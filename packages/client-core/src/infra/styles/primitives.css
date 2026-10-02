@@ -277,7 +277,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   width: var(--control-h-xs);
 }
 /* A subheading in a list column of rows starts where the rows do, with a group label's rhythm. One that
-   sticks keeps the list's colour, as a group label does. */
+   sticks keeps the list's colour, as a group label does. A host's list region gets the same rule in
+   shell.css. */
 .ui-listdetail-list:not([data-scroll]) .section-header[data-level='sub']:not(:is(.ui-card, .ui-alert) *) {
   padding: var(--space-5) var(--pane-pad) var(--space-2);
 }
@@ -1697,7 +1698,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    without setting the row's height. Three rungs, one per height token: md fills a form or a
    toolbar, sm is a dense strip, xs sits inside another control's row. */
 .ui-btn[data-size='xs'] { min-height: var(--control-h-xs); padding: 0 var(--space-3); font-size: var(--fs-xs); }
-.ui-btn[data-size='xs'][data-icon-only] { width: var(--control-h-xs); }
+/* Not when armed: the armed prompt is words, and this rule comes after the one that widens it. */
+.ui-btn[data-size='xs'][data-icon-only]:not([data-armed]) { width: var(--control-h-xs); }
 /* An <a class="ui-btn"> has to shed the UA's link decoration and pick up the button's box. */
 a.ui-btn { text-decoration: none; }
 a.ui-btn:hover { text-decoration: none; }

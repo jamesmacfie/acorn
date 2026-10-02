@@ -113,6 +113,11 @@ const RULES: readonly RouteRule[] = [
   },
   { path: shape(`/v1/core/projects/${SEG}/mcp`), scopes: {}, note: 'The MCP servers a project’s agents load, commands and masked environments included.' },
   { path: shape(`/v1/core/projects/${SEG}/mcp/starter`), scopes: {}, note: 'Writes a file into the project folder.' },
+  {
+    path: shape(`/v1/core/projects/${SEG}/worktrees`),
+    scopes: {},
+    note: 'Absolute paths and branches of git worktrees on the machine, for the host\'s own new-task dialog.',
+  },
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },

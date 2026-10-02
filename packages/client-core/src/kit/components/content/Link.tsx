@@ -1,5 +1,6 @@
 import { Show, type JSX } from 'solid-js'
 import { isExternal } from './isExternal'
+import { tip } from '../overlays/tips'
 import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
 
 /* Link: a run of words inside a sentence that acts.
@@ -15,19 +16,22 @@ import { safeContentHref } from '@acorn/protocol/externalUrl.ts'
    token such as `CRA-404` names an issue, not an address — so it is a `<button>`, which is what
    gives it the keyboard for free.
 
-   At 80×24: the text, underlined, pressable. */
+   At 80×24: the text, underlined, pressable. `tip` draws nothing there. */
 export function Link(props: {
   /** A real URL. Leave it out for a token that opens something inside the app. */
   href?: string
   onPress?: () => void
+  /** The whole of what a shortened link names, such as a file's full path, on hover. */
+  tip?: string
   children: JSX.Element
 }) {
   const safeHref = () => safeContentHref(props.href)
+  const tipped = () => (props.tip ? tip(props.tip) : {})
   return (
     <Show
       when={safeHref()}
       fallback={
-        <button type="button" class="ui-link" onClick={() => props.onPress?.()}>
+        <button type="button" class="ui-link" {...tipped()} onClick={() => props.onPress?.()}>
           {props.children}
         </button>
       }
@@ -35,6 +39,7 @@ export function Link(props: {
       {(href) => (
         <a
           class="ui-link"
+          {...tipped()}
           href={href()}
           target={isExternal(href()) ? '_blank' : undefined}
           rel={isExternal(href()) ? 'noopener noreferrer' : undefined}

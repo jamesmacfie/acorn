@@ -15,8 +15,8 @@ export default function PanelBody(props: PanelViewProps) {
   return (
     <Switch
       fallback={(
-        <EmptyState align="start" size="sm" title="View unavailable">
-          This panel uses a “{props.view.kind}” view, which this version does not draw.
+        <EmptyState align="start" size="sm" title="Can't draw this view">
+          {`This version of acorn has no ${props.view.kind} view. Edit the panel to choose another.`}
         </EmptyState>
       )}
     >

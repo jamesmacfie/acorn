@@ -48,7 +48,7 @@ export default function SaveRequestModal(props: {
         </Field>
 
         <Show when={props.inTask}>
-          <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task and goes when the task does.' : "Filed in the project's tree, available from every task."}>
+          <Field label="Keep in" hint={scope() === 'task' ? 'Stays with this task, and goes when you archive it.' : 'Saved to the project, so every task can use it.'}>
             <Select
               value={scope()}
               onChange={(value: string) => setScope(value as 'task' | 'project')}
@@ -59,7 +59,7 @@ export default function SaveRequestModal(props: {
 
         {/* Suggestions, not a picker: existing folders are offered and a new path is just typed. */}
         <Show when={scope() === 'project'}>
-          <Field label="Folder" hint="Slash-separated. Leave blank for the top of the tree.">
+          <Field label="Folder" hint="Use / for subfolders. Leave it empty to save at the top.">
             <Input
               value={folder()}
               suggestions={props.folders}

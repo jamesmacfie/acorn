@@ -1,7 +1,7 @@
 import { For, Show } from 'solid-js'
 import { EmptyState, Table, TableCell, TableHead, TableRow } from '../../../kit/components/primitives'
 import Cell from './Cell'
-import type { PanelViewProps } from './props'
+import { rowPress, type PanelViewProps } from './props'
 
 // The table view: columns are the projected fields, each cell drawn by its field's semantic type.
 //
@@ -26,7 +26,7 @@ export default function TableView(props: PanelViewProps) {
         </TableRow>
         <For each={props.rows}>
           {(row) => (
-            <TableRow onPress={row.action ? () => props.onActivate(row) : undefined}>
+            <TableRow onPress={rowPress(props, row)}>
               <For each={props.fields}>
                 {(field) => <TableCell><Cell field={field} value={row.values[field.id]} /></TableCell>}
               </For>

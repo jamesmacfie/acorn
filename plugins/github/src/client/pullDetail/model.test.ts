@@ -1,7 +1,7 @@
 import { performance } from 'node:perf_hooks'
 import { describe, expect, it } from 'vitest'
 import type { PullDetail, Thread } from '../../shared/api'
-import { buildConversationEntries, hasRenderableBody, reviewAction } from './model'
+import { buildConversationEntries, hasRenderableBody, reviewAction, reviewDecision } from './model'
 
 const baseDetail = (overrides: Partial<PullDetail> = {}): PullDetail => ({
   pull: null,
@@ -97,3 +97,28 @@ describe('pull detail model', () => {
     expect(elapsed).toBeLessThan(250)
   })
 })
+
+describe('reviewDecision', () => {
+  const review = (author: string, state: string, submittedAt: number) => ({ id: `${author}-${submittedAt}`, author, state, body: null, submittedAt })
+
+  it('counts each author\'s latest verdict, and a change request outweighs approvals', () => {
+    expect(reviewDecision([review('ada', 'APPROVED', 1), review('grace', 'CHANGES_REQUESTED', 2)]))
+      .toEqual({ state: 'changes-requested', reviewers: ['grace'] })
+  })
+
+  it('lets a later approval replace the same author\'s change request, and ignores plain comments', () => {
+    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'APPROVED', 3), review('ada', 'COMMENTED', 4)]))
+      .toEqual({ state: 'approved', reviewers: ['grace'] })
+  })
+
+  it('reads the reviews in time order, whatever order they arrive in', () => {
+    expect(reviewDecision([review('grace', 'APPROVED', 5), review('grace', 'CHANGES_REQUESTED', 1)]).state).toBe('approved')
+  })
+
+  it('drops a dismissed review and says when nobody has decided', () => {
+    expect(reviewDecision([review('grace', 'CHANGES_REQUESTED', 1), review('grace', 'DISMISSED', 2)]))
+      .toEqual({ state: 'none', reviewers: [] })
+    expect(reviewDecision([])).toEqual({ state: 'none', reviewers: [] })
+  })
+})
+

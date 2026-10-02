@@ -540,8 +540,8 @@ pointer moving down the list.
 So the kit nodes write `data-tip`, never `title`. A `title` prop on `Button`, `IconButton`, `Chip`,
 `Checkbox`, `Menu.Item`, a `Select` option, a `SegmentedControl` option, a `Tabs` tab, `Input`,
 `Textarea`, and `Icon` is drawn as the styled tip. `Button`'s `tip` wins over its `title`. An
-`IconButton` with neither shows its `label`, because a glyph says nothing on its own. `Badge` and
-`StatusDot` take a `tip` of their own. A tipped badge is a tab stop, as a tipped `Text` is, and a dot's
+`IconButton` with neither shows its `label`, because a glyph says nothing on its own. `Badge`,
+`StatusDot`, and `Link` take a `tip` of their own. A tipped badge is a tab stop, as a tipped `Text` is, and a dot's
 tip is asked for rather than taken from its `label`, because a labelled dot inside a tipped rail tab
 would answer the pointer first and hide the tab's tip.
 
@@ -947,7 +947,7 @@ edge, and no real-WebKit run has accepted it.
 | Node | Focus | At 80×24 |
 | --- | --- | --- |
 | `Text` | none | plain text; `mono` is a no-op, `muted` is the palette grey, `strong` is bold |
-| `Link` | stop | the text, underlined, pressable |
+| `Link` | stop | the text, underlined, pressable. `tip` draws nothing, because this host has no hover |
 | `Heading` | none | eyebrow in grey uppercase, heading in bold. `help` is a grey line under it, because this host has no hover |
 | `Rows` | collection | its items on successive lines; `virtual` is the window of rows that fit, and it follows the active row because there is no pointer to scroll with |
 | `Row` | item | one line: status glyph, title, meta right-aligned. `variant="stacked"` puts the second child on a second line, as it does on the DOM. `reveal` has no meaning, because there is no hover, so the trailing controls always show. `collapsed` is ignored for the same reason its column's `collapseKey` is: the full row draws, and no name is lost |

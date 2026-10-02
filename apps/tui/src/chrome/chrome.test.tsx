@@ -198,14 +198,14 @@ describe('the shell', () => {
 
   it('opens on the first Menu source, with the keys on that row', async () => {
     const screen = await renderFixture({ width: 120, height: 40 })
-    const frame = await screen.until('Reviews')
+    const frame = await screen.until('Pull requests')
     screen.done()
 
     // There is no click to put the keys anywhere. Startup waits for provider/workspace gates, picks
     // the first source the Menu actually draws, and lands the caret on the same row.
     const row = frame.split('\n')[caretRow(frame)] ?? ''
     expect(row).toContain('GitHub')
-    expect(frame).toContain('Reviews')
+    expect(frame).toContain('Pull requests')
   }, 30_000)
 
   it('cycles rail, pane strip and pane on tab, and wraps', async () => {
@@ -271,7 +271,7 @@ describe('the shell', () => {
     screen.done()
 
     expect(closed).not.toContain('tasks, workspaces, and projects')
-    expect(closed).toContain('Reviews')
+    expect(closed).toContain('Pull requests')
     // Back where they were, which is what the DOM palette's `prevFocus` does with an element.
     expect(caretRow(closed)).toBe(before)
   }, 30_000)
@@ -302,7 +302,7 @@ describe('the shell', () => {
     await screen.press('ESCAPE')
     const closed = await screen.frame()
     expect(closed).not.toContain('Fixture group')
-    expect(closed).toContain('Reviews')
+    expect(closed).toContain('Pull requests')
 
     // A typed root reaches a descendant by its breadcrumb, so nesting hides nothing
     // (client-core/host/registries/commands/graph.ts).
@@ -604,7 +604,7 @@ describe('the footer asks the keymap once per change', () => {
   it('draws many frames without re-collecting, and re-collects when the keys move', async () => {
     const screen = await renderFixture({ width: 100, height: 28 })
     try {
-      await screen.until('Reviews')
+      await screen.until('Pull requests')
       const engine = keymap<Renderable, KeyEvent>()!
       let asks = 0
       const real = engine.getActiveKeys
@@ -723,9 +723,9 @@ describe('the footer says how to get out', () => {
     // Two deep, inside a `MenuList`'s scope. Nothing behind the menu is in scope, so most of what the
     // footer was saying goes with it — which is the moment a reader most needs the one key that gets
     // them out.
-    expect(await screen.reach('squash', 40)).toBe(true)
+    expect(await screen.reach('Squash and merge', 40)).toBe(true)
     await screen.press('RETURN')
-    await screen.until('rebase')
+    await screen.until('Rebase and merge')
     expect(footer(await screen.frame())).toContain('esc back')
 
     // And two deep inside a `Modal`, which is the other kind of scope and lands the keys as well as

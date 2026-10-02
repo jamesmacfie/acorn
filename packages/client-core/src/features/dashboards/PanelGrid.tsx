@@ -1,6 +1,7 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show, type JSX } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
 import { Button, SectionHeader } from '../../kit/components/primitives'
 import Icon from '../../kit/components/content/Icon'
+import { toast } from '../notifications/toast'
 import {
   applyMove,
   applyResize,
@@ -78,6 +79,9 @@ export default function PanelGrid(props: {
    *  (region.ts). Absent for Home and the task pane, which constrain nothing. Every rule it carries
    *  is applied in two places below, the offer and the render. */
   region?: PanelRegion
+  /** Home's. The host draws its own Add panel, so the grid draws no "Panels" header and no add
+   *  button, and draws this in place of an empty grid. A `heading` still draws. */
+  empty?: () => JSX.Element
 }) {
   const [typedEditing, setTypedEditing] = createSignal<DashboardEditorSession>()
   const [gesture, setGesture] = createSignal<Gesture | undefined>()
@@ -125,13 +129,19 @@ export default function PanelGrid(props: {
     setCollapsed(size < MIN_CELL_PX)
   }
 
-  onMount(() => {
-    measure()
-    if (typeof ResizeObserver === 'undefined' || !gridEl) return
-    const observer = new ResizeObserver(measure)
-    observer.observe(gridEl)
-    onCleanup(() => observer.disconnect())
-  })
+  // Observed from the grid's own ref, not from mount: an empty placement draws no grid, so a mount-time
+  // observer never attached and the first panel published there kept the starting cell size.
+  let observer: ResizeObserver | undefined
+  onCleanup(() => observer?.disconnect())
+  const attachGrid = (element: HTMLDivElement) => {
+    gridEl = element
+    observer?.disconnect()
+    // The ref runs before the element is in the document, so the first measure waits a tick.
+    queueMicrotask(measure)
+    if (typeof ResizeObserver === 'undefined') return
+    observer = new ResizeObserver(measure)
+    observer.observe(element)
+  }
 
   // ── Pointer gestures ────────────────────────────────────────────────────────────────────────
   //
@@ -333,6 +343,10 @@ export default function PanelGrid(props: {
     placePanelAt(homeTabScope(tabId, props.scope.workspaceId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
   }
 
+  const tabPanel = () => (props.panelAria
+    ? { id: props.panelAria.id, role: 'tabpanel' as const, 'aria-labelledby': props.panelAria.labelledBy }
+    : {})
+
   const addButton = () => (
     <Button size="sm" variant="ghost" onPress={() => setTypedEditing({})}>
       <Icon name="plus" /> Add panel
@@ -353,64 +367,66 @@ export default function PanelGrid(props: {
         {/* The fallback needs no gate: reaching it means no panels, and the Show above already
             established at least one source to offer, or a heading, which is a tab bar that has
             to survive its own tab being empty. */}
-        <Show when={panels().length || props.heading} fallback={<div class="dash-placement-add">{addButton()}</div>}>
-          <SectionHeader level="group" actions={<Show when={hasRoom()}>{addButton()}</Show>}>
-            {props.heading ?? 'Panels'}
-          </SectionHeader>
-          <div
-            class="dash-grid"
-            ref={(element) => { gridEl = element }}
-            {...(props.panelAria
-              ? { id: props.panelAria.id, role: 'tabpanel', 'aria-labelledby': props.panelAria.labelledBy }
-              : {})}
-            style={{
-              '--dash-cell': `${cell()}px`,
-              '--dash-pitch': `${pitch()}px`,
-              ...(collapsed() ? {} : { height: `${gridHeight()}px` }),
-            }}
-            {...(collapsed() ? { 'data-collapsed': '' } : {})}
-          >
-            {/* Visible only while a gesture is live. Nothing about the layout is discoverable
-                chrome until a gesture makes it relevant. */}
-            <Show when={gesture()}>
-              <div class="dash-grid-overlay" aria-hidden="true" />
-            </Show>
-            <For each={panels()}>
-              {(definition) => <PanelGridItem
-                definition={definition}
-                workspaceId={props.scope.workspaceId}
-                layout={{
-                  collapsed,
-                  style: () => slotStyle(definition.id),
-                  gestureKind: () => gesture()?.id === definition.id ? gesture()!.kind : undefined,
-                  keyboardActive: () => keyboardGesture()?.id === definition.id,
-                  announcement,
-                  register: (element) => slots.set(definition.id, element),
-                  unregister: () => slots.delete(definition.id),
-                  onKeyDown: (event) => onSlotKeyDown(definition.id, event),
-                  onBlur: () => onSlotBlur(definition.id),
-                  onBeginDrag: (event) => beginDrag(definition.id, event),
-                  onBeginResize: (edge, event) => beginResize(definition.id, edge, event),
-                }}
-                actions={{
-                  edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
-                  beginLayout: () => enterLayoutMode(definition.id),
-                  canMove: (delta) => canMove(definition.id, delta),
-                  move: (delta) => moveTo(definition.id, delta),
-                  moveTargets,
-                  moveToTab: (tabId) => moveToTab(definition.id, tabId),
-                  remove: () => unplacePanel(props.scope, definition.id),
-                  delete: () => deletePanelDefinition(definition, props.scope.workspaceId),
-                  deleteFailed: () => setAnnouncement('Could not delete the published panel. Reconnect the Node and try again.'),
-                }}
-              />}
-            </For>
-            {/* The candidate cells, under the floating panel: the shape of the panel that lands
-                there rather than a wireframe of it. */}
-            <Show when={gesture()?.kind === 'move'}>
-              <div class="dash-placeholder" aria-hidden="true" style={placeholderStyle()} />
-            </Show>
-          </div>
+        <Show when={panels().length || props.heading || props.empty} fallback={<div class="dash-placement-add">{addButton()}</div>}>
+          <Show when={props.heading || !props.empty}>
+            <SectionHeader level="group" actions={<Show when={hasRoom() && !props.empty}>{addButton()}</Show>}>
+              {props.heading ?? 'Panels'}
+            </SectionHeader>
+          </Show>
+          <Show when={panels().length || !props.empty} fallback={<div {...tabPanel()}>{props.empty?.()}</div>}>
+            <div
+              class="dash-grid"
+              ref={attachGrid}
+              {...tabPanel()}
+              style={{
+                '--dash-cell': `${cell()}px`,
+                '--dash-pitch': `${pitch()}px`,
+                ...(collapsed() ? {} : { height: `${gridHeight()}px` }),
+              }}
+              {...(collapsed() ? { 'data-collapsed': '' } : {})}
+            >
+              {/* Visible only while a gesture is live. Nothing about the layout is discoverable
+                  chrome until a gesture makes it relevant. */}
+              <Show when={gesture()}>
+                <div class="dash-grid-overlay" aria-hidden="true" />
+              </Show>
+              <For each={panels()}>
+                {(definition) => <PanelGridItem
+                  definition={definition}
+                  workspaceId={props.scope.workspaceId}
+                  layout={{
+                    collapsed,
+                    style: () => slotStyle(definition.id),
+                    gestureKind: () => gesture()?.id === definition.id ? gesture()!.kind : undefined,
+                    keyboardActive: () => keyboardGesture()?.id === definition.id,
+                    announcement,
+                    register: (element) => slots.set(definition.id, element),
+                    unregister: () => slots.delete(definition.id),
+                    onKeyDown: (event) => onSlotKeyDown(definition.id, event),
+                    onBlur: () => onSlotBlur(definition.id),
+                    onBeginDrag: (event) => beginDrag(definition.id, event),
+                    onBeginResize: (edge, event) => beginResize(definition.id, edge, event),
+                  }}
+                  actions={{
+                    edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
+                    beginLayout: () => enterLayoutMode(definition.id),
+                    canMove: (delta) => canMove(definition.id, delta),
+                    move: (delta) => moveTo(definition.id, delta),
+                    moveTargets,
+                    moveToTab: (tabId) => moveToTab(definition.id, tabId),
+                    remove: () => unplacePanel(props.scope, definition.id),
+                    delete: () => deletePanelDefinition(definition, props.scope.workspaceId),
+                    deleteFailed: () => toast("Couldn't delete this panel. Try again.", { tone: 'danger' }),
+                  }}
+                />}
+              </For>
+              {/* The candidate cells, under the floating panel: the shape of the panel that lands
+                  there rather than a wireframe of it. */}
+              <Show when={gesture()?.kind === 'move'}>
+                <div class="dash-placeholder" aria-hidden="true" style={placeholderStyle()} />
+              </Show>
+            </div>
+          </Show>
           <div class="dash-live" aria-live="polite">{announcement()}</div>
         </Show>
 

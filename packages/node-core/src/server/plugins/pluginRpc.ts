@@ -12,6 +12,11 @@ import {
   type WireResponse, type WireResponseValue, type WireSyncRequest,
 } from './rpcValues.ts'
 
+// Statuses that must not carry a body. The constructor throws on any body for these, even an empty
+// one, so a plugin's 204 became a 500 after its handler had already done the work. The same set as
+// ../middleware/idempotency.ts.
+const BODILESS = new Set([204, 205, 304])
+
 type Encoding = {
   created: Set<number>
   scope?: RpcScope
@@ -192,7 +197,7 @@ export class PluginRpcEndpoint {
     }
     if (value.__acornRpc === 'response') {
       const wire = value as WireResponseValue
-      return new Response(bodyBuffer(wire.body), { status: wire.status, statusText: wire.statusText, headers: wire.headers })
+      return new Response(BODILESS.has(wire.status) ? null : bodyBuffer(wire.body), { status: wire.status, statusText: wire.statusText, headers: wire.headers })
     }
     if (value.__acornRpc === 'abort-signal') {
       const wire = value as WireAbortSignal

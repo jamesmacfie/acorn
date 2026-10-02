@@ -16,9 +16,9 @@ const PrPane = lazy(async () => ({ default: (await import('./PrPane')).PrPane })
 
 export const prPaneContribution: PaneLayoutContribution = {
   id: 'pr',
-  label: 'PR review',
+  label: 'Pull request',
   glyph: 'git-pull-request',
-  description: 'Overview, files & diff',
+  description: 'Details, files, and diff',
   order: 10,
   defaultChord: 'meta+shift+r',
   when: (task) => task.pullNumber != null,

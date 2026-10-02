@@ -77,6 +77,7 @@ let loadProfiles: (() => Promise<unknown[]>) | undefined
 let loadRoster: (() => Promise<TerminalSession[]>) | undefined
 let createSession: (() => Promise<TerminalSession>) | undefined
 const created: string[] = []
+const createdTitles: string[] = []
 const detaches: string[] = []
 const attachSizes: ({ cols: number; rows: number } | undefined)[] = []
 const listeners = new Map<string, (m: ServerMsg) => void>()
@@ -89,7 +90,7 @@ vi.mock('./terminalClient', () => ({
       return roster
     },
     profiles: async () => loadProfiles ? loadProfiles() : [],
-    create: async () => { created.push('create'); return createSession ? createSession() : session(A, 'new') },
+    create: async (body: { title: string }) => { created.push('create'); createdTitles.push(body.title); return createSession ? createSession() : session(A, 'new') },
     resize: async (id: string, cols: number, rows: number) => {
       resizes.push(`${id} ${cols}x${rows}`)
       return true
@@ -152,7 +153,7 @@ let roster: TerminalSession[] = []
 const cleanups: (() => void)[] = []
 
 beforeEach(() => {
-  loadProfiles = undefined; loadRoster = undefined; createSession = undefined; created.length = 0; offline = false
+  loadProfiles = undefined; loadRoster = undefined; createSession = undefined; created.length = 0; createdTitles.length = 0; offline = false
   roster = [session(A, 'first'), session(B, 'second')]
   vi.stubGlobal('fetch', async (url: string) =>
     new Response(JSON.stringify(String(url).endsWith('/sessions') ? roster : {}), { status: 200, headers: { 'content-type': 'application/json' } }),
@@ -448,7 +449,7 @@ describe('deferred panel work stays with its view', () => {
     mount({ defaultProfile: 'shell' })
     await settle()
     expect(document.body.textContent).toContain('roster offline')
-    expect(document.body.textContent).not.toContain('Launching…')
+    expect(document.body.textContent).not.toContain('Starting…')
     expect(created).toEqual([])
     for (const stop of cleanups.splice(0)) stop()
     loadRoster = undefined
@@ -488,4 +489,16 @@ it('does not publish a held creation into a newer task after the task changes', 
   expect(tab(A)).toBeNull()
   expect(tab(B)?.getAttribute('aria-selected')).toBe('true')
   expect(surfaces()[0]).toBe(incomingBox)
+})
+
+it('numbers a new shell after the shells the task already has', async () => {
+  roster = [session(A, 'Shell'), session(B, 'Shell 2')]
+  loadProfiles = async () => [{ id: 'shell', label: 'Shell', available: true }]
+  mount()
+  await settle()
+  ;(document.querySelector('button[aria-label="New terminal"]') as HTMLButtonElement).click()
+  await settle()
+  ;([...document.querySelectorAll('[role="menuitem"]')].find((item) => item.textContent === 'Shell') as HTMLElement).click()
+  await settle()
+  expect(createdTitles).toEqual(['Shell 3'])
 })

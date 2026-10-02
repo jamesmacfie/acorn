@@ -20,6 +20,13 @@ export function formatUsd(value: number): string {
   return `$${value.toFixed(2)}`
 }
 
+// An estimate in whole dollars with a thousands separator: "≈$1,918". Cents would claim a precision
+// the estimate does not have, so anything under a dollar reads "<$1". Real spend keeps `formatUsd`.
+export function formatEstimateUsd(value: number): string {
+  if (value < 1) return '<$1'
+  return `≈${new Intl.NumberFormat(undefined, { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(value)}`
+}
+
 export function formatTokens(value: number): string {
   if (value < 10_000) return new Intl.NumberFormat().format(value)
   // One decimal always, so a column of compact counts lines up: 1,038,000 formatted as "1M" next to
@@ -58,13 +65,19 @@ export function formatUpdated(capturedAt: number | null, now = Date.now()): stri
   return `updated ${Math.floor(minutes / 60)}h ago`
 }
 
+// The plan ids a provider reports, as people write them. Codex reports `prolite` and `team`; Claude
+// reports a name already ("Claude Max"), which falls through to the sentence case below.
+const PLAN_NAMES: Record<string, string> = { prolite: 'Pro Lite', team: 'Team', max: 'Max', pro: 'Pro', plus: 'Plus' }
+
+export const planName = (plan: string): string => PLAN_NAMES[plan.toLowerCase()] ?? plan[0].toUpperCase() + plan.slice(1)
+
 // Whose account it is and how fresh the reading is, as one line. The harness's own name is not in it:
 // the block that draws this is already headed by the name.
 export function providerMetaLine(provider: AgentProviderUsage, now = Date.now()): string {
   return [
-    // Codex names its plan `team`, Claude names its `Claude Max`. The snapshot keeps whatever the
-    // provider said (see the note in formatReset); the sentence case is this line's business.
-    provider.plan && provider.plan[0].toUpperCase() + provider.plan.slice(1),
+    // The snapshot keeps whatever the provider said (see the note in formatReset); the name is this
+    // line's business.
+    provider.plan && planName(provider.plan),
     provider.account?.email,
     provider.account?.organization,
     `${provider.stale ? 'stale · ' : ''}${formatUpdated(provider.capturedAt, now)}`,
@@ -134,7 +147,7 @@ export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()
   if (daily) {
     rows.push({
       label: 'Estimated today',
-      value: daily.estimatedCostUsd == null ? 'pricing unavailable' : `≈${formatUsd(daily.estimatedCostUsd)}`,
+      value: daily.estimatedCostUsd == null ? 'No price for this model' : formatEstimateUsd(daily.estimatedCostUsd),
     })
     if (daily.unpricedModels.length > 0) {
       rows.push({ label: 'Unpriced models', value: daily.unpricedModels.join(', ') })
@@ -147,7 +160,7 @@ export function providerUsageRows(provider: AgentProviderUsage, now = Date.now()
     rows.push({ label: 'Working time', value: formatDuration(daily.workingSeconds) })
     rows.push({ label: 'Sessions', value: String(daily.sessionCount) })
     if (daily.estimatedCacheSavingsUsd != null && daily.estimatedCacheSavingsUsd > 0) {
-      rows.push({ label: 'Est. cache savings', value: `≈${formatUsd(daily.estimatedCacheSavingsUsd)}` })
+      rows.push({ label: 'Saved by caching (estimate)', value: formatEstimateUsd(daily.estimatedCacheSavingsUsd) })
     }
   }
   return rows

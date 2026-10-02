@@ -1,10 +1,10 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   canPickFolder, clientEvents, integrationsOptions, pickFolder, type ProjectImporterProps,
-  projectsKey, workspacesKey, writeJson,
+  projectsKey, projectsOptions, workspacesKey, writeJson,
 } from '@acorn/plugin-api/client'
-import { Alert, Badge, Button, EmptyState, Row, Rows, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
 import type { IntegrationsResponse } from '@acorn/protocol/api.ts'
 import {
   githubImportRoute, reposKey, type GithubImportAction, type GithubImportItem,
@@ -18,8 +18,8 @@ const connectedGithub = (integrations: IntegrationsResponse) =>
 const githubAccount = (integrations: IntegrationsResponse | undefined) =>
   integrations?.integrations.find((integration) => integration.providerId === 'github')?.account?.label ?? null
 
-// One repository, one decision, taken immediately: the button is the action. Map and Clone both open
-// the folder picker on the spot; there is no third "defer" action
+// One repository, one decision, taken immediately: the button is the action. Link folder and Clone
+// both open the folder picker on the spot; there is no third "defer" action
 // (docs/github-integration.md § Importing projects).
 //
 // Not the `wizard` layout the plan named. This is one screen, and the one place it appears in a
@@ -35,7 +35,11 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const [running, setRunning] = createSignal<{ repoId: number; action: GithubImportAction } | null>(null)
   const busy = (repo: Repo, action: GithubImportAction) => running()?.repoId === repo.id && running()?.action === action
   const [error, setError] = createSignal('')
-  const [imported, setImported] = createSignal<Record<number, string>>({})
+  // Which project already holds each repository, so a row says so. Owner and name compare without
+  // case, because GitHub's do.
+  const projects = createQuery(() => projectsOptions(true))
+  const projectFor = (repo: Repo) => (projects.data ?? []).find((project) =>
+    project.github?.owner.toLowerCase() === repo.owner.toLowerCase() && project.github?.name.toLowerCase() === repo.name.toLowerCase())
 
   const importOne = async (repo: Repo, action: GithubImportAction) => {
     if (running()) return
@@ -53,13 +57,12 @@ export default function GithubImporter(props: ProjectImporterProps) {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ repositories: [item] }),
-      }, (res) => `GitHub import ${res.status}`)
+      }, () => "Couldn't add that repository. Try again.")
       const result = response.results[0]
       if (!result?.ok) {
-        setError(result?.error ?? 'That repository could not be imported.')
+        setError(result?.error ?? "Couldn't add that repository.")
         return
       }
-      setImported((current) => ({ ...current, [repo.id]: action }))
       await Promise.all([
         queryClient.invalidateQueries({ queryKey: projectsKey }),
         queryClient.invalidateQueries({ queryKey: workspacesKey }),
@@ -75,9 +78,11 @@ export default function GithubImporter(props: ProjectImporterProps) {
     }
   }
 
-  const repoFor = (id: string): Repo | undefined => (repos.data ?? []).find((repo) => String(repo.id) === id)
+  // The frame is the host's when it draws no close control, as the first-run wizard does: a titled
+  // box inside a wizard step is a box inside a box.
+  const framed = () => props.showClose !== false
 
-  return (
+  const body = () => (
     <Stack gap="stack">
       <Show when={integrations.data && !githubReady()}>
         <Alert
@@ -87,7 +92,7 @@ export default function GithubImporter(props: ProjectImporterProps) {
             <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>Connect GitHub</Button>
           }
         >
-          Connect GitHub to discover repositories and import them into Projects.
+          Connect GitHub to add its repositories as projects.
         </Alert>
       </Show>
       <Show when={githubReady()}>
@@ -96,60 +101,55 @@ export default function GithubImporter(props: ProjectImporterProps) {
         </Show>
         <Show
           when={canPickFolder()}
-          fallback={<Text emphasis="muted">Folder selection is available in the desktop app.</Text>}
+          fallback={<Text emphasis="muted">To choose a folder, use the desktop app.</Text>}
         >
-          <Show when={!repos.isLoading} fallback={<EmptyState align="start" busy>Loading GitHub repositories…</EmptyState>}>
+          <Show when={!repos.isLoading} fallback={<EmptyState align="start" size="sm" busy>Loading GitHub repositories…</EmptyState>}>
             <Show
               when={repos.data?.length}
-              fallback={<EmptyState align="start">No mirrored GitHub repositories yet. Refresh GitHub and try again.</EmptyState>}
+              fallback={<EmptyState align="start" size="sm">No repositories to show.</EmptyState>}
             >
               <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
-              <Rows
-                id="github-import"
-                ariaLabel="GitHub repositories"
-                items={(repos.data ?? []).map((repo) => ({ key: String(repo.id), label: `${repo.owner}/${repo.name}` }))}
-              >
-                {(item, itemProps) => {
-                  const repo = () => repoFor(item.key)!
-                  const added = () => imported()[repo().id]
-                  return (
-                    <Row
-                      item={itemProps}
-                      label={item.label}
-                      title={item.label}
-                      meta={
-                        // Importing the same repository twice is legal — two clones of one repo are a
-                        // supported shape — so an added row is marked, not disabled.
-                        <Show
-                          when={added()}
-                          fallback={<Text emphasis="muted">{repo().private ? 'Private' : 'Public'}</Text>}
-                        >
-                          {(action) => <Badge size="xs" tone="ok">Added — {action() === 'clone' ? 'cloned' : 'mapped'}</Badge>}
-                        </Show>
-                      }
-                      trailing={
-                        <>
-                          <Button size="sm" busy={busy(repo(), 'clone')} disabled={!!running()} onPress={() => void importOne(repo(), 'clone')}>Clone</Button>
-                          <Button size="sm" busy={busy(repo(), 'map')} disabled={!!running()} onPress={() => void importOne(repo(), 'map')}>Map folder</Button>
-                        </>
-                      }
-                    >{item.label}</Row>
-                  )
-                }}
-              </Rows>
               <Text emphasis="muted" wrap>
-                Both ask for a folder straight away. Repositories you skip stay here — import them
-                whenever you're ready.
+                Clone asks where to put the copy. Link folder asks where your copy already is.
               </Text>
+              <Stack gap="none">
+                <For each={repos.data ?? []}>
+                  {(repo) => (
+                    // Adding the same repository twice is legal, since two clones of one repository
+                    // are a supported shape, so a row that already has a project keeps its buttons.
+                    <SettingRow
+                      label={`${repo.owner}/${repo.name}`}
+                      description={[
+                        repo.private ? 'Private' : 'Public',
+                        ...(projectFor(repo) ? [`Added as ${projectFor(repo)!.name}`] : []),
+                      ].join(' · ')}
+                    >
+                      <Inline gap="row">
+                        <Button variant="ghost" size="sm" busy={busy(repo, 'clone')} disabled={!!running()} onPress={() => void importOne(repo, 'clone')}>Clone</Button>
+                        <Button variant="ghost" size="sm" busy={busy(repo, 'map')} disabled={!!running()} onPress={() => void importOne(repo, 'map')}>Link folder</Button>
+                      </Inline>
+                    </SettingRow>
+                  )}
+                </For>
+              </Stack>
             </Show>
           </Show>
         </Show>
       </Show>
-      <Show when={props.showClose !== false}>
-        <Toolbar variant="actions">
-          <Button onPress={props.onClose}>Close</Button>
-        </Toolbar>
-      </Show>
     </Stack>
+  )
+
+  return (
+    <Show when={framed()} fallback={body()}>
+      <Card>
+        <Stack gap="stack">
+          <Inline spread>
+            <Heading level={3}>Import from GitHub</Heading>
+            <Button variant="ghost" size="sm" onPress={props.onClose}>Close</Button>
+          </Inline>
+          {body()}
+        </Stack>
+      </Card>
+    </Show>
   )
 }

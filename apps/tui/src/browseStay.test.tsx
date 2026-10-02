@@ -15,7 +15,7 @@ import { renderFixture } from './harness'
 describe('browsing while the path says something the router does not know', () => {
   it('stays on the chosen project rather than bouncing to the first', async () => {
     const screen = await renderFixture({ width: 120, height: 32 })
-    await screen.until('Reviews', 30)
+    await screen.until('Pull requests', 30)
 
     const { useNavigate } = await import('./kit/router')
     const { routedProjectId } = await import('./chrome/routing')

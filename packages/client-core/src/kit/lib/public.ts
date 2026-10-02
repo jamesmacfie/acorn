@@ -3,7 +3,7 @@ export { createArmedConfirm } from './controls/confirm.ts'
 export { debounce } from './state/debounce.ts'
 export { clearLocal, deviceStorage, readLocal, writeLocal } from './state/deviceStorage.ts'
 export {
-  CHECK_TONE, FAILED_STATUSES, checkStatusTone, checksState,
+  CHECK_TONE, FAILED_STATUSES, checkStatusTone, checkStatusWord, checksState, checksSummary,
   fileStatusMeta, githubAvatarUrl, railDotProps, summarizeFileStats,
 } from './rendering/displayMeta.ts'
 export { persistDraft, readDraft, writeDraft } from './state/draftState.ts'

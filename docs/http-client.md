@@ -63,7 +63,8 @@ Interpolation applies per field, never over a serialized request, so a variable'
 delimiters and reshape the request it is filling. A response follows redirects through the fetch
 client rather than a hand-rolled hop loop, because that client already strips the `Authorization`
 header on a cross-origin redirect and a hand-rolled loop would have to reproduce it. The timeline
-shows the final URL and whether a redirect happened, not each hop.
+shows the final URL and whether a redirect happened, not each hop. It lists what was sent and what
+came back under **Sent** and **Received**, and labels each header row by the header's own name.
 
 There is no core HTTP service. Nothing central inspects an outbound request and there is no host
 allowlist: this plugin declares an any-host fetch grant because the owner chooses each URL, and its
@@ -127,7 +128,7 @@ manifest and all served by this plugin's own node half.
 | Row | Kind | What it does |
 | --- | --- | --- |
 | Find a saved request | search, project-scoped | `/v1/p/http/palette/requests` answers the routed project's saved rows; picking one navigates to `http-project`, the same address the rail row has |
-| New request | action | Delivers `new-request` to the `http` pane, where the panel starts a blank draft — the same thing the "+ Request" button does |
+| New request | action | Delivers `new-request` to the `http` pane, where the panel starts a blank draft — the same thing the **New request** button does |
 | Import a curl command | input, task-scoped | `/v1/p/http/palette/import-curl` parses the pasted command, saves it encrypted against the task, and opens the pane on it |
 
 Two properties are the point of the pair, and both are structural rather than a filter applied

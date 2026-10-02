@@ -34,7 +34,7 @@ describe('env allowlist', () => {
     SESSION_ENC_KEY: 'a'.repeat(64),
     INTERNAL_TOKEN: 'internal-secret',
     ACORN_API_TOKEN: 'api-secret',
-    GITHUB_CLIENT_SECRET: 'gh-secret',
+    PROVIDER_API_KEY: 'provider-secret',
     // Proves the allowlist model: a binding nobody thought about is absent by default.
     SOME_FUTURE_CREDENTIAL: 'not-yet-invented',
   }
@@ -53,7 +53,7 @@ describe('env allowlist', () => {
     // Against the real process env, not a fixture: this is the assertion that would have caught
     // previewUrl passing no env at all.
     const seen = new Set(result.stdout.split('\n').map((line) => line.split('=')[0]))
-    for (const key of ['SESSION_ENC_KEY', 'INTERNAL_TOKEN', 'ACORN_API_TOKEN', 'GITHUB_CLIENT_ID', 'GITHUB_CLIENT_SECRET']) {
+    for (const key of ['SESSION_ENC_KEY', 'INTERNAL_TOKEN', 'ACORN_API_TOKEN', 'GITHUB_CLIENT_ID', 'PROVIDER_API_KEY']) {
       expect(seen.has(key)).toBe(false)
     }
     expect(result.stdout).toContain('PROBE=visible')

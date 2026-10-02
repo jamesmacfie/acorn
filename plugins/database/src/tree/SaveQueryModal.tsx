@@ -1,5 +1,5 @@
 import { createSignal, Show } from 'solid-js'
-import { Alert, Button, CodeBlock, Input, Modal, ModalActions, ModalBody, Textarea } from '@acorn/plugin-api/ui/tree'
+import { Alert, Button, CodeBlock, Field, Input, Modal, ModalActions, ModalBody, Textarea } from '@acorn/plugin-api/ui/tree'
 import type { DbSavedQuery } from '../shared/database'
 import type { DatabaseClient } from './databaseClient'
 
@@ -47,27 +47,31 @@ export default function SaveQueryModal(props: {
     // anyone reaching for ⌘Enter in a two-field dialog was already close to.
     <Modal title="Save query" onDismiss={props.onDismiss}>
       <ModalBody>
-        <Input
-          type="text"
-          maxLength={80}
-          placeholder="Name — e.g. recent paid orders"
-          autofocus
-          value={name()}
-          onChange={(value: string) => setName(value)}
-          onSubmit={(value: string) => {
-            setName(value)
-            void submit()
-          }}
-        />
-        <Textarea
-          mono
-          rows={3}
-          maxLength={2000}
-          assist={false}
-          placeholder="Notes — what it answers, gotchas. Sent to the AI with the query when used as an example."
-          value={notes()}
-          onChange={(value: string) => setNotes(value)}
-        />
+        <Field label="Name">
+          <Input
+            type="text"
+            maxLength={80}
+            placeholder="Recent paid orders"
+            autofocus
+            value={name()}
+            onChange={(value: string) => setName(value)}
+            onSubmit={(value: string) => {
+              setName(value)
+              void submit()
+            }}
+          />
+        </Field>
+        <Field label="Notes" hint="The model sees these when you use this query as an example.">
+          <Textarea
+            mono
+            rows={3}
+            maxLength={2000}
+            assist={false}
+            placeholder="What it answers, and anything surprising"
+            value={notes()}
+            onChange={(value: string) => setNotes(value)}
+          />
+        </Field>
         <CodeBlock size="xs" maxHeight="block" wrap>{props.sql}</CodeBlock>
         <Show when={error()}>
           <Alert>{error()}</Alert>

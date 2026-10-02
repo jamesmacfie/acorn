@@ -415,7 +415,7 @@ grouping, selection, empty states and context menus. A document with language-se
 
 The other thing worth keeping is why the button bar in a composed pane is the plugin's. Database's bar
 holds a searchable saved-queries picker with per-row delete chips, a Save button that opens a modal, a
-Generate button visible only when a model connection exists, and an Execute button disabled on
+Generate button visible only when a model connection exists, and a Run button disabled on
 connection status. A host-drawn action-bar descriptor sounds cheap until it needs all of that. The bar
 is common, not impossible, so it is the first row of the plugin's own region.
 
@@ -453,7 +453,7 @@ it shares the pane with. Today's code says exactly which operations, because eac
 
 | Bridge call | Proven consumer |
 | --- | --- |
-| `bridge.document.read()` | Execute button needs the current SQL (today `editor.getValue()`) |
+| `bridge.document.read()` | Run button needs the current SQL (today `editor.getValue()`) |
 | `bridge.document.write(text)` | the saved-queries picker loads a query into the editor (today `editor.setValue(q.sql)`); Generate inserts the model's SQL the same way |
 | `bridge.document.flush()` | "make sure my write route has the latest before I act on it" |
 

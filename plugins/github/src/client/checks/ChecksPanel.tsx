@@ -2,8 +2,8 @@ import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { createQuery } from '@tanstack/solid-query'
 import { jobLogOptions, runJobsOptions } from '../queries'
-import { checkStatusTone, FAILED_STATUSES } from '@acorn/plugin-api/client'
-import { EmptyState, Fold, Log, Modal, Stack, StatusDot } from '@acorn/plugin-api/ui'
+import { checkStatusTone, checkStatusWord, FAILED_STATUSES } from '@acorn/plugin-api/client'
+import { Button, EmptyState, Fold, Log, Modal, Stack, StatusDot } from '@acorn/plugin-api/ui'
 import { splitJobLog } from './splitJobLog'
 
 // One workflow run's steps, GitHub-Actions style: the steps of the clicked job matched by name,
@@ -19,6 +19,8 @@ export default function ChecksPanel(props: {
   repo: string
   runId: number
   jobName: string
+  /** The check's page on GitHub, where a reader goes next. */
+  url?: string | null
   onClose: () => void
 }) {
   const jobs = createQuery(() => runJobsOptions(props.owner, props.repo, props.runId, true))
@@ -67,7 +69,7 @@ export default function ChecksPanel(props: {
           <Show when={!jobs.isLoading} fallback={<EmptyState align="start" busy>Loading steps…</EmptyState>}>
             <Show
               when={steps().length}
-              fallback={<EmptyState align="start">{jobs.isError ? 'Failed to load steps.' : 'No steps.'}</EmptyState>}
+              fallback={<EmptyState align="start" size="sm">{jobs.isError ? "Couldn't load this run's steps." : 'This run has no steps.'}</EmptyState>}
             >
               <Stack gap="row">
                 <For each={steps()}>
@@ -75,10 +77,11 @@ export default function ChecksPanel(props: {
                     const status = () => (step.conclusion ?? step.status ?? '').toLowerCase()
                     return (
                       <Fold
+                        level="sub"
                         label={step.name}
                         open={open().has(step.number)}
                         onOpenChange={(next) => toggle(step.number, next)}
-                        meta={<StatusDot tone={checkStatusTone(status())} />}
+                        meta={<StatusDot tone={checkStatusTone(status())} label={checkStatusWord(status())} tip={checkStatusWord(status())} />}
                       >
                         <Show when={!log.isLoading} fallback={<EmptyState align="start" busy>Loading log…</EmptyState>}>
                           <Log lines={stepLog(step.number)} ariaLabel={`${step.name} log`} />
@@ -91,6 +94,12 @@ export default function ChecksPanel(props: {
             </Show>
           </Show>
         </Modal.Body>
+        <Modal.Actions>
+          <Button variant="ghost" onPress={props.onClose}>Close</Button>
+          <Show when={props.url}>
+            {(url) => <Button variant="solid" href={url()}>Open on GitHub</Button>}
+          </Show>
+        </Modal.Actions>
       </Modal>
     </Portal>
   )

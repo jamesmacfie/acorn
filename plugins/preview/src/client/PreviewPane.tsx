@@ -1,6 +1,6 @@
 import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { elementRectKey, observeNativePage, previewViews, toast, visibleElementRect } from '@acorn/plugin-api/client'
-import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Button, EmptyState, IconButton, Input, Rectangle, Spinner, Toolbar } from '@acorn/plugin-api/ui'
 
 const withScheme = (v: string) => (/^[a-z]+:\/\//i.test(v) ? v : `https://${v}`)
 
@@ -132,9 +132,9 @@ export default function PreviewPane(props: {
       {/* No "needs the desktop app" fallback: the pane's `requires: { seam: 'preview' }` means a host
           without the seam never offers it (./PreviewTaskPane.tsx). */}
       <Show when={props.remoteBlocked}>
-        <EmptyState title="Preview unavailable on remote Nodes">
-          A page loaded here could reach services on this computer's network. Run Acorn on the Node
-          machine to inspect its preview.
+        <EmptyState title="Preview works on this computer only">
+          A page from another computer could reach your local network, so acorn doesn't load it here.
+          Open acorn on that computer to preview it.
         </EmptyState>
       </Show>
       <Show when={!props.remoteBlocked && (failed() || props.resolutionFailed)}>
@@ -145,10 +145,9 @@ export default function PreviewPane(props: {
       </Show>
       <Show when={!props.remoteBlocked && props.resolving && !props.url}><Spinner label="Resolving preview URL" /></Show>
       <Show when={!props.remoteBlocked && !failed() && !props.resolutionFailed && props.url} fallback={props.remoteBlocked || props.resolving || failed() || props.resolutionFailed ? null :
-        <EmptyState title="No preview URL yet">
-          Start the run target from the pane switcher's ▶ button. If it is already running, check its{' '}
-          <Text emphasis="mono">url</Text> in <Text emphasis="mono">.acorn/config.toml</Text> or the
-          preview URL in Settings → workspace.
+        <EmptyState title="No preview address">
+          Start the app from the pane switcher's run button, or set an address in the project's Preview
+          settings.
         </EmptyState>
       }>
         {/* The browser chrome, as the kit's toolbar rather than a flex row of this plugin's own:
@@ -162,7 +161,7 @@ export default function PreviewPane(props: {
             label={loading() ? 'Stop loading the page' : 'Reload the page'}
             onPress={() => preview?.command(props.taskId, loading() ? 'stop' : 'reload')}
           />
-          <IconButton icon="house" label="Back to the run target's URL" onPress={() => props.url && preview?.load(props.taskId, props.url)} />
+          <IconButton icon="house" label="Go to the app's start page" onPress={() => props.url && preview?.load(props.taskId, props.url)} />
           <Input
             size="sm"
             label="Preview address"
@@ -171,8 +170,8 @@ export default function PreviewPane(props: {
             onInput={(value) => setAddr(value)}
             onKeyDown={(event) => { if (event.key === 'Enter') go() }}
           />
-          <IconButton icon="copy" label="Copy the page address" disabled={!addr()} onPress={copyAddr} />
-          <IconButton icon="code-xml" label="Toggle preview DevTools" onPress={() => preview?.command(props.taskId, 'devtools')} />
+          <IconButton icon="copy" label="Copy page address" disabled={!addr()} onPress={copyAddr} />
+          <IconButton icon="code-xml" label="Show developer tools" onPress={() => preview?.command(props.taskId, 'devtools')} />
           <Show when={loading()}><Spinner label="Loading page" /></Show>
         </Toolbar>
       </Show>

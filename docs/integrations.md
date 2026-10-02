@@ -307,6 +307,13 @@ subject, or remount the pane, losing the reader's open tab, scroll position, and
 whatever ticket they came from. Every other link in the ticket still goes over the bridge to the
 host's normal in-app or browser handling.
 
+Opening another issue clears the one on screen before the fetch, so the detail never shows one issue
+while the list has picked another, and a comment has no composer to land in during the wait. A
+refresh keeps the issue on screen and reports a failure above it. A failed load is a titled state
+with the reason in words and **Try again**, never the route's error code. The rail row is the state
+icon, the title, and the key. The state's name is in the detail, beside a badge toned by Linear's
+state type rather than the team's colour.
+
 ## Rollbar
 
 Rollbar is a read-focused provider. It lists active items, loads item/occurrence details, promotes an
@@ -318,12 +325,14 @@ have independent freshness.
 
 Refreshing an open Rollbar item keeps its detail and selected tab visible while the provider answers.
 If the refresh fails, the pane shows the failure above the last loaded detail so the reader can retry
-without losing their place.
+without losing their place. Overview loads the newest occurrence through the same cached occurrence
+route the Occurrences tab reads, and shows its message and stack under the facts.
 
-The source row spends its narrow width on severity, identity, frequency and the error itself: a
-semantic error/warning/info icon, one fixed-width `#id` field, the numeric occurrence badge, and an
-ellipsised title. Environment and connection remain in the item detail and promotion seed; repeating
-them in every source row crowds out the error name.
+The source row spends its narrow width on severity, the error itself, and frequency: a semantic
+error, warning, or info icon, the ellipsised title, and the occurrence count as one fixed-width field
+with a thousands separator. The `#id` is what a collapsed row shows, and it heads the detail.
+Environment and connection stay in the item detail and promotion seed. Repeating them in every row
+crowds out the error name.
 
 A Rollbar credential is a project access token, so a connection is one project. Its project source
 therefore makes no outbound call: it returns the single project recorded on the connection when the

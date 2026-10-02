@@ -1,8 +1,12 @@
-import { createEffect, createMemo } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { Heading } from '../../kit/components/content/Heading'
+import Icon from '../../kit/components/content/Icon'
+import { Inline } from '../../kit/components/layout/Inline'
+import { Button, EmptyState } from '../../kit/components/primitives'
+import DashboardPanelHost from '../dashboards/DashboardPanelHost'
 import DashboardTabs from '../dashboards/DashboardTabs'
 import { activeHomeTab, homeTabDomId, HOME_TAB_PANEL_ID, setActiveHomeTab } from '../dashboards/homeTab'
-import { adoptLegacyHomeDashboards, dashboards, homeTabs, homeTabScope } from '../dashboards/persist'
+import { adoptLegacyHomeDashboards, dashboards, homeTabs, homeTabScope, panelsAt } from '../dashboards/persist'
 import PanelGrid from '../dashboards/PanelGrid'
 import { createActiveWorkspaceId } from './activeWorkspaceId'
 import './home.css'
@@ -38,14 +42,34 @@ export default function Home() {
     if (ws) adoptLegacyHomeDashboards(ws)
   })
 
+  // Home owns its Add panel, in the title row once there are panels and in the empty state before,
+  // so the page never shows two. The grid still opens the editor for Edit.
+  const scope = () => homeTabScope(activeTab(), workspaceId())
+  const tabName = () => tabs().find((tab) => tab.id === activeTab())?.name ?? 'Home'
+  const [adding, setAdding] = createSignal(false)
+  const addButton = (size: 'sm' | 'md') => (
+    <Button size={size} onPress={() => setAdding(true)}>
+      <Icon name="plus" /> Add panel
+    </Button>
+  )
+
   return (
     <main class="panes home-source">
-      <Heading level={1}>Home</Heading>
+      <Inline spread>
+        <Heading level={1}>Home</Heading>
+        <Show when={panelsAt(scope()).length}>{addButton('sm')}</Show>
+      </Inline>
       <PanelGrid
-        scope={homeTabScope(activeTab(), workspaceId())}
+        scope={scope()}
         heading={tabs().length > 1 ? bar : undefined}
         panelAria={tabs().length > 1 ? { id: HOME_TAB_PANEL_ID, labelledBy: homeTabDomId(activeTab()) } : undefined}
+        empty={() => (
+          <EmptyState title={`Nothing on ${tabName()} yet`} action={addButton('md')}>
+            Add a panel to see tasks, pull requests, issues, or anything else in view.
+          </EmptyState>
+        )}
       />
+      <DashboardPanelHost session={adding() ? {} : undefined} scope={scope()} onClose={() => setAdding(false)} />
     </main>
   )
 }

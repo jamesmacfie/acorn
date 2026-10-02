@@ -159,6 +159,14 @@ describe('plugin RPC value shapes', () => {
     const decoded = await roundTrip({ at: new Date('2026-09-19T00:00:00.000Z') }) as { at: Date }
     expect(decoded.at).toBeInstanceOf(Date)
   })
+
+  // A delete route answers 204. Rebuilding it with a body threw, and the host answered 500 for a
+  // delete that had worked.
+  it('rebuilds a response that has no body', async () => {
+    const decoded = await roundTrip(new Response(null, { status: 204 })) as Response
+    expect(decoded.status).toBe(204)
+    expect(await decoded.text()).toBe('')
+  })
 })
 
 it('forwards an abort after an async callback has started', async () => {

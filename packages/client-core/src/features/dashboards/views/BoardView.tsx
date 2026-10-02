@@ -4,7 +4,7 @@ import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { boardColumns, groupField, titleField } from '../shaping'
 import Cell from './Cell'
 import Provenance from './Provenance'
-import { panelDotTone, type PanelViewProps } from './props'
+import { panelDotTone, rowPress, type PanelViewProps } from './props'
 
 // The board view. Kanban is not a component, it is group-by over a field with finite values
 // (docs/dashboards.md § Views are derived, not chosen from a menu), so there is almost nothing here.
@@ -36,7 +36,7 @@ export default function BoardView(props: PanelViewProps) {
   return (
     <Show
       when={field()}
-      fallback={<EmptyState align="start" size="sm" title="Nothing to group by">This source declares no field with a fixed set of values.</EmptyState>}
+      fallback={<EmptyState align="start" size="sm" title="Can't make a board from this source">It has no status or category field to make columns from.</EmptyState>}
     >
       <div class="dash-board">
         <For each={columns()}>
@@ -54,7 +54,7 @@ export default function BoardView(props: PanelViewProps) {
                   {(row) => (
                     <Card
                       pad="sm"
-                      {...(row.action ? { onPress: () => props.onActivate(row) } : {})}
+                      {...(rowPress(props, row) ? { onPress: rowPress(props, row) } : {})}
                     >
                       <span class="dash-card-title">
                         <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>

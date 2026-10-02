@@ -41,7 +41,7 @@ describe('browsing a source', () => {
     // Menu selects the row it opens on. A terminal has no pointer to make a second selection, so a
     // highlighted source and the source shown in Browse are one state from the first frame.
     const browsing = await screen.until('Invalidate')
-    expect(browsing).toContain('Reviews')
+    expect(browsing).toContain('Pull requests')
     expect(browsing).toContain('Invalidate')
 
     // Into the Browse panel, onto the pull, and the main panel follows with no Enter or arrow press.
@@ -94,11 +94,11 @@ describe('browsing a source', () => {
       }
       expect(focusedRegion()?.regionId).toBe('source')
       let comments = await screen.frame()
-      for (let step = 0; step < 8 && !comments.includes('[Comments/Commits] 1'); step += 1) {
+      for (let step = 0; step < 8 && !comments.includes('[Conversation] 1'); step += 1) {
         await screen.press('ARROW_RIGHT')
         comments = await screen.frame()
       }
-      expect(comments).toContain('[Comments/Commits] 1')
+      expect(comments).toContain('[Conversation] 1')
 
       // Down enters the active panel's first real control. Escape returns to the strip (proved by
       // Left changing tabs), and the next Escape restores the Browse row in the left column.

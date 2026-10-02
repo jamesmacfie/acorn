@@ -24,8 +24,17 @@ export type PanelViewProps = {
    *  says "github" on every row of a github panel is furniture. No wire change was needed for it:
    *  rows already carry the host's `pluginId` stamp (views/Provenance.tsx). */
   provenance?: boolean
-  /** Runs the row's own declared verb through the host dispatcher. Views never act themselves. */
-  onActivate: (row: DashboardDisplayRow) => void
+  /** The source's plural in lower case ("tasks"), for the stat's count. "items" when absent. */
+  plural?: string
+  /** Runs the row's own declared verb through the host dispatcher. Views never act themselves.
+   *  Absent in the editor's preview, so its rows are not pressable. */
+  onActivate?: (row: DashboardDisplayRow) => void
+}
+
+/** A row's press handler: only when the row declares a verb and the host can run it. */
+export const rowPress = (props: PanelViewProps, row: DashboardDisplayRow): (() => void) | undefined => {
+  const activate = props.onActivate
+  return row.action && activate ? () => activate(row) : undefined
 }
 
 /** A panel tone as StatusDot's. The dashboards vocabulary comes off the wire, where a plugin says

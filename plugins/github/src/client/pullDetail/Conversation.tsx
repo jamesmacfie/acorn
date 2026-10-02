@@ -2,7 +2,7 @@ import { createComputed, createEffect, createMemo, createSignal, For, onCleanup,
 import { createQuery } from '@tanstack/solid-query'
 import { formatChord, formatRelativeTime } from '@acorn/plugin-api/client'
 import {
-  Badge, Button, Card, CodeBlock, Composer, CopyButton, Inline, Kbd, Stack, Text, Timeline, UserAvatar,
+  Badge, Button, Card, CodeBlock, Composer, CopyButton, Inline, Kbd, Link, Stack, Text, Timeline, UserAvatar,
 } from '@acorn/plugin-api/ui'
 import { createDiffSnippets, type DiffSnippetAnchor, type DiffSnippetLine, type DiffSnippets } from '@acorn/plugin-api/ui/diff'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
@@ -70,21 +70,14 @@ export function ConversationEntryItem(props: {
   }
 }
 
-/** Who did what, when. The header line every turn carries. */
-function Byline(props: { author: string | null | undefined; action: string; state?: string | null; createdAt: number | null }) {
-  const tone = (): 'ok' | 'danger' | 'muted' | undefined => {
-    switch ((props.state ?? '').toUpperCase()) {
-      case 'APPROVED': return 'ok'
-      case 'CHANGES_REQUESTED': return 'danger'
-      case '': return undefined
-      default: return 'muted'
-    }
-  }
+/** Who did what, when. The header line every turn carries. The verb is words; a review's verdict is
+ *  also the colour of its card's stripe. */
+function Byline(props: { author: string | null | undefined; action: string; createdAt: number | null }) {
   return (
     <Inline>
       <UserAvatar login={props.author ?? null} />
       <Text emphasis="strong">{props.author ?? 'unknown'}</Text>
-      <Text emphasis="muted" tone={tone()}>{props.action}</Text>
+      <Text emphasis="muted">{props.action}</Text>
       <Show when={formatRelativeTime(props.createdAt)}>{(age) => <Text emphasis="muted">{age()}</Text>}</Show>
     </Inline>
   )
@@ -119,17 +112,24 @@ function ConversationItem(props: {
   onLinkClick: (event: MouseEvent) => void
 }) {
   const hasBody = () => hasRenderableBody(props.body)
+  const stripe = (): 'accent' | 'ok' | 'danger' => {
+    switch ((props.state ?? '').toUpperCase()) {
+      case 'APPROVED': return 'ok'
+      case 'CHANGES_REQUESTED': return 'danger'
+      default: return 'accent'
+    }
+  }
   let text = ''
   return (
-    <Card pad="sm" stripe="accent">
+    <Card pad="sm" stripe={stripe()}>
       <Stack gap="row">
         <Inline>
-          <Byline author={props.author} action={props.action} state={props.state} createdAt={props.createdAt ?? null} />
+          <Byline author={props.author} action={props.action} createdAt={props.createdAt ?? null} />
           <Show when={hasBody()}>
             <CopyButton text={() => text || props.body || ''} title="Copy comment" />
           </Show>
         </Inline>
-        <Show when={hasBody()} fallback={<Text emphasis="muted">No written summary.</Text>}>
+        <Show when={hasBody()}>
           <Show when={props.near()} fallback={<Text emphasis="muted">{NOT_DRAWN}</Text>}>
             <ProviderHtml html={props.body!} onLinkClick={props.onLinkClick} onText={(value) => { text = value }} />
           </Show>
@@ -160,6 +160,7 @@ function FileThreadItem(props: {
   const comments = createMemo(() => threadComments(props.thread))
   const first = () => comments()[0]
   const path = () => props.thread.path ?? 'Unknown file'
+  const fileName = () => path().split('/').pop() || path()
   // Where the thread sits in the diff, by the rule the diff viewer places it with: the new side unless
   // GitHub said LEFT. An outdated thread has no line, and so no snippet.
   const anchor = createMemo((): DiffSnippetAnchor | null =>
@@ -185,15 +186,12 @@ function FileThreadItem(props: {
       <Stack gap="row">
         <Inline>
           <Byline author={first()?.author} action="commented" createdAt={first()?.createdAt ?? null} />
-          <Show when={props.thread.resolved}><Badge size="xs" tone="ok">resolved</Badge></Show>
+          <Show when={props.thread.resolved}><Badge size="xs" tone="ok">Resolved</Badge></Show>
         </Inline>
-        <Button
-          variant="ghost"
-          size="sm"
-          onPress={() => props.thread.path && props.onOpenFile(props.thread.path)}
-        >
-          {path()}{props.thread.line != null ? ` L${props.thread.line}` : ''} — view in diff
-        </Button>
+        {/* The file's name and line, which fit the column; the path is in the tip. */}
+        <Link tip={path()} onPress={() => props.thread.path && props.onOpenFile(props.thread.path)}>
+          {fileName()}{props.thread.line != null ? `, line ${props.thread.line}` : ''}
+        </Link>
         <Show
           when={lines()}
           fallback={<Show when={snippet()?.state === 'unavailable'}><Text emphasis="muted">Snippet unavailable.</Text></Show>}

@@ -28,13 +28,13 @@ export type PanelSize = { minW: number; minH: number; w: number; h: number }
 const SIZES: Record<string, PanelSize> = {
   // One number and a label. Down to a single cell: a stat stays readable as a tile, and the sparkline
   // is written to be squeezed out rather than push the number off.
-  stat: { minW: 1, minH: 1, w: 3, h: 2 },
-  // Rows need a title's width.
-  list: { minW: 3, minH: 2, w: 4, h: 4 },
+  stat: { minW: 1, minH: 1, w: 2, h: 2 },
+  // Rows need a title's width. Three tall holds a handful of rows without an empty half.
+  list: { minW: 3, minH: 2, w: 4, h: 3 },
   // Columns need more.
-  table: { minW: 4, minH: 2, w: 6, h: 4 },
-  // Columns side by side; default full-width.
-  board: { minW: 4, minH: 3, w: 12, h: 4 },
+  table: { minW: 4, minH: 2, w: 6, h: 3 },
+  // Columns side by side. Two thirds of the width holds three columns, which stop growing at 320px.
+  board: { minW: 4, minH: 3, w: 8, h: 4 },
   // An axis needs room to carry ticks at both ends.
   chart: { minW: 4, minH: 3, w: 6, h: 4 },
 }

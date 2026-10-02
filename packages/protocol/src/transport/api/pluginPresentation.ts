@@ -40,8 +40,7 @@ export type PluginRailItem = {
    *
    *  Its own field rather than the first of `fields`, because the two answer different questions.
    *  `fields` is what lines up in columns down an expanded list, and the fact a source happens to put
-   *  first is not always the one that identifies a row: rollbar's is `#142` and linear's is the issue
-   *  state. A source that sends neither this nor `icon` still draws a reachable row, marked with a dot
+   *  first is not always the one that identifies a row: rollbar's is the occurrence count. A source that sends neither this nor `icon` still draws a reachable row, marked with a dot
    *  and named by its tooltip. */
   short?: string
   task?: PluginRailTask

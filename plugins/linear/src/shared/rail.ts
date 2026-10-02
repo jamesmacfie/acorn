@@ -44,17 +44,13 @@ const STATE_GLYPH: Record<string, string> = {
 }
 
 export function linearRailItem(issue: LinearProjectIssue, connection?: string): PluginRailItem {
-  // Title, key, status, row actions, the shape github's PR list has. Two columns, so the reserved tracks
-  // leave room to read the title. Assignee, priority, and labels are a click away in the detail pane.
-  //
-  // Positional, and never filtered: an issue with no state keeps the empty cell, or its key slides
-  // under the next row's state.
+  // The state glyph, the title, and the key. One column, because the host reserves a track per field
+  // and a second one left the title a few letters in a 300-pixel list. The state's name repeated what
+  // the glyph already says. Assignee, priority, and labels are a click away in the detail pane.
   return {
     id: linearRailItemId({ connectionId: issue.integrationId, identifier: issue.identifier }),
     title: issue.title,
-    fields: connection
-      ? [issue.identifier, issue.state?.name ?? '', connection]
-      : [issue.identifier, issue.state?.name ?? ''],
+    fields: connection ? [issue.identifier, connection] : [issue.identifier],
     ...(issue.state?.type && STATE_GLYPH[issue.state.type] ? { icon: STATE_GLYPH[issue.state.type] } : {}),
     // The key, not the first of `fields`, even though they are the same string today. `fields` is
     // what lines up in columns; this is what identifies the row when there is room for nothing else.

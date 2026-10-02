@@ -1,9 +1,10 @@
-import { createSignal, For, Show } from 'solid-js'
+import { For, Show } from 'solid-js'
 import {
-  CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, railDotProps,
+  CHECK_TONE, checkStatusTone, checkStatusWord, checksState, checksSummary, clientEvents, FAILED_STATUSES,
+  railDotProps,
 } from '@acorn/plugin-api/client'
 import {
-  Button, Chip, ChipRow, CopyButton, Picker, Row, Rows, Stack, StatusDot, Text, UserAvatar,
+  Button, Chip, ChipRow, CopyButton, Inline, Picker, Row, Rows, Stack, StatusDot, Text, UserAvatar,
   type KitSection,
 } from '@acorn/plugin-api/ui'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
@@ -22,60 +23,67 @@ import type { PrModel } from './prModel'
 //
 // A section that has nothing to say is left out rather than drawn empty. That is a decision about the
 // pull request rather than about the screen, which is why it is made here and not in either host: a
-// repository with no Linear links has no Integrations tab, on any host.
+// repository with no Linear links has no Linked issues tab, on any host.
 
+// The copy button is the section's action, in its header, and reads the text this body hands the
+// model. It used to sit on a line of its own above the text.
 function Description(props: { model: PrModel; onLinkClick: (event: MouseEvent) => void }) {
-  const [text, setText] = createSignal('')
   return (
-    <>
-      <CopyButton text={text} title="Copy description" />
-      <ProviderHtml
-        html={props.model.pull()?.body ?? ''}
-        refs={props.model.refPrefixes()}
-        onLinkClick={props.onLinkClick}
-        onText={setText}
-      />
-    </>
+    <ProviderHtml
+      html={props.model.pull()?.body ?? ''}
+      refs={props.model.refPrefixes()}
+      onLinkClick={props.onLinkClick}
+      onText={props.model.setDescriptionText}
+    />
   )
 }
 
-function Integrations(props: { model: PrModel }) {
+function LinkedIssues(props: { model: PrModel }) {
   const model = () => props.model
   return (
-    <Rows
-      id={`gh-integrations:${model().scope.number}`}
-      ariaLabel="Linked tickets"
-      items={model().linearRefs().map((ref) => ({ key: ref.item, label: ref.item }))}
-    >
-      {(item, itemProps) => {
-        const summary = () => model().linearSummary().get(item.key)
-        const url = () => model().linearRefs().find((ref) => ref.item === item.key)?.url ?? ''
-        return (
-          <Row
-            item={itemProps}
-            density="compact"
-            label={item.key}
-            {...(model().linearConnected() ? { onPress: () => model().showLinearIssue(item.key) } : { href: url() })}
-            leading={<Text emphasis="mono">{item.key}</Text>}
-            meta={
-              <Show when={summary()?.state}>
-                {/* The same visual the linear frame draws. */}
-                {(state) => <Chip size="xs" color={state().color}>{state().name}</Chip>}
-              </Show>
-            }
-          >
-            <Show
-              when={model().linearConnected()}
-              fallback={<Text emphasis="muted">Connect Linear to see titles.</Text>}
+    <Stack gap="row">
+      <Show when={!model().linearConnected()}>
+        <Inline gap="row" wrap>
+          <Text emphasis="muted">Connect Linear to see these issues' titles.</Text>
+          <Button
+            variant="ghost"
+            size="sm"
+            onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}
+          >Connect Linear</Button>
+        </Inline>
+      </Show>
+      <Rows
+        id={`gh-integrations:${model().scope.number}`}
+        ariaLabel="Linked issues"
+        items={model().linearRefs().map((ref) => ({ key: ref.item, label: ref.item }))}
+      >
+        {(item, itemProps) => {
+          const summary = () => model().linearSummary().get(item.key)
+          const url = () => model().linearRefs().find((ref) => ref.item === item.key)?.url ?? ''
+          return (
+            <Row
+              item={itemProps}
+              density="compact"
+              label={item.key}
+              {...(model().linearConnected() ? { onPress: () => model().showLinearIssue(item.key) } : { href: url() })}
+              {...(model().linearConnected() ? { leading: <Text emphasis="mono">{item.key}</Text> } : {})}
+              meta={
+                <Show when={summary()?.state}>
+                  {/* The same visual the linear frame draws. */}
+                  {(state) => <Chip size="xs" color={state().color}>{state().name}</Chip>}
+                </Show>
+              }
             >
-              <Text emphasis={summary() ? 'body' : 'muted'}>
-                {summary()?.label ?? (model().linearIssues.isLoading ? 'Loading…' : '')}
-              </Text>
-            </Show>
-          </Row>
-        )
-      }}
-    </Rows>
+              <Show when={model().linearConnected()} fallback={<Text emphasis="mono">{item.key}</Text>}>
+                <Text emphasis={summary() ? 'body' : 'muted'}>
+                  {summary()?.label ?? (model().linearIssues.isLoading ? 'Loading…' : '')}
+                </Text>
+              </Show>
+            </Row>
+          )
+        }}
+      </Rows>
+    </Stack>
   )
 }
 
@@ -83,7 +91,7 @@ function Labels(props: { model: PrModel }) {
   const model = () => props.model
   return (
     <Stack>
-      <Show when={model().labels().length} fallback={<Text emphasis="muted">None.</Text>}>
+      <Show when={model().labels().length} fallback={<Text emphasis="muted">No labels</Text>}>
         <ChipRow ariaLabel="Labels">
           <For each={model().labels()}>
             {(label) => (
@@ -98,6 +106,7 @@ function Labels(props: { model: PrModel }) {
       </Show>
       <Show when={!model().readOnly}>
         <Picker<Label>
+          size="sm"
           label="Add label…"
           placeholder="Filter labels…"
           emptyText={model().labelsLoading() ? 'Loading labels…' : 'No labels available.'}
@@ -128,16 +137,16 @@ function Checks(props: { model: PrModel }) {
             label={check()?.name}
             leading={<StatusDot tone={checkStatusTone(check()?.status)} />}
             {...(check()?.runId != null
-              ? { onPress: () => model().setOpenCheck({ runId: check()!.runId!, name: check()!.name }) }
+              ? { onPress: () => model().setOpenCheck({ runId: check()!.runId!, name: check()!.name, url: check()!.url }) }
               : {})}
-            meta={<Text emphasis="muted">{check()?.status}</Text>}
+            meta={<Text emphasis="muted">{checkStatusWord(check()?.status)}</Text>}
             trailing={
               <Show when={!model().readOnly && FAILED_STATUSES.has((check()?.status ?? '').toLowerCase()) && check()?.runId != null}>
                 <Button
                   size="sm"
                   disabled={model().rerunned().has(check()!.runId!)}
                   onPress={() => model().triggerRerun(check()!.runId!)}
-                >{model().rerunned().has(check()!.runId!) ? 'Queued' : 'Rerun'}</Button>
+                >{model().rerunned().has(check()!.runId!) ? 'Re-run queued' : 'Re-run'}</Button>
               </Show>
             }
           >{check()?.name}</Row>
@@ -151,7 +160,7 @@ function Reviewers(props: { model: PrModel }) {
   const model = () => props.model
   return (
     <Stack>
-      <Show when={model().reviewers().length} fallback={<Text emphasis="muted">No reviewers requested.</Text>}>
+      <Show when={model().reviewers().length} fallback={<Text emphasis="muted">No reviewers</Text>}>
         <ChipRow ariaLabel="Requested reviewers">
           <For each={model().reviewers()}>
             {(login) => (
@@ -166,6 +175,7 @@ function Reviewers(props: { model: PrModel }) {
       </Show>
       <Show when={!model().readOnly}>
         <Picker<string>
+          size="sm"
           label="Request review…"
           placeholder="Filter people…"
           emptyText={model().mentionsLoading() ? 'Loading people…' : 'No one to request.'}
@@ -199,20 +209,21 @@ export function prSections(input: {
     ...(model.pull()?.body ? [{
       id: 'description',
       label: 'Description',
+      actions: () => <CopyButton text={model.descriptionText} title="Copy description" />,
       render: () => <Description model={model} onLinkClick={input.onLinkClick} />,
     }] : []),
     ...(model.linearRefs().length ? [{
       id: 'integrations',
-      label: 'Integrations',
+      label: 'Linked issues',
       count: model.linearRefs().length,
-      render: () => <Integrations model={model} />,
+      render: () => <LinkedIssues model={model} />,
     }] : []),
     { id: 'labels', label: 'Labels', count: model.labels().length, render: () => <Labels model={model} /> },
     ...(model.checks().length ? [{
       id: 'checks',
       label: 'Checks',
       count: model.checks().length,
-      meta: () => <StatusDot {...railDotProps(CHECK_TONE[checksState(model.checks())])} />,
+      meta: () => <StatusDot {...railDotProps(CHECK_TONE[checksState(model.checks())])} tip={checksSummary(model.checks())} />,
       render: () => <Checks model={model} />,
     }] : []),
     { id: 'reviewers', label: 'Reviewers', count: model.reviewers().length, render: () => <Reviewers model={model} /> },
@@ -224,7 +235,7 @@ export function prSections(input: {
     },
     {
       id: 'conversation',
-      label: 'Comments/Commits',
+      label: 'Conversation',
       count: model.conversationEntries().length,
       render: () => <PrConversation model={model} onOpenFile={input.onOpenFile} onLinkClick={input.onLinkClick} />,
     },

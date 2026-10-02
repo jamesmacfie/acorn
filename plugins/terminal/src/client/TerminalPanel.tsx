@@ -7,7 +7,7 @@ import TerminalSurface from './TerminalSurface'
 import type { TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
 import { registerKeybindings } from '@acorn/plugin-api/ui/host'
 import {
-  Alert, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
+  Alert, Button, createSplitDrag, DocumentTabs, EmptyState, IconButton, Menu, SplitHandle,
 } from '@acorn/plugin-api/ui'
 import { Drawer } from '@acorn/plugin-api/ui/host'
 import { resolveTerminalFontSize } from './preferences'
@@ -209,9 +209,18 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
     },
   })
 
+  const taskContext = (task?: Task | null): string =>
+    task?.github ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}` : task?.title ?? ''
+
+  // Shells are numbered, so two of them in one task can be told apart; the task goes in the tab's tip.
+  // The title is stored on the node, so the number is picked here, at creation, and older sessions
+  // keep the title they were given.
   function titleFor(profileId: string, task?: Task | null): string {
-    const ctx = task?.github ? `${task.github.owner}/${task.github.name}${task.pullNumber != null ? ` #${task.pullNumber}` : ''}` : task?.title ?? ''
-    if (profileId === 'shell') return ctx || 'shell'
+    if (profileId === 'shell') {
+      const taken = visibleSessions().map((s) => /^Shell(?: (\d+))?$/.exec(s.title)).filter((m) => m !== null).map((m) => Number(m[1] ?? 1))
+      return taken.length ? `Shell ${Math.max(...taken) + 1}` : 'Shell'
+    }
+    const ctx = taskContext(task)
     const label = profiles().find((p) => p.id === profileId)?.label ?? profileId
     return ctx ? `${label} · ${ctx}` : label
   }
@@ -231,7 +240,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       addSession(s, createdNode) // create returns the session — no list round trip before the tab renders
       if (live(captured)) setActiveId(s.id)
     } catch (e) {
-      if (live(captured)) setError(e instanceof Error ? e.message : 'Failed to start the session.')
+      if (live(captured)) setError(e instanceof Error ? e.message : "Couldn't start the terminal.")
     } finally {
       if (live(captured)) { setPendingTitle(null); setBusy(false) }
     }
@@ -284,7 +293,9 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
             id: session.id,
             label: session.title,
             status: session.status === 'exited' ? ('muted' as const) : session.idle ? ('warn' as const) : ('ok' as const),
-            title: session.idle ? 'Agent idle — may be waiting for input' : session.title,
+            title: session.idle
+              ? 'Idle. It may be waiting for you.'
+              : session.kind === 'shell' && taskContext(ws()) ? `${session.title} · ${taskContext(ws())}` : session.title,
           })),
           // The launching session has no id yet, so it cannot be activated or closed. It is a
           // placeholder tab that the real session replaces.
@@ -348,7 +359,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
         }
       />
 
-      <Show when={error()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
+      <Show when={error()}>{(msg) => <Alert variant="banner">{msg()}</Alert>}</Show>
 
       {/* The session draws its own `Rectangle kind="pty"` (./TerminalSurface.tsx): a terminal is the
           rectangle, and an empty drawer has no pixels for one to hold.
@@ -369,9 +380,15 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
       <Show
         when={visibleIds().length > 0}
         fallback={
-          <EmptyState busy={launching() || !!pendingTitle()}>
-            {launching() || pendingTitle() ? 'Launching…' : 'No sessions. Press + to open one.'}
-          </EmptyState>
+          <Show
+            when={!launching() && !pendingTitle()}
+            fallback={<EmptyState busy>Starting…</EmptyState>}
+          >
+            <EmptyState
+              title="No terminals"
+              action={<Button disabled={busy() || !ws()} onPress={() => void startProfile('shell')}>New terminal</Button>}
+            />
+          </Show>
         }
       >
         <For each={visibleIds()}>

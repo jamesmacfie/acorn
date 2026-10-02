@@ -122,7 +122,7 @@ export default {
     agentContexts: [{
       id: 'saved-queries',
       label: 'Saved database queries',
-      description: 'Capture saved SQL and the notes beside it. No connection URL or credential is stored to leak.',
+      description: 'Saved SQL and its notes. Connection details are never included.',
       options: '/v1/p/database/context-options',
       capture: '/v1/p/database/context-capture',
     }],

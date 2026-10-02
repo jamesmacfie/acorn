@@ -33,12 +33,10 @@ describe('Rollbar descriptor rows', () => {
     expect(rollbarRailItem(ITEM)).toEqual({
       id: 'rollbar%3Aproduction:142%2F7',
       title: 'Checkout failed',
-      fields: ['#142/7'],
-      fieldsFirst: true,
+      fields: ['12'],
       short: '#142/7',
       icon: 'circle-x',
       severity: 'danger',
-      badge: '12',
       task: {
         origin: 'rollbar',
         title: 'Checkout failed',
@@ -57,6 +55,10 @@ describe('Rollbar descriptor rows', () => {
         },
       },
     })
+  })
+
+  it('writes the occurrence count with a thousands separator', () => {
+    expect(rollbarRailItem({ ...ITEM, totalOccurrences: 1284 }).fields).toEqual([(1284).toLocaleString()])
   })
 
   it.each([

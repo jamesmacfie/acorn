@@ -14,7 +14,9 @@ import { mergeAuthoringCandidate } from '../dataSources/authoringMerge'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { projectDashboardPanel, suggestStateCategoryMapping, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { Alert, Badge, Button, Checkbox, EmptyState, Field, Input, Select } from '../../kit/components/primitives'
+import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Select } from '../../kit/components/primitives'
+import { Heading } from '../../kit/components/content/Heading'
+import Icon from '../../kit/components/content/Icon'
 import { Fold } from '../../kit/components/layout/Fold'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
@@ -42,6 +44,14 @@ import './dashboards.css'
 
 const AUTOSAVE_MS = 750
 type SaveState = 'not-saved' | 'saved-on-device' | 'saving' | 'draft-saved' | 'conflict'
+const SAVE_WORDS: Record<SaveState, string> = {
+  'not-saved': 'Not saved',
+  'saved-on-device': 'Saved on this computer',
+  saving: 'Saving…',
+  'draft-saved': 'Saved',
+  conflict: "Couldn't save",
+}
+const AI_MISFIT = "The AI's suggestion doesn't fit this panel, so it wasn't applied."
 
 export default function DashboardEditor(props: {
   scope: PlacementScope
@@ -95,7 +105,7 @@ export default function DashboardEditor(props: {
     try {
       const loaded = await client.get(props.dashboardId)
       restore(loaded)
-    } catch { setProblem('This dashboard draft could not be loaded. Its placement remains unchanged.') }
+    } catch { setProblem("Couldn't load this panel's draft. The panel on your dashboard hasn't changed.") }
   })
 
   const copyFor = (next: DashboardPanelContent, current = draft()) => ({
@@ -133,7 +143,7 @@ export default function DashboardEditor(props: {
       return saved
     } catch {
       setSaveState('conflict')
-      setProblem('The draft changed elsewhere or the Node could not save it. Your local copy is retained.')
+      setProblem("Couldn't save. The panel changed somewhere else, or the node didn't answer. Your edits are kept on this computer.")
       throw new Error('dashboard-save-failed')
     }
   }
@@ -201,11 +211,11 @@ export default function DashboardEditor(props: {
   const applyAiProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
     const current = content()
     const merged = mergeAuthoringCandidate(proposal.base as DashboardPanelContent, proposal.candidate as DashboardPanelContent, current)
-    if (merged.conflicts.length) return `The dashboard changed while AI was working: ${merged.conflicts.map(value => value.path).join(', ')}.`
+    if (merged.conflicts.length) return 'This panel changed since you opened it.'
     const parsed = dashboardPanelContentSchema.safeParse(merged.value)
-    if (!parsed.success) return 'The reconciled dashboard no longer has a valid typed shape.'
+    if (!parsed.success) return AI_MISFIT
     try { await client.validate(parsed.data) }
-    catch (error) { return error instanceof Error ? error.message : 'The reconciled dashboard is no longer valid.' }
+    catch { return AI_MISFIT }
     setAiUndo(structuredClone(current))
     change(() => parsed.data)
     setSlots(parsed.data.queries.map(query => query.id))
@@ -214,7 +224,7 @@ export default function DashboardEditor(props: {
 
   const publish = async (): Promise<void> => {
     if (!dashboardPanelContentSchema.safeParse(content()).success) {
-      setProblem('Choose at least one complete data query before publishing.')
+      setProblem('Choose what to show before you publish.')
       return
     }
     try {
@@ -237,13 +247,19 @@ export default function DashboardEditor(props: {
     } catch { /* flush and publication leave an actionable problem above. */ }
   }
 
-  return <Modal title={props.dashboardId ? 'Edit dashboard panel' : 'Add dashboard panel'} size="lg" onDismiss={props.onClose}>
+  // The stat's count names the source when every query reads the same kind.
+  const plural = () => {
+    const sources = new Set(Object.values(states()).flatMap(state => state?.source ? [state.source.plural.toLowerCase()] : []))
+    return sources.size === 1 ? [...sources][0] : undefined
+  }
+  const isBoard = () => content().display.view.kind === 'board'
+
+  return <Modal title={props.dashboardId ? 'Edit panel' : 'Add panel'} size="lg" onDismiss={props.onClose}>
     <Modal.Body>
       <div class="dash-v2-editor">
         <Stack gap="stack">
           <Inline gap="inline" wrap>
-            <Badge>{saveState().replaceAll('-', ' ')}</Badge>
-            <Text emphasis="muted">Workspace: {scope.workspaceId || 'Unavailable'}</Text>
+            <Badge tone={saveState() === 'conflict' ? 'warn' : undefined}>{SAVE_WORDS[saveState()]}</Badge>
           </Inline>
           <Show when={problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
           <AuthoringConversation
@@ -263,34 +279,41 @@ export default function DashboardEditor(props: {
           }}>Undo AI edit</Button>}</Show>
           <Fold label="Data" level="group" defaultOpen>
             <Stack gap="stack">
-              <For each={slots()}>{(id, index) => <Fold label={`Data ${index() + 1}`} level="sub" defaultOpen>
+              <For each={slots()}>{(id, index) => <Fold label={`Query ${index() + 1}`} level="sub" defaultOpen>
                 <Stack gap="row">
                   <SourceQueryEditor
                     workspaceId={scope.workspaceId}
+                    previewOnOpen={!!props.dashboardId}
                     value={content().queries.find(query => query.id === id)?.reference}
                     onChange={reference => change(current => setDashboardQuery(current, id, reference))}
                     onStateChange={state => updateState(id, state)}
                   />
-                  <Button size="sm" variant="bare" onPress={() => removeSlot(id)}>Remove data query</Button>
+                  <Inline gap="row">
+                    <Button size="sm" variant="ghost" onPress={() => removeSlot(id)}>Remove data query</Button>
+                  </Inline>
                 </Stack>
               </Fold>}</For>
-              <Button size="sm" onPress={addSlot}>Add another query</Button>
+              <Inline gap="row">
+                <Button size="sm" onPress={addSlot}><Icon name="plus" /> Add another query</Button>
+              </Inline>
             </Stack>
           </Fold>
 
           <Fold label="Display" level="group" defaultOpen>
             <Stack gap="stack">
               <Field label="Panel title"><Input label="Panel title" assist={false} value={content().title} onInput={title => change(current => ({ ...current, title }))} /></Field>
-              <Field label="View" hint="Display changes redraw the retained preview without querying the source.">
+              <Field label="View">
                 <Select label="View" size="sm" value={content().display.view.kind}
                   options={available().map(kind => ({ value: kind, label: kind[0]!.toUpperCase() + kind.slice(1) }))}
                   onChange={kind => change(current => ({ ...current, display: { ...current.display, view: { kind: kind as PanelViewKind } } }))} />
-                <For each={dashboardViewKinds.filter(kind => !available().includes(kind))}>{kind => <Text emphasis="muted">{`${kind}: ${unavailableViewReason(kind)}`}</Text>}</For>
+                <For each={dashboardViewKinds.filter(kind => !available().includes(kind))}>{kind => <Text emphasis="muted" wrap>{unavailableViewReason(kind)}</Text>}</For>
               </Field>
-              <Inline gap="inline" wrap>
-                <Button size="sm" onPress={addColumnsFromStates}>Use exact source states</Button>
-                <Button size="sm" onPress={() => change(current => ({ ...current, mapping: { ...current.mapping, columns: [...current.mapping.columns, { id: crypto.randomUUID(), label: `Column ${current.mapping.columns.length + 1}` }] } }))}>Add board column</Button>
-              </Inline>
+              <Show when={isBoard()}>
+                <Inline gap="row" wrap>
+                  <Button size="sm" onPress={addColumnsFromStates}>One column per state</Button>
+                  <Button size="sm" onPress={() => change(current => ({ ...current, mapping: { ...current.mapping, columns: [...current.mapping.columns, { id: crypto.randomUUID(), label: `Column ${current.mapping.columns.length + 1}` }] } }))}><Icon name="plus" /> Add board column</Button>
+                </Inline>
+              </Show>
               <For each={content().queries}>{entry => <Fold label={`${entry.label} mappings`} level="sub">
                 <Stack gap="row">
                   <For each={(['title', 'status', 'assignee', 'updated', 'url'] as const)}>{role => <Select
@@ -301,8 +324,8 @@ export default function DashboardEditor(props: {
                       const retained = content().mapping.fields[entry.id]?.[role]
                       return [
                         { value: '', label: 'Not mapped' },
-                        ...(retained && !described.some(field => field.pointer === retained) ? [{ value: retained, label: `Unavailable · ${retained}` }] : []),
-                        ...described.map(field => ({ value: field.pointer, label: `${field.label} · ${field.pointer}` })),
+                        ...(retained && !described.some(field => field.pointer === retained) ? [{ value: retained, label: `${retained} (no longer in the source)` }] : []),
+                        ...described.map(field => ({ value: field.pointer, label: field.label, title: field.pointer })),
                       ]
                     })()}
                     onChange={pointer => change(current => ({ ...current, mapping: setRoleField(current.mapping, entry.id, role, pointer) }))}
@@ -310,14 +333,14 @@ export default function DashboardEditor(props: {
                   <For each={exactStatusOptions(states()[entry.id], content().mapping.fields[entry.id]?.status)}>{status => <Select
                     label={`State: ${status.label}`} size="sm"
                     value={content().mapping.columns.find(column => content().mapping.values[entry.id]?.[column.id]?.includes(status.id))?.id ?? ''}
-                    options={[{ value: '', label: 'Unmapped' }, ...content().mapping.columns.map(column => ({ value: column.id, label: column.label }))]}
+                    options={[{ value: '', label: 'No column' }, ...content().mapping.columns.map(column => ({ value: column.id, label: column.label }))]}
                     onChange={columnId => change(current => ({ ...current, mapping: mapExactStatus(current.mapping, entry.id, status.id, columnId) }))}
                   />}</For>
                   <Show when={(() => {
                     const described = new Set(exactStatusOptions(states()[entry.id], content().mapping.fields[entry.id]?.status).map(value => value.id))
                     const retained = Object.values(content().mapping.values[entry.id] ?? {}).flat().filter(id => !described.has(id))
                     return retained.length ? [...new Set(retained)] : undefined
-                  })()}>{retained => <Alert tone="warn">{`Unavailable state mappings retained for repair: ${retained().join(', ')}.`}</Alert>}</Show>
+                  })()}>{retained => <Alert tone="warn">{`Some states no longer exist in the source: ${retained().join(', ')}. Map them again or remove them.`}</Alert>}</Show>
                   <Show when={states()[entry.id]?.description?.fields.some(field => /category/i.test(field.label) || /category/i.test(field.pointer))}>
                     <Button size="sm" variant="bare" onPress={() => suggestCategories(entry.id)}>Suggest columns from state categories</Button>
                   </Show>
@@ -341,21 +364,27 @@ export default function DashboardEditor(props: {
           </Fold>
         </Stack>
 
-        <div class="dash-v2-preview" aria-label="Persistent panel preview">
-          <div class="dash-panel-head"><span class="dash-panel-title">{content().title}</span><Show when={Object.values(states()).some(state => state?.stale)}><Badge tone="warn">Preview is out of date</Badge></Show></div>
-          <div class="dash-panel-body">
-            <Show when={projected()} fallback={<EmptyState align="start" size="sm" title="Preview ready after refresh">Configure each query, then choose Refresh preview. Display changes use those retained records.</EmptyState>}>
-              {value => <PanelBody view={value().definition.view} schema={value().schema} fields={value().fields} rows={value().rows}
-                {...(value().definition.shaping.groupBy ? { groupBy: value().definition.shaping.groupBy } : {})}
-                provenance={content().queries.length > 1} onActivate={() => {}} />}
-            </Show>
-          </div>
+        <div class="dash-v2-preview" aria-label="Panel preview">
+          <Card>
+            <div class="dash-panel-head">
+              <Heading level={3}>{content().title}</Heading>
+              <Show when={Object.values(states()).some(state => state?.stale)}><Badge tone="warn">Preview is out of date</Badge></Show>
+            </div>
+            <div class="dash-panel-body">
+              <Show when={projected()} fallback={<EmptyState align="start" size="sm" title="No preview yet">Choose Refresh preview on each query to see it here.</EmptyState>}>
+                {value => <PanelBody view={value().definition.view} schema={value().schema} fields={value().fields} rows={value().rows}
+                  {...(value().definition.shaping.groupBy ? { groupBy: value().definition.shaping.groupBy } : {})}
+                  {...(plural() ? { plural: plural() } : {})}
+                  provenance={content().queries.length > 1} />}
+              </Show>
+            </div>
+          </Card>
         </div>
       </div>
     </Modal.Body>
     <Modal.Actions>
       <Button variant="ghost" onPress={props.onClose}>Close</Button>
-      <Button variant="solid" tone="accent" onPress={() => void publish()}>Publish</Button>
+      <Button variant="solid" tone="accent" disabled={!content().queries.length} onPress={() => void publish()}>Publish</Button>
     </Modal.Actions>
   </Modal>
 }

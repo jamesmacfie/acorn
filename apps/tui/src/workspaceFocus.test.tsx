@@ -14,7 +14,7 @@ describe('workspace focus handoff', () => {
     process.env.ACORN_FIXTURE_SECOND_WORKSPACE = '1'
     try {
       const screen = await renderFixture({ width: 100, height: 32 })
-      await screen.until('Reviews')
+      await screen.until('Pull requests')
 
       // Move off this workspace's default source first, so coming back to it has something to come
       // back to. The Menu selects on the caret, so one press down is the whole choice (./chrome/Rail.tsx).
@@ -31,7 +31,7 @@ describe('workspace focus handoff', () => {
       // schedules (./chrome/model.ts § defaultSource). Before those existed this loop asked twenty
       // times whether the caret had caught up yet.
       await screen.until('second > second-project')
-      const switched = await screen.until('Reviews')
+      const switched = await screen.until('Pull requests')
       expect(focusedRegion()?.regionId).toBe('menu')
       expect(selectedSource()).toBe('github')
       expect(caretLine(switched)).toContain('GitHub')

@@ -328,8 +328,14 @@
   padding-inline: var(--pane-pad);
   width: auto;
 }
-/* A banner in a list column of rows sits on the column's inset, not on its border. */
-:is(.ui-listdetail-list:not([data-scroll]), .layout-region-list) .ui-alert[data-variant='banner'] { margin-inline: var(--pane-pad); }
+/* A banner in a column of rows, or in a detail column that does not scroll, sits on the column's
+   inset, not on its border. */
+:is(.ui-listdetail-list:not([data-scroll]), .ui-listdetail-detail:not([data-scroll]), .layout-region-list) .ui-alert[data-variant='banner'] { margin-inline: var(--pane-pad); }
+/* A host's list region is a list column too, so a subheading in it starts where the rows do, as in
+   primitives.css. The API pane's folder names sat on the pane's edge without it. */
+.layout-region-list .section-header[data-level='sub']:not(:is(.ui-card, .ui-alert) *) {
+  padding: var(--space-5) var(--pane-pad) var(--space-2);
+}
 
 /* Two bars in a row are one piece of chrome, so the column's stack gap does not go between them. That
    gap is for content, and between a pane's header and the bar under it — the agents pane over its

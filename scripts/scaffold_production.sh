@@ -62,11 +62,10 @@ fi
 
 # --- Secrets -----------------------------------------------------------------
 if confirm "Set production secrets?"; then
-  read -rp  "GITHUB_CLIENT_ID: " gh_id
-  echo "$gh_id" | pnpm wrangler secret put GITHUB_CLIENT_ID
-
-  read -rsp "GITHUB_CLIENT_SECRET: " gh_secret; echo
-  echo "$gh_secret" | pnpm wrangler secret put GITHUB_CLIENT_SECRET
+  if confirm "Override acorn's GitHub client ID with your own app?"; then
+    read -rp "GITHUB_CLIENT_ID: " gh_id
+    echo "$gh_id" | pnpm wrangler secret put GITHUB_CLIENT_ID
+  fi
 
   key="$(openssl rand -hex 32)"
   if confirm "Use an auto-generated SESSION_ENC_KEY? (no = paste your own)"; then
@@ -95,8 +94,7 @@ fi
 cat <<'EOF'
 
 Done. Reminder:
-  • Register a PRODUCTION GitHub OAuth App with callback
-    https://<your-deployed-domain>/auth/callback
-  • The GITHUB_CLIENT_ID / GITHUB_CLIENT_SECRET you entered must be that app's
-    (the dev app at localhost:5173 is separate).
+  • GitHub defaults to acorn's public client ID.
+  • If you override GITHUB_CLIENT_ID, enable Device Flow in your app's settings.
+    The device grant uses no client secret or callback URL.
 EOF

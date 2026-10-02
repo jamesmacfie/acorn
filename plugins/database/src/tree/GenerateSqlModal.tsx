@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import {
-  Alert, Button, Chip, ChipRow, defaultModelIdFor, Modal, ModalActions, ModalBody,
-  ModelBackendPicker, modelProviderFailure, Picker, Stack, Text, Textarea,
+  Alert, Button, Chip, ChipRow, defaultModelIdFor, Field, Modal, ModalActions, ModalBody,
+  ModelBackendPicker, modelProviderFailure, Picker, Textarea,
 } from '@acorn/plugin-api/ui/tree'
 import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import type { DbSavedQuery } from '../shared/database'
@@ -76,19 +76,21 @@ export default function GenerateSqlModal(props: {
     // DOM, so the Generate button is the only way to fire it now.
     <Modal title="Generate SQL" onDismiss={dismiss}>
       <ModalBody>
-        <Textarea
-          mono
-          rows={4}
-          maxLength={GENERATE_MAX_PROMPT_CHARS}
-          assist={false}
-          autofocus
-          placeholder="Describe the query — e.g. the 10 most recent orders with the customer's email"
-          value={prompt()}
-          onChange={(value: string) => setPrompt(value)}
-        />
+        <Field label="What should the query return?">
+          <Textarea
+            mono
+            rows={4}
+            maxLength={GENERATE_MAX_PROMPT_CHARS}
+            assist={false}
+            autofocus
+            placeholder="The 10 most recent orders, with each customer's email"
+            value={prompt()}
+            onChange={(value: string) => setPrompt(value)}
+          />
+        </Field>
         <Show when={props.queries.length}>
-          <Stack gap="row">
-            <Text emphasis="eyebrow">Example queries</Text>
+          {/* `group`, so the picker's filter box does not take the caption. */}
+          <Field label="Example queries" group help="The model sees these saved queries as examples of how you write SQL.">
             <ChipRow ariaLabel="Example queries">
               <For each={chosen()}>
                 {(q) => (
@@ -113,7 +115,7 @@ export default function GenerateSqlModal(props: {
                 }}
               />
             </ChipRow>
-          </Stack>
+          </Field>
         </Show>
         <ModelBackendPicker
           backends={props.backends}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
-import { canonicalIdentifier, linearIdentifierFromHref, relativeTime, taskLinearTargets } from './model'
+import { canonicalIdentifier, failureReason, formatDate, linearIdentifierFromHref, relativeTime, taskLinearTargets } from './model'
 
 const task = (links: Task['links']): Task => ({ id: 't1', links } as Task)
 
@@ -33,5 +33,18 @@ describe('linear frame helpers', () => {
   it('renders an absent timestamp as nothing rather than as "unknown"', () => {
     expect(relativeTime(null)).toBe('')
     expect(relativeTime(1_000, 61_000)).toBe('1m ago')
+  })
+
+  it('writes a date as a short month and day, reading a bare date as the local day', () => {
+    const short = (date: Date) => date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    expect(formatDate('2026-10-06')).toBe(short(new Date(2026, 9, 6)))
+    expect(formatDate(null)).toBe('')
+  })
+
+  it('turns a route code into a sentence, and keeps prose a route wrote itself', () => {
+    const coded = (code: string, message = code) => Object.assign(new Error(message), { code })
+    expect(failureReason(coded('provider_needs_auth'))).toBe("Linear turned down acorn's key. Reconnect Linear in Settings.")
+    expect(failureReason(coded('bad_request'))).toBe('Something went wrong. Try again.')
+    expect(failureReason(new Error('The issue was archived.'))).toBe('The issue was archived.')
   })
 })

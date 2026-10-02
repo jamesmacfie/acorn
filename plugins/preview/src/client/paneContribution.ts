@@ -7,7 +7,7 @@ import { previewConfigured } from './configuredStore'
 const PreviewTaskPane = lazy(async () => ({ default: (await import('./PreviewTaskPane')).PreviewTaskPane }))
 
 export const previewPaneContribution: PaneLayoutContribution = {
-  id: 'preview', label: 'Browser preview', glyph: 'globe', description: 'Live preview of the app', order: 80,
+  id: 'preview', label: 'Preview', glyph: 'globe', description: 'The app running in this task', order: 80,
   // The gate is the seam that actually backs the pane, not "am I the desktop" (docs/frontend.md §
   // The desktop gate audit). The pane is a WebContentsView the shell positions over the client, and
   // a desktop shell may ship without preview views — so a host that has not installed the group

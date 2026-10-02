@@ -25,7 +25,7 @@ export function setDashboardQuery(
   const found = content.queries.find(query => query.id === id)
   return found
     ? { ...content, queries: content.queries.map(query => query.id === id ? { ...query, reference } : query) }
-    : { ...content, queries: [...content.queries, { id, label: `Data ${content.queries.length + 1}`, reference }] }
+    : { ...content, queries: [...content.queries, { id, label: `Query ${content.queries.length + 1}`, reference }] }
 }
 
 export function removeDashboardQuery(content: DashboardPanelContent, id: string): DashboardPanelContent {
@@ -113,5 +113,5 @@ export const availableDashboardViews = (
 }
 
 export const unavailableViewReason = (kind: PanelViewKind): string => kind === 'board'
-  ? 'Needs a mapped status or other finite field.'
-  : kind === 'chart' ? 'Needs a status/category field for bars or a datetime field for a line.' : ''
+  ? 'Board needs a status or other field with a fixed set of values.'
+  : kind === 'chart' ? 'Chart needs a status, category, or date field.' : ''

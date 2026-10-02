@@ -9,7 +9,7 @@
 //             request references it. Its output is never stored.
 import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
 import {
-  Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text,
+  Button, Checkbox, ConfirmButton, Icon, Inline, Input, Select, Stack, Text,
 } from '@acorn/plugin-api/ui/tree'
 import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
 import type { HttpClient } from './httpClient'
@@ -34,7 +34,8 @@ type Row = { id: string | null; name: string; kind: VariableKind; value: string;
 const toRow = (v: HttpVariable): Row => ({ id: v.id, name: v.name, kind: v.kind, value: v.value, enabled: v.enabled, hasStoredSecret: v.kind === 'secret' })
 const blankRow = (): Row => ({ id: null, name: '', kind: 'value', value: '', enabled: true, hasStoredSecret: false })
 
-export default function HttpVariables(props: { client: HttpClient; projectId: string; projectName: string }) {
+// Headed by its host: the panel's Variables bar, or the settings page's Variables section.
+export default function HttpVariables(props: { client: HttpClient; projectId: string }) {
   const { createVariable, deleteVariable, listVariables, updateVariable } = props.client
   const [error, setError] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal<string | null>(null)
@@ -83,9 +84,8 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
   return (
     <Stack gap="section">
       <Stack gap="row">
-        <Heading level={3}>Variables · {props.projectName}</Heading>
         <Text tone="muted" wrap>
-          {'Write {{NAME}} anywhere in a request — the URL, a header, the body, an auth field. '}
+          {'Write {{NAME}} anywhere in a request: the URL, a header, the body, or an auth field. '}
           {'A request can override any of these in its own Vars tab. '}
           {'Built in already: {{repo}}, {{branch}}, {{worktree}}, {{taskId}}.'}
         </Text>
@@ -104,7 +104,7 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
           <Stack gap="none">
             <Inline wrap>
               <Checkbox checked={row().enabled} ariaLabel="Enabled" onChange={(checked: boolean) => editRow(index, { enabled: checked })} />
-              <Input size="sm" value={row().name} placeholder="BASE_URL" onChange={(value: string) => editRow(index, { name: value })} />
+              <Input size="sm" label="Name" value={row().name} placeholder="BASE_URL" onChange={(value: string) => editRow(index, { name: value })} />
               <Select
                 size="sm"
                 value={row().kind}
@@ -114,6 +114,7 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
               />
               <Input
                 size="sm"
+                label="Value"
                 type={row().kind === 'secret' ? 'password' : 'text'}
                 value={row().value}
                 placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'Saved. Leave blank to keep it.' : PLACEHOLDER[row().kind]}
@@ -126,9 +127,10 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                   row identity so an armed button cannot move onto another variable. */}
               <Show when={row().id ?? row()} keyed>
                 <ConfirmButton
-                  variant="bare"
+                  variant="ghost"
                   size="sm"
-                  title={`Delete ${row().name}`}
+                  iconOnly
+                  tip={`Delete ${row().name}`}
                   label="Delete"
                   confirmLabel="Delete variable?"
                   skipConfirm={!row().id}

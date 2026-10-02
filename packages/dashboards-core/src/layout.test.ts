@@ -220,8 +220,8 @@ describe('applyResize', () => {
 })
 
 describe('sizeFor', () => {
-  it('gives a board the full width and a stat a corner', () => {
-    expect(sizeFor('board').w).toBe(COLS)
+  it('gives a board most of the width and a stat a corner', () => {
+    expect(sizeFor('board').w).toBeGreaterThan(sizeFor('table').w)
     expect(sizeFor('stat').w).toBeLessThan(sizeFor('table').w)
   })
 

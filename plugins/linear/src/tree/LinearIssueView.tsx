@@ -1,10 +1,10 @@
 import { createSignal, For, Show, type JSX } from 'solid-js'
 import {
-  Badge, Button, Card, Chip, ChipRow, Composer, CopyButton, EmptyState, Facts, Heading, Inline, Markdown,
-  Meter, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
+  Alert, Badge, Button, Card, Chip, ChipRow, Composer, CopyButton, EmptyState, Facts, Heading, Icon, IconButton,
+  Inline, Markdown, Meter, Row, Section, Stack, TabPanel, Tabs, Text, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { LinearComment, LinearIssueDetail, LinearRelatedIssue } from '../shared/api'
-import { priorityMeta } from '../shared/triage'
+import { priorityMeta, priorityTone, stateTone } from '../shared/triage'
 import { formatDate, relativeTime } from './model'
 
 // One Linear ticket, as a tree of acorn's own components. Three tabs, Overview, Activity, and
@@ -19,8 +19,11 @@ import { formatDate, relativeTime } from './model'
 // (client-core/host/frames/PluginRefPanel.tsx). The ticket switcher for a task linking several
 // tickets sits in app.tsx beside the task read.
 
-// Glyph per activity kind (Linear-style compact feed).
-const ACTIVITY_GLYPH: Record<string, string> = { created: '✦', state: '◐', assignee: '○', label: '▣', title: '✎' }
+// Icon per activity kind. Names, not typed glyphs: "○" used to mean both "assigned" and "not done".
+const ACTIVITY_ICON: Record<string, string> = { created: 'sparkles', state: 'circle-dot', assignee: 'user-round', label: 'tag', title: 'pencil' }
+
+// An attachment's source, named only when it is one people know by name.
+const SOURCE_NAME: Record<string, string> = { github: 'GitHub' }
 
 const isDone = (issue: LinearRelatedIssue) => issue.state?.type === 'completed' || issue.state?.type === 'canceled'
 
@@ -28,10 +31,13 @@ export type LinearIssueViewProps = {
   issue: LinearIssueDetail
   activeTab: string
   refreshing: boolean
+  /** Why the last refresh failed, drawn above the issue it left on screen. */
+  refreshError: string
   posting: boolean
   postError: string
-  /** Present when a relation row re-targeted the view, so there is somewhere to go back to. */
-  overridden: boolean
+  /** The issue the host opened, when a relation row re-targeted the view, so there is somewhere to go
+   *  back to. */
+  backTo?: string
   onSelect(id: string): void
   onRefresh(): void
   onBack(): void
@@ -51,26 +57,30 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   const issue = () => props.issue
   const topComments = () => issue().comments.filter((entry) => !entry.parentId)
   const repliesOf = (id: string) => issue().comments.filter((entry) => entry.parentId === id)
+  const priority = () => priorityMeta(issue().priority, issue().priorityLabel)
 
   // Facts values are strings on this path, because a tree's props are JSON on a message port. The one
   // fact that carried a control — the branch name and its copy button — is a toolbar of its own below.
   const facts = () => [
     issue().assignee ? { label: 'Assignee', value: issue().assignee! } : null,
     issue().creator ? { label: 'Opened by', value: `${issue().creator} ${relativeTime(issue().createdAt)}`.trim() } : null,
-    issue().estimate != null ? { label: 'Estimate', value: `${issue().estimate} pts` } : null,
-    issue().cycle ? { label: 'Cycle', value: `C${issue().cycle!.number}${issue().cycle!.endsAt ? ` → ${formatDate(issue().cycle!.endsAt)}` : ''}` } : null,
+    issue().estimate != null ? { label: 'Estimate', value: `${issue().estimate} points` } : null,
+    issue().cycle ? { label: 'Cycle', value: issue().cycle!.endsAt ? `Ends ${formatDate(issue().cycle!.endsAt)}` : `Cycle ${issue().cycle!.number}` } : null,
     issue().dueDate ? { label: 'Due', value: formatDate(issue().dueDate) } : null,
     issue().team ? { label: 'Team', value: issue().team!.name } : null,
     issue().project ? { label: 'Project', value: issue().project!.name } : null,
   ].filter((fact) => fact !== null)
 
+  // The done mark is an `Icon` in the body rather than `leading`, which a tree can only fill with text.
   const relatedRow = (related: LinearRelatedIssue, done?: boolean) => (
     <Row
       onPress={() => props.onOpenRelated(related.identifier)}
-      leading={done === undefined ? undefined : done ? '✓' : '○'}
       meta={related.state?.name}
     >
       <Inline>
+        <Show when={done !== undefined}>
+          <Icon name={done ? 'circle-check' : 'circle'} tone={done ? 'ok' : undefined} />
+        </Show>
         <Text emphasis="mono" tone={done ? 'muted' : 'neutral'}>{related.identifier}</Text>
         <Text tone={done ? 'muted' : 'neutral'}>{related.title}</Text>
       </Inline>
@@ -91,7 +101,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
           <Show when={!isReply}>
             <Button
               size="sm"
-              variant="bare"
+              variant="ghost"
               onPress={() => setReplyingId(replyingId() === entry.id ? null : entry.id)}
             >
               Reply
@@ -126,24 +136,30 @@ export function LinearIssueView(props: LinearIssueViewProps) {
   return (
     <Stack gap="section">
       <Toolbar variant="bar">
-        <Heading level={1} eyebrow={issue().identifier}>{issue().title}</Heading>
+        <Heading level={2} eyebrow={issue().identifier}>{issue().title}</Heading>
         <ToolbarSpacer />
-        <Show when={props.overridden}>
-          <Button size="sm" variant="bare" onPress={props.onBack}>← back</Button>
+        <Show when={props.backTo}>
+          {(identifier) => (
+            <Button size="sm" variant="ghost" onPress={props.onBack}><Icon name="arrow-left" /> Back to {identifier()}</Button>
+          )}
         </Show>
-        <Button size="sm" busy={props.refreshing} onPress={props.onRefresh}>Refresh</Button>
+        <IconButton icon="refresh-cw" label="Refresh issue" busy={props.refreshing} onPress={props.onRefresh} />
         {/* The clipboard, not `ui.openUrl`. The host resolves a URL through its content-link ladder,
             linear's recogniser claims `linear.app/…/issue/…`, and it resolves to the ticket already on
             screen, so the button would re-open where the reader is. See docs/integrations.md § Linear. */}
         <Button size="sm" onPress={() => props.onCopy(issue().url)}>Copy link</Button>
       </Toolbar>
 
-      <ChipRow ariaLabel="Ticket status">
+      <Show when={props.refreshError}>
+        {(reason) => <Alert variant="banner" title="Couldn't refresh this issue. Showing the last data we got.">{reason()}</Alert>}
+      </Show>
+
+      <ChipRow ariaLabel="Issue status">
         <Show when={issue().state}>
-          {(state) => <Chip color={state().color}>{state().name}</Chip>}
+          {(state) => <Badge tone={stateTone(state().type)} size="xs">{state().name}</Badge>}
         </Show>
-        <Show when={priorityMeta(issue().priority, issue().priorityLabel).level !== 'none'}>
-          <Badge tone="warn" size="xs">{priorityMeta(issue().priority, issue().priorityLabel).label}</Badge>
+        <Show when={priority().level !== 'none'}>
+          <Badge tone={priorityTone(priority().level)} size="xs">{priority().label}</Badge>
         </Show>
         <For each={issue().labels ?? []}>
           {(label) => <Chip color={label.color}>{label.name}</Chip>}
@@ -159,7 +175,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         active={props.activeTab}
         onChange={props.onSelect}
         idPrefix="linear"
-        ariaLabel="Linear ticket sections"
+        ariaLabel="Issue sections"
       />
 
       <TabPanel idPrefix="linear" id="overview" active={props.activeTab}>
@@ -180,6 +196,8 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             )}
           </Show>
 
+          {/* Muted text, not the small empty state: that one stands in for list rows and takes their
+              inset, which here would sit it 14 pixels in from the facts above. */}
           <Show when={issue().description} fallback={<Text tone="muted">No description.</Text>}>
             {(description) => <Markdown text={description()} onSelect={props.onLink} onCopy={props.onCopy} />}
           </Show>
@@ -188,12 +206,12 @@ export function LinearIssueView(props: LinearIssueViewProps) {
             <Section label="Links">
               <For each={issue().attachments}>
                 {(attachment) => (
-                  <Row onPress={() => props.onLink(attachment.url)} meta={attachment.sourceType}>
+                  <Row onPress={() => props.onLink(attachment.url)} meta={SOURCE_NAME[attachment.sourceType ?? '']}>
                     <Inline>
                       <Text>{attachment.title}</Text>
                       {/* Alongside, because an attachment is what a reader most often pastes somewhere,
                           and unlike the header URL it does not point back to this view. */}
-                      <Button size="sm" variant="bare" onPress={() => props.onCopy(attachment.url)}>Copy link</Button>
+                      <IconButton icon="copy" label="Copy link" size="xs" variant="ghost" onPress={() => props.onCopy(attachment.url)} />
                     </Inline>
                   </Row>
                 )}
@@ -221,15 +239,12 @@ export function LinearIssueView(props: LinearIssueViewProps) {
       </TabPanel>
 
       <TabPanel idPrefix="linear" id="activity" active={props.activeTab}>
-        <Show when={issue().activity.length} fallback={<Text tone="muted">No activity yet.</Text>}>
+        <Show when={issue().activity.length} fallback={<EmptyState align="start" size="sm">No activity yet.</EmptyState>}>
           <For each={issue().activity}>
             {(entry) => (
-              <Row
-                density="compact"
-                leading={ACTIVITY_GLYPH[entry.icon] ?? '•'}
-                meta={relativeTime(entry.createdAt)}
-              >
+              <Row density="compact" meta={relativeTime(entry.createdAt)}>
                 <Inline>
+                  <Icon name={ACTIVITY_ICON[entry.icon] ?? 'circle'} />
                   <Show when={entry.actor}>{(name) => <Text emphasis="strong">{name()}</Text>}</Show>
                   <Text>{entry.text}</Text>
                 </Inline>
@@ -241,7 +256,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
 
       <TabPanel idPrefix="linear" id="comments" active={props.activeTab}>
         <Stack gap="stack">
-          <Show when={topComments().length} fallback={<EmptyState>No comments yet.</EmptyState>}>
+          <Show when={topComments().length} fallback={<EmptyState align="start" size="sm">No comments yet.</EmptyState>}>
             <For each={topComments()}>{(entry) => comment(entry, false)}</For>
           </Show>
           <Composer
@@ -269,12 +284,11 @@ function SubIssues(props: {
   return (
     <Section label={children().length ? 'Sub-issues' : 'Parent'}>
       <Stack gap="row">
+        {/* The count is drawn as well as announced. Above the bar rather than beside it, because a
+            `Meter` fills its line. */}
         <Show when={children().length}>
-          <Meter
-            value={Math.round((doneCount() / children().length) * 100)}
-            label={`${doneCount()} of ${children().length} done`}
-            size="sm"
-          />
+          <Text tone="muted">{doneCount()} of {children().length} done</Text>
+          <Meter value={doneCount() / children().length} label={`${doneCount()} of ${children().length} done`} size="sm" />
         </Show>
         <Show when={props.issue.parent}>
           {(parent) => (

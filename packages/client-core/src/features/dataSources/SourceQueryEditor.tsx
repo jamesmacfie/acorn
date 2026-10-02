@@ -10,7 +10,7 @@ import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataVa
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { ApiError } from '../../infra/node/apiClient'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, Select, Stack, Text } from './kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -34,7 +34,7 @@ const errorMessage = (error: unknown): string => {
     if (error.code === 'unavailable') return 'This source is unavailable. Reconnect its provider or choose another source.'
     if (error.code === 'connection-required') return 'Choose a connection before continuing.'
     if (error.code === 'forbidden') return 'This connection is not available in the selected workspace.'
-    return `The source returned ${error.code ?? 'an error'}.`
+    return "The source couldn't answer."
   }
   return error instanceof Error ? error.message : 'The source could not be read.'
 }
@@ -224,6 +224,10 @@ export default function SourceQueryEditor(props: {
   projectId?: string
   value?: QueryReference
   disabled?: boolean
+  /** Run Refresh preview once, as soon as the source is described. For reopening something that
+   *  already has a query, such as a placed panel's Edit. A preview reads the source and writes
+   *  nothing. */
+  previewOnOpen?: boolean
   onChange(value: QueryReference | undefined): void
   /** Lets consumers project the shared editor's exact described fields and retained preview. It is
    * observational only: display changes never flow back into query semantics. */
@@ -362,6 +366,13 @@ export default function SourceQueryEditor(props: {
     }
   }
 
+  let previewedOnOpen = false
+  createEffect(() => {
+    if (!props.previewOnOpen || previewedOnOpen || !query() || !description.data) return
+    previewedOnOpen = true
+    void refresh()
+  })
+
   const updateConnection = (connectionId: string): void => {
     const current = query()
     if (!current) return
@@ -415,7 +426,7 @@ export default function SourceQueryEditor(props: {
         disabled={props.disabled}
         items={[
           ...(library.data ?? []).map(saved => ({ id: `saved:${saved.id}`, label: saved.content.name, note: 'Saved query', active: props.value?.kind === 'saved' && props.value.queryId === saved.id })),
-          ...sources().map(entry => ({ id: `source:${sourceKey(entry)}`, label: entry.name, note: `${entry.pluginId} · ${entry.plural}`, active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') })),
+          ...sources().map(entry => ({ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') })),
         ]}
         onPick={id => id.startsWith('saved:') ? selectSaved(id.slice(6)) : selectSource(sources().find(entry => sourceKey(entry) === id.slice(7))!)}
       />
@@ -453,6 +464,7 @@ export default function SourceQueryEditor(props: {
         base={content()!}
         label={content()?.name ?? 'Query'}
         disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
+        defaultOpen={false}
         onApply={applyAiProposal}
       />
       <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { emitContent(previous()); setAiUndo(undefined) }}>Undo AI edit</Button>}</Show>
@@ -488,13 +500,13 @@ export default function SourceQueryEditor(props: {
         <Inline gap="inline" wrap>
           <Button variant="solid" size="sm" busy={preview().loading} disabled={props.disabled || !canDescribe()} onPress={() => void refresh()}>Refresh preview</Button>
           <Show when={previewIsStale(preview())}><Badge tone="warn">Preview is out of date</Badge></Show>
-          <Show when={preview().result}><Text emphasis="muted">{`Read ${new Date(preview().result!.readTime).toLocaleString()} · preview limit 25`}</Text></Show>
+          <Show when={preview().result}><Text emphasis="muted" tip={`Read ${new Date(preview().result!.readTime).toLocaleString()}`}>Showing up to 25</Text></Show>
         </Inline>
-        <Show when={preview().error}><Alert tone="danger" title="Preview failed">{preview().error} Previous results are retained. Choose Refresh preview to retry.</Alert></Show>
+        <Show when={preview().error}><Alert tone="danger" title="Couldn't load a preview">{preview().error} The last preview stays until you refresh.</Alert></Show>
         <Show when={preview().result}>{result => <Stack gap="row">
           <Show when={incompleteCause()}>{cause => <Alert tone="warn">{`Preview is incomplete: ${cause()}.`}</Alert>}</Show>
           <Show when={!result().records.length}><Alert>{`No matching ${source()?.plural.toLowerCase() ?? 'records'}. Edit filters and refresh again.`}</Alert></Show>
-          <For each={result().records}>{record => <Fold label={record.display?.title ?? record.ref.recordId} level="group">
+          <For each={result().records}>{record => <Fold label={record.display?.title ?? record.ref.recordId} level="sub">
             <Stack gap="row">
               <For each={[...described().fields, ...Object.keys(record.data && typeof record.data === 'object' && !Array.isArray(record.data) ? record.data : {}).filter(key => !described().fields.some(field => field.pointer === `/${key}`)).map(key => ({ pointer: `/${key}`, label: key, origin: 'observed' as const }))]}>{field => {
                 const selected = valueAt(record.data, field.pointer)

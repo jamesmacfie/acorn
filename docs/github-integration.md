@@ -51,10 +51,12 @@ polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated o
    GitHub account is provider metadata; it does not bind the node-owner identity, which core mints at
    boot.
 
-The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and needs no callback URL.
-Without a client id the provider reports `connectable: false`, so Add connection and first-run setup
-leave GitHub out instead of offering a sign-in that cannot start. A connection stored earlier keeps
-working.
+The optional GitHub plugin defaults to acorn's public client ID, `Ov23liRC5Y5yDF7BTSeg`, so
+**Connect GitHub** appears in Add connection and first-run setup without environment configuration.
+Set `GITHUB_CLIENT_ID` to use your own GitHub app, and enable **Device Flow** in that app's settings.
+The plugin trims the override. An empty or whitespace-only override reports `connectable: false`
+and hides GitHub from those connection surfaces. A connection stored earlier keeps working.
+The device grant uses no client secret or callback URL.
 `githubToken(c)` is the single credential read site for GitHub routes.
 
 Device flow wins over the redirect web flow for three reasons. The web flow needs a client secret to
@@ -200,7 +202,7 @@ created PR through `CoreServices.tasks.attachPull`: the first attachment claims
 After a managed agent turn completes, the GitHub plugin checks the task branch for an open PR using
 the Node owner's GitHub connection. A single result whose head and base repositories match the task
 project is adopted into active tasks on that branch that have no primary PR. The task-change event
-refreshes client task caches, which enables **PR review** in the right rail without opening the
+refreshes client task caches, which enables the **Pull request** pane in the right rail without opening the
 repository's PR list. Tasks without a branch or GitHub project, and tasks with a primary PR, skip the
 lookup. Ambiguous results and fork heads are not adopted. This lookup uses GitHub's
 [head filter](https://docs.github.com/en/rest/pulls/pulls#list-pull-requests) and does not replace the
@@ -250,7 +252,8 @@ project and can clone into an owner-selected folder. Task and service credential
 This gate does not change the authority of other GitHub provider routes.
 
 Projects → Import from GitHub discovers repositories from the plugin's disposable mirror. A
-repository is either mapped to an existing folder or cloned with non-interactive Git. Both ask for
+repository is either linked to an existing folder (**Link folder**, the `map` action) or cloned with
+non-interactive Git. Both ask for
 the folder before anything is written, so cancelling the dialog cancels the import. There is no third
 "defer" action: skipping the repository is what deferring meant, and the path-null placeholder
 project it created turned into a duplicate as soon as the same repository was mapped.
@@ -292,7 +295,7 @@ The strip is drawn on the desktop only. A terminal has a few lines of chrome abo
 strip wants a whole row of them, so there it collapses to the primary PR; the related ones stay
 reachable from the pull list.
 
-Selecting a related PR with no task offers `+ Task` beside the strip. Promotion reuses the
+Selecting a related PR with no task offers **Create task** beside the strip. Promotion reuses the
 repository-list workflow: the new task takes the matching core project, the PR head branch and pull
 number, and any unambiguous Linear references from the PR body. If active tasks already own that PR,
 the offer is replaced by a control that opens the one owner, or by a chooser over several.
@@ -327,11 +330,11 @@ Every GitHub surface is a host layout filled with kit components; the plugin shi
 | --- | --- |
 | The PR pane | The `single` layout holding one split: the navigator beside the diff, which is browse's inner pair without browse's pull list. The navigator opens with the strip of pull requests this task is about. |
 | Navigator | Overview, then the changed files and the conversation as folds. Browse and the PR pane draw the same three trees over the same model. The shared split control closes this column to its edge, keeps its content mounted, and remembers the choice on this device. |
-| Overview | The pull's heading and facts, the actions toolbar, the conflict alert, description, linked tickets, labels, checks, reviewers, and the `github:summary-badges` slot. |
+| Overview | The pull's heading and facts (state, author, branch, review decision, checks, age), the merge box, the conflict alert, description, linked issues, labels, checks, reviewers, and the `github:summary-badges` slot. The merge box is two left-aligned rows: the one solid primary for the pull's state (**Merge** beside its method, or **Ready for review** on a draft), then **Convert to draft** and **Close**. A related pull says it is read-only instead. |
 | Conversation | The comment and review composers over a timeline of cards: comments, review summaries, commits, and file threads. |
 | Browse | Two splits, one inside the other: the pull list, then the navigator beside its diff, or the create form beside its compare preview. |
 | The reference panel | A heading, facts, and the host's task-link control, in the box the host draws. |
-| The importer | One row per repository with Clone and Map beside it. |
+| The importer | A titled card on the Projects page of setting rows, one per repository, with **Clone** and **Link folder** beside it. A repository that already has a project says "Added as" that project and keeps both buttons. In onboarding the wizard is the frame. |
 
 Two places let another plugin in. `github:diff-line` takes marks on a line of a pull request's diff,
 keyed by file, line and side, the same shape the changes pane opens over the working tree.

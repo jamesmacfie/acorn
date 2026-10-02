@@ -133,7 +133,6 @@ describe('the service as a spawned child process', () => {
     const service = new ServiceChild({
       SESSION_ENC_KEY: '0'.repeat(64),
       GITHUB_CLIENT_ID: 'test-client',
-      GITHUB_CLIENT_SECRET: 'test-secret',
       // The parent inherits vitest's environment, and an ACORN_PORT leaking in would pin the port and
       // hide the ephemeral path this whole phase depends on.
       ACORN_PORT: '',
@@ -153,7 +152,7 @@ describe('the service as a spawned child process', () => {
 
   it('refuses missing or different baseline before opening the data root', async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-spawn-incompatible-'))
-    child = new ServiceChild({ SESSION_ENC_KEY: '0'.repeat(64), GITHUB_CLIENT_ID: 'test-client', GITHUB_CLIENT_SECRET: 'test-secret', ACORN_PORT: '' })
+    child = new ServiceChild({ SESSION_ENC_KEY: '0'.repeat(64), GITHUB_CLIENT_ID: 'test-client', ACORN_PORT: '' })
     const config = { dataDir, version: 'spawn-test', isPackaged: false, hostRuntimePath: process.execPath, mcpEntry: join(dataDir, 'unused-mcp.js') }
     await expect(child.request('service.start', config)).rejects.toThrow()
     await expect(child.request('service.start', { ...config, baseline: 'other' })).rejects.toThrow()

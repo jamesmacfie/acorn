@@ -26,7 +26,7 @@ export function PrFileList(props: {
       <Show when={incompleteFilesMessage(model().filesCompleteness())}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
       <Show
         when={model().files().length}
-        fallback={<EmptyState align="start" busy={model().filesLoading()}>{model().filesLoading() ? 'Loading…' : 'No files.'}</EmptyState>}
+        fallback={<EmptyState align="start" size="sm" busy={model().filesLoading()}>{model().filesLoading() ? 'Loading…' : 'No changed files'}</EmptyState>}
       >
         <Rows
           virtual={props.virtual}
@@ -59,7 +59,7 @@ export function PrFileList(props: {
                   <>
                     <Checkbox
                       ariaLabel={`Mark ${item.key} viewed`}
-                      title="Mark viewed"
+                      title="Viewed"
                       checked={!!file()?.viewed}
                       disabled={model().readOnly}
                       onChange={(checked) => { if (!model().readOnly) model().setViewed(item.key, checked) }}

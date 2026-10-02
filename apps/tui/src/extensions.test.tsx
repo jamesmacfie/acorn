@@ -27,8 +27,8 @@ const litRuns = async (screen: { spans: () => Promise<{ text: string; fg: { r: n
 describe('a contribution inside somebody else’s surface', () => {
   // The keyboard contract for extension content, and the whole of requirement 9: content in a remote
   // slot is as reachable as the kit nodes it draws, inside the region its host registered. The slot
-  // sits above github's own action toolbar in the Details panel, so a contributed button is that
-  // panel's first stop and the merge `Select` becomes its second.
+  // sits above github's own merge box in the Details panel, so a contributed button is that panel's
+  // first stop and `[Merge]` becomes its second.
   it('draws a contributed button as a stop, reached with Down and pressable', async () => {
     process.env.ACORN_FIXTURE_BADGE = 'button'
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
@@ -44,7 +44,7 @@ describe('a contribution inside somebody else’s surface', () => {
 
       // …and the panel carries on past it, to github's own first control.
       await screen.press('ARROW_DOWN')
-      expect(await litRuns(screen)).toContain('[ squash ▾ ]')
+      expect(await litRuns(screen)).toContain('[Merge]')
     } finally {
       screen.done()
     }
@@ -60,7 +60,7 @@ describe('a contribution inside somebody else’s surface', () => {
       await screen.press('ARROW_DOWN')
       // The panel's first stop is github's own, exactly as it is with no contribution at all: a `Text`
       // is not a stop on either host and a contributor cannot make one (the shared `NODE_FOCUS` table).
-      expect(await litRuns(screen)).toContain('[ squash ▾ ]')
+      expect(await litRuns(screen)).toContain('[Merge]')
     } finally {
       screen.done()
     }

@@ -168,6 +168,17 @@ describe('the panel-local schema', () => {
     const schema = panelSchema(sources, undefined)
     expect(schema.fields.find((field) => field.id === 'status')?.values).toBeUndefined()
   })
+
+  it('keeps one source’s own field names and status words when it is mapped without columns', () => {
+    // A mapping with a field override and no columns still maps the panel. It used to drop the
+    // source's declared values, so a status drew its raw id on a grey dot.
+    const mapped: PanelMapping = { fields: { 'linear:issues-mine': { assignee: 'assignee' } } }
+    const schema = panelSchema([linear], mapped)
+    expect(schema.fields.find((field) => field.id === 'status')?.values).toEqual(linearSchema.fields[2]!.values)
+    expect(schema.fields.find((field) => field.id === 'title')?.name).toBe('Title')
+    const renamed = panelSchema([{ ...linear, schema: { fields: linearSchema.fields.map((f) => f.id === 'state' ? { ...f, name: 'State' } : f) } }], mapped)
+    expect(renamed.fields.find((field) => field.id === 'status')?.name).toBe('State')
+  })
 })
 
 describe('`source` as a panel-local field', () => {

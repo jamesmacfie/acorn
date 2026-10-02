@@ -161,6 +161,7 @@
     "./kit/keys/keymapHost.ts": "./src/kit/keys/keymapHost.ts",
     "./kit/lib": "./src/kit/lib/public.ts",
     "./kit/lib/confirm": "./src/kit/lib/controls/confirm.ts",
+    "./kit/lib/formatChord": "./src/kit/lib/rendering/formatChord.ts",
     "./kit/lib/savedSignal": "./src/kit/lib/controls/savedSignal.ts",
     "./kit/lib/graphLayout": "./src/kit/lib/layout/graphLayout.ts",
     "./kit/lib/markdown": "./src/kit/lib/rendering/markdown.ts",

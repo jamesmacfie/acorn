@@ -8,6 +8,10 @@ import type { Draft } from './draft'
 
 type RequestTab = 'params' | 'body' | 'headers' | 'auth' | 'vars'
 
+// The stored mode words stay as they are; only what the selects show changes.
+const BODY_LABEL: Record<BodyMode, string> = { none: 'None', json: 'JSON', text: 'Text', form: 'Form (URL-encoded)' }
+const AUTH_LABEL: Record<AuthConfig['mode'], string> = { none: 'None', basic: 'Basic', bearer: 'Bearer token', apikey: 'API key' }
+
 // Two shapes the kit owns, declared here rather than imported from the components barrel: a tree
 // bundle must not reach that barrel, because its build compiles JSX into acorn's nodes and a shell
 // component pulled in would come out the far side as a tree. A kit node's props arrive untyped on this
@@ -40,7 +44,7 @@ function VarsTable(props: { vars: Record<string, string>; onChange: (vars: Recor
   return (
     <Stack gap="row">
       <Text tone="muted" wrap>
-        Overrides for this request only. Repo variables (including secrets and command-derived ones) are set in the Variables tab and apply everywhere.
+        Values here replace the project's variables for this request only.
       </Text>
       <KeyValueTable
         rows={rows()}
@@ -59,7 +63,7 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
   return (
     <Stack gap="row">
       <Show when={props.auth.mode === 'none'}>
-        <Text tone="muted" wrap>No authentication. Anything you need can also be set directly as a header.</Text>
+        <Text tone="muted" wrap>This request sends no credentials. You can also add an Authorization header on the Headers tab.</Text>
       </Show>
 
       <Show when={props.auth.mode === 'basic'}>
@@ -114,7 +118,7 @@ function AuthEditor(props: { auth: AuthConfig; onChange: (auth: AuthConfig) => v
         })()}
       </Show>
 
-      <Text tone="muted" wrap>Whichever mode you pick, this becomes a header (or a query param) when the request is sent — you can see exactly what went out in the response Timeline.</Text>
+      <Text tone="muted" wrap>acorn sends this as a header or a query parameter. The response's Timeline shows what was sent.</Text>
     </Stack>
   )
 }
@@ -150,34 +154,32 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
     { id: 'vars', label: 'Vars', count: Object.keys(props.draft.vars).length || undefined },
   ]
 
+  // A fragment, so the strip is a direct child of the region and the bar rules reach it.
   return (
-    <Stack gap="row">
-      <Stack gap="none">
-        <Tabs
-          tabs={tabs()}
-          active={tab()}
-          onChange={(id: string) => setTab(id as RequestTab)}
-          idPrefix="http-request"
-          ariaLabel="Request"
-        />
-        {/* A remote-tree prop is data, not another tree. Passing these controls through Tabs.actions
-            put Solid nodes and handlers onto the worker message and stopped both API regions with a
-            DataCloneError. Keep them adjacent to the strip as ordinary tree children instead. */}
-        <Show when={tab() === 'body'}>
-          <Toolbar variant="actions" size="sm">
-            <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: m === 'form' ? 'form-urlencoded' : m }))]} />
-          </Toolbar>
-        </Show>
-        <Show when={tab() === 'auth'}>
-          <Toolbar variant="actions" size="sm">
-            <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: m === 'apikey' ? 'API key' : m }))]} />
-          </Toolbar>
-        </Show>
-      </Stack>
+    <>
+      <Tabs
+        tabs={tabs()}
+        active={tab()}
+        onChange={(id: string) => setTab(id as RequestTab)}
+        idPrefix="http-request"
+        ariaLabel="Request"
+      />
+      {/* A remote-tree prop is data, not another tree. Passing these controls through Tabs.actions
+          put Solid nodes and handlers onto the worker message and stopped both API regions with a
+          DataCloneError. Keep them adjacent to the strip as ordinary tree children instead. */}
+      <Show when={tab() === 'body'}>
+        <Toolbar variant="actions" size="sm">
+          <Select size="sm" width="narrow" value={props.draft.bodyMode} label="Body type" onChange={(value: string) => props.patch({ bodyMode: value as BodyMode })} options={[...bodyModes.map((m) => ({ value: m, label: BODY_LABEL[m] }))]} />
+        </Toolbar>
+      </Show>
+      <Show when={tab() === 'auth'}>
+        <Toolbar variant="actions" size="sm">
+          <Select size="sm" width="narrow" value={props.draft.auth.mode} label="Auth type" onChange={(value: string) => props.patch({ auth: emptyAuth(value as AuthConfig['mode']) })} options={[...authModes.map((m) => ({ value: m, label: AUTH_LABEL[m] }))]} />
+        </Toolbar>
+      </Show>
 
       <TabPanel idPrefix="http-request" id={tab()} active={tab()}>
         <Show when={tab() === 'params'}>
-          <Text tone="muted" wrap>Query parameters are part of the URL — editing either side keeps the other in step.</Text>
           <KeyValueTable rows={params()} onChange={setParams} nameLabel="Parameter" />
         </Show>
 
@@ -210,7 +212,7 @@ export default function RequestTabs(props: { draft: Draft; patch: (patch: Partia
           <VarsTable vars={props.draft.vars} onChange={(vars) => props.patch({ vars })} />
         </Show>
       </TabPanel>
-    </Stack>
+    </>
   )
 }
 

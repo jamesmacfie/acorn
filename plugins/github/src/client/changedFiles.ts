@@ -6,7 +6,7 @@ import { type PullFile } from '../shared/api'
 
 // Single source for a PR's changed-file order and the `?file=` scroll target. `?file=` is written from
 // three places (the `/` finder, `[` and `]` cycling in Shortcuts.tsx, and the file list in PullDetail),
-// all of which must agree on the file order, which is the summaries query's order. DiffView only reads
+// all of which must agree on the file order, which is the summaries query's order. DiffForPull only reads
 // `?file=` as its scroll anchor, so it keeps its own full-payload query.
 export function useChangedFiles(
   route: () => { owner: string; repo: string; number: string } | null,

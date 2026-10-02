@@ -148,5 +148,5 @@ export function taskPullTabTooltip(tab: TaskPullTab, currentTaskId: string): str
   })
   if (otherTasks.length === 1) evidence.push(`Open in ${otherTasks[0].title}`)
   else if (otherTasks.length > 1) evidence.push(`Open one of ${otherTasks.length} linked tasks`)
-  return evidence.join('. ') || (tab.relationship === 'primary' ? 'Primary pull request' : 'Related pull request')
+  return evidence.join('. ') || (tab.relationship === 'primary' ? "This task's pull request" : 'Related pull request')
 }

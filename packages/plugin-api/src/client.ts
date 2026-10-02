@@ -262,7 +262,7 @@ export { isAppDark, isDarkColor, token, watchAppearance } from '@acorn/client-co
 export { rowHeight, termFontSize } from '@acorn/client-core/kit/lib'
 // `railDotProps` is here beside CHECK_TONE because that is what it is for: the rail's dot
 // vocabulary is not the kit's, and this is the one translation between them.
-export { CHECK_TONE, checkStatusTone, checksState, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/kit/lib'
+export { CHECK_TONE, checkStatusTone, checkStatusWord, checksState, checksSummary, FAILED_STATUSES, fileStatusMeta, railDotProps, summarizeFileStats } from '@acorn/client-core/kit/lib'
 
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The client half of what `ctx.telemetry` and `ctx.log` are on the node, and the id is an argument

@@ -120,11 +120,11 @@ describe('task pull diff', () => {
       [{ kind: 'complete' }, null],
       [
         { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: 3000, reportedTotal: 3418, limit: 3000 },
-        'GitHub returned 3,000 of 3,418 changed files. The remaining files are outside the GitHub API limit.',
+        'GitHub sent 3,000 of 3,418 changed files, which is the most it sends for one pull request.',
       ],
       [
         { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: 3000, reportedTotal: null, limit: 3000 },
-        'GitHub may have more changed files than the 3,000 returned by its API.',
+        'GitHub might have more changed files than the 3,000 it sent.',
       ],
     ]
     for (const [completeness, message] of cases) {

@@ -416,8 +416,21 @@ describe('send — transport outcomes', () => {
       error: 'Could not find missing.test. Check the host name or DNS.',
     })
     expect(result.timeline).toEqual(expect.arrayContaining([
-      { label: 'request', detail: 'GET http://missing.test/health' },
-      expect.objectContaining({ label: 'error', detail: expect.stringContaining('ENOTFOUND') }),
+      { label: 'Request', detail: 'GET http://missing.test/health', group: 'sent' },
+      expect.objectContaining({ label: 'Error', detail: expect.stringContaining('ENOTFOUND') }),
+    ]))
+  })
+
+  it('labels each received header by its name, after the status', async () => {
+    fx = fixture()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response('ok', { status: 200, statusText: 'OK', headers: { 'x-request-id': 'abc' } })))
+
+    const result = await send(fx.db, fx.core, USER, 'project-widget', input({ url: 'http://api.test/ok' }))
+
+    expect(result.timeline).toEqual(expect.arrayContaining([
+      { label: 'Status', detail: '200 OK', group: 'received' },
+      { label: 'x-request-id', detail: 'abc', group: 'received' },
+      expect.objectContaining({ label: 'Size and time', detail: expect.stringMatching(/^2 B in \d+ ms$/) }),
     ]))
   })
 

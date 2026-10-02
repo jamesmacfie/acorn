@@ -37,25 +37,22 @@ const seriesSlot = (index: number): ChartSeriesSlot =>
  *  knows the panel's cell size. */
 export const CHART_BOX = { width: 320, height: 180 } as const
 
-/** Tick type is geometry, so the size lives here rather than in the stylesheet.
+/** Tick type is geometry, so the size is a number in user units rather than a stylesheet length.
  *
- *  Inside a scaled `viewBox` a CSS `font-size` is a length in user units, so it scales with the
- *  drawing. The ticks used to take `--fs-2xs`, around 11, which is a twelfth of this box's height, and
- *  on a half-screen panel that rendered as roughly 28px labels towering over the marks they named.
- *
- *  So the tick size is a number in the same units as the point radius, the bar widths and the padding,
- *  and `ChartView.tsx` sets it as an attribute. The appearance pack loses control of it, the same
- *  trade the box itself takes. */
+ *  Inside a scaled `viewBox` a CSS `font-size` scales with the drawing, so a fixed size draws large
+ *  on a big panel and small on a narrow one. `ChartView.tsx` measures how the box is scaled and asks
+ *  for `--fs-2xs` divided by that scale (`buildChart`'s `tickFont`), so a label draws at one size on
+ *  screen. This is the size before a measure, and the size a test lays out against. */
 export const TICK_FONT = 7
 
 /** The gap between a tick label and the thing it labels. Here rather than in the view because the left
  *  gutter is sized around it. */
 export const TICK_GAP = 4
 
-/** Rough advance width of one tick glyph. The y axis is tabular figures, so an estimate holds for the
- *  labels that decide the gutter. Only a category label is letters, and that axis has slack. Generous,
- *  because over-padding is invisible and under-padding clips. */
-const GLYPH_W = TICK_FONT * 0.62
+/** Rough advance width of one tick glyph, as a share of the font size. The y axis is tabular figures,
+ *  so an estimate holds for the labels that decide the gutter. Only a category label is letters, and
+ *  that axis has slack. Generous, because over-padding is invisible and under-padding clips. */
+const GLYPH_RATIO = 0.62
 
 const PAD = { top: 8, right: 8, bottom: 22 } as const
 /** A gutter narrower than this buys nothing back: two-character labels still need somewhere to sit. */
@@ -73,24 +70,31 @@ export type ChartFrame = {
   plotHeight: number
   baseline: number
   tickFont: number
+  /** How far below the baseline the x labels sit. Grows with the font, as the bottom pad does. */
+  labelDrop: number
 }
 
-const frameWithLeft = (left: number): ChartFrame => ({
-  ...CHART_BOX,
-  plotLeft: left,
-  plotTop: PAD.top,
-  plotWidth: CHART_BOX.width - left - PAD.right,
-  plotHeight: CHART_BOX.height - PAD.top - PAD.bottom,
-  baseline: CHART_BOX.height - PAD.bottom,
-  tickFont: TICK_FONT,
-})
+const frameWithLeft = (left: number, tickFont = TICK_FONT): ChartFrame => {
+  const labelDrop = tickFont + 3
+  const bottom = Math.max(PAD.bottom, labelDrop + tickFont)
+  return {
+    ...CHART_BOX,
+    plotLeft: left,
+    plotTop: PAD.top,
+    plotWidth: CHART_BOX.width - left - PAD.right,
+    plotHeight: CHART_BOX.height - PAD.top - bottom,
+    baseline: CHART_BOX.height - bottom,
+    tickFont,
+    labelDrop,
+  }
+}
 
 /** The frame for a set of y axis labels. Clamped at a third of the width: a field can format a label
  *  arbitrarily long ("1,234,567 MB") and past some point the answer is a shorter label, not a plot
  *  squeezed to nothing. */
-const frameFor = (yLabels: readonly string[]): ChartFrame => {
+const frameFor = (yLabels: readonly string[], tickFont: number): ChartFrame => {
   const widest = Math.max(0, ...yLabels.map((label) => label.length))
-  return frameWithLeft(Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * GLYPH_W + TICK_GAP * 2)))
+  return frameWithLeft(Math.min(CHART_BOX.width / 3, Math.max(MIN_LEFT, widest * tickFont * GLYPH_RATIO + TICK_GAP * 2)), tickFont)
 }
 
 /** The frame a chart has before any label widens its gutter. Only a placeholder: every plot carries
@@ -99,8 +103,8 @@ export const CHART_FRAME: ChartFrame = frameWithLeft(MIN_LEFT)
 
 /** Keep a tick label inside the box. A label centred on the last gridline hangs half of itself off the
  *  right edge, which is how `Aug 18` rendered as "Aug 1". `undefined` means centred, the normal case. */
-const tickAnchor = (at: number, label: string): ChartTick['anchor'] => {
-  const half = (label.length * GLYPH_W) / 2
+const tickAnchor = (at: number, label: string, tickFont: number): ChartTick['anchor'] => {
+  const half = (label.length * tickFont * GLYPH_RATIO) / 2
   if (at - half < 0) return 'start'
   if (at + half > CHART_BOX.width) return 'end'
   return undefined
@@ -323,10 +327,11 @@ const yAxisFor = (
   schema: DashboardDisplaySchema,
   view: PanelView,
   max: number,
+  tickFont: number,
 ): { ticks: ChartTick[]; frame: ChartFrame; top: number } => {
   const values = niceTicks(max)
   const labels = values.map((value) => axisNumber(schema, view, value))
-  const frame = frameFor(labels)
+  const frame = frameFor(labels, tickFont)
   const top = values[values.length - 1] || 1
   return {
     frame,
@@ -383,6 +388,7 @@ function buildBar(
   schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
+  tickFont: number,
 ): ChartPlot | undefined {
   const field = barCategoryField(schema, view, shaping)
   if (!field) return undefined
@@ -412,7 +418,7 @@ function buildBar(
       aggregateRows(series ? column.rows.filter((row) => inGroup.has(row)) : column.rows, schema, view) ?? 0)
   })
   const max = Math.max(0, ...values.flat())
-  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max)
+  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max, tickFont)
 
   const slot = frame.plotWidth / Math.max(1, columns.length)
   // The cluster keeps the width one bar used to have, and the series divide it, so a chart with no
@@ -431,12 +437,12 @@ function buildBar(
         title: series
           ? `${column.label} · ${group.label}: ${axisNumber(schema, view, value)}`
           : `${column.label}: ${axisNumber(schema, view, value)}`,
-        // What the colour answers moves with the split. Unsplit, each bar is a category, so a toned
-        // category keeps the tone the plugin gave it and anything else takes an ordinal slot. Split,
-        // colour answers "which series", and the category is answered by the x axis instead.
+        // What the colour answers moves with the split. Unsplit, the bars are one series and the x
+        // axis names each category, so a toned category keeps the tone the plugin gave it and anything
+        // else is the accent, as the single line is. Split, colour answers "which series".
         ...(series
           ? toneOrSlot(declaredTone(series, group.id), groupIndex)
-          : toneOrSlot(declaredTone(field, column.id), index)),
+          : { tone: declaredTone(field, column.id) ?? 'accent' }),
         x: frame.plotLeft + index * slot + (slot - cluster) / 2 + groupIndex * width,
         y: frame.plotTop + frame.plotHeight - height,
         w: width,
@@ -450,7 +456,7 @@ function buildBar(
   const xTicks = columns.flatMap((column, index): ChartTick[] => {
     if (index % stride !== 0) return []
     const at = frame.plotLeft + index * slot + slot / 2
-    const anchor = tickAnchor(at, column.label)
+    const anchor = tickAnchor(at, column.label, tickFont)
     return [{ label: column.label, at, ...(anchor ? { anchor } : {}) }]
   })
 
@@ -479,6 +485,7 @@ function buildLine(
   schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
+  tickFont: number,
 ): ChartPlot | undefined {
   const time = fieldById(schema, view.x)?.type === 'datetime'
     ? fieldById(schema, view.x)!
@@ -513,7 +520,7 @@ function buildLine(
 
   const days = byGroup.flatMap(({ byDay }) => [...byDay.keys()])
   if (!days.length) {
-    const empty = yAxisFor(schema, view, 0)
+    const empty = yAxisFor(schema, view, 0, tickFont)
     return {
       shape: 'line',
       lines: [],
@@ -563,7 +570,7 @@ function buildLine(
   })
 
   const max = Math.max(0, ...buckets.flatMap((bucket) => bucket.points.map((point) => point.value)))
-  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max)
+  const { ticks: yTicks, frame, top } = yAxisFor(schema, view, max, tickFont)
 
   // A single day has no span to scale against, so it sits in the middle rather than dividing by zero.
   const xAt = (day: number) =>
@@ -596,7 +603,7 @@ function buildLine(
   const xTicks = (last === first ? [first] : [first, last]).map((day) => {
     const label = dayLabel(day)
     const at = xAt(day)
-    const anchor = tickAnchor(at, label)
+    const anchor = tickAnchor(at, label, tickFont)
     return { label, at, ...(anchor ? { anchor } : {}) }
   })
   // Over the lines that drew, not the groups that exist: a series with no points has no mark for a
@@ -627,7 +634,9 @@ export function buildChart(
   schema: DashboardDisplaySchema,
   view: PanelView,
   shaping: PanelShaping,
+  /** The tick font in user units, from the measured scale (TICK_FONT). */
+  tickFont: number = TICK_FONT,
 ): ChartPlot | undefined {
   const shape: ChartShape = view.shape === 'line' ? 'line' : view.shape === 'bar' ? 'bar' : (chartShapesFor(schema)[0] ?? 'bar')
-  return shape === 'line' ? buildLine(rows, schema, view, shaping) : buildBar(rows, schema, view, shaping)
+  return shape === 'line' ? buildLine(rows, schema, view, shaping, tickFont) : buildBar(rows, schema, view, shaping, tickFont)
 }
