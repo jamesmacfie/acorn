@@ -1,0 +1,137 @@
+{
+  "note": "Final task artifacts and preserved command evidence. The deleted handoff remains represented by the retained workload plan. Shared programme-index edits are limited to the unit 29 links.",
+  "files": {
+    "plans/performance/evidence/unit29-cli-checks.json": {
+      "bytes": 754,
+      "sha256": "de916e9bee1ce10994b288ab593b50eeda9a34e8fcac6f09367a845931f69318"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/assets-after.json": {
+      "bytes": 1417965,
+      "sha256": "04d9f152a30aa6168901a138d7e38d969172497a035ba4f90f2d23106cb07d50"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/assets-before.json": {
+      "bytes": 1417460,
+      "sha256": "3e0a5c0a29f68250f94cc9d65af3466dd79decac2a1e7105c21142f51182aa2c"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/lint.txt": {
+      "bytes": 55493,
+      "sha256": "26968713c7030f61c902c6b2da57838ea2f20a5cc3146e976dc6b886f4b4956f"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/preparation-runner.mjs": {
+      "bytes": 5394,
+      "sha256": "bfd80ac45fb3817856ef25480af67404ea79a1f9dc3e3d7c2f879f8c8cbf60c4"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/prerequisites.json": {
+      "bytes": 3266,
+      "sha256": "1703a493b6fe7720325f8dcad03fc9bd3550e1c5f068144fc3cf12a9cae7e425"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/results.json": {
+      "bytes": 6331,
+      "sha256": "52e1abda739361d705f323c82ca0c59a9911f254819aae28ac3680b93893eab1"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/service-build.txt": {
+      "bytes": 3437,
+      "sha256": "35a4d22e76408466bf769ba84191112d433b1c9df62b33312ae9836f095f62f7"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/source-after.json": {
+      "bytes": 443877,
+      "sha256": "fa7510f8d9924e84c78769f11943ced83caaca3aeae43b7e019f41b21d041faa"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/source-before.json": {
+      "bytes": 443760,
+      "sha256": "f75ecb3f8609add22ce60ca5fcbaa3eb0a8ca1116dc43bec8436b0c4247a78f5"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/test.txt": {
+      "bytes": 591870,
+      "sha256": "e503ca94846073f1edd20b970245d7332184e06b9861ce28ee8f19d31e89ff97"
+    },
+    "plans/performance/evidence/unit29-cumulative-20261002/tui-build.txt": {
+      "bytes": 26954,
+      "sha256": "530c3d0c4ae836f73993a70bf9bc7149cecd18a82576d9fee51c96f69511e8c1"
+    },
+    "plans/performance/evidence/unit29-desktop-checks.json": {
+      "bytes": 1365,
+      "sha256": "78931864bbd3f63844f4576fe7ecfcc7fee6364252065301554555f029c4aa8d"
+    },
+    "plans/performance/evidence/unit29-desktop-rust.txt": {
+      "bytes": 6697,
+      "sha256": "263b22ed671ca9df1a4b982160988344ceb271443936f496e4c3f81ce78ab9a4"
+    },
+    "plans/performance/evidence/unit29-desktop-source.txt": {
+      "bytes": 5770,
+      "sha256": "abd715566f0771763a070e208a3f2d562423e85e5f743e9fb46f952dcc8d1b92"
+    },
+    "plans/performance/evidence/unit29-docs-contract.txt": {
+      "bytes": 1331,
+      "sha256": "69383f0bb84307b88020cb43d0a9dd89a0dc006bcaad606002a185bfac712eb8"
+    },
+    "plans/performance/evidence/unit29-evidence-guard.txt": {
+      "bytes": 696,
+      "sha256": "70704d57374a19f8b316316cd1f2cf4aabc5c69d4ee7bc287323b20125af323f"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/assets-after.json": {
+      "bytes": 1417965,
+      "sha256": "f020a4a063234b37d306ec3be3c5cc610d3ac45f0d273250887116b922b254d8"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/assets-before.json": {
+      "bytes": 1417965,
+      "sha256": "32509908d52da98c10b37facaf9caef4ce965992a151bdeb3e0cf177e18172aa"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/lint.txt": {
+      "bytes": 39446,
+      "sha256": "8ce081e7e2598c55e93f4c2e9bc83bef551912e0ac07685d7118be03df1a09cb"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/preparation-runner.mjs": {
+      "bytes": 5691,
+      "sha256": "a1776d8a4d3047f013258f3ee2431c07f7343c7f655a738952b9c505753b78bc"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/prerequisites.json": {
+      "bytes": 3586,
+      "sha256": "4ae997f689d402cf3160cb2356d50ed91201dea17860a389ac0b8db2b4280a6c"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/results.json": {
+      "bytes": 6348,
+      "sha256": "41f96233e045dfc0f22aa227ac4258a7b1041c695194b2605c801df055cb9091"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/service-build.txt": {
+      "bytes": 3029,
+      "sha256": "7a6a15e47630ba99cd19935b5587daf39d380fb395d1de2efe27466ea6721dcf"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/source-after.json": {
+      "bytes": 444000,
+      "sha256": "6a6dd3942d86c1161d3a1d711c1e10a611ac4c4fa14587dc6ee992e1a3a68357"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/source-before.json": {
+      "bytes": 443877,
+      "sha256": "612ab2455967b32f8596a8d9234e75d6c18bd2213790212410a490a8d52cf4a2"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/test.txt": {
+      "bytes": 373632,
+      "sha256": "592e968452de89536c88898b70d2de12d38c32970255a93d14090590472732b5"
+    },
+    "plans/performance/evidence/unit29-pinned-20261002/tui-build.txt": {
+      "bytes": 26546,
+      "sha256": "eeadb38c42bbe76d9779f9c303be3efebb4d68fa291fb3bb4ce2af5021567f11"
+    },
+    "plans/performance/evidence/unit29-runtime-guard.txt": {
+      "bytes": 1048,
+      "sha256": "725288f5c651c04f85c6ce9de44a9c8bb9701997a1c3dd44bdff824bc77aec69"
+    },
+    "plans/performance/evidence/unit29-sessions.json": {
+      "bytes": 2411,
+      "sha256": "f3296e3a8e2fe89527b9811800677e547eacaeb9ed62c3fa9747d4f6e119440c"
+    },
+    "plans/performance/implementation-29-sustained-validation.md": {
+      "bytes": 7858,
+      "sha256": "aaa80ac2415c2ccbb2e7a42c0e8e7a2e20c2793e859b53b995d29b2233cd028c"
+    },
+    "plans/performance/sustained-validation-plan.md": {
+      "bytes": 6564,
+      "sha256": "5b24b8326d14dbf6467744e5f5735bdfd5c01d5e32d400e72434a4efda383803"
+    },
+    "plans/performance/unit29-preparation.mjs": {
+      "bytes": 6146,
+      "sha256": "907c383d6d67af2cb62ed151b5b570c64ff92bc8e9ab27f36f983a9974aa1d52"
+    }
+  }
+}

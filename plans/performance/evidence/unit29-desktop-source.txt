@@ -1,0 +1,106 @@
+
+ RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop
+
+ ❯ |shell| src/helper/rendererConnection.test.ts (6 tests | 6 failed) 6ms
+     × filters explicit interest per socket through fleet reads, cleanup sends, malformed calls, and cached switches 4ms
+     × isolates equal request IDs and aborts only a disconnected renderer 1ms
+     × keeps legacy wildcard interest but a modern fetch-only observer receives statuses without opening a lease 0ms
+     × encodes only once for eligible recipients and does no payload work for inactive or missing viewers 0ms
+     × targets transport refusals to the requesting renderer while retaining sibling status delivery 0ms
+     × does not access a late response body after close and clears completed request ownership 0ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 6 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > filters explicit interest per socket through fleet reads, cleanup sends, malformed calls, and cached switches
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:63:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/6]⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > isolates equal request IDs and aborts only a disconnected renderer
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:92:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/6]⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > keeps legacy wildcard interest but a modern fetch-only observer receives statuses without opening a lease
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:111:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/6]⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > encodes only once for eligible recipients and does no payload work for inactive or missing viewers
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:127:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/6]⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > targets transport refusals to the requesting renderer while retaining sibling status delivery
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:148:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/6]⎯
+
+ FAIL  |shell| src/helper/rendererConnection.test.ts > renderer socket ownership > does not access a late response body after close and clears completed request ownership
+TypeError: Cannot read properties of undefined (reading 'watch')
+ ❯ startHelperServer src/helper/helperServer.ts:118:41
+    116|     }
+    117|   }
+    118|   const stopConfigWatch = helper.config.watch((state) => push({ push: …
+       |                                         ^
+    119|
+    120|   // The same filter as `push` above, and the same reason: an N-node f…
+ ❯ fixture src/helper/rendererConnection.test.ts:36:24
+ ❯ src/helper/rendererConnection.test.ts:162:21
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/6]⎯
+
+
+ Test Files  1 failed | 25 passed (26)
+      Tests  6 failed | 149 passed (155)
+   Start at  20:51:05
+   Duration  5.08s (transform 2.45s, setup 29ms, import 4.78s, tests 8.14s, environment 1ms)
+
+undefined
+/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/apps/desktop:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --exclude test/boot.test.ts

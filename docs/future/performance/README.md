@@ -16,7 +16,7 @@ main has independent fixes and architectural changes since the audit. If a depen
 record the reason and adjust the order without undoing completed work.
 
 Read [the implementation contract](./contract.md) and [the conditional work and refusals](./refused.md).
-The final assignment is [sustained-use validation](./29-sustained-validation.md). It belongs after
+The final assignment is [sustained-use validation](../../../plans/performance/implementation-29-sustained-validation.md). It belongs after
 all selected fixes and includes the two-Node and native/TUI composition checks.
 
 ## Sequential assignments
@@ -43,7 +43,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |
 | 28 | [Telemetry retirement and total histogram bounds](./28-telemetry.md) | Through 27 | Pending |
-| 29 | [Sustained-use and final performance validation](./29-sustained-validation.md) | Through 28 | Pending |
+| 29 | [Sustained-use validation record](../../../plans/performance/implementation-29-sustained-validation.md) | Through 28 | Preparation recorded; final acceptance blocked |
 
 The order encodes important dependencies: client origin/draft custody before agent process work;
 process ownership before queue admission; raw/search completeness before wait/result projection;
