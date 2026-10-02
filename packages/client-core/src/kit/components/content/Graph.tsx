@@ -47,8 +47,9 @@ export type GraphCard = {
 const FIT_PAD = 24
 /** How far a pointer travels before a press on a card becomes a drag. */
 const DRAG_SLOP = 3
-/** Half the width of a port or an edge control, so both centre on the point they belong to. */
-const DOT = 7
+/** Half the width of a port or an edge control, so both centre on the point they belong to. The
+ *  control is `--control-h-xs` (20) in primitives.css; the two numbers move together. */
+const DOT = 10
 
 const clampZoom = (value: number): number => Math.min(GRAPH_ZOOM_MAX, Math.max(GRAPH_ZOOM_MIN, value))
 
@@ -119,6 +120,8 @@ export function Graph(props: {
   // A memo rather than an inline getter: `on()` re-runs whenever anything it read changes identity,
   // and `props.nodes` is rebuilt on every frame of a live run. The count is what should refit.
   const count = createMemo(() => props.nodes.length)
+  // Edges carry ids, which a screen reader would read out as hashes.
+  const labelOf = (id: string): string => props.nodes.find((node) => node.id === id)?.label ?? id
   createEffect(on(count, () => { if (!held()) fit() }, { defer: true }))
 
   /** A pointer event in content coordinates. */
@@ -279,10 +282,10 @@ export function Graph(props: {
                 type="button"
                 class="ui-graph-cut"
                 style={{ transform: place(edge().control.x - DOT, edge().control.y - DOT) }}
-                aria-label={`Remove the edge from ${edge().from} to ${edge().to}`}
+                aria-label={`Remove the edge from ${labelOf(edge().from)} to ${labelOf(edge().to)}`}
                 onClick={() => props.onDisconnect?.(edge().from, edge().to)}
               >
-                ×
+                <Icon name="x" />
               </button>
             )}
           </Index>

@@ -341,7 +341,8 @@ is a record.
 
 The node list is the editor's list. Both call `graphOrder` in
 `plugins/workflows/src/client/editor/graphOrder.ts`, over the definition the run froze when it started, so
-the indentation in the run cannot disagree with the indentation in the editor. A node that waits on
+the indentation in the run cannot disagree with the indentation in the editor. Only a fork indents:
+a branch target, or a node that waits on more than one step. A node that waits on
 more than one step carries the same `⇐ n` mark. A dispatched child is a row under the step that
 spawned it.
 
@@ -451,6 +452,10 @@ a workflow session's row in Agent Center. The deep link
 A Rollbar error, a Linear issue and a GitHub pull request each have **Start workflow…** in their row
 menu, under **Create task**. It picks a workflow, fills its inputs from the item, makes a task or
 attaches to one, starts the run, and lands on the run pane.
+
+The workflow picker excludes unpublished database drafts and definitions with known problems.
+Repository and user-file workflows remain available without a database publication. If no runnable
+workflows remain, the dialog closes and directs the user to create and publish one in the Workflows rail.
 
 All three menus are the context-menu registry's `item.row` location
 ([plugins.md](./plugins.md) § Context menus), so this is one contribution rather than three. The

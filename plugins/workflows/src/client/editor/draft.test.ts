@@ -52,13 +52,24 @@ describe('the graph a definition describes', () => {
     expect(effectiveAfter(chain, 2)).toEqual(['b'])
   })
 
-  it('puts each node after the last of its predecessors, indented by rank', () => {
+  it('puts each node after the last of its predecessors, and indents only where the graph forks', () => {
     expect(graphOrder(def()).map((row) => [row.name, row.depth])).toEqual([
       ['reproduce', 0],
       ['recent-changes', 0],
-      ['history', 1],
-      ['synthesise', 2],
+      ['history', 0],
+      ['synthesise', 1],
     ])
+  })
+
+  it('indents a branch target under the step that chooses it', () => {
+    const branching: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'branching',
+      steps: [
+        { id: 'check', name: 'check', kind: 'if', branches: { true: 'yes' } },
+        { id: 'yes', name: 'yes', after: ['check'] },
+        { id: 'then', name: 'then', after: ['yes'] },
+      ],
+    }
+    expect(graphOrder(branching).map((row) => [row.name, row.depth])).toEqual([['check', 0], ['yes', 1], ['then', 1]])
   })
 
   it('marks the node that waits on more than one step', () => {

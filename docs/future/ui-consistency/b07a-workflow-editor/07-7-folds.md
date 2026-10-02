@@ -1,6 +1,6 @@
 # 07-7. Every group in the inspector is an uppercase fold
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 **Tools**, **Execution limits**, **Budget**, **Form**, **What it returns**, **Result schema**, each

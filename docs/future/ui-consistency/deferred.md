@@ -328,6 +328,38 @@ dialog on `Modal`.
   pane's Variables view in a task. The fixture has none of them. Each was read from code, and the
   connection page has a jsdom test.
 
+### B07a
+
+- **Shared with another session.** A second session added step and workflow timeouts in the same
+  files while B07a ran (`TimeBudgetField.tsx`). Its labels, **Workflow timeout in minutes** and **Step
+  timeout in minutes**, replace 07-15's "Time limit in minutes" in the Definition inspector. The
+  schedule dialog says "Time limit in minutes". Pick one name in B07b.
+- **07-2 and 07-6, changed from the plan.** A heading in a bar grows to fill it (the kit's rule), so the
+  badges after the title sit beside the controls, in the editor header and the step header alike. The
+  inspector's bars are direct children of the detail column, so they span it while the form stops at
+  720. A new shared rule seats a bar that heads a scrolling detail column on its top edge. The run
+  pane's step detail still wraps its bar in a `Stack`, so it keeps the 10-pixel gap above. B07b can
+  move it the same way.
+- **07-6, Result schema's explanation stays inline.** `Fold` has no `help`, so the rewritten line sits
+  inside the fold.
+- **07-8 and 07-9, the outline's "After" line is gone.** A row is two lines, so what a step waits on
+  lives in the inspector's **Waits on**. The outline summary keeps **Run {workflow}** for a Run a
+  workflow step, as well as the three the plan named.
+- **07-9, joins indent.** A step that waits on more than one indents one past its deepest parent, as
+  the plan says, so two branches that meet indent once more. Revisit if that reads as a staircase.
+- **07-10, the footer keeps "and {n} more".** The fix said "· {n} more", and the copy table said keep.
+  The copy table won.
+- **07-15, the start dialog's limits sentence is gone,** and with it the dialog's fetch of the saved
+  definition, which nothing else read.
+- **07-16:** the disabled overflow items say "(publish first)" in their labels, because a disabled item
+  takes no hover. A plugin kind with no icon draws `puzzle`.
+- **07-17:** the add buttons in the inspector draw `Icon name="plus"`, and the gate field's **Reset** in
+  the run pane is ghost. The Workflows list's **+ New** reads **New** with the plus icon.
+- **Not checked live:** a workflow with branches, the graph's edge control (it needs two cards),
+  **Not saved** with the node unreachable, the Publish badge after publishing, and the start and
+  schedule dialogs. The session had no workflows, so one throwaway was made and deleted. Each was
+  read from code, and the inspector, editor, and graph order have tests.
+
 ## Notes for later sessions
 
 - **Uncommitted file moves.** B01 renamed `features/workspaces/onboarding.css` to `projects.css`, and B05

@@ -41,9 +41,9 @@ export default function StepConfigurationFields(props: {
   return (
     <Show when={described()} fallback={(
       <Field label="Settings" hint={unavailableCatalogKind(kind(), props.catalog)
-        ? 'Plugin unavailable. Saved settings remain as raw JSON until it returns.'
-        : 'This step kind has not described its form, so its settings are raw JSON.'} group>
-        <Textarea size="sm" rows={6} mono assist={false} label="Settings" disabled={props.disabled}
+        ? "The plugin isn't on this computer. Its settings are kept as JSON."
+        : 'This step has no form, so its settings show as JSON.'} group>
+        <Textarea rows={6} mono assist={false} label="Settings" disabled={props.disabled}
           value={JSON.stringify(props.step.with ?? {}, null, 2)}
           onChange={(value) => {
             try {

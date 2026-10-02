@@ -75,7 +75,7 @@ step's recorded inputs in the run pane use that same form.
 
 All four kinds assemble that prompt through one function, which they did not until 2026-09-09. Only
 `agent` read the incoming edges, so a `decide` step was sent its prompt and nothing else: the editor
-offered it the Upstream output control, defaulted it to Append, and the runner dropped the output it
+offered it the upstream output control, defaulted it to append, and the runner dropped the output it
 was meant to judge. `ci-loop` pays for the upstream output and the context block on the turn that
 opens its session and not on the resumed turns, which already hold both.
 
@@ -284,7 +284,7 @@ budget, and remains charged across retries. An explicit failed-child retry reope
 dispatch path and reuses the task, run, roster, and frozen graph. Successful siblings are not rerun.
 The original absolute deadline still applies. A restart keeps unknown-usage turn reservations counted.
 
-The editor's **Plan with AI, then For each** shortcut inserts a structured agent plan and a For each
+The editor's **Ask AI for a list, then run each** shortcut inserts a structured agent plan and a For each
 step as one undoable draft edit. Select the child workflow and bind its inputs in the inspector. The
 plan declares stable item IDs and accepts an empty array. Removed execution kinds receive an upgrade
 diagnostic; they do not execute. Ordinary graph convergence uses `after` edges.

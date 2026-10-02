@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import { dataBindingSchema, type DataBinding } from '@acorn/protocol/dataBindings.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
-import { Button, Field, Fold, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Button, Field, Fold, Input, SectionHeader, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type {
   WorkflowCatalog, WorkflowCatalogTarget, WorkflowDef,
   WorkflowStepDef, WorkflowValueBinding,
@@ -40,7 +40,7 @@ export default function WorkflowDispatchForm(props: {
   const targetInputs = () => {
     const byName = new Map((target()?.inputs ?? []).map(input => [input.name, input]))
     for (const name of Object.keys(props.step.childWorkflow?.inputs ?? {})) {
-      if (!byName.has(name)) byName.set(name, { name, description: 'This input is not declared by the selected workflow.' })
+      if (!byName.has(name)) byName.set(name, { name, description: "The chosen workflow doesn't have this input." })
     }
     return [...byName.values()]
   }
@@ -76,9 +76,9 @@ export default function WorkflowDispatchForm(props: {
         }} />
     </Show>
 
-    <Field label="Child workflow" hint="Changing the target preserves compatible bindings so the edit is reversible."
+    <Field label="Child workflow"
       error={!targetKey() ? 'Choose a saved workflow.' : !target() ? 'This workflow is not available to the selected project.' : undefined} group>
-      <Select size="sm" label="Child workflow" disabled={props.disabled} value={targetKey()}
+      <Select label="Child workflow" disabled={props.disabled} value={targetKey()}
         options={[
           { value: '', label: 'Choose a workflow' },
           ...(!target() && targetKey() ? [{ value: targetKey(), label: `${targetKey()} (not available)` }] : []),
@@ -90,26 +90,25 @@ export default function WorkflowDispatchForm(props: {
         }} />
     </Field>
     <Show when={target()?.published === false}>
-      <Text emphasis="muted" wrap>This child is still a draft. Publication will review it with the parent.</Text>
+      <Text emphasis="muted" wrap>This workflow isn't published. It gets published with this one.</Text>
     </Show>
     <Show when={isMap() && itemSchema() && !props.disabled}>
       <Button size="sm" onPress={() => props.onCreateChild?.(itemSchema()!)}>Create a workflow for this record</Button>
     </Show>
 
     <Show when={targetInputs().length}>
-      <Fold label="Child inputs" level="group" defaultOpen><Stack gap="row">
-        <For each={targetInputs()}>{input => Binding({ ...input, required: input.required && !input.hasDefault })}</For>
-      </Stack></Fold>
+      <SectionHeader level="sub">Child inputs</SectionHeader>
+      <For each={targetInputs()}>{input => Binding({ ...input, required: input.required && !input.hasDefault })}</For>
     </Show>
 
     <Show when={isMap()}>
-      <Fold label="Advanced child settings" level="group"><Stack gap="row">
-        <Field label="Item key pointer" hint="Needed only for ordinary arrays. Source records already have stable identity." group>
-          <Input size="sm" label="Item key pointer" disabled={props.disabled} value={props.step.itemKey ?? ''}
+      <Fold label="Advanced" level="sub"><Stack gap="row">
+        <Field label="Item ID field" help="Only for plain lists. Records from a source already have an ID." group>
+          <Input label="Item ID field" disabled={props.disabled} value={props.step.itemKey ?? ''}
             placeholder="/id" onInput={itemKey => props.onChange({ itemKey: itemKey || undefined })} />
         </Field>
-        <Field label="Title template" hint="Optional. Acorn otherwise uses the record title or identity." group>
-          <Input size="sm" label="Title template" disabled={props.disabled} value={props.step.title?.template ?? ''}
+        <Field label="Task title" hint="Optional. Leave empty to use each record's title." group>
+          <Input label="Task title" disabled={props.disabled} value={props.step.title?.template ?? ''}
             placeholder="Review ${ticket}" onInput={template => props.onChange({ title: template ? { template, bindings: props.step.title?.bindings } : undefined })} />
         </Field>
         <For each={titleNames()}>{name =>

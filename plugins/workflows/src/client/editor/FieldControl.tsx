@@ -1,4 +1,4 @@
-import { createResource, Show } from 'solid-js'
+import { createContext, createResource, createSignal, Show, useContext } from 'solid-js'
 import { activeTaskId } from '@acorn/plugin-api/client'
 import { Checkbox, Field, Input, Select, Textarea } from '@acorn/plugin-api/ui'
 import type { StepField } from '../../shared/workflowContracts'
@@ -16,6 +16,21 @@ import { workflowApi } from '../workflowsClient'
  *  Two guards, and both matter. The route must sit inside that plugin's namespace, because a
  *  description is data a node sent and a route outside it would let one plugin read another's; and a
  *  placeholder the editor cannot fill means no fetch at all, because half a path is not a path. */
+/** Whether every required field shows its error, touched or not. The editor turns it on when Publish
+ *  or Run asks whether the workflow is ready; before that, an empty box on a new step is not a
+ *  mistake yet. The footer still lists what is missing either way. */
+export const RevealFieldErrors = createContext<() => boolean>(() => false)
+
+/** Whether a required field's error shows: after it is touched, or once the editor reveals them. */
+export function useRequiredError(empty: () => boolean): { error: () => string | undefined; touch: () => void } {
+  const reveal = useContext(RevealFieldErrors)
+  const [touched, setTouched] = createSignal(false)
+  return {
+    error: () => (empty() && (touched() || reveal()) ? 'Fill this in.' : undefined),
+    touch: () => setTouched(true),
+  }
+}
+
 export function fieldOptionsRoute(
   route: string,
   pluginId: string | null,
@@ -48,7 +63,6 @@ function RouteSelect(props: {
       when={route()}
       fallback={(
         <Input
-          size="sm"
           value={props.value}
           disabled={props.disabled}
           label={props.field.label}
@@ -58,7 +72,6 @@ function RouteSelect(props: {
       )}
     >
       <Select
-        size="sm"
         label={props.field.label}
         disabled={props.disabled}
         value={props.value}
@@ -86,7 +99,12 @@ export default function FieldControl(props: {
 }) {
   const text = () => (props.value == null ? '' : String(props.value))
   const hint = () => (props.field.required ? [props.field.hint, 'Required.'].filter(Boolean).join(' ') : props.field.hint)
-  const missing = () => props.field.required && !text().trim()
+  const required = useRequiredError(() => !!props.field.required && !text().trim())
+  const missing = () => !!required.error()
+  const change = (value: unknown): void => {
+    required.touch()
+    props.onChange(value)
+  }
 
   // A checkbox carries its own label, so it is not wrapped in a labelled Field: two captions for one
   // control is what `Field group` exists to avoid.
@@ -104,10 +122,9 @@ export default function FieldControl(props: {
         </Field>
       )}
     >
-    <Field label={props.field.label} hint={hint()} error={missing() ? 'This one has to be filled in.' : undefined} group>
+    <Field label={props.field.label} hint={hint()} error={required.error()} group>
       <Show when={props.field.type === 'number'}>
         <Input
-          size="sm"
           type="number"
           width="narrow"
           label={props.field.label}
@@ -117,24 +134,24 @@ export default function FieldControl(props: {
           max={props.field.max}
           value={text()}
           placeholder={props.field.placeholder}
-          onInput={(value) => props.onChange(value === '' ? undefined : Number(value))}
+          onBlur={required.touch}
+          onInput={(value) => change(value === '' ? undefined : Number(value))}
         />
       </Show>
       <Show when={props.field.type === 'text'}>
         <Input
-          size="sm"
           label={props.field.label}
           disabled={props.disabled}
           invalid={missing()}
           value={text()}
           assist={false}
           placeholder={props.field.placeholder}
-          onInput={props.onChange}
+          onBlur={required.touch}
+          onInput={change}
         />
       </Show>
       <Show when={props.field.type === 'textarea'}>
         <Textarea
-          size="sm"
           rows={4}
           mono
           label={props.field.label}
@@ -143,7 +160,8 @@ export default function FieldControl(props: {
           value={text()}
           assist={false}
           placeholder={props.field.placeholder}
-          onInput={props.onChange}
+          onBlur={required.touch}
+          onInput={change}
         />
       </Show>
       {/* A select the editor can fill draws a list. One whose route this host cannot reach, or whose
@@ -154,14 +172,14 @@ export default function FieldControl(props: {
           when={props.field.optionsRoute || (props.options ?? props.field.options ?? []).length}
           fallback={(
             <Input
-              size="sm"
               label={props.field.label}
               disabled={props.disabled}
               invalid={missing()}
               value={text()}
               assist={false}
               placeholder={props.field.placeholder}
-              onInput={props.onChange}
+              onBlur={required.touch}
+              onInput={change}
             />
           )}
         >
@@ -174,12 +192,11 @@ export default function FieldControl(props: {
               projectId={props.projectId}
               value={text()}
               disabled={props.disabled}
-              onChange={props.onChange}
+              onChange={change}
             />
           )}
         >
           <Select
-            size="sm"
             label={props.field.label}
             disabled={props.disabled}
             invalid={missing()}
@@ -192,7 +209,7 @@ export default function FieldControl(props: {
                 title: option.description,
               })),
             ]}
-            onChange={props.onChange}
+            onChange={change}
           />
         </Show>
         </Show>

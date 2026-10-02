@@ -1,6 +1,6 @@
 # 07-15. The workflow forms disagree with each other
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 The inspector and the start dialog use sm controls, the schedule dialog uses md, and

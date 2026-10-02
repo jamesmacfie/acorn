@@ -1,6 +1,6 @@
 # 07-9. Outline rows are five lines tall, and a straight chain becomes a staircase
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 Each step row in the editor's outline is compact density, 30 high, but holds the name, a two- or

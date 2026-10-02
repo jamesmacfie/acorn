@@ -484,7 +484,7 @@ function GateFormBody(props: { step: WorkflowStepRow; form: WorkflowGateForm; mo
               <Show when={edited(field.name)}>
                 <Inline gap="inline">
                   <Badge tone="accent" size="xs">Edited</Badge>
-                  <Button size="sm" variant="bare" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
+                  <Button size="sm" variant="ghost" disabled={props.model.busy()} onPress={() => set(field.name, proposal()[field.name])}>Reset</Button>
                 </Inline>
               </Show>
             </Stack>

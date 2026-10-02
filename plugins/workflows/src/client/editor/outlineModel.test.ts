@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { WorkflowDef } from '../../shared/workflowContracts'
-import { branchLabel, dependencyLabels, referenceLabels, stepSummary } from './outlineModel'
+import { branchLabel, dependencyLabels, referencingSteps, stepSummary } from './outlineModel'
 
 const inlineQuery = (pluginId: string, sourceId: string) => ({
   kind: 'inline' as const,
@@ -36,7 +36,7 @@ describe('outline model', () => {
   it('labels branches and names affected references before deletion', () => {
     expect(branchLabel(def.steps[3]!, def)).toBe('If')
     expect(branchLabel(def.steps[4]!, def)).toBe('Otherwise')
-    expect(referenceLabels('find', def)).toEqual(['For each issue dependency', 'For each issue records'])
+    expect(referencingSteps('find', def)).toEqual(['For each issue'])
   })
 
   it.each([
@@ -54,7 +54,7 @@ describe('outline model', () => {
       ],
     }
 
-    expect(stepSummary(journey.steps[0]!, journey, undefined)).toBe(`Find records from ${pluginId} · ${sourceId}.`)
+    expect(stepSummary(journey.steps[0]!, journey, undefined)).toBe(`Find ${pluginId} records.`)
     expect(stepSummary(journey.steps[1]!, journey, undefined)).toBe('For each result from Find records, run an unavailable workflow.')
     expect(dependencyLabels(journey.steps[1]!, journey)).toEqual(['Find records'])
     expect(stepSummary(journey.steps[1]!, journey, undefined)).not.toContain('/records')
