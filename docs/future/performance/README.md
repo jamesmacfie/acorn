@@ -42,7 +42,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |
-| 28 | [Telemetry retirement and total histogram bounds](./28-telemetry.md) | Through 27 | Pending |
+| 28 | [Telemetry implementation record](../../../plans/performance/implementation-28-telemetry.md) | Through 27 | Implemented; sustained-use acceptance remains separate |
 | 29 | [Sustained-use validation record](../../../plans/performance/implementation-29-sustained-validation.md) | Through 28 | Preparation recorded; final acceptance blocked |
 
 The order encodes important dependencies: client origin/draft custody before agent process work;

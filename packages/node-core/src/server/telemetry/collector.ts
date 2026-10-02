@@ -32,7 +32,7 @@ import type {
   TelemetryRuntime,
   TelemetrySpan,
 } from '@acorn/protocol/telemetry.ts'
-import { ATTR_VALUE_MAX, LOG_BODY_MAX, TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
+import { telemetryHistogramKey, ATTR_VALUE_MAX, LOG_BODY_MAX, TELEMETRY_PREF_KEY } from '@acorn/protocol/telemetry.ts'
 import type { TelemetrySummary } from '@acorn/protocol/api.ts'
 import { currentTelemetryContext, runWithTelemetryContext, type TelemetryContext } from './context'
 import { scrub, scrubAttrs, scrubLine } from './scrub'
@@ -54,7 +54,7 @@ const MAX_SAMPLES = 20_000
  *  would otherwise mint one series per call, which is the cardinality failure the vocabulary rule
  *  exists to prevent (docs/telemetry.md § The attribute vocabulary). */
 const MAX_SERIES = 200
-/** The separator inside a counter key, and inside a histogram's label fingerprint below. A control
+/** The separator inside a summary counter key. A control
  *  character because an owner, a seam and an attribute value are all free-ish text and none of them
  *  can contain one. */
 const SEP = '\u0000'
@@ -96,6 +96,7 @@ type CollectorState = {
   version: string
   dropped: number
   truncated: number
+  refused: number
   // Counters for the summary, all since the last `startTelemetry`. `dropped` and `truncated` above
   // are the pending ones: each flush turns them into a record and zeroes them, so a page reading
   // those two would show whatever happened in the last five seconds.
@@ -117,6 +118,7 @@ const state: CollectorState = {
   version: '0',
   dropped: 0,
   truncated: 0,
+  refused: 0,
   counts: new Map(),
   droppedTotal: 0,
   truncatedTotal: 0,
@@ -318,16 +320,6 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
   }
 }
 
-/** A stable fingerprint of one sample's attributes, so two samples share a histogram only when
- *  their labels match. Sorted, because two call sites can build the same attributes in a different
- *  order and a metrics backend counts those as one series. Empty for the common case of none. */
-function labelsOf(attrs: TelemetryAttrs | undefined): string {
-  if (!attrs) return ''
-  const keys = Object.keys(attrs).sort()
-  if (keys.length === 0) return ''
-  return keys.map((key) => `${key}=${String(attrs[key])}`).join(SEP)
-}
-
 /**
  * One sample into a histogram, aggregated over the flush window.
  *
@@ -343,16 +335,11 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
     // a histogram describes one label set and merging two of them under the first sample's labels
     // reports one channel's name for every channel's timings.
     const resolved = resolveOwner(owner)
-    const labels = labelsOf(attrs)
-    let key = `${resolved}${SEP}${seam}${SEP}${labels}`
+    const key = telemetryHistogramKey(resolved, seam, 'ms', attrs)
     let slot = state.histograms.get(key)
-    if (!slot && labels && state.histograms.size >= MAX_SERIES) {
-      // At the cap a sample keeps its count and loses its labels rather than being dropped: the
-      // totals stay exact, memory stays bounded, and the truncation counter says it happened.
-      state.truncated += 1
-      attrs = undefined
-      key = `${resolved}${SEP}${seam}${SEP}`
-      slot = state.histograms.get(key)
+    if (!slot && state.histograms.size >= MAX_SERIES) {
+      state.refused = Math.min(Number.MAX_SAFE_INTEGER, state.refused + 1)
+      return
     }
     if (!slot) {
       slot = { owner: resolved, seam, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
@@ -524,9 +511,15 @@ export function flushTelemetry(): void {
     if (!telemetryEnabled()) {
       state.ring = []
       state.histograms.clear()
+      state.refused = 0
       return
     }
     foldHistograms()
+    if (state.refused > 0) {
+      const refused = state.refused
+      state.refused = 0
+      push({ kind: 'metric', at: Date.now(), name: 'telemetry.histogram.refused', type: 'count', value: refused, attrs: cleanAttrs({}, 'core') })
+    }
     if (state.dropped > 0) {
       const dropped = state.dropped
       state.dropped = 0
@@ -555,14 +548,33 @@ export function flushTelemetry(): void {
   })
 }
 
-function tick(): void {
-  // The preference is re-read here rather than watched: `PUT /v1/core/prefs` writes the table
-  // directly and has nothing to notify. One SELECT every five seconds, and only while a sink is
-  // subscribed.
+// Reads join within one lifecycle. A restart, explicit preference update, or timer retirement
+// invalidates the pending answer without removing any other owner's sink.
+let preferenceGeneration = 0
+let pendingPreference: Promise<void> | null = null
+function invalidatePreference(): void {
+  preferenceGeneration += 1
+  pendingPreference = null
+}
+function refreshPreference(): Promise<void> {
+  if (pendingPreference) return pendingPreference
   const read = state.readPref
-  if (read) {
-    void read().then(setTelemetryPref).catch(() => setTelemetryPref(false)).then(flushTelemetry)
-  } else flushTelemetry()
+  if (!read) return Promise.resolve()
+  const generation = preferenceGeneration
+  const pending = read().catch(() => false).then(on => {
+    if (generation !== preferenceGeneration) return
+    applyPreference(on)
+  }).finally(() => {
+    if (pendingPreference === pending) pendingPreference = null
+  })
+  pendingPreference = pending
+  return pending
+}
+function tick(): void {
+  const generation = preferenceGeneration
+  void refreshPreference().then(() => {
+    if (generation === preferenceGeneration) flushTelemetry()
+  })
 }
 
 let stopPressure: (() => void) | null = null
@@ -579,6 +591,7 @@ function arm(): void {
 }
 
 function disarm(): void {
+  invalidatePreference()
   stopPressure?.()
   stopPressure = null
   if (!state.timer) return
@@ -610,10 +623,18 @@ export type StartTelemetryOptions = {
  * value set here is replaced within one window either way.
  */
 export function setTelemetryPref(on: boolean): void {
+  invalidatePreference()
+  applyPreference(on)
+}
+
+function applyPreference(on: boolean): void {
   state.prefEnabled = on
   if (!on && !PERF) {
     state.ring = []
     state.histograms.clear()
+    state.refused = 0
+    state.truncated = 0
+    state.dropped = 0
   }
 }
 
@@ -624,13 +645,15 @@ export function setTelemetryPref(on: boolean): void {
  * Calling it a second time resets the ring and re-reads the preference. That is the behaviour a
  * process which starts the service more than once wants, and the node's own test does exactly that.
  */
-export function startTelemetry(options: StartTelemetryOptions): void {
+export function startTelemetry(options: StartTelemetryOptions): Disposable {
+  invalidatePreference()
   state.ring = []
   state.histograms.clear()
   state.node = options.node
   state.version = options.version
   state.dropped = 0
   state.truncated = 0
+  state.refused = 0
   // The summary counts from here, which is what "since this node started" means on the page. A
   // second boot in one process is a second start, and the page says so through `since`.
   state.counts.clear()
@@ -639,10 +662,18 @@ export function startTelemetry(options: StartTelemetryOptions): void {
   state.startedAt = Date.now()
   state.lastFlushAt = null
   const read = options.readPref
-  state.readPref = read ? async () => (await read().catch(() => null)) === '1' : null
+  const reader = read ? async () => (await read().catch(() => null)) === '1' : null
+  state.readPref = reader
   state.prefEnabled = false
-  if (state.readPref) void state.readPref().then((value) => (state.prefEnabled = value)).catch(() => {})
+  if (state.readPref) void refreshPreference()
   if (PERF || state.sinks.size > 0) arm()
+  return {
+    dispose: () => {
+      if (!reader || state.readPref !== reader) return
+      invalidatePreference()
+      state.readPref = null
+    },
+  }
 }
 
 /** Flush what is held and stop the timer. The last chance a sink gets, so it runs before the node
@@ -662,6 +693,7 @@ export function resetTelemetryForTest(): void {
   state.readPref = null
   state.dropped = 0
   state.truncated = 0
+  state.refused = 0
   state.counts.clear()
   state.droppedTotal = 0
   state.truncatedTotal = 0

@@ -36,6 +36,14 @@ export const LOG_BODY_MAX = 2_000
 export const telemetryAttrsSchema = z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
 export type TelemetryAttrs = z.infer<typeof telemetryAttrsSchema>
 
+/** Typed, sorted labels and length-prefixed dimensions keep distinct legal series apart.
+ * No identities are retained outside the collector's bounded window. */
+export function telemetryHistogramKey(owner: string, seam: string, unit: string, attrs?: TelemetryAttrs): string {
+  const dimensions = `${owner.length}:${owner}${seam.length}:${seam}${unit.length}:${unit}`
+  if (!attrs || Object.keys(attrs).length === 0) return dimensions
+  return dimensions + JSON.stringify(Object.keys(attrs).sort().map(key => [key, attrs[key]]))
+}
+
 /** W3C sizes: 32 hex characters for a trace, 16 for a span, so a `traceparent` header round-trips
  *  with no conversion at either end. */
 const traceIdSchema = z.string().regex(/^[0-9a-f]{32}$/)

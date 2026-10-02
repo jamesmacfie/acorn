@@ -1,0 +1,30 @@
+{
+  "fixture": "Production emitters, synthetic sinks/posters in one Node isolate; no network, UI, or private records",
+  "node": "v24.11.0",
+  "hashes": {
+    "packages/custody/src/telemetry.ts": "40f066ea778d00eac75f033db5d363af3f8a346c312922fc5c333529bd7a05e1",
+    "packages/node-core/src/server/telemetry/collector.ts": "2561f186c224bd0fa017e9e6b19f6079a8fc5d0aedd1956d3630daa636798b1d",
+    "packages/client-core/src/infra/telemetry/emitter.ts": "0ad3bb24e8513c106308539fd79bf594d84c71bfa004cb65bb45e9233556a3de",
+    "plans/performance/unit28-probe.mts": "414dca99fd9c0c2029f3f9b212123767b456e060a32c59a6b3f73ee2d7fc4593"
+  },
+  "nodeStable100k": {
+    "cpuMs": 52.404,
+    "wallMs": 44.838791000000015
+  },
+  "nodeStableCount": 100000,
+  "nodeDistinct": {
+    "histograms": 1000,
+    "refused": 0
+  },
+  "nodeCollisionSeries": 2,
+  "clientStable100k": {
+    "cpuMs": 64.49,
+    "wallMs": 53.32491699999997
+  },
+  "clientStableCount": 100000,
+  "clientDistinct": {
+    "histograms": 1000,
+    "refused": 0
+  },
+  "clientCollisionSeries": 2
+}

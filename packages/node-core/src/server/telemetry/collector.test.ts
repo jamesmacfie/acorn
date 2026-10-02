@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TelemetryBatch, TelemetryMetric, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import type { TelemetryAttrs, TelemetryBatch, TelemetryMetric, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import {
   emitEvent,
   emitSpan,
@@ -11,6 +11,8 @@ import {
   startSpan,
   startTelemetry,
   stopTelemetry,
+  setTelemetryPref,
+  telemetrySummary,
   telemetryEnabled,
   telemetryFor,
 } from './collector'
@@ -260,4 +262,93 @@ it('reads revoked consent before handing a buffered window to sinks', async () =
   pref = '1'
   await vi.advanceTimersByTimeAsync(5_000)
   expect(sink.records()).toEqual([])
+})
+
+// Cardinality applies to names as well as labels. Admitted samples retain their exact identity.
+describe('total histogram admission', () => {
+  it.each(['unlabelled', 'labelled', 'mixed'] as const)('bounds %s series and keeps hot admitted aggregates exact', async mode => {
+    const sink = await enable()
+    for (let i = 0; i < 1_000; i++) {
+      recordDuration(mode === 'mixed' ? `owner-${i % 2}` : 'core', `operation-${i}`, 1, mode === 'unlabelled' ? undefined : { phase: `phase-${i}` })
+    }
+    recordDuration(mode === 'mixed' ? 'owner-0' : 'core', 'operation-0', 3, mode === 'unlabelled' ? undefined : { phase: 'phase-0' })
+    flushTelemetry()
+    const rows = sink.records().filter(row => row.kind === 'metric')
+    expect(rows.filter(row => row.type === 'histogram')).toHaveLength(200)
+    expect(rows.find(row => row.name === 'operation-0')?.value).toEqual({ count: 2, sum: 4, min: 1, max: 3, p50: 3, p95: 3 })
+    expect(rows.find(row => row.name === 'telemetry.histogram.refused')?.value).toBe(800)
+    recordDuration('core', 'next-window', 7)
+    flushTelemetry()
+    expect(sink.batches.at(-1)?.records).toHaveLength(1)
+    expect(sink.batches.at(-1)?.records[0]).toMatchObject({ name: 'next-window', unit: 'ms', value: { count: 1, sum: 7 } })
+  })
+
+  it('keeps scalar types and delimiter-containing labels distinct', async () => {
+    const sink = await enable()
+    for (const attrs of [{ label: 1 }, { label: '1' }, { 'a=b': 'c' }, { a: 'b=c' }] as TelemetryAttrs[]) recordDuration('core', 'operation', 1, attrs)
+    flushTelemetry()
+    expect(sink.records().filter(row => row.kind === 'metric' && row.type === 'histogram')).toHaveLength(4)
+  })
+
+  it('discards refused samples with their consent window', async () => {
+    const sink = await enable()
+    for (let i = 0; i < 1_000; i++) recordDuration('core', `operation-${i}`, 1)
+    setTelemetryPref(false)
+    setTelemetryPref(true)
+    recordDuration('core', 'after-consent', 7)
+    flushTelemetry()
+    expect(sink.records()).toHaveLength(1)
+    expect(sink.records()[0]).toMatchObject({ name: 'after-consent', value: { count: 1 } })
+  })
+})
+
+describe('preference read ownership', () => {
+  it.each(['restart', 'stop', 'last sink', 'explicit consent'] as const)('ignores an initial answer after %s', async transition => {
+    let resolve!: (value: string) => void
+    startTelemetry({ node: 'A', version: '1', readPref: () => new Promise(done => { resolve = done }) })
+    const sink = collect()
+    if (transition === 'restart') startTelemetry({ node: 'B', version: '1', readPref: async () => '0' })
+    if (transition === 'stop') stopTelemetry()
+    if (transition === 'last sink') sink.handle.dispose()
+    if (transition === 'explicit consent') setTelemetryPref(false)
+    resolve('1')
+    await settle()
+    expect(telemetryEnabled()).toBe(false)
+    expect(telemetrySummary().enabled).toBe(false)
+  })
+
+  it('joins overlapping ticks and preserves a surviving sink', async () => {
+    let resolve!: (value: string) => void
+    const readPref = vi.fn(() => new Promise<string>(done => { resolve = done }))
+    startTelemetry({ node: 'A', version: '1', readPref })
+    const departed = collect()
+    const survivor = collect()
+    departed.handle.dispose()
+    await vi.advanceTimersByTimeAsync(10_000)
+    expect(readPref).toHaveBeenCalledTimes(1)
+    resolve('1')
+    await settle()
+    emitEvent('core', 'survivor')
+    flushTelemetry()
+    expect(survivor.records()).toContainEqual(expect.objectContaining({ name: 'survivor' }))
+    expect(departed.records()).toEqual([])
+  })
+
+  it('ignores a held tick answer after stop', async () => {
+    let resolve!: (value: string) => void
+    let held = false
+    startTelemetry({ node: 'A', version: '1', readPref: () => held ? new Promise(done => { resolve = done }) : Promise.resolve('1') })
+    const sink = collect()
+    await settle()
+    held = true
+    await vi.advanceTimersByTimeAsync(5_000)
+    emitEvent('core', 'final')
+    stopTelemetry()
+    const count = sink.records().length
+    resolve('0')
+    await settle()
+    expect(telemetrySummary().enabled).toBe(true)
+    expect(sink.records()).toHaveLength(count)
+    expect(vi.getTimerCount()).toBe(0)
+  })
 })

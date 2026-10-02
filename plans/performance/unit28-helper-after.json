@@ -1,0 +1,25 @@
+{
+  "fixture": "Actual startHelperTelemetry and collector, held synthetic preference GET; no real Node, no private crash file",
+  "reads": 1,
+  "posts": 0,
+  "summaryImmediatelyAfterDispose": {
+    "enabled": false,
+    "collecting": false,
+    "since": 1790927477267,
+    "lastFlushAt": null,
+    "dropped": 0,
+    "truncated": 0,
+    "sinks": [],
+    "records": []
+  },
+  "summaryAfterLatePreferenceRead": {
+    "enabled": false,
+    "collecting": false,
+    "since": 1790927477267,
+    "lastFlushAt": null,
+    "dropped": 0,
+    "truncated": 0,
+    "sinks": [],
+    "records": []
+  }
+}

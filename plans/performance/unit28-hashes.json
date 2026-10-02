@@ -1,0 +1,14 @@
+{
+  "packages/custody/src/telemetry.ts": "793daadb2281fe1af3b56d2a6473aba442a43614e535608a02ba171b78674f06",
+  "packages/custody/src/telemetryRequests.ts": "3d9c5cd0deea988a6a89a93f2ace432b1970bad799dd2ce078a61c650743d8c0",
+  "packages/custody/src/telemetryLifecycle.test.ts": "90b3a51955866a9037de660ba50a16a7e3fca5c23ae83b002d0a35f032b20f4e",
+  "packages/node-core/src/server/telemetry/collector.ts": "1971bd10281c85c549adad81b164b0455bc17b3f60ea923d62d3dea7d925a76d",
+  "packages/node-core/src/server/telemetry/collector.test.ts": "f66db927b13c31b5ec73bf2da11f38d2e6c47535b79da561f0305eaf6e25140e",
+  "packages/node-core/src/server/telemetry/context.test.ts": "d38280a7ea3aa16583bc3a370c9306ea98dd8cc1bfcb87f5f332e569ff6ae2db",
+  "packages/client-core/src/infra/telemetry/emitter.ts": "55d5fbff6a5acb130fbcc960281d78141829b8b8d5de94c939d28e5279131b76",
+  "packages/client-core/src/infra/telemetry/emitter.test.ts": "a61c4eca79aea1eeb5531fbfd1e7aa88c3c5bdc4eb2b75834cd02427ea0fffbd",
+  "packages/protocol/src/runtime/telemetry.ts": "f146dbeed7d8a8fc20b156a30872ccd79c7c3a82afe149ef6d96536af44d92fe",
+  "plans/performance/unit28-probe.mts": "414dca99fd9c0c2029f3f9b212123767b456e060a32c59a6b3f73ee2d7fc4593",
+  "plans/performance/unit28-helper-probe.test.ts": "61d1f5e2806fb9e1096a3c2102f0a8922545c3c9d02ccd1528cdd57c2e3e2341",
+  "plans/performance/unit28-probe.config.ts": "70876bcd33822f0bc7840af92d0d7b21f454355af0940d9799db1dc1b1f32b6d"
+}

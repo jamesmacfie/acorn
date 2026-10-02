@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import type { TelemetryAttrs, TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 import { parseTraceparent } from '@acorn/protocol/telemetry.ts'
 import { reportContributionError } from '../../kit/lib/telemetry/contributionErrors'
 import { _resetSurfaceHealth, registerSurfaceHealth } from '../../kit/lib/telemetry/surfaceHealth'
@@ -312,24 +312,16 @@ describe('histograms', () => {
     expect(rows[0].kind === 'metric' && typeof rows[0].value === 'object' && rows[0].value.count).toBe(2)
   })
 
-  it('past 200 series a sample keeps its count, loses its labels, and says so', async () => {
+  it('refuses distinct series past 200 without stripping labels', async () => {
     start()
     setTelemetryEnabled(true)
     for (let index = 0; index < 250; index += 1) recordDuration('core', 'tree.apply', 1, { 'tree.id': `t${index}` })
     await flushTelemetry()
     const rows = posted[0].filter((record) => record.kind === 'metric')
-    // 200 labelled rows, the unlabelled row the overflow folded into, and the truncation count.
-    const labelled = rows.filter((row) => typeof row.attrs['tree.id'] === 'string')
-    expect(labelled).toHaveLength(200)
-    const overflow = rows.find((row) => row.name === 'tree.apply' && row.attrs['tree.id'] === undefined)
-    expect(overflow?.kind === 'metric' && typeof overflow.value === 'object' && overflow.value.count).toBe(50)
-    const truncated = rows.find((row) => row.name === 'telemetry.truncated')
-    expect(truncated?.kind === 'metric' && truncated.value).toBe(50)
-    // The totals stay exact whatever the cap did to the labels.
-    const counted = rows
-      .filter((row) => row.name === 'tree.apply')
-      .reduce((total, row) => total + (row.kind === 'metric' && typeof row.value === 'object' ? row.value.count : 0), 0)
-    expect(counted).toBe(250)
+    expect(rows.filter(row => row.type === 'histogram')).toHaveLength(200)
+    expect(rows.filter(row => row.name === 'tree.apply').every(row => typeof row.attrs['tree.id'] === 'string')).toBe(true)
+    expect(rows.find(row => row.name === 'telemetry.histogram.refused')?.value).toBe(50)
+    expect(rows.find(row => row.name === 'telemetry.truncated')).toBeUndefined()
   })
 })
 
@@ -438,5 +430,54 @@ describe('rendered-surface checkpoints', () => {
     const commits = rows.find((row) => row.name === 'ui.surface.measurement.max_commits_in_frame' && row.attrs.checkpoint === 'ready')
     expect(commits?.kind === 'metric' && typeof commits.value === 'object' && commits.value.max).toBe(3)
     for (const row of rows) expect(Object.keys(row.attrs).sort()).toEqual(['checkpoint', 'owner', 'runtime', 'seam', 'surface'])
+  })
+})
+
+describe('total histogram admission', () => {
+  it.each(['unlabelled', 'labelled', 'mixed'] as const)('bounds %s identities and admits hot samples at capacity', async mode => {
+    start()
+    setTelemetryEnabled(true)
+    for (let i = 0; i < 1_000; i++) recordSample(mode === 'mixed' ? `owner-${i % 2}` : 'core', `operation-${i}`, 1, mode === 'mixed' ? (i % 2 ? 'byte' : 'ms') : '1', mode === 'unlabelled' ? undefined : { phase: `phase-${i}` })
+    recordSample(mode === 'mixed' ? 'owner-0' : 'core', 'operation-0', 3, mode === 'mixed' ? 'ms' : '1', mode === 'unlabelled' ? undefined : { phase: 'phase-0' })
+    await flushTelemetry()
+    const rows = posted[0].filter(row => row.kind === 'metric')
+    expect(rows.filter(row => row.type === 'histogram')).toHaveLength(200)
+    expect(rows.find(row => row.name === 'operation-0')?.value).toEqual({ count: 2, sum: 4, min: 1, max: 3, p50: 3, p95: 3 })
+    expect(rows.find(row => row.name === 'telemetry.histogram.refused')?.value).toBe(800)
+    recordSample('core', 'next-window', 7, 'byte')
+    await flushTelemetry()
+    expect(posted[1]).toHaveLength(1)
+    expect(posted[1][0]).toMatchObject({ name: 'next-window', unit: 'byte', value: { count: 1, sum: 7 } })
+  })
+
+  it('keeps scalar types, separators, owners, and units distinct', async () => {
+    start()
+    setTelemetryEnabled(true)
+    for (const attrs of [{ label: 1 }, { label: '1' }, { 'a=b': 'c' }, { a: 'b=c' }] as TelemetryAttrs[]) recordSample('core', 'operation', 1, '1', attrs)
+    recordSample('other', 'operation', 1, '1', { label: 1 })
+    recordSample('core', 'operation', 1, 'byte', { label: 1 })
+    await flushTelemetry()
+    expect(posted[0].filter(row => row.kind === 'metric' && row.type === 'histogram')).toHaveLength(6)
+  })
+
+  it('retries refused counts once and discards them on consent revocation', async () => {
+    let fail = true
+    start(async rows => { if (fail) throw new Error('offline'); posted.push([...rows]) })
+    setTelemetryEnabled(true)
+    for (let i = 0; i < 1_000; i++) recordDuration('core', `operation-${i}`, 1)
+    await flushTelemetry()
+    fail = false
+    recordDuration('core', 'next-window', 7)
+    await flushTelemetry()
+    const metrics = posted.flat().filter(row => row.kind === 'metric')
+    expect(metrics.filter(row => row.type === 'histogram')).toHaveLength(201)
+    expect(metrics.filter(row => row.name === 'telemetry.histogram.refused').map(row => row.value)).toEqual([800])
+    for (let i = 0; i < 1_000; i++) recordDuration('core', `pending-${i}`, 1)
+    setTelemetryEnabled(false)
+    setTelemetryEnabled(true)
+    recordDuration('core', 'after-consent', 7)
+    await flushTelemetry()
+    expect(posted.at(-1)).toHaveLength(1)
+    expect(posted.at(-1)?.[0]).toMatchObject({ name: 'after-consent', value: { count: 1 } })
   })
 })

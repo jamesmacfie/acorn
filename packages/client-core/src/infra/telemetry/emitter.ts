@@ -31,7 +31,7 @@ import type {
   TelemetrySpan,
   PostedTelemetryRuntime,
 } from '@acorn/protocol/telemetry.ts'
-import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
+import { telemetryHistogramKey, ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, formatTraceparent } from '@acorn/protocol/telemetry.ts'
 import { setContributionErrorHandler } from '../../kit/lib/telemetry/contributionErrors'
 import { setWorkTelemetry } from '../../kit/lib/telemetry/workTelemetry'
 import { setScrollPlaceHandler } from '../../kit/lib/telemetry/scrollPlace'
@@ -87,6 +87,7 @@ type EmitterState = {
   posting: boolean
   trace: { traceId: string; spanId: string } | null
   truncated: number
+  refused: number
   generation: number
 }
 
@@ -100,6 +101,7 @@ const state: EmitterState = {
   posting: false,
   trace: null,
   truncated: 0,
+  refused: 0,
   generation: 0,
 }
 
@@ -125,6 +127,9 @@ export function setTelemetryEnabled(on: boolean): void {
   disarm()
   state.queue.take()
   state.histograms.clear()
+  state.refused = 0
+  state.truncated = 0
+  state.queue.takeDropped()
   state.trace = null
 }
 
@@ -490,16 +495,6 @@ export function measureRenderBatch<T>(
   }
 }
 
-/** One histogram per owner, seam and label set, so two samples share a row only when all three
- *  match. Sorted, because two call sites can build the same attributes in a different order and a
- *  metrics backend counts those as one series. Empty for the common case of none. */
-function labelsOf(attrs: TelemetryAttrs | undefined): string {
-  if (!attrs) return ''
-  const keys = Object.keys(attrs).sort()
-  if (keys.length === 0) return ''
-  return keys.map((key) => `${key}=${String(attrs[key])}`).join('\u0000')
-}
-
 /** One sample into a histogram, aggregated over the flush window. What a seam past about ten a
  *  second uses instead of a span (docs/telemetry.md § Hot seams are metrics). */
 export const recordDuration = (owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void =>
@@ -515,16 +510,11 @@ export function recordSample(owner: string, seam: string, ms: number, unit = '1'
     // reports one pane's name for every pane's timings. The terminal client's `tui.frame` carries a
     // phase and its `tui.key` carries a reason, so this is the difference between four rows and one
     // wrong one.
-    const labels = labelsOf(attrs)
-    let key = `${owner}\u0000${seam}\u0000${unit}\u0000${labels}`
+    const key = telemetryHistogramKey(owner, seam, unit, attrs)
     let slot = state.histograms.get(key)
-    if (!slot && labels && state.histograms.size >= MAX_SERIES) {
-      // At the cap a sample keeps its count and loses its labels rather than being dropped: the
-      // totals stay exact, memory stays bounded, and the truncation counter says it happened.
-      state.truncated += 1
-      attrs = undefined
-      key = `${owner}\u0000${seam}\u0000${unit}\u0000`
-      slot = state.histograms.get(key)
+    if (!slot && state.histograms.size >= MAX_SERIES) {
+      state.refused = Math.min(Number.MAX_SAFE_INTEGER, state.refused + 1)
+      return
     }
     if (!slot) {
       slot = { owner, seam, unit, attrs: { ...attrs, seam }, histogram: { count: 0, sum: 0, min: ms, max: ms, samples: [] } }
@@ -608,6 +598,11 @@ function foldHistograms(): void {
 export async function flushTelemetry(): Promise<void> {
   if (!state.enabled || state.posting) return
   safely(foldHistograms)
+  if (state.refused > 0) {
+    const refused = state.refused
+    state.refused = 0
+    state.queue.push({ kind: 'metric', at: Date.now(), name: 'telemetry.histogram.refused', type: 'count', value: refused, attrs: cleanAttrs({}, 'core') })
+  }
   slowSamples = 0
   const dropped = state.queue.takeDropped()
   if (dropped > 0) {
@@ -733,6 +728,7 @@ export function _resetClientTelemetry(): void {
   renderBatches.clear()
   state.trace = null
   state.truncated = 0
+  state.refused = 0
   state.runtime = 'renderer'
   spansOnTimeline = false
 }

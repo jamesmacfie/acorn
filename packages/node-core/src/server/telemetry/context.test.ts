@@ -151,14 +151,14 @@ describe('a histogram keeps one label set', () => {
     expect(metrics()[0]!.value).toMatchObject({ count: 2 })
   })
 
-  it('drops the labels rather than the sample once the series cap is reached', () => {
+  it('refuses samples for distinct labels once the series cap is reached', () => {
     for (let index = 0; index < 260; index += 1) recordDuration('core', 'ws.frame', 1, { channel: `c${index}` })
     const series = metrics().filter((metric) => metric.name === 'ws.frame')
-    expect(series.length).toBeLessThanOrEqual(201)
-    // Nothing is lost: every sample is still counted somewhere.
+    expect(series).toHaveLength(200)
+    // Admitted histograms remain separate from refused sample counts.
     const counted = series.reduce((total, metric) => total + (typeof metric.value === 'number' ? 0 : metric.value.count), 0)
-    expect(counted).toBe(260)
+    expect(counted).toBe(200)
     // And the overflow is visible instead of silent.
-    expect(metrics().some((metric) => metric.name === 'telemetry.truncated')).toBe(true)
+    expect(metrics().find(metric => metric.name === 'telemetry.histogram.refused')?.value).toBe(60)
   })
 })
