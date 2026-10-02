@@ -1,7 +1,6 @@
 import { createEffect, createSignal, Index, Show } from 'solid-js'
 import { Input } from '../../kit/components/primitives'
 import { IconButton } from '../../kit/components/inputs/IconButton'
-import { createArmedConfirm } from '../../kit/lib/controls/confirm'
 import { isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import { ContextMenu, Menu, type MenuContext } from '../../kit/components/overlays/Menu'
 import { addTab, homeTabDomId, HOME_TAB_PANEL_ID, renameTab, shiftTab } from './homeTab'
@@ -59,7 +58,6 @@ export default function DashboardTabs(props: {
   const [renaming, setRenaming] = createSignal<string>()
   const [menuAt, setMenuAt] = createSignal<{ x: number; y: number } | null>(null)
   const [menuTab, setMenuTab] = createSignal<DashboardTab>()
-  const confirmDelete = createArmedConfirm()
 
   createEffect(() => revealActiveTab(stripRef, homeTabDomId(props.active)))
 
@@ -145,16 +143,8 @@ export default function DashboardTabs(props: {
           "empty it", and it is the one tab that must stay reachable. */}
       <Show when={tab.id}>
         <Menu.Separator />
-        {/* Armed, and the copy says what survives: arrangement is real work, definitions are not at
-            risk (tabs.md § Survival rules). */}
-        <Menu.Item
-          context={menu}
-          tone="danger"
-          closeOnSelect={confirmDelete.armed() === tab.id}
-          title="Panels stay in your library and on other tabs."
-          onSelect={() => { if (confirmDelete.request(tab.id)) remove(tab) }}
-        >
-          {confirmDelete.armed() === tab.id ? 'Delete — press again' : 'Delete dashboard'}
+        <Menu.Item context={menu} tone="danger" confirm="Delete dashboard?" onSelect={() => remove(tab)}>
+          Delete dashboard
         </Menu.Item>
       </Show>
     </>
@@ -205,23 +195,28 @@ export default function DashboardTabs(props: {
             >
               <RenameTab name={tab().name} onCommit={(name) => commitRename(tab(), name)} />
             </Show>
-            <Show when={props.active === tab().id && renaming() !== tab().id}>
-              <Menu
-                ariaLabel={`${tab().name} dashboard actions`}
-                placement="bottom-start"
-                trigger={({ open, toggle }) => (
-                  <IconButton
-                    size="xs"
-                    variant="ghost"
-                    icon="chevron-down"
-                    label={`${tab().name} dashboard actions`}
-                    {...(open() ? { 'data-open': '' } : {})}
-                    onPress={toggle}
-                  />
-                )}
-              >
-                {(menu) => verbs(tab(), menu)}
-              </Menu>
+            {/* Every tab keeps the chevron's room, so picking one does not shift the strip sideways.
+                Only the active tab draws the button, so the others add no tab stop. */}
+            <Show when={renaming() !== tab().id}>
+              <Show when={props.active === tab().id} fallback={<span class="dash-tab-menu-room" aria-hidden="true" />}>
+                <Menu
+                  ariaLabel={`${tab().name} dashboard actions`}
+                  placement="bottom-start"
+                  trigger={({ open, toggle }) => (
+                    <IconButton
+                      size="xs"
+                      variant="ghost"
+                      icon="chevron-down"
+                      label={`${tab().name} dashboard actions`}
+                      opens="menu"
+                      expanded={open()}
+                      onPress={toggle}
+                    />
+                  )}
+                >
+                  {(menu) => verbs(tab(), menu)}
+                </Menu>
+              </Show>
             </Show>
           </span>
         )}
@@ -235,7 +230,7 @@ export default function DashboardTabs(props: {
         variant="ghost"
         icon="plus"
         label="New dashboard"
-        title={props.tabs.length >= MAX_TABS ? `${MAX_TABS} dashboards is the limit.` : 'New dashboard'}
+        tip={props.tabs.length >= MAX_TABS ? `You can have up to ${MAX_TABS} dashboards.` : 'New dashboard'}
         disabled={props.tabs.length >= MAX_TABS}
         onPress={create}
       />

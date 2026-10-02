@@ -24,11 +24,17 @@ Missing plugins, connections, publications, or fields are unavailable states. Th
 silently replaced with an empty result or a guessed schema. Source identity is
 `(pluginId, sourceId)`; record identity and provenance remain the source contract's responsibility.
 
+Pressing a row in a placed panel runs the record's declared action through `runChromeAction`, the
+same dispatcher a rail row uses. An action whose `risk` is `write` or `execute` asks first, in a strip
+above the rows. Rows in the editor's preview are not pressable.
+
 ## Editor
 
 The editor uses the shared data controls for source choice, scope, parameters, predicates, sort,
 and preview. Mapping and display configuration are pure `dashboards-core` projections. Publication
 is the boundary between mutable authoring state and a panel that can be placed or sampled.
+**Edit** on a placed panel runs **Refresh preview** once on open. A preview reads the source and
+writes nothing to the draft.
 
 The old flat panel form and client collection registry do not exist. Old definitions are rejected by
 the versioned persistence parser and are recoverable only from the workflow-v2 transition export.

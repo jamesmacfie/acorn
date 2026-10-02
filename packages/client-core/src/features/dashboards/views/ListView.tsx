@@ -4,7 +4,7 @@ import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { titleField } from '../shaping'
 import Cell from './Cell'
 import Provenance from './Provenance'
-import type { PanelViewProps } from './props'
+import { rowPress, type PanelViewProps } from './props'
 
 // The list view: the title-role field leads, everything else projected trails as meta.
 //
@@ -28,7 +28,7 @@ export default function ListView(props: PanelViewProps) {
       {(row) => (
         <Row
           density="compact"
-          onPress={row.action ? () => props.onActivate(row) : undefined}
+          onPress={rowPress(props, row)}
           leading={(
             <>
               <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>

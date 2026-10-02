@@ -18,11 +18,15 @@
 .dash-v2-preview {
   position: sticky;
   top: 0;
+  display: flex;
   min-height: 22rem;
+}
+/* The preview is the placed panel's `Card`, so it draws at the panel's pad and edge. */
+.dash-v2-preview > .ui-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
   overflow: auto;
-  border: var(--surface-border);
-  border-radius: var(--radius-md);
-  background: var(--bg);
 }
 
 @media (max-width: 760px) {
@@ -76,12 +80,22 @@
   border-bottom: var(--tab-active-w) solid transparent;
   cursor: pointer;
   white-space: nowrap;
-  max-width: 16ch;
+  max-width: 24ch;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .dash-tab[aria-selected='true'] { color: var(--text); border-bottom-color: var(--accent); }
 .dash-tab:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: -2px; }
+/* An inactive tab keeps the room its chevron takes when active, so selecting a tab moves nothing.
+   The chevron fades in rather than popping. */
+.dash-tab-menu-room {
+  flex: none;
+  width: var(--control-h-xs);
+}
+.dash-tab-slot .ui-btn {
+  animation: dash-fade-in var(--dur-short) var(--ease-out);
+}
+@keyframes dash-fade-in { from { opacity: 0; } }
 @media (hover: hover) {
   .dash-tab:hover { color: var(--text); background: var(--bg-hover); }
 }
@@ -103,7 +117,7 @@
   display: grid;
   grid-template-columns: repeat(12, minmax(0, 1fr));
   grid-auto-rows: var(--dash-cell);
-  gap: var(--space-3);
+  gap: var(--gap-stack);
   min-width: 0;
 }
 
@@ -160,6 +174,14 @@
 .dash-slot[data-gesture='keyboard'] {
   z-index: var(--z-float);
 }
+/* The panel the arrow keys are moving: the focus ring and a raised shadow, so the mode reads on the
+   panel and not only on the lattice behind it. */
+.dash-slot[data-gesture='keyboard'] {
+  outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus);
+  outline-offset: var(--focus-ring-offset);
+  border-radius: var(--radius-surface);
+  box-shadow: var(--shadow-3);
+}
 
 /* Where the panel will be, not a diagram of it: the panel's own radius, a solid edge and a wash of the
    accent. `color-mix` over `--accent` rather than a wash token, so the terminal pack's accent and a
@@ -201,14 +223,17 @@
   transition: opacity var(--dur-short) var(--ease-out);
 }
 
-/* The keyboard path's announcement, drawn. Same string as the live region, near the panel it is about,
-   because a sighted keyboard user was getting strictly less than a screen-reader one. */
+/* The keyboard path's announcement, drawn, with how to use it. Same position string as the live
+   region, because a sighted keyboard user was getting strictly less than a screen-reader one. Inside
+   the panel's bottom edge, so it never sits over the next panel's title. */
 .dash-caption {
   position: absolute;
-  inset-block-start: 100%;
-  inset-inline-start: 0;
+  inset-block-end: var(--space-3);
+  inset-inline: var(--space-3);
   z-index: var(--z-float);
-  margin-block-start: var(--space-1);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
   padding: var(--space-1) var(--space-2);
   border: var(--surface-border);
   border-radius: var(--radius-popover);
@@ -216,7 +241,6 @@
   box-shadow: var(--shadow-2);
   color: var(--text-muted);
   font-size: var(--fs-sm);
-  white-space: nowrap;
   pointer-events: none;
 }
 
@@ -287,11 +311,19 @@
 /* Also the placement's drag surface (dashboards/PanelGrid.tsx). The body is not, so a press inside a
    board stays free for a future card gesture. The cursor is the whole affordance. */
 .dash-panel-head {
+  position: relative;
   display: flex;
   align-items: center;
   gap: var(--gap-inline);
   min-width: 0;
   touch-action: none;
+}
+/* The title gives way to the buttons, never the reverse. */
+.dash-panel-head > .ui-heading { flex: 1 1 0; }
+.dash-panel-head .ui-heading-title {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .dash-grid:not([data-collapsed]) .dash-panel-head {
   cursor: grab;
@@ -300,13 +332,16 @@
   cursor: grabbing;
 }
 
-/* The grip: a 2x3 dot field at the header's leading edge, appearing on hover or focus-within. A
-   pseudo-element, so it is decoration the accessibility tree never sees and Panel.tsx never learns
-   about. The whole header is still the drag surface and the keyboard path is still the overflow menu's
-   "Move / resize". Drawn only where dragging is actually offered. */
+/* The grip: a 2x3 dot field in the card's padding beside the title, appearing on hover or
+   focus-within. Absolute, so it takes no room and the title, rows, and body share the card's edge. A
+   pseudo-element, so the accessibility tree never sees it. The whole header is still the drag surface
+   and the keyboard path is still the overflow menu's "Move or resize". Drawn only where dragging is
+   offered. */
 .dash-grid:not([data-collapsed]) .dash-panel-head::before {
   content: '';
-  flex: none;
+  position: absolute;
+  inset-inline-start: calc(var(--space-4) * -1);
+  inset-block-start: calc(50% - var(--space-2));
   width: 6px;
   height: 9px;
   opacity: 0;
@@ -332,7 +367,7 @@
 }
 .dash-slot:hover .dash-panel-head button,
 .dash-slot:focus-within .dash-panel-head button,
-.dash-slot .dash-panel-head button[data-open] {
+.dash-slot .dash-panel-head button[aria-expanded='true'] {
   opacity: 1;
 }
 
@@ -349,14 +384,9 @@
   .dash-slot .dash-panel-head button {
     transition: none;
   }
-}
-.dash-panel-title {
-  flex: 1;
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  font-weight: var(--fw-medium);
+  .dash-tab-slot .ui-btn {
+    animation: none;
+  }
 }
 /* Scrolls itself rather than growing the surface: the rect decides how tall a panel is, and a 500-row
    source result must not decide it instead. A table taller than its panel scrolls inside it, which is what
@@ -377,8 +407,8 @@
 .dash-board {
   display: grid;
   grid-auto-flow: column;
-  grid-auto-columns: minmax(200px, 1fr);
-  gap: var(--space-3);
+  grid-auto-columns: minmax(200px, 320px);
+  gap: var(--gap-stack);
   overflow-x: auto;
   min-width: 0;
   min-height: 0;
@@ -401,7 +431,6 @@
   font-size: var(--fs-sm);
 }
 .dash-board-column-label {
-  flex: 1;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -466,7 +495,9 @@
                   ok-green only because it was drawn second is a judgement nobody made.
 
    Both restyle with the appearance pack; neither is spelled in ChartView.tsx. */
+/* The font size here is what ChartView reads to size its ticks (views/ChartView.tsx). */
 .dash-chart-wrap {
+  font-size: var(--fs-2xs);
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
@@ -649,6 +680,7 @@
 }
 .dash-stat-value {
   font-size: var(--fs-xl);
+  font-weight: var(--heading-weight);
   font-variant-numeric: var(--tabular);
   line-height: var(--lh-tight);
 }

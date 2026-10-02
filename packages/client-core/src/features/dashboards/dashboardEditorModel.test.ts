@@ -76,8 +76,8 @@ describe('dashboard editor model', () => {
 
   it('explains unavailable view prerequisites', () => {
     expect(availableDashboardViews({})).not.toContain('board')
-    expect(unavailableViewReason('board')).toContain('mapped status')
-    expect(unavailableViewReason('chart')).toContain('datetime')
+    expect(unavailableViewReason('board')).toContain('fixed set of values')
+    expect(unavailableViewReason('chart')).toContain('date field')
   })
 
   it('resumes the newest unpublished draft without replacing a placed publication', () => {

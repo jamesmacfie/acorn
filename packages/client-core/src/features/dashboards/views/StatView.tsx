@@ -43,7 +43,7 @@ export default function StatView(props: PanelViewProps) {
   }
 
   const label = () => {
-    if (aggregate() === 'count') return props.rows.length === 1 ? 'row' : 'rows'
+    if (aggregate() === 'count') return props.plural ?? 'items'
     return `${AGGREGATE_LABELS[aggregate()] ?? aggregate()} · ${field()?.name ?? props.view.field ?? ''}`
   }
 
@@ -111,7 +111,7 @@ export default function StatView(props: PanelViewProps) {
           today has an empty series and says so rather than drawing a flat line through a fortnight
           it was not watching. */}
       <Show when={props.view.trend === 'history' && !mark()}>
-        <span class="dash-stat-label">Collecting — hourly, from now on.</span>
+        <span class="dash-stat-label">Recording once an hour from today.</span>
       </Show>
     </div>
   )

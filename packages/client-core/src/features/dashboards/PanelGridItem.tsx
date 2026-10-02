@@ -1,7 +1,6 @@
 import { For, onCleanup, Show, type Accessor, type JSX } from 'solid-js'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu } from '../../kit/components/overlays/Menu'
-import { createArmedConfirm } from '../../kit/lib/controls/confirm'
 import type { PanelDefinition } from './model'
 import PublishedDashboardPanel from './PublishedDashboardPanel'
 
@@ -43,8 +42,6 @@ export default function PanelGridItem(props: {
   layout: PanelGridItemLayout
   actions: PanelGridItemActions
 }) {
-  const confirmDelete = createArmedConfirm()
-
   const chrome = () => (
     <Menu
       ariaLabel={`${props.definition.title} panel actions`}
@@ -55,9 +52,10 @@ export default function PanelGridItem(props: {
           variant="ghost"
           icon="ellipsis"
           label={`${props.definition.title} panel actions`}
-          // Header actions fade when the pointer leaves. Keep the trigger present while its portalled
-          // menu owns pointer and focus.
-          {...(open() ? { 'data-open': '' } : {})}
+          // Header actions fade when the pointer leaves. `aria-expanded` keeps the trigger present
+          // while its portalled menu owns pointer and focus (dashboards.css).
+          opens="menu"
+          expanded={open()}
           onPress={toggle}
         />
       )}
@@ -67,7 +65,7 @@ export default function PanelGridItem(props: {
           <Menu.Item context={menu} onSelect={props.actions.edit}>Edit</Menu.Item>
           <Menu.Separator />
           <Show when={!props.layout.collapsed()}>
-            <Menu.Item context={menu} onSelect={props.actions.beginLayout}>Move / resize</Menu.Item>
+            <Menu.Item context={menu} onSelect={props.actions.beginLayout}>Move or resize</Menu.Item>
           </Show>
           <Menu.Item context={menu} disabled={!props.actions.canMove(-1)} onSelect={() => props.actions.move(-1)}>
             Move up
@@ -84,18 +82,14 @@ export default function PanelGridItem(props: {
           </Show>
           <Menu.Separator />
           {/* Remove keeps the definition for its other placements; Delete destroys it everywhere. */}
-          <Menu.Item context={menu} onSelect={props.actions.remove}>Remove from here</Menu.Item>
+          <Menu.Item context={menu} onSelect={props.actions.remove}>Remove from this dashboard</Menu.Item>
           <Menu.Item
             context={menu}
             tone="danger"
-            closeOnSelect={confirmDelete.armed() === props.definition.id}
-            onSelect={() => {
-              if (confirmDelete.request(props.definition.id)) {
-                void props.actions.delete().catch(props.actions.deleteFailed)
-              }
-            }}
+            confirm="Delete panel?"
+            onSelect={() => void props.actions.delete().catch(props.actions.deleteFailed)}
           >
-            {confirmDelete.armed() === props.definition.id ? 'Delete — press again' : 'Delete panel'}
+            Delete panel
           </Menu.Item>
         </>
       )}
@@ -134,6 +128,7 @@ export default function PanelGridItem(props: {
           definition={props.definition}
           workspaceId={props.workspaceId}
           actions={chrome()}
+          onEdit={props.actions.edit}
           headProps={props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag }}
         />
       </Show>
@@ -143,7 +138,10 @@ export default function PanelGridItem(props: {
         {handle('se')}
       </Show>
       <Show when={props.layout.keyboardActive()}>
-        <div class="dash-caption" aria-hidden="true">{props.layout.announcement()}</div>
+        <div class="dash-caption" aria-hidden="true">
+          <span>{props.layout.announcement()}</span>
+          <span>Arrow keys move. Shift and arrows resize. Enter to finish.</span>
+        </div>
       </Show>
     </div>
   )

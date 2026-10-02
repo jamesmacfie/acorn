@@ -158,17 +158,17 @@ describe('the arranged layout', () => {
       layouts: {},
     })
     const layout = layoutAt(HOME_PLACEMENT)
-    expect(layout.rects.a).toEqual({ x: 0, y: 0, w: 4, h: 4 })
-    expect(layout.rects.b).toEqual({ x: 4, y: 0, w: 4, h: 4 })
+    expect(layout.rects.a).toEqual({ x: 0, y: 0, w: 4, h: 3 })
+    expect(layout.rects.b).toEqual({ x: 4, y: 0, w: 4, h: 3 })
   })
 
-  it('sizes a panel by its view kind, so a board arrives full width', () => {
+  it('sizes a panel by its view kind, so a board arrives wider than a list', () => {
     hydrateDashboards({ version: 1,
       panels: { a: panel('a', { view: { kind: 'board' } }) },
       placements: { home: ['a'] },
       layouts: {},
     })
-    expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 0, y: 0, w: 12, h: 4 })
+    expect(layoutAt(HOME_PLACEMENT).rects.a).toEqual({ x: 0, y: 0, w: 8, h: 4 })
   })
 
   it('auto-places only the panel that has no rect', () => {
@@ -179,7 +179,7 @@ describe('the arranged layout', () => {
     })
     const layout = layoutAt(HOME_PLACEMENT)
     expect(layout.rects.a).toEqual({ x: 0, y: 0, w: 8, h: 3 })
-    expect(layout.rects.b).toEqual({ x: 8, y: 0, w: 4, h: 4 })
+    expect(layout.rects.b).toEqual({ x: 8, y: 0, w: 4, h: 3 })
   })
 
   it('ignores a retained rect whose panel is not placed here', () => {

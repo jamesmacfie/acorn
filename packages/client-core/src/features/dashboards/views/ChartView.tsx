@@ -1,6 +1,6 @@
-import { createMemo, For, Show } from 'solid-js'
+import { createMemo, createSignal, For, onCleanup, Show } from 'solid-js'
 import { EmptyState } from '../../../kit/components/primitives'
-import { buildChart, CHART_FRAME, TICK_GAP } from '../chart'
+import { buildChart, CHART_BOX, CHART_FRAME, TICK_FONT, TICK_GAP } from '../chart'
 import type { PanelViewProps } from './props'
 
 // The chart view. Every number on screen comes out of `chart.ts`, which is pure and tested; this
@@ -11,11 +11,27 @@ import type { PanelViewProps } from './props'
 // `dashboards.css` owning the colour. No `fill="#…"` here, so a swatch and its mark cannot drift
 // apart. See docs/dashboards.md § Views are derived, not chosen from a menu.
 
-const LABEL_DROP = 10
-
 export default function ChartView(props: PanelViewProps) {
+  // The box scales uniformly (`meet`), so its scale is the smaller of the two ratios. Dividing the
+  // wrapper's `--fs-2xs` by it gives a tick size in user units that draws at `--fs-2xs` on screen.
+  // The size comes off the wrapper's computed style, not the token by name, as PanelGrid reads its gap.
+  const [tickFont, setTickFont] = createSignal(TICK_FONT)
+  let observer: ResizeObserver | undefined
+  onCleanup(() => observer?.disconnect())
+  const watch = (svg: SVGSVGElement) => {
+    const measure = () => {
+      const scale = Math.min(svg.clientWidth / CHART_BOX.width, svg.clientHeight / CHART_BOX.height)
+      const px = Number.parseFloat(getComputedStyle(svg.parentElement ?? svg).fontSize)
+      if (scale > 0 && px > 0) setTickFont(Math.round((px / scale) * 10) / 10)
+    }
+    queueMicrotask(measure)
+    if (typeof ResizeObserver === 'undefined') return
+    observer?.disconnect()
+    observer = new ResizeObserver(measure)
+    observer.observe(svg)
+  }
   const plot = createMemo(() =>
-    buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}))
+    buildChart(props.rows, props.schema, props.view, props.groupBy ? { groupBy: props.groupBy } : {}, tickFont()))
 
   // Every coordinate comes off the plot's own frame, never a module constant, because the left
   // gutter is as wide as this chart's y axis labels need. `CHART_FRAME` is only the stand-in for
@@ -42,12 +58,12 @@ export default function ChartView(props: PanelViewProps) {
     <Show
       when={plot()}
       fallback={(
-        <EmptyState align="start" size="sm" title="Nothing to chart">
-          This source has no field with a fixed set of values and no date to plot against.
+        <EmptyState align="start" size="sm" title="Can't chart this source">
+          It has no status, category, or date field to chart by.
         </EmptyState>
       )}
     >
-      <Show when={props.rows.length} fallback={<EmptyState align="start" size="sm">No rows.</EmptyState>}>
+      <Show when={props.rows.length} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
         <div class="dash-chart-wrap">
           {/* One row above the plot, wrapping rather than truncating. Identity lives in the swatch,
               never in coloured text, so the legend reads the same to someone who cannot tell the
@@ -92,11 +108,10 @@ export default function ChartView(props: PanelViewProps) {
               </ul>
             )}
           </Show>
-          {/* `font-size` in user units, from the frame. Inside a scaled viewBox a CSS px is a user
-              unit, so type set in the stylesheet scales with the drawing and `--fs-2xs` came out
-              enormous on a large panel. Here it is geometry (chart.ts § TICK_FONT); the stylesheet
-              keeps the colour. */}
+          {/* `font-size` in user units, from the frame (chart.ts § TICK_FONT); the stylesheet keeps
+              the colour. */}
           <svg
+            ref={watch}
             class="dash-chart"
             viewBox={`0 0 ${frame().width} ${frame().height}`}
             font-size={String(frame().tickFont)}
@@ -178,7 +193,7 @@ export default function ChartView(props: PanelViewProps) {
                 <text
                   class="dash-chart-tick"
                   x={tick.at}
-                  y={frame().baseline + LABEL_DROP}
+                  y={frame().baseline + frame().labelDrop}
                   text-anchor={tick.anchor ?? 'middle'}
                 >
                   {tick.label}

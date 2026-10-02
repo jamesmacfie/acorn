@@ -44,6 +44,9 @@ export type AuthoringConversationProps = {
   /** Drawn as a modal's body and footer, with Send and Close in the footer, for a host that frames
    *  it in a `Modal`. Close calls this. Without it the conversation draws in its own fold. */
   onClose?: () => void
+  /** Whether the fold starts open, without `onClose`. Default true. A second conversation inside a
+   *  form that already has one starts closed. */
+  defaultOpen?: boolean
   /** How a proposal names what a change touches, such as a workflow step by its name rather than
    *  its id. `candidate` is the proposed value, which holds anything the change adds. The path is
    *  the default. */
@@ -172,7 +175,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       <Text emphasis="muted" wrap>
         {samplesEnabled()
           ? 'Up to 3 records and 16 KiB from a model-requested preview may be sent through the selected backend.'
-          : 'Only source metadata is shared. Preview record contents stay off.'}
+          : "The AI sees each source's fields and choices, not its records."}
       </Text>
       <Show when={!props.onClose}>
         <Inline gap="inline" wrap>
@@ -213,7 +216,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       </ErrorBoundary>
     </Stack>
   )
-  if (!props.onClose) return <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen>{body}</Fold>
+  if (!props.onClose) return <Fold label={`AI authoring · ${props.label}`} level="group" defaultOpen={props.defaultOpen ?? true}>{body}</Fold>
   // While a turn is out, the ghost button stops it rather than closing over it.
   return (
     <>

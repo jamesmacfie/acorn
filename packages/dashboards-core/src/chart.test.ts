@@ -153,15 +153,19 @@ describe('bar charts', () => {
     expect(plot.bars.every((bar) => bar.series === undefined)).toBe(true)
   })
 
-  it('gives an undeclared category an identity slot, never a status tone', () => {
+  it('draws an unsplit bar with no declared tone in the accent, never a status tone', () => {
     const kind = { id: 'kind', name: 'Kind', type: 'enum' as const }
     const undeclared = ['a', 'b', 'c', 'd', 'e'].map((value, index) => row(`${index}`, { kind: value }))
     const plot = buildChart(undeclared, schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    // Three slots then the fold, and not one of them borrows ok, warn or bad. See
-    // docs/dashboards.md § Views are derived, not chosen from a menu.
-    expect(plot.bars.map((bar) => bar.series)).toEqual([1, 2, 3, 'other', 'other'])
-    expect(plot.bars.every((bar) => bar.tone === undefined)).toBe(true)
+    // One series: the x axis names each category, so identity colour has no job here.
+    expect(plot.bars.every((bar) => bar.tone === 'accent' && bar.series === undefined)).toBe(true)
+  })
+
+  it('grows the bottom pad and the label drop with a larger tick font', () => {
+    const plot = buildChart([row('1', { state: 'open' })], schema(status), { kind: 'chart', shape: 'bar', x: 'state' }, {}, 20)
+    expect(plot?.frame.tickFont).toBe(20)
+    expect(plot!.frame.height - plot!.frame.baseline).toBeGreaterThanOrEqual(plot!.frame.labelDrop + 20)
   })
 
   it('draws a declared value with no rows as a zero-height bar rather than dropping the column', () => {
@@ -192,14 +196,13 @@ describe('bar charts', () => {
     expect(plot.xTicks.length).toBeLessThanOrEqual(8)
   })
 
-  it('gives a value DECLARED WITHOUT A TONE an identity slot, not the muted default', () => {
+  it('gives a value DECLARED WITHOUT A TONE the accent, not the muted default', () => {
     // The plugin declared that the value exists, not what it means, so there is no meaning to keep.
-    // Colouring every value of an untoned enum `muted` would make them all the same bar: the identity
-    // ramp is for identity with no declared tone.
+    // Colouring every value of an untoned enum `muted` would draw them all in faint ink.
     const kind = { id: 'kind', name: 'Kind', type: 'enum' as const, values: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }] }
     const plot = buildChart([row('1', { kind: 'a' })], schema(kind), { kind: 'chart', shape: 'bar', x: 'kind' }, {})
     if (plot?.shape !== 'bar') throw new Error('expected a bar chart')
-    expect(plot.bars.map((bar) => bar.series)).toEqual([1, 2])
+    expect(plot.bars.map((bar) => bar.tone)).toEqual(['accent', 'accent'])
   })
 
   it('draws no legend for an unsplit bar — its categories are named on the axis, not by a swatch', () => {
