@@ -26,7 +26,7 @@ import NodeGate from '@acorn/client-core/features/fleet/NodeGate.tsx'
 import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
-import { applyNodePlugins } from './activate'
+import { applyNodePlugins, clientPluginsReady } from './activate'
 import { clearCache } from './clearCache'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
@@ -287,6 +287,7 @@ export default function App() {
     prefsSettled: () => Math.max(prefs.dataUpdatedAt, prefs.errorUpdatedAt) >= mountedAt
       || (!nodeGateHolds() && nodeState(activeNodeId() ?? '') === 'offline'),
     cacheRestoring: isRestoring,
+    contributionsReady: clientPluginsReady,
     projects: () => projects.data,
     tasks: () => tasks.data,
     workspaces: () => workspaces.data,
@@ -295,7 +296,7 @@ export default function App() {
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
   // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
   createTaskDeepLink({
-    taskId: () => activeTaskId(),
+    taskId: () => startup.restored() ? activeTaskId() : null,
     search: () => location.query,
     navigate,
   })
@@ -537,7 +538,7 @@ export default function App() {
   // before their routes exist. The `isRestoring` gate stays too: it is an IndexedDB read, and painting
   // in front of it would show the empty shell and then fill it.
   return (
-    <Show when={!nodeGateHolds() && !isRestoring()} fallback={<NodeGate />}>
+    <Show when={!nodeGateHolds() && !isRestoring() && clientPluginsReady()} fallback={<NodeGate />}>
     <div class="shell">
     <header class="topbar-host">
       <ExclusiveSlotHost slot="topbar" value={topbarProps()}

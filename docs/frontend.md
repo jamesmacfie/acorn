@@ -373,13 +373,18 @@ the wire value.
 
 The desktop opens its window as soon as the helper is listening, then shows the existing startup
 loader while the helper selects a Node and the supervised local Node finishes booting. The renderer
-does not mount the shell or plugin panes until that local Node emits its first broker status. This
-keeps pane-owned resources from issuing requests before their routes exist.
+does not mount the shell or plugin panes until that local Node emits its first broker status and
+compiled plugin registration finishes. This keeps pane-owned resources from issuing requests before
+their routes exist.
 
 `apps/desktop/src/client/index.tsx` starts `selectActiveNode()` and `applyNodePlugins()` without
-blocking the renderer. Their effects arrive through the signals they already set: `activate.ts`
-registers every compiled plugin before any node has answered, and `applyNodePlugins` re-runs that
-registration with the node's disabled list when it arrives. The host skips a pass whose plugins and
+blocking the renderer. `activate.ts` registers core eagerly. After the first paint, a queued task
+imports the twelve-plugin roster and runs its synchronous registration and activation passes. An
+occluded window gets a 250 ms fallback because macOS can suspend animation frames. Workspace restore
+waits for registration, including the plugin state slices, before reopening tasks or dispatching pane
+deep links. `applyNodePlugins` waits for registration and applies the node's disabled list when it
+arrives; concurrent calls for one node share a request, and responses for a node no longer selected
+are discarded. A failed read remains retryable. The host skips a pass whose plugins and
 disabled set match the last one, so a node that disables nothing costs no second registration and no
 second `activate`. A plugin whose startup read depends on the node, such as the agent roster or the
 terminal session list, waits for that node to report itself reachable rather than reading at
@@ -770,8 +775,9 @@ Both clients have a build check over what they load before they draw, and both f
 over a byte ceiling, and on a **chunk name**.
 
 - **The renderer.** `apps/desktop/scripts/check-renderer-budget.mjs`, run from `@acorn/desktop`'s
-  `build`, sums every script and stylesheet a cold window loads: 906,000 B for scripts, 200,000 B
-  for styles. The script ceiling is the 2026-10-01 measurement, 862,188 B, plus about 5%. This includes
+  `build`, sums every script and stylesheet a cold window loads: 760,000 B for scripts, 200,000 B
+  for styles. The script ceiling is 760,000 B, about 5% above the 2026-10-02 measurement of
+  726,109 B after compiled plugin registration moved behind the first paint. This includes
   the security changes to frame request ownership and tree validation, which run before plugin
   content is drawn. The previous ceiling used the 2026-09-29 measurement of 819,628 B. A change
   that needs more raises it in the same commit, with the reason in the commit message. It reads the graph from Vite's manifest, which `vite.config.ts` moves out of the shipped
@@ -786,18 +792,15 @@ over a byte ceiling, and on a **chunk name**.
   also prints `hops`, the fetches that run one after another before the app can start, and how much
   more one dynamic import away would fetch. Neither of those is counted.
 - **The terminal client.** `apps/tui/scripts/check-startup-graph.mjs`, run from `@acorn/tui`'s `build`.
-  That bundle sets `modulePreload: false` and has one entry, so there is no preload list to read; the
-  analogue is the static import closure of the `App` chunk `main.js` reaches for first, and everything
-  in it is evaluated before the first cell is drawn. The ceiling is 1,175,000 B. The 2026-09-28
-  security build measured 1,137,492 B across 131 eager chunks; validation at the Node and content
-  boundaries must load before untrusted content is drawn. The earlier 2026-09-23 acceptance build
-  measured 1,118,096 B across 123 eager chunks. The closure grew when the client
-  took over its own painting: what
-  used to be a 6 MB native library outside the bundle is about 98 KB inside it
-  ([tui.md](./tui.md) § How a frame is drawn). Dropping a dependency moves this number by nothing —
-  every bare import is left to the runtime, so a package that is only ever imported weighs nothing
-  here. The walk is a regex over import edges rather than a real module graph, so it is approximate
-  on purpose — it exists to catch a 300 KB regression, not to be exact.
+  `apps/tui/startupGraph.ts` writes `dist/startup-graph.json` from the bundler's module graph. It
+  includes `main.js`, every top-level dynamic import in that entry, and their complete static
+  dependencies. Imports inside functions, including the post-frame roster, stay outside this set.
+  A dependency reached both statically and dynamically still counts. The ceiling is 720,000 B,
+  about 4% above the 2026-10-02 production measurement of 692,052 B across 158 chunks. The older
+  1,175,000 B ceiling counted only an unminified App closure, omitting the launcher and other awaited
+  imports, so the figures are not directly comparable. Production output is minified with Oxc.
+  Zod is bundled and tree-shaken; validation still runs before untrusted content is drawn. Other
+  external imports are listed separately, and their package bytes are not included in this budget.
 
 The architecture reset briefly pulled DOM primitives, diff virtualization, and annotation rendering
 into this closure through broad `public.ts` barrels. The TUI now imports narrow supported entrypoints
@@ -825,13 +828,14 @@ needs only when it draws: `MemoryAddForm`, the workflow editor's `draft-` and
 `draftStore`, `stepFields`, `GithubImporter`, `PreviewTaskPane` and `PreviewPane`. All of those were
 on the renderer's startup graph until 2026-09-25.
 
-The renderer tests a name against modules as well as chunks. `vite.config.ts` writes
+Both hosts test names against modules as well as chunks. The renderer's `vite.config.ts` writes
 `dist/renderer-modules.json` beside the manifest, listing the source modules in each chunk, and the
 check tests every folder on a startup module's path and its file name, written the way a chunk would be
 named after it (`draft.ts` as `draft-`). That second test is the one that matters most. A module that
 startup code imports statically merges into a startup chunk named after some other module, so a
 chunk-name test alone never sees it. That is how the plugin code above reached startup unnoticed. The
-terminal client's check still tests chunk names only. The shape of the mistake is always the same — a
+terminal client's manifest also records source modules and external imports. Its denylist additionally
+rejects Drizzle, the remote tree implementation, its kit host, and the post-frame roster. The shape of the mistake is always the same — a
 string-keyed table from a name to a **value** rather than to a **loader**, which pulls every value into
 whichever chunk holds the table. All five instances have been fixed: `kit/tokens/iconNodes.ts` (see
 [ui-design.md](./ui-design.md) § Which names are drawn without waiting), the DOM host's kit table (see
@@ -844,11 +848,11 @@ landed in a chunk called `prSections`. Both names stay listed. A prefix that nam
 not an error — a module can be renamed or deleted — and neither script fails on one, which is what
 makes the allowance list below keepable.
 
-Each script also carries a short `KNOWN` list: denylisted names that are in the startup list **today**
+The renderer script also carries a short `KNOWN` list: denylisted names that are in the startup list **today**
 and are somebody's open work. Those report loudly and do not fail the build. The list may only shrink —
 once a chunk with that name is built and no longer fetched at startup, the check fails until the entry
-is deleted, so a fix cannot quietly regress a month later. **Both lists are empty**, and a test in each
-package asserts that they are: a name added back has to argue for itself.
+is deleted, so a fix cannot quietly regress a month later. That list is empty. The terminal check has
+no allowances; fixture tests exercise its byte count, omitted launcher, merged modules, and external ORM imports.
 
 ## Telemetry
 

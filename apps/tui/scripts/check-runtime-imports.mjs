@@ -17,13 +17,9 @@ function jsFiles(dir) {
 
 function bareImports(source) {
   const found = new Set()
-  // Rollup emits static imports and re-exports on one line. Dynamic imports of a literal specifier
-  // also need to resolve, even when their chunk is loaded only after a user opens a pane.
-  for (const line of source.split('\n')) {
-    const staticImport = line.match(/^(?:import|export)\s+(?:.*?\s+from\s+)?["']([^"']+)["']/)
-    if (staticImport) found.add(staticImport[1])
-    for (const match of line.matchAll(/\bimport\(\s*["']([^"']+)["']\s*\)/g)) found.add(match[1])
-  }
+  // Minified chunks can have many declarations on one line, with no space after `import`.
+  for (const match of source.matchAll(/(?:^|[;\n}])\s*(?:import(?!\s*\()|export)\s*(?:[^'";]*?\s*from\s*)?["']([^"']+)["']/g)) found.add(match[1])
+  for (const match of source.matchAll(/\bimport\s*\(\s*["']([^"']+)["']\s*\)/g)) found.add(match[1])
   return [...found].filter((id) => !id.startsWith('.') && !isAbsolute(id))
 }
 

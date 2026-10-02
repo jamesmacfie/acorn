@@ -2,9 +2,10 @@ import { builtinModules } from 'node:module'
 import { isAbsolute, resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import solid from 'vite-plugin-solid'
+import { startupGraph } from './startupGraph'
 
 // The terminal client's bundle. Shaped after apps/node's config, because the output is the same kind
-// of thing: one ES module run by Node, with every bare import left to the runtime.
+// of thing: ES modules run by Node, with selected third-party imports left to the runtime.
 //
 // Three things make it the TUI rather than the desktop:
 //
@@ -35,6 +36,9 @@ const isWorkspacePackage = (id: string) => id.startsWith('@acorn/')
 // pnpm-workspace.yaml's catalog says the same thing about solid-js for the same reason.
 const isReactiveRuntime = (id: string) =>
   id === 'solid-js' || id.startsWith('solid-js/') || id.startsWith('@tanstack/')
+// Validation stays on the client boundary. Bundle it so unused Zod exports and locales can be
+// removed instead of making Node load the entire package before the first frame.
+const isValidationRuntime = (id: string) => id === 'zod' || id.startsWith('zod/')
 // Aliased to something local, and therefore not externalisable — see `externalizeBareImports` below.
 // The `@codemirror`, `@xterm` and `shiki` entries are the packages this host has no way to run and
 // no longer installs; every one of them is matched by a pattern in `resolve.alias`, so the list here
@@ -49,7 +53,7 @@ const isAliased = (id: string) => id === '@solidjs/router' || id === 'lucide-sta
 // Archive-only entry bundles its parser closure; none of these packages enters startup.
 const isArchivePackage = (id: string) => ['tar', '@isaacs/fs-minipass', 'chownr', 'minipass', 'minizlib', 'yallist'].some((name) => id === name || id.startsWith(`${name}/`))
 const externalizeBareImports = (id: string) =>
-  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isAliased(id)
+  !id.startsWith('.') && !isAbsolute(id) && !isWorkspacePackage(id) && !isReactiveRuntime(id) && !isValidationRuntime(id) && !isAliased(id)
 
 export default defineConfig({
   resolve: {
@@ -121,17 +125,18 @@ export default defineConfig({
       { find: /^shiki(?:\/.*)?$/, replacement: resolve(import.meta.dirname, 'src/kit/shiki.ts') },
     ],
   },
-  plugins: [solid({ solid: { generate: 'universal', moduleName: RECONCILER } })],
+  plugins: [solid({ solid: { generate: 'universal', moduleName: RECONCILER } }), startupGraph()],
   ssr: { noExternal: true },
   define: { __ACORN_HOST__: '"tui"' },
   build: {
     target: 'node22',
     outDir: 'dist',
     ssr: true,
+    ssrEmitAssets: true,
     modulePreload: false,
     copyPublicDir: false,
     reportCompressedSize: false,
-    minify: false,
+    minify: 'oxc',
     emptyOutDir: true,
     rollupOptions: {
       input: {

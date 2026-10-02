@@ -222,6 +222,17 @@ rail, pane strip, and palette fill through the same reactivity that handles a pl
 Node later. The four host seams in `App.tsx`, especially the layout table, must remain eager because a
 pane needs them before it can draw.
 
+Production JavaScript is minified with Oxc. Zod stays bundled so unused validation exports and
+locales can be removed, while the other external runtime packages keep their existing resolution
+rules. The startup budget counts the launcher and all imports awaited before rendering, as well as
+the App closure ([frontend.md](./frontend.md) § Startup budget).
+
+Custody imports supported Node-core leaf entrypoints for private file writes, attachment locks,
+workspace paths, certificate fingerprints, and bounded package reads. The package installer loads
+only when a device plugin is installed. This keeps Node database and plugin-loader dependencies out
+of the first frame. The shell and kit facade share a lazy remote-tree component; its host and kit
+table load when an accepted plugin renders a tree.
+
 | Group | What the TUI installs |
 | --- | --- |
 | `transport` | `NodeBroker`, in-process. Responses stay buffered `Uint8Array`. |

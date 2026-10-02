@@ -6,10 +6,10 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeFetchRequest, NodeFetchResponse } from '@acorn/protocol/broker.ts'
 import { MAX_BUNDLE_BYTES, PluginCache } from './pluginCache'
-import { writePrivateAtomic } from '@acorn/node-core/server/storage'
+import { writePrivateAtomic } from '@acorn/node-core/server/storage/dataRoot.ts'
 
-vi.mock('@acorn/node-core/server/storage', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage')>()
+vi.mock('@acorn/node-core/server/storage/dataRoot.ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@acorn/node-core/server/storage/dataRoot.ts')>()
   return { ...actual, writePrivateAtomic: vi.fn(actual.writePrivateAtomic) }
 })
 

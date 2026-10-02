@@ -1,10 +1,12 @@
 // The changes plugin's client part (docs/plugins.md § The plugin API).
 import { openPane, type ClientPlugin } from '@acorn/plugin-api/client'
-import { ChangesToolCard } from './ToolCard'
+import { lazy } from 'solid-js'
 import { changeViewSlice } from './changesPrefs'
 import { changesPaneContribution } from './paneContribution'
 import { DIFF_LINE_KEY, PUSH_ACTIONS_MAX } from './extensionPoints'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
+
+const ChangesToolCard = lazy(() => import('./ToolCard').then((module) => ({ default: module.ChangesToolCard })))
 
 export const changesClientPlugin: ClientPlugin = {
   name: 'changes',

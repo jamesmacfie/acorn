@@ -538,8 +538,8 @@ unless its inputs are declared.
 The startup budget checks live in `build` scripts because they assert properties of built output.
 `@acorn/desktop`'s `build` runs
 `apps/desktop/scripts/check-renderer-budget.mjs` over the built `index.html` and Vite's manifest, and
-`@acorn/tui`'s `build` runs `apps/tui/scripts/check-startup-graph.mjs` over its built chunks. Both fail
-the build over a byte ceiling or a denylisted chunk name; [frontend.md](./frontend.md) § Startup budget owns what they
+`@acorn/tui`'s `build` runs `apps/tui/scripts/check-startup-graph.mjs` over its emitted startup manifest.
+Both fail the build over a byte ceiling or a denylisted chunk or source-module name; [frontend.md](./frontend.md) § Startup budget owns what they
 enforce. The TUI build also checks that Node can resolve every external import in its emitted modules,
 including lazy chunks, through `apps/tui/scripts/check-runtime-imports.mjs`.
 
