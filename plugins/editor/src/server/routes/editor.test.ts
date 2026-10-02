@@ -105,8 +105,43 @@ describe('editor routes over a real worktree', () => {
 
   it('writes within the worktree', async () => {
     const res = await authed().fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/a.ts', content: 'export const a = 2\n' }), {} as Env)
-    expect(await res.json()).toEqual({ ok: true })
+    expect(await res.json()).toMatchObject({ ok: true, text: expect.any(String), revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(readFileSync(join(work, 'sub', 'a.ts'), 'utf8')).toBe('export const a = 2\n')
+  })
+
+  it('round-trips Unicode, BOM, genuine replacement characters, and a complete 17 MiB file', async () => {
+    const bridge = editorBridge({ tasks: createTaskService(t.db), fs: coreFs })
+    const text = '\ufeff😀 café\r\n\ufffd\n' + 'a'.repeat(17 * 1024 * 1024) + '\nEND'
+    writeFileSync(join(work, 'large.txt'), text)
+    expect(await bridge.read('task1', 'large.txt')).toBe(text)
+    const result = await bridge.write('task1', 'large.txt', text)
+    expect(result).toMatchObject({ ok: true, text })
+    expect(readFileSync(join(work, 'large.txt')).equals(Buffer.from(text))).toBe(true)
+  })
+
+  it('visibly rejects invalid UTF-8 and binary data without changing source bytes', async () => {
+    const app = authed()
+    for (const [name, bytes] of [['invalid.txt', Buffer.from([0xc3, 0x28])], ['binary.txt', Buffer.from([65, 0, 66])]] as const) {
+      writeFileSync(join(work, name), bytes)
+      const result = await app.fetch(req(`/api/tasks/task1/editor/read?path=${name}`), {} as Env)
+      expect(result.status).toBe(422)
+      expect(await result.json()).toMatchObject({ error: { code: 'unsupported_text' } })
+      expect(readFileSync(join(work, name))).toEqual(bytes)
+    }
+  })
+
+  it('acknowledges the exact formatter body and preserves hook veto and invalidation', async () => {
+    let changes = 0
+    const core = { tasks: createTaskService(t.db), fs: coreFs }
+    const formatted = editorBridge(core, () => { changes++ }, { run: async (_id, payload) => ({ ok: true, payload: { ...payload, text: 'formatted\n' } }) })
+    const result = await formatted.write('task1', 'hello.txt', 'submitted')
+    expect(result).toMatchObject({ ok: true, text: 'formatted\n', revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
+    expect(readFileSync(join(work, 'hello.txt'), 'utf8')).toBe('formatted\n')
+    expect(changes).toBe(1)
+    const vetoed = editorBridge(core, () => { changes++ }, { run: async (_id, payload) => ({ ok: false, payload, by: 'formatter', reason: 'veto' }) })
+    expect(await vetoed.write('task1', 'hello.txt', 'rejected')).toEqual({ ok: false, reason: 'formatter: veto' })
+    expect(readFileSync(join(work, 'hello.txt'), 'utf8')).toBe('formatted\n')
+    expect(changes).toBe(1)
   })
 
   it('returns image bytes with their type while rejecting unsupported paths and oversized images', async () => {
@@ -172,7 +207,7 @@ describe('editor routes over a real worktree', () => {
     expect(await refused.json()).toMatchObject({ ok: false })
     expect(existsSync(outsideTarget)).toBe(false)
     const written = await app.fetch(req('/api/tasks/task1/editor/file', 'PUT', { path: 'sub/new.txt', content: 'ordinary content' }), {} as Env)
-    expect(await written.json()).toEqual({ ok: true })
+    expect(await written.json()).toMatchObject({ ok: true, text: expect.any(String), revision: expect.stringMatching(/^[a-f0-9]{64}$/) })
     expect(readFileSync(join(work, 'sub/new.txt'), 'utf8')).toBe('ordinary content')
   })
 

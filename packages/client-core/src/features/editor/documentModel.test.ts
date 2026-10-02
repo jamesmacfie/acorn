@@ -52,16 +52,15 @@ describe('view state', () => {
     expect(documentViewState('node-a', 'task-2', uri)).toBeUndefined()
   })
 
-  it('evicts a scope across EVERY node, because archival is final', () => {
-    // A key left behind under another node's prefix would never be reached again.
+  it('evicts only the originating Node when scope IDs collide', () => {
     clearDocumentViewStates()
     const uri = documentUri('database', 'db')
     rememberDocumentViewState('node-a', 'task-1', uri, { scroll: 10 })
     rememberDocumentViewState('node-b', 'task-1', uri, { scroll: 20 })
     rememberDocumentViewState('node-a', 'task-2', uri, { scroll: 30 })
-    evictDocumentViewStates('task-1')
+    evictDocumentViewStates('task-1', 'node-a')
     expect(documentViewState('node-a', 'task-1', uri)).toBeUndefined()
-    expect(documentViewState('node-b', 'task-1', uri)).toBeUndefined()
+    expect(documentViewState('node-b', 'task-1', uri)).toEqual({ scroll: 20 })
     expect(documentViewState('node-a', 'task-2', uri)).toEqual({ scroll: 30 })
   })
 

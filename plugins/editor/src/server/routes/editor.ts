@@ -10,7 +10,8 @@ import { imageTypeForPath } from '../../contract/imagePreview'
 // a 403 and an unmapped repo is a 404. See server/routes/editor.test.ts.
 
 export type EditorEntry = { name: string; dir: boolean }
-export type EditorWriteResult = { ok: boolean; reason?: string }
+import type { EditorWriteResult } from '../../contract/api'
+export type { EditorWriteResult } from '../../contract/api'
 export type EditorBridge = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>

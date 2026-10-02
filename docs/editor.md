@@ -655,10 +655,60 @@ PR line keeps both markers on its replacement. Changes compares `HEAD` directly 
 so its set includes staged and unstaged edits and treats an untracked file as an addition from an empty
 document.
 
-Marker reads run beside text and grammar reads when a file first opens. The pane refreshes them after
+Usable text opens independently of optional marker and grammar reads. The pane refreshes them after
 its own save, after a focus reload, and when a cached tab has been away for more than the two-second
 Git status coalescing window. Marker failures remain presentation failures: text still opens and stays
 editable.
+
+## Save acknowledgements and recovery
+
+Each file address has one write owner, keyed by the captured Node, task, and path. Host document
+regions use the Node, scope kind, scope ID, URI, and declared routes. A document admits one write at
+a time. Repeated flushes join that write, and requested later edits occupy one follow-up slot.
+Independent documents save independently. A clean save skips the request and its hooks and
+invalidation.
+
+The file write response adds optional `text` and `revision` fields beside `ok` and `reason`. `text`
+is the exact body passed to the filesystem after the before-save hook; `revision` is its SHA-256
+hash over UTF-8 bytes. The acknowledgement does not reread a file that another writer might already
+have changed. Formatting replaces the visible submission only if its local edit revision still
+matches. Later human edits remain dirty. Older clients ignore the added fields. When an older Node
+omits the saved body, the client retains dirty custody and asks for a Node update before closing.
+
+Closing a file waits for its intended revision and retains the tab if persistence fails or the
+person edits during the wait. Model retirement admits the final write through the captured Node.
+Dirty text and CodeMirror undo state remain in device memory beyond pane and model retirement;
+cursor and scroll are retained with them. Device recovery storage keeps the full dirty and
+acknowledged text plus cursor and scroll, without an eviction cap. Recovery storage can fail or
+run out of quota; the full in-memory document remains available, but process restart cannot restore
+undo history or a recovery record that storage refused. Reopening the same address restores recovery
+without requiring an offline Node read. Recovery does not automatically replay an offline write.
+
+Host document flushes reject persistence failures. Surface actions execute only after the requested
+revision acknowledges and remains current. Autosave and retirement consume that rejection and keep
+recovery. A retired document handle cannot read, write, or flush through a replacement slot. A fresh
+surface acquires a fresh handle and writer for the same document address; recovery stores content,
+not a frame grant. The host keeps its 2 MiB UTF-8 wire limit and preserves oversized dirty text for
+recovery when it refuses a write. The file pane has no borrowed host-document size limit.
+
+## Text loads and deferred presentation
+
+The file reader accepts complete UTF-8 text, preserving Unicode, a genuine U+FFFD replacement
+character, and a byte order mark. Invalid UTF-8 and NUL-containing binary bodies return
+`unsupported_text`. A failed read displays an error and leaves the surface read-only; it never
+creates an editable empty saved file.
+
+Usable text opens before optional grammar or marker responses. Those responses belong to the
+captured document entry and cannot repopulate a retired preview. A focus reload checks its read
+generation, document identity, captured text, edit revision, and dirty status after the response.
+Applying acknowledged disk text does not schedule autosave. Local edits reject held disk markers
+and clear their annotations. Exact disk/body provenance requires the marker identity contract
+tracked by performance unit 15; generation checks alone cannot prove it against external writes.
+
+Canonical tabs determine clean preview retention. Replacing a clean preview releases its text,
+saved body, and view state. Promoted and dirty tabs keep their state across same-task pane toggles.
+Archiving a scope evicts view state only for its originating Node, so equal IDs on independent
+Nodes retain independent cursor and scroll positions.
 
 ## Editing in your own editor
 

@@ -30,7 +30,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 13 | [Agent wait facts and complete result capture](./13-agent-results.md) | Through 12 | Pending |
 | 14 | [Git observations, filesystem admission, and exact paths](./14-git-filesystem.md) | Through 13 | Pending |
 | 15 | [Shared pull request comparisons and marker identity](./15-pr-markers.md) | Through 14 | Pending |
-| 16 | [Editor saves, document custody, reloads, and text fidelity](./16-editor-custody.md) | Through 15 | Pending |
+| 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integration and native verification remain open |
 | 17 | [Editor search, file tree viewport, and host admission](./17-editor-search-tree.md) | Through 16 | Pending |
 | 18 | [Database implementation record](../../../plans/performance/implementation-18-database.md) | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
 | 19 | [Docker process ownership, log tails, and Node scope](./19-docker.md) | Through 18 | Pending |

@@ -2,7 +2,7 @@ import { measure, recordSample } from '../../infra/telemetry/emitter'
 import { createSignal, onMount, onCleanup, Show } from 'solid-js'
 import { useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
-import { EditorState, Prec, Text, type Extension } from '@codemirror/state'
+import { EditorState, Prec, StateEffect, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import type { Completion, CompletionContext, CompletionResult } from '@codemirror/autocomplete'
 import { prefsKey } from '@acorn/protocol/api.ts'
@@ -26,6 +26,7 @@ import {
   type PluginCompletionRequest,
   type PluginDocumentBody,
 } from './documentModel'
+import { documentCustody, recoverDocumentCustody, type DocumentCustody } from './documentCustody'
 import { languageFor, shouldHighlightDocument } from './language'
 import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
@@ -57,10 +58,6 @@ const log = createLogger('document-surface')
 //     without it every plugin independently rediscovers "it ran the previous version of my query".
 //   - Completions, as a plain POST to a route the plugin declared. The host stays a dumb proxy: it never
 //     learns the language, which is what lets the same mechanism serve SQL, GraphQL and YAML.
-//
-// There is also no abstraction layer, on purpose. One implementation behind an internal interface is
-// over-building; the name the plugin declares is neutral, the code below calls CodeMirror bluntly, and
-// when shiki backs a read-only variant that is a branch in this file rather than a strategy pattern.
 //
 // The editor is imported here at module scope and not in the frame registry, which is the file that
 // registers this pane: that one is evaluated on every shell boot, so it reaches this module through
@@ -109,6 +106,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const nodeId = props.nodeId
   const readPath = resolveDocumentRoute(props.region.read, props.scope)
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
+  const address = [nodeId, props.scope.taskId ? 'task' : 'project', scope, uri, readPath, writePath]
   // A language id the manifest parser already checked, re-checked because the manifest reached this
   // device as a roster row, which is bytes a node sent (the rule chrome/data.ts states).
   //
@@ -124,15 +122,19 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
   let disposed = false
-  // The document at the last successful load or save. Dirty is derived from it rather than tracked as a
-  // flag, so undoing back to the saved text clears the dot the way it should. `Text.eq` is the direct
-  // equivalent of Monaco's version-id comparison and is exact rather than merely cheap.
-  let saved: Text = Text.empty
+  // Custody outlives this surface; the surface supplies a captured writer while its grant is live.
+  let custody: DocumentCustody | undefined
+  let releaseCustody: (() => void) | undefined
+  let unsubscribe: (() => void) | undefined
 
-  const scheduleSave = debounce(() => void save(), 1500)
+  const scheduleSave = debounce(() => void save().catch(() => {}), 1500)
 
   const saveViewState = (): void => {
-    if (view) rememberDocumentViewState(nodeId, scope, uri, captureViewState(view))
+    if (view) {
+      const state = captureViewState(view)
+      rememberDocumentViewState(nodeId, scope, uri, state)
+      if (custody) { custody.viewState = state; custody.state = view.state; custody.flushRecovery() }
+    }
   }
 
   // No `disposed` guard on the way in. The last thing an unmounting pane does is flush, and everything up
@@ -140,29 +142,31 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   // captured before the view is destroyed below. Only the state writes afterwards are guarded, because by
   // then the component may be gone.
   async function save(): Promise<void> {
-    if (!view || !writePath) return
-    const doc = view.state.doc // snapshot: the value we are about to write
-    if (doc.eq(saved)) return
-    const previous = saved
-    saved = doc
+    if (!custody || !writePath) return
     try {
-      await writeJson<unknown>(writePath, {
-        method: 'PUT',
-        nodeId,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text: doc.toString() } satisfies PluginDocumentBody),
+      await custody.flush(async (text) => {
+        if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document is larger than 2 MiB. Its full text is retained for recovery.')
+        const result = await writeJson<unknown>(writePath, {
+          method: 'PUT', nodeId, headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text } satisfies PluginDocumentBody),
+        })
+        if (result && typeof result === 'object' && 'ok' in result && result.ok === false) throw new Error('Save failed')
+        return {}
       })
       if (!disposed) setError('')
     } catch (cause) {
-      saved = previous // the write did not land, so the next change must try again
       if (!disposed) setError(cause instanceof Error ? cause.message : 'Save failed')
+      throw cause
     }
   }
 
   /** The flush every surface action waits on, and the one the frame can ask for by name. */
   const flush = async (): Promise<void> => {
+    if (disposed) throw new Error('This document grant has retired. Reopen the surface to retry.')
     scheduleSave.cancel()
+    const revision = custody?.revision
     await save()
+    if (disposed || custody?.dirty || custody?.revision !== revision) throw new Error('The document changed while saving. Try again.')
   }
 
   // A chord pressed with focus inside this editor. It cannot reach the shell's window dispatcher, since
@@ -229,6 +233,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         // in it. The document itself is unaffected, unlike a failed save.
         return null
       }
+      if (disposed || context.aborted) return null
       const options = items.slice(0, MAX_COMPLETION_ITEMS).flatMap<Completion>((item) => {
         // Route output is bytes a node sent, so the shape is checked rather than believed.
         if (typeof item?.label !== 'string' || !item.label) return []
@@ -248,8 +253,10 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       props.onHandle?.(null)
       saveViewState() // pane unmounting (task or workspace switch) — remember where we were
       scheduleSave.cancel()
-      void save() // reads the document before the destroy below; the request outlives the component
+      void save().catch(() => {}) // captured routes own the final admitted write
       disposed = true
+      unsubscribe?.()
+      releaseCustody?.()
       stopTheme?.()
       view?.destroy()
     })
@@ -257,8 +264,9 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     void (async () => {
       if (!readPath) return setError('This surface needs a task; open one first.')
       let text: string
+      const recovery = recoverDocumentCustody(address)
       try {
-        const body = await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
+        const body = recovery?.dirty ? await Promise.resolve({ text: recovery.acknowledged.toString() }) : await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
         if (typeof body?.text !== 'string') {
           log.warn(`${props.pluginId} returned an unusable document`, body, { 'plugin.id': props.pluginId })
           return setError('This plugin returned an unreadable document.')
@@ -279,13 +287,12 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
 
       const highlighted = shouldHighlightDocument(text.length)
       if (!highlighted) recordSample(props.pluginId, 'editor.syntax.skipped', text.length, 'character', { reason: 'document-size' })
-      const loadedGrammar = await language
-      const grammar = highlighted ? loadedGrammar : []
-      if (disposed || !host) return
+      const grammar: Extension = []
+      custody = recovery ?? documentCustody(address, text)
+      releaseCustody = custody.retain()
+      if (custody.error) setError(custody.error)
       const autocomplete = completions()
-      const state = measure(props.pluginId, 'editor.state.create', () => EditorState.create({
-        doc: text,
-        extensions: [
+      const extensions: Extension[] = [
           basicSetup,
           editorTheme(),
           grammar,
@@ -299,17 +306,35 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
             ? [
               // Autosave, with cmd+S as an explicit flush rather than the only way to persist, the same
               // semantics the editor pane has, now owned once instead of per plugin.
-              EditorView.updateListener.of((update) => { if (update.docChanged) scheduleSave() }),
+              EditorView.updateListener.of((update) => {
+                if (update.docChanged && !disposed && custody) {
+                  custody.state = update.state
+                  custody.edit(update.state.doc)
+                  if (custody.dirty || custody.writing) scheduleSave()
+                  else scheduleSave.cancel()
+                }
+              }),
               EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
-              Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void flush(); return true } }])),
+              Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void flush().catch(() => {}); return true } }])),
             ]
             : []),
-        ],
-      }))
-      view = measure(props.pluginId, 'editor.view.create', () => new EditorView({ state, parent: host }))
-      saved = view.state.doc
+      ]
+      const state = measure(props.pluginId, 'editor.state.create', () => EditorState.create({ doc: custody!.current, extensions }))
+      const restored = custody.state ? custody.state.update({ effects: StateEffect.reconfigure.of(extensions) }).state : state
+      view = measure(props.pluginId, 'editor.view.create', () => new EditorView({ state: restored, parent: host }))
+      custody.state = view.state
+      unsubscribe = custody.subscribe(() => {
+        if (disposed || !view || !custody) return
+        if (custody.error) setError(custody.error)
+        if (!view.state.doc.eq(custody.current)) view.setState(custody.state ?? view.state)
+      })
+      if (highlighted) void language.then((loaded) => {
+        if (disposed || !view || !custody || (Array.isArray(loaded) && !loaded.length)) return
+        view.dispatch({ effects: StateEffect.appendConfig.of(loaded) })
+        custody.state = view.state
+      })
       stopTheme = watchEditorTheme(view)
-      const remembered = documentViewState(nodeId, scope, uri) as EditorViewState | undefined
+      const remembered = custody.viewState ?? documentViewState(nodeId, scope, uri) as EditorViewState | undefined
       if (remembered) applyViewState(view, remembered)
       // The frame's view of this document. `write` goes through a transaction, so it lands in the undo
       // stack and schedules the same autosave a keystroke would. Loading a saved query is an edit like
@@ -317,11 +342,18 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       // `write` is the one that has nowhere to go, and it is a no-op rather than a throw, because the
       // plugin declared no write route and already knows.
       props.onHandle?.({
-        read: () => view?.state.doc.toString() ?? '',
+        read: () => {
+          if (disposed) throw new Error('This document grant has retired.')
+          return custody?.current.toString() ?? ''
+        },
         write: writePath
-          ? (next) => view?.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
+          ? (next) => {
+            if (disposed) throw new Error('This document grant has retired.')
+            if (new TextEncoder().encode(next).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document is too large.')
+            view?.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: next } })
+          }
           : () => {},
-        flush: writePath ? flush : async () => {},
+        flush,
       })
     })()
   })

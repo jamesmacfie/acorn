@@ -17,3 +17,5 @@ export { applyViewState, captureViewState, type EditorViewState } from '@acorn/c
 // (client-core features/editor/embed.ts). Workflows' JSON tab is the case.
 export { mountEmbeddedEditor } from '@acorn/client-core/features/editor'
 export type { EmbeddedEditor } from '@acorn/client-core/features/editor'
+
+export { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor'

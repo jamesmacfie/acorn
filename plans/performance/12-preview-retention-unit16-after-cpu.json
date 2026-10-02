@@ -1,0 +1,19 @@
+{
+  "fixture": "24 sequential clean previews, actual EditorPane and CodeMirror in jsdom; pool strong-reference counts",
+  "count": 24,
+  "charsPerFile": 65536,
+  "beforeUnmount": {
+    "openTabs": 1,
+    "pooledFiles": 1,
+    "savedDocuments": 1,
+    "retainedCharacters": 65560,
+    "reads": 24
+  },
+  "afterUnmount": {
+    "pooledFiles": 1,
+    "savedDocuments": 1,
+    "openTabs": 1
+  },
+  "nodeCpuMs": 2285.598,
+  "expected": "Superseded clean previews do not remain in the document/saved pool; kept and dirty tabs retain content/history."
+}

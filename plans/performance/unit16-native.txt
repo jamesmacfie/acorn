@@ -1,0 +1,7 @@
+Command: rtk proxy pnpm dev:agent -- --session unit16-editor
+Result: failed during Node service staging before a graphical process launched.
+[service-budget] dist/service.js and 11 chunk(s): 3080127B (ceiling 3062000B)
+Error: The node service's static graph is 3080127B, over the 3062000B ceiling.
+No budget override or source edit outside unit 16 was applied.
+Command: rtk proxy pnpm dev:agent:ui -- --session unit16-editor stop
+Result: Agent session unit16-editor is not running.

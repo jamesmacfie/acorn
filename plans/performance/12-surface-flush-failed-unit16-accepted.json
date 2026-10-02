@@ -1,0 +1,7 @@
+{
+  "fixture": "actual DocumentHandle.flush with failed write",
+  "flush": "rejected",
+  "visible": "UNSENT\nbaseline\n",
+  "errorVisible": true,
+  "expected": "flush rejects failure so execute/surfaceAction does not run on the stale saved document; unsent text survives teardown for retry."
+}

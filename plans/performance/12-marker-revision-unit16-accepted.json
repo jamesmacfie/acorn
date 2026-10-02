@@ -1,0 +1,5 @@
+{
+  "fixture": "actual save-triggered refresh; marker ranges refer to disk line 1, edit inserts a first line while response is pending",
+  "visible": "UNSENT NEW FIRST LINE\nSAVED EDIT\nbaseline a.txt\n",
+  "expected": "A disk range is versioned and mapped to its loaded document revision, or rejected while unsaved text diverges."
+}

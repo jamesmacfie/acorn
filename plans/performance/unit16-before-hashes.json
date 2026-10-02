@@ -1,0 +1,7 @@
+{
+  "plugins/editor/src/client/EditorPane.tsx": "35a86cbc8ecdf32db5a31ba522133f94fac5564a870775e8c889bc58cf90ceef",
+  "plugins/editor/src/client/editorClient.ts": "b0c230cd405a5f7c6d1dae781b670883dc661b713f9ca011a99b40c0065db336",
+  "plugins/editor/src/server/editor.ts": "8facc1479d08455d9f570ea753ef771cf7cec0816ae760bc3ff069366c0e81ea",
+  "packages/client-core/src/features/editor/DocumentSurface.tsx": "947b49a9622f8089270960d364236aafd7a5371be47b93cc1afe20e9be0b0217",
+  "plans/performance/12-probe.config.ts": "e6f4448e23fc60fd69a8bcfe0e9ad6e0f108728c50c37e212d8ccaeab9a96bfe"
+}

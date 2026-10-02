@@ -1,20 +1,20 @@
 import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { basicSetup } from 'codemirror'
-import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
+import { EditorState, Prec, StateEffect, type Extension } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
-import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
-import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { createEditorDocumentPool, flushEditorDocument, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
-import { editorViewState, rememberEditorViewState } from './editorViewState'
+import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
 import SearchPanel from './search/SearchPanel'
-import type { EditorLineMarkerSet } from '../contract/lineMarkers'
 import { imageTypeForPath } from '../contract/imagePreview'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
@@ -22,34 +22,6 @@ const EditorTerminal = lazy(() => import('./EditorTerminal'))
 const ImagePreview = lazy(() => import('./ImagePreview'))
 const log = createLogger('editor', 'editor')
 const telemetry = telemetryFor('editor')
-
-/** One open file, as this pane keeps it while the task is open. */
-type PooledFile = {
-  /** Text, undo history and the file's own grammar — what a Monaco model used to be. */
-  state: EditorState
-  /** Kept beside the state so a later mount can rebuild the extensions without a second download. */
-  language: Extension
-  /** Which mount built the extensions in `state`. See `adopt` below for why that matters. */
-  mount: object
-  /** Marker reads are refreshed on a later tab restore without making every quick swap run Git. */
-  markersReadAt: number
-}
-
-/**
- * Everything the pane's own mounts share, held by the host per task
- * (client-core registries/paneModels.ts, docs/panes.md § Layout model).
- *
- * It used to be three maps in the component, cleared in its cleanup, so toggling the pane off and on
- * threw away every open file's text, undo history and cursor and read them all back. The model
- * outlives a mount and is disposed with the task, which is the same lifetime the reader assumes.
- */
-type EditorPool = {
-  files: Map<string, PooledFile>
-  /** The document as last loaded or written, for the dirty derivation. */
-  saved: Map<string, Text>
-  /** Reads in flight for this mount, so its warm-up and first `show()` share one request. */
-  reading: Map<string, { mount: object; run: Promise<EditorState | null> }>
-}
 
 // The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
 
@@ -62,8 +34,10 @@ type EditorPool = {
 // (docs/editor.md § Editing in your own editor). One device preference switches it, graphical is the
 // default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
-  const api = editorApi()
   const queryClient = useQueryClient()
+  const registeredNode = queryOwner(queryClient)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const api = editorApi(queryClient)
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
@@ -80,9 +54,9 @@ export default function EditorPane(props: { task: Task }) {
   // rather than read off props or signals mid-swap. Without that, a stale write lands in the wrong
   // file.
   let currentPath: string | null = null
-  // The per-file documents, held by the host for as long as the task is (see EditorPool above). They
-  // need no disposing, so closing a tab is a delete.
-  const pool = paneModel<EditorPool>('editor', taskId, () => ({ files: new Map(), saved: new Map(), reading: new Map() }))
+  let currentCustody: DocumentCustody | undefined
+  // The pane model retains open view states; the document owner retains failed dirty work.
+  const pool = paneModel<EditorPool>('editor', taskId, () => createEditorDocumentPool(api, taskId))
   const saved = pool.saved
   // This mount's identity. A pooled state carries extensions — the update listener, the save chord —
   // that close over the mount that built them, and after a remount those closures point at a
@@ -104,21 +78,29 @@ export default function EditorPane(props: { task: Task }) {
     ephemeral: file.ephemeral,
   })))
   let disposed = false
+  let applyingAcknowledgement = false
+  let reloadGeneration = 0
+  const subscriptions = new Map<string, () => void>()
+  const live = () => !disposed && !pool.retired && activeNodeId() === nodeId
 
   /** Put a file's live state back in the pool. Only for a file still open: `close()` deletes its
    *  entry after flushing it, and re-adding it there would keep a closed file's text forever. */
   const remember = (path: string, state: EditorState) => {
     const entry = pool.files.get(path)
-    if (!entry) return
+    if (!entry || pool.retired || !files().some((file) => file.path === path)) return
+    entry.custody.state = state
     entry.state = state
     entry.mount = mountToken
   }
 
   /** A pooled state, made this mount's own. Cheap and synchronous when it already is. */
   const adopt = (path: string, entry: PooledFile): EditorState => {
+    watchCustody(path, entry)
+    entry.state = entry.custody.state ?? entry.state
     if (entry.mount === mountToken) return entry.state
     entry.state = entry.state.update({ effects: StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
     entry.mount = mountToken
+    entry.custody.state = entry.state
     return entry.state
   }
 
@@ -188,35 +170,48 @@ export default function EditorPane(props: { task: Task }) {
   // Autosave (no Save button): debounce while typing, flush on blur / tab-switch / close.
   const scheduleSave = debounce((p: string) => void save(p), 1500)
 
-  const isDirty = (path: string): boolean => {
-    const was = saved.get(path)
-    return !!view && !!was && !view.state.doc.eq(was)
-  }
+  const isDirty = (path: string): boolean => pool.files.get(path)?.custody.dirty ?? false
 
   // Stash the current file's scroll/cursor so it can be restored after a tab swap or a remount.
   const saveViewState = () => {
-    if (view && currentPath) rememberEditorViewState(taskId, currentPath, captureViewState(view))
+    if (view && currentPath) {
+      if (!files().some((file) => file.path === currentPath) && !currentCustody?.dirty && !currentCustody?.writing) {
+        forgetEditorViewState(taskId, currentPath, nodeId)
+        return
+      }
+      const state = captureViewState(view)
+      rememberEditorViewState(taskId, currentPath, state, nodeId)
+      const custody = currentCustody ?? pool.files.get(currentPath)?.custody
+      if (custody) { custody.state = view.state; custody.viewState = state; custody.flushRecovery() }
+    }
   }
 
   // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
   // explicit-flush chord. Built per path, because the language is the file's and the update listener
   // has to name the file it is reporting on.
-  //
-  // The grammar is passed in rather than fetched here, because fetching it is a network round trip
-  // (client-core features/editor/language.ts downloads one grammar per file) and `stateFor` below
-  // already awaits the file's text. One `Promise.all` there, and this stays synchronous.
+  // Grammar installation follows usable text and stays within the same document entry.
   const perFile = (path: string, language: Extension): Extension[] => [
     basicSetup,
     editorTheme(),
     lineMarkerExtension(),
     language,
     EditorView.updateListener.of((update) => {
-      if (!update.docChanged) return
+      if (!update.docChanged || applyingAcknowledgement || !live()) return
+      const entry = pool.files.get(path)
+      if (!entry) return
+      entry.state = entry.custody.state = update.state
+      entry.custody.edit(update.state.doc)
       // Dirty derives from the text versus the last saved text, so undoing back to the saved state
       // clears it.
       const dirty = isDirty(path)
       editorSetDirty(taskId, path, dirty)
-      if (dirty) scheduleSave(path)
+      if (dirty || entry.custody.writing) {
+        const document = update.state.doc
+        queueMicrotask(() => {
+          if (live() && view && currentPath === path && view.state.doc === document) view.dispatch({ effects: lineMarkerEffect([]) })
+        })
+        scheduleSave(path)
+      } else scheduleSave.cancel()
     }),
     EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
     // Highest precedence so the explicit flush wins over anything the library binds to the chord;
@@ -241,6 +236,7 @@ export default function EditorPane(props: { task: Task }) {
       saveViewState()
       if (view && currentPath) remember(currentPath, view.state)
       currentPath = null
+      currentCustody = undefined
       stopTheme?.()
       stopTheme = undefined
       view?.destroy()
@@ -265,6 +261,8 @@ export default function EditorPane(props: { task: Task }) {
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
+      for (const unsubscribe of subscriptions.values()) unsubscribe()
+      subscriptions.clear()
       // A pane replaced during navigation must not leave its remembered-file warm-up owning later
       // renderer work. The request may still finish, but `readFile` drops it before CodeMirror state
       // creation; removing its entry lets a new mount start a read that belongs to the visible pane.
@@ -311,6 +309,9 @@ export default function EditorPane(props: { task: Task }) {
   // and the graphical view reads the file back off disk when it next shows it. That is the whole
   // refresh contract: the editor in the PTY owned the buffer, and the pane never guessed at it.
   const forget = (path: string) => {
+    const entry = pool.files.get(path)
+    if (entry?.custody.dirty || entry?.custody.writing) return
+    entry?.release()
     pool.files.delete(path)
     saved.delete(path)
     editorSetDirty(taskId, path, false)
@@ -345,20 +346,14 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   async function readFile(relPath: string): Promise<EditorState | null> {
-    const [content, language, markers] = await Promise.all([
-      api?.read(taskId, relPath).catch(() => '').then((text) => text ?? '') ?? Promise.resolve(''),
-      // No highlighting beats no file, so a grammar that will not download is an empty extension
-      // rather than a throw that takes `show()` down with it.
-      languageForPath(relPath).catch(() => [] as Extension),
-      api?.lineMarkers(taskId, relPath).catch(() => [] as EditorLineMarkerSet[]) ?? Promise.resolve([]),
-    ])
-    // Navigation can replace this pane while the bridge response is in flight. Parsing syntax and
-    // constructing an EditorState here would block the renderer for a pane nobody can see, and the
-    // state carries listeners bound to this destroyed mount in any case.
-    if (disposed) {
-      telemetry.observe('editor.state.skipped', content.length, 'character', { reason: 'pane-unmounted' })
-      return null
-    }
+    if (!api) throw new Error('Editor API is unavailable.')
+    const address = [nodeId, 'file', taskId, relPath]
+    const recovery = recoverDocumentCustody(address)
+    const content = recovery?.dirty ? recovery.acknowledged.toString() : await api.read(taskId, relPath)
+    if (!live() || !files().some((file) => file.path === relPath)) return null
+    // Optional grammar and marker work never gate usable text.
+    const custody = recovery ?? documentCustody(address, content)
+    const language: Extension = []
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
     const highlighted = shouldHighlightDocument(content.length)
@@ -367,7 +362,7 @@ export default function EditorPane(props: { task: Task }) {
     let state: EditorState
     try {
       state = telemetry.measure('editor.state.create', () => EditorState.create({
-        doc: content,
+        doc: custody.current,
         extensions: perFile(relPath, activeLanguage),
       }), { highlighted })
     } catch (error) {
@@ -378,26 +373,61 @@ export default function EditorPane(props: { task: Task }) {
         'document.characters': content.length,
       })
       activeLanguage = []
-      state = EditorState.create({ doc: content, extensions: perFile(relPath, activeLanguage) })
+      state = EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage) })
     }
-    state = state.update({ effects: lineMarkerEffect(markers) }).state
-    saved.set(relPath, state.doc)
-    pool.files.set(relPath, { state, language: activeLanguage, mount: mountToken, markersReadAt: Date.now() })
+    if (custody.state) state = custody.state.update({ effects: StateEffect.reconfigure.of(perFile(relPath, activeLanguage)) }).state
+    custody.state = state
+    const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, mount: mountToken, markersReadAt: 0, markersGeneration: 0 }
+    saved.set(relPath, custody.acknowledged)
+    pool.files.set(relPath, entry)
+    watchCustody(relPath, entry)
+    if (live()) editorSetDirty(taskId, relPath, custody.dirty)
+    void refreshLineMarkers(relPath)
+    if (highlighted) void languageForPath(relPath).then((grammar) => {
+      if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
+      entry.language = grammar
+      const effects = StateEffect.reconfigure.of(perFile(relPath, grammar))
+      if (view && currentPath === relPath) {
+        view.dispatch({ effects })
+        remember(relPath, view.state)
+      } else entry.state = custody.state = entry.state.update({ effects }).state
+    }).catch(() => {})
     return state
   }
 
+  function watchCustody(path: string, entry: PooledFile): void {
+    if (subscriptions.has(path)) return
+    subscriptions.set(path, entry.custody.subscribe(() => {
+      if (pool.files.get(path) !== entry || pool.retired) return
+      saved.set(path, entry.custody.acknowledged)
+      entry.state = entry.custody.state ?? entry.state
+      if (!live()) return
+      if (entry.custody.error) setSaveErr(entry.custody.error)
+      if (view && currentPath === path && !view.state.doc.eq(entry.custody.current)) {
+        applyingAcknowledgement = true
+        try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: entry.custody.current } }) }
+        finally { applyingAcknowledgement = false }
+        entry.state = entry.custody.state = view.state
+      }
+      editorSetDirty(taskId, path, entry.custody.dirty)
+      if (!entry.custody.dirty) void refreshLineMarkers(path)
+    }))
+  }
+
   async function refreshLineMarkers(relPath: string): Promise<void> {
-    if (!api) return
-    const markers = await api.lineMarkers(taskId, relPath).catch(() => null)
-    if (!markers || disposed) return
     const entry = pool.files.get(relPath)
-    if (!entry) return
+    if (!api || !entry || entry.custody.dirty) return
+    entry.markersReadAt = Date.now()
+    const generation = ++entry.markersGeneration
+    const doc = entry.custody.current
+    const revision = entry.custody.revision
+    const markers = await api.lineMarkers(taskId, relPath).catch(() => null)
+    if (!markers || !live() || pool.files.get(relPath) !== entry || entry.custody.dirty
+      || generation !== entry.markersGeneration || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
     if (view && currentPath === relPath) {
       view.dispatch({ effects: lineMarkerEffect(markers) })
       remember(relPath, view.state)
-    } else {
-      entry.state = entry.state.update({ effects: lineMarkerEffect(markers) }).state
-    }
+    } else entry.state = entry.custody.state = entry.state.update({ effects: lineMarkerEffect(markers) }).state
     entry.markersReadAt = Date.now()
   }
 
@@ -410,16 +440,26 @@ export default function EditorPane(props: { task: Task }) {
     // The outgoing file's state, with whatever the reader typed in it. `setState` hands the view a
     // new one, so the old instance is what has to go back in the cache.
     if (currentPath) remember(currentPath, view.state)
-    const state = await stateFor(relPath)
+    currentPath = null
+    currentCustody = undefined
+    if (!view.state.readOnly) view.dispatch({ effects: StateEffect.appendConfig.of([EditorState.readOnly.of(true), EditorView.editable.of(false)]) })
+    const state = await stateFor(relPath).catch((cause: unknown) => {
+      if (live() && active() === relPath) setSaveErr(cause instanceof Error ? cause.message : 'Could not load this file.')
+      return null
+    })
     // A read may finish after the reader chose another tab. Active state changes synchronously at
     // the interaction boundary; a stale read must not put its document on screen afterward.
-    if (disposed || !view || !state || active() !== relPath) return
+    if (disposed || !view || active() !== relPath) return
+    if (!state) { view.setState(emptyState()); return }
     currentPath = relPath
-    view.setState(state)
+    currentCustody = pool.files.get(relPath)?.custody
+    const entryAtShow = pool.files.get(relPath)
+    if (!entryAtShow) return
+    view.setState(adopt(relPath, entryAtShow))
     // A cached state carries the theme it was built with, so a file opened before a theme change
     // comes back wearing the old one until this line.
     refreshEditorTheme(view)
-    const remembered = editorViewState(taskId, relPath)
+    const remembered = pool.files.get(relPath)?.custody.viewState ?? editorViewState(taskId, relPath, nodeId)
     if (remembered) applyViewState(view, remembered)
     maybeReveal(relPath)
     const entry = pool.files.get(relPath)
@@ -467,33 +507,37 @@ export default function EditorPane(props: { task: Task }) {
     editorOpen(taskId, relPath, ephemeral) // the active() effect swaps the surface
   }
 
-  // The document for a path, which is the live view's when that path is the one on screen and the
-  // cached state's otherwise. A debounced save can land after a tab swap, so this is not always the
-  // file the reader is looking at.
-  const docFor = (path: string): Text | undefined =>
-    (view && path === currentPath ? view.state.doc : pool.files.get(path)?.state.doc)
-
-  async function save(p: string | null = currentPath) {
-    const doc = p ? docFor(p) : undefined
-    if (!api || !p || !doc) return
-    const res = await api.write(taskId, p, doc.toString())
-    // Not guarded on `disposed`. What follows is the pool's and the open-files store's, both of which
-    // outlive this mount, and a write that lands after the pane closed still happened: bailing here
-    // left the file marked dirty on disk-clean content until something else re-read it.
-    if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
-    saved.set(p, doc)
-    // Still-dirty if the user typed more during the async write.
-    editorSetDirty(taskId, p, !docFor(p)?.eq(doc))
-    void refreshLineMarkers(p)
+  async function save(p: string | null = currentPath): Promise<boolean> {
+    const entry = p ? pool.files.get(p) : undefined
+    if (!api || !p || !entry) return false
+    const custody = entry.custody
+    try {
+      await flushEditorDocument(custody, api, taskId, p)
+      if (!pool.retired && pool.files.get(p) === entry) {
+        saved.set(p, custody.acknowledged)
+        if (activeNodeId() === nodeId) editorSetDirty(taskId, p, custody.dirty)
+      }
+      if (live()) setSaveErr('')
+      return !custody.dirty
+    } catch (cause) {
+      if (live()) setSaveErr(cause instanceof Error ? cause.message : 'Save failed')
+      return false
+    }
   }
 
   async function close(relPath: string) {
     scheduleSave.cancel()
-    await save(relPath) // autosave: persist before we discard the state
-    if (disposed) return
-    editorClose(taskId, relPath) // active() moves to the neighbour; the effect swaps the surface
+    const entry = pool.files.get(relPath)
+    const revision = entry?.custody.revision
+    if (entry && !await save(relPath)) return
+    if (!live() || pool.files.get(relPath) !== entry || entry?.custody.revision !== revision || entry?.custody.dirty) return
+    editorClose(taskId, relPath)
+    subscriptions.get(relPath)?.()
+    subscriptions.delete(relPath)
+    entry?.release()
     pool.files.delete(relPath)
     saved.delete(relPath)
+    forgetEditorViewState(taskId, relPath, nodeId)
   }
 
   // External-change reload on window focus: the agent edits the same worktree. A clean document
@@ -504,18 +548,38 @@ export default function EditorPane(props: { task: Task }) {
   // territory as the editor's own DOM (docs/editor.md § Reload on focus).
   async function onFocus() {
     const p = currentPath
-    const doc = p ? docFor(p) : undefined
-    if (!api || !p || !doc || !view) return
-    const file = files().find((x) => x.path === p)
-    if (file?.dirty) return
+    const entry = p ? pool.files.get(p) : undefined
+    if (!api || !p || !entry || !view || entry.custody.dirty || entry.custody.writing) return
+    const generation = ++reloadGeneration
+    const revision = entry.custody.revision
+    const doc = view.state.doc
     const disk = await api.read(taskId, p).catch(() => null)
-    if (disposed || !view || disk == null || currentPath !== p) return
+    if (!live() || !view || disk == null || currentPath !== p || pool.files.get(p) !== entry
+      || generation !== reloadGeneration || revision !== entry.custody.revision || entry.custody.dirty || !view.state.doc.eq(doc)) return
+    if (disk !== view.state.doc.toString()) {
+      entry.custody.reload(disk)
+      applyingAcknowledgement = true
+      try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } }) }
+      finally { applyingAcknowledgement = false }
+      remember(p, view.state)
+      saved.set(p, entry.custody.acknowledged)
+      editorSetDirty(taskId, p, false)
+    }
     void refreshLineMarkers(p)
-    if (disk === view.state.doc.toString()) return
-    view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } })
-    saved.set(p, view.state.doc)
-    editorSetDirty(taskId, p, false)
   }
+
+  createEffect(() => {
+    const open = new Set(files().map((file) => file.path))
+    for (const [path, entry] of pool.files) {
+      if (open.has(path) || entry.custody.dirty || entry.custody.writing) continue
+      subscriptions.get(path)?.()
+      subscriptions.delete(path)
+      entry.release()
+      pool.files.delete(path)
+      saved.delete(path)
+      forgetEditorViewState(taskId, path, nodeId)
+    }
+  })
 
   // Single driver for the reused surface. The state swaps here whenever the active file changes,
   // whether from a task switch, a tree click, a tab close, or the quick-open palette. Deferred so
@@ -527,6 +591,7 @@ export default function EditorPane(props: { task: Task }) {
       else if (!next) {
         if (currentPath) remember(currentPath, view.state)
         currentPath = null
+        currentCustody = undefined
         view.setState(emptyState())
       }
     }, { defer: true }),

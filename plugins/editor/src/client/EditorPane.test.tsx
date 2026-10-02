@@ -68,6 +68,7 @@ vi.mock('./EditorTerminal', () => ({
 const { default: EditorPane } = await import('./EditorPane')
 const { editorOpen, openFiles } = await import('./editorState')
 const { saveEditorMode } = await import('./editorPrefs')
+const { editorViewState } = await import('./editorViewState')
 
 // A task per test. The per-file document pool is held by the host per (pane, task) and outlives a
 // mount on purpose, so two tests sharing a task id would share the first one's open documents.
@@ -88,6 +89,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   write.mockClear()
+  write.mockImplementation(async (_taskId, path, content) => { disk.set(path, content); return { ok: true } })
   read.mockClear()
   readImage.mockClear()
   lineMarkers.mockClear()
@@ -131,6 +133,134 @@ const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
 describe('the editor pane', () => {
+  const saveChord = (view: EditorView) => view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
+    key: 's', code: 'KeyS', keyCode: 83, ctrlKey: true, bubbles: true,
+  }))
+
+  it('skips clean writes, retains a refused close, and closes after retry', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    saveChord(view)
+    await Promise.resolve()
+    expect(write).not.toHaveBeenCalled()
+    write.mockRejectedValueOnce(new Error('formatter veto'))
+    view.dispatch({ changes: { from: 0, insert: '// unsent\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('formatter veto'))
+    expect(openFiles(taskId)).toMatchObject([{ path: 'a.ts', dirty: true }])
+    expect(view.state.doc.toString()).toContain('// unsent')
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
+    expect(disk.get('a.ts')).toContain('// unsent')
+  })
+
+  it('keeps a later edit and its tab when close waits on an earlier revision', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let resolve!: (result: { ok: true }) => void
+    write.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    view.dispatch({ changes: { from: 0, insert: '// first\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+    view.dispatch({ changes: { from: 0, insert: '// later\n' } })
+    resolve({ ok: true })
+    await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(true))
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    expect(view.state.doc.toString()).toContain('// later')
+  })
+
+  it('rejects a held focus reload after typing and does not save an acknowledged reload', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let resolve!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(resolve).toBeDefined())
+    view.dispatch({ changes: { from: 0, insert: '// human edit\n' } })
+    resolve('external text')
+    await Promise.resolve()
+    expect(view.state.doc.toString()).toContain('// human edit')
+    saveChord(view)
+    await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(false))
+    write.mockClear()
+    read.mockResolvedValueOnce('acknowledged external text')
+    window.dispatchEvent(new Event('focus'))
+    await showing(() => view, 'acknowledged external text')
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    saveChord(view)
+    expect(write).not.toHaveBeenCalled()
+  })
+
+  it('opens text before held markers and refuses fabricated editable text after a failed load', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    let resolve!: (markers: Awaited<ReturnType<typeof lineMarkers>>) => void
+    lineMarkers.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    expect(resolve).toBeDefined()
+    read.mockRejectedValueOnce(new Error('unsupported UTF-8'))
+    editorOpen(taskId, 'binary.dat', false)
+    await vi.waitFor(() => expect(host.textContent).toContain('unsupported UTF-8'))
+    expect(view.state.readOnly).toBe(true)
+    saveChord(view)
+    expect(write).not.toHaveBeenCalled()
+    resolve([])
+  })
+
+
+  it('retires superseded previews and held reads without losing a promoted tab', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    for (let i = 0; i < 24; i++) {
+      disk.set(`preview-${i}.txt`, `preview ${i}`)
+      editorOpen(taskId, `preview-${i}.txt`, true)
+      await showing(() => view, `preview ${i}`)
+    }
+    expect(openFiles(taskId).map((file) => file.path)).toEqual(['a.ts', 'preview-23.txt'])
+    expect(editorViewState(taskId, 'preview-0.txt')).toBeUndefined()
+    let resolve!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    editorOpen(taskId, 'discarded.txt', true)
+    await vi.waitFor(() => expect(resolve).toBeDefined())
+    editorOpen(taskId, 'b.ts', true)
+    await showing(() => view, 'const b = 2')
+    resolve('discarded response')
+    await Promise.resolve()
+    expect(openFiles(taskId).some((file) => file.path === 'discarded.txt')).toBe(false)
+    expect(view.state.doc.toString()).toContain('const b = 2')
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+  })
+
+  it('restores dirty text, undo, and cursor after model retirement and failed persistence', async () => {
+    const first = mount()
+    const view = await editor(first.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// recovery\n' }, selection: { anchor: 5 } })
+    write.mockRejectedValue(new Error('offline'))
+    const { paneModel } = await import('@acorn/plugin-api/client')
+    paneModel('editor', 'other-task', () => ({}))
+    first.unmount()
+    await Promise.resolve()
+    read.mockRejectedValue(new Error('still offline'))
+    const second = mount(true)
+    const reopened = await editor(second.host)
+    await showing(() => reopened, '// recovery')
+    expect(reopened.state.selection.main.anchor).toBe(5)
+    reopened.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', keyCode: 90, ctrlKey: true, bubbles: true }))
+    await vi.waitFor(() => expect(reopened.state.doc.toString()).not.toContain('// recovery'))
+  })
+
   it('uses the shared collapse control and keeps the sidebar panels mounted in an empty rail', async () => {
     const { host } = mount()
     await editor(host)
@@ -155,9 +285,11 @@ describe('the editor pane', () => {
     editorOpen(taskId, 'a.ts', false)
     await showing(() => view, 'const a = 1')
 
-    const firstLine = view.contentDOM.querySelector('.cm-line')
-    expect(firstLine?.classList.contains('cm-line-pull-request')).toBe(true)
-    expect(firstLine?.classList.contains('cm-line-uncommitted')).toBe(true)
+    await vi.waitFor(() => {
+      const firstLine = view.contentDOM.querySelector('.cm-line')
+      expect(firstLine?.classList.contains('cm-line-pull-request')).toBe(true)
+      expect(firstLine?.classList.contains('cm-line-uncommitted')).toBe(true)
+    })
   })
 
   it('selects a tab and its file-tree row before the document read finishes', async () => {

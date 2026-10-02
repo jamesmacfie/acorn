@@ -4,6 +4,7 @@
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // node/index.ts.
 import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import { createHash } from 'node:crypto'
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import { normalizedLineRanges, type EditorLineMarkerProvider, type EditorLineMarkerSet } from '../contract/lineMarkers'
@@ -64,8 +65,16 @@ export const editorBridge = (
   read: async (taskId, relPath) => {
     const abs = await confine(core, taskId, relPath)
     try {
-      return await readFile(abs, 'utf8')
-    } catch {
+      const bytes = await readFile(abs)
+      try {
+        const text = new TextDecoder('utf-8', { fatal: true, ignoreBOM: true }).decode(bytes)
+        if (text.includes('\0')) throw new Error('Binary content')
+        return text
+      } catch {
+        throw new BridgeError(422, 'unsupported_text', 'This file is not supported UTF-8 text.')
+      }
+    } catch (error) {
+      if (error instanceof BridgeError) throw error
       throw new BridgeError(404, 'not_found', 'File not found.')
     }
   },
@@ -105,9 +114,8 @@ export const editorBridge = (
     return [...byKind].map(([kind, ranges]) => ({ kind, ranges }))
   },
 
-  // Write keeps the {ok, reason} contract and never throws: EditorPane surfaces reason inline, and
-  // the autosave loop must not see a rejected promise. A path escape is a benign {ok:false} rather
-  // than a 4xx, because the client already confined the path and this check is a second layer.
+  // The additive acknowledgement names the exact body written after hooks. Path and filesystem
+  // failures retain the {ok:false, reason} response used by file-pane recovery.
   write: async (taskId, relPath, content) => {
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
@@ -118,7 +126,8 @@ export const editorBridge = (
     const verdict = await hooks?.run('before-save', { taskId, path: relPath, text: content })
     if (verdict && !verdict.ok) return { ok: false, reason: `${verdict.by}: ${verdict.reason}` }
     try {
-      await writeFile(abs, verdict?.payload.text ?? content, 'utf8')
+      const text = verdict?.payload.text ?? content
+      await writeFile(abs, text, 'utf8')
       // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
       // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
       invalidateWorktreeStatus(root)
@@ -127,7 +136,7 @@ export const editorBridge = (
       // its tree, its dirty markers and its git status all went stale until something else pinged
       // (docs/plugins.md § Hearing a core event).
       changed(taskId)
-      return { ok: true }
+      return { ok: true, text, revision: createHash('sha256').update(text, 'utf8').digest('hex') }
     } catch (e) {
       return { ok: false, reason: e instanceof Error ? e.message : String(e) }
     }
