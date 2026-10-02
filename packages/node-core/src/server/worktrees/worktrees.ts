@@ -65,6 +65,22 @@ const gitFailure = (summary: string, error: unknown): string =>
     ? `${summary} Accept the Xcode license in Terminal, or install the standalone Command Line Tools.`
     : summary
 
+// The linked worktrees git knows for this checkout, each on a branch. Git lists the main checkout
+// first, so it is skipped, along with bare, detached, and prunable entries, since none of them has a
+// branch a task could own.
+export async function listWorktrees(checkout: string): Promise<Array<{ path: string; branch: string }>> {
+  const roster = await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: checkout, timeoutMs: 10_000 })
+  const out: Array<{ path: string; branch: string }> = []
+  // Entries are separated by an empty field.
+  for (const entry of roster.split('\0\0').slice(1)) {
+    const fields = entry.split('\0')
+    const path = fields.find((f) => f.startsWith('worktree '))?.slice('worktree '.length)
+    const branch = fields.find((f) => f.startsWith('branch refs/heads/'))?.slice('branch refs/heads/'.length)
+    if (path && branch && !fields.some((f) => f === 'bare' || f.startsWith('prunable'))) out.push({ path, branch })
+  }
+  return out
+}
+
 // Read structured local metadata after a failed add. Git's stderr can contain credentials, so
 // expose the occupied branch and path without forwarding arbitrary command output.
 async function worktreeCreationFailure(checkout: string, branch: string, summary: string, error: unknown): Promise<string> {
