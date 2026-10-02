@@ -1,7 +1,7 @@
 /* Settings (SettingsView.tsx): a full-window layer over the shell, top bar included. The rail is a
-   fixed column, the main column scrolls, and a page is a column capped at a readable width unless it
-   asks for the whole of it. At the modal's z-level, so a menu, a select's list or a confirmation a page
-   opens, all of which portal to the body, still paint above it. */
+   fixed column, the main column scrolls, and a page fills it up to --pane-measure, the width a pane's
+   reading column stops at, unless it asks for the whole of it. At the modal's z-level, so a menu, a
+   select's list or a confirmation a page opens, all of which portal to the body, still paint above it. */
 .settings-view {
   position: fixed;
   inset: 0;
@@ -75,7 +75,7 @@
 }
 /* The header's words and controls keep to the page's width, so the scope and the close sit by the
    title rather than at the window's edge. */
-.settings-heading-text { min-width: 0; max-width: var(--page-measure); display: flex; flex-direction: column; gap: var(--space-2); }
+.settings-heading-text { min-width: 0; max-width: var(--pane-measure); display: flex; flex-direction: column; gap: var(--space-2); }
 .settings-header[data-width='full'] .settings-heading-text { max-width: none; }
 /* The group label's look, as an eyebrow over the title. */
 .settings-breadcrumb {
@@ -97,7 +97,7 @@
    grows to at least the column's height, which is what lets a plugin's frame, a flex child that takes
    the space left, fill it the way it filled the modal's fixed-height pane. */
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: var(--pane-pad); }
-.settings-page { flex: 1 0 auto; width: 100%; max-width: var(--page-measure); display: flex; flex-direction: column; gap: var(--gap-section); container: settings-page / inline-size; }
+.settings-page { flex: 1 0 auto; width: 100%; max-width: var(--pane-measure); display: flex; flex-direction: column; gap: var(--gap-section); container: settings-page / inline-size; }
 .settings-page[data-width='full'] { max-width: none; }
 /* A narrow page stacks its inline rows, the control under the words, so a long label is not squeezed
    into a third of the page beside a mostly empty control column. The query reads the page, not the

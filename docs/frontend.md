@@ -478,7 +478,7 @@ its workspace page, and a workspace's projects are rows under it while it is exp
 and projects below). The arrow keys
 move through the rail, Enter opens a page, and the rail's single Tab stop is the open page's row, so
 Tab moves into the page. A dot beside a row marks an attention row whose target is that settings page.
-A page's body is capped at `--page-measure`, 720 px, unless it sets `fullWidth`. Below 900 px the rail is its own screen
+A page's body is capped at `--pane-measure`, 1200 px, the width a pane's reading column stops at, unless it sets `fullWidth`. Below 900 px the rail is its own screen
 and a page opens over it with a back link. The page is a size container, so when it is narrower than
 32rem its inline rows stack, the control under the words, however wide the window is.
 

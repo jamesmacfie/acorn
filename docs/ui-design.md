@@ -332,7 +332,7 @@ A list column is flush and scrolls its own rows. A column holding a document ins
 column is a pull request, not a picker. Its rows, headers, fold summaries, and bars take that padding
 back, the same way chrome does in a pane body, so row text and fold labels start on the heading's
 edge. A detail column holding a form or a document can pass `measure="page"`, which stops its content
-at `--page-measure`, the settings page width, from the column's start edge. A bar, tab strip, or
+at `--page-measure`, 720 px, from the column's start edge. A bar, tab strip, or
 section header that is a direct child of the column still spans it, so put a detail's header bar
 there rather than inside the capped form. A bar that heads a scrolling detail column sits on the
 column's top edge, and the content under it starts a section gap below.
