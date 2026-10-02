@@ -27,8 +27,7 @@ import {
 import { fileURLToPath } from 'node:url'
 import type { RunSessionGlue } from './runChannel'
 import { TerminalDisplay } from './terminalDisplay'
-import { TerminalReviewSnapshots, trailingUtf8 } from './reviewSnapshots'
-import type { TerminalCompletedEvent } from '../contract/reviewInput'
+import type { TerminalCompletedEvent } from '../contract/lifecycle'
 
 // This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
 // rather than bound by the host (docs/plugin-authoring.md § Telemetry and logging).
@@ -131,8 +130,6 @@ export const sessionControl = {
 let launchContextText: ((taskId: string) => Promise<string | null>) | null = null
 let launchContext: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let completed: ((event: TerminalCompletedEvent) => void) | null = null
-let archiveReview: ((input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>) | null = null
-export const reviewSnapshots = new TerminalReviewSnapshots()
 let seedNotes: ((task: TaskRef) => Promise<void>) | null = null
 let internalEnv: InternalEnvFactory = () => ({})
 let statusBroadcast: () => void = () => {}
@@ -149,14 +146,13 @@ type EngineOwner = {
   launchText: ((taskId: string) => Promise<string | null>) | null
   launch: ((taskId: string, sessionId: string) => Promise<void>) | null
   complete: ((event: TerminalCompletedEvent) => void) | null
-  archive: ((input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>) | null
   seed: ((task: TaskRef) => Promise<void>) | null
 }
 let engineToken: object | null = null
 function owner(): EngineOwner {
   if (!engineToken || !store) throw new Error('The terminal engine has not been initialized.')
   return { token: engineToken, db: store, core: services(), env: internalEnv,
-    status: statusBroadcast, worktree: worktreeBroadcast, launch: launchContext, launchText: launchContextText, complete: completed, archive: archiveReview, seed: seedNotes }
+    status: statusBroadcast, worktree: worktreeBroadcast, launch: launchContext, launchText: launchContextText, complete: completed, seed: seedNotes }
 }
 function assertOwner(engine: EngineOwner): void {
   if (engine.token !== engineToken) throw new Error('The terminal engine has been disposed.')
@@ -388,7 +384,6 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner): Ses
         () => {
           if (s.meta.kind !== 'agent' || s.meta.title === 'Teardown') return
           const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
-          reviewSnapshots.capture(event, s.ring.tail(16_000))
           engine.complete?.(event)
         },
         () => settleSession(s, exitCode),
@@ -713,7 +708,6 @@ export type TerminalChannelDeps = {
   launchContextText?: (taskId: string) => Promise<string | null>
   launchContext: (taskId: string, sessionId: string) => Promise<void>
   completed: (event: TerminalCompletedEvent) => void
-  archiveReview: (input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>
   seedTaskNotes: (task: TaskRef) => Promise<void>
   // Resolves when the composition root's post-window reconcile pass is done, including on failure.
   // Mutating surfaces that read the sessions map await it.
@@ -754,8 +748,6 @@ export function disposeTerminal(): void {
   launchContextText = null
   launchContext = null
   completed = null
-  archiveReview = null
-  reviewSnapshots.clear()
   seedNotes = null
   statusBroadcast = () => {}
   worktreeBroadcast = () => {}
@@ -778,7 +770,6 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   launchContextText = deps.launchContextText ?? null
   launchContext = deps.launchContext
   completed = deps.completed
-  archiveReview = deps.archiveReview
   seedNotes = deps.seedTaskNotes
   statusBroadcast = deps.status ?? (() => {})
   worktreeBroadcast = deps.worktreeChanged ?? (() => {})
@@ -837,7 +828,6 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
       sessions.delete(id)
       drain([() => { if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession) },
         () => retireSession(s)])
-      reviewSnapshots.forget(id)
       try {
         if (s.meta.backend === 'tmux') await deleteRow(id, engine.db)
       } finally { if (engine.token === engineToken) drain([() => engine.status()]) }
@@ -859,24 +849,6 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   const taskSessions: TaskSessionsBridge = {
     // The reconcile gate the route awaits before the running-session guard.
     ready: () => deps.reconciled,
-    captureArchiveReviewInput: async (taskId) => {
-      assertOwner(engine)
-      const reviewSessions = [...sessions.values()]
-        .filter((session) => session.admitted && !session.retired && session.meta.taskId === taskId && session.meta.title !== 'Teardown')
-      const output = reviewSessions
-        .map((session) => session.ring.tail(4_000))
-        .filter(Boolean)
-        .join('\n\n')
-        .slice(-16_000)
-      const cwd = await engine.core.tasks.root(taskId).catch(() => null)
-      assertOwner(engine)
-      const diff = cwd
-        ? await engine.core.git.gitText(['diff', 'HEAD'], { cwd, timeoutMs: 15_000, maxOutputBytes: 12_000 }).catch(() => null)
-        : null
-      assertOwner(engine)
-      await engine.archive?.({ taskId, sessionIds: reviewSessions.slice(-64).map((session) => session.meta.id),
-        terminalOutput: trailingUtf8(output), diff: trailingUtf8(diff ?? '', 12_000) })
-    },
     runningCount: (taskId) => { assertOwner(engine); return [...sessions.values()].filter((s) => s.admitted && !s.retired && s.meta.taskId === taskId && s.meta.status === 'running').length },
     killRunning: (taskId) => {
       assertOwner(engine)
@@ -890,7 +862,6 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
         sessions.delete(s.meta.id)
         s.discardRow = true
         retireSession(s)
-        reviewSnapshots.forget(s.meta.id)
       }
       try {
         await Promise.all(dropped.filter(s => s.meta.backend === 'tmux').map(s => deleteRow(s.meta.id, engine.db)))

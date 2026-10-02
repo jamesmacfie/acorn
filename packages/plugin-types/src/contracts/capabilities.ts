@@ -68,8 +68,6 @@ export type CapabilityCatalogue = {
   'terminal.sendToAgent': HostOwned<'plugins/terminal/contract/sendToAgent.TerminalSendToAgent'>
   /** Start, stop and inspect a task's run targets. */
   'terminal.runTargets': HostOwned<'plugins/terminal/contract/runTargets.TerminalRunTargets'>
-  /** Read the short-lived bounded input captured when an agent PTY exits. */
-  'terminal.reviewInput.v1': HostOwned<'plugins/terminal/contract/reviewInput.TerminalReviewInputCapability'>
   /** Read and write task, workspace and global notes. */
   'notes.store': HostOwned<'plugins/notes/contract/store.NotesStoreCapability'>
   /** Seed a new task's notes from its linked external items. */
@@ -86,8 +84,6 @@ export type CapabilityCatalogue = {
   'preview.urls': HostOwned<'plugins/preview/contract/urls.PreviewUrlsCapability'>
   /** Ask the workflow runner to reconcile after a restart. */
   'workflows.runner': { reconcile(): Promise<void> }
-  /** Read persisted, bounded completion handoffs for workflow runs. */
-  'workflows.reviewInput.v1': HostOwned<'plugins/workflows/contract/reviewInput.WorkflowReviewInputCapability'>
   /** Rebuild a task's pending workflow approval inbox. */
   'workflows.gates': HostOwned<'plugins/workflows/contract/events.WorkflowGatesCapability'>
   /** The per-step event stream behind the run panel. For a bell row, use `events.notice`, which is

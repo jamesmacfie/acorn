@@ -12,7 +12,7 @@ import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../se
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
+import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { createSessionControl } from '../server/sessions/sessionControl'
@@ -245,10 +245,6 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         }),
         ctx.capabilities.provide(AGENTS_SESSIONS, {
           list: (taskId) => runtime!.store.lifecycleSessions(taskId),
-        }),
-        ctx.capabilities.provide(AGENTS_REVIEW_INPUT, {
-          listCompleted: (taskId) => runtime!.store.lifecycleCompletedReviewInputs(taskId),
-          read: (input) => runtime!.store.lifecycleReviewInput(input),
         }),
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits

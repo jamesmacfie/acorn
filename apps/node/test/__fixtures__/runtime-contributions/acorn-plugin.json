@@ -2,7 +2,7 @@
   "id": "runtime-fixture",
   "name": "Runtime contribution fixture",
   "version": "1.0.0",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "node": "./node.js",
   "permissions": {
     "node": {}

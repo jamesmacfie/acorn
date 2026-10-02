@@ -1,9 +1,10 @@
-import { BridgeError, ToolError, type CoreServices, isDir, type PluginDatabase } from '@acorn/plugin-api/node'
+import { BridgeError, ToolError, type CoreServices } from '@acorn/plugin-api/node'
 import { homedir } from 'node:os'
 import type { KnowledgeBridge } from '../server/routes/knowledge'
-import { listMemories, memorySources, MEMORY_TYPES, privateMemoryRoot, reconcileMemories, searchMemories, normalizeMemoryType, type MemoryType } from './memory'
+import { contentHashId, MEMORY_TYPES, privateMemoryRoot, normalizeMemoryType } from './memory'
+import { searchMemoryFiles } from './memorySearch'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
-import type { MemoryRow } from './memory'
+import type { MemoryRow, MemoryType } from '../contract/library'
 import type { MemoryStoreAccess } from './memoryStore'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
@@ -14,24 +15,15 @@ export type KnowledgeDeps = {
 
 export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity' | 'prefs'>
 
-// Reads over the derived index, bound to this plugin's own database (docs/data-layer.md § Plugin
-// databases). Findings and the legacy page read through this during phase 1 measurement.
-// Direct agent tools and standing context read the files (docs/notes-and-memory.md § Memory).
-export type MemoryIndex = {
-  // Exposed as well as used internally: a caller that then reads through a different path (core's
-  // context assembler) still needs the index fresh.
-  reconciled(): Promise<void>
-  list(opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryRow[]>
-}
-
-export type MemoryKnowledge = MemoryIndex & {
+export type MemoryKnowledge = {
+  list(projectId: string | null): Promise<MemoryRow[]>
   // Builds the bounded task and memory block. Terminal owns delivery to its new session.
   launchContext(taskId: string): Promise<string | null>
   standingContext(taskId: string): Promise<string | null>
   store: MemoryStoreAccess
 }
 
-export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
+export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
   const guard = async <T>(fn: () => Promise<T>): Promise<T | { error: string }> => {
     try {
       return await fn()
@@ -40,18 +32,6 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
     }
   }
 
-  // Memory (docs/notes-and-memory.md § Memory): files are truth, and the SQLite index reconciles from
-  // the private store plus every active worktree and primary checkout before each read. The worktree
-  // and checkout halves are read-only: acorn writes memory under the private root alone.
-  const buildMemorySources = async () => {
-    const active = (await core.tasks.active())
-      .filter((t) => t.worktreePath && isDir(t.worktreePath))
-      .filter((t) => t.projectId)
-      .map((t) => ({ dir: t.worktreePath!, projectId: t.projectId! }))
-    const checkouts = (await core.projects.checkouts()).filter((p) => isDir(p.path))
-    return await memorySources(active, checkouts, homedir())
-  }
-  const reconciled = async () => reconcileMemories(db, await buildMemorySources())
   const announceMemories = (projectId: string | null) => deps.emit?.({
     channel: pluginChannel('memory', 'memories-changed'),
     ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
@@ -68,6 +48,12 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
     delete: async (...args) => (await loadStore()).delete(...args),
     undo: async (...args) => (await loadStore()).undo(...args),
   }
+  const list = async (projectId: string | null): Promise<MemoryRow[]> => (await store.list(projectId)).map((memory) => ({
+    ...memory,
+    id: `${memory.scope}:${memory.projectId ?? ''}:${contentHashId(memory.name, memory.body, memory.description)}`,
+    createdAt: memory.createdAt || Math.round(memory.updatedAt),
+    updatedAt: Math.round(memory.updatedAt),
+  }))
   const standingContext = async (taskId: string) => {
     const { standingContextBuilder } = await import('./standingContext')
     return standingContextBuilder(store, core)(taskId)
@@ -110,14 +96,12 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
       return project ? { projectId: project.id } : null
     },
     memoryList: (projectId) =>
-      guard(async () => {
-        await reconciled()
-        return listMemories(db, { projectId: projectId ?? null })
-      }),
+      guard(() => list(projectId ?? null)),
     memorySearch: (query, projectId, type) =>
       guard(async () => {
-        await reconciled()
-        return searchMemories(db, query, { projectId: projectId ?? null, type: MEMORY_TYPES.includes(type as MemoryType) ? (type as MemoryType) : undefined })
+        const rows = await list(projectId ?? null)
+        const filtered = type && MEMORY_TYPES.includes(type as MemoryType) ? rows.filter((row) => row.type === normalizeMemoryType(type)) : rows
+        return searchMemoryFiles(filtered.filter((row) => !row.supersededBy), query)
       }),
     // Manual add: both scopes write under the owner's private root, so a memory never turns up in the
     // repo's diff. Project scope is keyed by the task's project id; private scope applies everywhere.
@@ -125,14 +109,12 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
       guard(async () => {
         const t = await core.tasks.load(taskId)
         if (p.scope === 'project' && !t?.projectId) throw new Error('Project memory needs a task that names a project.')
-        const res = await store.write({ scope: p.scope, projectId: p.scope === 'project' ? t!.projectId! : null, name: p.name.trim() }, {
+        return store.write({ scope: p.scope, projectId: p.scope === 'project' ? t!.projectId! : null, name: p.name.trim() }, {
           name: p.name.trim(),
           description: p.description.trim(),
           type: normalizeMemoryType(p.type),
           body: p.body,
         }, { by: 'owner', taskId })
-        await reconciled()
-        return res
       }),
     memoryProjectAdd: (projectId, input) => guard(async () => {
       if (!await core.projects.byId(projectId)) throw new Error('No such project.')
@@ -146,17 +128,14 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
         throw error
       }
     },
-    memoryApproveFinding: async () => ({ ok: false, reason: 'Findings review is unavailable.' }),
   }
 
-  // The index reads bind to this plugin's own database; Terminal consumes launchContext as a
-  // contribution and the other reads stay inside Memory.
+  // Terminal consumes launch context; every library read scans the same two scope folders.
   return {
     route,
     store,
     standingContext,
-    reconciled,
     launchContext,
-    list: (opts) => listMemories(db, opts),
+    list,
   }
 }

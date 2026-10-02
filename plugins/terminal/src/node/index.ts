@@ -4,13 +4,12 @@ import { TERMINAL_RUN_TARGETS } from '../contract/runTargets'
 import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
 import { TERMINAL_LAUNCH_CONTEXT } from '../contract/launchContext'
-import { TERMINAL_REVIEW_INPUT } from '../contract/reviewInput'
 import { deliverLaunchContext, readLaunchContext } from '../server/launchContext'
 import { runAgentTools } from '../server/agentTools'
 import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
 import { commandStep, runTargetStep } from '../server/workflowSteps'
 import { createRuntimeService } from '../server/runChannel'
-import { disposeTerminal, registerTerminalChannel, reviewSnapshots, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
+import { disposeTerminal, registerTerminalChannel, sendToAgent, sessionControl, terminalRunGlue, type TerminalChannelDeps } from '../server/terminal'
 import { TERMINAL_ROUTE, terminal } from '../server/routes/terminal'
 
 export type TerminalPluginDeps = Pick<TerminalChannelDeps, 'internalEnv' | 'reconciled'>
@@ -22,7 +21,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
     name: 'terminal',
     label: 'Terminal',
     required: true,
-    emits: [{ verb: 'completed', description: 'A task agent terminal exited with bounded input available for a short read window' }],
+    emits: [{ verb: 'completed', description: 'A task agent terminal exited' }],
     // This module's own URL: the chain sits at plugins/terminal/migrations beside it, and the host owns
     // open/migrate/close from there (@acorn/node-core/server/plugins/storage.ts).
     migrationsModule: import.meta.url,
@@ -32,11 +31,6 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // reach an unmigrated database.
       const db = ctx.storage.open()
       ctx.extensionPoints.declare(TERMINAL_LAUNCH_CONTEXT, 'Agent launch context')
-      ctx.hooks.declare({
-        id: 'archive-review', label: 'capture task evidence before archive',
-        payload: { taskId: 'string', sessionIds: 'string[]', terminalOutput: 'string', diff: 'string', captureStatus: 'string' },
-        allows: ['transform'], timeoutMs: 5_000,
-      })
       // Fills the terminal bridge, the WS stream handlers (including streamTaskId, which the task-scope
       // guard in server/transport/wsHub.ts refuses attachment without), core's archive-time task-sessions bridge and
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
@@ -48,10 +42,6 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
             (id, text) => sendToAgent(id, text, 'after-ready'), (message) => ctx.log.warn(message))
         },
         completed: (event) => ctx.events.send({ channel: 'plugin:terminal:completed', ...event }),
-        archiveReview: async ({ taskId, sessionIds, terminalOutput, diff }) => {
-          const result = await ctx.hooks.run('archive-review', { taskId, sessionIds, terminalOutput, diff, captureStatus: 'pending' })
-          if (result.payload.captureStatus === 'failed') throw new Error('Findings archive capture failed')
-        },
         seedTaskNotes: (task) => ctx.capabilities.get(NOTES_SEED_TASK)?.(task) ?? Promise.resolve(),
         // `terminal:sessions-changed`, not `ctx.events.status`. This fires on every idle-to-working
         // edge, which is machine speed, and the old ping had six subscribers. Written as a frame here for
@@ -65,9 +55,6 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TERMINAL_ROUTE, registrations.terminal),
         ctx.capabilities.provide(TASK_SESSIONS, registrations.taskSessions),
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
-        ctx.capabilities.provide(TERMINAL_REVIEW_INPUT, {
-          read: async (taskId, sessionId) => reviewSnapshots.read(taskId, sessionId),
-        }),
       ]
       // The repo's setup script, as a handler on core's `core:worktree-created` hook rather than the
       // single slot it used to fill (docs/plugins.md § Hooks). `transform` and not `observe` because

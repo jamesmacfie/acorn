@@ -78,7 +78,7 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
                 {/* Under a `Suspense`, because a pane whose contribution is a bare component rather than a
                     set of regions is a `lazy()` this host mounts itself, and a pending `lazy()` resolves to
                     an empty string — which a cell host refuses outright where the DOM would have drawn a
-                    text node nobody sees (findings.md § A pending `lazy()` region is an empty string). The
+                    text node nobody sees. A pending `lazy()` region is an empty string. The
                     layout mount path already has this guard; a component pane does not go through it. */}
                 <Suspense fallback={null}>
                   {createComponent(pane.component, { get task() { return props.task } })}

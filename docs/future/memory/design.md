@@ -15,7 +15,7 @@ proposal goes to Findings, which records an observation, prepares a candidate, a
 bundle. The owner approves each candidate on the Memory page, with a revision, a payload hash, an
 idempotency key, and a prepared receipt ([notes and memory](../../notes-and-memory.md#the-memory-page-and-transcript)).
 Archive-time review needs a configured backend and model, and without one Findings records evidence and
-prepares nothing ([findings](../../findings.md#completion-boundaries)).
+prepares nothing (findings (retired; see Git history for docs/findings.md)).
 
 **Recall depends on the agent choosing to look.** A managed chat receives memory only if the owner
 ticked the Context pane's memory section, which is off by default
@@ -313,8 +313,8 @@ Across phases 1 and 2:
 
 - The whole Findings plugin, its database, its four agent tools, its pane, its settings page, and its
   context section.
-- The proposal path in memory: `plugins/memory/src/server/findingsReview.ts`,
-  `plugins/memory/src/client/FindingsBundleReview.tsx`, and the approval route.
+- The proposal path in memory, its bundle review UI, and the approval route. These retired
+  implementations remain in Git history.
 - The review producers: `agents.reviewInput.v1`, `terminal.reviewInput.v1`, the `archive-review` hook
   and its PTY and diff capture, and `workflows.reviewInput.v1`.
 - The **Review learnings** and **Review memory suggestions** commands, the **Review after archive**

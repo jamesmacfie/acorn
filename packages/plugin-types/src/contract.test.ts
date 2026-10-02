@@ -164,11 +164,11 @@ it('names every capability the first-party plugins publish', () => {
   const ids: Array<keyof Published.CapabilityCatalogue> = [
     'agents.sessionExecute', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
     'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
-    'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'terminal.reviewInput.v1', 'notes.store', 'notes.seedTask',
+    'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
     'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
-    'workflows.runner', 'workflows.reviewInput.v1', 'workflows.gates', 'workflows.notices',
+    'workflows.runner', 'workflows.gates', 'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(23)
+  expect(new Set(ids).size).toBe(21)
 })
 
 it('keeps every published declaration module free of runtime statements', () => {

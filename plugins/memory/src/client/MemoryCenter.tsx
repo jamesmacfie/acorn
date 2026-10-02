@@ -1,12 +1,10 @@
 import { createQuery } from '@tanstack/solid-query'
 import { useParams } from '@solidjs/router'
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Row, Stack, Text } from '@acorn/plugin-api/ui'
-import { clientEvents, onPluginFrame, tasksOptions } from '@acorn/plugin-api/client'
+import { Badge, Button, CodeBlock, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Row, Stack, Text } from '@acorn/plugin-api/ui'
+import { onPluginFrame, tasksOptions } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { MEMORY_SCOPE_LABEL, MEMORY_TYPE_LABEL, memoryApi } from './memoryClient'
-import { highlightedFinding, clearHighlightedFinding } from './proposalTarget'
-import FindingsBundleReview from './FindingsBundleReview'
 import MemoryAddForm from './MemoryAddForm'
 import { selectedMemory, selectMemory } from './memorySelection'
 
@@ -16,8 +14,6 @@ export default function MemoryCenter() {
   const tasks = createQuery(() => tasksOptions(true))
   const task = () => tasks.data?.find((task) => task.id === params.taskId)
   const projectId = createMemo(() => params.projectId ?? task()?.projectId ?? undefined)
-  const [reviewSettings, { refetch: refetchReviewSettings }] = createResource(() => memoryApi().reviewSettings())
-  onCleanup(onPluginFrame('findings', pluginChannel('findings', 'settings-changed'), () => void refetchReviewSettings()))
   const [memories, { refetch: refetchMemories }] = createResource(
     () => projectId() ?? '',
     async (projectId) => {
@@ -28,11 +24,9 @@ export default function MemoryCenter() {
   )
   onCleanup(onPluginFrame('memory', pluginChannel('memory', 'memories-changed'), () => void refetchMemories()))
   const selected = createMemo(() => memories().find((row) => row.name === selectedMemory()?.name && row.scope === selectedMemory()?.scope))
-  // The highlight belongs to one arrival from the bell, not to the page.
-  onCleanup(clearHighlightedFinding)
   const [filter, setFilter] = createSignal('')
-  // Filtered on the device rather than through the node's index: this is a list already in hand, and
-  // the full-text search is a separate question the palette's "Search memory" answers.
+  // Filtered on the device rather than through a new Node query: this is a list already in hand, and
+  // search is a separate question the palette's "Search memory" answers.
   const shown = createMemo(() => {
     const needle = filter().trim().toLowerCase()
     if (!needle) return memories()
@@ -47,17 +41,7 @@ export default function MemoryCenter() {
     <ListDetail>
       <DetailColumn scroll measure="page">
         <Stack gap="section">
-          <Heading level={1} help="Durable memory shared by your agents, and suggestions from finished tasks.">Memory</Heading>
-          <Show when={reviewSettings() && (!reviewSettings()!.backendId || !reviewSettings()!.targetId)}>
-            <Alert
-              tone="warn"
-              title="Configure memory review"
-              actions={<Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'findings-settings' })}>Open review settings</Button>}
-            >
-              To get suggestions, choose a review model and where they go.
-            </Alert>
-          </Show>
-          <FindingsBundleReview focusCandidateId={highlightedFinding()} scope={projectId() ? { kind: 'project', projectId: projectId()! } : { kind: 'private' }} onChanged={() => void refetchMemories()} />
+          <Heading level={1} help="Durable memory shared by your agents.">Memory</Heading>
           <Stack gap="row">
             <MemoryAddForm task={task()} projectId={projectId()} onChanged={() => void refetchMemories()} />
             <Show when={selected()}>{(memory) => <Stack gap="row">

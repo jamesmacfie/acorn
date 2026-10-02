@@ -206,9 +206,9 @@ dependencies, an acyclic package graph, and the client/Node split.
 ## Data ownership
 
 Table-owning plugins get one `plugins/<name>.sqlite` file under the Node data root and own its
-migrations. There are eight: agents, changes, database, GitHub, HTTP, memory, terminal, and workflows.
+migrations. There are eight: agents, browser, changes, database, GitHub, HTTP, terminal, and workflows.
 Core owns shared workspace/task/integration/external-item/security tables. Docker, editor, Linear,
-Rollbar, model providers, preview, notes and the built-in agents profiles use core services, provider
+Rollbar, model providers, preview, memory, notes, and the built-in agents profiles use core services, provider
 registries or plain files without owning a database (notes writes markdown under `<data-root>/notes`).
 
 Both tiers get their handle from `ctx.storage.open()`, and the host owns the lifecycle either way: it

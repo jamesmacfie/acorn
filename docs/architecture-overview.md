@@ -417,8 +417,7 @@ minimal shape: a node bundle and a manifest, no client bundle at all, so there i
 device to trust. Linear is the widest: a pane frame, a reference-panel frame that github's PR detail
 renders, a descriptor rail source with host-owned task promotion, and declarative `linear.app` URL
 recognisers. HTTP was the first to exercise plugin-owned tables and migrations end to end, and
-database moved onto the host-owned document surface, which proved that contract. Findings moved its
-review surface into a remote tree, and agent-cost is a client-only loaded example. See document
+database moved onto the host-owned document surface, which proved that contract. Agent-cost is a client-only loaded example. See document
 surfaces in [the plugins doc](./plugins.md).
 
 The desktop ships every built package as app resources, and the service reconciles them into the

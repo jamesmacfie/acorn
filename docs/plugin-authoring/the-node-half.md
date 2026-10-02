@@ -104,56 +104,21 @@ If the handler needs another plugin, declare that plugin in `requires.plugins` a
 `ctx.capabilities.get(id)` or `require(id)` so a disabled or reloaded provider cannot leave a cached
 implementation. Keep the step's saved kind ID stable; a rename makes saved workflows unavailable.
 
-### Contributing findings from an installed plugin
+### Contributing agent launch context
 
-An external producer does not import Findings' runtime or receive its storage. It requires a
-compatible `findings` version in `requires.plugins`, declares local kinds, and connects a producer to
-the public extension point:
+Terminal's `terminal:launch-context` point accepts contributions with a `read(taskId)` function.
+Memory uses it to supply standing context. An installed plugin can contribute startup text through
+the same point:
 
 ```js
-let writer
-
-export default {
-  name: 'architecture-review',
-  init(ctx) {
-    ctx.extensionPoints.handle('findings:kind', {
-      id: 'architecture',
-      value: { version: 1, label: 'Architecture concern' },
-    })
-    ctx.extensionPoints.handle('findings:producer', {
-      id: 'review',
-      value: {
-        kinds: ['architecture'],
-        connect(next) {
-          writer = next
-          return () => { writer = undefined }
-        },
-      },
-    })
-    ctx.routes.fetch(async (request) => {
-      if (new URL(request.url).pathname !== '/record' || request.method !== 'POST' || !writer) {
-        return new Response('Not found', { status: 404 })
-      }
-      const { taskId } = await request.json()
-      const result = await writer.record({ kind: 'task', taskId }, {
-        sourceKey: `architecture:${taskId}`,
-        kind: 'architecture-review:architecture',
-        kindVersion: 1,
-        title: 'Review architecture boundary',
-        bodyMd: 'The adapter crosses an ownership boundary.',
-        claim: 'observed',
-        evidence: [],
-      })
-      return Response.json(result)
-    })
-  },
-}
+ctx.extensionPoints.handle('terminal:launch-context', {
+  id: 'guidance',
+  value: { read: async (taskId) => `Task guidance for ${taskId}` },
+})
 ```
 
-The host qualifies `architecture` with the producer's plugin ID and binds the writer to that identity.
-It rejects undeclared kinds and revokes cached writers when either contribution unloads. The fixture at
-`apps/node/test/__fixtures__/findings-producer` is built and installed independently in the Findings
-integration test.
+Terminal resolves contributors on each launch and owns byte limits and delivery. Keep repository
+instructions in `AGENTS.md` or `CLAUDE.md`; this seam supplies runtime-owned context.
 
 **Node actions and harnesses have no `ctx` member at all.** The manifest is the only way in — a command
 whose verb is `runNodeAction`, and `contributions.harnesses` — and the host registers them for you

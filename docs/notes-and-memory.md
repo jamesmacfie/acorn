@@ -1,6 +1,6 @@
 # Notes and memory
 
-Notes and memory are separate Node plugins with different ownership and review semantics. Both are
+Notes and memory are separate Node plugins with different ownership and scopes. Both are
 available to the renderer and to task-scoped MCP tools.
 
 ## Notes
@@ -105,16 +105,6 @@ calls show the scope, name, description, **Open**, and **Undo**. Undo calls
 `POST /v1/p/memory/memory/changes/:id/undo`, which requires a paired device. Manual additions also
 require a device and use the same validation, history, and change log as agent writes.
 
-Findings review remains available during phase 1's measurement period. Its review bundles, archive
-producers, approval route, and durable promotion receipts remain supported. The review fingerprints
-compare normalized type labels. The Memory page shows review bundles above the library.
-`memory_write` does not submit a Findings proposal. Removing Findings and the derived SQLite index
-is gated by the measurement in [the memory programme](./future/memory/01-direct-writes.md).
-
-The page and Findings review still use the derived SQLite index, including its read-only repository
-sources. Agent tools and standing context scan only the private root and the task's project folder.
-Repository folders are outside the direct-write tool contract.
-
 ## Context integration
 
 Notes contribute to `task_context` and the Context pane alongside task, PR, and linked-issue sections.
@@ -145,7 +135,7 @@ index caps and the contract. Command overrides receive no automatic agent contex
 
 ## From the command palette
 
-Five rows across the two plugins, all registered by their own client half.
+Three rows across the two plugins, all registered by their own client half.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
@@ -165,31 +155,14 @@ the Node owns the kind and the slug, so a note started from the palette gets the
 same `name-2` collision rule the pane's own button gets. Both rows are task-scoped, because opening a
 note is a pane intent addressed at a task even when the note is a global one.
 
-Memory contributes a search and two actions (`plugins/memory/src/client/commands.ts`). **Search
-memory** goes through the existing full-text path, so the ordering is that index's own rank and the
-device does not re-rank it. Selecting a row opens its scope and filename on the Memory page. The
-search is task-scoped and carries the captured project. **Review memory suggestions** opens the
-Memory page and is offered with no task in hand.
-**Review learnings** is task-scoped and explicitly prepares findings from that task, then routes to
-the owning project's Memory page. The Node resolves the same saved backend and model used by archive
-review; without one it asks the owner to configure review instead of creating unfiltered candidates.
-Findings validates generated payloads against Memory's target-owned contract before publication. If
-the model returns an invalid payload, Findings sends the validation error through one bounded
-correction pass; a second invalid response leaves the bundle failed and retryable.
-The Findings plugin also contributes **Show what acorn recorded for this task**, the command-only route to
-raw observations and provenance.
+Memory contributes **Search memory** (`plugins/memory/src/client/commands.ts`). The Node scans the
+private folder and the captured task's project folder. Search matches every query term literally,
+ignoring case, across names, descriptions, and bodies. Name matches rank above description matches,
+then body matches; update time breaks ties. Results are capped at 10. Selecting a row opens its scope
+and filename on the Memory page. Listing and searching reflect external edits on the next read.
+Memory uses no SQLite database or recall counters. Repository `.acorn/memory` folders are outside
+all Memory read paths.
 
 What stays out is deliberate. Deleting a note and changing whether an agent sees one stay in the note
-list, where the scope and the current value are both on screen. Accepting or rejecting a proposal
-needs the proposal's body and its verification flags in front of the reader. Adding a memory needs a
+list, where the scope and the current value are both on screen. Adding a memory needs a
 name, a type, a scope, and a body, which is four fields rather than one line.
-
-## Lifecycle hooks
-
-Managed-agent completion records Findings checkpoints when Findings is active. Ordinary turns do
-not create review cards or notices. Terminal exit and top-level workflow completion contribute
-evidence through their own completion events and bounded read capabilities. Task archive freezes the
-task's evidence through an awaited pre-teardown hook and queues one project-scoped review when a backend
-and target are configured. Workflow handoff notes remain notes and are read only as bounded input for
-the workflow boundary. If Findings is disabled, task completion and direct Memory writes continue. Legacy review preparation
-requires Findings.

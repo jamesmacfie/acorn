@@ -23,7 +23,6 @@ const log = createLogger('worktree')
 export type TaskSessionsBridge = {
   // Archive waits for startup reconciliation before checking or stopping live sessions.
   ready(): Promise<void>
-  captureArchiveReviewInput?(taskId: string): Promise<void>
   runningCount(taskId: string): number
   killRunning(taskId: string): void
   dropTaskSessions(taskId: string): Promise<void>
@@ -95,7 +94,6 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
     killRunning: sessions.killRunning,
     dropTaskSessions: sessions.dropTaskSessions,
     runTeardown: sessions.runTeardown,
-    captureReviewInput: sessions.captureArchiveReviewInput,
     // Injected here rather than imported by server/storage/archive.ts: the registry is a server-layer thing and
     // the lifecycle module deliberately does not reach into it (server/storage/archive.ts § ArchiveDeps).
     applyTaskChecks: async (task, ids) => {

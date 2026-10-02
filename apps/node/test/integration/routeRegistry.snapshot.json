@@ -219,8 +219,6 @@
   "POST /v1/p/github/repos/refresh",
   "POST /v1/p/memory/memory/changes/:id/undo",
   "POST /v1/p/memory/memory/changes/:id/undo",
-  "POST /v1/p/memory/memory/findings/:id/approve",
-  "POST /v1/p/memory/memory/findings/:id/approve",
   "POST /v1/p/memory/projects/:id/memory",
   "POST /v1/p/memory/projects/:id/memory",
   "POST /v1/p/memory/tasks/:id/memory",

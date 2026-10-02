@@ -61,7 +61,7 @@ function fixture(tmux: boolean, failInsert = false, realDatabase = false) {
   const core = { tasks: { load: async () => ({ id: 'synthetic', projectId: null }), resolveCwd: async () => ({ cwd: state.dir, isWorktree: false }) }, projects: {}, proc: {}, git: {} }
   let rosterEvents = 0
   const { terminal } = registerTerminalChannel((real?.db ?? db) as never, core as never, {
-    internalEnv: () => ({}), launchContext: async () => {}, completed() {}, archiveReview: async () => {}, seedTaskNotes: async () => {},
+    internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {},
     reconciled: Promise.resolve(), status: () => { rosterEvents++ },
   })
   return { terminal, rows, realRows: () => real?.db.select().from(terminalSessions), events: () => rosterEvents }

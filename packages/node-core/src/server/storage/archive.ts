@@ -46,9 +46,6 @@ export type ArchiveDeps = {
   dropTaskSessions: (taskId: string) => Promise<void>
   // Teardown runner. The app streams it through a drawer session, and tests use runTeardownProcess.
   runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string) => Promise<TeardownResult>
-  // Best-effort source capture while the worktree and terminal buffers still exist. Preparation is
-  // scheduled by the owner and never awaited here.
-  captureReviewInput?: (taskId: string) => Promise<void>
   // The plugin cleanups the owner ticked in the archive dialog, resolved and run by the caller
   // (server/pluginHost/taskChecks.ts). Injected rather than imported, like every other dep here, so this
   // module never reaches into the server layer. It returns the plugin ids whose cleanup failed. The
@@ -89,13 +86,6 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   const project = await projectForTask(db, t)
   const projectRoot = project?.path ? resolve(project.path) : null
   const ownsWorktree = !!t.worktreePath && (!projectRoot || resolve(t.worktreePath) !== projectRoot)
-
-  let reviewCaptureFailed = false
-  try {
-    await deps.captureReviewInput?.(id)
-  } catch {
-    reviewCaptureFailed = true
-  }
 
   // Teardown runs while the worktree and any services still exist, before sessions stop and before
   // removal. A non-zero exit pauses the archive so the caller can abort or re-invoke with
@@ -151,7 +141,6 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   return {
     ok: true,
     ...(checkFailures.length ? { cleanupFailed: checkFailures } : {}),
-    ...(reviewCaptureFailed ? { reviewCaptureFailed: true } : {}),
   }
 }
 

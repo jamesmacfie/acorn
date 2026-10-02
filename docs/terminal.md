@@ -48,10 +48,8 @@ roughly every 16 milliseconds (about one frame at 60 frames per second) instead 
 chunk, so a busy TUI does not send a frame for every keystroke echo.
 
 An agent PTY exit emits `plugin:terminal:completed` with task and session IDs, exit code, and time.
-Output stays behind `terminal.reviewInput.v1`: at most 256 snapshots of 16 KiB are retained for
-60 seconds. A removed, expired, evicted, or pre-restart snapshot reads as unavailable. Task archive
-uses a separate awaited hook. Terminal gathers bounded PTY output and Git diff before teardown, then
-runs `terminal:archive-review` with task and session identities; Findings formats the observation.
+The event remains public for lifecycle consumers. Terminal captures no review snapshots or archive
+evidence; archive proceeds directly to teardown and session cleanup.
 
 The session engine publishes each successful creation and removal at its roster boundary. Setup,
 run targets, teardown, and capability callers share that boundary. A task drop or reconciliation

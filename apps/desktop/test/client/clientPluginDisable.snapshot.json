@@ -24,9 +24,7 @@
       "editor.files.open",
       "editor.search.open",
       "source.github.open",
-      "memory.learnings.review",
       "memory.search",
-      "memory.proposals.open",
       "notes.find",
       "notes.create",
       "preview.open",
@@ -116,7 +114,6 @@
     ],
     "attentionSources": [
       "agents.sessions",
-      "memory.proposals",
       "workflows.gates"
     ],
     "contentLinks": [

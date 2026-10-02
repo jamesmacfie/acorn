@@ -70,12 +70,12 @@ const STARTUP_IMPORTS = ['src/client/index.tsx']
 // leaving it in is what catches the module coming back under its old name.
 //
 // The second group is plugin code a registration needs only when it draws: the memory section and
-// the Findings review it carries, the workflow editor's draft modules, the GitHub importer and the
+// the workflow editor's draft modules, the GitHub importer and the
 // preview pane. Each was on the renderer's startup graph through a plugin's client entry until
 // 2026-09-25. The terminal client's graph was not checked for them, so only this list has them.
 const DENYLIST = [
   'shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes',
-  'MemoryAddForm', 'FindingsBundleReview', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
+  'MemoryAddForm', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
 ]
 
 // The denylist entries that are allowed in the startup list for now, reported loudly rather than

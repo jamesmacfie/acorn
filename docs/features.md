@@ -27,7 +27,6 @@ previews one read-only, and restores it onto its branch
 - `agents` — managed Claude/Codex sessions, requests, context, artifacts, and lifecycle.
 - `pr` — linked pull-request review.
 - `changes` — uncommitted diff, staging, commit/push, and review notes.
-- `findings` — quiet observations plus explicit, consolidated memory-review bundles with retained provenance and history.
 - `notes` — task, workspace, and global Markdown notes.
 - `context` — choose, preview, size, and send task context.
 - `editor` / `search` — worktree files, code editing, and ripgrep search.
@@ -83,13 +82,8 @@ and finds this in Settings later.
 
 Notes are Markdown at task, workspace, and global scope. Agents write durable Memory directly with
 hash conflicts, guarded content, history, and transcript Undo. Each new session starts with the
-memory contract and capped private and project indexes. Findings review remains during phase 1
-measurement. The context feature assembles provider, task, and notes sections within byte/token
-budgets and can sync an immutable snapshot to an agent session.
-
-Findings retains evidence discovered during a task without notifying the owner or creating a review
-obligation. Managed agents, paired devices, and registered plugin producers can record bounded,
-structured observations. The task pane shows their full history.
+memory contract and capped private and project indexes. The context feature assembles provider, task,
+and notes sections within byte/token budgets and can sync an immutable snapshot to an agent session.
 
 ## Workflows
 
@@ -118,7 +112,7 @@ archived task keeps its agent history, what a new session starts on, and whether
 sent the task's context), Custom agents and MCP servers (each a list, then
 one item's editor in the same pane), Tools and permissions (grouped by owner or by tier), MCP config
 files (for a project picked on the page, whether or not a task is open), Limits and cost (concurrency
-and pricing), and Review after archive. Connections holds
+and pricing). Connections holds
 Services (each connection, a page per connection with where it shows up, and an Add connection
 gallery) and AI models (the model keys, the agent CLIs, and Generate with). Features holds Terminal, Docker, API requests, and any plugin page that names no group.
 Automation holds Schedules, Run history, and Workflows. Machines holds Nodes, Security and backup,

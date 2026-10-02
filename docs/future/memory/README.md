@@ -1,14 +1,14 @@
 # Simple memory
 
-Status: phase 1 implemented for verification, 2026-10-02. The two-week measurement remains open.
-Phases 2 and 3 are gated by that measurement; phase 4 also waits on cloud teams. Where a file here
-disagrees with a shipped contract, the owning reference document wins until the implementation
+Status: phases 1 and 2 implemented for verification, 2026-10-02. Phase 2 proceeded by explicit
+owner request before phase 1's two-week measurement finished. Phase 3 is next; phase 4 also waits on
+cloud teams. Where a file here disagrees with a shipped contract, the owning reference document wins until the implementation
 changes that contract.
 
 ## What this is
 
 Agents write memory directly, in the turn where they learn something, and every new session starts
-with the memory index already in its system prompt. After the phase 1 measurement, phase 2 removes the review queue, the Findings plugin, and the
+with the memory index already in its system prompt. Phase 2 removes the review queue, the Findings plugin, and the
 search index behind them. Memory becomes Markdown files, one index file per scope, a handful
 of agent tools, and a page where the owner can read, edit, delete, and undo.
 
@@ -56,7 +56,7 @@ door, so it comes second, after phase 1 has shown that direct writes work.
 
 Each phase updates the owning documents it touches. Taken together, the programme rewrites
 [notes and memory](../../notes-and-memory.md) § Memory and § Context integration, deletes
-[findings](../../findings.md), and edits these:
+findings (retired; see Git history for docs/findings.md), and edits these:
 
 - [Agent tools](../../agent-tools.md), for the memory tools and the removal of the four `findings_*` tools.
 - [API reference](../../api-reference.md), for the memory routes and the removed Findings routes.
@@ -77,6 +77,6 @@ with the Findings plugin despite the shared word.
 ## Verify before building
 
 Recheck the shipped memory contract in [notes and memory](../../notes-and-memory.md#memory), the
-Findings contract in [findings](../../findings.md), and the harness system prompt seams in
+Findings contract in findings (retired; see Git history for docs/findings.md), and the harness system prompt seams in
 [managed agents](../../managed-agents.md) before each phase. Do not describe a proposal in this folder
 as shipped.

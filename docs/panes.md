@@ -32,10 +32,6 @@ nothing to draw, so it gets no button ([shell.md](./shell.md) § Host-owned webv
 connection script and no `DATABASE_URL` in its worktree `.env` or the Node's environment gets no
 button ([database.md](./database.md) § Connection resolution).
 
-The loaded Findings pane is deliberately absent from this list. Its manifest sets
-`showInSwitcher: false`, so the pane remains a valid persisted layout target and can be opened by
-**Show what acorn recorded for this task**, but raw review inputs do not occupy the everyday task switcher.
-
 Compiled provider panes appear when their linked provider is connected and the task has relevant
 data. The four loaded ones, `database`, `http`, `linear`, and `rollbar`, are declared in a manifest and
 offered whenever the plugin is running on the node the window is talking to. All four draw **trees**:

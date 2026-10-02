@@ -58,7 +58,6 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [managed-agents/client-surfaces.md](./managed-agents/client-surfaces.md) | Agent Center, task panes, transcript storage, and search. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
-| [findings.md](./findings.md) | Quiet task evidence, provenance, capture authority, history, and plugin collaboration contracts. |
 | [dashboards.md](./dashboards.md) | User-composed panels over typed record collections. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
@@ -67,7 +66,7 @@ orientation map over the whole plugin system and it is much shorter than the ref
 | [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
 | [workflows/execution.md](./workflows/execution.md) | Workflow graph execution, retries, recovery, and child tasks. |
 | [workflows/authoring.md](./workflows/authoring.md) | Workflow editor, scheduling, generation, drafts, and publication. |
-| [notes-and-memory.md](./notes-and-memory.md) | Task notes and the memory proposals loop. |
+| [notes-and-memory.md](./notes-and-memory.md) | Task notes, direct memory writes, standing context, and Undo. |
 | [http-client.md](./http-client.md) | The HTTP request pane and the outbound-request gap. |
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |
 | [database.md](./database.md) | The database plugin: the Postgres browser and SQL editor. |
@@ -129,6 +128,9 @@ Start with the plugin map, then follow the authoring guide or API reference.
   from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
   Today that is `docs/schemas/enrollment-v1.json`.
+
+The Findings plugin and docs/findings.md were retired by memory phase 2 on 2026-10-02.
+Their design and implementation remain in Git history.
 
 ## Documentation ownership
 

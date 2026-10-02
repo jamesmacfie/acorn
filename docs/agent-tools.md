@@ -22,7 +22,7 @@ must validate input again at execution time and use CoreServices for files, Git,
 and task lookup.
 
 Tool groups cover task and context inspection, the issue and error trackers, Git and changes, the
-pull request, notes, memory, findings, terminal handoff, and browser operations. Nothing drives a workflow,
+pull request, notes, memory, terminal handoff, and browser operations. Nothing drives a workflow,
 opens a database, or talks to Docker: [the MCP doc](./mcp.md) § Tool surface says why, and the
 registry is the authority on the list.
 
@@ -43,23 +43,6 @@ ci-loop step uses (`checkFailed` in `plugins/github/src/server/mirrorQueries.ts`
 
 Both distinguish an unmirrored pull request from an empty one, and say which in a `status` field. A
 task whose PR has never been mirrored is not a PR with no feedback, and it is not a green one.
-
-## Findings
-
-The findings plugin contributes two read tools and two write tools. All four derive the task from the
-tool context. The record and withdraw tools also require a signed managed-session claim.
-
-| Tool | Input | Result |
-| --- | --- | --- |
-| `findings_record` | Source key, kind and version, title, Markdown body, claim status, evidence, and optional correction ID | Observation ID, whether the call created it, and the scope revision |
-| `findings_list` | Optional cursor, limit, and `active` or `history` state | A bounded page, next cursor, and scope revision |
-| `findings_get` | Observation ID | The observation, provenance, evidence, correction link, and withdrawal history |
-| `findings_withdraw` | Observation ID and optional reason | Whether the call changed the record and the scope revision |
-
-An agent can record only for its signed task and session. It can withdraw only an observation from
-that session. Cross-task and foreign-session lookups return `not_found`. Repeating a source key with
-the same payload returns the original record; changing the payload returns `conflict`. These calls do
-not generate notices or attention items. For the data and limits, see [Findings](./findings.md).
 
 ## issue_detail
 

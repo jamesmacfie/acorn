@@ -250,7 +250,7 @@ complete manifest has a node bundle and one route-backed extension:
   "name": "Deploy status",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "node": "./node.js",
   "contributions": {
     "extensions": [
@@ -393,7 +393,7 @@ This is the whole plugin that adds OpenCode:
   "name": "OpenCode",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "icon": { "d": "M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" },
   "contributions": {
     "harnesses": [

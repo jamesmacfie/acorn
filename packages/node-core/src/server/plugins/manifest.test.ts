@@ -1859,7 +1859,7 @@ describe('declared dependencies', () => {
 
 it('reports cross-field errors in author-facing order with their descriptor paths', () => {
   const result = parsePluginManifest({
-    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '2',
+    id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3',
     requires: { plugins: [{ id: 'board' }] },
     contributions: {
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://docs.example.com', hosts: ['docs.example.com'] }],

@@ -12,7 +12,7 @@ const output = resolve(DESKTOP, 'dist/bundled-plugins')
 // The distribution roster. Adding another bundled plugin is one row here; package construction,
 // desktop resources, boot reconciliation, update ownership, uninstall tombstones and client trust
 // are all generic over the resulting directories.
-const BUNDLED_PLUGINS = ['agent-cost', 'database', 'findings', 'http', 'linear', 'model-providers', 'rollbar', 'sentry-telemetry']
+const BUNDLED_PLUGINS = ['agent-cost', 'database', 'http', 'linear', 'model-providers', 'rollbar', 'sentry-telemetry']
 
 // Client bundles import the SDK through its package exports, which point to dist/.
 // Build it before bundling plugins so staging also works in a clean checkout.

@@ -24,8 +24,7 @@ export type AttentionInbox = {
   unavailable: FleetUnavailable[]
 }
 
-// Acknowledging a row. A finished session, or an unreviewed memory proposal, is a state the node
-// keeps until someone acts on it, so it sits in "Needs you" long after they have read it. Looking at
+// Acknowledging a row. A finished session is a state the node keeps until someone acts on it, so it sits in "Needs you" long after they have read it. Looking at
 // it in a focused window acknowledges it, and so does "Mark all read" in the bell.
 //
 // The key is the node and the row, and deliberately not the row's `at`. A timestamped key looked like

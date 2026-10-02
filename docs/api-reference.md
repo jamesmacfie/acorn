@@ -420,34 +420,6 @@ and `agent_cancel` only for a task-scoped internal principal with a signed sessi
 required execute permission. `POST /v1/core/tasks/:id/tools/:name` invokes them. A direct-child
 authorization failure is indistinguishable from an unknown session and returns 404.
 
-### Findings
-
-```text
-/v1/p/findings/tasks/:id/observations
-/v1/p/findings/tasks/:id/observations/:observationId
-/v1/p/findings/tasks/:id/observations/:observationId/withdraw
-/v1/p/findings/observations
-/v1/p/findings/observations/batch
-/v1/p/findings/tasks/:id/review/prepare
-/v1/p/findings/review/bundles
-/v1/p/findings/review/bundles/:id/cancel
-/v1/p/findings/review/bundles/:id/outcomes/:observationId/restore
-/v1/p/findings/review/candidates/:id
-/v1/p/findings/review/candidates/:id/edit
-/v1/p/findings/review/candidates/:id/decision
-/v1/p/findings/review/candidates/:id/history
-/v1/p/findings/review/candidates/:id/split
-```
-
-These routes are device-only and support task history, explicit device-authored capture, atomic
-capture batches, withdrawal, explicit preparation, and exact-revision review history. They stamp
-scope from the URL and origin from the authenticated device. Task-scoped internal callers use the `findings_*` agent tools instead. For request bodies,
-limits, retry semantics, and pagination, see [Findings](./findings.md).
-
-Final findings-backed memory approval is separately device-gated at
-`POST /v1/p/memory/memory/findings/:id/approve`; memory, not findings, owns its durable receipt and
-file effect.
-
 ### Terminal, workflows, and execution
 
 ```text
@@ -596,7 +568,7 @@ edit returns a conflict. The paths in this paragraph are relative to `/v1/p/memo
 | `docker` | Node inventory and task container actions |
 | `editor` | task file reads/writes and search |
 | `http` | encrypted request/variable storage and send |
-| `memory` | memory entries and Findings approval |
+| `memory` | memory entries, manual additions, and change Undo |
 | `notes` | task, workspace, and global note CRUD |
 | `linear` | projects, issues, comments, reference resolution, and rail rows (loaded package) |
 | `rollbar` | normalized items, occurrences, and details |

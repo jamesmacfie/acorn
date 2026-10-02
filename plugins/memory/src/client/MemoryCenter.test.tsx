@@ -5,9 +5,8 @@ const mocks = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [{ id: 'task-1', projectId: 'project-1' }] }) }))
 vi.mock('@solidjs/router', () => ({ useParams: () => ({ taskId: 'task-1' }) }))
 vi.mock('@acorn/plugin-api/client', async original => ({ ...await original<Record<string, unknown>>(), onPluginFrame: () => () => {} }))
-vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ list: mocks.list, reviewSettings: async () => ({ backendId: 'model', targetId: 'memory:change' }) }) }))
+vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ list: mocks.list }) }))
 vi.mock('./MemoryAddForm', () => ({ default: () => null }))
-vi.mock('./FindingsBundleReview', () => ({ default: () => null }))
 import MemoryCenter from './MemoryCenter'
 import { selectMemory } from './memorySelection'
 

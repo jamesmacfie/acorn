@@ -26,7 +26,7 @@ type ToolPerms = ToolPermissions
 
 const TIERS: { risk: ToolRisk; label: string; blurb: string; help?: string }[] = [
   { risk: 'read', label: 'Read', blurb: 'Look at the task, notes, memory, git, and the pull request. Changes nothing.' },
-  { risk: 'write', label: 'Write', blurb: 'Write notes and suggest memory for you to review.' },
+  { risk: 'write', label: 'Write', blurb: 'Write notes and save or delete memory.' },
   { risk: 'execute', label: 'Execute', blurb: 'Use the preview browser and start run targets. Off until you turn it on.', help: 'Execute tools added in a later version of acorn start off too.' },
 ]
 

@@ -29,7 +29,7 @@ vi.mock('@acorn/plugin-api/node', () => ({
 import { disposeTerminal, registerTerminalChannel, terminalRunGlue, sendToAgent, reconcileTmux } from './terminal'
 
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes }); return { promise, resolve } }
-function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Promise<unknown>; project?: () => Promise<unknown>; insert?: () => Promise<void>; remove?: () => Promise<void>; root?: () => Promise<string>; archive?: () => Promise<void>; status?: () => void; launchText?: () => Promise<string | null>; launch?: () => Promise<void> } = {}) {
+function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Promise<unknown>; project?: () => Promise<unknown>; insert?: () => Promise<void>; remove?: () => Promise<void>; root?: () => Promise<string>; status?: () => void; launchText?: () => Promise<string | null>; launch?: () => Promise<void> } = {}) {
   const rows = new Map<string, Record<string, unknown>>()
   const mutations: string[] = []
   let rosterEvents = 0
@@ -46,7 +46,7 @@ function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Pr
   }
   const streams = vi.fn()
   const reg = registerTerminalChannel(db as never, core as never, {
-    internalEnv: () => ({}), launchContextText: options.launchText, launchContext: options.launch ?? (async () => {}), completed() {}, archiveReview: options.archive ?? (async () => {}),
+    internalEnv: () => ({}), launchContextText: options.launchText, launchContext: options.launch ?? (async () => {}), completed() {},
     seedTaskNotes: async () => {}, reconciled: Promise.resolve(), streams, status: () => { rosterEvents++; options.status?.() },
   })
   return { ...reg, db, core, rows, mutations, events: () => rosterEvents, streams: streams.mock.calls[0][0] }
@@ -173,15 +173,8 @@ it.each(['remove', 'dispose', 'deadline'] as const)('settles teardown and clears
   expect(vi.getTimerCount()).toBe(0)
 })
 
-it('does not invoke replacement archive services after an old root read resolves', async () => {
-  const hold = deferred<string>(), oldArchive = vi.fn(async () => {}), nextArchive = vi.fn(async () => {})
-  const f = fixture({ root: () => hold.promise, archive: oldArchive })
-  const pending = f.taskSessions.captureArchiveReviewInput!('task').catch(error => error.message)
-  disposeTerminal(); const next = fixture({ archive: nextArchive })
-  hold.resolve('/tmp/fixture')
-  expect(await pending).toContain('disposed')
-  expect(next.core.git.gitText).not.toHaveBeenCalled()
-  expect(oldArchive).not.toHaveBeenCalled(); expect(nextArchive).not.toHaveBeenCalled()
+it('rejects stale run glue after the terminal engine is replaced', () => {
+  fixture()
   const oldGlue = terminalRunGlue()
   disposeTerminal(); fixture()
   expect(oldGlue.isRunning('unknown')).toBe(false)
@@ -252,7 +245,7 @@ it('preserves fresh tmux work when a rejected metadata operation actually commit
     select: () => ({ from: () => ({ where: () => ({ limit: async () => [...f.rows.values()] }) }) }) }
   disposeTerminal()
   const core = { tasks: { load: async () => ({ id: 'task', projectId: null }), resolveCwd: async () => ({ cwd: '/tmp', isWorktree: false }) }, projects: {}, proc: {}, git: {} }
-  const reg = registerTerminalChannel(db as never, core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, archiveReview: async () => {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
+  const reg = registerTerminalChannel(db as never, core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
   await expect(reg.terminal.create({ taskId: 'task' })).rejects.toThrow('after commit')
   expect(f.rows.size).toBe(1)
   expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
@@ -321,7 +314,7 @@ it('retires a failed reconciliation attachment without deleting its preexisting 
   disposeTerminal()
   state.aliveTmux = meta.tmuxSession!
   state.failExitRegistration = true
-  const next = registerTerminalChannel(f.db as never, f.core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, archiveReview: async () => {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
+  const next = registerTerminalChannel(f.db as never, f.core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
   await reconcileTmux()
   expect(state.ptys).toHaveLength(2)
   expect(state.ptys[1]!.kills).toBe(1)

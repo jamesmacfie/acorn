@@ -10,7 +10,7 @@ import { pathToFileURL } from 'node:url'
  * The plugin API major this scaffold writes into `apiVersion`. Hardcoded because this package is
  * published standalone and can't import the constant. The scaffold tests compare it with the host.
  */
-export const API_VERSION = '2'
+export const API_VERSION = '3'
 export const BASELINE = 'acorn-1'
 
 /**
@@ -362,8 +362,8 @@ edit → reload instead of edit → prompt → restart. Reload starts a fresh No
 - **Your routes are confined to \`/v1/p/${id}/\`**, at parse time and again at runtime.
 - **The id is permanent.** It is the route namespace, the renderer route prefix, the persisted layout
   key and the SQLite filename. Renaming is "new plugin, plus a data migration, plus a tombstone".
-- **\`apiVersion\` must cover the loading node's major.** \`"2"\` covers major 2; a tested plugin can
-  declare a range such as \`"1 || 2"\`. A range that excludes the host is a \`failed\` roster row.
+- **\`apiVersion\` must cover the loading node's major.** \`"3"\` covers major 3; a tested plugin can
+  declare a range such as \`"2 || 3"\`. A range that excludes the host is a \`failed\` roster row.
 
 The full contract is \`docs/plugin-authoring.md\` in the acorn repository. An agent should call the
 \`plugin_authoring\` tool first — it answers with that guide plus the connected node's *current*

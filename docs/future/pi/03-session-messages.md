@@ -147,7 +147,7 @@ nothing in the transcript; the attention item is enough.
 
 - `enqueueTurn` in `plugins/agents/src/server/sessions/runtime.ts`: still the only entry, and still
   runs `before-send` for every source.
-- How `findings:producer` binds a writer to its contributor in `plugins/findings/src/node/index.ts`,
+- How `findings:producer` binds a writer to its contributor in plugins/findings/src/node/index.ts (retired; read from Git history),
   and how a loaded plugin contributes to a node-side point through `ctx`.
 - How the transcript draws `delegation_report` turns, to reuse the row.
 - Whether the client treats `AgentTurnSource` as a closed union anywhere that would throw on `plugin`.

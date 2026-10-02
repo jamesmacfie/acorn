@@ -20,7 +20,6 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   // and the memory mark rather than the `gate` kind it used to borrow: nothing is blocked on this, and
   // a ban glyph in warn tone read as a failure. It matches the tone of the attention row for the same
   // proposals, which is the row beside it in the bell.
-  { id: 'findings-review', glyph: 'list-checks', severity: 'info', toast: true },
   { id: 'agent-completed', glyph: 'circle-dot', severity: 'info', toast: true },
   { id: 'agent-needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
   { id: 'agent-error', glyph: 'triangle-alert', severity: 'danger', toast: true },

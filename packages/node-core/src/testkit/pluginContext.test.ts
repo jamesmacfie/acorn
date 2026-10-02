@@ -161,7 +161,7 @@ describe('makeTestNodeContext', () => {
   it('resolves a workspace plugin\'s chain from its id alone', () => {
     // The default that replaced twenty `migrationsDir()` call sites: a real chain, really migrated, with
     // the test naming nothing but the plugin id.
-    const ctx = makeTestNodeContext({ plugin: { name: 'memory' } })
+    const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     try {
       const db = ctx.storage.open()
       expect(db.batch).toBeTypeOf('function')

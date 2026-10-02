@@ -403,7 +403,7 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   routers and portable fetch handlers. Task-shaped HTTP mounts enforce the signed task ID;
   handlers outside those mounts must check resource scope from that principal before doing work.
   Database CLI and context handlers enforce supplied task IDs, and Memory resolves the caller's
-  project before index reads. Device-only administration remains separately gated. There is no
+  project before file reads. Device-only administration remains separately gated. There is no
   blanket task-token denial or route opt-in metadata gate. A default-deny policy with per-route
   opt-in metadata and permission-prompt disclosure is planned, not an implemented control.
 - **Agent tools are a prompt-injection surface.** A plugin-contributed tool is callable by an
@@ -412,13 +412,6 @@ its fetch usage inside the broker module, same posture as the phase-5 installer.
   **disabled or ask-every-time until the owner enables them**, regardless of the plugin being
   trusted for everything else. Trusting a plugin's code and trusting an agent to call its tools
   autonomously are different decisions; keep them separate in the UI.
-- **Findings has no workflow-gate authority today.** Observations and memory candidates remain
-  advisory, and findings contributes no `workflows:policy`. A future opted-in policy must evaluate
-  only decision requests explicitly bound by the workflow definition, against the exact evidence
-  revision at execution time. Missing policy code, stale evidence, and incomplete obligations fail
-  closed. Clearing a required fix is a device-authenticated decision—addressed, explicit risk
-  waiver, or verified not applicable—and is never an agent tool. Acknowledgement, snooze,
-  withdrawal, dismissal, or a model-assigned severity grants no authority.
 - **A reviewer prompt is not a sandbox.** Before a provider can be advertised for a read-only
   reviewer preset, conformance tests must prove both the Acorn tool ceiling and the provider-native
   restriction on edits, shell commands, and other write paths. A provider that cannot enforce both

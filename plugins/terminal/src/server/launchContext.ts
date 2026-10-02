@@ -1,5 +1,12 @@
 import type { TerminalLaunchContext } from '../contract/launchContext'
-import { leadingUtf8 } from './reviewSnapshots'
+
+function leadingUtf8(value: string, maxBytes: number): string {
+  const bytes = Buffer.from(value, 'utf8')
+  if (bytes.length <= maxBytes) return value
+  let end = maxBytes
+  while (end > 0 && (bytes[end]! & 0xc0) === 0x80) end -= 1
+  return bytes.subarray(0, end).toString('utf8')
+}
 
 export async function deliverLaunchContext(
   taskId: string,

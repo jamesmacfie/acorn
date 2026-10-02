@@ -105,7 +105,7 @@ API major `2` is where that changed, and a source written for `1` moves like thi
 - `hasLineExtra` and `lineExtraSignature` become `lineExtra: { anchors, render }`: name every line you
   draw under, up front.
 
-Declare `"apiVersion": "2"`, or a range that covers it, once the source is moved.
+Declare `"apiVersion": "3"`, or a range that covers it, once the source is moved.
 
 ## Storage and migrations
 

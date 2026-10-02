@@ -8,31 +8,15 @@ import {
 } from '@acorn/plugin-api/client'
 import { selectMemory } from './memorySelection'
 import { memoryApi } from './memoryClient'
-import { MEMORY_SOURCE_ID } from './proposalTarget'
+import { MEMORY_SOURCE_ID } from '../shared/api'
 
-// Search results and review actions open this project's Memory page.
+// Search results open this project's Memory page.
 const openMemory = (context: { projectId: string | null; navigate?: (path: string) => void }, projectId = context.projectId): void => {
   setSelectedSource(MEMORY_SOURCE_ID)
   if (projectId) context.navigate?.(projectPath(projectId))
 }
 
 export const memoryCommands: readonly ContributedCommand[] = [
-  {
-    id: 'memory.learnings.review',
-    title: 'Review learnings',
-    hint: 'suggest what to remember from this task',
-    keywords: ['memory', 'findings', 'prepare', 'learnings'],
-    category: 'action',
-    palette: true,
-    scope: 'task',
-    requires: { plugin: 'findings' },
-    run: async (context): Promise<CommandOutcome> => {
-      if (!context.taskId) return { effect: 'stay', status: 'Choose a task first.' }
-      const bundle = await memoryApi().prepare(context.taskId, `manual:${context.taskId}:${Date.now()}`)
-      openMemory(context, bundle.scope.kind === 'project' ? bundle.scope.projectId : null)
-      return COMMAND_CLOSED
-    },
-  },
   {
     id: 'memory.search',
     kind: 'search',
@@ -44,7 +28,7 @@ export const memoryCommands: readonly ContributedCommand[] = [
     scope: 'task',
     requires: { plugin: 'memory' },
     placeholder: 'Search project memory…',
-    // The node's own full-text index, so the ordering is its rank and the host does not re-rank it.
+    // The Node searches current files and orders the matches by relevance.
     // Debounce and minimum query stay at the defaults: every keystroke here is a request.
     query: async (text, context) => {
       const found = await memoryApi().search(text, context.projectId ?? undefined)
@@ -67,16 +51,5 @@ export const memoryCommands: readonly ContributedCommand[] = [
       } catch { /* An obsolete search row is safe to ignore. */ }
       return COMMAND_CLOSED
     },
-  },
-  {
-    id: 'memory.proposals.open',
-    title: 'Review memory suggestions',
-    hint: 'what an agent suggested this project should remember',
-    keywords: ['memory', 'proposals', 'review'],
-    category: 'navigation',
-    palette: true,
-    requires: { plugin: 'memory' },
-    // The Memory page is project-scoped and remains useful without an active task.
-    run: (context) => openMemory(context),
   },
 ]

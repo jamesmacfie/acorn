@@ -134,6 +134,6 @@ export type PluginContextSectionDescriptor = z.infer<typeof pluginContextSection
 
 export const qualifiedPluginToolName = (pluginId: string, localId: string): string => `${pluginId}_${localId}`
 // A section id is persisted in inclusion preferences. Keep the established `<pluginId>` spelling when
-// a plugin's local id repeats its owner (findings does this); otherwise qualify the local namespace.
+// a plugin's local id repeats its owner (a plugin may do this); otherwise qualify the local namespace.
 export const qualifiedPluginContextSectionId = (pluginId: string, localId: string): string =>
   pluginId === localId ? pluginId : `${pluginId}:${localId}`

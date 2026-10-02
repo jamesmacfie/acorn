@@ -42,7 +42,7 @@ your manifest at it and every contribution array is validated as you type:
   "name": "My widget",
   "version": "1.0.0",
   "baseline": "acorn-1",
-  "apiVersion": "2"
+  "apiVersion": "3"
 }
 ```
 
@@ -76,8 +76,8 @@ drizzle handle behind `ctx.storage.open()`. The manifest-carried `PluginAgentToo
 exported here without adding a runtime dependency. The rest of the surface is exact, and a test in
 the acorn repository fails if it drifts.
 
-`apiVersion` is a range over plugin API majors. This host speaks major `2`; write `"2"` for a plugin
-tested against it. A range such as `"1 || 2"` covers both majors, but declare one only after testing
+`apiVersion` is a range over plugin API majors. This host speaks major `3`; write `"3"` for a plugin
+tested against it. A range such as `"2 || 3"` covers both majors, but declare one only after testing
 the plugin against each included host. Additive descriptor fields do not change the major; removing a
 published field does.
 

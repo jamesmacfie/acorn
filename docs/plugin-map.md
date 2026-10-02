@@ -131,7 +131,7 @@ verb in `emits` and the consumer grants the full channel. Missing producers emit
 
 First-party lifecycle broadcasts cover workflow runs and human gates, managed-agent turns,
 requests and session rosters, GitHub repositories and pull-request mirrors, browser-capture
-typed sources, local review-note counts, findings scope revisions, memory-library scopes, and resolved preview homes. The
+typed sources, local review-note counts, memory-library scopes, and resolved preview homes. The
 provider's `contract/` directory holds the matching read capability whenever a listener needs more
 than the event's safe state payload. Exact payloads and deliberate omissions are in
 [Forward compatibility](./plugins/forward-compatibility.md#shipped-first-party-lifecycle-events).
@@ -154,13 +154,6 @@ Share identifiers and types through public contracts. Do not import a provider's
 read its database, or use core internals to bypass a missing API. For working fragments, see
 [Events and capabilities](./plugin-authoring/events-and-capabilities.md).
 
-Findings is the loaded example with separate read and write collaboration contracts. Consumers
-read task history through `findings.records.v1`. Producers contribute to `findings:producer` and
-receive a host-bound writer that limits them to their declared `findings:kind` entries. For the full
-contract, see [Findings](./findings.md).
-Review consumers use read-only `findings.review.v1`. A destination contributes validation and an
-owner-bound completion callback through `findings:review-target`; memory uses that callback only
-after its own device route and durable promotion receipt have completed the target write.
 
 ## Notifications
 

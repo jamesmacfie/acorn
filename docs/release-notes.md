@@ -1,5 +1,18 @@
 # Release notes
 
+## Memory phase 2
+
+Plugin API major 3 removes `terminal.reviewInput.v1` and `workflows.reviewInput.v1`.
+Rebuild compatible installed plugins with a manifest range covering major 3.
+
+Memory reads and searches Markdown files in the private root and the selected project's folder.
+The Findings plugin, review settings, review notices, archive capture, and derived search database
+are retired. Agent writes, standing context, transcript cards, and Undo continue through the file store.
+Repository `.acorn/memory` folders are no longer read. Import is planned for memory phase 3.
+
+Acorn leaves `plugins/findings.sqlite` and `plugins/memory.sqlite` on disk and does not open them.
+You can delete those files by hand after preserving any review records you want to keep.
+
 The acorn-1 baseline includes the Tauri desktop app, the terminal client, a headless CLI, and a
 standalone Node.
 

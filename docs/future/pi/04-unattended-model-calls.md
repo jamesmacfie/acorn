@@ -28,7 +28,7 @@ A plugin that reacts to an event has no person and no picker. That leaves three 
 
 Findings already solved all three for itself. It keeps its own saved backend and model from a settings
 page, never falls back to another paid backend, and stores the backend, model, and usage on each job
-([findings.md](../../findings.md)). That works, and it is a private copy of something every unattended
+(findings.md (retired; see Git history for docs/findings.md)). That works, and it is a private copy of something every unattended
 consumer needs. The advisor in [05](./05-advisor.md) would be the second copy, which is the point to
 lift it into the host.
 
@@ -115,7 +115,7 @@ task-authorized, and that is enough for a reviewer. A plugin builds its own prom
 
 - `CoreModelService` in `packages/plugin-types/src/contracts/coreMisc.ts` and how the loaded worker
   forwards it.
-- How Findings stores its review backend, in `plugins/findings/src/server/runtime.ts`, before copying
+- How Findings stores its review backend, in plugins/findings/src/server/runtime.ts (retired; read from Git history), before copying
   or replacing the pattern.
 - What `ctx.core.identity.active()` returns and whether `generateText` takes that value as `userId`.
 - Where node-held per-plugin settings already live, so the grant does not become a second store.

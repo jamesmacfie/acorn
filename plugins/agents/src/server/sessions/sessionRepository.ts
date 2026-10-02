@@ -858,11 +858,4 @@ export class AgentSessionRepository {
     return this.lifecycle.sessions(taskId)
   }
 
-  lifecycleCompletedReviewInputs(taskId: string) {
-    return this.lifecycle.completedReviewInputs(taskId)
-  }
-
-  lifecycleReviewInput(input: { taskId: string; sessionId: string; turnId: string }) {
-    return this.lifecycle.reviewInput(input)
-  }
 }

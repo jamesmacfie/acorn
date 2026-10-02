@@ -191,22 +191,6 @@ The built-in kinds are `agent`, `gate-human`, `gate-policy`, `ci-loop`, `decide`
 | `workflows:policy` | a verdict source for `gate-policy` | a step's `policy` |
 | `workflows:trigger` | something that decides which workflows should start | nothing; the sweep asks it |
 
-Findings currently contributes no policy. Its observations and memory candidates are advisory, and
-their severity, acknowledgement, withdrawal, dismissal, or snooze cannot change a run. This is a
-deliberate deferral: there is no shipped workflow definition or product configuration that binds a
-findings decision to a gate. Existing workflows therefore keep their current posture and policy
-behavior whether findings is installed or not.
-
-If a concrete gating workflow is introduced later, it must name the findings policy explicitly on a
-`gate-policy` step and bind only the decision requests selected by that workflow definition. It must
-not sweep every high-severity observation on the task. The policy is evaluated when the step runs,
-against the reviewed evidence revision and any outstanding follow-up obligations. A missing policy,
-stale evidence, or incomplete obligation fails explicitly; disabling the contributing plugin cannot
-turn absence into approval. Addressed evidence, a device-authenticated risk waiver, or a verified
-not-applicable result are the only clearing outcomes. Acknowledgement and deferral are not. Gate UX
-continues to use this plugin's existing run pane and attention source rather than creating a global
-approval queue. [Findings](./findings.md) owns the future decision record contract.
-
 **A contributed kind is addressed by its qualified id, a built-in by a bare word.** `kind = "agent"`
 is the built-in; `kind = "http:request"` is the http plugin's. That is deliberate: the file says which
 package will run the step, and two plugins can both call their entry `request` without either
@@ -431,9 +415,8 @@ One `setRun` mutation funnel compares old and new state, so retries and terminal
 drift into separate event semantics.
 
 At a terminal run status, Workflows also emits `plugin:workflows:completed` with task and run IDs,
-status, and completion time. Findings reads the persisted handoff note through
-`workflows.reviewInput.v1`; the read caps text at 16 KiB and explicitly reports an absent handoff.
-The capability lists up to 256 completed runs per task for startup reconciliation.
+status, and completion time. The event remains public for lifecycle consumers. Handoff notes remain
+owned by Notes.
 
 Events remain invalidation hints. The run pane and its task-run index re-read after reconnect, so a
 missed child, run, or gate frame cannot leave durable state stale. These resources are mounted inside

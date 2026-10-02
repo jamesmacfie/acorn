@@ -125,10 +125,8 @@ These plugins own SQLite files and migrations:
 | `plugins/changes.sqlite` | review notes and plugin-local change state |
 | `plugins/database.sqlite` | project-scoped saved SQL queries, and the per-task scratch document behind the pane's editor (a loaded plugin, same binding as `http.sqlite` below) |
 | `plugins/browser.sqlite` | browser captures and screenshot bytes |
-| `plugins/findings.sqlite` | immutable observations and candidate revisions, durable preparation jobs and lifecycle checkpoints, grouping outcomes, suppressions, review history, and notification receipts |
 | `plugins/github.sqlite` | repository/PR mirror, PR children in provider order, PR file patch state and digest, GitHub freshness and files completeness, viewed files, pinned repos |
 | `plugins/http.sqlite` | project-scoped requests and variables, encrypted request fields (a loaded plugin, so this file is bound from its manifest id and its chain ships inside the package) |
-| `plugins/memory.sqlite` | project-scoped derived memory index, proposals, FTS |
 | `plugins/terminal.sqlite` | terminal session metadata; PTY output is not persisted there |
 | `plugins/workflows.sqlite` | Workflow drafts and immutable revisions, dependency/publication journals, recoverable repository-file drafts and write journals, runs, steps, gates, dispatches, approved schedule bindings and occurrences, processing scopes, selections, record states, attempts, and committed source boundaries |
 
@@ -410,7 +408,7 @@ way. The comparison happens on the same handle before Drizzle migrates, so the d
 unchanged. Once on this baseline, ordinary future migrations still append to each owner's chain.
 
 Drizzle-kit cannot model a virtual table, so a plugin that wants FTS5 search
-(`plugins/agents.sqlite`'s `agent_events_fts`, `plugins/memory.sqlite`'s `memories_fts`) writes the
+(`plugins/agents.sqlite`'s `agent_events_fts`) writes the
 `CREATE VIRTUAL TABLE` and its triggers by hand into its migration SQL instead of declaring them in
 the Drizzle schema. The schema file still declares the backing columns the triggers read, so renaming
 one there is a signal to update the migration, but the thing that actually catches a missed rename is

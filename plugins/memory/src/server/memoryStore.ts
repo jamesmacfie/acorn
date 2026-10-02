@@ -4,6 +4,7 @@ import { join, relative, sep } from 'node:path'
 import { ToolError } from '@acorn/plugin-api/node'
 import type { MemoryScope } from '../contract/library'
 import { atomicWrite, isValidMemoryName, parseMemory, regenerateIndexFile, scanMemoryDir, serializeMemory } from './memory'
+import { searchMemoryFiles } from './memorySearch'
 import { validateMemoryWrite, type MemoryWrite } from './memorySafety'
 
 export type MemoryAddress = { scope: MemoryScope; projectId: string | null; name: string }
@@ -83,13 +84,11 @@ export class MemoryStore {
   async search(projectId: string | null, query: string, scope?: MemoryScope) {
     const terms = query.toLowerCase().split(/\s+/).filter(Boolean)
     if (!terms.length) return []
-    return (await this.list(projectId, scope)).flatMap((memory) => {
-      const text = `${memory.name} ${memory.description} ${memory.body}`.toLowerCase()
-      if (!terms.every((term) => text.includes(term))) return []
-      const rank = terms.reduce((score, term) => score + (memory.name.toLowerCase().includes(term) ? 3 : memory.description.toLowerCase().includes(term) ? 2 : 1), 0)
+    return searchMemoryFiles(await this.list(projectId, scope), query).map((memory) => {
+      const { rank } = memory
       const offset = Math.max(0, memory.body.toLowerCase().indexOf(terms[0]) - 60)
-      return [{ name: memory.name, description: memory.description, type: memory.type, scope: memory.scope, updatedAt: memory.updatedAt, rank, excerpt: memory.body.slice(offset, offset + 300) }]
-    }).sort((a, b) => b.rank - a.rank || b.updatedAt - a.updatedAt).slice(0, 10)
+      return { name: memory.name, description: memory.description, type: memory.type, scope: memory.scope, updatedAt: memory.updatedAt, rank, excerpt: memory.body.slice(offset, offset + 300) }
+    })
   }
 
   private historyDirectory(address: MemoryAddress): string {

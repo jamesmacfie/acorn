@@ -51,7 +51,7 @@ reach the person as acorn's form card. Confirm that in step 2.
   "name": "oh-my-pi",
   "version": "0.1.0",
   "baseline": "acorn-1",
-  "apiVersion": "2",
+  "apiVersion": "3",
   "icon": { "d": "PLACEHOLDER_24x24_PATH_D" },
   "contributions": {
     "harnesses": [

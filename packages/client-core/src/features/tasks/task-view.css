@@ -153,7 +153,7 @@
 .task-slot:has(> .pane-slot-actions > .node-chip) { --pane-actions-w: calc(2 * var(--control-h-xs) + var(--space-10) + var(--space-4)); }
 /* The bar at the pane's top right is the one the actions sit over: the first bar of the last column
    in a split pane (directly, or one wrapper down for a remote tree), a remote tree's split inside a
-   `single` pane (Findings), or the header of a single-column pane. A class chain with `:first-child`,
+   `single` pane, or the header of a single-column pane. A class chain with `:first-child`,
    because `:first-of-type` matches by element and every bar is a div. */
 .task-slot:has(> .pane-slot-actions > .ui-btn) > :is(.layout-list-detail, .ui-listdetail) > :last-child > :is(.ui-toolbar, .diff-toolbar, .section-header[data-level='pane'], .ui-doctabs):first-child,
 .task-slot:has(> .pane-slot-actions > .ui-btn) > :is(.layout-list-detail, .ui-listdetail) > :last-child > :first-child > :is(.ui-toolbar, .section-header[data-level='pane']):first-child,

@@ -20,3 +20,19 @@ export type MemoryLibraryCapability = {
 }
 
 export const MEMORY_LIBRARY = capabilityId<MemoryLibraryCapability>('memory.library')
+
+export type MemoryRow = {
+  id: string
+  scope: 'project' | 'private'
+  projectId: string | null
+  name: string
+  type: MemoryType
+  description: string
+  body: string
+  path: string
+  originSessionId: string | null
+  commitSha: string | null
+  supersededBy: string | null
+  createdAt: number
+  updatedAt: number
+}

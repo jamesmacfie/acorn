@@ -1,4 +1,4 @@
-# loaded plugin API major: 2
+# loaded plugin API major: 3
 acorn-plugin-sdk/remote: member KitNodeProps.children
 acorn-plugin-sdk/remote: type KitNodeProps
 acorn-plugin-sdk/remote: value Alert
@@ -242,14 +242,12 @@ acorn-plugin-types: member CapabilityCatalogue.'notes.seedTask'
 acorn-plugin-types: member CapabilityCatalogue.'notes.store'
 acorn-plugin-types: member CapabilityCatalogue.'preview.rules'
 acorn-plugin-types: member CapabilityCatalogue.'preview.urls'
-acorn-plugin-types: member CapabilityCatalogue.'terminal.reviewInput.v1'
 acorn-plugin-types: member CapabilityCatalogue.'terminal.runTargets'
 acorn-plugin-types: member CapabilityCatalogue.'terminal.sendToAgent'
 acorn-plugin-types: member CapabilityCatalogue.'terminal.sessions'
 acorn-plugin-types: member CapabilityCatalogue.'workflows.gates'
 acorn-plugin-types: member CapabilityCatalogue.'workflows.notices'
 acorn-plugin-types: member CapabilityCatalogue.'workflows.notices'.stepEvent
-acorn-plugin-types: member CapabilityCatalogue.'workflows.reviewInput.v1'
 acorn-plugin-types: member CapabilityCatalogue.'workflows.runner'
 acorn-plugin-types: member CapabilityCatalogue.'workflows.runner'.reconcile
 acorn-plugin-types: member CapabilityId.__signature

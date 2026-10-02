@@ -110,12 +110,11 @@ describe('archiveTask teardown ordering', () => {
     expect(row.worktreePath).toBeNull()
   })
 
-  it('captures review input before teardown or worktree removal', async () => {
+  it('stops managed agents after teardown and before worktree removal', async () => {
     const order: string[] = []
     await setTeardown('true')
     const res = await archiveTask(t.db, 'task1', {}, {
       ...deps(),
-      captureReviewInput: async () => { order.push(`capture:${existsSync(worktree)}`) },
       runTeardown: async (script, cwd, env) => { order.push(`teardown:${existsSync(worktree)}`); return runTeardownProcess(script, cwd, env) },
       taskArchiving: async (taskId) => { order.push(`archiving:${taskId}:${existsSync(worktree)}`) },
       dropTaskSessions: async () => { order.push(`drop:${existsSync(worktree)}`) },
@@ -123,19 +122,7 @@ describe('archiveTask teardown ordering', () => {
     expect(res).toEqual({ ok: true })
     // The archiving hook runs on every archive, after teardown and while the worktree still exists,
     // because the agents plugin stops processes that are writing into it.
-    expect(order).toEqual(['capture:true', 'teardown:true', 'archiving:task1:true', 'drop:false'])
-  })
-
-  it('archives but reports when review input capture fails', async () => {
-    const res = await archiveTask(t.db, 'task1', {}, {
-      ...deps(),
-      captureReviewInput: async () => { throw new Error('findings unavailable') },
-    })
-
-    expect(res).toEqual({ ok: true, reviewCaptureFailed: true })
-    expect(existsSync(worktree)).toBe(false)
-    const [row] = await t.db.select().from(schema.tasks)
-    expect(row.status).toBe('archived')
+    expect(order).toEqual(['teardown:true', 'archiving:task1:true', 'drop:false'])
   })
 
   it('does not serve or recreate the worktree while archive owns the task', async () => {

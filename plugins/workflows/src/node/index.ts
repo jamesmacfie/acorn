@@ -25,8 +25,6 @@ import { WorkflowRunner, type RunnerDeps, type WorkflowDef } from '../server/run
 import { WORKFLOWS_NOTICES, type WorkflowNotices } from '../contract/notices'
 import { WORKFLOWS_RUNNER } from '../contract/runner'
 import { WORKFLOW_GATES } from '../contract/events'
-import { WORKFLOW_REVIEW_INPUT } from '../contract/reviewInput'
-import { workflowReviewInput } from '../server/runs/read/reviewInput'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../contract/extensions'
 import { encodeToolCeiling } from '../server/steps/tools'
 import { validateWorkflow } from '../server/validation/definition'
@@ -97,7 +95,6 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       const notices = buildNotices(ctx)
       const failingChecks = async (taskId: string): Promise<string | null> =>
         (await ctx.capabilities.get(GITHUB_MIRROR)?.failingChecks(core.identity.active(), taskId)) ?? null
-      ctx.capabilities.provide(WORKFLOW_REVIEW_INPUT, workflowReviewInput(store, () => ctx.capabilities.get(NOTES_STORE)))
 
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first

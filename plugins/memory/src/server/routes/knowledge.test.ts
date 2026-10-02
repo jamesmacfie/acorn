@@ -54,16 +54,6 @@ describe('memory routes', () => {
     expect((await device().fetch(req('/memory'), {} as Env)).status).toBe(503)
   })
 
-  it('keeps findings approval device-gated', async () => {
-    const calls: string[] = []
-    setKnowledgeBridge(bridge({ memoryApproveFinding: async (id, input) => { calls.push(`${id}:${input.revision}:${input.deviceId}`); return { ok: true } } }))
-    const body = { revision: 3, payloadHash: 'sha256', idempotencyKey: 'approve-1' }
-    expect((await task().fetch(req('/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(403)
-    expect((await service().fetch(req('/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(403)
-    expect((await device().fetch(req('/memory/findings/candidate-1/approve', 'POST', body), {} as Env)).status).toBe(200)
-    expect(calls).toEqual(['candidate-1:3:device-1'])
-  })
-
   it('keeps Undo and manual writes behind device authority', async () => {
     const undo = vi.fn(async () => ({ ok: true }))
     const add = vi.fn(async () => ({ path: '/memory' }))
@@ -86,7 +76,7 @@ describe('memory routes', () => {
     }
   })
 
-  it.each(['/memory', '/memory/search?q=reference'])('%s denies foreign and unknown projects before index reads', async (path) => {
+  it.each(['/memory', '/memory/search?q=reference'])('%s denies foreign and unknown projects before file reads', async (path) => {
     const scope = vi.fn<KnowledgeBridge['taskMemoryScope']>().mockResolvedValue({ projectId: 'project-widget' })
     const memoryList = vi.fn(async () => [])
     const memorySearch = vi.fn(async () => [])

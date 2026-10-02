@@ -1,8 +1,7 @@
 # Phase 2: remove Findings and the search index
 
-Status: proposed, 2026-10-01. Start only after [phase 1](./01-direct-writes.md)'s two-week measurement
-says direct writes are acceptable. This phase is mostly deletion, and it is the one-way door in the
-programme.
+Status: implemented for verification, 2026-10-02. The owner explicitly requested phase 2 before
+phase 1's two-week measurement finished. The requirements below describe the delivered scope.
 
 ## Goal
 
@@ -146,7 +145,7 @@ Plugins has no Findings row. An agent session's tool list has no `findings_*` to
 
 ## Docs that change
 
-- [Findings](../../findings.md): delete, and add a retired-folder note to [the docs index](../../README.md).
+- Findings (retired; see Git history for docs/findings.md): delete, and add a retired-folder note to [the docs index](../../README.md).
 - [Notes and memory](../../notes-and-memory.md): remove every Findings reference, the review page, the
   approval route, the index, and reconciliation.
 - [Agent tools](../../agent-tools.md) and [API reference](../../api-reference.md): remove the four
@@ -169,3 +168,33 @@ Plugins has no Findings row. An agent session's tool list has no `findings_*` to
 - That nothing outside Findings contributes to `findings:producer` or `findings:kind`.
 - Which pending review candidates exist on the owner's machine, in case any are worth copying into
   memory by hand before the plugin goes.
+
+## Delivery verification (2026-10-02)
+
+The file scan serves the page, palette, library capability, and agent tools. Tests cover scope
+isolation, body-only search, external edits and deletions, legacy type normalization, distinct
+private/project result IDs, and preservation of retired database bytes. The phase 1 tool schemas,
+standing context, cards, history, and Undo remain in place.
+
+Removing published review capabilities required plugin API major 3 under the published-surface
+compatibility gate. The scaffold, schema, fixtures, and published-surface snapshot use that major.
+Terminal and workflow completion events remain public, with their payload types in lifecycle contracts.
+
+Verification results:
+
+- `pnpm lint`: all 36 packages pass.
+- Memory: 47 tests pass. Agents, Terminal, Workflows, Node, protocol, plugin contracts, and architecture
+  suites pass in the full run. Architecture includes all 74 boundary and documentation checks.
+- The route and plugin-disable snapshots were regenerated through their update flags.
+- The rebuilt automation desktop starts. Its Memory page saves and opens a file, Settings has no
+  review page or Findings row, and the tool catalog has the five Memory tools and no Findings tools.
+- The isolated terminal client renders Memory at 80×24 and 120×40. Its build's startup graph is
+  1,198,244 bytes against a 1,175,000-byte ceiling; the PTY check used the built output with `--no-build`.
+- `pnpm test` was run twice. The remaining repeatable failures are in unchanged frame route
+  classification, renderer helper fixtures, and display-label expectations. Intermittent SDK and
+  terminal file-dialog failures pass alone. SQLite backup timeouts on Node 26 pass on pinned Node 24.
+
+The screenshot driver stalled and required a session restart. Desktop interactions were verified
+with snapshots. Live Codex session creation failed with `ENOENT` on this host; the archive check
+uses a real running shell and a stopped imported agent-session fixture. Archive and restore
+completed; the transcript survived restoration and the Node log contained no review-capture lines.

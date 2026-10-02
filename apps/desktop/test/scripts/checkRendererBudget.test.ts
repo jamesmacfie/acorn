@@ -106,10 +106,10 @@ describe('check-renderer-budget', () => {
     build({
       'index.html': { file: 'assets/index-aaaa.js', isEntry: true, imports: ['_x'] },
       _x: { file: 'assets/store-bbbb.js' },
-    }, {}, { 'assets/index-aaaa.js': ['apps/desktop/src/client/index.tsx', 'plugins/memory/src/client/MemorySection.tsx'] })
+    }, {}, { 'assets/index-aaaa.js': ['apps/desktop/src/client/index.tsx', 'plugins/memory/src/client/MemoryAddForm.tsx'] })
     const { code, output } = run(dir)
     expect(code).toBe(1)
-    expect(output).toContain('plugins/memory/src/client/MemorySection.tsx (in index-aaaa.js)')
+    expect(output).toContain('plugins/memory/src/client/MemoryAddForm.tsx (in index-aaaa.js)')
   })
 
   it('reads a module prefix the way a chunk would be named after it', () => {

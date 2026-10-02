@@ -1090,7 +1090,8 @@ The plugin lifecycle checks are supported by `distributionModel.test.ts`,
 `distribution.test.ts`, `availabilityModel.test.ts`, the Node state and bundle-route tests, and the
 worker/remote-tree suites. The real desktop driver reaches the main renderer but not native dialogs
 or host-owned child webviews; use the release pass for those surfaces. On 2026-09-26 an isolated Tauri
-session verified Settings → Plugins and a Findings remote settings tree, including its two controls.
+session verified Settings → Plugins and a remote settings tree. That dated check used the retired
+Findings plugin; repeat loaded-tree checks with an installed plugin such as API requests.
 
 The task-annotation lifecycle's automated coverage described under Test layers was implemented on
 2026-09-26. The following real-window and real-terminal checks keep the same host behavior reviewable

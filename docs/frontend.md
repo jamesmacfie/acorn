@@ -680,7 +680,6 @@ The Agents group is seven pages. The agents plugin owns four of them
 | MCP servers (`agent-mcp-servers`) | agents | The servers acorn declares to every session, a list then one server's editor |
 | MCP config files (`mcp`) | core | The servers a CLI loads by itself, for the project picked on the page |
 | Limits and cost (`agent-limits`) | agents | Turns at once, then prices. `agent-concurrency` and `agent-pricing` are aliases |
-| Review after archive (`findings-settings`) | findings | The findings plugin's settings frame |
 
 The task-context switch writes core's `startup_context_injection` preference, which the memory
 plugin's launch-context handler reads on the node, so it sits with the other things a session starts
@@ -821,7 +820,7 @@ it. And a budget that only counts bytes lets the next heavy chunk in as long as 
 The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `prSections`, `viewState` and `icon-nodes`:
 each is a lazy surface that leaked into the eager graph, and a chunk with one of those names being
 fetched at startup is wrong whatever it weighs. The renderer's list adds plugin code a registration
-needs only when it draws: `MemoryAddForm`, `FindingsBundleReview`, the workflow editor's `draft-` and
+needs only when it draws: `MemoryAddForm`, the workflow editor's `draft-` and
 `draftStore`, `stepFields`, `GithubImporter`, `PreviewTaskPane` and `PreviewPane`. All of those were
 on the renderer's startup graph until 2026-09-25.
 

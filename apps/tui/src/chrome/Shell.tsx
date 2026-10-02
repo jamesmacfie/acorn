@@ -308,8 +308,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
           {/* Under `PanelBody`, because a browse source's component is a `lazy()` and a pending one
               resolves to an empty string — which a cell host refuses outright, where the DOM would
               have shrugged and drawn a text node nobody sees. The same guard the pane mount path
-              already has for the same reason (../layouts/index.ts, findings.md § A pending `lazy()`
-              region is an empty string). It carries the error boundary too, so a surface that
+              already has for the same reason (../layouts/index.ts). It carries the error boundary too, so a surface that
               throws says what it threw rather than leaving the main panel blank (../panel.tsx). */}
           <PanelBody name="main" nodeId={props.nodeId} region={SOURCE}>
             <Switch fallback={<EmptyState title="Nothing open">Choose a task in the rail.</EmptyState>}>

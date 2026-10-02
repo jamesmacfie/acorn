@@ -5,11 +5,10 @@ export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: s
 // (running sessions / dirty worktree) for the UI to surface. A failed teardown script
 // (docs/terminal-and-agents.md) sets teardownFailed so the UI can offer continue (re-archive with
 // skipTeardown) or abort; `output` is the script's tail for display.
-// `cleanupFailed` names the plugins whose opted-in cleanup threw. `reviewCaptureFailed` says the
-// pre-teardown handoff to the review provider failed. `ok` is still true: the task is archived, and
+// `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task is archived, and
 // reporting a failure would have the caller offering to retry something already done.
 export type ArchiveResult =
-  | { ok: true; cleanupFailed?: string[]; reviewCaptureFailed?: boolean }
+  | { ok: true; cleanupFailed?: string[] }
   | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
 
 export type ArchiveOpts = {
