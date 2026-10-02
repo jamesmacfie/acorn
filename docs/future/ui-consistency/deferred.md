@@ -145,8 +145,9 @@ The performance work owns these. Fix batches leave their structure alone.
 - **11-11 (part).** A padded detail column that does not scroll, for Docker's rail source. Needs a kit
   mode; `scrollDetail` breaks the log's own scroller.
 - **08-15 (part).** The editor's empty state drawn over its `Rectangle`, which must stay mounted for
-  CodeMirror. Needs a positioning rule or a `Rectangle` prop. The "No file open" copy in
-  [08-19](./b08b-document-panes/08-19-editor.md) waits with it.
+  CodeMirror. Needs a positioning rule or a `Rectangle` prop. 08-19's "No file open" copy waits with
+  it: title "No file open", body "Pick one from the list, or use **Go to file**", or the bound chord
+  through `formatChord`.
 
 ### Needs a product decision
 
@@ -439,6 +440,57 @@ dialog on `Modal`.
 - **Not checked live:** a clean tree, a folder that is not Git, a failed segment, a sent note, and
   Context loading. The fixture has none of them. Each was read from code, and the Changes list has a
   test for the empty tree and the notes banner.
+
+### B08b
+
+- **08-5, the fallback title.** The plan asked for "Agent turn {n}" or "Workflow step {name}". A finding
+  carries a turn id and a step id, not a number or a name, so an empty body falls back to "Agent turn"
+  or "Workflow step". Only the two fixed lifecycle titles are replaced; a producer's own title stays.
+  A title drawn from the first sentence is left out of the excerpt under it.
+- **08-5, the list never scrolled.** Findings drew plain rows in a column that hides overflow, so 13
+  of the 19 fixture rows were out of reach before this batch too. The column takes `scroll`, and the
+  rows sit in a `Stack`, because without the `Section` wrapper they shrank into each other. Measured:
+  2,384 pixels of rows in an 825 column, each row 122 high.
+- **08-7, the pin.** The Findings detail bar sat under the pane's pin. `task-view.css` reserves the
+  pin's room for a remote tree's split inside a `single` pane, which no rule named. The button ends at
+  1,334 where it reached 1,378.
+- **08-7, Findings' second label.** The list header reads **Findings** with the count. The group label
+  "Findings" shows only when **Ready in Memory** stands above it, so the column does not say the word
+  twice. The detail's three part headings are `sub` headers on the column's edge (363, which is 14 in),
+  and "Observation" reads **Details**.
+- **08-7, measured.** Context's bar is 48 high with its title on 14, which closes K2's unmeasured
+  `Toolbar` in the hbf header. The Notes title field is 26 high in a 48 bar, one line.
+- **08-8, item rows.** `TreeRow` has a twist only when the item has a body or details. The terminal's
+  `TreeRow` has no `label`, so the row's text is its name. The fold rule also covers the footer's
+  **What the agent gets** fold: all three markers sit at 61 or 62, where they were 61 and 76.
+  **Refresh** moved from the footer to the header bar. "Sent {ago}" reads "Sent just now" or "Sent 5m
+  ago", and the queued toast lost its em dash.
+- **08-12, the third group.** "Global" reads **Everywhere**, so the group label and the scope badge
+  say one word. The header counts the rows shown, including the offered scratchpad.
+- **08-19.** The terminal toggle is bare like the send button, so the strip has one look. The terminal
+  prints it as "[ ] Edit in your terminal editor", and `panes.test.tsx` asserts that. A failed save
+  reads "Couldn't save this file." Code is 12 with a 16.8 line, where it was 13 and 18.2.
+- **08-20, the count.** The result count rides at the end of the toggles' strip, and the truncation
+  note is a muted banner above the results. `sub` headers in a list column that does not scroll take
+  the pane pad and a group label's rhythm, and a sticky one keeps the list's colour. The file name
+  still sticks. The Search panel is the only `sticky` caller. Results were checked with made-up hits
+  through `nodeFetch`, because the fixture's search returned nothing for any query.
+- **08-21.** Type and Scope share a row through `Inline even`. **Cancel** clears the form and closes it.
+  The labels live in `memoryClient.ts` as `MEMORY_TYPE_LABEL` and `MEMORY_SCOPE_LABEL`, which the
+  review and the Memory page read too. The save path was checked by test only.
+- **08-22.** Rows show the name, the description, and the path in mono, with type and scope badges as
+  meta. Not seen populated: the session's memory list was empty, and the plan forbids adding one.
+- **08-23, words.** A ready suggestion shows no status badge. History reads Edited, Dismissed,
+  Restored, Snoozed, Separated, Approved, or Needed a fix, with the reason as words after a colon. The
+  dismissal alert's body reads "Say why, if you like." over the reason buttons, because `Alert` needs a
+  body. The diff is one hunk: shared lines at the start and end are context, everything between them
+  changed (`memoryPatch`, with a test). The review was never seen in the app; it needs a review model.
+- **08-24b, measured.** Group labels with an icon button are 34 high, where Notes' were 40. Changes'
+  are 32: the last 2 pixels are the 20-pixel button over an 18-pixel line, and closing them needs a
+  negative margin. The agent list's **Managed sessions** label took the same 34 and looks right.
+- **08-24g, h.** The source key left the facts. "Observations" reads **Findings**.
+- **The Memory page hung the window once.** The first visit in a fresh session timed out a screenshot
+  and the window went down. The second visit, after a relaunch, was fine. Not traced.
 
 ## Notes for later sessions
 

@@ -1,8 +1,9 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Fifteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-B06, B07a, and B07b on branch `more-ui`, merged to main, and B08a on `more-ui`, committed and not yet merged. Five area
-batches and the final sweep remain. Written 2026-10-01.
+**Status:** in progress. Sixteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+B06, B07a, and B07b on branch `more-ui`, merged to main, B08a on `more-ui`, committed and not merged,
+and B08b on `more-ui`, not committed. Four area batches and the final sweep remain. Written
+2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
@@ -155,24 +156,24 @@ a filter with no match draws a centred state with **Clear filter**. The composer
 starts at its code in both views. The file header's status is an xs badge with a styled tip, and code
 lines carry no native tooltip. See [deferred.md](./deferred.md) § B08a.
 
+**B08b, Notes, Context, Findings, Memory, and Editor.** Notes, Context, and Findings head their panes
+with a 48 bar. Notes switches with a segmented **Edit** and **Preview**, its title is one line at 15,
+**Show in Context** moved into the header, and the status strip is gone. Scope and author read as
+`Badge` words (**Task**, **Workspace**, **Everywhere**, **By agent**, **From a workflow**) from one
+map in `@acorn/protocol/notes.ts` that Context shares. Context folds start on the pane pad, the include
+box sits before its section's label with a tip, every meter is 64 wide, items are tree rows with their
+kind once as a badge, and the footer says **Send context** at sm. Findings titles come from the body's
+first sentence, rows show a short time with the full date in a tip, the list scrolls, and the detail
+headings sit on the column's edge. The Memory page is rows capped at 720 with its description in help.
+The memory form is a stacked page form with one set of type and scope words, and its toast says
+"Memory saved". The suggestion review has one solid **Approve**, words for every status and history
+entry, a `StackedDiff` of the change, and alert buttons in `actions`. The editor's tab strip has two
+icon buttons, its code is 12 like the diff's, and its search sits on the pane inset with paths in
+their own case. Group labels with an icon button are 34 high. See [deferred.md](./deferred.md) § B08b.
+
 ## What remains, in order
 
 Run the batches in this order. Each depends on the kit batches; B10b depends on B10a.
-
-### B08b. Task panes: Notes, Context, Findings, Memory, and Editor
-
-- [08-5. Findings rows wrap one word per line, and every row has the same title](./b08b-document-panes/08-5-findings-rows.md)
-- [08-7. The document panes do not share one frame](./b08b-document-panes/08-7-one-pane-frame.md)
-- [08-8. Context: four left edges, checkboxes far from their labels, and meters that change size](./b08b-document-panes/08-8-context.md)
-- [08-12. Notes: a toggle that renames itself, a footer that jumps, and emoji marks](./b08b-document-panes/08-12-notes.md)
-- [08-19. Editor: "$EDITOR → agent" reads as one phrase, and code is a different size from the diff](./b08b-document-panes/08-19-editor.md)
-- [08-20. Editor search: a field with no inset, tiny toggles, and paths in capitals](./b08b-document-panes/08-20-editor-search.md)
-- [08-21. The memory form: misaligned fields, three words for one choice, and a toast that prints a path](./b08b-document-panes/08-21-memory-form.md)
-- [08-22. The Memory page is a wall of full-width cards](./b08b-document-panes/08-22-memory-page.md)
-- [08-23. The memory proposal review: four equal buttons and the machine's words](./b08b-document-panes/08-23-proposal-review.md)
-- [08-24. Smaller defects in the document panes](./b08b-document-panes/08-24-smaller-defects.md)
-
-Never add, edit, or delete a memory through the app. Render the memory form and stop.
 
 ### B09. GitHub
 
