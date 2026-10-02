@@ -240,7 +240,7 @@ definitions.
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, optional `profileId` or `agent`, `isolation`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
+| `agent_spawn` | `title`, `prompt`, optional `profileId` or `agent`, `isolation`, `baseBranch`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
 | `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Durable turn ID, queue state and ordinal, session state, and cursor |
 | `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether the condition matched or timed out, plus state, attention, and the latest sequence |
 | `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
@@ -257,7 +257,10 @@ different `profileId` beside it is refused. The agent's options apply first and 
 child's system prompt gets the agent's instructions the same way an interactive session does.
 
 `agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
-isolation creates a selectable child task, but the managed session remains the execution authority.
+isolation creates a selectable child task. Its optional `baseBranch` starts from an existing local
+branch's last commit; uncommitted changes do not carry over. Without it, the child starts from the
+project folder's `HEAD`. Shared isolation rejects `baseBranch`. The managed session remains the
+execution authority.
 The caller can prompt, wait for, read, or cancel only a direct child recorded in the Agents plugin's
 spawn ledger. A missing, foreign, sibling, ancestor, descendant, or cross-task ID returns
 `not_found`.

@@ -18,7 +18,7 @@ import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { resolve } from 'node:path'
-import { worktreeAvailability, worktreeNameConflict } from '../../worktrees/worktreeAvailability'
+import { saveTaskBranch, TaskBranchError, withBranchReservation } from '../../worktrees/taskBranch'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
@@ -76,6 +76,8 @@ const taskSeedBody = z.object({
   origin: z.string().min(1),
   projectId: z.string().min(1),
   branch: z.string().optional(),
+  branchSource: z.enum(['derived', 'exact']).optional(),
+  baseBranch: z.string().min(1).optional(),
   worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
@@ -186,6 +188,7 @@ export const tasks = new Hono<AppEnv>()
     // because resolveTaskCwd only runs it for a worktree it created.
     let worktreePath: string | null = null
     let attachedBranch: string | null = null
+    if (seed.worktreePath && seed.baseBranch !== undefined) return respondError(c, 400, 'bad_request', ['A base branch cannot be used with an existing worktree.'])
     if (seed.worktreePath) {
       if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
       const wanted = resolve(seed.worktreePath)
@@ -197,33 +200,38 @@ export const tasks = new Hono<AppEnv>()
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
-    const branch = attachedBranch ?? (project.vcs === 'git' ? seed.branch?.trim() || null : null)
+    let branch = attachedBranch ?? (project.vcs === 'git' ? seed.branch || null : null)
     const projectLabel = project.githubName ?? project.name
     const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
     const sort = (value ?? -1) + 1
     const icon = cleanIcon(seed.icon)
-    if (branch && !worktreePath) {
-      const availability = await worktreeAvailability(db, project, branch)
-      if (!availability.available) return respondError(c, 409, 'worktree-unavailable', [availability.reason])
-      const conflict = worktreeNameConflict(db, project, branch)
-      if (conflict) return respondError(c, 409, 'worktree-unavailable', [conflict])
+    const save = (allocatedBranch: string | null) => {
+      db.insert(schema.tasks).values({
+        id,
+        title,
+        icon,
+        origin: seed.origin,
+        projectId: project.id,
+        branch: allocatedBranch,
+        skipSetup: seed.skipSetup ?? false,
+        pullNumber: seed.pullNumber ?? null,
+        worktreePath,
+        status: 'active',
+        sort,
+        createdAt: now,
+        updatedAt: now,
+        archivedAt: null,
+      }).run()
+      return allocatedBranch
     }
-    db.insert(schema.tasks).values({
-      id,
-      title,
-      icon,
-      origin: seed.origin,
-      projectId: project.id,
-      branch,
-      skipSetup: seed.skipSetup ?? false,
-      pullNumber: seed.pullNumber ?? null,
-      worktreePath,
-      status: 'active',
-      sort,
-      createdAt: now,
-      updatedAt: now,
-      archivedAt: null,
-    }).run()
+    try {
+      branch = await withBranchReservation(db, async () => worktreePath
+        ? save(branch)
+        : saveTaskBranch(db, project, { branch, branchSource: seed.branchSource, baseBranch: seed.baseBranch }, save))
+    } catch (error) {
+      if (error instanceof TaskBranchError) return respondError(c, error.status, error.status === 400 ? 'bad_request' : 'worktree-unavailable', [error.message])
+      throw error
+    }
     if (links.length) {
       await db
         .insert(schema.taskLinks)

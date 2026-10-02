@@ -246,6 +246,16 @@ describe('agent delegation service', () => {
     expect(child).toMatchObject({ profileId: 'codex', parentSessionId: null, parentTurnId: null })
   })
 
+  it('passes the chosen base through worktree provisioning and rejects it for shared children', async () => {
+    const parent = await managedCaller()
+    const result = await service.spawn({ title: 'From parent', prompt: 'Continue.', isolation: 'worktree', baseBranch: 'feature/parent' }, context(parent.taskId, parent.id, 'base-spawn'))
+    expect(result.provisioningState).toBe('provisioned')
+    expect(createChildTask).toHaveBeenCalledWith(parent.taskId, { title: 'From parent', branch: 'From parent', baseBranch: 'feature/parent' }, result.taskId)
+    createChildTask.mockClear()
+    await expect(service.spawn({ title: 'Shared', prompt: 'Continue.', isolation: 'shared', baseBranch: 'feature/parent' }, context(parent.taskId, parent.id, 'shared-base'))).rejects.toThrow('baseBranch requires worktree isolation')
+    expect(createChildTask).not.toHaveBeenCalled()
+  })
+
   it('provisions an owned worktree child task, session, and initial turn exactly once', async () => {
     const parent = await managedCaller()
     const caller = context(parent.taskId, parent.id, 'worktree-spawn')

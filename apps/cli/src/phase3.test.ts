@@ -55,6 +55,16 @@ describe('Phase 3 core writes', () => {
     expect(calls).toEqual([])
   })
 
+  it.each([
+    [[], {}],
+    [['--base', 'feature/parent'], { branch: 'review-api', branchSource: 'derived', baseBranch: 'feature/parent' }],
+    [['--branch', 'Review/API', '--base', 'feature/parent'], { branch: 'Review/API', branchSource: 'exact', baseBranch: 'feature/parent' }],
+  ])('sends the branch source and base for %j', async (options, expected) => {
+    const { node, calls } = fakeNode({}, () => ({ id: 't', projectId: 'p', title: 'Review API', status: 'active', branch: null }))
+    await runCommand(node, parseCliArgs(['task', 'create', '--project', 'p', '--title', 'Review API', ...options]))
+    expect(calls[0]!.body).toEqual({ projectId: 'p', title: 'Review API', origin: 'local', skipSetup: false, ...expected })
+  })
+
   it('returns an inspectable task when the on-created hook fails, with stable step keys', async () => {
     const row = { id: 'task-one', projectId: 'project-one', title: 'Review', status: 'active', branch: null, worktreePath: null, parentId: null }
     const { node, calls } = fakeNode({}, ({ path }) => {

@@ -28,7 +28,7 @@ acorn [--node NODE] project add --workspace ID --path ABSOLUTE [--name NAME]
 acorn [--node NODE] project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID
 acorn [--node NODE] project config show ID|set ID --patch-file FILE|-
 acorn [--node NODE] task list [--project ID] [--status active|archived|all]
-acorn [--node NODE] task show ID|create --project ID --title TEXT [--branch NAME] [--skip-setup]
+acorn [--node NODE] task show ID|create --project ID --title TEXT [--branch NAME] [--base BRANCH] [--skip-setup]
 acorn [--node NODE] agent providers|list [--task ID|--workspace ID]|show ID
 acorn [--node NODE] agent start --task ID --profile ID [--provider ID] --prompt TEXT|--prompt-file FILE|-
 acorn [--node NODE] agent send ID --prompt TEXT|--prompt-file FILE|-
@@ -72,6 +72,12 @@ connected provider and project membership. Provider mappings do not register loc
 hook seeds notes and may prepare a worktree or execute a created-trigger setup script. A branchless
 task runs in its project folder, and a non-Git project has no worktree isolation. The hook itself
 is best effort in the Node; a successful response does not prove that every setup action succeeded.
+
+`--base BRANCH` starts a worktree task from an existing local branch's last commit. Uncommitted
+changes do not carry over. With `--branch NAME`, Acorn preserves the exact name and refuses a taken
+name. With `--base` alone, it derives the name from the title and adds a numeric suffix on a clash.
+With neither option, the task remains branchless. Without a base, an unused local branch can be
+reused; with a base, every local branch name counts as taken.
 
 `--workspace -`, `--project -`, `--task -`, and positional session `-` read one
 `acorn.cli/v1` resource from stdin and require the expected `kind` and selected `nodeId`. A command

@@ -10,7 +10,7 @@ export type ParsedArgs = {
 }
 
 const valueOptions = new Set([
-  'node', 'output', 'workspace', 'project', 'status', 'name', 'path', 'title', 'branch',
+  'node', 'output', 'workspace', 'project', 'status', 'name', 'path', 'title', 'branch', 'base',
   'patch-file', 'file', 'task', 'session', 'provider', 'profile', 'prompt', 'prompt-file',
   'request-id', 'after-seq', 'limit', 'timeout', 'until', 'definition', 'inputs-file',
   'input-file',
@@ -55,7 +55,7 @@ export function helpFor(positionals: string[]): string {
     ]
     : section === 'task' ? [
       'task list [--project ID] [--status active|archived|all]|show ID',
-      'task create --project ID --title TEXT [--branch NAME] [--skip-setup] [--request-id UUID]',
+      'task create --project ID --title TEXT [--branch NAME] [--base BRANCH] [--skip-setup] [--request-id UUID]',
       'a branch and created-trigger setup may prepare a worktree and execute project configuration',
     ]
     : section === 'agent' ? [

@@ -4,7 +4,7 @@ import { delegatedTurn } from './reports'
 import type { AgentDelegationStore, AgentSpawn, AgentSpawnProvisioning } from './store'
 
 export type WorktreeTaskService = {
-  createChild(parentTaskId: string, seed: { title: string; branch: string }, intendedChildId?: string): Promise<string>
+  createChild(parentTaskId: string, seed: { title: string; branch: string; baseBranch?: string }, intendedChildId?: string): Promise<string>
 }
 
 /** Recoverable provisioning across core's task database and the Agents plugin database. */
@@ -32,7 +32,7 @@ export class WorktreeProvisioning {
 
     const taskId = await this.tasks.createChild(
       spawn.ownerTaskId,
-      { title: plan.title, branch: plan.branch },
+      { title: plan.title, branch: plan.branch, ...(plan.baseBranch !== undefined ? { baseBranch: plan.baseBranch } : {}) },
       spawn.childTaskId,
     )
     if (taskId !== spawn.childTaskId) throw new Error('Core returned a different child task during replay.')

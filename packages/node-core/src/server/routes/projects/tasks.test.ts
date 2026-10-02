@@ -240,6 +240,39 @@ describe('creating a task on an existing worktree', () => {
     body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Adopted', worktreePath, branch: 'ignored' }),
   })
 
+  it('groups local task branches separately and reports the checkout branch', async () => {
+    const project = (await t.db.select().from(schema.projects))[0]!
+    const [free] = await unclaimedWorktrees(t.db, project)
+    const adopted = await (await create(free!.path)).json() as Task
+    const response = await app.request('http://acorn.test/api/projects/p/branches')
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({
+      current: 'main',
+      tasks: [{ branch: 'feat/elsewhere', taskId: adopted.id, title: 'Adopted' }],
+      other: [{ name: 'main', committedAt: expect.any(Number) }],
+    })
+    await t.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, adopted.id))
+    const after = await (await app.request('http://acorn.test/api/projects/p/branches')).json() as { tasks: unknown[]; other: Array<{ name: string }> }
+    expect(after.tasks).toEqual([])
+    expect(after.other.map((branch) => branch.name).sort()).toEqual(['feat/elsewhere', 'main'])
+  })
+
+  it('keeps the branch roster private to unconfined callers', async () => {
+    const confined = new Hono<AppEnv>()
+    confined.use('/api/*', async (c, next) => {
+      c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'parent' })
+      await next()
+    })
+    confined.route('/api/projects', projects)
+    expect((await confined.request('http://acorn.test/api/projects/p/branches')).status).toBe(403)
+  })
+
+  it('returns no branches for a non-Git project and rejects a base there', async () => {
+    await t.db.update(schema.projects).set({ vcs: null }).where(eq(schema.projects.id, 'p'))
+    expect(await (await app.request('http://acorn.test/api/projects/p/branches')).json()).toEqual({ current: null, tasks: [], other: [] })
+    expect((await createSeed({ branch: 'child', baseBranch: 'main' })).status).toBe(400)
+  })
+
   it('lists only branch worktrees, takes the branch from git, and refuses one already in use', async () => {
     const project = (await t.db.select().from(schema.projects))[0]!
     const free = await unclaimedWorktrees(t.db, project)
@@ -317,6 +350,94 @@ describe('creating a task on an existing worktree', () => {
     expect((await create(free!.path)).status).toBe(200)
     expect((await createBranch('feat/elsewhere')).status).toBe(409)
     expect((await createBranch('feat-elsewhere')).status).toBe(200)
+  })
+
+  const createSeed = (seed: Record<string, unknown>) => app.request('http://acorn.test/api/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'From base', ...seed }),
+  })
+  const revision = (branch: string) => execFileSync('git', ['rev-parse', `refs/heads/${branch}`], { cwd: join(dir, 'checkout'), encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+
+  it('captures the chosen local base commit and leaves the worktree lazy', async () => {
+    execFileSync('git', ['-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'base work'], { cwd: worktree })
+    const created = await createSeed({ branch: 'new-child', baseBranch: 'feat/elsewhere' })
+    expect(created.status).toBe(200)
+    expect(await created.json()).toMatchObject({ branch: 'new-child', worktreePath: null })
+    expect(revision('new-child')).toBe(revision('feat/elsewhere'))
+    expect(revision('new-child')).not.toBe(revision('main'))
+    expect((await unclaimedWorktrees(t.db, (await t.db.select().from(schema.projects))[0]!)).map((tree) => tree.branch)).not.toContain('new-child')
+  })
+
+  it('keeps branch creation lazy when no base is supplied', async () => {
+    expect((await createSeed({ branch: 'lazy-child' })).status).toBe(200)
+    expect(() => revision('lazy-child')).toThrow()
+  })
+
+  it.each(['missing', 'origin/remote-only', '--force', '../main'])('rejects an invalid or absent local base %s', async (baseBranch) => {
+    expect((await createSeed({ branch: 'new-child', baseBranch })).status).toBe(400)
+    expect(await t.db.select().from(schema.tasks)).toEqual([])
+    expect(() => revision('new-child')).toThrow()
+  })
+
+  it('rejects a base for project-folder and existing-worktree tasks', async () => {
+    expect((await createSeed({ baseBranch: 'main' })).status).toBe(400)
+    expect((await createSeed({ baseBranch: 'main', worktreePath: worktree })).status).toBe(400)
+  })
+
+  it('suffixes derived names across Git branches, task reservations, and directory collisions', async () => {
+    execFileSync('git', ['branch', '--', 'feature/child'], { cwd: join(dir, 'checkout') })
+    expect((await createBranch('feature-child-2')).status).toBe(200)
+    mkdirSync(join(getWorktreesRoot(), 'p-p-feature-child-3'), { recursive: true })
+    const preview = await app.request('http://acorn.test/api/projects/p/worktree-availability?branch=feature%2Fchild&branchSource=derived&baseBranch=main')
+    expect(await preview.json()).toEqual({ available: true, branch: 'feature/child-4' })
+    const created = await createSeed({ branch: 'feature/child', branchSource: 'derived', baseBranch: 'main' })
+    expect(created.status).toBe(200)
+    expect(await created.json()).toMatchObject({ branch: 'feature/child-4' })
+    expect(revision('feature/child-4')).toBe(revision('main'))
+  })
+
+  it('rejects exact names on unused Git branches when a base is supplied', async () => {
+    execFileSync('git', ['branch', '--', 'unused-base-name'], { cwd: join(dir, 'checkout') })
+    const original = revision('unused-base-name')
+    const created = await createSeed({ branch: 'unused-base-name', branchSource: 'exact', baseBranch: 'feat/elsewhere' })
+    expect(created.status).toBe(409)
+    expect(revision('unused-base-name')).toBe(original)
+    expect(await t.db.select().from(schema.tasks)).toEqual([])
+  })
+
+  it.each([undefined, 'main'])('allocates different derived names for simultaneous requests (base: %s)', async (baseBranch) => {
+    const responses = await Promise.all([createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch }), createSeed({ branch: 'racing-child', branchSource: 'derived', baseBranch })])
+    expect(responses.map((response) => response.status)).toEqual([200, 200])
+    const bodies = await Promise.all(responses.map((response) => response.json() as Promise<Task>))
+    expect(bodies.map((task) => task.branch).sort()).toEqual(['racing-child', 'racing-child-2'])
+  })
+
+  it('retries a derived name when an external Git writer takes the previewed branch', async () => {
+    execFileSync('git', ['branch', '--', 'external-race-2', 'feat/elsewhere'], { cwd: join(dir, 'checkout') })
+    const run = git.git
+    let raced = false
+    vi.spyOn(git, 'git').mockImplementation(async (args, options) => {
+      if (args[0] === 'branch' && args[2] === 'external-race' && !raced) {
+        raced = true
+        execFileSync('git', ['branch', '--', 'external-race', 'feat/elsewhere'], { cwd: join(dir, 'checkout') })
+      }
+      return run(args, options)
+    })
+    const created = await createSeed({ branch: 'external-race', branchSource: 'derived', baseBranch: 'main' })
+    expect(created.status).toBe(200)
+    expect(await created.json()).toMatchObject({ branch: 'external-race-3' })
+    expect(revision('external-race')).toBe(revision('feat/elsewhere'))
+    expect(revision('external-race-2')).toBe(revision('feat/elsewhere'))
+    expect(revision('external-race-3')).toBe(revision('main'))
+  })
+
+  it.each([true, false])('removes only a branch created by this request if the row insert fails (base: %s)', async (withBase) => {
+    if (!withBase) execFileSync('git', ['branch', '--', 'save-fails'], { cwd: join(dir, 'checkout') })
+    vi.spyOn(t.db, 'insert').mockImplementation(() => { throw new Error('insert failed') })
+    const created = await createSeed({ branch: 'save-fails', ...(withBase ? { baseBranch: 'main' } : {}) })
+    expect(created.status).toBe(500)
+    if (withBase) expect(() => revision('save-fails')).toThrow()
+    else expect(revision('save-fails')).toBe(revision('main'))
   })
 
   it('allows a branch that exists without a worktree and branchless tasks', async () => {

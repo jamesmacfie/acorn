@@ -18,6 +18,7 @@ export type SelectOption = {
   /** A muted second line in the open list, under the label. With one, each line stays on one line
    *  and ends in an ellipsis, rather than wrapping. The trigger shows the label alone. */
   description?: string
+  group?: string
   /** The long form, on hover. Agents' model list uses it for the model's description. */
   title?: string
   disabled?: boolean
@@ -100,26 +101,31 @@ function SelectList(props: {
         </Show>
         <div class="ui-select-options" role="listbox" aria-label={props.ariaLabel}>
           <For each={filtered()} fallback={<p class="ui-select-nomatch muted">No matches.</p>}>
-            {(option) => (
-              <button
-                type="button"
-                class="ui-menu-item"
-                role="option"
-                data-value={option.value}
-                aria-selected={option.value === props.value()}
-                disabled={option.disabled}
-                data-tip={option.title}
-                onClick={() => props.onPick(option)}
-              >
-                <Show when={option.description} fallback={<span class="ui-menu-label">{option.label}</span>}>
-                  {(description) => (
-                    <span class="ui-menu-label ui-select-option-stack">
-                      <span>{option.label}</span>
-                      <span class="ui-select-option-description">{description()}</span>
-                    </span>
-                  )}
+            {(option, index) => (
+              <>
+                <Show when={option.group && (index() === 0 || filtered()[index() - 1]?.group !== option.group)}>
+                  <div class="ui-select-group muted" role="presentation">{option.group}</div>
                 </Show>
-              </button>
+                <button
+                  type="button"
+                  class="ui-menu-item"
+                  role="option"
+                  data-value={option.value}
+                  aria-selected={option.value === props.value()}
+                  disabled={option.disabled}
+                  data-tip={option.title}
+                  onClick={() => props.onPick(option)}
+                >
+                  <Show when={option.description} fallback={<span class="ui-menu-label">{option.label}</span>}>
+                    {(description) => (
+                      <span class="ui-menu-label ui-select-option-stack">
+                        <span>{option.label}</span>
+                        <span class="ui-select-option-description">{description()}</span>
+                      </span>
+                    )}
+                  </Show>
+                </button>
+              </>
             )}
           </For>
         </div>

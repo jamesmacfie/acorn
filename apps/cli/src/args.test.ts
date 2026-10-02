@@ -15,6 +15,14 @@ describe('CLI argument contract', () => {
     expect(() => parseCliArgs(['--node'])).toThrow('needs a value')
   })
 
+  it('accepts a base branch and requires its value', () => {
+    const args = parseCliArgs(['task', 'create', '--project', 'p', '--title', 'Child', '--base', 'feature/parent'])
+    expect(args.options.base).toBe('feature/parent')
+    expect(() => validateCommand(args)).not.toThrow()
+    expect(() => parseCliArgs(['task', 'create', '--base'])).toThrow('needs a value')
+    expect(helpFor(['task'])).toContain('[--base BRANCH]')
+  })
+
   it('renders offline help for every built-in level', () => {
     for (const subject of ['node', 'workspace', 'project', 'task', 'plugin']) {
       expect(helpFor([subject])).toContain(`${subject} `)

@@ -12,7 +12,7 @@ const configOptions = z.record(z.string().min(1).max(100), z.string().max(2_000)
 
 export const agentSpawnInputSchema = z.object({
   title: z.string().trim().min(1).max(500)
-    .describe('Shown in the session list. With worktree isolation, it also names the new task and its branch.'),
+    .describe('Shown in the session list. With worktree isolation, it names the child task and derives its branch, adding a numeric suffix if taken.'),
   prompt: z.string().min(1).max(1_000_000)
     .describe("The child's first message. The child sees none of your conversation, so write a complete brief."),
   profileId: z.string().min(1).max(100).optional()
@@ -20,7 +20,9 @@ export const agentSpawnInputSchema = z.object({
   agent: z.string().trim().min(1).max(200).optional()
     .describe('A custom agent the user saved, by its name or id, such as "Bug reviewer". It sets the agent to run, its settings, and its instructions, so leave profileId out. configOptions and toolCeiling still apply on top.'),
   isolation: z.enum(['shared', 'worktree']).default('shared')
-    .describe("'shared' runs the child in this task's checkout, so its edits land beside yours. 'worktree' creates a new task with its own checkout and branch. Use 'worktree' for a separate change."),
+    .describe("'shared' runs the child in this task's checkout, so its edits land beside yours. 'worktree' creates a new task with its own checkout and branch. Without baseBranch, the branch starts from the project folder's HEAD. Use 'worktree' for a separate change."),
+  baseBranch: z.string().min(1).optional()
+    .describe("An existing local branch to start the child from. Only valid with worktree isolation. Takes its last commit; uncommitted changes do not carry over. Leave it out to start from the project folder's HEAD."),
   resultSchema: resultSchema.optional()
     .describe("A JSON Schema for the child's final answer. An answer that matches comes back as structured output in the report and in agent_read."),
   configOptions: configOptions.optional(),

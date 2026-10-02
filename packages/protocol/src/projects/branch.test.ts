@@ -29,6 +29,10 @@ describe('isValidBranch', () => {
     expect(isValidBranch('release/v1.2.0')).toBe(true)
   })
 
+  it.each(['HEAD', '../main', 'foo..bar', 'foo//bar', '.hidden', 'foo/.hidden', 'foo.lock', 'foo/', 'foo.'])('refuses the invalid Git branch %s', (name) => {
+    expect(isValidBranch(name)).toBe(false)
+  })
+
   it('refuses a name that is empty, leading-dashed, or spaced', () => {
     expect(isValidBranch('')).toBe(false)
     expect(isValidBranch('--force')).toBe(false)

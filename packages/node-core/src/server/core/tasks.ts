@@ -9,6 +9,7 @@ import { schema } from '../db'
 import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify'
 import { loadTask, projectForTask, requireTaskRoot, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
 import { getProject, normalizeGithubPart } from '../projects'
+import { saveTaskBranch, withBranchReservation } from '../worktrees/taskBranch'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
@@ -22,9 +23,8 @@ export type TaskRunConfig =
 export type TaskLinkRef = { provider: string; integrationId: string; identifier: string }
 
 // What a dispatched child needs to exist. `branch` is a suggestion: it is slugged and de-duped against
-// every existing task before it is written, because two children of one plan often propose the same
-// name.
-export type ChildTaskSeed = { title: string; branch: string; origin?: string }
+// task reservations, worktree directories, and Git worktrees. A base also reserves local branches.
+export type ChildTaskSeed = { title: string; branch: string; origin?: string; baseBranch?: string }
 export type RootTaskSeed = { title: string; branch?: string; origin: string }
 
 export type TaskPullRelation = {
@@ -333,49 +333,30 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
       const project = await projectForTask(db, parent)
       if (!project) throw new Error('Parent task has no project.')
       const id = intendedChildId ?? randomUUID()
-      const created = db.transaction((tx) => {
-        const existingTask = tx.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
-        // De-duped against every *other* task, not just this parent's children. Excluding the
-        // intended row makes the same seed resolve to its original branch during replay.
-        const branches = tx
-          .select({ id: schema.tasks.id, branch: schema.tasks.branch })
-          .from(schema.tasks)
-          .all()
-          .flatMap((row) => row.id !== id && row.branch ? [row.branch] : [])
-        const branch = project.vcs === 'git'
-          ? dedupeBranch(slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`, branches)
-          : null
+      const stem = slugifyBranch(seed.branch || seed.title) || `child-${parentTaskId.slice(0, 8)}`
+      const created = await withBranchReservation(db, async () => {
+        const existingTask = db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
+        // Replay keeps the first allocation even when Git or other task reservations have changed.
         if (existingTask) {
-          if (
-            existingTask.parentId !== parentTaskId
-            || existingTask.projectId !== project.id
-            || existingTask.title !== seed.title
-            || existingTask.branch !== branch
-            || existingTask.origin !== (seed.origin ?? 'local')
-          ) {
+          const branchMatches = project.vcs !== 'git' ? existingTask.branch === null
+            : existingTask.branch === stem || (existingTask.branch?.startsWith(`${stem}-`)
+              && /^[0-9]+$/.test(existingTask.branch.slice(stem.length + 1)) && Number(existingTask.branch.slice(stem.length + 1)) >= 2)
+          if (existingTask.parentId !== parentTaskId || existingTask.projectId !== project.id
+            || existingTask.title !== seed.title || !branchMatches || existingTask.origin !== (seed.origin ?? 'local')) {
             throw new Error(`Child task id '${id}' is already used by a different parent or seed.`)
           }
           return false
         }
-        const value = tx.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
-        const at = Date.now()
-        tx.insert(schema.tasks).values({
-          id,
-          title: seed.title,
-          origin: seed.origin ?? 'local',
-          // A child works in the parent's repo by definition, so it inherits the project id too.
-          projectId: project.id,
-          branch,
-          pullNumber: null,
-          worktreePath: null,
-          status: 'active',
-          parentId: parentTaskId,
-          sort: (value ?? -1) + 1,
-          createdAt: at,
-          updatedAt: at,
-          archivedAt: null,
-        }).run()
-        return true
+        return saveTaskBranch(db, project, { branch: project.vcs === 'git' ? stem : null, branchSource: 'derived', baseBranch: seed.baseBranch }, (branch) => {
+          const value = db.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
+          const at = Date.now()
+          db.insert(schema.tasks).values({
+            id, title: seed.title, origin: seed.origin ?? 'local', projectId: project.id, branch,
+            pullNumber: null, worktreePath: null, status: 'active', parentId: parentTaskId,
+            sort: (value ?? -1) + 1, createdAt: at, updatedAt: at, archivedAt: null,
+          }).run()
+          return true
+        })
       })
       if (!created) return id
       broadcastWorktreeStatusChanged({ taskId: id })

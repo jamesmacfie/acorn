@@ -6,7 +6,9 @@
 // Whether a name can be handed to git as-is. Shared with the Node, which guards the git argument
 // with it (worktrees.ts): one character class, so a name the client accepts is one the Node accepts.
 export function isValidBranch(branch: string): boolean {
-  return !branch.startsWith('-') && /^[A-Za-z0-9._/-]+$/.test(branch)
+  return !branch.startsWith('-') && branch !== 'HEAD' && /^[A-Za-z0-9._/-]+$/.test(branch)
+    && !branch.includes('..') && !branch.endsWith('.')
+    && branch.split('/').every((part) => !!part && !part.startsWith('.') && !part.endsWith('.lock'))
 }
 
 export function slugifyBranch(input: string): string {

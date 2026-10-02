@@ -25,7 +25,11 @@ export function Select(props: SelectProps) {
     >
       {(context) => (
         <For each={props.options}>
-          {(option) => (
+          {(option, index) => (
+            <>
+            <Show when={option.group && (index() === 0 || props.options[index() - 1]?.group !== option.group)}>
+              <Line role="muted">{option.group}</Line>
+            </Show>
             <Option
               label={option.label}
               chosen={option.value === props.value}
@@ -35,6 +39,7 @@ export function Select(props: SelectProps) {
                 context.close()
               }}
             />
+            </>
           )}
         </For>
       )}

@@ -1,4 +1,5 @@
 import { isAbsolute } from 'node:path'
+import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { Project, Task, Workspace } from '@acorn/protocol/api.ts'
 import type { ParsedArgs } from './args'
 import { CliError } from './error'
@@ -141,7 +142,8 @@ export async function runCoreWrite(node: CliNode, args: ParsedArgs): Promise<unk
     const projectId = await typedId(o.project, 'Project', node, 'project')
     const title = requireOption(o, 'title')
     const row = await mutation<Task>(node, 'POST', '/v1/core/tasks', {
-      projectId, title, origin: 'local', ...(o.branch ? { branch: o.branch } : {}), skipSetup: o['skip-setup'] === 'true',
+      projectId, title, origin: 'local', ...(o.branch ? { branch: o.branch, branchSource: 'exact' } : o.base ? { branch: slugifyBranch(title) || 'task', branchSource: 'derived' } : {}),
+      ...(o.base ? { baseBranch: o.base } : {}), skipSetup: o['skip-setup'] === 'true',
     }, operationKey(key, 'task-create'))
     const resource = taskResource(node.nodeId, row)
     try {

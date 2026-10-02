@@ -174,6 +174,9 @@ export class AgentDelegationService {
 
   async spawn(input: AgentSpawnInput, context: ToolContext): Promise<AgentSpawnResult> {
     await this.reconciled
+    if (input.baseBranch !== undefined && input.isolation !== 'worktree') {
+      throw new ToolError('bad_request', 'baseBranch requires worktree isolation.')
+    }
     if (!context.callId) throw new ToolError('bad_request', 'agent_spawn requires a stable tool call id.')
     const sessionId = context.sessionId
     if (!sessionId) throw new ToolError('not_found', 'Session not found.')
@@ -317,6 +320,7 @@ export class AgentDelegationService {
               title: input.title,
               prompt: input.prompt,
               branch: input.title,
+              ...(input.baseBranch !== undefined ? { baseBranch: input.baseBranch } : {}),
               providerId: provider.id,
               profileId: provider.profileId,
               parentSessionId: caller.managedSession?.id ?? null,

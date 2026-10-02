@@ -170,10 +170,14 @@ creation. Acorn reports the occupied branch and path from Git's worktree roster.
 in the reported checkout, then reopen the task to retry creation. Acorn leaves the other checkout
 and its uncommitted files untouched. Setup runs only after creation succeeds.
 
-A new task branch starts from the branch checked out in the mapped project folder. Acorn runs
-`git worktree add -b` from that folder without an explicit start point, so Git uses the folder's
-current `HEAD`. Remote-tracking refs such as `origin/main` do not take precedence over local commits.
-If the task branch already exists, Acorn checks out that branch without changing its history.
+A task can select an existing local branch as its base. Acorn creates the task branch from that
+base's last commit when saving the task, then creates its worktree on first use. Uncommitted changes
+in the base's checkout do not carry over. Remote-only branches are not accepted.
+
+Without a base, `git worktree add -b` uses the mapped project folder's `HEAD` on first use.
+Remote-tracking refs such as `origin/main` do not take precedence over local commits. An unused local
+branch can be reused without a base. With a base, a local branch name is taken: a derived name gets a
+numeric suffix, and an exact name is refused. This keeps the chosen base from being ignored.
 
 The project's setup script runs in the new worktree as an ordinary terminal session titled "Setup",
 so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
@@ -343,28 +347,29 @@ resumes the conversation. A session someone archived on its own is restored from
 ## Task creation and navigation
 
 The rail creates local tasks from a project and derives a branch from the title when the project is
-Git-backed. An explicitly entered branch is preserved. The promote-to-task modal follows the same
-rule from the other direction: a branch a provider seeded is used exactly as given, because a pull
-request's head branch already exists on the remote and a rewritten name could never be pushed back to
-that PR. Only a name a person types is slugged, and either way a name git would refuse leaves the
-button disabled. For a Git project the dialog has three tabs. "New worktree" is the default
-above. "Project folder" creates the task with no branch, so it works in the project folder on
-whatever is already checked out and never gets a worktree. "Existing worktree" lists the linked
-worktrees Git reports for the project's checkout that no active task uses, skipping detached and
-prunable ones. The task takes that folder and its branch as they are, and setup does not run. PR, Linear, and Rollbar promotions resolve or
-create the appropriate project and task link, then reuse an existing task when that exact link is
-already present.
+Git-backed. **New worktree** has a collapsed **Advanced** section with **Branch name** and
+**Branch from**. The base defaults to the branch checked out in the project folder. The dropdown
+groups local branches belonging to active tasks by task title, followed by the other local branches.
+The helper text explains that uncommitted changes do not carry over. Non-Git projects hide these
+options.
 
-The local task dialog keeps the title-derived branch name instead of adding a numeric suffix.
-"New worktree" checks `GET /v1/core/projects/:id/worktree-availability?branch=...` and shows
-"This branch name already exists in another worktree" beside the branch field when the name is
-occupied. Creation stays disabled while the check runs. A failed availability request, Git lookup,
-or filesystem check allows creation; any worktree error surfaces when the task needs its root.
-The Node checks active task reservations, the derived
-directory, and Git's worktree roster, including the project checkout. Branches that map to the same
-directory also conflict. A branch without a worktree remains available. Task creation repeats the
-check before inserting the row and returns a `worktree-unavailable` 409 on conflict, so simultaneous
-submissions cannot reserve the same name. Attaching through "Existing worktree" uses its separate
+Editing **Branch name** preserves the typed value and stops title changes from updating it.
+**Project folder** creates a branchless task in the project folder. **Existing worktree** lists
+linked worktrees that no active task uses, skipping detached and prunable ones. The task takes that
+folder and branch, and setup does not run. Provider promotions preserve seeded branches, resolve or
+create the project and task link, and reuse a task when that exact link is already present.
+
+The Node adds `-2`, `-3`, and further suffixes to a title-derived branch until it is available. The
+dialog previews that final name without an error. An exact name instead shows
+"This branch name already exists in another worktree" when occupied. Creation stays disabled while
+the preview runs. A failed availability lookup allows submission; the create route validates again.
+
+The Node checks active task reservations, the derived directory, and Git's worktree roster,
+including the project checkout. Branches that map to the same directory conflict. With a selected
+base, every local branch name also counts as taken. Without a base, a branch without a worktree
+remains available. Task creation serializes allocation and row reservation with child tasks and
+returns a `worktree-unavailable` 409 for an exact conflict. If saving the row fails, Acorn removes
+only a branch that request created. Attaching through **Existing worktree** uses its separate
 ownership check.
 
 The desktop stores task ordering, layout, last pane/source, and drafts per Node. `⌘1`–`⌘9` activates

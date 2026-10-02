@@ -611,7 +611,11 @@ the child session owns readiness, work, attention, and terminal status.
 
 Shared isolation keeps the child on the caller's task. Worktree isolation reserves a stable child
 task ID before crossing into core, then creates the task, delegated session, and initial turn with
-spawn-derived idempotency keys. Startup reconciliation resumes any `creating` worktree row from the
+spawn-derived idempotency keys. An optional `baseBranch` selects an existing local branch's last
+commit. Core creates the branch when saving the child task and suffixes derived names on a clash;
+the worktree stays lazy. Without a base, the child starts from the project folder's `HEAD` when its
+worktree is created. Uncommitted changes do not carry over. Shared isolation rejects `baseBranch`.
+The provisioning ledger retains the chosen base for restart recovery. Startup reconciliation resumes any `creating` worktree row from the
 last durable boundary. A permanent failure keeps the row and any child task or session that already
 exists, so recovery never deletes a checkout that might contain work.
 

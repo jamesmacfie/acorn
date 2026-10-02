@@ -295,6 +295,8 @@ For more information, see model providers in [the integrations doc](./integratio
 | `GET` | `/v1/core/projects` | List local projects and their facets |
 | `POST` | `/v1/core/projects` | Add or import a project |
 | `GET` | `/v1/core/projects/:id` | Read one project |
+| `GET` | `/v1/core/projects/:id/branches` | List local branches grouped by active task, with the project checkout branch. Device-only |
+| `GET` | `/v1/core/projects/:id/worktree-availability` | Check a task branch and preview a derived name. Device-only |
 | `PATCH` | `/v1/core/projects/:id` | Update project identity, colour, folder, or visibility |
 | `GET` | `/v1/core/workspaces/:id/external-projects` | List provider projects linked to a workspace |
 | `PUT` | `/v1/core/workspaces/:id/external-projects` | Replace provider projects linked to a workspace |
@@ -308,6 +310,25 @@ For more information, see model providers in [the integrations doc](./integratio
 | `POST` | `/v1/core/tasks/:id/tools/:name` | Invoke an authorized task tool |
 | `GET` | `/v1/core/agent-tools` | Catalog tools for Settings |
 | `GET` | `/v1/core/search` | Search core and every plugin's search provider, grouped (`?q=`, `?archived=1`, `?workspaceId=`). Device-only |
+
+`POST /v1/core/tasks` takes `origin` and `projectId`, plus optional `title`, `icon`, `branch`,
+`branchSource`, `baseBranch`, `worktreePath`, `skipSetup`, `pullNumber`, and `links`.
+`branchSource` is `exact` by default; `derived` permits the Node to add numeric suffixes on a
+collision. `baseBranch` must name an existing local Git branch and requires a task branch. It cannot
+be combined with `worktreePath`. The Node creates the branch from that base's last commit before
+saving the task and removes it if the insert fails. Worktree creation remains lazy. With a base,
+an existing local branch name is taken; without a base, an unused local branch can be reused.
+Invalid bases return 400; exact name conflicts return a `worktree-unavailable` 409.
+
+`GET /v1/core/projects/:id/branches` returns
+`{ current, tasks: [{ branch, taskId, title }], other: [{ name, committedAt }] }`.
+`current` is the checkout branch, or `null` for a detached HEAD. `committedAt` is Unix time in
+milliseconds. Only existing local branches appear. Non-Git projects return empty groups.
+
+`GET /v1/core/projects/:id/worktree-availability` takes `branch` and optional `branchSource` and
+`baseBranch` query parameters. A preview returns `{ available: true, branch }`, with the next free
+name for a derived request, or `{ available: false, branch, reason }`. Allocation is repeated on
+creation, so the preview does not reserve a name.
 
 Task-addressed routes are guarded by the `taskId` in a task-scoped internal token. Task lifecycle,
 worktree, run-target, and repo-config authority remains in core.

@@ -149,6 +149,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
    is a paragraph to read, and a list of them stops scanning as a list. */
 .ui-select-option-stack { display: flex; flex-direction: column; }
 .ui-select-option-stack > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-group { padding: var(--space-2) var(--space-3); font-size: var(--fs-xs); }
 .ui-select-option-description { font-size: var(--fs-xs); color: var(--text-muted); }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }

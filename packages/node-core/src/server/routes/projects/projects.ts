@@ -13,7 +13,8 @@ import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { isTaskConfined } from '../../middleware/requireUser'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
-import { worktreeAvailability } from '../../worktrees/worktreeAvailability'
+import { taskBranchAvailability, TaskBranchError } from '../../worktrees/taskBranch'
+import { projectBranches } from '../../worktrees/branches'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
 // Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
@@ -125,14 +126,38 @@ export const projects = new Hono<AppEnv>()
     if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
     return c.json(await unclaimedWorktrees(getDb(c.env), row))
   })
+  .get('/:id/branches', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
+    const db = getDb(c.env)
+    const project = await getProject(db, c.req.param('id'))
+    if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
+    try {
+      return c.json(await projectBranches(db, project))
+    } catch {
+      return respondError(c, 409, 'branches-unavailable', ['Could not list local branches.'])
+    }
+  })
   .get('/:id/worktree-availability', async (c) => {
     if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
-    const branch = c.req.query('branch')?.trim()
+    const branch = c.req.query('branch')
     if (!branch) return respondError(c, 400, 'bad_request', ['A branch name is required.'])
     const db = getDb(c.env)
     const project = await getProject(db, c.req.param('id'))
     if (!project) return respondError(c, 404, 'not_found', ['No such project.'])
-    return c.json(await worktreeAvailability(db, project, branch))
+    const branchSource = c.req.query('branchSource')
+    if (branchSource !== undefined && branchSource !== 'derived' && branchSource !== 'exact') return respondError(c, 400, 'bad_request')
+    try {
+      const result = await taskBranchAvailability(db, project, { branch, branchSource, baseBranch: c.req.query('baseBranch') })
+      // Preserve the response for callers that do not request a preview.
+      if (!branchSource && c.req.query('baseBranch') === undefined) {
+        const { branch: _branch, ...availability } = result
+        return c.json(availability)
+      }
+      return c.json(result)
+    } catch (error) {
+      if (error instanceof TaskBranchError) return respondError(c, error.status, 'bad_request', [error.message])
+      throw error
+    }
   })
   .get('/:id/mcp', async (c) => {
     const row = await getProject(getDb(c.env), c.req.param('id'))

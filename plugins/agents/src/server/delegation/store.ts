@@ -32,6 +32,7 @@ export type AgentSpawnProvisioning = {
   title: string
   prompt: string
   branch: string
+  baseBranch?: string
   providerId: string
   profileId: string
   parentSessionId: string | null
@@ -84,6 +85,7 @@ const parseProvisioning = (value: string | null): AgentSpawnProvisioning | null 
       typeof parsed.title !== 'string'
       || typeof parsed.prompt !== 'string'
       || typeof parsed.branch !== 'string'
+      || (parsed.baseBranch !== undefined && typeof parsed.baseBranch !== 'string')
       || typeof parsed.providerId !== 'string'
       || typeof parsed.profileId !== 'string'
       || (parsed.parentSessionId !== null && typeof parsed.parentSessionId !== 'string')

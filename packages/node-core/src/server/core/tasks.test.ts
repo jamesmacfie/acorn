@@ -1,3 +1,8 @@
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
+import { getWorktreesRoot, setWorktreesRoot } from '../worktrees/taskWorktree'
 import { eq } from 'drizzle-orm'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { schema, type AppDatabase } from '../db'
@@ -318,5 +323,50 @@ describe('task pull attachments', () => {
     expect(broadcasts.filter((frame) => frame.channel === 'tasks:changed')).toEqual([
       { channel: 'tasks:changed', taskId: 'task-pulls' },
     ])
+  })
+})
+
+
+describe('child task base branches', () => {
+  let t: TestDb
+  let dir: string
+  let previousRoot: string
+  const git = (...args: string[]) => execFileSync('git', args, { cwd: dir, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim()
+  beforeEach(async () => {
+    t = makeTestDb()
+    dir = mkdtempSync(join(tmpdir(), 'acorn-child-base-'))
+    previousRoot = getWorktreesRoot()
+    setWorktreesRoot(join(dir, 'managed'))
+    git('init', '-q', '-b', 'main')
+    git('-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'base')
+    git('switch', '-q', '-c', 'feature/parent')
+    git('-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'parent work')
+    git('switch', '-q', 'main')
+    const at = Date.now()
+    t.db.insert(schema.workspaces).values({ id: 'w', name: 'Git', isDefault: true, sort: 0, createdAt: at, updatedAt: at }).run()
+    t.db.insert(schema.projects).values({ id: 'p', name: 'p', path: dir, workspaceId: 'w', vcs: 'git', sort: 0, hidden: false, createdAt: at, updatedAt: at }).run()
+    t.db.insert(schema.tasks).values({ id: 'parent', title: 'Parent', origin: 'local', projectId: 'p', branch: null, status: 'active', sort: 0, createdAt: at, updatedAt: at }).run()
+  })
+  afterEach(() => {
+    t.cleanup()
+    setWorktreesRoot(previousRoot)
+    rmSync(dir, { recursive: true, force: true })
+  })
+  it('uses the base commit, suffixes an unused Git branch, and preserves the allocation on replay', async () => {
+    git('branch', '--', 'child')
+    const tasks = createTaskService(t.db)
+    const seed = { title: 'Child', branch: 'child', baseBranch: 'feature/parent' }
+    expect(await tasks.createChild('parent', seed, 'stable')).toBe('stable')
+    const child = t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'stable')).get()!
+    expect(child).toMatchObject({ branch: 'child-2', worktreePath: null, parentId: 'parent' })
+    expect(git('rev-parse', 'refs/heads/child-2')).toBe(git('rev-parse', 'refs/heads/feature/parent'))
+    git('branch', '--', 'child-3')
+    expect(await tasks.createChild('parent', seed, 'stable')).toBe('stable')
+    expect(t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'stable')).get()!.branch).toBe('child-2')
+  })
+  it('checks Git worktrees without a task row even when no base is supplied', async () => {
+    git('worktree', 'add', '-q', '-b', 'child', join(dir, 'external'))
+    const id = await createTaskService(t.db).createChild('parent', { title: 'Child', branch: 'child' })
+    expect(t.db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()!.branch).toBe('child-2')
   })
 })

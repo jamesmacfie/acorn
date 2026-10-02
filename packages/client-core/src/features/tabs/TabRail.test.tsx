@@ -71,6 +71,7 @@ beforeEach(() => {
   readJsonMock.mockImplementation(async (url: string) => {
     if (url.includes('worktree-availability')) return { available: true }
     if (url.endsWith('/worktrees')) return []
+    if (url.endsWith('/branches')) return { current: 'main', tasks: [], other: [{ name: 'main', committedAt: 1 }] }
     throw new Error('No live Node in this test.')
   })
   localStorage.clear()
@@ -374,11 +375,11 @@ describe('new task worktree validation', () => {
     await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' })))
   })
 
-  it('keeps the generated branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
+  it('keeps a typed branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
     setActiveTaskId('t1')
     mount([{ ...task('t1', 'Taken'), branch: 'taken' }], true)
     readJsonMock.mockImplementation(async (url: string) => {
-      if (url.includes('worktree-availability')) return url.endsWith('branch=taken')
+      if (url.includes('worktree-availability')) return new URL(url, 'http://acorn.test').searchParams.get('branch') === 'taken'
         ? { available: false, reason: 'This branch name already exists in another worktree' }
         : { available: true }
       if (url.endsWith('/worktrees')) return []
@@ -394,19 +395,63 @@ describe('new task worktree validation', () => {
       field.dispatchEvent(new InputEvent('input', { bubbles: true }))
     }
     const submit = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    fill(input('Title'), 'Another title')
+    const advanced = document.querySelector<HTMLDetailsElement>('[role="dialog"] details')!
+    advanced.open = true
+    advanced.dispatchEvent(new Event('toggle'))
+    fill(input('Branch name'), 'taken')
     fill(input('Title'), 'Taken')
     await vi.waitFor(() => expect(document.querySelector('[role="dialog"]')?.textContent).toContain('This branch name already exists in another worktree'))
-    expect(input('Branch').value).toBe('taken')
+    expect(input('Branch name').value).toBe('taken')
     expect(submit().disabled).toBe(true)
     submit().click()
     input('Title').dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
     expect(createTaskMock).not.toHaveBeenCalled()
 
-    fill(input('Branch'), 'available-name')
+    fill(input('Branch name'), 'available-name')
     await vi.waitFor(() => expect(submit().disabled).toBe(false))
     expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('This branch name already exists in another worktree')
     createTaskMock.mockResolvedValue(task('created', 'Taken'))
     submit().click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name' })))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name', branchSource: 'exact' })))
+  })
+})
+
+
+describe('advanced task branch choices', () => {
+  it('shows the server suffix for a derived name and groups the bases by task and local branch', async () => {
+    setActiveTaskId('t1')
+    mount(undefined, true)
+    readJsonMock.mockImplementation(async (url: string) => {
+      if (url.includes('worktree-availability')) return { available: true, branch: 'taken-2' }
+      if (url.endsWith('/branches')) return { current: 'main', tasks: [{ branch: 'feature/parent', taskId: 't1', title: 'Parent work' }], other: [{ name: 'main', committedAt: 1 }] }
+      if (url.endsWith('/worktrees')) return []
+      throw new Error('No live Node.')
+    })
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const field = (name: string) => {
+      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((item) => item.textContent === name)!
+      return document.getElementById(label.htmlFor)!
+    }
+    const title = field('Title') as HTMLInputElement
+    title.value = 'Taken'
+    title.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    const advanced = document.querySelector<HTMLDetailsElement>('[role="dialog"] details')!
+    expect(advanced.open).toBe(false)
+    advanced.open = true
+    advanced.dispatchEvent(new Event('toggle'))
+    await vi.waitFor(() => expect((field('Branch name') as HTMLInputElement).value).toBe('taken-2'))
+    expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('already exists')
+    ;(field('Branch from') as HTMLButtonElement).click()
+    await vi.waitFor(() => expect(document.querySelector('[role="listbox"]')?.textContent).toContain('Active tasks'))
+    expect(document.querySelector('[role="listbox"]')?.textContent).toContain('Other local branches')
+    expect(document.querySelector('[role="listbox"]')?.textContent).toContain('Parent work')
+    const parent = document.querySelector<HTMLButtonElement>('[role="option"][data-value="feature/parent"]')!
+    parent.click()
+    createTaskMock.mockResolvedValue(task('created', 'Taken'))
+    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    await vi.waitFor(() => expect(submit.disabled).toBe(false))
+    submit.click()
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'taken', branchSource: 'derived', baseBranch: 'feature/parent' })))
   })
 })

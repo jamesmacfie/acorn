@@ -48,10 +48,11 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { Text } from '../../kit/components/content/Text'
 import { readJson } from '../../infra/node/apiClient'
-import { projectWorktreeAvailabilityRoute, projectWorktreesRoute, type ProjectWorktree, type WorktreeAvailability } from '@acorn/protocol/api.ts'
+import { projectBranchesRoute, projectWorktreeAvailabilityRoute, projectWorktreesRoute, type ProjectBranches, type ProjectWorktree, type WorktreeAvailability } from '@acorn/protocol/api.ts'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
+import { BranchOptions } from './BranchOptions'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
 import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
 
@@ -103,6 +104,7 @@ export default function TabRail() {
   // a slug of the title until the user edits the field, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
+  const [baseChoice, setBaseChoice] = createSignal<{ projectId: string; branch: string } | null>(null)
   // Where a git task's files come from, one tab each (docs/workspaces-and-tasks.md § Task creation and
   // navigation). `folder` opts out of the branch entirely: the task runs in the project folder on
   // whatever is already checked out, no worktree. `worktree` adopts a linked worktree git already
@@ -127,6 +129,11 @@ export default function TabRail() {
     // null on failure: a resource that errors throws on read and would take the dialog down with it.
     (id) => readJson<ProjectWorktree[]>(projectWorktreesRoute(id)).catch(() => null),
   )
+  const [branches] = createResource(
+    () => (draft()?.mode === 'new' && selectedProject()?.vcs === 'git' ? newProject() : undefined),
+    (id) => readJson<ProjectBranches>(projectBranchesRoute(id)).catch(() => null),
+  )
+  const baseBranch = () => baseChoice()?.projectId === newProject() ? baseChoice()?.branch : branches()?.current ?? undefined
   // The pick if it is still in the list, else the first one, so a project switch never submits a
   // worktree from the previous project.
   const chosenWorktree = () => {
@@ -135,23 +142,23 @@ export default function TabRail() {
   }
   const defaultBranch = (title: string) =>
     withBranchPrefix(branchPrefix(), slugifyBranch(title))
-  const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
+  const effectiveBranch = () => (branchTouched() ? branchText() : defaultBranch(text()))
   const [availability] = createResource(
     () => {
       if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git' || source() !== 'new' || !effectiveBranch()) return undefined
       // Recheck when another window creates or archives a task while this dialog is open.
       query.data
-      return { projectId: newProject(), branch: effectiveBranch() }
+      return { projectId: newProject(), branch: effectiveBranch(), baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const }
     },
     async (request) => ({
       ...request,
-      result: await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(request.projectId, request.branch))
+      result: await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(request.projectId, request.branch, request))
         .catch((): WorktreeAvailability => ({ available: true })),
     }),
   )
   const branchAvailability = () => {
     const checked = availability()
-    return checked?.projectId === newProject() && checked.branch === effectiveBranch() ? checked.result : undefined
+    return checked?.projectId === newProject() && checked.branch === effectiveBranch() && checked.baseBranch === baseBranch() && checked.branchSource === (branchTouched() ? 'exact' : 'derived') ? checked.result : undefined
   }
   const branchError = () => {
     const result = branchAvailability()
@@ -321,6 +328,7 @@ export default function TabRail() {
     setIconDraft(randomIconName())
     setBranchText('')
     setBranchTouched(false)
+    setBaseChoice(null)
     setSource('new')
     setPickedWorktree('')
     setSkipSetup(false)
@@ -341,7 +349,7 @@ export default function TabRail() {
     if (savingDraft() || !text().trim()) return false
     if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git') return true
     if (source() === 'worktree') return !!chosenWorktree()
-    return noBranch() || (!!effectiveBranch() && !prefixRow.loading && !availability.loading && branchAvailability()?.available === true)
+    return noBranch() || (!!effectiveBranch() && !prefixRow.loading && !branches.loading && !availability.loading && branchAvailability()?.available === true)
   }
 
   async function submitDraft() {
@@ -358,7 +366,7 @@ export default function TabRail() {
         const git = project.vcs === 'git'
         const worktreePath = git && source() === 'worktree' ? chosenWorktree()?.path : undefined
         const branch = git && source() === 'new' ? effectiveBranch() : undefined
-        const seed = { origin: 'local' as const, projectId: project.id, branch, worktreePath, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
+        const seed = { ...(branch ? { baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}), origin: 'local' as const, projectId: project.id, branch, worktreePath, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
         const w = await createTask(seed)
         await invalidate()
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
@@ -654,16 +662,16 @@ export default function TabRail() {
                 {/* The body's column gap, again, so the wrapper does not squash the fields inside it together. */}
                 <div id={`new-task-panel-${source()}`} role="tabpanel" aria-labelledby={`new-task-tab-${source()}`} style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}>
                   <Show when={source() === 'new'}>
-                    <Field label="Branch" error={branchError()} hint={availability.loading ? 'Checking worktree availability…' : undefined}>
-                      <Input
-                        value={branchTouched() ? branchText() : effectiveBranch()}
-                        onInput={(value) => {
-                          setBranchTouched(true)
-                          setBranchText(value)
-                        }}
-                        onSubmit={() => void submitDraft()}
-                      />
-                    </Field>
+                    <BranchOptions
+                      branch={branchTouched() ? branchText() : branchAvailability()?.branch ?? effectiveBranch()}
+                      error={branchError()}
+                      checking={availability.loading}
+                      base={baseBranch() ?? ''}
+                      branches={branches()}
+                      onBranch={(value) => { setBranchTouched(true); setBranchText(value) }}
+                      onBase={(branch) => setBaseChoice({ projectId: newProject(), branch })}
+                      onSubmit={() => void submitDraft()}
+                    />
                     <Checkbox size="sm" label="Skip setup script" checked={skipSetup()} onChange={setSkipSetup} />
                   </Show>
                   <Show when={source() === 'folder'}>
