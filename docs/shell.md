@@ -782,6 +782,20 @@ and re-reads on `plugin:preview:url-changed { taskId, url, source }`, where `url
 connected client agree on the answer. The terminal recipe picker reaches preview through the
 `preview.recipeSelection` client capability, avoiding a reverse package import.
 
+Overlapping URL reads for one task share one active resolution wave, including script execution.
+A completed read is not a URL cache: the next read runs the ladder again. Recipe selection,
+run-target changes, project configuration changes, and task changes retire affected waves before
+refreshing. Retired callers receive `null`; their results cannot replace observed state or emit a
+URL change. Disposal refuses further resolution and suppresses late events. Scripts already running
+finish through the core process owner and its 10-second deadline. One reader leaving does not cancel
+another reader's script. The runtime forgets archived or removed tasks' recipe and observation state
+when it reconciles `tasks:changed` against active tasks.
+
+The pane captures its Node and task for each read and teardown. A result from the outgoing Node
+cannot become a same-ID task's home on the incoming Node. Tunnel cleanup includes that captured Node;
+without a Node it closes nothing. Remote-preview classification also uses the captured Node and
+continues to refuse remote URLs.
+
 The pane button and the **Open Preview** command appear only on a task that has somewhere to find a
 URL. `/v1/p/preview/configured` answers that for every active task by walking the same order and
 asking only whether each step is filled in: a picked recipe URL, a default target with `url` or
@@ -799,7 +813,12 @@ native webview can make additional requests directly from the client computer. T
 binding `0.0.0.0` would publish another machine's dev server to the local network, the opposite of
 the tunnel's purpose. Because a task's preview URL can be resolved more than once while its resource
 is settling, opening for a key already in flight returns the same promise instead of racing a second
-listener into existence.
+listener into existence. Admission reserves a slot synchronously, so pending and published listeners
+together count toward the 16 limit. Task/Node closure retires pending binds as well as live listeners;
+a retired bind rejects without publishing its port or secret. Listener, socket, error, and idle
+callbacks retain their entry identity, so they cannot close or rearm a same-key replacement. Failed
+binds release their slot. Disposal permanently refuses further opens and closes owned sockets and
+listeners.
 
 Each listener carries a 32-byte, base64url-encoded secret, generated once per listener rather than
 per connection. wry cannot inject a request header per request, so the credential travels as a

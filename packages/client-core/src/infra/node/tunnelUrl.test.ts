@@ -1,8 +1,10 @@
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { setActiveNode } from './activeNode'
 import { refreshFleet, _resetFleet } from './fleet'
-import { previewUrlForClient, remotePreviewBlocked, tunnelUrl } from './tunnelUrl'
+import { previewUrlForClient, remotePreviewBlocked, tunnelUrl, closeTunnelsForTask } from './tunnelUrl'
+
+const close = vi.fn()
 
 const node = (nodeId: string, local: boolean): NodeRecord => ({
   nodeId, label: nodeId, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local,
@@ -10,6 +12,7 @@ const node = (nodeId: string, local: boolean): NodeRecord => ({
 
 beforeEach(async () => {
   _resetFleet()
+  close.mockClear()
   ;(globalThis as { window?: unknown }).window = {
     acorn: {
       desktop: true,
@@ -19,7 +22,7 @@ beforeEach(async () => {
       }),
       onNodeStatus: () => () => {},
       nodeTunnelOpen: () => { throw new Error('remote preview must not open a tunnel') },
-      nodeTunnelClose: () => {},
+      nodeTunnelClose: close,
     },
   }
   await refreshFleet()
@@ -66,4 +69,18 @@ describe('tunnelUrl', () => {
     setActiveNode('remote')
     await expect(tunnelUrl('task-1', null)).resolves.toBeNull()
   })
+})
+
+it('closes only the captured Node and never makes a task-only close without a Node', () => {
+  setActiveNode('remote')
+  closeTunnelsForTask('same', 'local')
+  expect(close).toHaveBeenCalledWith({ nodeId: 'local', taskId: 'same' })
+  closeTunnelsForTask('same', null)
+  expect(close).toHaveBeenCalledOnce()
+})
+
+it('classifies a URL by its originating Node after the selection changes', async () => {
+  setActiveNode('local')
+  expect(await tunnelUrl('same', 'http://localhost:3000', 'remote')).toBeNull()
+  expect(await tunnelUrl('same', 'http://localhost:3000', 'local')).toBe('http://localhost:3000')
 })

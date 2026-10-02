@@ -36,7 +36,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 19 | [Docker implementation record](../../../plans/performance/implementation-19-docker.md) | Through 18 | Implemented; native verification blocked by service bundle size gate |
 | 20 | [HTTP implementation record](../../../plans/performance/implementation-20-http.md) | Through 19 | Implemented; native verification blocked by service bundle size gate |
 | 21 | [SQL recovery implementation record](../../../plans/performance/implementation-21-sql-recovery.md) | Through 20 | Implemented; native and PTY checks blocked by service bundle size gate |
-| 22 | [Preview listener admission, retirement, and URL resolution](./22-preview.md) | Through 21 | Pending |
+| 22 | [Preview implementation record](../../../plans/performance/implementation-22-preview.md) | Through 21 | Implemented; native verification blocked by service bundle size gate |
 | 23 | [Memory delta indexing and fresh reconciliation](./23-memory.md) | Through 22 | Pending |
 | 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
 | 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |

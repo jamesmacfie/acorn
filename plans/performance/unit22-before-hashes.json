@@ -1,0 +1,12 @@
+{
+  "commit": "bd9b7efbcc33fee67870a0751f6c435b17c721d8",
+  "sha256": {
+    "packages/custody/src/supervision/previewTunnel.ts": "fc102e6e40531e1aa72e9867d3aaac1b76484c10984707bbacd3ce5b39d435df",
+    "plugins/preview/src/server/previewUrls.ts": "c4319a6b11ffe0f2a7cfed8f7d1db7aa78303435d880dd7274f03acbc2008d83",
+    "plugins/preview/src/node/index.ts": "b1afbf890665742a4f665cd19454d88e745b967d822d326370bbd976bcdb574d",
+    "plugins/preview/src/client/PreviewTaskPane.tsx": "41ac9a85404078d0d7c5c9e90ae1019b7bae7e5557a8fe11ce771a887acb6081",
+    "packages/client-core/src/infra/node/tunnelUrl.ts": "f9e8e71579690987d6b88a694ac24a3014fccc07cfcfcd8bac3e80a0492931c1",
+    "plans/performance/13-preview-probe.test.ts": "04e3e1164460e86e00f248b032d9a5556d063d28c705e8a9beccb0a323126148",
+    "plans/performance/13-tunnel-probe.mjs": "60280886c8edaa40ea14bd6f7161026a9c20fc4fd931565d5e3e55920cb4f14b"
+  }
+}
