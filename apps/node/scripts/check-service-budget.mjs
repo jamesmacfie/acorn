@@ -20,11 +20,12 @@ const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[dirFlag + 1])
 
-// The measured figure plus about 5%: 2,916,482 B on 2026-09-29. The ceiling was 2,910,000 B, and the
-// last 48 KB over it is jsdiff, which the agent drivers use to write each file change's hunks
+// The measured figure plus about 5%: 3,063,547 B on 2026-10-02, when the old 3,062,000 B ceiling
+// stopped `pnpm dev:agent` from starting. Before that it was 2,916,482 B on 2026-09-29, and 48 KB of
+// that rise is jsdiff, which the agent drivers use to write each file change's hunks
 // (plugins/agents/src/server/drivers/patchText.ts). `floor` is a lower bound, not a target: a graph
 // that small means the walk below stopped following imports, and a check that passes on that is blind.
-const limits = { ceiling: 3_062_000, floor: 1_000_000 }
+const limits = { ceiling: 3_217_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
