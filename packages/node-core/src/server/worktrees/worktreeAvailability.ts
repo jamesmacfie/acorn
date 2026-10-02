@@ -31,7 +31,11 @@ export function worktreeNameConflict(db: AppDatabase, project: ProjectRow, branc
       ? resolve(task.worktreePath) === resolve(path)
       : task.branch && owner.vcs === 'git' && resolve(worktreePath(owner, task.branch)) === resolve(path)),
   )) return occupied
-  if (getWorktreesRoot() && lstatSync(path, { throwIfNoEntry: false })) return occupied
+  try {
+    if (getWorktreesRoot() && lstatSync(path, { throwIfNoEntry: false })) return occupied
+  } catch {
+    // Availability is best effort. Filesystem access errors surface when the task needs its root.
+  }
   return null
 }
 
@@ -47,7 +51,7 @@ export async function worktreeAvailability(db: AppDatabase, project: ProjectRow,
       const roster = await gitText(['worktree', 'list', '--porcelain', '-z'], { cwd: project.path, timeoutMs: 10_000 })
       if (roster.split('\0').includes(`branch refs/heads/${branch}`)) return { available: false, reason: occupied }
     } catch {
-      return { available: false, reason: 'Could not check existing worktrees. Try again.' }
+      // A failed Git lookup does not block creation. Task reservations are still checked below.
     }
   }
   const latest = worktreeNameConflict(db, project, branch)

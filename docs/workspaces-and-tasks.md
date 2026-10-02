@@ -356,8 +356,10 @@ already present.
 
 The local task dialog keeps the title-derived branch name instead of adding a numeric suffix.
 "New worktree" checks `GET /v1/core/projects/:id/worktree-availability?branch=...` and shows
-"This branch name already exists in another worktree" beside the branch field when the name is occupied. Creation stays
-disabled while the check runs or fails. The Node checks active task reservations, the derived
+"This branch name already exists in another worktree" beside the branch field when the name is
+occupied. Creation stays disabled while the check runs. A failed availability request, Git lookup,
+or filesystem check allows creation; any worktree error surfaces when the task needs its root.
+The Node checks active task reservations, the derived
 directory, and Git's worktree roster, including the project checkout. Branches that map to the same
 directory also conflict. A branch without a worktree remains available. Task creation repeats the
 check before inserting the row and returns a `worktree-unavailable` 409 on conflict, so simultaneous
