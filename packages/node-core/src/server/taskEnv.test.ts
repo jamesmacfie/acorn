@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { buildSessionEnv, childEnv } from './taskEnv'
 
 describe('buildSessionEnv', () => {
-  const baseEnv = { HOME: '/Users/x', PATH: '/usr/bin', SESSION_ENC_KEY: 'super-secret', GITHUB_CLIENT_SECRET: 'also-secret' }
+  const baseEnv = { HOME: '/Users/x', PATH: '/usr/bin', SESSION_ENC_KEY: 'super-secret', PROVIDER_API_KEY: 'also-secret' }
   const task = { projectId: 'project-1', projectName: 'Widget', github: { owner: 'acme', name: 'widget' }, branch: 'feat/login', title: 'Fix login' }
 
   it('injects all six ACORN_* vars for a task with a resolved worktree', () => {
@@ -39,7 +39,7 @@ describe('buildSessionEnv', () => {
     expect(env.PATH).toBe('/usr/bin')
     expect(env.TERM).toBe('xterm-256color')
     expect(env.SESSION_ENC_KEY).toBeUndefined()
-    expect(env.GITHUB_CLIENT_SECRET).toBeUndefined()
+    expect(env.PROVIDER_API_KEY).toBeUndefined()
   })
 })
 
@@ -63,14 +63,14 @@ describe('childEnv', () => {
       HOME: '/Users/x',
       PATH: '/usr/bin',
       SESSION_ENC_KEY: 'super-secret',
-      GITHUB_CLIENT_SECRET: 'also-secret',
+      PROVIDER_API_KEY: 'also-secret',
       RANDOM_OTHER: 'nope',
     })
     expect(env.HOME).toBe('/Users/x')
     expect(env.PATH).toBe('/usr/bin')
     expect(env.TERM).toBe('xterm-256color')
     expect(env.SESSION_ENC_KEY).toBeUndefined()
-    expect(env.GITHUB_CLIENT_SECRET).toBeUndefined()
+    expect(env.PROVIDER_API_KEY).toBeUndefined()
     expect(env.RANDOM_OTHER).toBeUndefined()
   })
 })

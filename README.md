@@ -89,9 +89,9 @@ pnpm pack:node                             # build the standalone Node tarball
 ```
 
 `SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development. A Node without one
-generates its own. Setting it in `.env` pins a stable key across throwaway data roots. The GitHub
-plugin reads `GITHUB_CLIENT_ID` when GitHub connection or import features are enabled; it does not
-use a client secret.
+generates its own. Setting it in `.env` pins a stable key across throwaway data roots. GitHub connects
+with acorn's public client ID by default. Set `GITHUB_CLIENT_ID` only to use your own app. For more
+information, see [GitHub integration](./docs/github-integration.md#connecting).
 
 `node-pty` is the only native module, because SQLite is the runtime's own `node:sqlite`. There is
 one ABI to match: the desktop runs the Node under the same pinned runtime the tests use, so

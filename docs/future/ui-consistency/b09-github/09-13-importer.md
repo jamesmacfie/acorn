@@ -16,9 +16,10 @@ seed; not connected is the fixture's state.
 
 ## Already done
 
-- B01 hid GitHub from Add connection in a build with no client id. The dev session has no
-  `GITHUB_CLIENT_ID`, so after a restart **Connect GitHub** is gone from Add connection. A stored
-  connection keeps working. Set the variable before starting the session to see the connect flow.
+- B01 hid GitHub from Add connection in a build with no client ID. The plugin defaults to acorn's
+  public client ID, so fresh dev sessions show **Connect GitHub** without `GITHUB_CLIENT_ID`.
+  The variable is an optional override for your own app. An empty override hides the connect flow;
+  a stored connection keeps working.
 
 ## The fix
 

@@ -7,17 +7,19 @@ desktop's three processes are `apps/desktop/src/client/`, `src/shell/`, and `src
 
 ## Environment
 
-Create `<checkout>/apps/desktop/.env` for local desktop development:
+To customize local desktop development, create `<checkout>/apps/desktop/.env`:
 
 ```dotenv
-GITHUB_CLIENT_ID=...
+# Optional: use your own GitHub app instead of acorn's default.
+# GITHUB_CLIENT_ID=your-app-client-id
 SESSION_ENC_KEY=<64 hexadecimal characters>
 ```
 
-`GITHUB_CLIENT_ID` is only needed when connecting GitHub, and the GitHub plugin owns that
-configuration. There is no GitHub client secret. `SESSION_ENC_KEY` is optional: a node without one
-generates its own into the data root. For more information, see
-[node-distribution.md](./node-distribution.md). Setting it in `.env` pins a stable key across
+GitHub connects without environment configuration. The plugin owns the optional `GITHUB_CLIENT_ID`
+override. For app setup, see [GitHub integration](./github-integration.md#connecting).
+
+`SESSION_ENC_KEY` is optional: a node without one generates its own into the data root. For more
+information, see [node-distribution.md](./node-distribution.md). Setting it in `.env` pins a stable key across
 throwaway data roots, which is why it is listed here.
 
 The data root defaults to `apps/node/.acorn/` and is gitignored. Set `ACORN_DATA_DIR` to isolate a

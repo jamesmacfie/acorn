@@ -9,6 +9,7 @@ import { decryptSecret } from '@acorn/plugin-api/testkit'
 import { githubDeviceAuth } from './deviceAuth'
 import { githubProvider } from '../provider'
 import { connectionProviderRegistry } from '@acorn/plugin-api/testkit'
+import { githubClientId } from '../config'
 
 const ENC_KEY = '0'.repeat(64)
 const PRINCIPAL: Principal = { kind: 'device', deviceId: 'd1', userId: 'james' }
@@ -20,11 +21,13 @@ beforeEach(() => {
   harness = makeTestDb()
   fetchMock.mockReset()
   vi.stubGlobal('fetch', fetchMock)
+  vi.stubEnv('GITHUB_CLIENT_ID', 'client-id')
   if (!connectionProviderRegistry.get('github')) connectionProviderRegistry.register(githubProvider)
 })
 
 afterEach(() => {
   vi.unstubAllGlobals()
+  vi.unstubAllEnvs()
   harness.cleanup()
 })
 
@@ -35,7 +38,7 @@ const env = () =>
   }) as unknown as Env
 
 const post = (path: string, body?: unknown, principal: Principal = PRINCIPAL) => {
-  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/github', githubDeviceAuth(() => 'client-id'))
+  const app = new Hono<AppEnv>().use('/api/*', ...testGate(principal)).route('/api/github', githubDeviceAuth(githubClientId))
   return app.fetch(
     new Request(`http://acorn.test/api/github${path}`, {
       method: 'POST',
@@ -50,7 +53,11 @@ const json = (body: unknown, init?: ResponseInit) =>
   new Response(JSON.stringify(body), { ...init, headers: { 'content-type': 'application/json', ...init?.headers } })
 
 describe('github device flow — start', () => {
-  it('returns the code, where to enter it, and the poll interval', async () => {
+  it.each([
+    { override: undefined, clientId: 'Ov23liRC5Y5yDF7BTSeg' },
+    { override: ' custom-client-id ', clientId: 'custom-client-id' },
+  ])('starts the code flow with client ID $clientId', async ({ override, clientId }) => {
+    vi.stubEnv('GITHUB_CLIENT_ID', override)
     fetchMock.mockResolvedValueOnce(
       json({ device_code: 'dc', user_code: 'WDJB-MJHT', verification_uri: 'https://github.com/login/device', expires_in: 899, interval: 5 }),
     )
@@ -66,7 +73,14 @@ describe('github device flow — start', () => {
     // The whole point of the device grant: no client secret is ever sent.
     const [, init] = fetchMock.mock.calls[0]
     expect(String(init.body)).not.toContain('client_secret')
-    expect(String(init.body)).toContain('client_id=client-id')
+    expect(new URLSearchParams(String(init.body)).get('client_id')).toBe(clientId)
+  })
+
+  it.each(['', '   '])('refuses an empty client ID override %j before calling GitHub', async (override) => {
+    vi.stubEnv('GITHUB_CLIENT_ID', override)
+    const res = await post('/auth/device/start')
+    expect(res.status).toBe(503)
+    expect(fetchMock).not.toHaveBeenCalled()
   })
 
   it('surfaces an unusable GitHub response as provider_unavailable', async () => {
@@ -80,11 +94,19 @@ describe('github device flow — start', () => {
 describe('github device flow — poll', () => {
   const pollBody = { deviceCode: 'dc' }
 
-  it('reports pending without treating it as an error', async () => {
+  it.each([
+    { override: undefined, clientId: 'Ov23liRC5Y5yDF7BTSeg' },
+    { override: ' custom-client-id ', clientId: 'custom-client-id' },
+  ])('polls with client ID $clientId and reports pending', async ({ override, clientId }) => {
+    vi.stubEnv('GITHUB_CLIENT_ID', override)
     fetchMock.mockResolvedValueOnce(json({ error: 'authorization_pending' }))
     const res = await post('/auth/device/poll', pollBody)
     expect(res.status).toBe(200)
     expect(await res.json()).toEqual({ status: 'pending', slowDown: false })
+    const [, init] = fetchMock.mock.calls[0]
+    const form = new URLSearchParams(String(init.body))
+    expect(form.get('client_id')).toBe(clientId)
+    expect(form.has('client_secret')).toBe(false)
   })
 
   it('passes slow_down through so the client can back off', async () => {
@@ -99,7 +121,8 @@ describe('github device flow — poll', () => {
     expect(await (await post('/auth/device/poll', pollBody)).json()).toEqual({ status: 'expired' })
   })
 
-  it('stores the token encrypted and records the granted scopes', async () => {
+  it('connects with the default client ID, stores the token encrypted, and records the granted scopes', async () => {
+    vi.stubEnv('GITHUB_CLIENT_ID', undefined)
     fetchMock
       .mockResolvedValueOnce(json({ access_token: 'gho_realtoken' })) // token exchange
       .mockResolvedValueOnce(json({ login: 'james', name: 'James', avatar_url: null }, { headers: { 'x-oauth-scopes': 'repo, read:org' } }))
