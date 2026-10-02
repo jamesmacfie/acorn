@@ -1,3 +1,5 @@
 export { panelMeasure } from '../measure.ts'
 export { projectDashboardPanel, suggestStateCategoryMapping } from '../typedProjection.ts'
 export type { DashboardQueryProjection } from '../typedProjection.ts'
+export { checkDashboardPanel, describeDashboardProblem } from '../publicationCheck.ts'
+export type { DashboardProblem, DescribedDashboardQuery } from '../publicationCheck.ts'

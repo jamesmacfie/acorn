@@ -43,6 +43,10 @@ export function personInitials(name: string): string {
   return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters[0]).toUpperCase()
 }
 
+/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision yet;
+ *  workstream 2's units decide their own. */
+const NUMBER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
+
 /** `%` reads wrong with a space and every other unit reads wrong without one. */
 const withUnit = (text: string, unit: string | undefined): string =>
   unit === undefined ? text : unit === '%' ? `${text}%` : `${text} ${unit}`
@@ -59,7 +63,7 @@ export function formatCell(
   switch (field.type) {
     case 'number': {
       const numeric = Number(value)
-      return Number.isFinite(numeric) ? { kind: 'number', text: withUnit(String(numeric), field.unit) } : EMPTY
+      return Number.isFinite(numeric) ? { kind: 'number', text: withUnit(NUMBER.format(numeric), field.unit) } : EMPTY
     }
     case 'boolean':
       return { kind: 'boolean', value: Boolean(value), text: value ? 'Yes' : 'No' }

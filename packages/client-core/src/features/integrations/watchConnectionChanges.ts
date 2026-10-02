@@ -14,6 +14,7 @@ import { clientFor } from '../../infra/node/fleet'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 import { wsOnConnectionChanged } from '../../infra/node/wsClient'
 import { invalidateDataSources } from '../dataSources/queries'
+import { invalidatePublishedPanels } from '../dashboards/dashboardClient'
 import { CONNECTION_ATTENTION_ID } from '../settings/connections/connectionAttention'
 
 /** Subscribe for the life of the shell. Returns the unsubscribe for symmetry with the other watchers;
@@ -27,6 +28,7 @@ export function watchConnectionChanges(): () => void {
     // an invalidation of its own key and nothing else (../../infra/node/fanout.ts).
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: ['attention', CONNECTION_ATTENTION_ID] })
     void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId(), { connectionId: event.integrationId })
+    void invalidatePublishedPanels(clientFor(activeCacheId()).client, activeCacheId(), { connectionId: event.integrationId })
     clientEvents.emit('connection:changed', event)
   })
 }

@@ -111,7 +111,9 @@ programme's final acceptance checks.
 
 Core tasks and managed agent sessions use this same Node-owned contract. A core task's
 `worktreeChanged` value is nullable and remains `null` until the Node has actually inspected that
-worktree. GitHub pull requests, Linear issues, and Rollbar error groups are provider-backed sources.
+worktree. The agent sessions source reads every unarchived session through the session
+store's cursor, up to the host's 5,000-record selection budget, and reports `incomplete` with
+`host-budget` when more remain. GitHub pull requests, Linear issues, and Rollbar error groups are provider-backed sources.
 No client registration or cold-cache schema discovery path exists: every consumer describes and
 queries through this runtime.
 

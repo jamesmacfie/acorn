@@ -31,14 +31,24 @@ export type MeasureSeries = DashboardHistoryResponse
  *  measure, and keeping both makes every read ambiguous. */
 export async function appendSample(
   db: AppDatabase,
-  input: { panelId: string; signature: string; bucket: number; value: number; recordedAt: number },
+  sample: {
+    panelId: string; signature: string; bucket: number; value: number; recordedAt: number
+    /** A series written under this older signature is relabelled rather than reset. */
+    adopt?: string
+  },
 ): Promise<{ reset: boolean }> {
+  const { adopt, ...input } = sample
   const existing = await db
     .select({ signature: schema.dashboardMeasureSamples.signature })
     .from(schema.dashboardMeasureSamples)
     .where(eq(schema.dashboardMeasureSamples.panelId, input.panelId))
     .limit(1)
-  const reset = existing.length > 0 && existing[0]!.signature !== input.signature
+  const previous = existing[0]?.signature
+  if (previous !== undefined && previous !== input.signature && previous === adopt) {
+    await db.update(schema.dashboardMeasureSamples).set({ signature: input.signature })
+      .where(eq(schema.dashboardMeasureSamples.panelId, input.panelId))
+  }
+  const reset = previous !== undefined && previous !== input.signature && previous !== adopt
   if (reset) await deleteSeries(db, [input.panelId])
   await db
     .insert(schema.dashboardMeasureSamples)

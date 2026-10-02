@@ -6,7 +6,8 @@ import { readSeries, type MeasureSeries } from '../dashboards/history'
 import { respondError } from '../respond'
 import { authorizeQueryScope } from '../queries/runtime'
 import { dashboardStore, DashboardLibraryError } from '../dashboards/store'
-import { deleteDashboard, publishDashboard, validateDashboardContent } from '../dashboards/publication'
+import { dashboardContentProblems, deleteDashboard, publishDashboard } from '../dashboards/publication'
+import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 
 // The measure-history read route (docs/dashboards.md § Trends).
 //
@@ -46,14 +47,14 @@ export const dashboards = new Hono<AppEnv>().get('/history', async (c) => {
       case 'get': return c.json(store.get(input.scope, input.id))
       case 'create': return c.json(store.create(input.scope, input.content))
       case 'save': return c.json(store.save(input.scope, input.id, input.expectedRevision, input.content))
-      case 'validate': await validateDashboardContent(c.env, input.scope, input.content, invocation); return c.json({ problems: [] })
+      case 'validate': return c.json({ problems: (await dashboardContentProblems(c.env, input.scope, input.content, invocation)).map(describeDashboardProblem) })
       case 'publish': return c.json(await publishDashboard(c.env, input.scope, input.id, input.expectedRevision, invocation))
       case 'published': return c.json(store.published(input.scope, input.id, input.revision))
       case 'delete': deleteDashboard(c.env, input.scope, input.id, input.expectedRevision); return c.json({ ok: true })
     }
   } catch (error) {
     if (error instanceof DashboardLibraryError) {
-      return respondError(c, error.code === 'not-found' ? 404 : error.code === 'invalid-dashboard' ? 400 : 409, error.code)
+      return respondError(c, error.code === 'not-found' ? 404 : error.code === 'invalid-dashboard' ? 400 : 409, error.code, error.problems.map(describeDashboardProblem))
     }
     return respondError(c, 400, 'invalid-dashboard')
   }

@@ -15,6 +15,7 @@ import { queryStore } from '../queries/store'
 import { publishQuery } from '../queries/runtime'
 import { dashboardStore } from './store'
 import { publishDashboard } from './publication'
+import { DashboardLibraryError } from './store'
 
 const cleanups: (() => void)[] = []
 afterEach(() => { clearRegistrations('dashboard-fixture'); for (const cleanup of cleanups.splice(0)) cleanup() })
@@ -73,5 +74,21 @@ describe('dashboard publication', () => {
     })
     await publishDashboard(env, scope, draft.id, detached.draftRevision, invocation())
     expect(queryStore(db).consumers(scope, query.id)).toEqual([])
+  })
+
+  it('refuses a panel with an unknown field and names its path', async () => {
+    const { db, env } = await world()
+    const draft = dashboardStore(db).create(scope, {
+      title: 'Items', queries: [{ id: 'first', label: 'Items', reference: { kind: 'inline', bindings: {}, content: queryContentSchema.parse({
+        name: 'Items', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+        query: { source: { pluginId: 'dashboard-fixture', sourceId: 'items' }, scope: { ...scope, parameters: {} }, sort: [] },
+      }) } }],
+      mapping: { columns: [], fields: {}, values: {}, unmapped: 'catch-all' },
+      display: { view: { kind: 'list' }, fields: ['/title', '/missing'] },
+    })
+    const refused = await publishDashboard(env, scope, draft.id, draft.draftRevision, invocation()).catch((error: unknown) => error)
+    expect(refused).toBeInstanceOf(DashboardLibraryError)
+    expect((refused as DashboardLibraryError).problems).toEqual([expect.objectContaining({ path: '/display/fields/1' })])
+    expect(dashboardStore(db).get(scope, draft.id).publishedRevision).toBeNull()
   })
 })

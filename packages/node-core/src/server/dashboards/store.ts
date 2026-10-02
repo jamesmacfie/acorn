@@ -2,17 +2,23 @@ import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, isNull, or } from 'drizzle-orm'
 import {
   dashboardPanelContentSchema,
+  storedDashboardPanelContentSchema,
   type DashboardDraft,
   type DashboardPanelContent,
   type DashboardRevision,
   type DashboardScope,
 } from '@acorn/protocol/dashboards.ts'
+import type { DashboardProblem } from '@acorn/dashboards-core/projection'
 import { canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import type { AppDatabase } from '../db'
 import { dashboardDrafts, dashboardRevisions } from './schema'
 
 export class DashboardLibraryError extends Error {
-  constructor(readonly code: 'not-found' | 'conflict' | 'unpublished' | 'invalid-dashboard') { super(code) }
+  constructor(
+    readonly code: 'not-found' | 'conflict' | 'unpublished' | 'invalid-dashboard',
+    /** What publication refused, for `invalid-dashboard`. */
+    readonly problems: readonly DashboardProblem[] = [],
+  ) { super(code) }
 }
 
 const scopeWhere = (scope: DashboardScope) => and(
@@ -22,12 +28,12 @@ const scopeWhere = (scope: DashboardScope) => and(
 const parseDraft = (row: typeof dashboardDrafts.$inferSelect): DashboardDraft => ({
   ...row,
   projectId: row.projectId ?? undefined,
-  content: dashboardPanelContentSchema.parse(JSON.parse(row.content)),
+  content: storedDashboardPanelContentSchema.parse(JSON.parse(row.content)),
 })
 const parseRevision = (row: typeof dashboardRevisions.$inferSelect): DashboardRevision => ({
   ...row,
   projectId: row.projectId ?? undefined,
-  content: dashboardPanelContentSchema.parse(JSON.parse(row.content)),
+  content: storedDashboardPanelContentSchema.parse(JSON.parse(row.content)),
 })
 
 export function dashboardStore(db: AppDatabase) {

@@ -15,4 +15,12 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(now - 3 * 24 * 60 * 60_000, now)).toBe('3d ago')
     expect(formatRelativeTime(now - 65 * 24 * 60 * 60_000, now)).toBe('2mo ago')
   })
+
+  it('formats future instants as a distance ahead', () => {
+    expect(formatRelativeTime(now + 30_000, now)).toBe('now')
+    expect(formatRelativeTime(now + 5 * 60_000, now)).toBe('in 5m')
+    expect(formatRelativeTime(now + 3 * 60 * 60_000, now)).toBe('in 3h')
+    expect(formatRelativeTime(now + 2 * 24 * 60 * 60_000, now)).toBe('in 2d')
+    expect(formatRelativeTime(now + 31 * 24 * 60 * 60_000, now)).toBe('in 1mo')
+  })
 })

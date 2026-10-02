@@ -21,17 +21,69 @@ export const dashboardMappingSchema = z.object({
   unmapped: z.enum(['catch-all', 'hidden']).default('catch-all'),
 }).strict()
 
-export const dashboardPanelContentSchema = z.object({
+/** The panel field ids `dashboards-core/mapping.ts` projects a mapped panel onto. */
+export const dashboardPanelFieldIds = ['title', 'status', 'assignee', 'updated', 'url', 'source'] as const
+
+const dashboardPanelContentObject = z.object({
   title: label,
   queries: z.array(z.object({ id, label, reference: queryReferenceSchema }).strict()).min(1).max(8),
   mapping: dashboardMappingSchema.default({ columns: [], fields: {}, values: {}, unmapped: 'catch-all' }),
   display: z.object({
     view: dashboardViewSchema,
-    fields: z.array(pointer).max(100).default([]),
-    groupBy: pointer.optional(),
+    /** Panel field ids on a mapped panel, source pointers otherwise. See `dashboardDisplayRefFits`. */
+    fields: z.array(z.string()).max(100).default([]),
+    groupBy: z.string().optional(),
     limit: z.number().int().min(1).max(5000).optional(),
   }).strict(),
-}).strict().refine(content => new Set(content.queries.map(query => query.id)).size === content.queries.length, 'Duplicate dashboard query instance')
+}).strict()
+
+type DashboardContentShape = z.infer<typeof dashboardPanelContentObject>
+
+/** The same test `isMapped` in dashboards-core applies to the projected sources: a mapped panel's
+ * schema is the panel field vocabulary, an unmapped one passes its source's fields through. */
+export const isMappedDashboard = (content: Pick<DashboardContentShape, 'queries' | 'mapping'>): boolean =>
+  content.queries.length > 1 || content.mapping.columns.length > 0
+  || content.queries.some(query => !!content.mapping.fields[query.id] || !!content.mapping.values[query.id])
+
+/** Until workstream 2 replaces both with column ids, `display.fields` and `display.groupBy` name a
+ * panel field on a mapped panel and a source pointer otherwise, because those are the ids each
+ * projected schema carries. */
+export const dashboardDisplayRefFits = (mapped: boolean, ref: string): boolean => mapped
+  ? (dashboardPanelFieldIds as readonly string[]).includes(ref)
+  : ref === '' || ref.startsWith('/')
+
+/** Drops display references that the panel's mapping state can't resolve. A reference that no longer
+ * fits shows nothing, so dropping it keeps the draft saveable without changing what it draws. */
+export function fitDashboardDisplay<T extends DashboardContentShape>(content: T): T {
+  const mapped = isMappedDashboard(content)
+  const fields = content.display.fields.filter(ref => dashboardDisplayRefFits(mapped, ref))
+  const { groupBy, ...display } = content.display
+  const keepGroup = groupBy !== undefined && dashboardDisplayRefFits(mapped, groupBy)
+  if (fields.length === content.display.fields.length && keepGroup === (groupBy !== undefined)) return content
+  return { ...content, display: { ...display, fields, ...(keepGroup ? { groupBy } : {}) } }
+}
+
+function checkDashboardContent(content: DashboardContentShape, ctx: z.RefinementCtx): void {
+  if (new Set(content.queries.map(query => query.id)).size !== content.queries.length) {
+    ctx.addIssue({ code: 'custom', path: ['queries'], message: 'Duplicate dashboard query instance' })
+  }
+  const mapped = isMappedDashboard(content)
+  const expected = mapped ? `one of ${dashboardPanelFieldIds.join(', ')}` : 'a JSON Pointer'
+  content.display.fields.forEach((ref, index) => {
+    if (!dashboardDisplayRefFits(mapped, ref)) ctx.addIssue({ code: 'custom', path: ['display', 'fields', index], message: `Expected ${expected}` })
+  })
+  if (content.display.groupBy !== undefined && !dashboardDisplayRefFits(mapped, content.display.groupBy)) {
+    ctx.addIssue({ code: 'custom', path: ['display', 'groupBy'], message: `Expected ${expected}` })
+  }
+}
+
+export const dashboardPanelContentSchema = dashboardPanelContentObject.superRefine(checkDashboardContent)
+
+/** Rows written before the display rule existed may name a source pointer on a mapped panel. Reading
+ * them drops what can't resolve, rather than failing the whole library list. */
+export const storedDashboardPanelContentSchema = dashboardPanelContentObject
+  .transform(content => fitDashboardDisplay(content))
+  .superRefine(checkDashboardContent)
 
 export type DashboardMapping = z.infer<typeof dashboardMappingSchema>
 export type DashboardPanelContent = z.infer<typeof dashboardPanelContentSchema>

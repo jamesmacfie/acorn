@@ -9,7 +9,8 @@ import { dashboardPanelContentSchema } from '@acorn/protocol/dashboards.ts'
 import { queryContentSchema } from '@acorn/protocol/dataQueries.ts'
 import { createModelService } from '../core/models'
 import { authoringMetadata } from '../authoring/metadata'
-import { validateDashboardContent } from '../dashboards/publication'
+import { dashboardContentProblems } from '../dashboards/publication'
+import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 import { getDb } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
@@ -44,8 +45,9 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
         return { candidate: content, problems: [] }
       }
       const content = dashboardPanelContentSchema.parse(candidate)
-      await validateDashboardContent(c.env, request.scope, content, invocation)
-      return { candidate: content, problems: [] }
+      // The same check publication runs, so the AI can't propose a panel that publish would refuse.
+      const problems = (await dashboardContentProblems(c.env, request.scope, content, invocation)).map(describeDashboardProblem)
+      return problems.length ? { problems } : { candidate: content, problems }
     } catch (error) {
       return { problems: [message(error)] }
     }

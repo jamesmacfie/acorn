@@ -34,6 +34,14 @@ describe('appending', () => {
     expect(await readSeries(test.db, 'never-sampled')).toEqual({ signature: '', samples: [] })
   })
 
+  it('relabels a series written under the signature it adopts instead of resetting it', async () => {
+    const bucket = hourBucket(NOW)
+    await write('p1', bucket, 6, 'before-query-identity')
+    const result = await appendSample(test.db, { panelId: 'p1', signature: 'with-query-identity', adopt: 'before-query-identity', bucket: bucket + HOUR_MS, value: 7, recordedAt: bucket })
+    expect(result.reset).toBe(false)
+    expect(await readSeries(test.db, 'p1')).toEqual({ signature: 'with-query-identity', samples: [{ bucket, value: 6 }, { bucket: bucket + HOUR_MS, value: 7 }] })
+  })
+
   it('keeps one sample per bucket, and a later look wins', async () => {
     const bucket = hourBucket(NOW)
     await write('p1', bucket, 6)

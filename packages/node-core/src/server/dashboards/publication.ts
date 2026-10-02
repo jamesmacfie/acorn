@@ -1,10 +1,38 @@
 import type { DashboardPanelContent, DashboardRevision, DashboardScope } from '@acorn/protocol/dashboards.ts'
+import { checkDashboardPanel, type DashboardProblem, type DescribedDashboardQuery } from '@acorn/dashboards-core/projection'
 import type { Env } from '../bindings'
 import { getDb } from '../db'
 import type { DataSourceInvocation } from '../dataSources/authority'
+import { invokeDataSource } from '../dataSources/runtime'
+import { describeError } from '../telemetry/logger'
 import { queryStore } from '../queries/store'
 import { authorizeQueryScope, resolveQuery } from '../queries/runtime'
 import { dashboardStore, DashboardLibraryError } from './store'
+
+/** Every reason publication would refuse this content, each naming its path. Empty means it fits. */
+export async function dashboardContentProblems(
+  env: Env,
+  scope: DashboardScope,
+  content: DashboardPanelContent,
+  invocation: DataSourceInvocation,
+): Promise<DashboardProblem[]> {
+  const problems: DashboardProblem[] = []
+  const described: DescribedDashboardQuery[] = []
+  for (const [index, entry] of content.queries.entries()) {
+    try {
+      const resolved = await resolveQuery(env, scope, entry.reference, {}, invocation)
+      const description = await invokeDataSource(env, { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, invocation)
+      described.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description })
+    } catch (error) {
+      problems.push({
+        path: `/queries/${index}/reference`,
+        message: `${entry.label} can't be read (${describeError(error).message}). Check that its account is connected and its saved query still exists.`,
+      })
+    }
+  }
+  // The rest needs every source's description, so an unreadable query is the only answer for now.
+  return problems.length ? problems : checkDashboardPanel(content, described)
+}
 
 export async function validateDashboardContent(
   env: Env,
@@ -12,12 +40,8 @@ export async function validateDashboardContent(
   content: DashboardPanelContent,
   invocation: DataSourceInvocation,
 ): Promise<void> {
-  const ids = new Set<string>()
-  for (const entry of content.queries) {
-    if (ids.has(entry.id)) throw new DashboardLibraryError('invalid-dashboard')
-    ids.add(entry.id)
-    await resolveQuery(env, scope, entry.reference, {}, invocation)
-  }
+  const problems = await dashboardContentProblems(env, scope, content, invocation)
+  if (problems.length) throw new DashboardLibraryError('invalid-dashboard', problems)
 }
 
 export async function publishDashboard(

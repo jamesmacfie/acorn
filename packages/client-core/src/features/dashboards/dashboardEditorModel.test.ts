@@ -1,7 +1,10 @@
 import { describe, expect, it } from 'vitest'
-import type { DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
+import { dashboardPanelContentSchema, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
-import { availableDashboardViews, displaySchema, exactStatusOptions, latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, suggestRoleFields, unavailableViewReason } from './dashboardEditorModel'
+import {
+  addStatusColumns, applyCategoryColumns, availableDashboardViews, displaySchema, emptyDashboardContent, exactStatusOptions,
+  latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason,
+} from './dashboardEditorModel'
 
 const query = { kind: 'inline' as const, bindings: {}, content: {
   name: 'Issues', parameters: { type: 'object' as const, properties: {}, additionalProperties: false,
@@ -105,5 +108,49 @@ describe('dashboard editor model', () => {
       },
     }, '/state/id')
     expect(options).toEqual([{ id: 'state-uuid', label: 'In review' }])
+  })
+
+  describe('drafts built through the model parse with the panel schema', () => {
+    const issueState = (instanceId: string): SourceQueryEditorState => ({
+      stale: false,
+      query: query.content.query,
+      description: {
+        schema: { type: 'object', properties: { title: { type: 'string' }, state: { type: 'string' }, category: { type: 'string' } } },
+        fields: [
+          { pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' } },
+          { pointer: '/state', label: 'State', origin: 'declared', display: { kind: 'status', role: 'status' },
+            choices: { kind: 'static', values: [{ id: 'todo', label: 'Todo' }, { id: 'done', label: 'Done' }] } },
+          { pointer: '/category', label: 'Category', origin: 'declared' },
+        ],
+        parameters: { type: 'object', properties: {}, additionalProperties: false }, parameterFields: [],
+        operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] }, revision: instanceId, consistency: 'test',
+      },
+    })
+    const withQuery = (current: DashboardPanelContent, id: string, states: Record<string, SourceQueryEditorState>) => {
+      const next = setDashboardQuery(current, id, query)
+      return { ...next, mapping: suggestRoleFields(next.mapping, id, states[id]!.description!.fields) }
+    }
+
+    it('builds a board', () => {
+      const states = { mine: issueState('mine') }
+      let board = withQuery(emptyDashboardContent(), 'mine', states)
+      board = { ...board, display: { ...board.display, view: { kind: 'board' } } }
+      board = addStatusColumns(board, states)
+      board = applyCategoryColumns(board, 'mine', { columns: [{ id: 'open', label: 'Open' }], values: { open: ['todo'] } })
+      board = setFieldVisible(board, states, 'assignee', false)
+      expect(board.display.groupBy).toBe('status')
+      expect(board.display.fields).toEqual(['title', 'status'])
+      expect(dashboardPanelContentSchema.safeParse(board).success).toBe(true)
+    })
+
+    it('builds a combined panel', () => {
+      const states = { mine: issueState('mine'), team: issueState('team') }
+      let combined = withQuery(withQuery(emptyDashboardContent(), 'mine', states), 'team', states)
+      combined = setFieldVisible(combined, states, 'source', false)
+      expect(combined.display.fields).toEqual(['title', 'status'])
+      expect(dashboardPanelContentSchema.safeParse(combined).success).toBe(true)
+      // A source pointer on a mapped panel names nothing in its projected schema.
+      expect(dashboardPanelContentSchema.safeParse({ ...combined, display: { ...combined.display, groupBy: '/state' } }).success).toBe(false)
+    })
   })
 })

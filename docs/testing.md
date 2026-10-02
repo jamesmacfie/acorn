@@ -1354,6 +1354,34 @@ The dashboards programme keeps its own once-only check of the surfaces that ship
 v2 in [workstream 1](./future/dashboards/01-trustworthy-results.md#verify-what-shipped), because its items
 gate that programme's work rather than a release.
 
+Result, 2026-10-03, in `pnpm dev:agent` on macOS with 18 seeded tasks (six each active, archived, and
+cancelled). The session window runs hidden until brought to the front. While hidden, WebKit runs no
+animation frames and screenshots show stale frames, so every result below was taken with the window
+in front. WebDriver pointer actions arrive only as an untrusted `mousedown`, so the drag was driven
+with synthetic pointer events dispatched in the page.
+
+- Editor: unticking a visible field and adding one column per state both autosaved, and the board
+  published with `groupBy: "status"`. Before workstream 1 both drafts failed the schema and stopped
+  saving. The validate route named `/display/groupBy` and `/display/view/series` for bad references.
+- Grid drag: passes. The dot lattice shows, the soft slot marks the landing cells, the dragged panel
+  lifts with a shadow, a neighbour moves out of the way, and the release commits the new layout.
+  Keyboard **Move or resize** shrinks a chart to its 4 by 3 minimum.
+- Tab bar: passes once a second tab exists. **+** creates a tab and opens its rename field, Enter
+  commits the name, arrow keys wrap, Home and End jump, the first **Delete dashboard** press arms and
+  the second deletes, and the active tab survives a reload after its debounced write. **Broken:** with
+  only the default tab, Home draws no tab bar and no **+**, so a person can't create a second
+  dashboard. Filed against workstream 1.
+- Chart legend and series colours: passes. A line chart split by status draws three series, each in
+  its own colour, with its legend. The legend stays on one line without overflow down to a 266-pixel
+  panel, so wrapping was never exercised by three short labels. The three series colours are the same
+  in every style pack (terminal, cozy, cute, modern) in light and dark, by design
+  (`tokens-theme.css` § Series identity), and read clearly on both grounds.
+- Stat sparkline: the history stat shows "Recording once an hour from today" before its first
+  sample. `trend` was set through the draft API, since the editor has no view controls yet.
+- Rail-source side panel and `pane.aside`: not checked. No plugin in this build reserves either
+  region, so neither can be placed without a fixture plugin. With the window at 560 and 330 pixels,
+  Home's grid collapses to one column and every panel stays readable.
+
 Workflow-v2 dashboard checks are split by owner:
 `packages/dashboards-core/src/typedProjection.test.ts` covers nested projection and independent exact-status mappings;
 `packages/node-core/src/server/dashboards/*.test.ts`

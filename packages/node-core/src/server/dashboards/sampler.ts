@@ -1,10 +1,11 @@
+import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { parsePanels } from '@acorn/dashboards-core/contract'
 import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
 import { panelMeasure } from '@acorn/dashboards-core/projection'
-import { measureSignature } from '@acorn/dashboards-core/contract'
+import { measureSignature, type MeasureQueryIdentity } from '@acorn/dashboards-core/contract'
 import { projectDashboardPanel, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
-import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
+import { canonicalDataEncoding, DATA_LIMITS, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import { type AppDatabase, schema } from '../db'
 import { invokeDataSource } from '../dataSources/runtime'
@@ -14,6 +15,10 @@ import { dashboardStore } from './store'
 import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('dashboards')
+
+/** The digest the query library gives a published revision, applied to inline content. */
+const contentDigest = (content: unknown): string =>
+  createHash('sha256').update(canonicalDataEncoding(parseDataValue(content))).digest('hex')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards.md § Sampling and retention for what a pass does.
@@ -88,6 +93,7 @@ export async function runSamplePass(
     if (signal.aborted) break
     if (!panel.publication) continue
     const projections: DashboardQueryProjection[] = []
+    const identities: MeasureQueryIdentity[] = []
     let unavailable: string | null = null
     let published
     try { published = dashboardStore(db).publishedById(panel.publication.dashboardId) }
@@ -110,7 +116,19 @@ export async function runSamplePass(
           operation: 'query', query: resolved.query, mode: 'execution', evaluationTime: now,
           pageSize: DATA_LIMITS.options,
         }, invocation)
+        // A number over part of the data is a number that never happened. `more` can't reach here,
+        // because execution reads follow every cursor, so anything else is a cut-short read.
+        if (page.completeness.kind !== 'complete' && page.completeness.kind !== 'bounded') {
+          unavailable = `${entry.label} returned partial data`
+          break
+        }
         projections.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description, result: page })
+        identities.push({
+          id: entry.id,
+          digest: resolved.published?.digest ?? contentDigest(entry.reference.kind === 'inline' ? entry.reference.content : null),
+          parameters: resolved.parameters,
+          account: resolved.query.scope.connectionId ?? null,
+        })
       } catch (error) {
         unavailable = `${entry.label} unavailable`
         // One line for the author. The run row gets the short form, because it is a settings list,
@@ -135,7 +153,9 @@ export async function runSamplePass(
 
     const { reset } = await appendSample(db, {
       panelId: panel.id,
-      signature: measureSignature(projection.definition),
+      signature: measureSignature(projection.definition, identities),
+      // Drop `adopt` once every series has been sampled under query identity.
+      adopt: measureSignature(projection.definition),
       bucket,
       value,
       recordedAt: now,

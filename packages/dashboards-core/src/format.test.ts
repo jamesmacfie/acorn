@@ -21,6 +21,14 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'number' }), 'not a number')).toEqual({ kind: 'empty' })
   })
 
+  it('groups digits and keeps at most two decimals in the device locale', () => {
+    const locale = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, useGrouping: true })
+    expect(formatCell(field({ type: 'number' }), 10 / 3)).toEqual({ kind: 'number', text: locale.format(3.33) })
+    expect((formatCell(field({ type: 'number' }), 10 / 3) as { text: string }).text).toMatch(/^3\D33$/)
+    expect(formatCell(field({ type: 'number' }), 1234567.891)).toEqual({ kind: 'number', text: locale.format(1234567.89) })
+    expect(formatCell(field({ type: 'number', unit: '%' }), 12.5)).toEqual({ kind: 'number', text: `${locale.format(12.5)}%` })
+  })
+
   it('gives a datetime both an age and an absolute time', () => {
     const cell = formatCell(field({ type: 'datetime' }), NOW - 2 * 60 * 60 * 1000, NOW)
     expect(cell).toMatchObject({ kind: 'datetime', relative: '2h ago' })

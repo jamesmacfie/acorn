@@ -45,6 +45,16 @@ describe('what resets a series and what does not', () => {
     expect(measureSignature(panel({ view: { kind: 'stat', aggregate: 'sum', field: 'additions' } }))).not.toBe(base)
   })
 
+  it("resets when a query's content, parameters, or account changes", () => {
+    const query = { id: 'q', digest: 'a', parameters: { repo: 'acorn' }, account: 'work' }
+    const base = measureSignature(panel(), [query])
+    expect(measureSignature(panel(), [{ ...query }])).toBe(base)
+    expect(measureSignature(panel(), [{ ...query, digest: 'b' }])).not.toBe(base)
+    expect(measureSignature(panel(), [{ ...query, parameters: { repo: 'other' } }])).not.toBe(base)
+    expect(measureSignature(panel(), [{ ...query, account: 'personal' }])).not.toBe(base)
+    expect(measureSignature(panel())).not.toBe(base)
+  })
+
   it('gives two panels with the same meaning the same signature', () => {
     // The series is keyed by panel id, so this is not a correctness requirement. It is the property
     // that says the hash is over meaning and carries nothing incidental.

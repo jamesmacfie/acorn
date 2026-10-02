@@ -24,6 +24,11 @@ Missing plugins, connections, publications, or fields are unavailable states. Th
 silently replaced with an empty result or a guessed schema. Source identity is
 `(pluginId, sourceId)`; record identity and provenance remain the source contract's responsibility.
 
+A placed panel refetches when the Node announces a change to an account one of its queries read, or
+any plugin change on that Node, because the plugin frame names only the Node. A panel that has no
+data yet refetches on either change. It also refetches when the window regains focus, once its last
+read is older than 30 seconds.
+
 Pressing a row in a placed panel runs the record's declared action through `runChromeAction`, the
 same dispatcher a rail row uses. An action whose `risk` is `write` or `execute` asks first, in a strip
 above the rows. Rows in the editor's preview are not pressable.
@@ -36,6 +41,27 @@ is the boundary between mutable authoring state and a panel that can be placed o
 **Edit** on a placed panel runs **Refresh preview** once on open. A preview reads the source and
 writes nothing to the draft.
 
+Until workstream 2 replaces both with column IDs, `display.fields` and `display.groupBy` name the
+panel's own fields (`title`, `status`, `assignee`, `updated`, `url`, and `source`) when the panel has
+a mapping, and source JSON Pointers when it doesn't. A panel has a mapping when it has more than one
+query, board columns, or a field or value mapping for any query. The schema enforces the rule, and the
+editor drops references that stop fitting when a query is removed. Rows stored before the rule was
+enforced are read the same way, so they never fail the library list.
+
+**Validate** and **Publish** describe each query's source, project the panel over no records, and
+refuse it when:
+
+- A display field or the grouping isn't a field of the projected schema.
+- The view kind isn't one `viewsForSchema` allows for that schema.
+- A view option names a missing field or one of the wrong type: `field` needs a number, `x` needs an
+  enum for a bar or a date for a line, and `series` needs an enum. A sum, average, minimum, or maximum
+  without a `field` is refused too.
+- A mapped role points at a pointer the source doesn't describe.
+
+Each problem names its JSON Pointer path, such as `/display/groupBy`, and what to change. A query
+that can't be resolved or described is reported at `/queries/<index>/reference`. The authoring route
+runs the same check on every AI candidate.
+
 The old flat panel form and client collection registry do not exist. Old definitions are rejected by
 the versioned persistence parser and are recoverable only from the workflow-v2 transition export.
 
@@ -46,7 +72,7 @@ the verified `acorn-1` data root:
 
 ```json
 {
-  "version": 2,
+  "version": 1,
   "panels": {
     "panel-id": {
       "id": "panel-id",
@@ -88,11 +114,17 @@ cannot prove compatibility.
 The core `core:sample-measures` schedule runs in the Node with no client attached. For each placed
 history-stat panel it resolves the immutable dashboard publication, resolves every query, invokes the
 same Node data-source runtime, projects the panel, and appends the numeric measure. If any source is
-unavailable or the projection has no finite measure, that panel is skipped with a reason; no zero is
-invented.
+unavailable, any read is neither `complete` nor `bounded`, or the projection has no finite measure,
+that panel is skipped with a reason, such as "Issues returned partial data". No zero is invented and
+no number is taken from partial data.
 
-Samples are keyed by panel ID and a signature of the published measure definition. A signature
-change resets that panel's series. The sampler is bounded per pass, and compaction removes series for
+Samples are keyed by panel ID and a signature of the published measure definition: the projected
+sources, the mapping, panel filters, the aggregate and its field, and for each query the published
+revision digest of a saved query or the digest of inline content, its resolved parameters, and its
+account. Republishing a saved query with a different filter therefore changes the signature. A
+signature change resets that panel's series, and the pass counts the reset in its run result. Series
+recorded before query identity joined the signature are relabelled on their next sample instead of
+reset. The sampler is bounded per pass, and compaction removes series for
 definitions that no longer exist.
 
 ## Ownership

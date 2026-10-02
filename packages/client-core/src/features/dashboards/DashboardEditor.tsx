@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import {
   dashboardPanelContentSchema,
   dashboardViewKinds,
+  fitDashboardDisplay,
   type DashboardDraft,
   type DashboardPanelContent,
   type DashboardView,
@@ -14,6 +15,7 @@ import { mergeAuthoringCandidate } from '../dataSources/authoringMerge'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { projectDashboardPanel, suggestStateCategoryMapping, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
 import { activeCacheId } from '../../infra/node/activeNode'
+import { ApiError } from '../../infra/node/apiClient'
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Select } from '../../kit/components/primitives'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
@@ -26,6 +28,8 @@ import PanelBody from './views/PanelBody'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import {
+  addStatusColumns,
+  applyCategoryColumns,
   availableDashboardViews,
   displaySchema,
   emptyDashboardContent,
@@ -34,6 +38,7 @@ import {
   mapExactStatus,
   removeDashboardQuery,
   setDashboardQuery,
+  setFieldVisible,
   setRoleField,
   suggestRoleFields,
   unavailableViewReason,
@@ -122,7 +127,8 @@ export default function DashboardEditor(props: {
 
   const change = (update: (current: DashboardPanelContent) => DashboardPanelContent): void => {
     setContent(current => {
-      const next = update(current)
+      // A query removed or remapped can turn panel field ids into stale references.
+      const next = fitDashboardDisplay(update(current))
       persist(next)
       return next
     })
@@ -177,18 +183,7 @@ export default function DashboardEditor(props: {
     ? homeTabScope(placement(), props.scope.workspaceId)
     : props.scope
 
-  const addColumnsFromStates = (): void => change(current => {
-    const existing = new Map(current.mapping.columns.map(column => [column.id, column]))
-    const values = structuredClone(current.mapping.values)
-    for (const entry of current.queries) {
-      for (const choice of exactStatusOptions(states()[entry.id], current.mapping.fields[entry.id]?.status)) {
-        existing.set(choice.id, existing.get(choice.id) ?? { id: choice.id, label: choice.label })
-        values[entry.id] ??= {}
-        values[entry.id]![choice.id] = [...new Set([...(values[entry.id]![choice.id] ?? []), choice.id])]
-      }
-    }
-    return { ...current, mapping: { ...current.mapping, columns: [...existing.values()], values }, display: { ...current.display, groupBy: 'status' } }
-  })
+  const addColumnsFromStates = (): void => change(current => addStatusColumns(current, states()))
 
   const suggestCategories = (entryId: string): void => {
     const state = states()[entryId]
@@ -197,15 +192,7 @@ export default function DashboardEditor(props: {
     const category = state?.description?.fields.find(field => /category/i.test(field.label) || /category/i.test(field.pointer))
     if (!preview || !status || !category) return
     const suggestion = suggestStateCategoryMapping(preview, status, category.pointer)
-    change(current => ({
-      ...current,
-      mapping: {
-        ...current.mapping,
-        columns: [...new Map([...current.mapping.columns, ...suggestion.columns].map(column => [column.id, column])).values()],
-        values: { ...current.mapping.values, [entryId]: suggestion.values },
-      },
-      display: { ...current.display, groupBy: 'status' },
-    }))
+    change(current => applyCategoryColumns(current, entryId, suggestion))
   }
 
   const applyAiProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
@@ -214,7 +201,7 @@ export default function DashboardEditor(props: {
     if (merged.conflicts.length) return 'This panel changed since you opened it.'
     const parsed = dashboardPanelContentSchema.safeParse(merged.value)
     if (!parsed.success) return AI_MISFIT
-    try { await client.validate(parsed.data) }
+    try { if ((await client.validate(parsed.data)).problems.length) return AI_MISFIT }
     catch { return AI_MISFIT }
     setAiUndo(structuredClone(current))
     change(() => parsed.data)
@@ -229,7 +216,14 @@ export default function DashboardEditor(props: {
     }
     try {
       const saved = await flush()
-      await client.publish(saved.id, saved.draftRevision)
+      try { await client.publish(saved.id, saved.draftRevision) }
+      catch (error) {
+        // Publication names each part that doesn't fit, one per line.
+        setProblem(error instanceof ApiError && error.code === 'invalid-dashboard' && error.message !== error.code
+          ? `This panel can't be published yet:\n${error.message}`
+          : "Couldn't publish. The node didn't answer, or the panel changed somewhere else.")
+        throw error
+      }
       void queryClient.invalidateQueries({ queryKey: publishedDashboardPanelKey(nodeId, scope, saved.id) }).catch(() => {})
       recovery.discard(nodeId, saved.id)
       const sourceMetadata = Object.values(states()).flatMap(state => state?.query && state.description
@@ -261,7 +255,7 @@ export default function DashboardEditor(props: {
           <Inline gap="inline" wrap>
             <Badge tone={saveState() === 'conflict' ? 'warn' : undefined}>{SAVE_WORDS[saveState()]}</Badge>
           </Inline>
-          <Show when={problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
+          <Show when={problem()}>{message => <Alert tone="warn"><Stack gap="row"><For each={message().split('\n')}>{line => <Text wrap>{line}</Text>}</For></Stack></Alert>}</Show>
           <AuthoringConversation
             endpoint="/v1/core/authoring/turn"
             target="dashboard"
@@ -350,12 +344,7 @@ export default function DashboardEditor(props: {
                 <Field label="Visible fields">
                   <Inline gap="inline" wrap>
                     <For each={displaySchema(states(), content().mapping).fields}>{field => <Checkbox label={field.name} checked={!content().display.fields.length || content().display.fields.includes(field.id)}
-                      onChange={checked => change(current => {
-                        const all = displaySchema(states(), current.mapping).fields.map(candidate => candidate.id)
-                        const selected = current.display.fields.length ? current.display.fields : all
-                        const fields = checked ? [...new Set([...selected, field.id])] : selected.filter(id => id !== field.id)
-                        return { ...current, display: { ...current.display, fields } }
-                      })} />}</For>
+                      onChange={checked => change(current => setFieldVisible(current, states(), field.id, checked))} />}</For>
                   </Inline>
                 </Field>
               </Show>
