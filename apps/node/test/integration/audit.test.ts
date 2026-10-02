@@ -56,7 +56,6 @@ beforeEach(async () => {
     NODE_FINGERPRINT: 'ff'.repeat(32),
     ...testSecretEnv(ENC_KEY),
     GITHUB_CLIENT_ID: 'client-id',
-    GITHUB_CLIENT_SECRET: '',
     INTERNAL_TOKEN: 'internal-secret',
     ACTIVE_IDENTITY: { get: () => 'james', set: () => {}, clear: () => {} },
     DEVICES: devices,

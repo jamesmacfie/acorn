@@ -143,8 +143,10 @@ stored as an encrypted `integrations` row.
 | `POST /v1/p/github/auth/device/start` | Request a GitHub device code |
 | `POST /v1/p/github/auth/device/poll` | Poll once and connect on success |
 
-The flow needs `GITHUB_CLIENT_ID`, does not use a client secret, and has no callback URL. The token
-never appears in a response or renderer state.
+The flow uses acorn's public client ID by default, with an optional `GITHUB_CLIENT_ID` override.
+It uses no client secret or callback URL. For configuration, see
+[GitHub integration](./github-integration.md#connecting). The token never appears in a response or
+renderer state.
 
 ## WebSocket authentication
 

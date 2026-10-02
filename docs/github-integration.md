@@ -51,10 +51,12 @@ polling cadence (the advertised interval, `slow_down`, `expires_in`) is stated o
    GitHub account is provider metadata; it does not bind the node-owner identity, which core mints at
    boot.
 
-The optional GitHub plugin reads `GITHUB_CLIENT_ID`, uses no client secret, and needs no callback URL.
-Without a client id the provider reports `connectable: false`, so Add connection and first-run setup
-leave GitHub out instead of offering a sign-in that cannot start. A connection stored earlier keeps
-working.
+The optional GitHub plugin defaults to acorn's public client ID, `Ov23liRC5Y5yDF7BTSeg`, so
+**Connect GitHub** appears in Add connection and first-run setup without environment configuration.
+Set `GITHUB_CLIENT_ID` to use your own GitHub app, and enable **Device Flow** in that app's settings.
+The plugin trims the override. An empty or whitespace-only override reports `connectable: false`
+and hides GitHub from those connection surfaces. A connection stored earlier keeps working.
+The device grant uses no client secret or callback URL.
 `githubToken(c)` is the single credential read site for GitHub routes.
 
 Device flow wins over the redirect web flow for three reasons. The web flow needs a client secret to

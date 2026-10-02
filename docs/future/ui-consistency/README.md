@@ -391,9 +391,9 @@ closed port gives the network error. Delete any saved query, request, or variabl
   start.
 - **Another worktree may run its own acorn window.** Never stop, signal, or reuse a process that is not
   your session.
-- **The dev session has no `GITHUB_CLIENT_ID`,** so GitHub is missing from Add connection after a
-  restart. A stored connection keeps working. Set the variable before starting the session to see the
-  connect flow.
+- **GitHub connects without `GITHUB_CLIENT_ID`.** The plugin ships acorn's public client ID, so
+  fresh dev sessions show **Connect GitHub** in Add connection. Set the variable only to use your
+  own app. An empty override hides the connect flow.
 - **State the review left in the fixture:** the published workflow **Release check**, with a failed and a
   cancelled run on **Plan follow-up work**; a task note "Review checklist"; and a terminal session in
   **Review changed files**. Leave them, or restore them if you change them.

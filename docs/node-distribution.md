@@ -191,8 +191,9 @@ into `session.key` in the data root at mode 0600, beside the TLS private key tha
 radius. It is never re-minted. A damaged key file is an error, because silently generating a
 replacement would turn "this file is wrong" into "every stored credential is gone".
 
-If GitHub is enabled, its plugin reads the optional `GITHUB_CLIENT_ID`; connection uses device flow
-and does not need a client secret or callback URL.
+If GitHub is enabled, its plugin uses acorn's public client ID by default. `GITHUB_CLIENT_ID` is an
+optional override. Connection uses device flow without a client secret or callback URL. For app
+setup, see [GitHub integration](./github-integration.md#connecting).
 
 ## Operations
 
