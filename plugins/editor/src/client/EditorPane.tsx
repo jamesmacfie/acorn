@@ -16,6 +16,7 @@ import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeRevea
 import { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
 import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
+import { markerRevision } from './markerRevision'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -206,12 +207,11 @@ export default function EditorPane(props: { task: Task }) {
       const dirty = isDirty(path)
       editorSetDirty(taskId, path, dirty)
       if (dirty || entry.custody.writing) {
-        const document = update.state.doc
-        queueMicrotask(() => {
-          if (live() && view && currentPath === path && view.state.doc === document) view.dispatch({ effects: lineMarkerEffect([]) })
-        })
         scheduleSave(path)
-      } else scheduleSave.cancel()
+      } else {
+        scheduleSave.cancel()
+        void refreshLineMarkers(path)
+      }
     }),
     EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
     // Highest precedence so the explicit flush wins over anything the library binds to the chord;
@@ -416,14 +416,17 @@ export default function EditorPane(props: { task: Task }) {
 
   async function refreshLineMarkers(relPath: string): Promise<void> {
     const entry = pool.files.get(relPath)
-    if (!api || !entry || entry.custody.dirty) return
+    if (!api || !entry || entry.custody.dirty || entry.custody.writing) return
     entry.markersReadAt = Date.now()
     const generation = ++entry.markersGeneration
     const doc = entry.custody.current
     const revision = entry.custody.revision
-    const markers = await api.lineMarkers(taskId, relPath).catch(() => null)
-    if (!markers || !live() || pool.files.get(relPath) !== entry || entry.custody.dirty
+    const bodyRevision = await markerRevision(doc.toString()).catch(() => null)
+    if (!bodyRevision || !live() || generation !== entry.markersGeneration || entry.custody.revision !== revision) return
+    const response = await api.lineMarkers(taskId, relPath, bodyRevision).catch(() => null)
+    if (!response || response.revision !== bodyRevision || !live() || pool.files.get(relPath) !== entry || entry.custody.dirty || entry.custody.writing
       || generation !== entry.markersGeneration || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
+    const markers = response.markers
     if (view && currentPath === relPath) {
       view.dispatch({ effects: lineMarkerEffect(markers) })
       remember(relPath, view.state)
@@ -511,6 +514,7 @@ export default function EditorPane(props: { task: Task }) {
     const entry = p ? pool.files.get(p) : undefined
     if (!api || !p || !entry) return false
     const custody = entry.custody
+    const needsMarkers = custody.dirty || custody.writing
     try {
       await flushEditorDocument(custody, api, taskId, p)
       if (!pool.retired && pool.files.get(p) === entry) {
@@ -518,6 +522,7 @@ export default function EditorPane(props: { task: Task }) {
         if (activeNodeId() === nodeId) editorSetDirty(taskId, p, custody.dirty)
       }
       if (live()) setSaveErr('')
+      if (needsMarkers && live() && !custody.dirty) void refreshLineMarkers(p)
       return !custody.dirty
     } catch (cause) {
       if (live()) setSaveErr(cause instanceof Error ? cause.message : 'Save failed')

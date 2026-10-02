@@ -33,7 +33,8 @@ function decorations(doc: Text, sets: readonly EditorLineMarkerSet[]): Decoratio
 const markerField = StateField.define<DecorationSet>({
   create: () => Decoration.none,
   update: (markers, transaction) => {
-    let next = markers.map(transaction.changes)
+    // Disk provenance belongs to an exact body. Typing, reload, and formatter replacement retire it.
+    let next = transaction.docChanged ? Decoration.none : markers
     for (const effect of transaction.effects) {
       if (effect.is(replaceMarkers)) next = decorations(transaction.state.doc, effect.value)
     }

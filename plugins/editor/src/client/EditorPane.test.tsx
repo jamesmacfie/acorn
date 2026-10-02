@@ -1,3 +1,4 @@
+import { createHash, webcrypto } from 'node:crypto'
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
@@ -5,6 +6,7 @@ import { EditorView } from '@codemirror/view'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
+import { setActiveNode } from '@acorn/plugin-api/testkit/client'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -28,10 +30,10 @@ const write = vi.fn(async (_taskId: string, path: string, content: string) => {
 })
 const read = vi.fn(async (_taskId: string, path: string) => disk.get(path) ?? '')
 const readImage = vi.fn(async (_taskId: string, _path: string) => ({ bytes: Uint8Array.from([0x52, 0x49, 0x46, 0x46]), type: 'image/webp' }))
-const lineMarkers = vi.fn(async (_taskId: string, _path: string) => [
+const lineMarkers = vi.fn(async (_taskId: string, _path: string, revision: string) => ({ revision, markers: [
   { kind: 'pull-request' as const, ranges: [{ from: 1, to: 1 }] },
   { kind: 'uncommitted' as const, ranges: [{ from: 1, to: 1 }] },
-])
+] }))
 // The checkout path, which the pane now reads through the query cache. A test that wants to see what
 // the pane does *while* that request is outstanding replaces this with a promise it holds open.
 let root: () => Promise<string | null> = async () => '/worktree'
@@ -45,7 +47,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     files: async () => [...disk.keys()],
     read: (taskId: string, path: string) => read(taskId, path),
     readImage: (taskId: string, path: string) => readImage(taskId, path),
-    lineMarkers: (taskId: string, path: string) => lineMarkers(taskId, path),
+    lineMarkers: (taskId: string, path: string, revision: string) => lineMarkers(taskId, path, revision),
     write: (taskId: string, path: string, content: string) => write(taskId, path, content),
   }),
 }))
@@ -79,6 +81,8 @@ const task = (): Task => ({ id: taskId }) as unknown as Task
 const cleanups: (() => void)[] = []
 let queryClient = new QueryClient()
 beforeEach(() => {
+  setActiveNode(null)
+  vi.stubGlobal('crypto', webcrypto)
   taskId = `t${++tasks}`
   root = async () => '/worktree'
   // The worktree, back as it was: one test quits `$EDITOR` over a file and another asserts what the
@@ -97,6 +101,7 @@ afterEach(() => {
   quitEditor = undefined
   sidebarCollapse(paneCollapseKey('editor'))[1](false)
   localStorage.clear()
+  setActiveNode(null)
 })
 
 // The pane reads the editor-mode preference off the prefs query, so it needs a client with the cache
@@ -204,14 +209,93 @@ describe('the editor pane', () => {
     lineMarkers.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
     editorOpen(taskId, 'a.ts', false)
     await showing(() => view, 'const a = 1')
-    expect(resolve).toBeDefined()
+    await vi.waitFor(() => expect(resolve).toBeDefined())
     read.mockRejectedValueOnce(new Error('unsupported UTF-8'))
     editorOpen(taskId, 'binary.dat', false)
     await vi.waitFor(() => expect(host.textContent).toContain('unsupported UTF-8'))
     expect(view.state.readOnly).toBe(true)
     saveChord(view)
     expect(write).not.toHaveBeenCalled()
-    resolve([])
+    resolve({ revision: '', markers: [] })
+  })
+
+  it('rejects a different disk body without clearing matching displayed markers', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    const marked = () => view.contentDOM.querySelector('.cm-line-pull-request')
+    await vi.waitFor(() => expect(marked()).not.toBeNull())
+    const calls = lineMarkers.mock.calls.length
+    lineMarkers.mockResolvedValueOnce({ revision: 'different-body', markers: [] })
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(lineMarkers.mock.calls.length).toBeGreaterThan(calls))
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(marked()).not.toBeNull()
+  })
+
+  it('requests the exact displayed UTF-8 body including BOM, Unicode, and CRLF', async () => {
+    const body = '\ufeff😀 café\r\nsecond\n'
+    disk.set('exact.txt', body)
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'exact.txt', false)
+    await showing(() => view, 'second')
+    expect(view.state.doc.toString()).toBe(body)
+    await vi.waitFor(() => expect(lineMarkers).toHaveBeenCalledWith(taskId, 'exact.txt', createHash('sha256').update(body).digest('hex')))
+  })
+
+  it('requires the cached document body when returning to a tab after disk changes', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    await vi.waitFor(() => expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull())
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    await vi.waitFor(() => expect(lineMarkers.mock.calls.some(([, path]) => path === 'b.ts')).toBe(true))
+    disk.set('a.ts', 'external body\n')
+    const { markerRevision } = await import('./markerRevision')
+    lineMarkers.mockResolvedValueOnce({ revision: await markerRevision(disk.get('a.ts')!), markers: [] })
+    const clock = vi.spyOn(Date, 'now').mockReturnValue(Date.now() + 3_000)
+    const calls = lineMarkers.mock.calls.length
+    try {
+      editorOpen(taskId, 'a.ts', false)
+      await showing(() => view, 'const a = 1')
+      await vi.waitFor(() => expect(lineMarkers.mock.calls.length).toBeGreaterThan(calls))
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      expect(view.contentDOM.querySelector('.cm-line-pull-request')).not.toBeNull()
+    } finally { clock.mockRestore() }
+  })
+
+  it.each(['edit', 'save', 'reload', 'node-switch', 'dispose'])('rejects held markers across %s', async (action) => {
+    const mounted = mount()
+    const view = await editor(mounted.host)
+    let release!: () => void
+    lineMarkers.mockImplementationOnce((_task, _path, revision) => new Promise((resolve) => {
+      release = () => resolve({ revision, markers: [{ kind: 'pull-request', ranges: [{ from: 1, to: 1 }] }] })
+    }))
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    await vi.waitFor(() => expect(release).toBeDefined())
+    if (action === 'dispose') mounted.unmount()
+    else if (action === 'node-switch') setActiveNode('other-node')
+    else if (action === 'reload') {
+      disk.set('a.ts', 'external body\n')
+      lineMarkers.mockResolvedValueOnce({ revision: '', markers: [] })
+      window.dispatchEvent(new Event('focus'))
+      await showing(() => view, 'external body')
+    } else {
+      view.dispatch({ changes: { from: 0, insert: '// typed\n' } })
+      if (action === 'save') {
+        lineMarkers.mockResolvedValueOnce({ revision: '', markers: [] })
+        saveChord(view)
+        await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(false))
+      }
+    }
+    release()
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(mounted.host.querySelector('.cm-line-pull-request')).toBeNull()
   })
 
 

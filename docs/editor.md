@@ -660,6 +660,29 @@ its own save, after a focus reload, and when a cached tab has been away for more
 Git status coalescing window. Marker failures remain presentation failures: text still opens and stays
 editable.
 
+The graphical client hashes its captured clean document as SHA-256 over UTF-8 bytes, including BOM
+and line endings. It requests `line-markers` with that `revision` query parameter. The Node returns
+`{ revision, markers }` only when confined disk reads before and after provider work match that body,
+root, inode, size, modification time, and change time. A changed or unreadable body returns
+`{ revision: null, markers: [] }`. Byte hashes detect same-size edits with restored modification time;
+change time and inode also reject ordinary write-and-restore and file replacement during Git work.
+These observations do not lock out external writers or filesystem changes that evade those observations.
+
+The pane also checks its captured Node, document entry, local edit revision, and request generation
+before publishing. A stale response preserves annotations for the displayed body. Every CodeMirror
+document change clears disk annotations synchronously, including typing, reload, and formatter
+replacement. Dirty or saving documents defer marker reads; save completion, undo to acknowledged
+text, focus, and cached-tab return can retry. Initial text and markers can arrive separately because
+the returned body hash must match the displayed text. Generic host documents and the terminal client's
+external editor do not consume disk line markers.
+
+Requests without `revision` retain the array response for older clients. A newer client omits markers
+when an older Node returns that unverifiable array. Provider ranges keep their established contract;
+an optional third argument supplies the editor's confined root, and first-party providers verify it
+against their independently resolved root. Older loaded providers can ignore that argument. No
+provider gains a filesystem capability or custody of displayed text. Exact reads add two full disk
+reads and hashes per admitted marker request, plus one client document hash.
+
 ## Save acknowledgements and recovery
 
 Each file address has one write owner, keyed by the captured Node, task, and path. Host document
@@ -701,9 +724,9 @@ creates an editable empty saved file.
 Usable text opens before optional grammar or marker responses. Those responses belong to the
 captured document entry and cannot repopulate a retired preview. A focus reload checks its read
 generation, document identity, captured text, edit revision, and dirty status after the response.
-Applying acknowledged disk text does not schedule autosave. Local edits reject held disk markers
-and clear their annotations. Exact disk/body provenance requires the marker identity contract
-tracked by performance unit 15; generation checks alone cannot prove it against external writes.
+Applying acknowledged disk text does not schedule autosave. Document changes reject held disk
+markers and clear their annotations. The body identity and publication checks are described in
+[Line provenance markers](#line-provenance-markers).
 
 Canonical tabs determine clean preview retention. Replacing a clean preview releases its text,
 saved body, and view state. Promoted and dirty tabs keep their state across same-task pane toggles.

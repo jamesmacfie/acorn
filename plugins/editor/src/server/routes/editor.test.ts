@@ -1,5 +1,6 @@
 import { execFileSync } from 'node:child_process'
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, symlinkSync, truncateSync, writeFileSync } from 'node:fs'
+import { createHash } from 'node:crypto'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, statSync, symlinkSync, truncateSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Hono } from 'hono'
@@ -178,6 +179,63 @@ describe('editor routes over a real worktree', () => {
     expect(await response.json()).toEqual([
       { kind: 'pull-request', ranges: [{ from: 2, to: 4 }, { from: 8, to: 8 }] },
     ])
+  })
+
+  it('pairs exact UTF-8 marker bodies and isolates failed and legacy providers', async () => {
+    const text = '\ufeff😀 café\r\nsecond\n'
+    writeFileSync(join(work, 'markers.txt'), text)
+    const revision = createHash('sha256').update(text).digest('hex')
+    setEditorBridge(editorBridge({ tasks: createTaskService(t.db), fs: coreFs }, undefined, undefined, () => [
+      { kind: 'pull-request', read: async () => [{ from: 2, to: 2 }] },
+      { kind: 'uncommitted', read: async () => { throw new Error('optional failure') } },
+    ]))
+    const app = authed()
+    const route = '/api/tasks/task1/editor/line-markers?path=markers.txt&revision='
+    expect(await (await app.fetch(req(route + revision), {} as Env)).json()).toEqual({
+      revision, markers: [{ kind: 'pull-request', ranges: [{ from: 2, to: 2 }] }],
+    })
+    expect(await (await app.fetch(req(route + '0'.repeat(64)), {} as Env)).json()).toEqual({ revision: null, markers: [] })
+    expect((await app.fetch(req(route + 'invalid'), {} as Env)).status).toBe(400)
+    expect((await app.fetch(req('/api/tasks/task1/editor/line-markers?path=escape%2Fsecret.txt&revision=' + revision), {} as Env)).status).toBe(403)
+  })
+
+  it.each(['same-size-restored-mtime', 'write-and-restore', 'root-change'])('rejects %s during provider work and admits a fresh retry', async (mode) => {
+    const path = join(work, 'held-markers.txt')
+    const original = 'first\nsecond\n'
+    writeFileSync(path, original)
+    const stamp = statSync(path)
+    const revision = createHash('sha256').update(original).digest('hex')
+    let release!: () => void
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const hold = new Promise<void>((resolve) => { release = resolve })
+    let root = work
+    const core = { tasks: { ...createTaskService(t.db), root: async () => root }, fs: coreFs }
+    const bridge = editorBridge(core, undefined, undefined, () => [{
+      kind: 'pull-request', read: async (_task, _path, source) => {
+        expect(source?.root).toBe(root)
+        entered()
+        await hold
+        return [{ from: 2, to: 2 }]
+      },
+    }])
+    const response = bridge.markerSnapshot!('task1', 'held-markers.txt', revision)
+    await started
+    if (mode === 'root-change') {
+      root = outside
+      writeFileSync(join(outside, 'held-markers.txt'), original)
+    } else {
+      writeFileSync(path, 'other\nsecond\n')
+      if (mode === 'write-and-restore') writeFileSync(path, original)
+      utimesSync(path, stamp.atime, stamp.mtime)
+    }
+    release()
+    expect(await response).toEqual({ revision: null, markers: [] })
+    root = work
+    writeFileSync(path, original)
+    expect(await bridge.markerSnapshot!('task1', 'held-markers.txt', revision)).toEqual({
+      revision, markers: [{ kind: 'pull-request', ranges: [{ from: 2, to: 2 }] }],
+    })
   })
 
   it('rejects path traversal on read (403) and write ({ok:false}) — outside file untouched', async () => {

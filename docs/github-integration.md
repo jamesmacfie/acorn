@@ -167,6 +167,15 @@ segment is simply not drawn.
 
 ## Reads and writes
 
+Editor pull-request markers resolve the authorized task root and user-scoped mirror on every read.
+Overlapping reads share only active PR-head, base-ref, and merge-base resolution with matching root,
+user, mirror repository, pull number, base ref, and head SHA. The wave is removed on success or failure;
+a subsequent request resolves mutable refs again. Each file runs its own PR diff and fresh
+PR-head-to-worktree translation. Remote base refs precede local refs, the resolved head must match
+the mirror's exact SHA, and missing refs produce no PR contribution. Diff failures do not publish
+untranslated ranges. Literal pathspecs and disabled external diff and text conversion preserve file
+and line identity. [Editor marker custody](./editor.md#line-provenance-markers) owns disk/body matching.
+
 The GitHub source provides repository browse, PR lists/detail, diff files, checks, Actions logs,
 mentions, labels, reviewers, comments, review threads, and create-PR. Mutations call GitHub first and
 then update or invalidate the affected mirror so a subsequent read does not serve a known pre-write

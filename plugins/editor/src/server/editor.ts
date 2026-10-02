@@ -7,21 +7,25 @@ import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, t
 import { createHash } from 'node:crypto'
 import { readdir, readFile, stat, writeFile } from 'node:fs/promises'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
-import { normalizedLineRanges, type EditorLineMarkerProvider, type EditorLineMarkerSet } from '../contract/lineMarkers'
+import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
+import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
 
 export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
 // No worktree yet (unmapped repo) → 404; a path that escapes the root → 403 (never leaks whether
 // the outside target exists).
-async function confine(core: EditorCoreServices, taskId: string, relPath: string): Promise<string> {
+async function confinedFile(core: EditorCoreServices, taskId: string, relPath: string): Promise<{ root: string; abs: string }> {
   const root = await core.tasks.root(taskId)
   if (!root) throw new BridgeError(404, 'no_worktree', 'No worktree for this task yet.')
   const abs = core.fs.resolveInRoot(root, relPath)
   if (!abs) throw new BridgeError(403, 'path_outside', 'Path is outside the worktree.')
-  return abs
+  return { root, abs }
 }
+
+const confine = async (core: EditorCoreServices, taskId: string, relPath: string): Promise<string> =>
+  (await confinedFile(core, taskId, relPath)).abs
 
 /** `ctx.events.worktreeStatus`: "something under this task's worktree changed". Passed in rather than
  *  reached for, so this module stays plain Node and testable without a host. */
@@ -98,21 +102,15 @@ export const editorBridge = (
 
   lineMarkers: async (taskId, relPath) => {
     // Apply the same confinement as a text read before another plugin receives the path.
-    await confine(core, taskId, relPath)
-    const settled = await Promise.allSettled(markerProviders().map(async (provider): Promise<EditorLineMarkerSet> => ({
-      kind: provider.kind,
-      ranges: normalizedLineRanges(await provider.read(taskId, relPath)),
-    })))
-    const byKind = new Map<EditorLineMarkerSet['kind'], EditorLineMarkerSet['ranges']>()
-    for (const result of settled) {
-      if (result.status !== 'fulfilled') continue // line provenance is optional presentation
-      byKind.set(result.value.kind, normalizedLineRanges([
-        ...(byKind.get(result.value.kind) ?? []),
-        ...result.value.ranges,
-      ]))
-    }
-    return [...byKind].map(([kind, ranges]) => ({ kind, ranges }))
+    const { root } = await confinedFile(core, taskId, relPath)
+    return readMarkerProviders(markerProviders(), taskId, relPath, root)
   },
+
+  markerSnapshot: (taskId, relPath, revision) => markerSnapshot(
+    () => confinedFile(core, taskId, relPath),
+    revision,
+    (root) => readMarkerProviders(markerProviders(), taskId, relPath, root),
+  ),
 
   // The additive acknowledgement names the exact body written after hooks. Path and filesystem
   // failures retain the {ok:false, reason} response used by file-pane recovery.

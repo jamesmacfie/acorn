@@ -11,7 +11,7 @@ import {
   editorRootRoute,
   editorWriteRoute,
   type EditorEntry,
-  type EditorLineMarkerSet,
+  type EditorLineMarkerSnapshot,
   type EditorWriteResult,
 } from '../contract/api'
 import type { QueryClient } from '@tanstack/solid-query'
@@ -26,7 +26,7 @@ export type EditorApi = {
   files(taskId: string): Promise<string[]>
   read(taskId: string, relPath: string): Promise<string>
   readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
-  lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
+  lineMarkers(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot | null>
   write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
 }
 
@@ -39,7 +39,11 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
   read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => r.text),
   readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { nodeId, maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
-  lineMarkers: (taskId, relPath) => readJson<EditorLineMarkerSet[]>(editorLineMarkersRoute(taskId, relPath), { nodeId }),
+  lineMarkers: async (taskId, relPath, revision) => {
+    const result = await readJson<EditorLineMarkerSnapshot | unknown[]>(editorLineMarkersRoute(taskId, relPath, revision), { nodeId })
+    // An old Node ignores the added query parameter and returns an unverifiable array.
+    return !Array.isArray(result) && result.revision === revision ? result : null
+  },
   write: (taskId, relPath, content) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',
