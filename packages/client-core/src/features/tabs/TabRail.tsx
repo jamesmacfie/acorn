@@ -656,7 +656,7 @@ export default function TabRail() {
                         value={chosenWorktree()?.path ?? ''}
                         onChange={setPickedWorktree}
                         disabled={!freeWorktrees()?.length}
-                        options={(freeWorktrees() ?? []).map((wt) => ({ value: wt.path, label: `${wt.branch} · ${wt.path}` }))}
+                        options={(freeWorktrees() ?? []).map((wt) => ({ value: wt.path, label: wt.branch, description: wt.path }))}
                       />
                     </Field>
                   </Show>
