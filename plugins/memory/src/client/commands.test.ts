@@ -3,7 +3,7 @@ import type { CommandExecutionContext, ContributedCommand, SearchCommand } from 
 import type { MemoryRow } from './memoryClient'
 
 const mocks = vi.hoisted(() => ({ search: vi.fn(), openPane: vi.fn(), setSelectedSource: vi.fn(), projectPath: vi.fn((id: string) => `/p/${id}`) }))
-vi.mock('./memoryClient', () => ({ memoryApi: () => ({ search: mocks.search }) }))
+vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ search: mocks.search }) }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   openPane: mocks.openPane,
@@ -38,8 +38,8 @@ describe('the memory plugin catalogue', () => {
   it('asks about the captured project and badges each row with its type', async () => {
     mocks.search.mockResolvedValue([memory(), memory({ id: 'm2', name: 'rtk-grep', type: 'fix', description: 're-run through rtk proxy' })])
     expect(await find().query('grep', context(), signal())).toEqual([
-      { id: 'm1', title: 'no-ponytail-comments', subtitle: 'strip the marker before committing', badge: 'convention', ref: '{"name":"no-ponytail-comments","scope":"project"}' },
-      { id: 'm2', title: 'rtk-grep', subtitle: 're-run through rtk proxy', badge: 'fix', ref: '{"name":"rtk-grep","scope":"project"}' },
+      { id: 'm1', title: 'no-ponytail-comments', subtitle: 'strip the marker before committing', badge: 'Convention', ref: '{"name":"no-ponytail-comments","scope":"project"}' },
+      { id: 'm2', title: 'rtk-grep', subtitle: 're-run through rtk proxy', badge: 'Fix', ref: '{"name":"rtk-grep","scope":"project"}' },
     ])
     expect(mocks.search).toHaveBeenCalledWith('grep', 'p-1')
   })

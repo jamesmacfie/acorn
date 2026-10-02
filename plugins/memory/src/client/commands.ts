@@ -7,7 +7,7 @@ import {
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
 import { selectMemory } from './memorySelection'
-import { memoryApi } from './memoryClient'
+import { memoryApi, memoryTypeLabel } from './memoryClient'
 import { MEMORY_SOURCE_ID } from '../shared/api'
 
 // Search results open this project's Memory page.
@@ -37,7 +37,7 @@ export const memoryCommands: readonly ContributedCommand[] = [
         id: memory.id,
         title: memory.name,
         subtitle: memory.description,
-        badge: memory.type,
+        badge: memoryTypeLabel(memory.type),
         // Name and scope distinguish same-named private and project memories.
         ref: JSON.stringify({ name: memory.name, scope: memory.scope }),
       }))
