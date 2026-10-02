@@ -252,7 +252,12 @@ const EMPTY_SCHEMA: DashboardDisplaySchema = { fields: [] }
  *
  *  Unmapped: the single source's own schema, untouched. Mapped: the role fields at least one source can
  *  fill, with the status field carrying the user's columns as its declared values, which is what makes
- *  `boardColumns` draw the user's board without knowing a mapping exists. */
+ *  `boardColumns` draw the user's board without knowing a mapping exists.
+ *
+ *  A mapped panel with one source names each field as that source does, and a status field with no
+ *  columns keeps the values that source declares. Without that, a panel of tasks printed the raw id
+ *  "active" on a grey dot though the source says "Active", and called its fields "Title" and "Status"
+ *  whatever the source called them. */
 export function panelSchema(
   sources: readonly PanelSourcePage[],
   mapping: PanelMapping | undefined,
@@ -263,11 +268,16 @@ export function panelSchema(
     // The host feeds this one. No source has to be able to fill it, and no mapping row points at it.
     if (field.id === PANEL_SOURCE_FIELD_ID) return [field]
     if (!sources.some((source) => sourceFieldFor(source, field.id, mapping))) return []
-    if (field.id !== PANEL_STATUS_FIELD_ID) return [field]
+    // The one source's own field, when there is one source: its name, and for status its values.
+    const ownId = sources.length === 1 ? sourceFieldFor(sources[0]!, field.id, mapping) : undefined
+    const own = ownId ? sources[0]!.schema.fields.find((candidate) => candidate.id === ownId) : undefined
+    const named = own ? { ...field, name: own.name } : field
+    if (field.id !== PANEL_STATUS_FIELD_ID) return [named]
     const columns = mapping?.columns ?? []
-    // No columns yet means no derived enum, so the field carries no declared values and the board
-    // builds its columns out of whatever arrived: two providers' vocabularies side by side.
-    return [columns.length ? { ...field, values: columns } : field]
+    if (columns.length) return [{ ...named, values: columns }]
+    // No columns yet means no derived enum. One source keeps the words and tones it declares; across
+    // several, the board builds its columns out of whatever arrived: two vocabularies side by side.
+    return [own?.values ? { ...named, values: own.values } : named]
   })
   return { fields }
 }

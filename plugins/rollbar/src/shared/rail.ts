@@ -25,14 +25,12 @@ export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
   return {
     id: rollbarRailItemId(item),
     title: item.title,
-    // One reserved track keeps short and long Rollbar ids aligned; the flexible title gets the rest.
-    fields: [`#${item.identifier}`],
-    fieldsFirst: true,
-    // The same string the reserved track holds, said again because the two are asked different
-    // questions: one lines up down an expanded list, the other is all a collapsed row has room for.
+    // The title leads, and the occurrence count is the one reserved track, so every title ends at the
+    // same place. The count is what a reader triages by; the id is in the detail's header.
+    fields: [item.totalOccurrences.toLocaleString()],
+    // All a collapsed row has room for.
     short: `#${item.identifier}`,
     ...rollbarSeverity(item.level),
-    badge: String(item.totalOccurrences),
     task: {
       origin: 'rollbar',
       title: item.title.slice(0, 120),

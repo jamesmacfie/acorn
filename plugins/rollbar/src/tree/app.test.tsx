@@ -7,8 +7,8 @@ import { RollbarPane } from './app'
 
 // The pane, driven the way the sandbox drives it: through `solidTree` into a remote root, with the
 // mutations it emits as the only evidence. What this pins is the failure path, which until now only the
-// running app could reach: a detail fetch that fails must draw the Alert, not strip the loading text and
-// leave an empty box behind.
+// running app could reach: a detail fetch that fails must draw the titled failure state, not strip the
+// loading text and leave an empty box behind.
 
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0))
 
@@ -27,7 +27,7 @@ describe('RollbarPane', () => {
     const ops: TreeMutation[] = []
     const root = createRemoteRoot((batch) => ops.push(...batch))
     const bridge = {
-      api: { get: () => Promise.reject(new Error('rollbar said no')) },
+      api: { get: () => Promise.reject(Object.assign(new Error('provider_needs_auth'), { code: 'provider_needs_auth' })) },
       onSelect: () => () => {},
     } as unknown as AcornBridge
     solidTree(RollbarPane)(bridge, {
@@ -45,8 +45,11 @@ describe('RollbarPane', () => {
     })
     await settle()
     await settle()
-    const alert = inserted(ops).find((node) => node.type === 'Alert')
-    expect(alert?.props.title).toBe('Could not load this Rollbar item.')
+    const failure = inserted(ops).find((node) => node.type === 'EmptyState' && node.props.title)
+    expect(failure?.props.title).toBe("Couldn't load this error")
+    // The reason in words, never the route's code.
+    expect(JSON.stringify(failure)).toContain("Rollbar turned down acorn's token.")
+    expect(JSON.stringify(failure)).not.toContain('provider_needs_auth')
     root.dispose()
   })
 
@@ -89,7 +92,7 @@ describe('RollbarPane', () => {
       return found
     }
     const tabs = () => nodes().find((node) => node.type === 'Tabs')
-    const refresh = () => nodes().find((node) => node.type === 'Button' && node.children.some((child) => child.props.value === 'Refresh'))
+    const refresh = () => nodes().find((node) => node.type === 'IconButton' && node.props.label === 'Refresh error')
     expect(tabs()).toBeDefined()
     ;(tabs()?.props.onChange as (tab: string) => void)('occurrences')
     ;(refresh()?.props.onPress as () => void)()
@@ -110,7 +113,7 @@ describe('RollbarPane', () => {
     await settle()
     expect(nodes().some((node) => node.type === 'Heading')).toBe(true)
     expect(tabs()?.props.active).toBe('occurrences')
-    expect(nodes().find((node) => node.type === 'Alert')?.props.title).toBe('Could not refresh this Rollbar item.')
+    expect(nodes().find((node) => node.type === 'Alert')?.props.title).toBe("Couldn't refresh this error. Showing the last data we got.")
     root.dispose()
   })
 })

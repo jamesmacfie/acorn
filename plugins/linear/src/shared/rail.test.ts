@@ -31,7 +31,7 @@ describe('Linear descriptor rows', () => {
     expect(linearRailItem(ISSUE)).toEqual({
       id: 'linear%3Aacme:ENG-42',
       title: 'Ship it',
-      fields: ['ENG-42', 'In Progress'],
+      fields: ['ENG-42'],
       icon: 'circle-dot',
       short: 'ENG-42',
       task: {
@@ -50,8 +50,8 @@ describe('Linear descriptor rows', () => {
   it('adds a workspace column only when the list spans more than one connection', () => {
     // Two connected workspaces can both hold an ENG-42, so the caller names the workspace for every
     // row in a merged list. With one connection the column would repeat a single answer down the list.
-    expect(linearRailItem(ISSUE).fields).toEqual(['ENG-42', 'In Progress'])
-    expect(linearRailItem(ISSUE, 'Work').fields).toEqual(['ENG-42', 'In Progress', 'Work'])
+    expect(linearRailItem(ISSUE).fields).toEqual(['ENG-42'])
+    expect(linearRailItem(ISSUE, 'Work').fields).toEqual(['ENG-42', 'Work'])
   })
 
   it('marks the row from Linear\'s own state vocabulary, not the name a team chose', () => {

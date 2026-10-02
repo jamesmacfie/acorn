@@ -45,7 +45,7 @@ export default {
       // reason. Keep both — a project-scoped task pane would break the keybinding and the command.
       target: 'pane',
       id: 'rollbar-item',
-      label: 'Rollbar item',
+      label: 'Rollbar error',
       glyph: 'brand:rollbar',
       scope: 'project',
       layout: 'single',
@@ -63,7 +63,7 @@ export default {
     }],
     sources: [{
       id: 'rollbar-items',
-      label: 'Rollbar',
+      label: 'Rollbar errors',
       glyph: 'brand:rollbar',
       order: 30,
       providerId: 'rollbar',
@@ -74,6 +74,8 @@ export default {
       // `navigate`, not `openPane`: the detail belongs to the project, so a row click changes the URL
       // and the surface beside the list follows. It is also what mounts `rollbar-item` at all.
       onSelect: { verb: 'navigate', surface: 'rollbar-item' },
+      // Message only, for the reason linear's source gives: no context-free verb reaches settings.
+      emptyState: { message: 'No active errors in the linked Rollbar projects.' },
     }],
     commands: [{
       id: 'open',
@@ -96,7 +98,7 @@ export default {
       // one into a task is deliberately not what picking it means.
       id: 'find-item',
       title: 'Find a Rollbar item',
-      hint: 'active items in the projects this repository follows',
+      hint: 'active errors in the linked Rollbar projects',
       keywords: ['error', 'exception', 'issue', 'rollbar'],
       category: 'navigation',
       kind: 'search',

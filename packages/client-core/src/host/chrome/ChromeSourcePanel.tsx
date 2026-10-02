@@ -22,6 +22,7 @@ import { tasksKey, tasksOptions, workspacesOptions } from '../../infra/queries'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { PromoteToTaskModal } from '../../features/integrations/PromoteToTaskModal'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
+import { taskTracksRef } from '../registries/sources/sources'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 
 const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
@@ -51,10 +52,11 @@ export type ChromeSourcePanelProps = { pluginId: string; descriptor: PluginSourc
 // contributes the plugin's message and its action, and shared CSS owns the geometry.
 function SourceEmpty(props: { pluginId: string; nodeId: string; empty?: PluginSourceEmptyState }) {
   return (
-    <Show when={props.empty} fallback={<EmptyState align="start">Nothing to show.</EmptyState>}>
+    <Show when={props.empty} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
       {(empty) => (
         <EmptyState
           align="start"
+          size="sm"
           action={
             <Show when={empty().action}>
               {(action) => (
@@ -118,10 +120,10 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   // (plugins/github pullList/model.ts). It narrows what the source returned rather than asking the
   // plugin to search, so no descriptor field and no plugin route is involved.
   const [filter, setFilter] = createSignal('')
+  const query = () => collapsed() ? '' : filter().trim().toLowerCase()
   const items = createMemo(() => {
-    const query = collapsed() ? '' : filter().trim().toLowerCase()
-    if (!query) return allItems()
-    return allItems().filter((item) => item.title.toLowerCase().includes(query))
+    if (!query()) return allItems()
+    return allItems().filter((item) => item.title.toLowerCase().includes(query()))
   })
 
   const [refreshing, setRefreshing] = createSignal(false)
@@ -143,6 +145,19 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   }
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
 
+  // The active task that already tracks this row, through `taskTracksRef` rather than a link check
+  // written here (docs/plugins.md § Context menus). First match, the ceiling RefPanelTaskLink states.
+  const trackingTask = (item: PluginRailItem): Task | undefined => {
+    const link = item.task?.link
+    if (!link) return undefined
+    const ref = { providerId: props.descriptor.providerId, displayId: link.identifier, connectionId: link.connectionId }
+    return (tasks.data ?? []).find((task) => task.status === 'active' && taskTracksRef(task, ref))
+  }
+  const openTask = (task: Task): void => {
+    activateTaskSignals(task)
+    navigate(pathForTask(task))
+  }
+
   // What a row's menu is about. `item` is the row itself, handed back untouched to whoever
   // contributed the action; only `providerId` and `projectId` are facts a `when` may name
   // (docs/plugins.md § Context menus).
@@ -158,10 +173,16 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   })
 
   onMount(() => {
-    // Core's own row action, registered rather than written inline, so this list and github's cannot
-    // offer different things (docs/plugins.md § Context menus). One registration per mounted panel
-    // and one panel on screen at a time: `Dynamic` disposes the source it is leaving before it
-    // creates the one it is going to.
+    // Core's own row actions, registered rather than written inline, so this list and github's cannot
+    // offer different things (docs/plugins.md § Context menus). Two items with opposite `when`s, the
+    // pair github's pull list registers: a row that already has a task opens it rather than offering a
+    // second. One registration per mounted panel and one panel on screen at a time: `Dynamic`
+    // disposes the source it is leaving before it creates the one it is going to.
+    //
+    // A row with no `task` block has no promotion seed, and a source whose click already creates a
+    // task does not need the menu offering it twice.
+    const promotable = (target: ItemRowTarget) =>
+      !!(target.item as PluginRailItem).task && props.descriptor.onSelect?.verb !== 'createTask'
     const rows = registerContextMenuItems([
       {
         id: 'item.create-task',
@@ -169,10 +190,20 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
         label: 'Create task…',
         icon: 'square-plus',
         order: 10,
-        // A row with no `task` block has no promotion seed, and a source whose click already
-        // creates a task does not need the menu offering it twice.
-        when: (target) => !!(target.item as PluginRailItem).task && props.descriptor.onSelect?.verb !== 'createTask',
+        when: (target) => promotable(target) && !trackingTask(target.item as PluginRailItem),
         run: (target) => setPromoteItem(target.item as PluginRailItem),
+      },
+      {
+        id: 'item.open-task',
+        location: 'item.row',
+        label: 'Open task',
+        icon: 'list-checks',
+        order: 10,
+        when: (target) => promotable(target) && !!trackingTask(target.item as PluginRailItem),
+        run: (target) => {
+          const task = trackingTask(target.item as PluginRailItem)
+          if (task) openTask(task)
+        },
       },
     ])
     onCleanup(() => rows.dispose())
@@ -204,8 +235,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const afterPromote = (task: Task): void => {
     setPromoteItem(null)
     void queryClient.invalidateQueries({ queryKey: tasksKey })
-    activateTaskSignals(task)
-    navigate(pathForTask(task))
+    openTask(task)
   }
 
   // Collapsed, the row is its severity glyph over its identifier. A source that sends neither an
@@ -223,8 +253,9 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   return (
     <>
       <Show when={!collapsed()}>
+        {/* No count until the list answers: a 0 while loading claims an empty list. */}
         <SectionHeader
-          count={items().length}
+          count={row() ? items().length : undefined}
           actions={(
             <>
               <Show when={row() && row()!.freshness !== 'live'}><span class="muted">{FRESHNESS_LABELS[row()!.freshness]}</span></Show>
@@ -267,7 +298,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
               </Inline>
             )}
           >
-            <Alert>Couldn't reach {entry().label}. {entry().reason}</Alert>
+            <Alert variant="banner" tone="warn">Couldn't reach {entry().label}. {entry().reason}</Alert>
           </Show>
         )}
       </Show>
@@ -287,12 +318,18 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             {/* The authored empty state, or the fixed string for a source that declares none. Renders
                 only under `row()`, meaning the plugin's route answered with nothing. An unreachable node
                 is the banner above, because "nothing is assigned to you" is a claim the host cannot make
-                on a failed fetch. */}
+                on a failed fetch. A filter that hides every row says so instead, because the source's
+                sentence would claim there is nothing at all. */}
             <For
               each={items()}
               fallback={(
                 <Show when={!collapsed()}>
-                  <SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />
+                  <Show
+                    when={query() && allItems().length}
+                    fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}
+                  >
+                    <EmptyState align="start" size="sm">Nothing matches that filter.</EmptyState>
+                  </Show>
                 </Show>
               )}
             >
@@ -327,6 +364,8 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
                     </>
                   )}
                   title={item.title}
+                  tip={item.title}
+                  label={item.title}
                 >
                   {item.title}
                 </Row>

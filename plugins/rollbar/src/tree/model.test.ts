@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { Task } from '@acorn/protocol/api.ts'
 import type { RollbarItemMetadata, RollbarOccurrenceDetail } from '../shared/api'
-import { occurrenceContext, relativeTime, taskRollbarTargets } from './model'
+import { failureReason, levelWord, occurrenceContext, relativeTime, statusWord, taskRollbarTargets } from './model'
 
 describe('Rollbar frame model', () => {
   it('keeps only Rollbar links from the host task projection', () => {
@@ -17,7 +17,7 @@ describe('Rollbar frame model', () => {
   it('formats bounded relative times', () => {
     expect(relativeTime(999_000, 1_000_000)).toBe('1s ago')
     expect(relativeTime(940_000, 1_000_000)).toBe('1m ago')
-    expect(relativeTime(null, 1_000_000)).toBe('unknown')
+    expect(relativeTime(null, 1_000_000)).toBe('Not reported')
   })
 
   it('copies a privacy-bounded context projection', () => {
@@ -35,5 +35,19 @@ describe('Rollbar frame model', () => {
     expect(text).toContain('Rollbar #142 [error] Checkout failed')
     expect(text).toContain('at src/checkout.ts:12 (run)')
     expect(text).not.toContain('private@example.com')
+  })
+
+  it('reads levels and statuses as sentence-case words with their own tone', () => {
+    expect(levelWord('error')).toEqual({ label: 'Error', tone: 'danger' })
+    expect(levelWord('warning')).toEqual({ label: 'Warning', tone: 'warn' })
+    expect(statusWord('active')).toEqual({ label: 'Active', tone: 'neutral' })
+    expect(statusWord('resolved')).toEqual({ label: 'Resolved', tone: 'ok' })
+    expect(statusWord('snoozed')).toEqual({ label: 'Snoozed', tone: 'neutral' })
+  })
+
+  it('turns a route code into a sentence', () => {
+    expect(failureReason(Object.assign(new Error('provider_rate_limited'), { code: 'provider_rate_limited' })))
+      .toBe('Rollbar is limiting requests. Try again in a minute.')
+    expect(failureReason(new Error('rollbar said no'))).toBe('rollbar said no')
   })
 })

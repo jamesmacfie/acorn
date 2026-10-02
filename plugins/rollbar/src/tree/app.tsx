@@ -1,6 +1,6 @@
 import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
-  Alert, DetailColumn, EmptyState, ListColumn, ListDetail, Row,
+  Button, DetailColumn, EmptyState, ListColumn, ListDetail, Row,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { Task } from '@acorn/protocol/api.ts'
@@ -13,15 +13,13 @@ import {
   type RollbarOccurrenceSummary,
 } from '../shared/api'
 import { parseRollbarRailItemId, type RollbarRailTarget } from '../shared/rail'
-import { occurrenceContext, targetKey, taskRollbarTargets } from './model'
+import { failureReason, occurrenceContext, targetKey, taskRollbarTargets } from './model'
 import { RollbarItemView, type OccurrenceState, type RollbarViewState } from './RollbarItemView'
 
 type PageState =
-  | { kind: 'empty'; message: string }
-  | { kind: 'loading'; message: string }
-  | { kind: 'error'; title: string; detail: string }
-
-const detailOf = (error: unknown): string => error instanceof Error ? error.message : String(error)
+  | { kind: 'empty'; title: string }
+  | { kind: 'loading' }
+  | { kind: 'error'; title: string; detail: string; retry?: () => void }
 
 /** What the host mounts this tree with: the pane's subject, minted by the shell per slot. */
 export type RollbarPaneProps = { taskId?: string; item?: string }
@@ -37,9 +35,11 @@ export type RollbarPaneProps = { taskId?: string; item?: string }
 export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   const [linkedTargets, setLinkedTargets] = createSignal<RollbarRailTarget[]>([])
   const [view, setView] = createSignal<RollbarViewState | null>(null)
-  const [page, setPage] = createSignal<PageState>({ kind: 'loading', message: 'Loading Rollbar…' })
+  const [page, setPage] = createSignal<PageState>({ kind: 'loading' })
   const [activeTab, setActiveTab] = createSignal('overview')
   const [occurrence, setOccurrence] = createSignal<OccurrenceState>({ kind: 'empty' })
+  // The newest occurrence, for Overview: the message and stack are why anyone opens an error.
+  const [latest, setLatest] = createSignal<OccurrenceState>({ kind: 'empty' })
   const [refreshing, setRefreshing] = createSignal(false)
   const [refreshError, setRefreshError] = createSignal('')
   let itemLoad = 0
@@ -56,8 +56,9 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       setRefreshing(false)
       setView(null)
       setOccurrence({ kind: 'empty' })
+      setLatest({ kind: 'empty' })
       setActiveTab('overview')
-      setPage({ kind: 'loading', message: 'Loading Rollbar item…' })
+      setPage({ kind: 'loading' })
     }
     try {
       const [item, occurrences] = await Promise.all([
@@ -74,12 +75,29 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
         setOccurrence({ kind: 'empty' })
       }
       setView({ target, item, occurrences: occurrences.occurrences })
+      const newest = occurrences.occurrences[0]
+      if (newest) void loadLatest(target, newest.id, request, keepView)
+      else setLatest({ kind: 'empty' })
     } catch (error) {
       if (request !== itemLoad) return
-      if (keepView) setRefreshError(detailOf(error))
-      else setPage({ kind: 'error', title: 'Could not load this Rollbar item.', detail: detailOf(error) })
+      if (keepView) setRefreshError(failureReason(error))
+      else setPage({ kind: 'error', title: "Couldn't load this error", detail: failureReason(error), retry: () => void load(target) })
     } finally {
       if (request === itemLoad) setRefreshing(false)
+    }
+  }
+
+  // The same cached occurrence route the Occurrences tab reads, so Overview adds no new request shape.
+  // A refresh keeps the old one on screen until the new one lands.
+  const loadLatest = async (target: RollbarRailTarget, id: string, request: number, keep: boolean): Promise<void> => {
+    if (!keep) setLatest({ kind: 'loading', id })
+    try {
+      const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
+        rollbarOccurrenceRoute(target.integrationId, target.identifier, id),
+      )
+      if (request === itemLoad) setLatest({ kind: 'ready', detail })
+    } catch (error) {
+      if (request === itemLoad && !keep) setLatest({ kind: 'error', id, detail: failureReason(error) })
     }
   }
 
@@ -87,7 +105,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
     const current = view()
     if (!current) return
     const request = ++occurrenceLoad
-    setOccurrence({ kind: 'loading' })
+    setOccurrence({ kind: 'loading', id })
     try {
       const detail = await props.bridge.api.get<RollbarOccurrenceDetail>(
         rollbarOccurrenceRoute(current.target.integrationId, current.target.identifier, id),
@@ -95,7 +113,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
       if (request === occurrenceLoad && view() === current) setOccurrence({ kind: 'ready', detail })
     } catch (error) {
       if (request === occurrenceLoad && view() === current) {
-        setOccurrence({ kind: 'error', detail: detailOf(error) })
+        setOccurrence({ kind: 'error', id, detail: failureReason(error) })
       }
     }
   }
@@ -104,7 +122,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
     const current = view()
     if (!current) return
     await props.bridge.ui.copy(occurrenceContext(current.item, detail))
-    props.bridge.ui.toast('Rollbar context copied')
+    props.bridge.ui.toast('Copied the error details')
   }
 
   onMount(() => {
@@ -123,7 +141,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
 
       const taskId = props.taskId
       if (!taskId) {
-        setPage({ kind: 'empty', message: 'Open a task or select an item from the Rollbar rail.' })
+        setPage({ kind: 'empty', title: 'Choose an error' })
         return
       }
 
@@ -133,14 +151,9 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
         setLinkedTargets(targets)
         const first = targets[0]
         if (first) await load(first)
-        else {
-          setPage({
-            kind: 'empty',
-            message: 'No Rollbar items are linked to this task. Select one from the Rollbar rail, then choose Create task from its row menu.',
-          })
-        }
+        else setPage({ kind: 'empty', title: 'This task has no Rollbar errors' })
       } catch (error) {
-        setPage({ kind: 'error', title: 'Could not read this task.', detail: detailOf(error) })
+        setPage({ kind: 'error', title: "Couldn't load this task", detail: failureReason(error) })
       }
     })()
   })
@@ -152,6 +165,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
           state={state()}
           activeTab={activeTab()}
           occurrence={occurrence()}
+          latest={latest()}
           refreshing={refreshing()}
           refreshError={refreshError()}
           onSelect={setActiveTab}
@@ -169,7 +183,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>
       <ListDetail split listWidth="narrow">
-        <ListColumn label="Linked Rollbar items">
+        <ListColumn label="Linked Rollbar errors">
           <For each={linkedTargets()}>{(target) => (
             <Row
               density="compact"
@@ -186,15 +200,29 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   )
 }
 
-// A `Show`, not a bare ternary. A component body runs once, so a ternary there stays on whichever
+// `Show`s, not a bare ternary. A component body runs once, so a ternary there stays on whichever
 // branch the first state picked: the pane mounts loading, the fetch fails, and the error had nowhere
 // to draw. What was left was the EmptyState with its text removed, which reads as a blank pane.
+//
+// Loading is the start-aligned busy line; nothing to show and a failure are the centred state a detail
+// column uses, the failure with its reason and **Try again** (linear/src/tree/app.tsx says why).
 function PageStatus(props: { state: PageState }) {
   const failure = () => (props.state.kind === 'error' ? props.state : undefined)
-  const message = () => (props.state.kind === 'error' ? '' : props.state.message)
+  const empty = () => (props.state.kind === 'empty' ? props.state : undefined)
   return (
-    <Show when={failure()} fallback={<EmptyState busy={props.state.kind === 'loading'}>{message()}</EmptyState>}>
-      {(error) => <Alert variant="banner" title={error().title}>{error().detail}</Alert>}
+    <Show when={failure()} fallback={(
+      <Show when={empty()} fallback={<EmptyState busy align="start" size="sm">Loading…</EmptyState>}>
+        {(state) => <EmptyState title={state().title} />}
+      </Show>
+    )}
+    >
+      {(error) => (
+        <EmptyState title={error().title}>
+          {error().detail}
+          {/* A child, not `action`: a tree's props are JSON, so an element-valued prop never arrives. */}
+          <Show when={error().retry}>{(retry) => <> <Button size="sm" variant="ghost" onPress={retry()}>Try again</Button></>}</Show>
+        </EmptyState>
+      )}
     </Show>
   )
 }

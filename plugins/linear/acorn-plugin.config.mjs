@@ -98,7 +98,7 @@ export default {
     }],
     sources: [{
       id: 'linear-issues',
-      label: 'Linear',
+      label: 'Linear issues',
       glyph: 'brand:linear',
       order: 20,
       providerId: 'linear',
@@ -120,7 +120,7 @@ export default {
       // workspace links none (client-core/features/tabs/railSources.ts), so the two empty lists left to explain are
       // followed projects with nothing active in them, and a repository its workspace follows Linear
       // for but which follows no Linear project of its own.
-      emptyState: { message: 'No active issues in the Linear projects this repository follows.' },
+      emptyState: { message: 'No open issues in the linked Linear projects.' },
     }],
     // `openPane: 'linear'` is the task pane, deliberately not the project surface. A content link is
     // clicked inside a PR conversation, a note, or an agent transcript, and each of those has a task.
@@ -160,7 +160,7 @@ export default {
       // row changes the URL and `linear-issue` draws beside the list.
       id: 'find-issue',
       title: 'Find a Linear issue',
-      hint: 'active issues in the Linear projects this repository follows',
+      hint: 'open issues in the linked Linear projects',
       keywords: ['issue', 'ticket', 'linear'],
       category: 'navigation',
       kind: 'search',
