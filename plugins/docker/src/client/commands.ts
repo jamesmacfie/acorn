@@ -9,6 +9,7 @@ import {
 import { fetchImages, fetchNetworks, fetchVolumes } from './dockerClient'
 import { containers, refreshDocker } from './dockerStore'
 import { revealDockerResource } from './dockerViewStore'
+import { captureDockerScope, type DockerScopeOwner } from './dockerScope'
 import type { DockerScope } from '../shared/model'
 
 // Docker in the palette: open the browse surface, and find one of the four things on the daemon
@@ -46,6 +47,8 @@ const resourceItem = (scope: DockerScope, id: string, title: string, subtitle?: 
   ref: id,
 })
 
+const origins = new WeakMap<CommandSearchItem, DockerScopeOwner>()
+
 export const dockerCommands: readonly ContributedCommand[] = [
   {
     id: 'source.docker.open',
@@ -70,12 +73,15 @@ export const dockerCommands: readonly ContributedCommand[] = [
     scope: 'none',
     requires: { plugin: 'docker' },
     placeholder: 'Find a container, image, volume or network…',
-    ...localSearch(async () => {
+    ...localSearch(async (context) => {
+      const owner = captureDockerScope(context.nodeId)
       // The containers come from the store this plugin already keeps in step with the daemon over the
       // socket; the other three are read here, because nothing keeps them resident.
       await refreshDocker()
-      const [images, volumes, networks] = await Promise.all([fetchImages(), fetchVolumes(), fetchNetworks()])
-      return [
+      if (!owner.current()) return []
+      const [images, volumes, networks] = await Promise.all([fetchImages(owner.nodeId), fetchVolumes(owner.nodeId), fetchNetworks(owner.nodeId)])
+      if (!owner.current()) return []
+      const items = [
         ...containers().map((container) => resourceItem(
           'containers',
           container.id,
@@ -87,10 +93,12 @@ export const dockerCommands: readonly ContributedCommand[] = [
         ...volumes.map((volume) => resourceItem('volumes', volume.name, volume.name, volume.driver)),
         ...networks.map((network) => resourceItem('networks', network.id, network.name, network.driver)),
       ]
+      for (const item of items) origins.set(item, owner)
+      return items
     }),
     select: (item): CommandOutcome => {
       const scope = item.id.slice(0, item.id.indexOf(':')) as DockerScope
-      if (!item.ref || !(scope in badge)) return COMMAND_CLOSED
+      if (!origins.get(item)?.current() || !item.ref || !(scope in badge)) return COMMAND_CLOSED
       // The source first, then what to land on: the shell draws from the selected source, and the
       // browse surface consumes the reveal whether it was already mounted or opens because of this.
       revealDockerResource(scope, item.ref)

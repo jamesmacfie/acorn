@@ -1,0 +1,23 @@
+{
+  "runtime": "v26.8.1",
+  "external": "mocked Docker CLI/fs, actual runtime owners",
+  "records": [
+    {
+      "name": "cold-health-and-list",
+      "requests": 16,
+      "healthCommands": 1,
+      "inventoryCommands": 1
+    },
+    {
+      "name": "empty-inventory-summary",
+      "tasks": 300,
+      "containers": 0,
+      "returnedSummaries": 0,
+      "configReads": 0,
+      "peakConfigReads": 0,
+      "elapsedMs": 0.07912499999997635,
+      "cpuMs": 0.085,
+      "note": "Each synthetic fs read has 1ms delay; elapsed is a waterfall demonstration, not disk timing."
+    }
+  ]
+}

@@ -4,6 +4,7 @@
 // precedent: the plugin owns its eviction by subscribing to the core lifecycle event).
 import { createSignal } from 'solid-js'
 import { clientEvents } from '@acorn/plugin-api/client'
+import { dockerScopeKey, onDockerRetired } from './dockerScope'
 import type { DockerScope } from '../shared/model'
 
 export type DockerDetailTab = 'info' | 'logs' | 'stats' | 'terminal'
@@ -16,13 +17,13 @@ export type DockerDetailViewState = {
 
 const selectedByTask = new Map<string, string>()
 const detailStates = new Map<string, DockerDetailViewState>()
-const detailKey = (taskId: string | undefined, target: string): string => `${taskId ?? 'browse'}:${target}`
+const detailKey = (taskId: string | undefined, target: string): string => dockerScopeKey(taskId ?? 'browse', target)
 
 export const rememberDockerSelection = (taskId: string, containerId: string): void => {
-  selectedByTask.set(taskId, containerId)
+  selectedByTask.set(dockerScopeKey(taskId), containerId)
 }
 
-export const dockerSelection = (taskId: string): string | undefined => selectedByTask.get(taskId)
+export const dockerSelection = (taskId: string): string | undefined => selectedByTask.get(dockerScopeKey(taskId))
 
 export const rememberDockerDetailState = (taskId: string | undefined, target: string, state: DockerDetailViewState): void => {
   detailStates.set(detailKey(taskId, target), state)
@@ -60,10 +61,14 @@ export const consumeDockerReveal = (): DockerReveal | null => {
 /** The signal itself, for a surface that wants to react to a reveal arriving while it is on screen. */
 export const dockerReveal = pendingReveal
 
+onDockerRetired(() => setPendingReveal(null))
+
 clientEvents.on('runtime:task-archived', ({ taskId }) => {
-  selectedByTask.delete(taskId)
-  const prefix = `${taskId}:`
-  for (const key of detailStates.keys()) if (key.startsWith(prefix)) detailStates.delete(key)
+  selectedByTask.delete(dockerScopeKey(taskId))
+  for (const key of detailStates.keys()) {
+    const [nodeId, task] = JSON.parse(key) as [string | null, string]
+    if (JSON.stringify([nodeId, task]) === dockerScopeKey(taskId)) detailStates.delete(key)
+  }
 })
 
 // A container state's StatusDot tone. One mapping for the browse list, the task pane, and the detail

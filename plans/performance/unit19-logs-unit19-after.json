@@ -1,0 +1,25 @@
+{
+  "runtime": "v24.11.0",
+  "owner": "production dockerLogStore",
+  "fixture": "one Solid browser runtime, mocked stream, fake 50ms cadence; no DOM",
+  "records": [
+    {
+      "consumer": false,
+      "buffers": 8,
+      "chunks": 24000,
+      "projections": 0,
+      "retainedCharacters": 4194304,
+      "cpuMs": 12.184,
+      "elapsedMs": 8.746000000001004
+    },
+    {
+      "consumer": true,
+      "buffers": 8,
+      "chunks": 24000,
+      "projections": 808,
+      "retainedCharacters": 4194304,
+      "cpuMs": 127.715,
+      "elapsedMs": 382.7552919999998
+    }
+  ]
+}

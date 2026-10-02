@@ -2,6 +2,8 @@
 // as the node reads them from the project's checkout and the home config
 // (../server/dockerConfig.ts). Read only: the keys live in `.acorn/config.toml`, a file the repo
 // commits, and the tab says where to change them rather than writing a committed file for the person.
+import { queryOwner } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
 import { createResource, Show } from 'solid-js'
 import { CodeBlock, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
 import type { DockerMatcherKeys } from '../shared/model'
@@ -28,7 +30,8 @@ const KEYS: Array<{ key: keyof DockerMatcherKeys; label: string; description: st
 ]
 
 export default function DockerProjectSettings(props: ProjectScope) {
-  const [matcher] = createResource(() => props.context.scope.project?.id, fetchProjectMatcher)
+  const nodeId = queryOwner(useQueryClient())
+  const [matcher] = createResource(() => props.context.scope.project?.id, id => fetchProjectMatcher(id, nodeId))
   const from = (key: keyof DockerMatcherKeys): string | undefined => {
     const layers = matcher.latest
     if (!layers) return undefined

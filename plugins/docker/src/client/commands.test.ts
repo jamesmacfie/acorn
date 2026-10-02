@@ -19,6 +19,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 }))
 
 import { dockerCommands } from './commands'
+import { setActiveNode } from '@acorn/plugin-api/client'
 import { consumeDockerReveal } from './dockerViewStore'
 
 // One search over the four things the daemon holds, and where picking one lands. What is pinned is the
@@ -35,6 +36,7 @@ const find = (): SearchCommand => at('docker.find') as SearchCommand
 
 describe('the docker plugin catalogue', () => {
   beforeEach(() => {
+    setActiveNode('node-1')
     vi.clearAllMocks()
     consumeDockerReveal()
     mocks.refreshDocker.mockResolvedValue(undefined)
@@ -90,4 +92,20 @@ describe('the docker plugin catalogue', () => {
     // Taken once: a later remount must not jump somewhere the reader has since navigated away from.
     expect(consumeDockerReveal()).toBeNull()
   })
+  it('drops a held lookup and an earlier selection after switching Nodes', async () => {
+    let resolve!: (rows: unknown[]) => void
+    mocks.fetchImages.mockReturnValueOnce(new Promise(done => { resolve = done }))
+    const held = find().query('', context(), signal())
+    await vi.waitFor(() => expect(mocks.fetchImages).toHaveBeenCalledTimes(1))
+    setActiveNode('node-2')
+    resolve([])
+    expect(await held).toEqual([])
+    setActiveNode('node-1')
+    const rows = await find().query('', context(), signal())
+    setActiveNode('node-2')
+    find().select(rows[0], context())
+    expect(consumeDockerReveal()).toBeNull()
+    expect(mocks.setSelectedSource).not.toHaveBeenCalled()
+  })
+
 })

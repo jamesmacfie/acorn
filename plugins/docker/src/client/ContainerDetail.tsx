@@ -1,7 +1,9 @@
 // Shared container detail panel (docs/docker.md): Info + live Logs + live Stats tabs, used by the
 // browse right pane and the task pane. One component, two hosts, the same split as RollbarItemPanel.
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
-import { requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
+import { queryOwner, requestTerminalFocusIntent, toast, writeJson } from '@acorn/plugin-api/client'
+import { useQueryClient } from '@tanstack/solid-query'
+import { captureDockerScope } from './dockerScope'
 import { terminalSessionsRoute } from '@acorn/plugin-terminal/contract/api.ts'
 import { wsDockerAttach } from './wsChannel'
 import type { DockerStatsSample } from '../shared/wsFrames'
@@ -18,20 +20,28 @@ import {
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 
-  // Try bash, fall back to sh. Works across alpine/debian-ish images.
+// Try bash, fall back to sh. Works across alpine/debian-ish images.
 const execCommand = (ref: string): string => `docker exec -it ${ref} sh -c 'command -v bash >/dev/null && exec bash || exec sh'`
 
 const portLabel = (p: DockerPort): string =>
   p.hostPort ? `${p.hostPort} → ${p.containerPort}/${p.protocol}` : `${p.containerPort}/${p.protocol}`
 
 export default function ContainerDetail(props: { target: string; taskId?: string; onRemoved?: () => void; actions?: JSX.Element }) {
+  const owner = captureDockerScope(queryOwner(useQueryClient()))
+  let mounted = true
+  onCleanup(() => { mounted = false })
+  const document = createMemo(() => ({ target: props.target, taskId: props.taskId }))
+  const captureView = () => {
+    const view = document()
+    return { ...view, current: () => mounted && owner.current() && view === document() }
+  }
   const initialView = dockerDetailState(props.taskId, props.target)
   const [tab, setTab] = createSignal<Tab>(initialView?.tab ?? 'info')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const [showEnv, setShowEnv] = createSignal(false)
 
-  const [detail, { refetch }] = createResource(() => props.target, fetchContainerDetail)
+  const [detail, { refetch }] = createResource(() => props.target, target => fetchContainerDetail(target, owner.nodeId))
 
   // Live logs: a session-scoped buffer (dockerLogStore) that outlives this component, so
   // navigating away and back lands on the same content; view state (tab/follow/find) is restored per
@@ -46,9 +56,12 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   const logLines = createMemo(() => logText().split('\n'))
 
   // Remembered eagerly on every mutation (tab/follow/find), so no unmount hook is needed.
-  const rememberView = () => rememberDockerDetailState(props.taskId, props.target, {
-    tab: tab(), logScrollTop: 0, logFollow: follow(), logQuery: logQuery(),
-  })
+  const rememberView = () => {
+    if (!owner.current()) return
+    rememberDockerDetailState(props.taskId, props.target, {
+      tab: tab(), logScrollTop: 0, logFollow: follow(), logQuery: logQuery(),
+    })
+  }
   const switchTab = (t: Tab) => {
     setTab(t)
     rememberView()
@@ -61,10 +74,13 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     setFollow(saved?.logFollow ?? true)
     setLogQuery(saved?.logQuery ?? '')
     setMatchIdx(0)
+    setBusy(false)
+    setError('')
+    setShowEnv(false)
   }, { defer: true }))
 
   createEffect(on(() => (tab() === 'logs' ? props.target : null), (ref) => {
-    setLogBuf(ref ? dockerLogBuffer(ref) : null)
+    setLogBuf(owner.current() && ref ? dockerLogBuffer(ref) : null)
   }))
 
   // Find-in-logs: case-insensitive substring over the visible buffer. The count and the keyboard
@@ -93,7 +109,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   createEffect(on(() => (tab() === 'stats' ? props.target : null), (ref) => {
     setStats(null)
     setStatsEnded(false)
-    if (!ref) return
+    if (!ref || !owner.current()) return
     const off = wsDockerAttach('stats', ref, (event) => {
       if (event.kind === 'stats') setStats(event.sample)
       else if (event.kind === 'end') setStatsEnded(true)
@@ -102,29 +118,35 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   }))
 
   async function act(action: DockerContainerAction) {
+    const view = captureView()
+    if (!view.current()) return
     setBusy(true)
     setError('')
     try {
-      await containerAction(props.target, action)
-      await Promise.all([refetch(), refreshDocker()])
+      await containerAction(view.target, action, owner.nodeId)
+      if (!view.current()) return
+      await Promise.all([refetch(), refreshDocker(true)])
     } catch (e) {
-      setError(e instanceof Error ? e.message : `${action} failed`)
+      if (view.current()) setError(e instanceof Error ? e.message : `${action} failed`)
     } finally {
-      setBusy(false)
+      if (view.current()) setBusy(false)
     }
   }
 
   async function remove() {
+    const view = captureView()
+    if (!view.current()) return
     setBusy(true)
     setError('')
     try {
-      await removeContainer(props.target, detail()?.state === 'running')
-      await refreshDocker()
-      props.onRemoved?.()
+      await removeContainer(view.target, detail()?.state === 'running', owner.nodeId)
+      if (!view.current()) return
+      await refreshDocker(true)
+      if (view.current()) props.onRemoved?.()
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'remove failed')
+      if (view.current()) setError(e instanceof Error ? e.message : 'remove failed')
     } finally {
-      setBusy(false)
+      if (view.current()) setBusy(false)
     }
   }
 
@@ -139,7 +161,9 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   // drawer (plain HTTP plus the core focus intent, no terminal-plugin import). Without one, copy
   // the command for any terminal.
   async function openExec(name: string) {
-    if (!props.taskId) {
+    const view = captureView()
+    if (!view.current()) return
+    if (!view.taskId) {
       void navigator.clipboard.writeText(execCommand(name))
       toast('Copied exec command')
       return
@@ -147,13 +171,14 @@ export default function ContainerDetail(props: { target: string; taskId?: string
     setError('')
     try {
       const session = await writeJson<{ id: string }>(terminalSessionsRoute, {
+        nodeId: owner.nodeId,
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ taskId: props.taskId, command: execCommand(name), title: `docker: ${name}` }),
+        body: JSON.stringify({ taskId: view.taskId, command: execCommand(name), title: `docker: ${name}` }),
       })
-      requestTerminalFocusIntent(props.taskId, session.id)
+      if (view.current()) requestTerminalFocusIntent(view.taskId, session.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'could not open a terminal session')
+      if (view.current()) setError(e instanceof Error ? e.message : 'could not open a terminal session')
     }
   }
 
@@ -316,7 +341,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
 
             <TabPanel id="terminal" active={running() ? tab() : ''} idPrefix="docker-detail">
               {/* The exec session draws its own `Rectangle kind="pty"` (./DockerExecTerminal.tsx). */}
-              <DockerExecTerminal containerRef={d().name} label={`${d().name} shell`} />
+              <Show when={d().id} keyed>{(id) => <DockerExecTerminal containerRef={id} label={`${d().name} shell`} />}</Show>
             </TabPanel>
 
             <TabPanel id="stats" active={tab()} idPrefix="docker-detail">

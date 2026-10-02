@@ -2,9 +2,10 @@
 // containers by compose project (running groups first, a Stopped section below) with a tab strip for
 // Images / Volumes / Networks; the right pane is the shared ContainerDetail. Refresh is event-driven:
 // the store re-fetches on `docker:changed`.
-import { createQuery } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { prefsOptions } from '@acorn/plugin-api/client'
+import { captureDockerScope } from './dockerScope'
+import { prefsOptions, queryOwner } from '@acorn/plugin-api/client'
 import { wsOnDockerChanged } from './wsChannel'
 import { readDockerPrefs } from './dockerPrefs'
 import type { DockerComposeAction, DockerContainerSummary, DockerPruneKind } from '../shared/model'
@@ -55,6 +56,10 @@ function groupContainers(list: DockerContainerSummary[]): Group[] {
 const label = (g: Group): string => g.project ?? g.containers[0]?.name ?? ''
 
 export default function DockerBrowse() {
+  const owner = captureDockerScope(queryOwner(useQueryClient()))
+  let mounted = true
+  onCleanup(() => { mounted = false })
+  const current = () => mounted && owner.current()
   const [section, setSection] = createSignal<SectionId>('containers')
   const [selected, setSelected] = createSignal<string | null>(null)
   const [filter, setFilter] = createSignal('')
@@ -82,20 +87,20 @@ export default function DockerBrowse() {
   })
 
   // Object lists load on section entry and refresh on their docker:changed scope.
-  const [images, imagesCtl] = createResource(() => (section() === 'images' ? 'images' : null), fetchImages)
-  const [volumes, volumesCtl] = createResource(() => (section() === 'volumes' ? 'volumes' : null), fetchVolumes)
-  const [networks, networksCtl] = createResource(() => (section() === 'networks' ? 'networks' : null), fetchNetworks)
+  const [images, imagesCtl] = createResource(() => (section() === 'images' ? 'images' : null), () => fetchImages(owner.nodeId))
+  const [volumes, volumesCtl] = createResource(() => (section() === 'volumes' ? 'volumes' : null), () => fetchVolumes(owner.nodeId))
+  const [networks, networksCtl] = createResource(() => (section() === 'networks' ? 'networks' : null), () => fetchNetworks(owner.nodeId))
   const offChanged = wsOnDockerChanged((scopes) => {
-    if (scopes.includes('images') && section() === 'images') void imagesCtl.refetch()
-    if (scopes.includes('volumes') && section() === 'volumes') void volumesCtl.refetch()
-    if (scopes.includes('networks') && section() === 'networks') void networksCtl.refetch()
+    if (current() && scopes.includes('images') && section() === 'images') void imagesCtl.refetch()
+    if (current() && scopes.includes('volumes') && section() === 'volumes') void volumesCtl.refetch()
+    if (current() && scopes.includes('networks') && section() === 'networks') void networksCtl.refetch()
   })
   onCleanup(offChanged)
 
   const failing = <T,>(work: Promise<T>): Promise<T | null> => {
-    setActionError('')
+    if (current()) setActionError('')
     return work.catch((e) => {
-      setActionError(e instanceof Error ? e.message : 'action failed')
+      if (current()) setActionError(e instanceof Error ? e.message : 'action failed')
       return null
     })
   }
@@ -104,20 +109,24 @@ export default function DockerBrowse() {
   const dockerPrefs = () => readDockerPrefs(prefs.data)
 
   async function prune(kind: DockerPruneKind) {
+    if (!current()) return
     setPruneNote('pruning…')
-    const result = await failing(dockerPrune(kind))
+    const result = await failing(dockerPrune(kind, owner.nodeId))
+    if (!current()) return
     setPruneNote(result ? `reclaimed ${result.reclaimed}` : '')
     if (kind === 'images') void imagesCtl.refetch()
     if (kind === 'volumes') void volumesCtl.refetch()
     if (kind === 'networks') void networksCtl.refetch()
-    if (kind === 'containers') void refreshDocker()
+    if (kind === 'containers') void refreshDocker(true)
   }
 
   async function groupAction(project: string, action: DockerComposeAction) {
+    if (!current()) return
     setGroupBusy(project)
-    await failing(composeAction(project, action))
-    await refreshDocker()
-    setGroupBusy(null)
+    await failing(composeAction(project, action, owner.nodeId))
+    if (!current()) return
+    await refreshDocker(true)
+    if (current()) setGroupBusy(null)
   }
 
   // Stale stacks: compose projects whose worktree directory is gone.
@@ -126,8 +135,13 @@ export default function DockerBrowse() {
   )])
 
   async function cleanUpStale() {
-    for (const project of staleProjects()) await failing(composeAction(project, 'down'))
-    await refreshDocker()
+    const projects = staleProjects()
+    for (const project of projects) {
+      if (!current()) return
+      await failing(composeAction(project, 'down', owner.nodeId))
+    }
+    if (!current()) return
+    await refreshDocker(true)
   }
 
   const filtered = createMemo(() => {
@@ -159,14 +173,16 @@ export default function DockerBrowse() {
   }
 
   async function rowAction(c: DockerContainerSummary, kind: 'toggle' | 'remove') {
+    if (!current()) return
     setRowBusy(c.id)
-    if (kind === 'toggle') await failing(containerAction(c.id, isActive(c) ? 'stop' : 'start'))
+    if (kind === 'toggle') await failing(containerAction(c.id, isActive(c) ? 'stop' : 'start', owner.nodeId))
     else {
-      const ok = await failing(removeContainer(c.id, isActive(c)))
-      if (ok && selected() === c.id) setSelected(null)
+      const ok = await failing(removeContainer(c.id, isActive(c), owner.nodeId))
+      if (current() && ok && selected() === c.id) setSelected(null)
     }
-    await refreshDocker()
-    setRowBusy(null)
+    if (!current()) return
+    await refreshDocker(true)
+    if (current()) setRowBusy(null)
   }
 
   // Destructive actions arm through `ConfirmButton` unless the reader turned the gate off, so the
@@ -373,7 +389,7 @@ export default function DockerBrowse() {
                     title="Remove image"
                     confirmLabel="Remove image?"
                     skipConfirm={skipConfirm()}
-                    onConfirm={() => void failing(removeImage(entry.img.id, false)).then(() => imagesCtl.refetch())}
+                    onConfirm={() => void failing(removeImage(entry.img.id, false, owner.nodeId)).then(() => { if (current()) return imagesCtl.refetch() })}
                   >🗑</ConfirmButton>
                 }
               >
@@ -410,7 +426,7 @@ export default function DockerBrowse() {
                     title="Remove volume (deletes its data)"
                     confirmLabel="Remove volume?"
                     skipConfirm={skipConfirm()}
-                    onConfirm={() => void failing(removeVolume(entry.volume.name, false)).then(() => volumesCtl.refetch())}
+                    onConfirm={() => void failing(removeVolume(entry.volume.name, false, owner.nodeId)).then(() => { if (current()) return volumesCtl.refetch() })}
                   >🗑</ConfirmButton>
                 }
               >
@@ -448,7 +464,7 @@ export default function DockerBrowse() {
                       title="Remove network"
                       confirmLabel="Remove network?"
                       skipConfirm={skipConfirm()}
-                      onConfirm={() => void failing(removeNetwork(entry.network.id)).then(() => networksCtl.refetch())}
+                      onConfirm={() => void failing(removeNetwork(entry.network.id, owner.nodeId)).then(() => { if (current()) return networksCtl.refetch() })}
                     >🗑</ConfirmButton>
                   </Show>
                 }

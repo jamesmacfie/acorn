@@ -1,0 +1,26 @@
+{
+  "owner": "actual Docker ws channel, activeNode, wsClient, synthetic transport",
+  "sends": [
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "docker:logs:attach",
+        "id": "same-container"
+      }
+    },
+    {
+      "nodeId": "node-a",
+      "frame": {
+        "channel": "docker:logs:detach",
+        "id": "same-container"
+      }
+    }
+  ],
+  "oldSubscriptionReplayedAfterSwitch": [],
+  "oldSubscriptionReceivedNewNodeOutput": [
+    {
+      "kind": "end"
+    }
+  ],
+  "expected": "A stream is keyed to its originating Node; departing cleanup addresses A, and B same-ID frames cannot feed A log history."
+}
