@@ -50,6 +50,8 @@ export { Wizard } from '../layouts/Wizard'
 
 // The compiled message composer uses the terminal projection of the host's model-choice control.
 export { ModelPickerPopover } from './asking/modelPickerPopover'
+export { IconPicker } from './asking/iconPicker'
+export type { IconPickerProps } from '@acorn/client-core/kit/components/inputs'
 
 // ── The acorn ────────────────────────────────────────────────────────────────────────────────────
 

@@ -4,7 +4,7 @@ import { pluginLabel, useSettingsDetail, useUnsavedChanges } from '@acorn/plugin
 import {
   Alert, Badge, Button, EmptyState, Field, Icon, Inline, Input, Select, SettingRow, SettingsSection, Stack, Text, Textarea,
 } from '@acorn/plugin-api/ui'
-import { confirmAction } from '@acorn/plugin-api/ui/host'
+import { confirmAction, IconPicker } from '@acorn/plugin-api/ui/host'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { MAX_CUSTOM_AGENT_INSTRUCTIONS, type CustomAgent, type CustomAgentInput } from '../../shared/customAgents'
 import { managedAgentApi } from '../sessions/managedClient'
@@ -235,9 +235,13 @@ function AgentEditor(props: {
           <Field label="Description" hint="Shown under the name in New. Leave it empty to show the harness and its settings.">
             <Input value={draft().description ?? ''} maxLength={500} onInput={(description) => update({ description: description || undefined })} />
           </Field>
-          {/* A typed name: the kit's icon picker is not on the plugin surface (deferred, B06 06-17). */}
-          <Field label="Icon" hint="A Lucide icon name, such as bug. Leave it empty to use the harness's icon.">
-            <Input value={draft().glyph ?? ''} maxLength={200} onInput={(glyph) => update({ glyph: glyph.trim() || undefined })} />
+          <Field label="Icon" hint="Choose an icon, or reset to use the harness's icon.">
+            <IconPicker
+              ariaLabel="Agent icon"
+              value={draft().glyph ?? null}
+              fallback={provider()?.glyph ?? provider()?.label.slice(0, 1).toUpperCase() ?? 'bot'}
+              onSelect={(glyph) => update({ glyph: glyph ?? undefined })}
+            />
           </Field>
           <Field label="Harness">
             <Select

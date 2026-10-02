@@ -1,4 +1,6 @@
 export { Composer } from './Composer.tsx'
 export { FindBar } from './FindBar.tsx'
 export { IconButton } from './IconButton.tsx'
+export { default as IconPicker } from './IconPicker.tsx'
+export type { IconPickerProps } from './IconPicker.tsx'
 export { KeyValueEditor } from './KeyValueEditor.tsx'

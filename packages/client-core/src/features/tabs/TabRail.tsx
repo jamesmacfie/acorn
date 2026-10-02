@@ -648,7 +648,7 @@ export default function TabRail() {
                   {/* Kept out of the field, which would otherwise name the icon button "Title". It
                       has its own name, "Task icon". */}
                   <FieldProvider value={NO_FIELD}>
-                    <IconPicker value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
+                    <IconPicker ariaLabel="Task icon" value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
                   </FieldProvider>
                   <Input
                     ref={(el) => (draftTitle = el)}

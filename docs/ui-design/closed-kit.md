@@ -53,6 +53,11 @@ Compiled controls can compose these nodes without joining the remote vocabulary.
 choices its caller supplies as JSX. The desktop and terminal hosts provide that composition. It has
 no support-matrix row because a remote tree describes the component nodes themselves.
 
+`IconPicker` on `@acorn/plugin-api/ui/host` composes the searchable picker, icon previews, random
+selection, and reset to the caller's default. The task modal and custom agent editor share it.
+Its `ariaLabel` names the control for its caller. The terminal composition draws an editable icon
+name and a reset button; it has no glyph previews or random selection. It adds no remote tree node.
+
 Two hosts exist, and both draw the whole kit. `dom` is the desktop and the browser, from
 `client-core/host/tree/components.ts`. `tui` is the terminal, from `apps/tui/src/kit/components.tsx`,
 since 2026-08-31 (`docs/tui.md`). The two tables have the same

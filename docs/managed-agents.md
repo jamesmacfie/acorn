@@ -995,6 +995,10 @@ effort, and mode pickers are read off the newest session that advertised them, t
 and defaults reads them, with the same limit: a harness you have not run inside the 50 most recent sessions shows no
 pickers until you run it again.
 
+The icon control uses the shared `IconPicker`, also used by the task modal. You can search Lucide
+icons, choose a random icon, or reset to the harness's icon. Reset removes the optional `glyph`
+override from the saved agent, so changing its harness also changes its default icon.
+
 **Another agent can start one by name.** `agent_spawn` takes `agent`, a name or an id
 ([agent-tools.md](./agent-tools.md) § Managed-session orchestration). The lookup is by id first, then by name ignoring
 case.

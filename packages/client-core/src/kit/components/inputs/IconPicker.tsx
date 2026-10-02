@@ -31,13 +31,16 @@ const iconWords = (name: string): string => {
   return words.charAt(0).toUpperCase() + words.slice(1)
 }
 
-export default function IconPicker(props: {
+export type IconPickerProps = {
   value: string | null
   /** Shown when `value` is null: the caller's derived default (e.g. the task's origin icon). */
   fallback: string
   onSelect: (icon: string | null) => void
+  ariaLabel?: string
   disabled?: boolean
-}) {
+}
+
+export default function IconPicker(props: IconPickerProps) {
   // The picker is the one surface that has to see every name, and the one where a row drawing its own
   // text instead of its icon would be the point of the screen missed. Awaited here rather than at the
   // call site: opening this popover is the moment the full set is worth its 371 KB
@@ -58,7 +61,7 @@ export default function IconPicker(props: {
   return (
     <Picker<string>
       label={<Icon name={props.value ?? props.fallback} />}
-      ariaLabel="Task icon"
+      ariaLabel={props.ariaLabel ?? 'Icon'}
       placeholder="Filter icons…"
       emptyText="No icon matches."
       results={results}

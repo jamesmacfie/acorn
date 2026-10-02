@@ -13,7 +13,10 @@ const agents: CustomAgent[] = [
 ]
 
 const confirmAction = vi.fn(async (_question: { title: string }) => false)
-vi.mock('@acorn/plugin-api/ui/host', () => ({ confirmAction: (question: { title: string }) => confirmAction(question) }))
+vi.mock('@acorn/plugin-api/ui/host', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/ui/host')>(),
+  confirmAction: (question: { title: string }) => confirmAction(question),
+}))
 
 const deleteCustomAgent = vi.fn(async (_client: unknown, _id: string) => {})
 vi.mock('./customAgentsClient', () => ({
