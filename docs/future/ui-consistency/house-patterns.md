@@ -1,11 +1,13 @@
-# House patterns: the yardstick for the remaining batches
+# House patterns: the yardstick for the final sweep
 
-**Status:** reference for the open batches. Written 2026-10-01, after batches K1a to B05. Line numbers
-are from 2026-10-01 and may have moved. Where this file and an owning doc disagree, the owning doc wins:
+**Status:** complete for every batch, K1a to B11. Written 2026-10-01 after B05, and brought up to date
+on 2026-10-02 with what B06 to B11 settled. The final sweep checks the app against it, and when the
+programme closes, its rules move into the owning docs. Line numbers are from 2026-10-01 and may have
+moved. Where this file and an owning doc disagree, the owning doc wins:
 [UI design](../../ui-design.md), [the closed kit](../../ui-design/closed-kit.md), and
 [frontend](../../frontend.md).
 
-This is the review's baseline, condensed, and updated for what the kit batches changed. Measurements are
+This is the review's baseline, condensed, and updated for what the kit and area batches changed. Measurements are
 logical pixels in the Terminal style pack. Judge a fix against this file: the same role should look and
 behave the same way on every page.
 
@@ -71,6 +73,14 @@ hex colour outside the token sheets, and at most 147 off-scale spacing pixels.
   `DetailColumn measure="page"` caps a detail column's content at 720 and starts it at the column's
   start edge; chrome bars are not capped.
 - A tree or pane root whose content can be long must be `<Stack grow>`, or the region clips it.
+- A bar that heads a scrolling detail column sits on its top edge, with no gap above (B07a). A list
+  footer that holds only a bar sits on the column's bottom edge (B07b). An action row in a list footer
+  takes the footer's pad once, not the pane-edge pad as well (B08a).
+- A `sub` heading in a list column that does not scroll, or in a host list region, takes the pane inset
+  and a group label's rhythm (B08b, B11). So does a banner in a detail column that does not scroll
+  (B11).
+- Rows inside a `Card` keep their own inset and do not pull out, so in a dashboard panel list rows start
+  17 in from the card's title. That is deliberate (B10b).
 
 ## Page title
 
@@ -105,6 +115,7 @@ inside content is level 3. Pick the level for the role, never for its size.
 - A list with more than one section uses `level="group"` for each, never a pane-level header mid-list.
 - A label that is content (a path, a name, a sentence) uses `level="sub"` for a `Fold` or
   `SectionHeader`, so it keeps its case.
+- A group label that holds an icon button is 34 high (B08b).
 - Only pane and group headers stick. A `sub` header and every `Fold` summary scroll, unless they carry
   `sticky`. A `sub` header right after a setting row takes `--gap-section` above it.
 - In a dense list or form, a subheading is `SectionHeader level="sub"` (12, 600, `--text`). In a
@@ -202,6 +213,8 @@ row's `error`, which means "the last write failed" (plan decision 12).
 - An "add" action is the word with `Icon name="plus"`, never a typed "+".
 - A destructive two-press button is `ConfirmButton` with `confirmLabel="{Verb} {thing}?"`. Armed, it
   keeps at least its resting width. The default prompt is "Confirm?".
+- An armed icon-only or xs `ConfirmButton` grows to fit its prompt, so the prompt never overlaps the
+  row's text (B08a, B11).
 - Buttons, links, and segmented controls do not stretch in a `Stack`, a settings section, a stacked
   setting row, or a stacked `Field`.
 - Every row of buttons is `--gap-row` apart.
@@ -213,6 +226,9 @@ row's `error`, which means "the last write failed" (plan decision 12).
 - `Field`'s caption is a `<label for>` its control; the hint, error, and help describe it. `hint` is what
   to type. `help` is how it works. A `Picker` claims the nearest field; wrap one in the `NO_FIELD`
   provider when the caption should name another control.
+- Fields in a dialog are md, like fields in a page form (B11).
+- A `Field` label is a plain string. Anything more, such as a column's type or "Primary key", goes in
+  the hint: "uuid · Primary key" (B11).
 - Number fields that hold a few digits take `width="narrow"`.
 - `Inline even` lays a row of equal fields or choice cards on an equal-column grid that wraps below
   12rem. Only a `Card` child stretches.
@@ -255,6 +271,20 @@ the solid primary, with the modal footer's padding and divider (plan decision 15
   spinner and text in one row.
 - A failure says what failed in one sentence, gives a plain reason, and offers **Try again** (or
   **Reconnect** for an auth failure). Never show a raw error code. Write "Couldn't", not "Could not".
+- A load failure that leaves a list or pane with no data is a centred, titled `EmptyState` with the
+  reason in words, not a banner (B09, B10a). In a remote tree, **Try again** is a child of the state,
+  because a tree's `action` prop never arrives. A tree cannot offer **Reconnect** yet, so an auth
+  reason says "Reconnect Linear in Settings." in words.
+- Map error codes to sentences in one table per plugin: GitHub's `client/actionErrors.ts`, and
+  `failureReason` in the Linear and Rollbar tree models. Keep a message that is the provider's own
+  prose. A failed write that keeps its data on screen is a toast or a banner, not an empty state.
+- A filter that hides every row says "Nothing matches that filter." in the list. In a detail column it
+  is a centred state with **Clear filter** (B08a, B10a).
+- A list shows no count until it has answered once, never a loading "0" (B10a).
+- Loading must not flash the empty state. A model that can be empty tracks `loaded`, true after its
+  first read, and shows "No changes" only after that (B08a).
+- Inside a detail, a missing value is a muted line ("No description.") or words in the fact ("Not
+  resolved"), never an em dash and never the small `EmptyState`, which takes the row inset (B10a).
 
 ## List and detail, and rows
 
@@ -265,6 +295,11 @@ the solid primary, with the modal footer's padding and divider (plan decision 15
   at 17.
 - Row meta shrinks, caps at half the row, and ends in an ellipsis; the body keeps at least `8ch`. Keep
   meta short ("14m", "Up 14h") and put the full value in a tip.
+- A rail or list row gives its title the room: one leading glyph, the title, and at most one short
+  field (B09, B10a). A second fixed-width field left Linear's title 31 pixels wide.
+- A row's `tip` is what the row truncates, usually the full title, with the age or status under it. A
+  row with a `tip` drops its native `title`, which was its accessible name, so it takes `label` too
+  (B09, B10a).
 - In a row body written as a line of texts, the first keeps its width and the rest give way, so a file
   name stays whole.
 - `RowActions` hides until hover, focus, or selection, and stays while its menu is open.
@@ -273,11 +308,29 @@ the solid primary, with the modal footer's padding and divider (plan decision 15
 - An include or stage checkbox in a list is the row's last trailing control, lined up with its group's
   box, with a styled tip. In a full-width pane it leads instead (`Fold leading`).
 - Do not change row heights, the diff's line height, or virtual-list geometry in this pass.
+- Picking another item clears the one on screen, or remounts it in a keyed `Show` over a memo of the
+  route, so nothing from the last item lands on the next (B09, B10a). A refresh keeps the item on
+  screen, with a banner above it while the read is out.
 
 ## Status badges
 
 - Status is a toned `Badge` with a sentence-case word: Open, Draft, Merged, Closed; Passed, Failed,
   Running; Connected, Needs you, Off; Installed, Not installed. Never an enum word, never colour alone.
+- Each domain reads its words from one map, which every surface in that domain shares:
+
+  | Domain | Map |
+  | --- | --- |
+  | Plugins | `statusWord` in `packages/client-core/src/features/settings/plugins/installed.ts` |
+  | Workflow runs and steps | `statusLabel` in `plugins/workflows/src/client/runs/runDisplay.ts` |
+  | Checks | `checkStatusWord` and `checksSummary` on `@acorn/plugin-api/client` |
+  | Notes and Context scope | `packages/protocol/src/projects/notes.ts` (Task, Workspace, Everywhere) |
+  | Memory type and scope | `MEMORY_TYPE_LABEL` and `MEMORY_SCOPE_LABEL` in `plugins/memory/src/client/memoryClient.ts` |
+
+  Add a word to the map, not to a call site. Settings › Run history and Agent Center still print their
+  own run words; see [deferred.md](./deferred.md) § B07b.
+- A word with no state worth a colour, such as Canceled, is neutral. `Badge` has no muted tone.
+- Show no badge for the ordinary state when the others are the news: a ready memory suggestion has
+  none (B08b).
 - A dot that stays gets `StatusDot tip`. A badge whose word needs a reason gets `Badge tip` (a tipped
   badge is a tab stop).
 - Every small bordered label is a `Badge`. `Chip` is the interactive node; never use it as a label.
@@ -306,14 +359,20 @@ the solid primary, with the modal footer's padding and divider (plan decision 15
 - When a label changes, change its settings search declaration and any test that asserts the old text.
 - Plugins are named by `pluginLabel(idOrRow)` (from `@acorn/plugin-api/client`), which falls back to the
   id. Paths are shortened with `formatPath` (core only; it keeps the last two folders and writes the
-  home folder as `~`). Chords go through `formatChord`.
+  home folder as `~`). Chords go through `formatChord`, which a remote tree imports from
+  `@acorn/plugin-api/ui/tree` to write a `tipKey`.
+- Dates in a row or fact read "Oct 7". Ages are short ("5m", "Sent just now"), with the full date in a
+  tip. Counts take a thousands separator.
+- Mono is for values a person might copy: versions, hosts, paths, and commands. Not for titles, names,
+  or messages (B10a).
+- A second of a thing is numbered in words: "Shell", "Shell 2"; "Query 1"; "Run a command 2".
 - Vocabulary, until the product call: "this computer" in static copy about the machine the window runs
   on; **This device** for device-scoped chips; the node's label where the code knows it is another
   machine.
 
 ## Decisions this plan takes
 
-These settled conflicts between areas. Each is reversible. Status as of 2026-10-01.
+These settled conflicts between areas. Each is reversible. Status as of 2026-10-02.
 
 1. **Page-form footers are a left-aligned `Inline gap="row"`:** the one `solid` primary first, then
    **Cancel** as `ghost`, under the last field. Modal footers stay `Modal.Actions`, right-aligned.
@@ -334,9 +393,9 @@ These settled conflicts between areas. Each is reversible. Status as of 2026-10-
     header is deferred. Shipped in K2.
 11. **No `labelHidden` prop.** A page with one section renames the section. Applies.
 12. **List status in settings is a toned `Badge` word plus the description line,** never the row's
-    `error`. Applies (B06).
-13. **Findings titles are derived on the client** from the body, so old records benefit too. Applies
-    (B08b).
+    `error`. Shipped in B06.
+13. **Findings titles are derived on the client** from the body, so old records benefit too. Shipped in
+    B08b.
 14. **Kept as they are, on purpose:** the workflow editor's **Save** button, the default Home tab name
     "Home", and the Notes autosave toast (the toast is a deferred product call). Applies.
 15. **The wizard footer matches the modal footer.** Shipped in K4a.
@@ -348,9 +407,26 @@ These settled conflicts between areas. Each is reversible. Status as of 2026-10-
 19. **`NodeDevices.tsx` is deleted.** Shipped in B05.
 20. **New optional kit props, no new nodes:** `Inline even`, `Fold leading`, `Badge tip`, `StatusDot tip`,
     `DetailColumn measure`, `Picker removeLabel` with a confirming remove, `Menu.Item checked` and
-    `kind`, `Field help`, and the wizard labels on `LayoutProps`. All shipped. A later batch that needs a
+    `kind`, `Field help`, the wizard labels on `LayoutProps`, `ModelPickerPopover tipSub` (B08a),
+    `Link tip` (B09), and the `formatChord` export from the tree entry (B11). All shipped. `Link tip`
+    has no `props.test-d.ts` line, because it is a plain string rather than a role token. A later batch that needs a
     new prop adds it the same way: the prop, its terminal rendering, one 80-column sentence in
     `docs/ui-design.md` § Every node at 80 by 24, and a line in `props.test-d.ts`.
+
+## Known gaps against these patterns
+
+The batches saw these and left them, each with a reason in [deferred.md](./deferred.md). The final
+sweep should not count them as regressions:
+
+- In a task pane, a remote tree's first `Toolbar` does not reserve room for the pane's pin, so
+  Rollbar's refresh and Linear's **Copy link** sit under it (B10a).
+- A `Section` header in a tree pane starts 14 in from the content beside it, and so does a
+  start-aligned `EmptyState` inside a card (B10a, B10b).
+- Linear's labels are still a `Chip` in the team's colour, against "Chip is never a label" (B10a).
+- About 20 client files, mostly in agents, still print a route's `error.message` as it arrives (B09).
+- The run pane's gate input spans its column, because a host-drawn detail region takes no `measure`
+  (B07b).
+- Generate SQL's model selects have accessible names but no visible labels (B11).
 
 ## Lead's overrides
 

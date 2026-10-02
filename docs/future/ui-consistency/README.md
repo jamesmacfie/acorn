@@ -19,7 +19,8 @@ session needs.
 ## Files in this folder
 
 - [house-patterns.md](./house-patterns.md): the yardstick. The scales and the role-by-role patterns, as
-  the kit batches left them, plus the plan's decisions and the lead's overrides.
+  the twenty fix batches left them, the known gaps the final sweep should not count, the plan's decisions, and
+  the lead's overrides.
 - [deferred.md](./deferred.md): everything deferred, why, and the product decisions that need a
   person. It plays the role a `refused.md` plays in other programmes.
 - One folder per remaining batch, one file per finding, named `<id>-<slug>.md`. Each file says what is
