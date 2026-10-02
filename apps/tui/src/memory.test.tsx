@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { expect, it, vi } from 'vitest'
 import { renderCells } from './kit/render'
-import { focusedRenderable, regionFocus } from './keys/regions'
+import { focusedRenderable, focusRegion, regionFocus } from './keys/regions'
 import { runText } from './tree/renderer'
 
 const fixture = vi.hoisted(() => ({ exists: true, undo: vi.fn() }))
@@ -22,12 +22,16 @@ vi.mock('@acorn/plugin-api/client', async original => ({
     }
   },
 }))
-import { MemoryCenter, selectMemory } from '@acorn/plugin-memory/testkit/client'
+import { MemoryCenterDetail, MemoryList, selectMemory } from '@acorn/plugin-memory/testkit/client'
 
 it('lets the terminal keyboard read a memory, inspect context, and undo an agent write', async () => {
   fixture.exists = true
   selectMemory(undefined)
-  let screen = await renderCells(() => <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'memory', regionId: 'library' }, 0)}><MemoryCenter /></box>, { width: 120, height: 40 })
+  // The two regions a terminal shell gives a split source: the Browse panel and the main panel.
+  let screen = await renderCells(() => <box flexDirection="row" flexGrow={1}>
+    <box flexDirection="column" width={40} ref={regionFocus({ paneId: 'memory', regionId: 'list' }, 0)}><MemoryList /></box>
+    <box flexDirection="column" flexGrow={1} ref={regionFocus({ paneId: 'memory', regionId: 'detail' }, 1)}><MemoryCenterDetail /></box>
+  </box>, { width: 120, height: 40 })
   const reach = async (label: string) => {
     for (let step = 0; step < 40; step += 1) {
       const node = focusedRenderable()
@@ -44,6 +48,10 @@ it('lets the terminal keyboard read a memory, inspect context, and undo an agent
     expect(await reach('terminal-rule')).toBe(true)
     screen = await screen.press('RETURN')
     await waitFor('Run the pipeline before release.')
+    // Closing the reader brings back the overview, which holds the context preview and the feed.
+    selectMemory(undefined)
+    await waitFor('What agents see')
+    expect(focusRegion({ paneId: 'memory', regionId: 'detail' })).toBe(true)
     expect(await reach('What agents see')).toBe(true)
     screen = await screen.press('RETURN')
     await waitFor('Exact agent context')
