@@ -141,7 +141,9 @@ and there is no workflow group or automatic archive operation.
 ## Worktrees and setup
 
 Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
-derives and revalidates the path; clients cannot choose an arbitrary worktree path. A task with no
+derives and revalidates the path; clients cannot choose an arbitrary worktree path. The one path a
+client may name is an existing worktree at task creation, and the Node accepts it only when Git lists
+it for that project and no active task uses it. A task with no
 branch uses the mapped project folder directly.
 
 The directory is keyed by owner, repo, and branch, so revalidation checks the branch as well as the
@@ -332,9 +334,11 @@ Git-backed. An explicitly entered branch is preserved. The promote-to-task modal
 rule from the other direction: a branch a provider seeded is used exactly as given, because a pull
 request's head branch already exists on the remote and a rewritten name could never be pushed back to
 that PR. Only a name a person types is slugged, and either way a name git would refuse leaves the
-button disabled. Ticking "Use the project folder and its
-current branch" creates the task with no branch, so it works in the project folder on whatever is
-already checked out and never gets a worktree. PR, Linear, and Rollbar promotions resolve or
+button disabled. For a Git project the dialog has three tabs. "New worktree" is the default
+above. "Project folder" creates the task with no branch, so it works in the project folder on
+whatever is already checked out and never gets a worktree. "Existing worktree" lists the linked
+worktrees Git reports for the project's checkout that no active task uses, skipping detached and
+prunable ones. The task takes that folder and its branch as they are, and setup does not run. PR, Linear, and Rollbar promotions resolve or
 create the appropriate project and task link, then reuse an existing task when that exact link is
 already present.
 
