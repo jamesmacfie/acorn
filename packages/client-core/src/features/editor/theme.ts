@@ -89,7 +89,8 @@ function currentTheme(): Extension {
   const dark = isAppDark()
   return [
     EditorView.theme({
-      '&': { color: token('--text'), backgroundColor: token('--bg') },
+      // The diff's code size, so a line opened from the diff keeps its size in the editor.
+      '&': { color: token('--text'), backgroundColor: token('--bg'), fontSize: token('--fs-sm') },
       '.cm-content': { caretColor: token('--text'), fontFamily: token('--font-mono') },
       '.cm-cursor, .cm-dropCursor': { borderLeftColor: token('--text') },
       // Selecting inside one line used to show nothing at all, and the four rules below are why.

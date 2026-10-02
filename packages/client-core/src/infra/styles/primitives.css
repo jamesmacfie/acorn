@@ -265,6 +265,18 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   position: static;
   background: transparent;
 }
+/* A group label is a line of text, so an icon button on it is the row-strip size. A 26-pixel one made
+   Notes' group labels 40 high beside Changes' 32. */
+.section-header[data-level='group'] .ui-section-header-actions .ui-btn[data-icon-only]:not([data-armed]) {
+  min-height: var(--control-h-xs);
+  width: var(--control-h-xs);
+}
+/* A subheading in a list column of rows starts where the rows do, with a group label's rhythm. One that
+   sticks keeps the list's colour, as a group label does. */
+.ui-listdetail-list:not([data-scroll]) .section-header[data-level='sub']:not(:is(.ui-card, .ui-alert) *) {
+  padding: var(--space-5) var(--pane-pad) var(--space-2);
+}
+.section-header[data-level='sub'][data-sticky] { background: var(--bg); }
 /* A subheading after a setting row starts a new group, so it takes the section gap above it. */
 .ui-setting-row + .section-header[data-level='sub'] { padding-top: var(--gap-section); }
 .ui-section-header-label { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -906,6 +918,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   outline: none;
 }
 .ui-input[data-kind='filter'] { font-size: var(--fs-sm); min-height: var(--control-h-sm); }
+/* A bare input in a bar is the bar's title, such as a note's name: no underline of its own under the
+   bar's divider, and a detail title's size, so the header is one line. */
+.ui-toolbar .ui-input[data-kind='bare'] {
+  padding: 0;
+  border-bottom: 0;
+  min-height: var(--control-h-sm);
+  font-size: var(--fs-lg);
+  font-weight: var(--heading-weight);
+  background: transparent;
+}
 .ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
@@ -1924,6 +1946,8 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-setting-error { grid-column: 1 / -1; font-size: var(--fs-sm); color: var(--danger); }
 /* Beside the label, before the actions: a fact about the fold rather than a control on it. */
 .ui-fold-meta { flex: none; display: flex; align-items: center; min-width: 0; }
+/* One length for every meter on a fold, so two budgets draw bars that can be compared. */
+.ui-fold-meta .ui-meter { width: calc(var(--space-11) * 2); }
 
 /* `follow`: the timeline owns the scroll and stays on the newest turn. The scroller is a box of
    its own rather than the list, because the follow machinery watches the list grow and a scroller

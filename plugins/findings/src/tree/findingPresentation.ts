@@ -41,11 +41,30 @@ export function findingBody(finding: FindingObservation): { markdown: string; re
   }
 }
 
+const clip = (text: string, limit: number): string =>
+  text.length <= limit ? text : `${text.slice(0, limit - 1).trimEnd()}…`
+
 export function findingExcerpt(finding: FindingObservation, limit = 150): string {
   const body = findingBody(finding)
   const summary = body.repaired ? body.markdown.split('\n\n---\n\n', 1)[0]! : body.markdown
-  const text = plainText(summary)
-  return text.length <= limit ? text : `${text.slice(0, limit - 1).trimEnd()}…`
+  return clip(plainText(summary), limit)
+}
+
+// The titles the server gives every automatic finding. They say how a record was made, not what it
+// says, so every row read the same. The list draws a title from the body instead, which old records
+// get too, and the stored title does not change.
+const GENERIC_TITLES = new Set(['Managed agent turn completed', 'Workflow-managed turn checkpoint'])
+const TITLE_LIMIT = 80
+
+/** A finding's title and the excerpt under it. A title drawn from the body's first sentence leaves
+ *  that sentence out of the excerpt, so a row does not say it twice. */
+export function findingHeadline(finding: FindingObservation, limit = 150): { title: string; excerpt: string } {
+  const text = findingExcerpt(finding, Number.MAX_SAFE_INTEGER)
+  if (!GENERIC_TITLES.has(finding.title)) return { title: finding.title, excerpt: clip(text, limit) }
+  const sentence = text.match(/^.+?[.!?](?=\s|$)/)?.[0] ?? text
+  const title = clip(sentence.replace(/[.!?]$/, ''), TITLE_LIMIT)
+  if (!title) return { title: finding.origin.kind === 'workflow' ? 'Workflow step' : 'Agent turn', excerpt: '' }
+  return { title, excerpt: clip(text.slice(sentence.length).trim(), limit) }
 }
 
 export function findingOriginLabel(origin: FindingOrigin): string {
@@ -69,6 +88,14 @@ export function evidenceLabel(evidence: FindingEvidence): string {
     case 'observation': return 'Related finding'
     case 'memory-version': return 'Memory version'
   }
+}
+
+/** The row's short time: the time for today, the day for anything older. The full date goes in the
+ *  tip, because the long form took more than half a 300-pixel row. */
+export function findingTime(value: number, now = Date.now()): string {
+  const date = new Date(value)
+  const today = date.toDateString() === new Date(now).toDateString()
+  return new Intl.DateTimeFormat(undefined, today ? { timeStyle: 'short' } : { month: 'short', day: 'numeric' }).format(date)
 }
 
 export function findingTimestamp(value: number): string {

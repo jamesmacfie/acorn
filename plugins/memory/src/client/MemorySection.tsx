@@ -1,13 +1,11 @@
 import { createSignal, Show } from 'solid-js'
 import { toast, type Task } from '@acorn/plugin-api/client'
-import { memoryApi, type MemoryType } from './memoryClient'
-import { Alert, Button, Card, Field, Inline, Input, Select, Stack, Textarea, Toolbar } from '@acorn/plugin-api/ui'
+import { MEMORY_SCOPE_OPTIONS, MEMORY_TYPE_OPTIONS, memoryApi, type MemoryType } from './memoryClient'
+import { Alert, Button, Card, Field, Icon, Inline, Input, Select, Stack, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import FindingsBundleReview from './FindingsBundleReview'
 
-const MEMORY_TYPE_OPTIONS: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
-
 // The memory surfaces of the Context pane (docs/agent-tools.md), kept in the memory plugin so it owns
-// every memoryApi() call. It shows canonical Findings review and the manual "+ memory" form.
+// every memoryApi() call. It shows canonical Findings review and the manual "Add memory" form.
 // Both scopes write under ~/.acorn/memory and never into the repo, so the choice is
 // about reach: project scope applies to this project alone, private scope everywhere.
 //
@@ -41,11 +39,15 @@ export default function MemorySection(props: {
       body: memBody(),
     })
     if ('error' in res) return setMemMsg(res.error)
-    toast(`Saved → ${res.path}`, { tone: 'success' })
+    toast('Memory saved', { tone: 'success' })
+    clear()
+    props.onChanged()
+  }
+
+  function clear() {
     setMemName('')
     setMemDesc('')
     setMemBody('')
-    props.onChanged()
   }
 
   return (
@@ -55,37 +57,36 @@ export default function MemorySection(props: {
       </Show>
       <Show when={memoryApi()}>
         <Toolbar variant="actions" size="sm">
-          <Button size="sm" onPress={() => setMemFormOpen(!memFormOpen())} expanded={memFormOpen()}>+ memory</Button>
+          <Button size="sm" onPress={() => setMemFormOpen(!memFormOpen())} expanded={memFormOpen()}><Icon name="plus" /> Add memory</Button>
         </Toolbar>
       </Show>
       <Show when={memMsg()}>{(msg) => <Alert>{msg()}</Alert>}</Show>
       <Show when={memFormOpen()}>
+        {/* A boxed page form: the fields stacked, then the solid primary and a ghost Cancel on the left.
+            The name needs no format hint, because addMemory makes it file-safe itself. */}
         <Card>
-          <Stack gap="row">
-            <Inline gap="inline" wrap>
-              <Field label="Name" hint="kebab-case">
-                <Input value={memName()} placeholder="name" onInput={(value) => setMemName(value)} />
-              </Field>
+          <Stack gap="stack">
+            <Field label="Name">
+              <Input value={memName()} onInput={(value) => setMemName(value)} />
+            </Field>
+            <Inline even>
               <Field label="Type">
-                <Select value={memType()} onChange={(value) => setMemType(value as MemoryType)} options={MEMORY_TYPE_OPTIONS.map((k) => ({ value: k, label: k }))} />
+                <Select value={memType()} onChange={(value) => setMemType(value as MemoryType)} options={MEMORY_TYPE_OPTIONS} />
               </Field>
               <Field label="Scope">
-                <Select
-                  value={memScope()}
-                  onChange={(value) => setMemScope(value as 'project' | 'private')}
-                  options={[{ value: 'project', label: 'project (this project only)' }, { value: 'private', label: 'private (every project)' }]}
-                />
+                <Select value={memScope()} onChange={(value) => setMemScope(value as 'project' | 'private')} options={MEMORY_SCOPE_OPTIONS} />
               </Field>
             </Inline>
             <Field label="Description">
-              <Input value={memDesc()} placeholder="one-line description" onInput={(value) => setMemDesc(value)} />
+              <Input value={memDesc()} placeholder="What the agent should know, in one line" onInput={(value) => setMemDesc(value)} />
             </Field>
             <Field label="Body">
-              <Textarea mono rows={3} placeholder={'Body — include a **Why:** line.'} value={memBody()} onInput={(value) => setMemBody(value)} />
+              <Textarea mono rows={3} placeholder="The details. Say why, so the agent knows when it applies." value={memBody()} onInput={(value) => setMemBody(value)} />
             </Field>
-            <Toolbar variant="actions" size="sm">
-              <Button size="sm" disabled={!memName().trim() || !memDesc().trim()} onPress={() => void addMemory()}>Save memory</Button>
-            </Toolbar>
+            <Inline gap="row">
+              <Button variant="solid" disabled={!memName().trim() || !memDesc().trim()} onPress={() => void addMemory()}>Save memory</Button>
+              <Button variant="ghost" onPress={() => { clear(); setMemFormOpen(false) }}>Cancel</Button>
+            </Inline>
           </Stack>
         </Card>
       </Show>

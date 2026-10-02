@@ -5,9 +5,9 @@ import type { FindingBundle, FindingCandidateRevision } from '@acorn/plugin-find
 
 Element.prototype.scrollIntoView ??= () => {}
 const mocks = vi.hoisted(() => ({ bundles: vi.fn(), finding: vi.fn(), findingHistory: vi.fn(), prepare: vi.fn(), retryPreparation: vi.fn(), approveFinding: vi.fn(), editFinding: vi.fn(), decideFinding: vi.fn(), cancelPreparation: vi.fn(), dismissBundle: vi.fn(), restoreFindingObservation: vi.fn(), splitFinding: vi.fn() }))
-vi.mock('./memoryClient', () => ({ memoryApi: () => mocks }))
+vi.mock('./memoryClient', async (original) => ({ ...await original<Record<string, unknown>>(), memoryApi: () => mocks }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), onPluginFrame: () => () => {} }))
-const { default: FindingsBundleReview } = await import('./FindingsBundleReview')
+const { default: FindingsBundleReview, memoryPatch } = await import('./FindingsBundleReview')
 
 const payload = { operation: 'update' as const, name: 'owner-boundaries', type: 'architecture' as const, description: 'Keep writes with owners.', body: 'New full body.', scope: { kind: 'project' as const, projectId: 'project-1' }, baseMemoryId: 'memory-1', baseHash: 'hash-1' }
 const candidate = (id: string): FindingCandidateRevision => ({ candidateId: id, revision: 1, targetKind: 'memory:change', targetVersion: 1, scope: { kind: 'project', projectId: 'project-1' }, payload, sourceObservationIds: ['observation-1'], payloadHash: 'payload-hash', fingerprint: id, subjectKey: id, groupingExplanation: 'Grouped exact target evidence.', warnings: ['Review the contradiction.'], base: { targetId: 'memory-1', hash: 'hash-1', payload: { ...payload, description: 'Old description.', body: 'Old full body.' } }, status: 'ready', snoozedUntil: null, createdAt: 1, updatedAt: 1 })
@@ -28,16 +28,17 @@ afterEach(() => { dispose?.(); host?.remove(); vi.clearAllMocks() })
 const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 
 describe('findings-backed memory review', () => {
-  it('keeps summary review actions compact, right-aligned, and usable without opening the change', async () => {
+  it('marks Approve as the one primary and keeps the review usable without opening the change', async () => {
     mocks.bundles.mockResolvedValue([bundle(1)])
     mocks.approveFinding.mockResolvedValue({ ok: true })
     host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
     await settle()
 
-    const toolbar = host.querySelector('.ui-toolbar[data-variant="actions"]')!
-    expect(toolbar).not.toBeNull()
-    expect([...toolbar.querySelectorAll('button')].map((button) => button.textContent)).toEqual(['View change', 'Approve', 'Edit', 'Dismiss', 'Snooze'])
-    expect([...toolbar.querySelectorAll('button')].every((button) => button.dataset.size === 'sm')).toBe(true)
+    const toolbar = [...host.querySelectorAll('button')].find((button) => button.textContent === 'View change')!.parentElement!
+    const buttons = [...toolbar.querySelectorAll('button')]
+    expect(buttons.map((button) => button.textContent)).toEqual(['View change', 'Approve', 'Edit', 'Dismiss', 'Snooze'])
+    expect(buttons.every((button) => button.dataset.size === 'md')).toBe(true)
+    expect(buttons.map((button) => button.dataset.variant)).toEqual(['ghost', 'solid', 'ghost', 'ghost', 'ghost'])
 
     ;([...toolbar.querySelectorAll('button')].find((button) => button.textContent === 'Approve') as HTMLButtonElement).click()
     await settle()
@@ -58,8 +59,11 @@ describe('findings-backed memory review', () => {
     expect(host.textContent).toContain('New full body.')
     expect(host.textContent).toContain('Old full body.')
     expect(host.textContent).toContain('Observed source body.')
-    expect(host.textContent).toContain('Applies to this project')
+    expect(host.textContent).toContain('This project')
+    expect(host.textContent).toContain('What changes')
     expect(host.textContent).toContain('Review history')
+    expect(host.textContent).toContain('Edited')
+    expect(host.textContent).not.toContain('edit')
   })
 
   it('opens a candidate when the selected destination arrives', async () => {
@@ -104,7 +108,7 @@ describe('findings-backed memory review', () => {
     await settle()
     ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'View change') as HTMLButtonElement).click()
     await settle()
-    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Restore to open change') as HTMLButtonElement).click()
+    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Add back') as HTMLButtonElement).click()
     ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Separate') as HTMLButtonElement).click()
     await settle()
     expect(mocks.restoreFindingObservation).toHaveBeenCalledWith('bundle', 'observation-3', 'candidate-1', 1, expect.any(String))
@@ -128,7 +132,7 @@ describe('findings-backed memory review', () => {
     mocks.dismissBundle.mockResolvedValue({ ...unfiltered, candidates: [] })
     host = document.createElement('div'); document.body.append(host); dispose = render(() => <FindingsBundleReview scope={{ kind: 'project', projectId: 'project-1' }} />, host)
     await settle()
-    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Dismiss this bundle') as HTMLButtonElement).click()
+    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Dismiss all of these') as HTMLButtonElement).click()
     await settle()
     expect(mocks.dismissBundle).toHaveBeenCalledWith('bundle', expect.any(String), 'bundle-not-useful')
   })
@@ -144,8 +148,17 @@ describe('findings-backed memory review', () => {
     ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Snooze') as HTMLButtonElement).click()
     const date = host.querySelector('input[type="date"]')! as HTMLInputElement
     date.value = '2030-01-02'; date.dispatchEvent(new InputEvent('input', { bubbles: true }))
-    ;([...host.querySelectorAll('button')].find((button) => button.textContent === 'Snooze until date') as HTMLButtonElement).click()
+    ;([...host.querySelectorAll('button')].filter((button) => button.textContent === 'Snooze').at(-1) as HTMLButtonElement).click()
     await settle()
     expect(mocks.decideFinding).toHaveBeenCalledWith('candidate-1', expect.objectContaining({ action: 'snooze', until: new Date('2030-01-02T23:59:59').getTime() }))
+  })
+
+  it('diffs a suggestion against the accepted memory as one hunk with shared context', () => {
+    const base = { operation: 'update', name: 'queue', type: 'fix', scope: { kind: 'private' }, description: 'Keep it bounded', body: 'One\nTwo' } as never
+    const next = { ...(base as object), body: 'One\nThree' } as never
+    expect(memoryPatch(base, base)).toBeNull()
+    expect(memoryPatch(base, next)!.split('\n')).toEqual([
+      '@@ -1,7 +1,7 @@', ' name: queue', ' type: Fix', ' scope: All projects', ' description: Keep it bounded', ' ', ' One', '-Two', '+Three',
+    ])
   })
 })

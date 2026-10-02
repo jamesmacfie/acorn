@@ -4,50 +4,72 @@
  * contrast: pass (46–50)
  */
 import { createEffect, createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { onPluginFrame } from '@acorn/plugin-api/client'
+import { onPluginFrame, pluginLabel } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { Alert, Badge, Button, Card, CodeBlock, Field, Heading, Inline, Input, Markdown, Section, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
-import type { FindingCandidateRevision, FindingBundle } from '@acorn/plugin-findings/contract/review.ts'
+import { Alert, Badge, Button, Card, Field, Heading, Inline, Input, Markdown, Section, SegmentedControl, Select, Stack, StackedDiff, Text, Textarea } from '@acorn/plugin-api/ui'
+import type { FindingCandidateRevision, FindingBundle, FindingCandidateStatus } from '@acorn/plugin-findings/contract/review.ts'
 import type { FindingEvidence, FindingObservation, FindingOrigin, FindingScope } from '@acorn/plugin-findings/contract/records.ts'
-import { memoryApi, type MemoryType } from './memoryClient'
+import { MEMORY_SCOPE_LABEL, MEMORY_SCOPE_OPTIONS, MEMORY_TYPE_LABEL, MEMORY_TYPE_OPTIONS, memoryApi, type MemoryType } from './memoryClient'
 import { type MemoryChangePayload, memoryChangePayloadSchema } from '../contract/findingsReview'
 
-const TYPES: MemoryType[] = ['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']
 const key = () => globalThis.crypto?.randomUUID?.() ?? `${Date.now()}-${Math.random()}`
 const payloadOf = (candidate: FindingCandidateRevision): MemoryChangePayload | null => {
   const parsed = memoryChangePayloadSchema.safeParse(candidate.payload); return parsed.success ? parsed.data : null
 }
-const scopeLabel = (payload: MemoryChangePayload): string => payload.scope.kind === 'private' ? 'Applies across projects' : 'Applies to this project'
+const scopeLabel = (payload: MemoryChangePayload): string => MEMORY_SCOPE_LABEL[payload.scope.kind]
+const typeLabel = (type: MemoryType): string => MEMORY_TYPE_LABEL[type] ?? type
+// The words a person reads for a suggestion's state and for what was done to it, in place of the
+// enum. A ready suggestion shows no badge, so it has no word.
+const STATUS_LABEL: Partial<Record<FindingCandidateStatus, string>> = {
+  draft: 'Draft', snoozed: 'Snoozed', dismissed: 'Dismissed', applying: 'Saving', applied: 'Saved', conflict: 'Needs a fix', superseded: 'Replaced',
+}
+const HISTORY_LABEL: Record<string, string> = {
+  edit: 'Edited', dismiss: 'Dismissed', 'dismiss-reason': 'Dismissed', 'undo-dismiss': 'Restored', snooze: 'Snoozed',
+  restore: 'Restored', split: 'Separated', applying: 'Saving', applied: 'Approved', conflict: 'Needed a fix',
+}
+const REASON_LABEL: Record<string, string> = { 'task-specific': 'Task-specific', 'already-covered': 'Already covered', 'not-useful': 'Not useful' }
 const boundaryLabel = (key: string): string => key.startsWith('task:') ? 'Task archive'
   : key.startsWith('workflow:') ? 'Workflow completion'
     : key.startsWith('terminal:') ? 'Terminal completion'
       : key.startsWith('manual:') ? 'Manual review'
         : key.startsWith('legacy:') ? 'Legacy import' : 'Review'
-const originLabel = (origin: FindingOrigin): string => origin.kind === 'agent' ? 'Managed agent'
+const originLabel = (origin: FindingOrigin): string => origin.kind === 'agent' ? 'Agent'
   : origin.kind === 'workflow' ? 'Workflow'
     : origin.kind === 'schedule' ? 'Schedule'
-      : origin.kind === 'device' ? 'Device'
-        : origin.kind === 'plugin' ? `Plugin · ${origin.pluginId}` : 'Legacy proposal'
-const evidenceLabel = (evidence: FindingEvidence): string => evidence.label ?? (
-  evidence.kind === 'repository' ? evidence.path
-    : evidence.kind === 'url' ? evidence.url
-      : evidence.kind === 'managed-turn' ? `Managed turn ${evidence.turnId}`
-        : evidence.kind === 'workflow-step' ? `Workflow ${evidence.runId}`
-          : evidence.kind === 'observation' ? `Observation ${evidence.observationId}`
-            : `Memory ${evidence.memoryId}`
-)
+      : origin.kind === 'device' ? 'This device'
+        : origin.kind === 'plugin' ? pluginLabel(origin.pluginId) : 'Older suggestion'
+// What the evidence is, in words; the id it points at goes in the tip, for anyone who needs it.
+const evidenceLabel = (evidence: FindingEvidence): { text: string; tip?: string } => evidence.label ? { text: evidence.label }
+  : evidence.kind === 'repository' ? { text: evidence.path }
+    : evidence.kind === 'url' ? { text: evidence.url }
+      : evidence.kind === 'managed-turn' ? { text: 'An agent turn', tip: evidence.turnId }
+        : evidence.kind === 'workflow-step' ? { text: 'A workflow run', tip: evidence.runId }
+          : evidence.kind === 'observation' ? { text: 'A finding', tip: evidence.observationId }
+            : { text: 'A memory', tip: evidence.memoryId }
 const previewLines = (payload: MemoryChangePayload): string[] => [
   `name: ${payload.name}`,
-  `type: ${payload.type}`,
+  `type: ${typeLabel(payload.type)}`,
   `scope: ${scopeLabel(payload)}`,
   `description: ${payload.description}`,
   '',
   ...payload.body.split('\n'),
 ]
-const unifiedDiff = (before: MemoryChangePayload, after: MemoryChangePayload): string => {
+/** The accepted memory against the suggestion, as one hunk for `StackedDiff`: the lines both share at
+ *  the start and the end are context, and everything between them changed. Null when nothing did. */
+export const memoryPatch = (before: MemoryChangePayload, after: MemoryChangePayload): string | null => {
   const left = previewLines(before), right = previewLines(after)
-  if (left.join('\n') === right.join('\n')) return 'No text changes.'
-  return ['--- accepted memory', '+++ proposed memory', ...left.map((line) => `- ${line}`), ...right.map((line) => `+ ${line}`)].join('\n')
+  if (left.join('\n') === right.join('\n')) return null
+  let start = 0
+  while (start < left.length && start < right.length && left[start] === right[start]) start++
+  let end = 0
+  while (end < left.length - start && end < right.length - start && left[left.length - 1 - end] === right[right.length - 1 - end]) end++
+  return [
+    `@@ -1,${left.length} +1,${right.length} @@`,
+    ...left.slice(0, start).map((line) => ` ${line}`),
+    ...left.slice(start, left.length - end).map((line) => `-${line}`),
+    ...right.slice(start, right.length - end).map((line) => `+${line}`),
+    ...left.slice(left.length - end).map((line) => ` ${line}`),
+  ].join('\n')
 }
 
 function ObservationSource(props: { observation: FindingObservation; canSplit: boolean; onSplit(): void }) {
@@ -55,7 +77,7 @@ function ObservationSource(props: { observation: FindingObservation; canSplit: b
     <Card>
       <Stack gap="row">
         <Inline wrap>
-          <Badge>{props.observation.claimStatus}</Badge>
+          <Badge>{props.observation.claimStatus === 'asked' ? 'Question' : props.observation.claimStatus === 'inferred' ? 'Inferred' : 'Observed'}</Badge>
           <Text emphasis="strong">{props.observation.title}</Text>
           <Show when={props.observation.scopeLabels.task}><Badge>{props.observation.scopeLabels.task}</Badge></Show>
           <Show when={props.canSplit}><Button size="sm" variant="bare" onPress={props.onSplit}>Separate</Button></Show>
@@ -64,7 +86,7 @@ function ObservationSource(props: { observation: FindingObservation; canSplit: b
         <Markdown text={props.observation.body} images="placeholder" />
         <Show when={props.observation.evidence.length}>
           <Section label="Evidence" count={props.observation.evidence.length}>
-            <Stack gap="row"><For each={props.observation.evidence}>{(evidence) => <Text>{evidenceLabel(evidence)}</Text>}</For></Stack>
+            <Stack gap="row"><For each={props.observation.evidence}>{(evidence) => <Text tip={evidenceLabel(evidence).tip}>{evidenceLabel(evidence).text}</Text>}</For></Stack>
           </Section>
         </Show>
       </Stack>
@@ -84,19 +106,20 @@ function CandidateActions(props: {
   onSnooze(): void
   onUndoDismissal(): void
 }) {
+  // Approve is the one primary; the rest are ghost, so the row says which press moves things on.
   return (
-    <Toolbar variant="actions" size="sm">
-      <Show when={props.showOpen}><Button size="sm" onPress={props.onOpen}>View change</Button></Show>
+    <Inline gap="row" wrap>
+      <Show when={props.showOpen}><Button variant="ghost" onPress={props.onOpen}>View change</Button></Show>
       <Show when={props.candidate.status === 'ready' && !props.dismissed}>
-        <Button size="sm" busy={props.busy} onPress={props.onApprove}>{props.candidate.revision > 1 ? 'Approve changes' : 'Approve'}</Button>
-        <Button size="sm" disabled={props.busy} onPress={props.onEdit}>Edit</Button>
-        <Button size="sm" disabled={props.busy} onPress={props.onDismiss}>Dismiss</Button>
-        <Button size="sm" disabled={props.busy} onPress={props.onSnooze}>Snooze</Button>
+        <Button variant="solid" busy={props.busy} onPress={props.onApprove}>{props.candidate.revision > 1 ? 'Approve changes' : 'Approve'}</Button>
+        <Button variant="ghost" disabled={props.busy} onPress={props.onEdit}>Edit</Button>
+        <Button variant="ghost" disabled={props.busy} onPress={props.onDismiss}>Dismiss</Button>
+        <Button variant="ghost" disabled={props.busy} onPress={props.onSnooze}>Snooze</Button>
       </Show>
-      <Show when={props.candidate.status === 'dismissed'}><Button size="sm" busy={props.busy} onPress={props.onUndoDismissal}>Undo dismissal</Button></Show>
-      <Show when={props.candidate.status === 'conflict'}><Button size="sm" disabled={props.busy} onPress={props.onEdit}>Edit conflicted change</Button></Show>
-      <Show when={props.candidate.status === 'applying'}><Button size="sm" busy={props.busy} onPress={props.onApprove}>Retry approval</Button></Show>
-    </Toolbar>
+      <Show when={props.candidate.status === 'dismissed'}><Button busy={props.busy} onPress={props.onUndoDismissal}>Undo</Button></Show>
+      <Show when={props.candidate.status === 'conflict'}><Button variant="solid" disabled={props.busy} onPress={props.onEdit}>Fix the conflict</Button></Show>
+      <Show when={props.candidate.status === 'applying'}><Button variant="solid" busy={props.busy} onPress={props.onApprove}>Try again</Button></Show>
+    </Inline>
   )
 }
 
@@ -136,29 +159,35 @@ function Candidate(props: { bundleId: string; boundary: string; candidate: Findi
   return (
     <Card focus={props.focused} selected={props.focused}>
       <Stack gap="row">
-        <Show when={initial()} fallback={<Alert tone="danger" title="Invalid memory candidate">This candidate cannot be previewed.</Alert>}>
+        <Show when={initial()} fallback={<Alert tone="danger">Can't show this suggestion</Alert>}>
           {(payload) => <>
-            <Inline wrap><Badge shape="pill">{payload().operation === 'update' ? 'Update' : 'Add'}</Badge><Text emphasis="strong">{payload().name}</Text><Badge>{scopeLabel(payload())}</Badge><Badge tone="neutral">{boundaryLabel(props.boundary)}</Badge><Show when={props.candidate.status !== 'ready'}><Badge tone="neutral">{props.candidate.status}</Badge></Show></Inline>
+            <Inline wrap><Badge shape="pill">{payload().operation === 'update' ? 'Update' : 'Add'}</Badge><Text emphasis="strong">{payload().name}</Text><Badge>{scopeLabel(payload())}</Badge><Badge tone="neutral">{boundaryLabel(props.boundary)}</Badge><Show when={STATUS_LABEL[props.candidate.status]}>{(status) => <Badge tone={props.candidate.status === 'conflict' ? 'warn' : 'neutral'}>{status()}</Badge>}</Show></Inline>
             <Text>{payload().description}</Text>
             <Show when={!props.focused}>{actions()}</Show>
             <Show when={props.focused}>
               <Stack gap="row">
-                <Text tone="muted" wrap>{props.candidate.groupingExplanation} · {props.candidate.sourceObservationIds.length} source occurrence{props.candidate.sourceObservationIds.length === 1 ? '' : 's'}</Text>
+                <Text tone="muted" wrap>From {props.candidate.sourceObservationIds.length} finding{props.candidate.sourceObservationIds.length === 1 ? '' : 's'}. {props.candidate.groupingExplanation}</Text>
                 <For each={props.candidate.warnings}>{(warning) => <Alert tone="warn">{warning}</Alert>}</For>
-                <Show when={props.candidate.base}>{(base) => <Section label="Update diff"><CodeBlock>{unifiedDiff(base().payload as MemoryChangePayload, draft() ?? payload())}</CodeBlock></Section>}</Show>
+                <Show when={props.candidate.base}>{(base) => (
+                  <Section label="What changes">
+                    <Show when={memoryPatch(base().payload as MemoryChangePayload, draft() ?? payload())} fallback={<Text tone="muted">No text changes.</Text>}>
+                      {(patch) => <StackedDiff path={`${payload().name}.md`} patch={patch()} lineNumbers={false} />}
+                    </Show>
+                  </Section>
+                )}</Show>
                 <Show when={!editing()} fallback={
                   <Stack gap="row">
                     <Field label="Name"><Input disabled={payload().operation === 'update'} value={draft()?.name ?? ''} onInput={(name) => setDraft((value) => value && ({ ...value, name }))} /></Field>
-                    <Field label="Type"><Select value={draft()?.type ?? 'reference'} options={TYPES.map((type) => ({ value: type, label: type }))} onChange={(type) => setDraft((value) => value && ({ ...value, type: type as MemoryType }))} /></Field>
+                    <Field label="Type"><Select value={draft()?.type ?? 'reference'} options={MEMORY_TYPE_OPTIONS} onChange={(type) => setDraft((value) => value && ({ ...value, type: type as MemoryType }))} /></Field>
                     <Field label="Description"><Input value={draft()?.description ?? ''} onInput={(description) => setDraft((value) => value && ({ ...value, description }))} /></Field>
                     <Field label="Body"><Textarea mono rows={10} value={draft()?.body ?? ''} onInput={(body) => setDraft((value) => value && ({ ...value, body }))} /></Field>
-                    <Field label="Scope"><Select value={draft()?.scope.kind ?? 'project'} options={[{ value: 'project', label: 'This project' }, { value: 'private', label: 'Across projects' }]} onChange={(scope) => setDraft((value) => value && ({ ...value, scope: scope === 'private' ? { kind: 'private' } : payload().scope.kind === 'project' ? payload().scope : { kind: 'project' } }))} /></Field>
-                    <Toolbar variant="actions" size="sm"><Button size="sm" busy={busy()} onPress={save}>Save changes</Button><Button size="sm" onPress={() => { setDraft(payload()); setEditing(false) }}>Cancel</Button></Toolbar>
+                    <Field label="Scope"><Select value={draft()?.scope.kind ?? 'project'} options={MEMORY_SCOPE_OPTIONS} onChange={(scope) => setDraft((value) => value && ({ ...value, scope: scope === 'private' ? { kind: 'private' } : payload().scope.kind === 'project' ? payload().scope : { kind: 'project' } }))} /></Field>
+                    <Inline gap="row"><Button variant="solid" busy={busy()} onPress={save}>Save changes</Button><Button variant="ghost" onPress={() => { setDraft(payload()); setEditing(false) }}>Cancel</Button></Inline>
                   </Stack>
                 }>
-                  <Heading level={3}>{payload().name}</Heading><Text>{payload().type} · {scopeLabel(payload())}</Text><Text>{payload().description}</Text><Markdown text={payload().body} images="placeholder" copy />
+                  <Heading level={3}>{payload().name}</Heading><Text>{typeLabel(payload().type)} · {scopeLabel(payload())}</Text><Text>{payload().description}</Text><Markdown text={payload().body} images="placeholder" copy />
                   {actions()}
-                  <Show when={props.candidate.status === 'ready' && !recentlyDismissed() && snoozing()}><Inline wrap><Field label="Snooze until"><Input type="date" value={snoozeDate()} onInput={setSnoozeDate} /></Field><Button size="sm" busy={busy()} onPress={snooze}>Snooze until date</Button><Button size="sm" variant="bare" onPress={() => setSnoozing(false)}>Cancel snooze</Button></Inline></Show>
+                  <Show when={props.candidate.status === 'ready' && !recentlyDismissed() && snoozing()}><Inline wrap><Field label="Snooze until"><Input type="date" value={snoozeDate()} onInput={setSnoozeDate} /></Field><Button busy={busy()} onPress={snooze}>Snooze</Button><Button variant="ghost" onPress={() => setSnoozing(false)}>Cancel</Button></Inline></Show>
                 </Show>
                 <Show when={detail()?.observations?.length}>
                   <Section label="Source tasks and evidence" count={detail()!.observations.length}>
@@ -167,12 +196,12 @@ function Candidate(props: { bundleId: string; boundary: string; candidate: Findi
                     )}</For></Stack>
                   </Section>
                 </Show>
-                <Show when={history()?.items.length}><Section label="Review history"><Stack gap="row"><For each={history()!.items}>{(entry) => <Text tone="muted">{entry.action}{entry.reason ? ` · ${entry.reason}` : ''}</Text>}</For></Stack></Section></Show>
+                <Show when={history()?.items.length}><Section label="Review history"><Stack gap="row"><For each={history()!.items}>{(entry) => <Text tone="muted">{HISTORY_LABEL[entry.action] ?? entry.action}{entry.reason ? `: ${REASON_LABEL[entry.reason] ?? entry.reason}` : ''}</Text>}</For></Stack></Section></Show>
               </Stack>
             </Show>
           </>}
         </Show>
-        <Show when={recentlyDismissed()}><Alert tone="muted" title="Suggestion dismissed"><Inline wrap><Button size="sm" onPress={undo}>Undo</Button><Button size="sm" variant="bare" onPress={() => dismissalReason('task-specific')}>Task-specific</Button><Button size="sm" variant="bare" onPress={() => dismissalReason('already-covered')}>Already covered</Button><Button size="sm" variant="bare" onPress={() => dismissalReason('not-useful')}>Not useful</Button></Inline></Alert></Show>
+        <Show when={recentlyDismissed()}><Alert tone="muted" title="Suggestion dismissed" actions={<><Button onPress={undo}>Undo</Button><Button variant="ghost" onPress={() => dismissalReason('task-specific')}>Task-specific</Button><Button variant="ghost" onPress={() => dismissalReason('already-covered')}>Already covered</Button><Button variant="ghost" onPress={() => dismissalReason('not-useful')}>Not useful</Button></>}>Say why, if you like.</Alert></Show>
         <Show when={error()}><Alert tone="danger">{error()}</Alert></Show>
       </Stack>
     </Card>
@@ -202,24 +231,33 @@ export default function FindingsBundleReview(props: { scope: FindingScope; compa
     void memoryApi().restoreFindingObservation(bundle.id, observationId, candidate.candidateId, candidate.revision, key()).then(changed).catch((error) => setGroupingError(error instanceof Error ? error.message : String(error)))
   }
   return <Show when={(bundles() ?? []).length}>
-    <Stack gap="row"><Inline wrap><Heading level={2}>Suggested memory changes</Heading><Badge>{candidates().length}</Badge><Button size="sm" variant="bare" onPress={() => setShowHistory(!showHistory())}>{showHistory() ? 'Active suggestions' : 'History'}</Button></Inline>
-      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'failed')}>{(bundle) => <Alert tone="danger" title="Could not prepare suggestions">{bundle.error ?? 'Preparation failed.'}<Button size="sm" onPress={() => retry(bundle)}>Retry</Button></Alert>}</For>
-      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'preparing')}>{(bundle) => <Alert tone="muted" title="Preparing suggestions">{bundle.pendingCount} observations remain.<Button size="sm" onPress={() => void memoryApi().cancelPreparation(bundle.id).then(changed)}>Cancel</Button></Alert>}</For>
-      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'cancelled' && bundle.pendingCount > 0)}>{(bundle) => <Alert tone="muted" title="Preparation cancelled">Completed suggestions were kept. {bundle.pendingCount} observations remain.<Button size="sm" onPress={() => retry(bundle)}>Resume</Button></Alert>}</For>
+    <Stack gap="row">
+      <Inline spread wrap>
+        <Inline gap="inline"><Heading level={2}>Suggested memory changes</Heading><Text emphasis="muted">{candidates().length}</Text></Inline>
+        <SegmentedControl
+          size="sm"
+          ariaLabel="Suggestions to show"
+          value={showHistory() ? 'history' : 'waiting'}
+          options={[{ value: 'waiting', label: 'Waiting' }, { value: 'history', label: 'History' }]}
+          onChange={(value) => setShowHistory(value === 'history')}
+        />
+      </Inline>
+      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'failed')}>{(bundle) => <Alert tone="danger" title="Couldn't prepare suggestions" actions={<Button onPress={() => retry(bundle)}>Try again</Button>}>{bundle.error ?? 'Something went wrong while preparing them.'}</Alert>}</For>
+      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'preparing')}>{(bundle) => <Alert tone="muted" title="Preparing suggestions" actions={<Button variant="ghost" onPress={() => void memoryApi().cancelPreparation(bundle.id).then(changed)}>Cancel</Button>}>{bundle.pendingCount} findings left to read.</Alert>}</For>
+      <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'cancelled' && bundle.pendingCount > 0)}>{(bundle) => <Alert tone="muted" title="Stopped" actions={<Button onPress={() => retry(bundle)}>Resume</Button>}>The suggestions so far are kept. {bundle.pendingCount} findings are left.</Alert>}</For>
       <For each={(bundles() ?? []).filter((bundle) => bundle.state === 'ready' && bundle.backendId === null && bundle.candidates.length > 3)}>{(bundle) => (
-        <Alert tone="warn" title="Earlier unfiltered review">
-          This bundle was prepared without a model and may contain one suggestion per observation.
-          <Button size="sm" onPress={() => dismissBundle(bundle)}>Dismiss this bundle</Button>
+        <Alert tone="warn" title="Unfiltered suggestions" actions={<Button onPress={() => dismissBundle(bundle)}>Dismiss all of these</Button>}>
+          These were made without a model, so there can be one per finding.
         </Alert>
       )}</For>
       <For each={shown()}>{(candidate) => {
         const bundle = (bundles() ?? []).find((entry) => entry.candidates.some((member) => member.candidateId === candidate.candidateId))!
         return <Candidate bundleId={bundle.id} boundary={bundle.boundaryKey} candidate={candidate} focused={focused() === candidate.candidateId} onOpen={() => setFocused(candidate.candidateId)} onChanged={changed} />
       }}</For>
-      <For each={(bundles() ?? []).filter((bundle) => bundle.outcomes.some((outcome) => outcome.outcome === 'not-selected'))}>{(bundle) => <Section label="Omitted observations"><Stack gap="row"><For each={bundle.outcomes.filter((outcome) => outcome.outcome === 'not-selected')}>{(outcome) => <Card><Text>{outcome.explanation}</Text><Text tone="muted">Observation {outcome.observationId}</Text><Show when={bundle.candidates.some((candidate) => candidate.candidateId === focused())}><Button size="sm" variant="bare" onPress={() => restore(bundle, outcome.observationId)}>Restore to open change</Button></Show></Card>}</For></Stack></Section>}</For>
+      <For each={(bundles() ?? []).filter((bundle) => bundle.outcomes.some((outcome) => outcome.outcome === 'not-selected'))}>{(bundle) => <Section label="Findings left out"><Stack gap="row"><For each={bundle.outcomes.filter((outcome) => outcome.outcome === 'not-selected')}>{(outcome) => <Card><Text tip={outcome.observationId}>{outcome.explanation}</Text><Show when={bundle.candidates.some((candidate) => candidate.candidateId === focused())}><Button size="sm" variant="ghost" onPress={() => restore(bundle, outcome.observationId)}>Add back</Button></Show></Card>}</For></Stack></Section>}</For>
       <Show when={candidates().length > 3 && !showAll()}><Button size="sm" onPress={() => setShowAll(true)}>Show all {candidates().length} changes</Button></Show>
       <Show when={!candidates().length && (bundles() ?? []).some((bundle) => bundle.state === 'ready')}>
-        <Text>No memory suggestions are awaiting review. The latest review either found nothing durable or its suggestions have already been resolved.</Text>
+        <Text>Nothing to review. The last review found nothing worth keeping, or you've handled it all.</Text>
       </Show>
       <Show when={groupingError()}><Alert tone="danger">{groupingError()}</Alert></Show>
     </Stack>

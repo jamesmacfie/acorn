@@ -4,7 +4,7 @@ import { basicSetup } from 'codemirror'
 import { EditorState, Prec, StateEffect, type Extension, type Text } from '@codemirror/state'
 import { EditorView, keymap } from '@codemirror/view'
 import { activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
-import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { Alert, DocumentTabs, EmptyState, Icon, IconButton, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
@@ -480,7 +480,7 @@ export default function EditorPane(props: { task: Task }) {
     // Not guarded on `disposed`. What follows is the pool's and the open-files store's, both of which
     // outlive this mount, and a write that lands after the pane closed still happened: bailing here
     // left the file marked dirty on disk-clean content until something else re-read it.
-    if (!res.ok) return setSaveErr(res.reason ?? 'Save failed')
+    if (!res.ok) return setSaveErr(res.reason ?? "Couldn't save this file.")
     saved.set(p, doc)
     // Still-dirty if the user typed more during the async write.
     editorSetDirty(taskId, p, !docFor(p)?.eq(doc))
@@ -534,7 +534,7 @@ export default function EditorPane(props: { task: Task }) {
 
   return (
     <Show when={root() !== undefined} fallback={<EmptyState busy>Loading…</EmptyState>}>
-      <Show when={root()} fallback={<EmptyState>Open a terminal first to map this repo's checkout.</EmptyState>}>
+      <Show when={root()} fallback={<EmptyState title="Can't find this task's files">Open a terminal in this task, then try again.</EmptyState>}>
         <ListDetail
           listLabel="Editor sidebar"
           collapseKey={sidebarKey}
@@ -580,18 +580,22 @@ export default function EditorPane(props: { task: Task }) {
             tabs={documentTabs()}
             actions={
               <>
+                {/* Two glyphs rather than two words, which read as one phrase: a mode switch, and a
+                    send. */}
                 <ToggleButton
+                  iconOnly
                   variant="bare"
                   size="sm"
-                  tip="Edit in $EDITOR, in a terminal inside this pane"
+                  label="Edit in your terminal editor"
+                  tip="Edit in your terminal editor"
+                  tipSub="Uses $EDITOR"
                   pressed={mode() === 'terminal'}
                   onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
-                >$EDITOR</ToggleButton>
+                ><Icon name="square-terminal" /></ToggleButton>
                 <Show when={active() && !imagePath()}>
-                  <Button
-                    variant="bare"
-                    size="sm"
-                    tip="Add file/selection reference to the agent composer"
+                  <IconButton
+                    icon="send"
+                    label="Add to your message to the agent"
                     onPress={() => {
                       const p = currentPath
                       if (!p || !view) return
@@ -605,12 +609,13 @@ export default function EditorPane(props: { task: Task }) {
                         else setSaveErr('')
                       })
                     }}
-                  >→ agent</Button>
+                  />
                 </Show>
-                <Show when={saveErr()}><Alert>{saveErr()}</Alert></Show>
               </>
             }
           />
+          {/* Under the strip rather than in it: a sentence does not fit a 48-pixel bar. */}
+          <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
           {/* CodeMirror owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
               pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
               the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor

@@ -1,9 +1,10 @@
 import { createEffect, For, onCleanup, onMount, Show } from 'solid-js'
 import { bytesOf, clientEvents, consumePaneIntent, formatSize, type PaneIntent, type Task, type SessionSummary } from '@acorn/plugin-api/client'
 import type { ContextItem, TaskContext } from '@acorn/protocol/api.ts'
+import { NOTE_AUTHOR_LABEL, NOTE_SCOPE_LABEL, type NoteScope } from '@acorn/protocol/notes.ts'
 import {
   Alert, Badge, Button, Checkbox, CodeBlock, EmptyState, Fold, Heading, IconButton, Inline, Meter, Picker,
-  Row, Rows, Stack, Text, Toolbar,
+  Rows, Stack, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { collectionId, pillText, sessionLabel, type ContextModel } from './contextModel'
@@ -15,21 +16,23 @@ import { CONTEXT_SECTION_POINT } from './sectionPoint'
 
 type Section = TaskContext['sections'][number]
 
-const originBadge = (author?: 'user' | 'agent' | 'workflow'): string =>
-  (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
-const scopePill = (scope?: string): string =>
-  (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : scope === 'global' ? '🌐' : '')
+// Notes' words for scope and author, so a note reads the same in both panes.
+const originLabel = (author?: 'user' | 'agent' | 'workflow'): string => (author ? NOTE_AUTHOR_LABEL[author] : '')
+const scopeLabel = (scope?: NoteScope): string => (scope ? NOTE_SCOPE_LABEL[scope] : '')
 
+// The pane's bar, as every other pane has one. The message sits under the bar rather than in it.
 export function ContextHeader(props: { task: Task; model: ContextModel }) {
   const model = () => props.model
   return (
-    <Stack gap="row">
-      <Inline gap="row">
-        <Heading level={3}>context</Heading>
+    <>
+      <Toolbar ariaLabel="Context">
+        <Heading level={2}>Context</Heading>
         <Text emphasis="muted">{model().summary()}</Text>
-      </Inline>
-      <Show when={model().msg()}>{(text) => <Alert>{text()}</Alert>}</Show>
-    </Stack>
+        <Toolbar.Spacer />
+        <IconButton icon="refresh-cw" label="Refresh" onPress={() => void model().refreshContext()} />
+      </Toolbar>
+      <Show when={model().msg()}>{(text) => <Alert variant="banner">{text()}</Alert>}</Show>
+    </>
   )
 }
 
@@ -51,21 +54,22 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
   const ItemRow = (rowProps: { section: Section; item: ContextItem }) => {
     const rowId = () => `${rowProps.section.id}:${rowProps.item.id}`
     const open = () => model().isOpen(rowId())
+    const expandable = () => !!rowProps.item.body || !!rowProps.item.details?.length
     return (
       <Stack gap="none">
-        <Row
-          density="compact"
-          depth={1}
-          label={rowProps.item.label}
+        <TreeRow
+          expandable={expandable()}
+          expanded={open()}
+          onToggle={() => model().toggleOpen(rowId())}
           onPress={() => model().toggleOpen(rowId())}
-          leading={<Text emphasis="muted">{open() ? '▾' : '▸'}</Text>}
           meta={
             <Inline gap="inline">
-              <Show when={originBadge(rowProps.item.origin?.author)}>
-                {(badge) => <Badge size="xs">{badge()}</Badge>}
+              <Badge size="xs">{rowProps.item.kind}</Badge>
+              <Show when={originLabel(rowProps.item.origin?.author)}>
+                {(label) => <Badge size="xs">{label()}</Badge>}
               </Show>
-              <Show when={scopePill(rowProps.item.jump?.noteScope)}>
-                {(pill) => <Text emphasis="muted">{pill()}</Text>}
+              <Show when={scopeLabel(rowProps.item.jump?.noteScope)}>
+                {(label) => <Badge size="xs">{label()}</Badge>}
               </Show>
             </Inline>
           }
@@ -75,11 +79,8 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
             </Show>
           }
         >
-          <Inline gap="inline">
-            <Text emphasis="muted">{rowProps.item.kind}</Text>
-            <Text>{rowProps.item.label}</Text>
-          </Inline>
-        </Row>
+          {rowProps.item.label}
+        </TreeRow>
         <Show when={open()}>
           <Stack gap="row">
             <Show when={rowProps.item.body}>{(body) => <Text emphasis="muted" wrap>{body()}</Text>}</Show>
@@ -114,16 +115,19 @@ export function ContextBody(props: { task: Task; model: ContextModel }) {
             </Show>
           </Inline>
         }
-        actions={
+        // Before the label, so the box reads as belonging to its section rather than to the pane's far
+        // edge. One phrase for the include box here and in Notes.
+        leading={
           <Checkbox
-            ariaLabel={`Include ${section().label}`}
+            ariaLabel={`Include ${section().label} in the agent's context`}
+            title="Include in the agent's context"
             checked={model().effective()[section().id] ?? false}
             onChange={() => model().toggleSection(section().id)}
           />
         }
       >
         <Show when={section().absent}>
-          {(absent) => <Text emphasis="muted">⚠ {absent().detail}</Text>}
+          {(absent) => <Alert tone="warn">{absent().detail}</Alert>}
         </Show>
         {/* Extra UI a plugin draws under its own section: memory's add form and proposal queue today,
             anybody's tree tomorrow. `stack`, so context's own rows stay and the contributor's tree
@@ -164,14 +168,15 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
   const model = () => props.model
   return (
     <Stack gap="none">
-      <Fold label="preview" persistKey="context.preview" meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}>
+      <Fold label="What the agent gets" persistKey="context.preview" meta={<Text emphasis="muted">{formatSize(bytesOf(model().assembled()?.block ?? ''))}</Text>}>
         <CodeBlock size="xs" maxHeight="block" wrap>{model().assembled()?.block}</CodeBlock>
       </Fold>
       <Toolbar ariaLabel="Context sync">
         <Picker<SessionSummary>
+          size="sm"
           label={sessionLabel(model().target())}
           placeholder="Filter sessions…"
-          emptyText="No running agent session."
+          emptyText="No agent is running for this task."
           results={(query) => model().sessions(query)}
           rowLabel={(session) => sessionLabel(session)}
           isActive={(session) => session.sourceId === model().target()?.sourceId && session.sessionId === model().target()?.sessionId && session.nodeId === model().target()?.nodeId}
@@ -186,9 +191,7 @@ export function ContextFooter(props: { task: Task; model: ContextModel }) {
             >{pillText(status())}</Badge>
           )}
         </Show>
-        <Button onPress={() => void model().syncContext()}>Sync context</Button>
-        <Toolbar.Spacer />
-        <IconButton icon="refresh-cw" title="Refresh" label="Refresh" onPress={() => void model().refreshContext()} />
+        <Button size="sm" onPress={() => void model().syncContext()}>Send context</Button>
       </Toolbar>
     </Stack>
   )

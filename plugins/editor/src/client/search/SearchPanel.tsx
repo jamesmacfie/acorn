@@ -1,6 +1,6 @@
 import { createEffect, createMemo, createResource, createSignal, on, Show } from 'solid-js'
 import { debounce } from '@acorn/plugin-api/client'
-import { CopyButton, EmptyState, Input, Row, Rows, Section, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, CopyButton, EmptyState, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
 
@@ -59,43 +59,58 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
     if (results.loading) return 'Searching…'
     const hits = `${totalHits()} result${totalHits() === 1 ? '' : 's'}`
     const where = `${files().length} file${files().length === 1 ? '' : 's'}`
-    return `${hits} in ${where}${results()?.truncated ? ' · results truncated' : ''}`
+    return `${hits} in ${where}`
   }
 
   return (
     <TabPanel idPrefix="editor-side" id="search" active={props.active ? 'search' : 'files'}>
       {/* Stacked, not a row: the sidebar is narrow, and an input sharing it with three toggles
-          leaves about a hundred pixels to type a query into. */}
-      <Stack gap="row">
+          leaves about a hundred pixels to type a query into. Two sm strips, so both sit on the pane's
+          inset, and the count rides at the end of the toggles. */}
+      <Toolbar size="sm" ariaLabel="Search">
         <Input
           ref={input}
           kind="filter"
+          size="sm"
+          label="Search in files"
           placeholder="Search in files…"
           value={query()}
           assist={false}
           onInput={(value) => onInput(value)}
         />
-        <Toolbar.Group>
-          {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
-              them mutually exclusive. */}
-          <ToggleButton variant="bare" size="sm" title="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
-          <ToggleButton variant="bare" size="sm" title="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
-          <ToggleButton variant="bare" size="sm" title="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
-        </Toolbar.Group>
-      </Stack>
+      </Toolbar>
+      <Toolbar size="sm" ariaLabel="Search options">
+        {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
+            them mutually exclusive. The find bar's shape. */}
+        <ToggleButton variant="bare" size="sm" tip="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
+        <ToggleButton variant="bare" size="sm" tip="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
+        <ToggleButton variant="bare" size="sm" tip="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
+        <Show when={files().length}>
+          <Toolbar.Spacer />
+          <Text emphasis="muted">{status()}</Text>
+        </Show>
+      </Toolbar>
 
       <Show when={files().length} fallback={<EmptyState busy={results.loading} size="sm" align="start">{status()}</EmptyState>}>
         {/* One collection per file rather than one for the whole result set: a hit's key has to be
             stable across a refetch, and `path:line:col` is the only thing about a hit that is. */}
-        <Stack gap="stack">
-          <Text emphasis="muted">{status()}</Text>
+        <Stack gap="none">
+          {/* The client never learns the node's cap, so this cannot say how many it kept. */}
+          <Show when={results()?.truncated}>
+            <Alert variant="banner" tone="muted">Showing the first results. Narrow your search to see more.</Alert>
+          </Show>
           {files().map((file) => (
-            <Section
-              label={file.path}
-              count={file.hits.length}
-              sticky
-              actions={<CopyButton text={() => file.path} title="Copy file path" />}
-            >
+            <Stack gap="none">
+              {/* `sub`, because a path is content and keeps its case. It still sticks, so the file a hit
+                  belongs to stays in view while its hits scroll. */}
+              <SectionHeader
+                level="sub"
+                sticky
+                count={file.hits.length}
+                actions={<CopyButton text={() => file.path} title="Copy file path" />}
+              >
+                {file.path}
+              </SectionHeader>
               {/* Every returned hit; the node caps the total result set. */}
               <Rows
                 id={`editor.search:${file.path}`}
@@ -118,7 +133,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
                   </Row>
                 )}
               </Rows>
-            </Section>
+            </Stack>
           ))}
         </Stack>
       </Show>

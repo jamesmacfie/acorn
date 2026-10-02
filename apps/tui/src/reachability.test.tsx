@@ -51,7 +51,7 @@ const SURFACES: Surface[] = [
   { name: 'changes', pane: 'changes', until: 'Tracked' },
   { name: 'notes', pane: 'notes', until: 'Repro steps' },
   { name: 'context', pane: 'context', until: 'Working tree' },
-  { name: 'editor', pane: 'editor', until: '$EDITOR' },
+  { name: 'editor', pane: 'editor', until: 'Edit in your terminal editor' },
   {
     name: 'overlay',
     until: '#42',

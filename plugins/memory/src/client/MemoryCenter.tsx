@@ -1,9 +1,9 @@
 import { useParams } from '@solidjs/router'
 import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
-import { Alert, Badge, Button, Card, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, DetailColumn, EmptyState, Heading, Icon, Inline, Input, ListDetail, Row, Stack, Text } from '@acorn/plugin-api/ui'
 import { clientEvents, onPluginFrame } from '@acorn/plugin-api/client'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
-import { memoryApi } from './memoryClient'
+import { MEMORY_SCOPE_LABEL, MEMORY_TYPE_LABEL, memoryApi } from './memoryClient'
 import { highlightedFinding, clearHighlightedFinding } from './proposalTarget'
 import FindingsBundleReview from './FindingsBundleReview'
 
@@ -33,15 +33,12 @@ export default function MemoryCenter() {
 
   // No `list` on the split, so it draws one full-width column: this page has nothing to put beside its
   // content, and `DetailColumn scroll` makes the whole page one scroll region. Agent Center is the
-  // same shape.
+  // same shape. `measure="page"` stops it at the page width, so a wide window does not stretch it.
   return (
     <ListDetail>
-      <DetailColumn scroll>
+      <DetailColumn scroll measure="page">
         <Stack gap="section">
-          <Stack gap="row">
-            <Heading level={1}>Memory</Heading>
-            <Text emphasis="muted">Durable knowledge and suggestions distilled from completed tasks.</Text>
-          </Stack>
+          <Heading level={1} help="What agents learned from your finished tasks, and the changes they suggest.">Memory</Heading>
           <Show when={reviewSettings() && (!reviewSettings()!.backendId || !reviewSettings()!.targetId)}>
             <Alert
               tone="warn"
@@ -54,32 +51,42 @@ export default function MemoryCenter() {
           <FindingsBundleReview focusCandidateId={highlightedFinding()} scope={params.projectId ? { kind: 'project', projectId: params.projectId } : { kind: 'private' }} onChanged={() => void refetchMemories()} />
           <Stack gap="row">
             <Heading level={2}>Memories</Heading>
-            <Input label="Filter memories" placeholder="Filter by name or description…" value={filter()} onInput={setFilter} />
+            {/* Only when there is something to narrow. */}
+            <Show when={memories().length}>
+              <Input kind="filter" size="sm" label="Filter memories" placeholder="Filter memories…" value={filter()} onInput={setFilter} />
+            </Show>
             <Show
               when={shown().length}
               fallback={(
-                <EmptyState icon={<Icon name="brain" />} title={memories().length ? 'Nothing matches that filter.' : 'No memories yet.'}>
+                <EmptyState icon={<Icon name="brain" />} title={memories().length ? 'No memories match' : 'No memories yet'}>
                   <Show when={!memories().length}>
                     Agents propose these as they work, and you can add one by hand from a task's Context pane.
                   </Show>
                 </EmptyState>
               )}
             >
-              <For each={shown()}>
-                {(memory) => (
-                  <Card>
-                    <Stack gap="row">
-                      <Inline gap="inline" wrap>
-                        <Badge shape="pill">{memory.type}</Badge>
-                        <Text emphasis="strong">{memory.name}</Text>
-                        <Show when={memory.scope === 'private'}><Badge tone="warn" shape="pill">private</Badge></Show>
-                      </Inline>
-                      <Text>{memory.description}</Text>
-                      <Text emphasis="muted">{memory.path}</Text>
-                    </Stack>
-                  </Card>
-                )}
-              </For>
+              {/* Rows, as every other list in the app. The path stays visible: until a memory can be
+                  opened from here, it is the only way to find the file. */}
+              <Stack gap="none">
+                <For each={shown()}>
+                  {(memory) => (
+                    <Row
+                      variant="stacked"
+                      label={memory.name}
+                      meta={(
+                        <Inline gap="inline">
+                          <Badge size="xs">{MEMORY_TYPE_LABEL[memory.type] ?? memory.type}</Badge>
+                          <Badge size="xs">{MEMORY_SCOPE_LABEL[memory.scope]}</Badge>
+                        </Inline>
+                      )}
+                    >
+                      <Text emphasis="strong">{memory.name}</Text>
+                      <Text wrap>{memory.description}</Text>
+                      <Text emphasis="mono" tone="muted">{memory.path}</Text>
+                    </Row>
+                  )}
+                </For>
+              </Stack>
             </Show>
           </Stack>
         </Stack>

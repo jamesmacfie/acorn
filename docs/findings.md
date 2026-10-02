@@ -134,6 +134,13 @@ observations. Agent and workflow provenance opens the owning run through a manif
 cooperative destination; managed-turn and workflow-step evidence uses the same path. Findings passes
 only the stored run or session identifier, while the owning plugin resolves and renders the target.
 
+Lifecycle captures are stored with one of two fixed titles, "Managed agent turn completed" and
+"Workflow-managed turn checkpoint". Those say how the row was made, not what it says, so the pane
+draws the title from the body's first sentence instead and leaves that sentence out of the excerpt
+(`findingHeadline` in `tree/findingPresentation.ts`). An empty body falls back to "Agent turn" or
+"Workflow step". The stored title never changes, so older rows get the same treatment. A row shows
+the time for today and the day for anything older, with the full date in its tip.
+
 Managed-agent completion text is reconstructed from append-only provider deltas before Findings
 captures it. Earlier rows used the general observation kind for lifecycle checkpoints. The Findings
 migration reclassifies those lifecycle-produced rows as review input while preserving their IDs,

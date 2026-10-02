@@ -12,6 +12,16 @@ import type { MemoryChangePayload } from '../contract/findingsReview'
 
 export type MemoryType = 'convention' | 'architecture' | 'decision' | 'fix' | 'reference' | 'feedback' | 'task' | 'user'
 
+// The words every memory surface shows for a type and a scope: the add form, the Memory page, and the
+// suggestion review. One map each, so the same choice never has three names.
+export const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
+  convention: 'Convention', architecture: 'Architecture', decision: 'Decision', fix: 'Fix',
+  reference: 'Reference', feedback: 'Feedback', task: 'Task', user: 'About you',
+}
+export const MEMORY_TYPE_OPTIONS = (Object.keys(MEMORY_TYPE_LABEL) as MemoryType[]).map((value) => ({ value, label: MEMORY_TYPE_LABEL[value] }))
+export const MEMORY_SCOPE_LABEL: Record<'project' | 'private', string> = { project: 'This project', private: 'All projects' }
+export const MEMORY_SCOPE_OPTIONS = (['project', 'private'] as const).map((value) => ({ value, label: MEMORY_SCOPE_LABEL[value] }))
+
 export type MemoryRow = {
   id: string
   scope: 'project' | 'private'

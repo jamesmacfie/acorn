@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { FindingObservation } from '../contract/records'
-import { evidenceLabel, findingBody, findingExcerpt, findingOriginLabel } from './findingPresentation'
+import { evidenceLabel, findingBody, findingExcerpt, findingHeadline, findingOriginLabel, findingTime } from './findingPresentation'
 
 const observation = (body: string, kind = 'findings:review-input'): FindingObservation => ({
   id: 'finding-1',
@@ -45,5 +45,19 @@ describe('finding presentation', () => {
     expect(findingOriginLabel(observation('body').origin)).toBe('Agent run · attempt 2')
     expect(evidenceLabel({ kind: 'managed-turn', sessionId: 'session-1', turnId: 'turn-1' })).toBe('Agent turn')
     expect(evidenceLabel({ kind: 'repository', path: 'src/example.ts' })).toBe('src/example.ts')
+  })
+
+  it('titles an automatic finding from its first sentence and leaves the stored title alone', () => {
+    const finding = observation('Turn 18 summary. The change keeps the queue bounded.', 'findings:note')
+    expect(findingHeadline(finding)).toEqual({ title: 'Turn 18 summary', excerpt: 'The change keeps the queue bounded.' })
+    expect(finding.title).toBe('Managed agent turn completed')
+    expect(findingHeadline({ ...finding, title: 'Queue stays bounded' }).title).toBe('Queue stays bounded')
+    expect(findingHeadline(observation('', 'findings:note')).title).toBe('Agent turn')
+  })
+
+  it('shows the time for today and the day for anything older', () => {
+    const now = new Date(2026, 9, 2, 15, 0).getTime()
+    expect(findingTime(new Date(2026, 9, 2, 11, 7).getTime(), now)).not.toMatch(/Oct/)
+    expect(findingTime(new Date(2026, 8, 30, 11, 7).getTime(), now)).toMatch(/Sep/)
   })
 })

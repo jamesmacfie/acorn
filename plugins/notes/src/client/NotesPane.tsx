@@ -1,9 +1,9 @@
 import { Show } from 'solid-js'
-import { bytesOf, formatSize, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
-import { SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
+import { openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
+import { NOTE_AUTHOR_LABEL, NOTE_SCOPE_LABEL, SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
-  Alert, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Menu, Row, RowActions, Rows, Section, Stack, Text,
-  Textarea, ToggleButton, Toolbar,
+  Alert, Badge, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Menu, Row, RowActions, Rows, Section,
+  SectionHeader, SegmentedControl, Stack, Text, Textarea, Toolbar,
 } from '@acorn/plugin-api/ui'
 import type { NotesModel } from './notesModel'
 import type { NoteScope, NoteSummary } from './notesClient'
@@ -12,16 +12,32 @@ import type { NoteScope, NoteSummary } from './notesClient'
 // the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
 // share is in ./notesModel.ts.
 
-const scopeGlyph = (scope: NoteScope): string => (scope === 'task' ? '◆ task' : scope === 'workspace' ? 'ws' : '🌐')
-const authorBadge = (author: NoteSummary['author']): string => (author === 'agent' ? '🤖' : author === 'workflow' ? 'seed' : '')
+const NEW_NOTE_LABEL: Record<NoteScope, string> = {
+  task: 'New task note', workspace: 'New workspace note', global: 'New note for everywhere',
+}
 
+const virtualScratchpad = (): NoteSummary => ({
+  slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0,
+})
+
+// The task group is the scratchpad (real or offered) plus everything else, as one collection, so the
+// arrows walk it in the order it is drawn.
+const taskRowsOf = (model: NotesModel): NoteSummary[] => {
+  const rows = model.scratchpad() ? [model.scratchpad()!] : model.matches(virtualScratchpad()) ? [virtualScratchpad()] : []
+  return [...rows, ...model.taskOther()]
+}
+
+// The house list header: the label and the count of rows shown, with the filter as its control.
 export function NotesHeader(props: { task: Task; model: NotesModel }) {
   const model = () => props.model
+  const count = () => taskRowsOf(model()).length + model().wsNotes().length + model().globalNotes().length
   return (
-    <Toolbar ariaLabel="Notes library">
-      <Text emphasis="muted">{model().workspace()?.name ?? 'workspace'}</Text>
-      <Input kind="filter" size="sm" label="Filter notes" placeholder="filter…" value={model().filter()} onInput={(value) => model().setFilter(value)} />
-    </Toolbar>
+    <SectionHeader
+      count={count()}
+      actions={<Input kind="filter" size="sm" label="Filter notes" placeholder="Filter notes…" value={model().filter()} onInput={(value) => model().setFilter(value)} />}
+    >
+      Notes
+    </SectionHeader>
   )
 }
 
@@ -50,7 +66,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
         label={rowProps.note.title}
         selected={model().isActive(rowProps.scope, rowProps.note.slug)}
         onPress={() => void model().open(rowProps.scope, rowProps.note.slug)}
-        meta={authorBadge(rowProps.note.author)}
+        meta={NOTE_AUTHOR_LABEL[rowProps.note.author] ? <Badge size="xs">{NOTE_AUTHOR_LABEL[rowProps.note.author]}</Badge> : undefined}
         trailing={
           <>
             <RowActions ariaLabel={`Actions for ${rowProps.note.title}`}>
@@ -74,12 +90,11 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
     )
   }
 
-  const NewButton = (headProps: { label: string; scope: NoteScope }) => (
+  const NewButton = (headProps: { scope: NoteScope }) => (
     <IconButton
       icon="plus"
       tone="accent"
-      title={`New ${headProps.label} note`}
-      label={`New ${headProps.label} note`}
+      label={NEW_NOTE_LABEL[headProps.scope]}
       disabled={!model().locationFor(headProps.scope)}
       onPress={() => void model().createIn(headProps.scope).then((made) => {
         // Focus lands on the title after the create round-trip, so the first thing you type is the
@@ -90,22 +105,12 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
     />
   )
 
-  const virtualScratchpad = (): NoteSummary => ({
-    slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0,
-  })
-
-  // The task group is the scratchpad (real or offered) plus everything else, as one collection, so the
-  // arrows walk it in the order it is drawn.
-  const taskRows = () => {
-    const rows = model().scratchpad() ? [model().scratchpad()!] : model().matches(virtualScratchpad()) ? [virtualScratchpad()] : []
-    return [...rows, ...model().taskOther()]
-  }
 
   const Group = (groupProps: { label: string; scope: NoteScope; notes: readonly NoteSummary[] }) => (
     <Section
       label={groupProps.label}
       count={groupProps.notes.length}
-      actions={<NewButton label={groupProps.label} scope={groupProps.scope} />}
+      actions={<NewButton scope={groupProps.scope} />}
     >
       <Rows
         id={`notes.${props.task.id}.${groupProps.scope}`}
@@ -130,9 +135,9 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
 
   return (
     <Stack gap="none">
-      <Group label="Task" scope="task" notes={taskRows()} />
-      <Group label="Workspace" scope="workspace" notes={model().wsNotes()} />
-      <Group label="Global" scope="global" notes={model().globalNotes()} />
+      <Group label={NOTE_SCOPE_LABEL.task} scope="task" notes={taskRowsOf(model())} />
+      <Group label={NOTE_SCOPE_LABEL.workspace} scope="workspace" notes={model().wsNotes()} />
+      <Group label={NOTE_SCOPE_LABEL.global} scope="global" notes={model().globalNotes()} />
     </Stack>
   )
 }
@@ -159,7 +164,7 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   ref={model().titleRef}
                   onInput={(value) => model().onTitleInput(value)}
                 />
-                <Text emphasis="muted">{scopeGlyph(sel().scope)}</Text>
+                <Badge size="xs">{NOTE_SCOPE_LABEL[sel().scope]}</Badge>
                 <Checkbox
                   size="sm"
                   checked={model().selectedIncluded()}
@@ -168,14 +173,25 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   title="Include in the agent's context"
                   onChange={(checked) => void model().toggleIncluded(sel().scope, sel().slug, checked)}
                 />
-                <ToggleButton
+                {/* Two named states, so the control says where you are rather than where a press goes. */}
+                <SegmentedControl
                   size="sm"
-                  label={model().preview() ? 'Edit' : 'Preview'}
-                  pressed={model().preview()}
-                  onPressedChange={() => { model().scheduleSave.flush(); model().setPreview(!model().preview()) }}
+                  ariaLabel="Note view"
+                  value={model().preview() ? 'preview' : 'edit'}
+                  options={[{ value: 'edit', label: 'Edit' }, { value: 'preview', label: 'Preview' }]}
+                  onChange={(value) => { model().scheduleSave.flush(); model().setPreview(value === 'preview') }}
                 />
-                {/* `saving…` is a live status and stays; the completed save is an event, so it toasts. */}
-                <Text emphasis="muted">{model().saving() ? 'saving…' : ''}</Text>
+                {/* `Saving…` is a live status and stays; the completed save is an event, so it toasts. */}
+                <Text emphasis="muted">{model().saving() ? 'Saving…' : ''}</Text>
+                <Toolbar.Spacer />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  disabled={sel().virtual}
+                  onPress={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
+                >
+                  Show in Context
+                </Button>
               </Toolbar>
               <Show when={!model().preview()} fallback={
                 <Markdown
@@ -194,19 +210,6 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   onBlur={() => model().scheduleSave.flush()}
                 />
               </Show>
-              <Toolbar size="sm" ariaLabel="Note status">
-                <Text emphasis="muted">{formatSize(bytesOf(model().body()))}</Text>
-                <Toolbar.Spacer />
-                <Button
-                  variant="bare"
-                  size="sm"
-                  tone="accent"
-                  disabled={sel().virtual}
-                  onPress={() => openPane(props.task.id, 'context', { kind: 'context:reveal', sectionId: 'notes', itemId: `${sel().scope}:${sel().slug}` })}
-                >
-                  view in Context →
-                </Button>
-              </Toolbar>
             </>
           )}
         </Show>

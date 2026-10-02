@@ -24,18 +24,18 @@ export type ContextModel = ReturnType<typeof createContextModel>
 
 const agoText = (at: number): string => {
   const minutes = Math.round((Date.now() - at) / 60_000)
-  return minutes < 1 ? 'now' : `${minutes}m`
+  return minutes < 1 ? 'just now' : `${minutes}m ago`
 }
 
 export const sessionLabel = (session: SessionSummary | undefined): string =>
-  session ? `${session.title}${session.idle ? ' ●' : ''}` : 'agent session'
+  session ? `${session.title}${session.idle ? ' ●' : ''}` : 'Choose a session'
 
 export const pillText = (status: SyncStatus): string =>
   status.kind === 'never'
-    ? 'not synced'
+    ? 'Not sent yet'
     : status.kind === 'synced'
-      ? `synced · ${agoText(status.at)}`
-      : `stale · ${status.changes} change${status.changes === 1 ? '' : 's'}`
+      ? `Sent ${agoText(status.at)}`
+      : `${status.changes} change${status.changes === 1 ? '' : 's'} since you sent it`
 
 export function createContextModel(task: Task) {
   const [msg, setMsg] = createSignal('')
@@ -101,7 +101,7 @@ export function createContextModel(task: Task) {
   async function syncContext() {
     setMsg('')
     const session = targetSessionFor(task.id)
-    if (!session) return setMsg('No running agent session.')
+    if (!session) return setMsg('No agent is running for this task.')
     await refreshContext() // fresh inventory, one fetch
     const current = ctx()
     if (!current) return
@@ -110,7 +110,7 @@ export function createContextModel(task: Task) {
     const res = await sendToSession(session, block, 'after-ready')
     if (res.ok) recordSync(`${session.nodeId}:${session.sourceId}:${session.sessionId}`, task.id, sections)
     // Success is transient feedback; a failure needs to stay next to the button that failed.
-    if (res.ok) return toast(res.queued ? 'Queued — delivers when the agent is idle.' : 'Sent.', { tone: 'success' })
+    if (res.ok) return toast(res.queued ? 'Queued. It goes to the agent when it is free.' : 'Sent.', { tone: 'success' })
     setMsg(res.reason ?? 'Send failed.')
   }
 

@@ -120,16 +120,17 @@ describe('every pane at 80 by 24', () => {
     const frame = await screenFor('context', { until: 'Working tree' })
     expect(frame).toContain('2 sections')
     expect(frame).toContain('Working tree')
-    expect(frame).toContain('Sync context')
+    expect(frame).toContain('Send context')
   }, 60_000)
 
   it('editor: the file box, and the offer to hand the file to $EDITOR', async () => {
-    const frame = await screenFor('editor', { until: '$EDITOR' })
+    const frame = await screenFor('editor', { until: 'Edit in your terminal editor' })
     expect(frame).toContain('Editor')
     // The handoff, as a device preference rather than a suspend-and-resume: turning it on opens the
     // reader's own editor in a PTY on the node, and on this host that PTY draws in cells
-    // (docs/editor.md § Editing in your own editor).
-    expect(frame).toContain('$EDITOR')
+    // (docs/editor.md § Editing in your own editor). The switch is an icon on the desktop, so the
+    // terminal prints its label.
+    expect(frame).toContain('[ ] Edit in your terminal editor')
   }, 60_000)
 
   // Wider than 80, because that is what a `reduced` node's loss is about: a pane that reads at 80 has

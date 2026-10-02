@@ -187,6 +187,13 @@
    divider has to reach the pane's edge. Same escape as `single`'s. */
 .layout-hbf-body:has(> .ui-listdetail, > .remote-tree > .ui-listdetail) { padding-inline: 0; }
 
+/* A fold directly in the body's or the footer's stack is a section of the pane, such as Context's, so
+   its summary reaches the pane's edges and its label starts on the pane pad, like the header above. */
+:is(.layout-hbf-body, .layout-hbf-footer) > .ui-stack > .ui-fold > .ui-fold-summary {
+  margin-inline: calc(-1 * var(--pane-pad));
+  padding-inline: var(--pane-pad);
+}
+
 /* `single`. The one region is the scroller; see the comment in layouts/Single.tsx for why the layout
    root cannot be. `padding-inline` rather than `padding`, because the vertical rhythm inside a region
    is the kit's `gap` roles and a top pad would double the first one. */
