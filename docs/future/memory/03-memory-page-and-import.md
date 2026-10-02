@@ -1,6 +1,6 @@
 # Phase 3: the Memory page and import
 
-Status: proposed, 2026-10-01. Depends on [phase 2](./02-remove-findings.md), which removes the review
+Status: implemented, 2026-10-02. Depends on [phase 2](./02-remove-findings.md), which removes the review
 section this page replaces.
 
 ## Goal
@@ -130,3 +130,36 @@ context preview at 120 by 40.
 - The TUI's current memory surface, if it has one.
 - Whether a compiled plugin can register a CLI command the way a loaded manifest's `cliCommands` does.
   If it cannot, import stays in the desktop and TUI.
+
+## Delivery record
+
+The library, hash-checked edits and scope moves, history and restore, change feed and Undo,
+standing-context preview and cap settings, and source preview/import are implemented. Desktop and
+TUI use the same project rail source. The TUI body editor uses a disposable file and the guarded save
+path. The owning contract is [notes and memory](../../notes-and-memory.md).
+
+The compiled Node plugin context does not expose CLI command registration, and compiled descriptors
+have no manifest `cliCommands` source. Per the fallback above, import stays in desktop and TUI.
+Claude discovery follows Git's common directory to the main repository and honors the Node's Claude
+config directory and project-name environment overrides. Custom `autoMemoryDirectory` settings
+remain outside this phase's source discovery.
+
+### Verification
+
+- `pnpm lint`: all 36 packages pass. Memory: 55 tests pass; TUI: 663 pass and two existing skips;
+  architecture: 74 pass; Node route registry: 36 pass.
+- The isolated Tauri window verified a racing agent write with the owner draft preserved and the
+  current body shown, delete/restore, body-only search, exact standing context, and saved cap settings.
+- The isolated PTY at 120 by 40 verified reading a memory, its session link, the context preview,
+  and Undo removing the memory and refreshing the index. A real PTY test verifies `$EDITOR` returns
+  the edited draft and removes its temporary directory. Both acceptance sessions were stopped.
+- Acceptance exposed two supporting fixes: the Node build now embeds the contract before TypeScript
+  transformation, and the TUI shell replaces each source's render and focus lifetime together. The
+  source-switch regression fails on the previous shell and passes with the fix.
+- The Node build passes its service budget. The TUI compiles, but its existing startup gate remains
+  over budget: 1,198,199 bytes against 1,175,000. Before the source fix, a diagnostic build replacing
+  the entire memory page with an empty component had the same 1,198,244-byte startup graph as the
+  feature build. Functional PTY checks used the compiled bundle with `--no-build`.
+- The generic `navigation` flow was attempted and failed at its `Agents 1` target before the source
+  fix. The memory-specific checks above were driven explicitly; that generic flow is not recorded
+  as passing.

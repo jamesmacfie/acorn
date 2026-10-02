@@ -69,6 +69,18 @@ describe('memory routes', () => {
     expect(undo).toHaveBeenCalledWith('change-1')
   })
 
+  it('requires device authority and validates library operations before dispatch', async () => {
+    const library = vi.fn(async () => ({ ok: true }))
+    setKnowledgeBridge(bridge({ memoryLibrary: library }))
+    for (const app of [task(), service()]) {
+      expect((await app.fetch(req('/library/changes?projectId=project-widget', 'POST', {}), {} as Env)).status).toBe(403)
+    }
+    expect((await device().fetch(req('/library/caps', 'POST', { caps: { project: 199, private: 4000 } }), {} as Env)).status).toBe(400)
+    expect(library).not.toHaveBeenCalled()
+    expect((await device().fetch(req('/library/changes?projectId=project-widget', 'POST', {}), {} as Env)).status).toBe(200)
+    expect(library).toHaveBeenCalledWith('changes', 'project-widget', {})
+  })
+
   it('has no Notes routes', async () => {
     setKnowledgeBridge(bridge())
     for (const path of ['/workspaces/global/notes', '/workspaces/ws1/notes/slug', '/tasks/task1/notes']) {

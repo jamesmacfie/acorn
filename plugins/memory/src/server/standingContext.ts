@@ -20,25 +20,40 @@ export function cappedMemoryIndex(index: string, cap: number): string {
   return '[MEMORY.md truncated: call memory_list to see every entry.]'
 }
 
+export async function memoryCaps(core: Pick<CoreServices, 'identity' | 'prefs'>) {
+  const user = core.identity.active()
+  const caps = { ...DEFAULT_MEMORY_CAPS }
+  if (user) {
+    try {
+      const parsed = JSON.parse(await core.prefs.read(user, MEMORY_CAPS_KEY) ?? '{}') as Record<string, unknown>
+      for (const scope of ['private', 'project'] as const) {
+        const value = parsed[scope]
+        if (typeof value === 'number' && Number.isInteger(value) && value >= 200 && value <= 32000) caps[scope] = value
+      }
+    } catch { /* A damaged preference retains the defaults. */ }
+  }
+  return caps
+}
+
+export async function memoryPreview(store: Pick<MemoryStore, 'list'>, core: Pick<CoreServices, 'identity' | 'prefs'>, projectId: string | null) {
+  const caps = await memoryCaps(core)
+  const memories = await store.list(projectId)
+  const indexes = {
+    private: renderMemoryIndex(memories.filter((memory) => memory.scope === 'private')),
+    project: renderMemoryIndex(memories.filter((memory) => memory.scope === 'project')),
+  }
+  const privateIndex = cappedMemoryIndex(indexes.private, caps.private)
+  const projectIndex = cappedMemoryIndex(indexes.project, caps.project)
+  const blocks = [memoryContract, '## Private memory', privateIndex || '(No memories yet.)']
+  if (projectId) blocks.push('## Project memory', projectIndex || '(No memories yet.)')
+  return { text: blocks.join('\n\n'), caps,
+    counts: { private: indexes.private.length, project: indexes.project.length },
+    shown: { private: privateIndex.length, project: projectIndex.length } }
+}
+
 export function standingContextBuilder(store: Pick<MemoryStore, 'list'>, core: Pick<CoreServices, 'tasks' | 'identity' | 'prefs'>) {
   return async (taskId: string): Promise<string | null> => {
     const task = await core.tasks.load(taskId)
-    if (!task) return null
-    const user = core.identity.active()
-    let caps = { ...DEFAULT_MEMORY_CAPS }
-    if (user) {
-      const raw = await core.prefs.read(user, MEMORY_CAPS_KEY)
-      try {
-        const parsed = JSON.parse(raw ?? '{}') as Record<string, unknown>
-        for (const scope of ['private', 'project'] as const) {
-          const value = parsed[scope]
-          if (typeof value === 'number' && Number.isInteger(value) && value >= 200 && value <= 32000) caps[scope] = value
-        }
-      } catch { /* A damaged preference retains the defaults. */ }
-    }
-    const memories = await store.list(task.projectId ?? null)
-    const blocks = [memoryContract, '## Private memory', cappedMemoryIndex(renderMemoryIndex(memories.filter((memory) => memory.scope === 'private')), caps.private) || '(No memories yet.)']
-    if (task.projectId) blocks.push('## Project memory', cappedMemoryIndex(renderMemoryIndex(memories.filter((memory) => memory.scope === 'project')), caps.project) || '(No memories yet.)')
-    return blocks.join('\n\n')
+    return task ? (await memoryPreview(store, core, task.projectId ?? null)).text : null
   }
 }

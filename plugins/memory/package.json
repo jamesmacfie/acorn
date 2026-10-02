@@ -8,7 +8,8 @@
     "./node/index.ts": "./src/node/index.ts",
     "./client/index.ts": "./src/client/index.ts",
     "./contract/*": "./src/contract/*",
-    "./testkit": "./src/testkit/index.ts"
+    "./testkit": "./src/testkit/index.ts",
+    "./testkit/client": "./src/testkit/client.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",
@@ -23,6 +24,7 @@
     "@tanstack/solid-query": "^5.101.0",
     "@solidjs/router": "^0.16.1",
     "hono": "catalog:",
+    "node-pty": "^1.0.0",
     "solid-js": "catalog:",
     "zod": "catalog:"
   },

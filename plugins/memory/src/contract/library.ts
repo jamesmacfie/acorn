@@ -13,6 +13,7 @@ export type MemoryLibraryEntry = {
   body: string
   createdAt: number
   updatedAt: number
+  updatedBy?: string
 }
 
 export type MemoryLibraryCapability = {
@@ -35,4 +36,5 @@ export type MemoryRow = {
   supersededBy: string | null
   createdAt: number
   updatedAt: number
+  updatedBy?: string
 }

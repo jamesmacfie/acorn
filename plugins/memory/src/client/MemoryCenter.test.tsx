@@ -3,9 +3,9 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn() }))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: [{ id: 'task-1', projectId: 'project-1' }] }) }))
-vi.mock('@solidjs/router', () => ({ useParams: () => ({ taskId: 'task-1' }) }))
+vi.mock('@solidjs/router', () => ({ useParams: () => ({ taskId: 'task-1' }), useNavigate: () => vi.fn() }))
 vi.mock('@acorn/plugin-api/client', async original => ({ ...await original<Record<string, unknown>>(), onPluginFrame: () => () => {} }))
-vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ list: mocks.list }) }))
+vi.mock('./memoryClient', async original => ({ ...await original<Record<string, unknown>>(), memoryApi: () => ({ list: mocks.list, get: async (address: unknown) => ({ ...address as object, name: 'deploy', description: 'Deployment rules.', body: 'Deploy through the release pipeline.', type: 'project', hash: 'h' }), history: async () => [], changes: async () => [], preview: async () => ({ text: 'Standing context', counts: { private: 0, project: 0 }, shown: { private: 0, project: 0 }, caps: { private: 4000, project: 12000 } }), sources: async () => [] }) }))
 vi.mock('./MemoryAddForm', () => ({ default: () => null }))
 import MemoryCenter from './MemoryCenter'
 import { selectMemory } from './memorySelection'

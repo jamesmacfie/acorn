@@ -70,15 +70,18 @@ export function serializeMemory(mem: MemoryFile): string {
 export function parseMemory(text: string, fallbackName: string): MemoryFile {
   const fields: Record<string, string> = {}
   let body = text
-  if (text.startsWith('---\n')) {
-    const end = text.indexOf('\n---', 4)
-    if (end > 0) {
-      for (const line of text.slice(4, end).split('\n')) {
-        const m = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/)
-        if (m) fields[m[2]] = m[3].trim() // flat + metadata-nested keys share one namespace (unique here)
-      }
-      body = text.slice(end + 4).replace(/^\n/, '')
+  const frontmatter = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n|$)/.exec(text)
+  if (frontmatter) {
+    for (const line of frontmatter[1].split(/\r?\n/)) {
+      const m = line.match(/^(\s*)([A-Za-z_][A-Za-z0-9_]*):\s*(.*)$/)
+      if (m) {
+        const value = m[3].trim()
+        fields[m[2]] = value.startsWith('"') && value.endsWith('"')
+          ? (() => { try { return JSON.parse(value) as string } catch { return value.slice(1, -1) } })()
+          : value.startsWith("'") && value.endsWith("'") ? value.slice(1, -1).replaceAll("''", "'") : value
+      } // flat + metadata-nested keys share one namespace (unique here)
     }
+    body = text.slice(frontmatter[0].length)
   }
   return {
     name: fields.name && isValidMemoryName(fields.name) ? fields.name : fallbackName,

@@ -285,3 +285,9 @@ After `npm install --omit=dev`, run `node bin/acorn.mjs --help`. Package manager
 `acorn` bin when the archive is installed as a package.
 See [node distribution](./node-distribution.md) for Node setup and [terminal client](./tui.md)
 for the no-argument interactive host.
+
+## Memory import
+
+Memory is a compiled plugin without a CLI command descriptor. Import memories through the project's
+**Memory** rail entry in the desktop or TUI. The source preview, collision choices, and import
+contract are described in [notes and memory](./notes-and-memory.md#the-memory-page-and-transcript).

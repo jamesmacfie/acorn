@@ -1,6 +1,7 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
 import { AGENT_STANDING_CONTEXT } from '@acorn/plugin-agents/contract/standingContext.ts'
 import { TERMINAL_LAUNCH_CONTEXT } from '@acorn/plugin-terminal/contract/launchContext.ts'
+import { registerMemoryEditor } from '../server/editorChannel'
 import { memoryAgentTools } from '../server/agentTools'
 import { registerKnowledgeChannel } from '../server/knowledgeChannel'
 import { MEMORY_LIBRARY, type MemoryLibraryEntry } from '../contract/library'
@@ -17,6 +18,7 @@ export const memoryPlugin = (): NodePlugin => {
       { verb: 'memories-changed', description: 'The project or private memory library changed' },
     ],
     init: (ctx) => {
+      registerMemoryEditor(ctx.events)
       const runtime = registerKnowledgeChannel(ctx.core, { emit: ctx.events.send })
       ctx.extensionPoints.handle(TERMINAL_LAUNCH_CONTEXT, { id: 'memory', value: { read: runtime.launchContext } })
       ctx.capabilities.provide(MEMORY_LIBRARY, {

@@ -217,6 +217,8 @@
   "POST /v1/p/github/repos/:owner/:repo/pulls/:number/viewed",
   "POST /v1/p/github/repos/:owner/:repo/pulls/batch",
   "POST /v1/p/github/repos/refresh",
+  "POST /v1/p/memory/library/:action",
+  "POST /v1/p/memory/library/:action",
   "POST /v1/p/memory/memory/changes/:id/undo",
   "POST /v1/p/memory/memory/changes/:id/undo",
   "POST /v1/p/memory/projects/:id/memory",

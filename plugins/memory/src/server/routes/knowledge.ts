@@ -2,6 +2,8 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { type AppEnv, BridgeError, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
+import type { LibraryRequest } from '../library'
+
 // Memory's route surface. Notes owns its own routes.
 
 export type KnowledgeBridge = {
@@ -11,6 +13,7 @@ export type KnowledgeBridge = {
   memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryProjectAdd?(projectId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryUndo?(changeId: string): Promise<unknown>
+  memoryLibrary?(action: string, projectId: string | undefined, request: LibraryRequest): Promise<unknown>
 }
 
 export const KNOWLEDGE = routeCapability<KnowledgeBridge>('memory.knowledgeRoute')
@@ -19,6 +22,15 @@ export const setKnowledgeBridge = (bridge: KnowledgeBridge | null): void => setR
 
 // Everything that writes a memory file gets a validated body.
 const addBody = z.object({ scope: z.enum(['project', 'private']), name: z.string(), description: z.string(), type: z.string(), body: z.string() })
+
+const libraryBody = z.object({
+  address: z.object({ scope: z.enum(['private', 'project']), projectId: z.string().nullable(), name: z.string() }).optional(),
+  input: z.object({ name: z.string(), description: z.string(), type: z.enum(['user', 'feedback', 'project', 'reference']), body: z.string(), hash: z.string() }).optional(),
+  scope: z.enum(['private', 'project']).optional(), hash: z.string().optional(), version: z.string().optional(),
+  caps: z.object({ private: z.number().int().min(200).max(32000), project: z.number().int().min(200).max(32000) }).optional(),
+  sourceId: z.enum(['claude', 'checkout']).optional(),
+  files: z.array(z.object({ name: z.string(), sourceHash: z.string(), destinationHash: z.string().nullable(), overwrite: z.boolean() })).max(1000).optional(),
+})
 
 // A project query must stay inside the signed task's project. Omitted scope reads only the shared
 // private library, but still requires an existing task. Resolve before reading files.
@@ -46,6 +58,14 @@ async function readMemory(c: Context<AppEnv>, read: (bridge: KnowledgeBridge, pr
 }
 
 export const knowledge = new Hono<AppEnv>()
+  .post('/library/:action', requireDevice, async (c) => {
+    const parsed = libraryBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, KNOWLEDGE, (bridge) => {
+      if (!bridge.memoryLibrary) throw new BridgeError(404, 'not_found')
+      return bridge.memoryLibrary(c.req.param('action'), c.req.query('projectId'), parsed.data)
+    })
+  })
   .get('/memory', (c) => readMemory(c, (b, projectId) => b.memoryList(projectId)))
   .get('/memory/search', (c) => {
     const q = c.req.query('q')

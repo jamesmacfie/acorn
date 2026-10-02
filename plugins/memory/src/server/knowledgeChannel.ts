@@ -1,3 +1,4 @@
+import { memoryLibrary } from './library'
 import { BridgeError, ToolError, type CoreServices } from '@acorn/plugin-api/node'
 import { homedir } from 'node:os'
 import type { KnowledgeBridge } from '../server/routes/knowledge'
@@ -13,7 +14,7 @@ export type KnowledgeDeps = {
   emit?(frame: { channel: string } & Record<string, unknown>): void
 }
 
-export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity' | 'prefs'>
+export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity' | 'prefs' | 'git'>
 
 export type MemoryKnowledge = {
   list(projectId: string | null): Promise<MemoryRow[]>
@@ -47,6 +48,10 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
     write: async (...args) => (await loadStore()).write(...args),
     delete: async (...args) => (await loadStore()).delete(...args),
     undo: async (...args) => (await loadStore()).undo(...args),
+    edit: async (...args) => (await loadStore()).edit(...args),
+    history: async (...args) => (await loadStore()).history(...args),
+    restore: async (...args) => (await loadStore()).restore(...args),
+    feed: async (...args) => (await loadStore()).feed(...args),
   }
   const list = async (projectId: string | null): Promise<MemoryRow[]> => (await store.list(projectId)).map((memory) => ({
     ...memory,
@@ -88,6 +93,7 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
   // The client's memory surface, exposed as the KnowledgeBridge behind the HTTP routes.
   // guard() keeps the `| { error }` contract the client unions on.
   const route: KnowledgeBridge = {
+    memoryLibrary: memoryLibrary(store, core),
     taskMemoryScope: async (taskId) => {
       const task = await core.tasks.load(taskId)
       if (!task) return null

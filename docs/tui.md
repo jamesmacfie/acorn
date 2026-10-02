@@ -446,6 +446,11 @@ is only a shape. And a node used to be destroyed a tick after it left the tree, 
 `Suspense` boundary that suspended twice; `removeNode` unlinks the object and keeps it, so there is
 nothing to be already destroyed.
 
+The shell keys each source match by its component. Switching to a lazy source that starts a fetch
+must replace the source's region and its focus claim together. Reusing the previous match retained
+the old tree under the resolved suspense boundary and left the new controls unreachable. The
+`sourceSwitch.test.tsx` regression covers that transition with a pending resource.
+
 ### There is no floating layer, so a panel needs somewhere to be laid out
 
 A terminal has no layer to open over, so `Modal`, `Menu`, `Popover` and `Picker` all draw in flow, and

@@ -559,3 +559,7 @@ A frame may keep only the modified chords declared in its manifest `claimsKeys`.
 `acorn.keys.claim()` may narrow that set, never extend it. Claims are visible in Shortcuts and in the
 trust prompt. The palette (`meta+k`), settings (`meta+,`), task switching (`meta+1`-`meta+9`) and
 `escape` are reserved and cannot be claimed. Bare typing inside a frame remains local.
+
+Memory's **Search memory** command searches names, descriptions, and bodies and opens the selected
+file in the project's Memory library. Edit, history, restore, Undo, index caps, and import controls
+live on that page. See [notes and memory](./notes-and-memory.md#the-memory-page-and-transcript).

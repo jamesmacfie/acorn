@@ -316,8 +316,10 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
                   main panel is its detail alone. One that did not keeps its whole surface here,
                   which is every source that has not been migrated
                   (client-core/host/registries/sources/sources.ts § regions). */}
-              <Match when={source()?.regions?.detail}>{(detail) => <SourceRegion><Dynamic component={detail()} /></SourceRegion>}</Match>
-              <Match when={source()?.component}>{(component) => <SourceRegion><Dynamic component={component()} /></SourceRegion>}</Match>
+              {/* A new source owns a new region lifetime. Reusing the Match while a lazy source
+                  starts a resource retained the previous tree and disposed the new focus claim. */}
+              <Match when={source()?.regions?.detail} keyed>{(detail) => <SourceRegion><Dynamic component={detail} /></SourceRegion>}</Match>
+              <Match when={source()?.component} keyed>{(component) => <SourceRegion><Dynamic component={component} /></SourceRegion>}</Match>
               <Match when={model.task()}>{(task) => <PaneBody task={task()} nodeId={props.nodeId} />}</Match>
             </Switch>
           </PanelBody>

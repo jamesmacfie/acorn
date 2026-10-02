@@ -1,8 +1,7 @@
 # Simple memory
 
-Status: phases 1 and 2 implemented for verification, 2026-10-02. Phase 2 proceeded by explicit
-owner request before phase 1's two-week measurement finished. Phase 3 is next; phase 4 also waits on
-cloud teams. Where a file here disagrees with a shipped contract, the owning reference document wins until the implementation
+Status: phases 1 and 2 implemented for verification; phase 3 implemented, 2026-10-02. Phase 2 proceeded by explicit
+owner request before phase 1's two-week measurement finished. Phase 4 waits on cloud teams. Where a file here disagrees with a shipped contract, the owning reference document wins until the implementation
 changes that contract.
 
 ## What this is

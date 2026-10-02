@@ -770,3 +770,13 @@ byte reads, and multipart uploads. Omitted `nodeId` selects the active fleet Nod
 keeps the serving-origin path in a browser without a broker; a broker rejects it rather than selecting
 a fleet Node. Multipart callers can capture this origin before awaiting file bytes or a native picker.
 The broker retains credentials and builds the multipart body from typed parts.
+
+### Memory library operations
+
+`POST /v1/p/memory/library/:action?projectId=ID` requires a paired device. The memory plugin owns
+`get`, `edit`, `delete`, `history`, `restore`, `changes`, `preview`, `caps`, `sources`,
+`import-preview`, and `import`. Addresses identify a name and scope; project addresses must match
+the selected project. Edits, deletes, and restores use the current file hash. Import binds each
+previewed file to its source hash and destination hash, with a per-file overwrite choice. Caps are
+integers from 200 through 32,000 characters. Conflicts return HTTP 409; missing resources return 404.
+See [notes and memory](./notes-and-memory.md#the-memory-page-and-transcript) for the page contract.

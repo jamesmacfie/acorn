@@ -1,4 +1,5 @@
-import { memoryAddRoute, memoryListRoute, memoryProjectAddRoute, memorySearchRoute, memoryUndoRoute } from '../shared/api'
+import type { MemoryAddress, MemoryChange, MemoryDocument, MemoryVersion, MemoryPreview, MemoryCaps, MemoryImportSource, MemoryImportFile, MemoryImportResult } from '../shared/api'
+import { memoryAddRoute, memoryListRoute, memoryProjectAddRoute, memorySearchRoute, memoryUndoRoute, memoryPageRoute } from '../shared/api'
 import { readJson, writeJson } from '@acorn/plugin-api/client'
 import type { MemoryRow, MemoryType } from '../contract/library'
 export type { MemoryRow, MemoryType } from '../contract/library'
@@ -17,12 +18,35 @@ export type MemoryApi = {
   search(query: string, projectId?: string, type?: MemoryType): Promise<(MemoryRow & { rank: number })[] | { error: string }>
   add(p: { taskId?: string; projectId?: string; scope: 'project' | 'private'; name: string; description: string; type: MemoryType; body: string }): Promise<{ path: string } | { error: string }>
   undo(changeId: string): Promise<unknown>
+  get(address: MemoryAddress, projectId?: string): Promise<MemoryDocument | null>
+  history(address: MemoryAddress, projectId?: string): Promise<MemoryVersion[]>
+  edit(address: MemoryAddress, input: { name: string; description: string; type: string; body: string; hash: string }, scope: 'project' | 'private', projectId?: string): Promise<unknown>
+  delete(address: MemoryAddress, hash: string, projectId?: string): Promise<unknown>
+  restore(address: MemoryAddress, version: string, hash: string | undefined, projectId?: string): Promise<unknown>
+  changes(projectId?: string): Promise<(MemoryChange & { canUndo: boolean })[]>
+  preview(projectId?: string): Promise<MemoryPreview>
+  caps(caps: MemoryCaps, projectId?: string): Promise<unknown>
+  sources(projectId: string): Promise<MemoryImportSource[]>
+  importPreview(projectId: string, sourceId: string): Promise<MemoryImportFile[]>
+  import(projectId: string, sourceId: string, files: { name: string; sourceHash: string; destinationHash: string | null; overwrite: boolean }[]): Promise<MemoryImportResult>
 }
 
 const post = <T>(url: string, body?: unknown) =>
   writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
 
+const page = <T>(action: string, projectId: string | undefined, request: unknown = {}) => post<T>(memoryPageRoute(action, projectId), request)
 const api: MemoryApi = {
+  get: (address, projectId) => page('get', projectId, { address }),
+  history: (address, projectId) => page('history', projectId, { address }),
+  edit: (address, input, scope, projectId) => page('edit', projectId, { address, input, scope }),
+  delete: (address, hash, projectId) => page('delete', projectId, { address, hash }),
+  restore: (address, version, hash, projectId) => page('restore', projectId, { address, version, hash }),
+  changes: (projectId) => page('changes', projectId),
+  preview: (projectId) => page('preview', projectId),
+  caps: (caps, projectId) => page('caps', projectId, { caps }),
+  sources: (projectId) => page('sources', projectId),
+  importPreview: (projectId, sourceId) => page('import-preview', projectId, { sourceId }),
+  import: (projectId, sourceId, files) => page('import', projectId, { sourceId, files }),
   list: (projectId) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(projectId)),
   search: (query, projectId, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, projectId, type)),
   add: (p) => post<{ path: string } | { error: string }>(p.taskId ? memoryAddRoute(p.taskId) : memoryProjectAddRoute(p.projectId ?? ''), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),

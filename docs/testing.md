@@ -1450,3 +1450,20 @@ in the repo that can say no.
 Two more regenerations joined it since: `UPDATE_PLUGIN_SCHEMA=1` rewrites the manifest JSON Schema from
 the Zod contract (`packages/plugin-types/src/pluginSchema.test.ts`), and the same file's assertion is what
 keeps the published schema and the contract one source of truth.
+
+## Memory phase 3 acceptance
+
+On an isolated Node, open the project's **Memory** rail entry. Add a memory, edit it, and race an
+agent update against an open draft. Verify that the draft survives, the current body is displayed,
+and saving requires a reload. Delete the memory and restore a retained history version. Save three
+agent memories and verify the feed links to their tasks and sessions; undoing the second creation
+removes only that memory.
+
+Set the project index cap to 500 characters. Verify the preview's truncation marker matches a fresh
+session's standing context and that a pre-existing session retains its snapshot. Preview and import
+a fixture Claude folder, then verify bodies, mapped types, regenerated index, import attribution,
+collision skip/overwrite choices, and unchanged source files. Repeat library reading, Undo, context
+preview, and `$EDITOR` editing in the isolated TUI driver at 120 by 40.
+
+Automated storage, import, preview, and route tests are in the memory plugin. Run
+`pnpm --filter @acorn/plugin-memory test` and `pnpm lint`.

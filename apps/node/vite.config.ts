@@ -7,6 +7,7 @@ import { thirdPartyNotices } from './thirdPartyNotices'
 export default defineConfig({
   plugins: [thirdPartyNotices('THIRD-PARTY-NOTICES.txt'), {
     name: 'memory-contract',
+    enforce: 'pre',
     transform(code, id) {
       if (!id.endsWith('/plugins/memory/src/server/standingContext.ts')) return
       const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')

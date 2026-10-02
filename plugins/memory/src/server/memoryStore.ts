@@ -7,15 +7,8 @@ import { atomicWrite, isValidMemoryName, parseMemory, regenerateIndexFile, scanM
 import { searchMemoryFiles } from './memorySearch'
 import { validateMemoryWrite, type MemoryWrite } from './memorySafety'
 
-export type MemoryAddress = { scope: MemoryScope; projectId: string | null; name: string }
-export type MemoryAuthor = { by: 'agent' | 'owner'; sessionId?: string; taskId?: string }
-export type MemoryChange = MemoryAddress & MemoryAuthor & {
-  id: string
-  at: string
-  action: 'write' | 'delete' | 'restore'
-  previousVersion: string | null
-  hash: string | null
-}
+import type { MemoryAddress, MemoryAuthor, MemoryChange, MemoryVersion } from '../shared/api'
+export type { MemoryAddress, MemoryAuthor, MemoryChange } from '../shared/api'
 export const memoryHash = (text: string): string => createHash('sha256').update(text).digest('hex')
 
 // The Node is the writer. Serialize all store instances for one root, including history and the log.
@@ -78,7 +71,10 @@ export class MemoryStore {
     const path = this.path(address)
     if (!await this.safeDirectory(this.directory(address.scope, address.projectId), false)) return null
     const text = await textIfPresent(path)
-    return text === null ? null : { ...parseMemory(text, address.name), ...address, path, hash: memoryHash(text) }
+    if (text === null) return null
+    const hash = memoryHash(text)
+    const change = (await this.changes()).findLast((change) => change.scope === address.scope && change.projectId === address.projectId && change.name === address.name && change.hash === hash)
+    return { ...parseMemory(text, address.name), ...address, path, hash, updatedAt: parseMemory(text, address.name).updatedAt || (await lstat(path)).mtimeMs, taskId: change?.taskId, sessionId: change?.sessionId }
   }
 
   async search(projectId: string | null, query: string, scope?: MemoryScope) {
@@ -99,6 +95,7 @@ export class MemoryStore {
   }
 
   async changes(): Promise<MemoryChange[]> {
+    if (!await this.safeDirectory(this.root, false)) return []
     const text = await textIfPresent(join(this.root, 'changes.jsonl'))
     return (text ?? '').split('\n').filter(Boolean).flatMap((line) => {
       try { return [JSON.parse(line) as MemoryChange] } catch { return [] }
@@ -133,7 +130,8 @@ export class MemoryStore {
     else await unlink(path)
     await textIfPresent(join(this.directory(address.scope, address.projectId), 'MEMORY.md'))
     await regenerateIndexFile(this.directory(address.scope, address.projectId))
-    const change: MemoryChange = { ...address, ...author, id: randomUUID(), at, action, previousVersion, hash: text === null ? null : memoryHash(text) }
+    const change: MemoryChange = { name: address.name, scope: address.scope, projectId: address.projectId,
+      ...author, id: randomUUID(), at, action, previousVersion, hash: text === null ? null : memoryHash(text) }
     const changes = [...await this.changes(), change].slice(-1000)
     await atomicWrite(join(this.root, 'changes.jsonl'), changes.map((entry) => JSON.stringify(entry)).join('\n') + '\n')
     this.announce(address.scope === 'project' ? address.projectId : null)
@@ -148,6 +146,64 @@ export class MemoryStore {
 
   delete(address: MemoryAddress, hash: string, author: MemoryAuthor) {
     return serialized(this.root, () => this.mutate(address, null, hash, author, 'delete'))
+  }
+
+  async history(address: MemoryAddress): Promise<MemoryVersion[]> {
+    const dir = this.historyDirectory(address)
+    if (!await this.safeDirectory(dir, false)) return []
+    const versions = (await readdir(dir)).filter((name) => /^[0-9TZ.-]+-[a-f0-9-]+\.md$/.test(name)).sort().reverse().slice(0, 20)
+    return (await Promise.all(versions.map(async (version) => {
+      const text = await textIfPresent(join(dir, version))
+      if (text === null) return null
+      const parsed = parseMemory(text, address.name)
+      return { version, at: new Date(parsed.updatedAt || parsed.createdAt || (await lstat(join(dir, version))).mtimeMs).toISOString(),
+        updatedBy: parsed.updatedBy ?? 'owner', body: parsed.body, name: parsed.name, description: parsed.description, type: parsed.type }
+    }))).filter((version) => version !== null)
+  }
+
+  restore(address: MemoryAddress, version: string, hash?: string) {
+    return serialized(this.root, async () => {
+      if (!/^[0-9TZ.-]+-[a-f0-9-]+\.md$/.test(version)) throw new ToolError('bad_request', 'Invalid history version.')
+      const dir = this.historyDirectory(address)
+      if (!await this.safeDirectory(dir, false)) throw new ToolError('not_found', 'No such history version.')
+      const text = await textIfPresent(join(dir, version))
+      if (!text) throw new ToolError('not_found', 'No such history version.')
+      const parsed = parseMemory(text, address.name)
+      const input = { name: address.name, description: parsed.description, type: parsed.type as MemoryWrite['type'], body: parsed.body }
+      validateMemoryWrite(input)
+      return this.mutate(address, input, hash, { by: 'owner' }, 'restore')
+    })
+  }
+
+  edit(address: MemoryAddress, input: MemoryWrite, scope: MemoryScope, projectId = address.projectId) {
+    validateMemoryWrite(input)
+    return serialized(this.root, async () => {
+      const current = await this.get(address)
+      if (!current || current.hash !== input.hash) throw new ToolError('conflict', 'Memory changed. Reload the current version before saving.')
+      const destination = { ...address, name: input.name, scope, projectId: scope === 'private' ? null : projectId }
+      this.path(destination)
+      if (destination.name === address.name && destination.scope === address.scope) return this.mutate(address, input, input.hash, { by: 'owner' }, 'write')
+      if (await this.get(destination)) throw new ToolError('conflict', 'A memory already exists at the destination.')
+      // Both operations run under the root lock. The old address retains its history for Undo.
+      const saved = await this.mutate(destination, input, undefined, { by: 'owner' }, 'write')
+      try { await this.mutate(address, null, input.hash, { by: 'owner' }, 'delete') }
+      catch (error) {
+        await this.mutate(destination, null, saved.hash ?? undefined, { by: 'owner' }, 'restore')
+        throw error
+      }
+      return saved
+    })
+  }
+
+  async feed(projectId: string | null) {
+    const changes = (await this.changes()).filter((change) => change.scope === 'private' || change.projectId === projectId)
+    const latest = new Map<string, string>()
+    for (const change of changes) latest.set(`${change.scope}:${change.projectId}:${change.name}`, change.id)
+    return Promise.all(changes.slice(-50).reverse().map(async (change) => ({ ...change,
+      canUndo: latest.get(`${change.scope}:${change.projectId}:${change.name}`) === change.id
+        && ((await this.get(change))?.hash ?? null) === change.hash
+        && (!change.previousVersion || (await this.history(change)).some((version) => version.version === change.previousVersion)),
+    })))
   }
 
   undo(changeId: string) {
@@ -169,4 +225,4 @@ export class MemoryStore {
   }
 }
 
-export type MemoryStoreAccess = Pick<MemoryStore, 'list' | 'get' | 'search' | 'write' | 'delete' | 'undo'>
+export type MemoryStoreAccess = Pick<MemoryStore, 'list' | 'get' | 'search' | 'write' | 'delete' | 'undo' | 'edit' | 'history' | 'restore' | 'feed'>
