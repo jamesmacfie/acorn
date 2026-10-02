@@ -1,7 +1,12 @@
 /* Settings (SettingsView.tsx): a full-window layer over the shell, top bar included. The rail is a
-   fixed column, the main column scrolls, and a page fills it. At the modal's z-level, so a menu, a
-   select's list or a confirmation a page opens, all of which portal to the body, still paint above it. */
+   fixed column, the main column scrolls, and a page is a column centred in it. At the modal's z-level, so
+   a menu, a select's list or a confirmation a page opens, all of which portal to the body, still paint
+   above it. */
 .settings-view {
+  /* How wide a page gets. The settings pages in the apps under references/ stop between 720 and
+     900 px and centre, and this leaves room for a table such as a workspace's projects. The header's
+     words and the plugin strip stop at it too, so the title and the close sit over the page. */
+  --settings-measure: 960px;
   position: fixed;
   inset: 0;
   z-index: var(--z-modal);
@@ -72,7 +77,7 @@
   padding: var(--space-7) var(--pane-pad) var(--space-5);
   border-bottom: var(--chrome-divider);
 }
-.settings-heading-text { min-width: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.settings-heading-text { min-width: 0; max-width: var(--settings-measure); margin-inline: auto; display: flex; flex-direction: column; gap: var(--space-2); }
 /* The group label's look, as an eyebrow over the title. */
 .settings-breadcrumb {
   font-size: var(--fs-2xs);
@@ -93,7 +98,7 @@
    grows to at least the column's height, which is what lets a plugin's frame, a flex child that takes
    the space left, fill it the way it filled the modal's fixed-height pane. */
 .settings-body { flex: 1; min-height: 0; overflow-y: auto; display: flex; flex-direction: column; padding: var(--pane-pad); }
-.settings-page { flex: 1 0 auto; width: 100%; display: flex; flex-direction: column; gap: var(--gap-section); container: settings-page / inline-size; }
+.settings-page { flex: 1 0 auto; width: 100%; max-width: var(--settings-measure); margin-inline: auto; display: flex; flex-direction: column; gap: var(--gap-section); container: settings-page / inline-size; }
 /* A narrow page stacks its inline rows, the control under the words, so a long label is not squeezed
    into a third of the page beside a mostly empty control column. The query reads the page, not the
    window, because a page can be narrow in a wide window. A size container is also the containing
