@@ -135,4 +135,20 @@ describe('the pull request conversation', () => {
     // The reply lands in the turn that was already there.
     expect(after[1]?.textContent).toContain('Bea')
   })
+
+  it('links a thread to its file by name and line, with the full path in the tip', () => {
+    mount(detail({ threads: [thread('t1', 'src/client/rail/RailBadge.tsx', 14, 1)] }))
+    const link = host.querySelector<HTMLElement>('[data-turn="thread:t1"] .ui-link')!
+    expect(link.textContent).toBe('RailBadge.tsx, line 14')
+    expect(link.dataset.tip).toBe('src/client/rail/RailBadge.tsx')
+  })
+
+  it('tints a review by its verdict and leaves a bare approval without filler text', () => {
+    mount(detail({ reviews: [{ id: 'r1', author: 'grace', state: 'APPROVED', body: null, submittedAt: 1 }] }))
+    const card = host.querySelector<HTMLElement>('[data-turn="review:r1"] .ui-card')!
+    expect(card.dataset.stripe).toBe('ok')
+    expect(card.textContent).toContain('approved')
+    expect(card.textContent).not.toContain('No written summary')
+  })
 })
+

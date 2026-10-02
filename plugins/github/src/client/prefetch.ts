@@ -2,7 +2,7 @@
 // detail + file summaries and seed their caches so likely navigation has an instant first paint.
 // The previous unbounded warm-up scaled network, SQLite reads, JSON parsing, memory and IndexedDB
 // writes with every open PR in a repo. Remaining rows are warmed on hover/focus instead.
-// Patch bodies stay intent-driven in DiffView. Open only; closed PRs stay on-demand.
+// Patch bodies stay intent-driven in DiffForPull. Open only; closed PRs stay on-demand.
 import type { QueryClient } from '@tanstack/solid-query'
 import { fileSummariesKey, pullKey, pullsBatchRoute, type PullBatchItem, type PullBatchRequest } from '../shared/api'
 import { pullsOptions } from './queries'

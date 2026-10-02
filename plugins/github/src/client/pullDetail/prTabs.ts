@@ -178,10 +178,10 @@ function build(task: Task) {
   }
   const taskCreationTitle = () => {
     if (!selectedProject()) return selectedProjects().length > 1
-      ? 'This repository has several mapped projects; create the task from the repository pull-request list.'
-      : 'Import or map this GitHub repository before creating a task.'
+      ? 'More than one project uses this repository. Create the task from the pull request list.'
+      : 'Add this repository as a project first.'
     if (!selectedDetail.data?.pull?.headRef) return selectedDetail.isError
-      ? 'The pull request could not be loaded.'
+      ? "Couldn't load this pull request."
       : 'Loading the pull request branch…'
     return `Create a task for #${selected()!.pull.number}`
   }
@@ -195,7 +195,7 @@ function build(task: Task) {
     try {
       openTask(await promotePullToTask(queryClient, { ...tab.pull, projectId: project.id, headRef }))
     } catch (error) {
-      setTaskError(error instanceof Error ? error.message : 'Could not create a task for this pull request.')
+      setTaskError(error instanceof Error ? error.message : "Couldn't create a task for this pull request.")
     } finally {
       setCreatingTask(false)
     }

@@ -14,7 +14,7 @@ export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; 
 
 /** The text, underlined, pressable. Underline is the `control` border role's answer, which is what a
  *  link is: a run of text with an edge under it. */
-export function Link(props: { href?: string; onPress?: () => void; children: JSX.Element }) {
+export function Link(props: { href?: string; onPress?: () => void; tip?: string; children: JSX.Element }) {
   // A link with a handler presses it. A link with only an `href` prints the URL on the line below,
   // which is what this host already does with anything it cannot open for you (../copy.ts) —
   // there is no browser to hand it to and a terminal's own OSC 8 support is not something to guess at.

@@ -2,7 +2,7 @@ import { createMemo, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { useNavigate } from '@solidjs/router'
 import {
-  CHECK_TONE, checksState, formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps,
+  CHECK_TONE, checksState, checksSummary, formatRelativeTime, openInAppUrl, railDotProps, type RefPanelProps,
 } from '@acorn/plugin-api/client'
 import { Button, EmptyState, Facts, Heading, Inline, Stack, StatusDot, Text, Toolbar } from '@acorn/plugin-api/ui'
 import { RefPanelBox, RefPanelTaskLink } from '@acorn/plugin-api/ui/host'
@@ -15,6 +15,8 @@ import { pullDetailOptions } from './queries'
 //
 // A tree in the box the host draws. The backdrop, the drawer, the title and the dismiss affordance
 // are `RefPanelBox`, the same box a loaded plugin's panel is wrapped in.
+
+const STATE_WORD: Record<string, string> = { open: 'Open', closed: 'Closed', merged: 'Merged' }
 
 export default function PullRefPanel(props: RefPanelProps) {
   const navigate = useNavigate()
@@ -53,13 +55,13 @@ export default function PullRefPanel(props: RefPanelProps) {
           <EmptyState align="start" size="sm" busy={detail.isLoading}>
             {/* A displayId this panel cannot parse means the recogniser and the panel disagree,
                 which is a bug, not a missing pull request. Say so instead of spinning. */}
-            {!parts() ? 'Not a pull request reference.' : detail.isLoading ? 'Loading…' : 'Could not load this pull request.'}
+            {!parts() ? "acorn can't read this pull request link." : detail.isLoading ? 'Loading…' : "Couldn't load this pull request."}
           </EmptyState>
         }
       >
         {(loaded) => (
           <Stack gap="section">
-            <Heading level={3}>{loaded().title}</Heading>
+            <Heading level={2}>{loaded().title}</Heading>
             <Facts
               size="sm"
               items={[
@@ -68,7 +70,7 @@ export default function PullRefPanel(props: RefPanelProps) {
                   value: (
                     <Inline>
                       <StatusDot tone={loaded().draft ? 'muted' : loaded().state === 'open' ? 'ok' : 'accent'} />
-                      <Text>{loaded().draft ? 'Draft' : loaded().state}</Text>
+                      <Text>{loaded().draft ? 'Draft' : STATE_WORD[loaded().state] ?? loaded().state}</Text>
                     </Inline>
                   ),
                 },
@@ -86,7 +88,7 @@ export default function PullRefPanel(props: RefPanelProps) {
                     value: (
                       <Inline>
                         <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} />
-                        <Text>{checks().length} check{checks().length === 1 ? '' : 's'}</Text>
+                        <Text>{checksSummary(checks())}</Text>
                       </Inline>
                     ),
                   }]

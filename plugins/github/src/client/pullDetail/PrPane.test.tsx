@@ -27,6 +27,7 @@ const seams = vi.hoisted(() => ({
   invalidateQueries: vi.fn(async () => {}),
   offPrSynced: vi.fn(),
   prSynced: undefined as ((payload: unknown) => void) | undefined,
+  paneIntent: undefined as ((event: unknown) => void) | undefined,
   subscribe: vi.fn((_pluginId: string, channel: string, listener: (payload: unknown) => void) => {
     if (channel === 'plugin:github:pr-synced') seams.prSynced = listener
     return seams.offPrSynced
@@ -51,13 +52,29 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>()
   return {
     ...actual,
-    clientEvents: { on: () => () => {}, emit: () => {} },
+    clientEvents: {
+      on: (name: string, listener: (event: unknown) => void) => {
+        if (name === 'presentation:pane-intent') seams.paneIntent = listener
+        return () => {}
+      },
+      emit: () => {},
+    },
     onPluginFrame: seams.subscribe,
     wsOnStatus: () => () => {},
     consumePaneIntent: () => undefined,
     activateTaskSignals: () => {},
   }
 })
+
+// The real diff needs the whole viewer. This stand-in reads its route once, as the real one does.
+vi.mock('../DiffForPull', () => ({
+  DiffForPull: (props: { route: { number: string }; readOnly?: boolean }) => {
+    const element = document.createElement('p')
+    element.dataset.diff = props.route.number
+    element.dataset.readOnly = String(!!props.readOnly)
+    return element
+  },
+}))
 
 const task = {
   id: 't1',
@@ -75,6 +92,7 @@ beforeEach(() => {
   seams.offPrSynced.mockClear()
   seams.subscribe.mockClear()
   seams.prSynced = undefined
+  seams.paneIntent = undefined
   host = document.createElement('div')
   document.body.append(host)
 })
@@ -127,7 +145,7 @@ describe('the PR pane', () => {
     expect(text).toContain('Merge')
     expect(text).toContain('Reviewers')
     expect(text).toContain('Files')
-    expect(text).toContain('Comments/Commits')
+    expect(text).toContain('Conversation')
   })
 
   it('re-reads this pull when its background mirror refresh lands', () => {
@@ -151,5 +169,17 @@ describe('the PR pane', () => {
 
     _resetPrModels()
     expect(seams.offPrSynced).toHaveBeenCalledOnce()
+  })
+
+  it('shows the selected pull\'s diff, read-only for a related pull', () => {
+    const node = draw()
+    const diff = () => node.querySelector<HTMLElement>('[data-diff]')!
+    expect(diff().dataset.diff).toBe('7')
+    expect(diff().dataset.readOnly).toBe('false')
+
+    seams.paneIntent?.({ taskId: 't1', paneId: 'pr', intent: { kind: 'plugin:select', item: 'runn-fast/acorn#8' } })
+    expect(node.querySelectorAll('[data-diff]')).toHaveLength(1)
+    expect(diff().dataset.diff).toBe('8')
+    expect(diff().dataset.readOnly).toBe('true')
   })
 })

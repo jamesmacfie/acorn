@@ -21,8 +21,8 @@ export type BrowseScope = {
    *  never enable. */
   linked: () => boolean
   /** Why the routed project is missing, or `undefined` while the query is in flight — so the first
-   *  paint shows the brand mark rather than flashing "select a project". */
-  emptyMessage: () => string | undefined
+   *  paint shows the brand mark rather than flashing "choose a project". */
+  emptyMessage: () => { title: string; body: string } | undefined
 }
 
 export function createBrowseScope(): BrowseScope {
@@ -37,8 +37,11 @@ export function createBrowseScope(): BrowseScope {
     emptyMessage: () => {
       if (!projects.data) return undefined
       const selected = project()
-      if (!selected) return 'Select a project from the project menu to browse pull requests.'
-      return `${selected.name} has no GitHub remote.`
+      if (!selected) return { title: 'Choose a project', body: 'Pick one in the project menu to see its pull requests.' }
+      return {
+        title: `${selected.name} isn't on GitHub`,
+        body: 'Its folder has no GitHub remote, so there are no pull requests to show.',
+      }
     },
   }
 }

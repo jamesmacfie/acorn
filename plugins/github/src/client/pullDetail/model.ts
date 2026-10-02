@@ -21,6 +21,27 @@ export function reviewAction(state: string | null): string {
   }
 }
 
+export type ReviewDecision = { state: 'changes-requested' | 'approved' | 'none'; reviewers: string[] }
+
+/**
+ * Where the reviews stand, the way GitHub decides it: each author's latest approval, change request
+ * or dismissal counts, and a plain comment changes nothing. One change request outweighs any number
+ * of approvals. `reviewers` names whoever holds the winning state.
+ */
+export function reviewDecision(reviews: readonly Review[]): ReviewDecision {
+  const latest = new Map<string, string>()
+  for (const review of [...reviews].sort((a, b) => (a.submittedAt ?? 0) - (b.submittedAt ?? 0))) {
+    const state = (review.state ?? '').toUpperCase()
+    if (!review.author || (state !== 'APPROVED' && state !== 'CHANGES_REQUESTED' && state !== 'DISMISSED')) continue
+    latest.set(review.author, state)
+  }
+  const holding = (wanted: string) => [...latest].filter(([, state]) => state === wanted).map(([author]) => author)
+  const blocking = holding('CHANGES_REQUESTED')
+  if (blocking.length) return { state: 'changes-requested', reviewers: blocking }
+  const approving = holding('APPROVED')
+  return approving.length ? { state: 'approved', reviewers: approving } : { state: 'none', reviewers: [] }
+}
+
 export function shouldShowReviewSummary(review: Review): boolean {
   return hasRenderableBody(review.body) || (review.state ?? '').toUpperCase() !== 'COMMENTED'
 }

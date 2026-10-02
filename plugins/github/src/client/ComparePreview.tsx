@@ -48,11 +48,14 @@ export default function ComparePreview() {
   }
 
   return (
-    <Show when={comparable()} fallback={<EmptyState align="start">Pick a branch to compare.</EmptyState>}>
-      <Show when={!compare.isLoading} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+    <Show
+      when={comparable()}
+      fallback={<EmptyState title="Choose a branch">The changes it would merge show here.</EmptyState>}
+    >
+      <Show when={!compare.isLoading} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
         <Show
           when={(compare.data?.aheadBy ?? 0) > 0}
-          fallback={<EmptyState align="start">Nothing to compare — branches are identical.</EmptyState>}
+          fallback={<EmptyState title="Nothing to merge">These branches are the same, so there's nothing to merge.</EmptyState>}
         >
           <Show when={incompleteFilesMessage(compare.data?.completeness)}>{(message) => <Alert tone="warn">{message()}</Alert>}</Show>
           <DiffPane source={source} />

@@ -9,7 +9,7 @@ import { requestFileScroll, routeKey } from './fileNavigation'
 import { fileSummariesKey, pullDiffKey, pullKey, pullsPrefixKey } from '../shared/api'
 import { forceRefreshPull } from './queries'
 import ChecksPanel from './checks/ChecksPanel'
-import { DiffForPull } from './DiffForPull'
+import { DiffForPull, type PullRoute } from './DiffForPull'
 import { prModel } from './pullDetail/prModel'
 import { PrOverview } from './pullDetail/PrOverview'
 import { prSections } from './pullDetail/prSections'
@@ -41,6 +41,13 @@ export default function PullDetail() {
     requestFileScroll({ routeKey: routeKey(owner(), repo(), number()), path })
   }
   const onLinkClick = makeContentLinkHandler(navigate)
+  // Keyed, because `DiffForPull` reads its route once and `Sections` renders the diff once. Without a
+  // new mount per pull, picking #44 after #42 left #42's diff on screen.
+  const diffRoute = createMemo<PullRoute | null>(
+    () => (ready() ? { owner: owner(), repo: repo(), number: number(), key: routeKey(owner(), repo(), number()) } : null),
+    null,
+    { equals: (a, b) => a?.key === b?.key },
+  )
 
   // The pull and its files again from the source, and every ticket anything linked off them. Here
   // rather than on the browse region because it is this pull's own verb, and the only surface that
@@ -68,9 +75,9 @@ export default function PullDetail() {
   }
 
   return (
-    <Show when={number()} fallback={<EmptyState align="start">Select a PR.</EmptyState>}>
-      <Show when={ready() || !projects.data} fallback={<EmptyState align="start">Not found.</EmptyState>}>
-        <Show when={model()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
+    <Show when={number()} fallback={<EmptyState title="Choose a pull request" />}>
+      <Show when={ready() || !projects.data} fallback={<EmptyState title={`Couldn't find pull request #${number()}`} />}>
+        <Show when={model()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
           {(loaded) => (
             <Show
               when={loaded().pull()}
@@ -98,13 +105,10 @@ export default function PullDetail() {
                   id: 'diff',
                   label: 'Diff',
                   actions: () => (
-                    <IconButton icon="refresh-cw" tip="Refresh diff" label="Refresh diff" busy={refreshing()} onPress={() => void refresh()} />
+                    <IconButton icon="refresh-cw" tip="Refresh pull request" label="Refresh pull request" busy={refreshing()} onPress={() => void refresh()} />
                   ),
                   render: () => (
-                    <DiffForPull
-                      route={{ owner: owner(), repo: repo(), number: number(), key: routeKey(owner(), repo(), number()) }}
-                      router
-                    />
+                    <Show when={diffRoute()} keyed>{(route) => <DiffForPull route={route} router />}</Show>
                   ),
                 }}
               />
@@ -116,6 +120,7 @@ export default function PullDetail() {
                     repo={repo()}
                     runId={check().runId}
                     jobName={check().name}
+                    url={check().url}
                     onClose={() => loaded().setOpenCheck(null)}
                   />
                 )}

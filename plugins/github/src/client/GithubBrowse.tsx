@@ -16,15 +16,17 @@
 // renders.
 import { createSignal, lazy, Show, Suspense, type JSX } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
-import { useQueryClient } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { pullsKey, pullsRoute, type Pull } from '../shared/api'
-import { readJson } from '@acorn/plugin-api/client'
+import { readJson, workspaceForProject, workspacesOptions } from '@acorn/plugin-api/client'
 import { Acorn } from '@acorn/plugin-api/ui/host'
 import PullList from './PullList'
 import { createBrowseScope } from './browseScope'
 import { githubCreateRoute } from './clientRoutes'
+import { prFilterFor } from './pullList/filterStore'
+import { pullsOptions } from './queries'
 import {
-  Button, DetailColumn, EmptyState, IconButton, ListColumn, ListDetail, SectionHeader,
+  Button, DetailColumn, EmptyState, Icon, IconButton, ListColumn, ListDetail, SectionHeader,
 } from '@acorn/plugin-api/ui'
 
 // Heavy surfaces stay behind their navigation intent so Shiki, diff rendering and the create-pull
@@ -36,12 +38,15 @@ const ComparePreview = lazy(() => import('./ComparePreview'))
 
 /** The gate both regions share. Drawn once per region rather than once for the surface, because the
  *  two regions no longer have a common parent to put it on — and a list that renders while its detail
- *  says "no GitHub remote" is the disagreement `createBrowseScope` exists to prevent. */
-function WhenLinked(props: { scope: ReturnType<typeof createBrowseScope>; children: JSX.Element }) {
+ *  says "no GitHub remote" is the disagreement `createBrowseScope` exists to prevent. The reason is
+ *  said once, in the detail; the list stays empty beside it. */
+function WhenLinked(props: { scope: ReturnType<typeof createBrowseScope>; quiet?: boolean; children: JSX.Element }) {
   return (
     <Show when={props.scope.linked()} fallback={
-      <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
-        {(message) => <EmptyState align="start">{message()}</EmptyState>}
+      <Show when={!props.quiet}>
+        <Show when={props.scope.emptyMessage()} fallback={<Acorn />}>
+          {(message) => <EmptyState title={message().title}>{message().body}</EmptyState>}
+        </Show>
       </Show>
     }>
       {props.children}
@@ -55,6 +60,12 @@ export function GithubBrowseList() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [refreshing, setRefreshing] = createSignal(false)
+  // The count is the open list's, so it shows on the Open tab only: the closed list arrives a page
+  // at a time and its length is not a count of anything. The same cached queries the list reads.
+  const workspaces = createQuery(() => workspacesOptions(true))
+  const onOpenTab = () => prFilterFor(workspaceForProject(workspaces.data, scope.projectId())?.id ?? '').tab === 'open'
+  const openPulls = createQuery(() => pullsOptions(scope.owner(), scope.repo(), 'open', scope.linked() && onOpenTab()))
+  const count = () => (onOpenTab() ? openPulls.data?.length : undefined)
 
   async function refreshAllPulls() {
     if (!scope.owner() || !scope.repo()) return
@@ -68,19 +79,20 @@ export function GithubBrowseList() {
   }
 
   return (
-    <WhenLinked scope={scope}>
+    <WhenLinked scope={scope} quiet>
       <SectionHeader
+        {...(count() === undefined ? {} : { count: count() })}
         actions={
           <>
             <Button
               tip="New pull request"
               onPress={() => navigate(githubCreateRoute.replace(':projectId', encodeURIComponent(scope.projectId())))}
-            >+ New PR</Button>
-            <IconButton icon="refresh-cw" tip="Refresh reviews" label="Refresh reviews" busy={refreshing()} onPress={refreshAllPulls} />
+            ><Icon name="plus" /> New</Button>
+            <IconButton icon="refresh-cw" tip="Refresh pull requests" label="Refresh pull requests" busy={refreshing()} onPress={refreshAllPulls} />
           </>
         }
       >
-        Reviews
+        Pull requests
       </SectionHeader>
       <PullList />
     </WhenLinked>
@@ -106,7 +118,7 @@ export function GithubBrowseDetail() {
       <Show
         when={isNew()}
         fallback={
-          <Show when={params.number} fallback={<Acorn />}>
+          <Show when={params.number} fallback={<EmptyState title="Choose a pull request" />}>
             {/* No split written here any more. A pull request is a header, its sections and its diff,
                 and `Sections` is the node that says so — so this region is the gate and `PullDetail`
                 is the surface (client-core/kit/components/layout/Sections.tsx). */}

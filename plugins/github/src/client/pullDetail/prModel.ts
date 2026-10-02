@@ -12,7 +12,8 @@ import {
   addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
   removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,
 } from '../mutations'
-import { buildConversationEntries } from './model'
+import { buildConversationEntries, reviewDecision } from './model'
+import { actionFailure, type ActionFailure } from '../actionErrors'
 
 // Everything one pull request knows, held once per pull and read by every surface that draws it
 // (docs/github-integration.md, docs/panes.md § Layout model).
@@ -158,16 +159,17 @@ function build(scope: PrScope) {
     queryClient.invalidateQueries({ queryKey: pullsPrefixKey(owner, repo) })
   }
 
-  const [actionError, setActionError] = createSignal('')
+  const [actionFailed, setActionFailed] = createSignal<ActionFailure | null>(null)
+  const setActionError = (cause: unknown) => setActionFailed(actionFailure(cause))
   // Reports the failure and resolves, so a caller chaining `.then` is not left hanging. That is fine
   // for a fire-and-forget action and wrong for anything that clears the reader's text; see
   // `runThenClear`.
-  const run = (work: Promise<unknown>) => work.then(refresh).catch((cause) => setActionError(message(cause)))
+  const run = (work: Promise<unknown>) => work.then(refresh).catch(setActionError)
   const runThenClear = (work: Promise<unknown>, clear: () => void) =>
     work.then(() => {
       clear()
       return refresh()
-    }).catch((cause: unknown) => setActionError(message(cause)))
+    }).catch(setActionError)
 
   const [mergeMethod, setMergeMethod] = createSignal('squash')
   const [draftText, setDraftText] = createSignal('')
@@ -176,7 +178,11 @@ function build(scope: PrScope) {
   persistDraft(() => (has() ? `pr-comment:${owner}/${repo}/${number}` : null), draftText, setDraftText)
   persistDraft(() => (has() ? `review-body:${owner}/${repo}/${number}` : null), reviewBody, setReviewBody)
 
-  const [openCheck, setOpenCheck] = createSignal<{ runId: number; name: string } | null>(null)
+  // The description as plain text, handed up by the body that renders it, for the copy button in the
+  // section's header.
+  const [descriptionText, setDescriptionText] = createSignal('')
+
+  const [openCheck, setOpenCheck] = createSignal<{ runId: number; name: string; url: string | null } | null>(null)
   const [rerunned, setRerunned] = createSignal(new Set<number>())
   const triggerRerun = (runId: number) => {
     setRerunned((current) => new Set([...current, runId]))
@@ -188,7 +194,7 @@ function build(scope: PrScope) {
           next.delete(runId)
           return next
         })
-        setActionError(message(cause))
+        setActionError(cause)
       })
   }
 
@@ -223,6 +229,7 @@ function build(scope: PrScope) {
     labels: () => detail.data?.labels ?? [],
     checks: () => detail.data?.checks ?? [],
     reviewers: () => detail.data?.requestedReviewers ?? [],
+    reviewDecision: createMemo(() => reviewDecision(detail.data?.reviews ?? [])),
     files: fileList,
     filesCompleteness: () => files.data?.completeness,
     filesLoading: () => files.isLoading,
@@ -242,13 +249,17 @@ function build(scope: PrScope) {
     labelsLoading: () => repoLabels.isLoading,
     labelResults,
     reviewerResults,
-    actionError,
+    actionError: () => actionFailed()?.text ?? '',
+    /** The last failure was GitHub refusing the stored sign-in, so the way out is to reconnect. */
+    actionNeedsReconnect: () => actionFailed()?.code === 'reauth',
     mergeMethod,
     setMergeMethod,
     draftText,
     setDraftText,
     reviewBody,
     setReviewBody,
+    descriptionText,
+    setDescriptionText,
     openCheck,
     setOpenCheck,
     rerunned,
@@ -273,5 +284,3 @@ function build(scope: PrScope) {
   }
 }
 
-const message = (cause: unknown): string =>
-  cause instanceof Error ? cause.message : String((cause as { message?: unknown })?.message ?? cause)

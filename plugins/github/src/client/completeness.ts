@@ -9,9 +9,9 @@ export function incompleteFilesMessage(completeness: PullTopologyCompleteness | 
     return `GitHub shows only the first ${received} changed files of a comparison. This one may have more.`
   }
   if (completeness.reportedTotal != null) {
-    return `GitHub returned ${received} of ${completeness.reportedTotal.toLocaleString('en-US')} changed files. The remaining files are outside the GitHub API limit.`
+    return `GitHub sent ${received} of ${completeness.reportedTotal.toLocaleString('en-US')} changed files, which is the most it sends for one pull request.`
   }
-  return `GitHub may have more changed files than the ${received} returned by its API.`
+  return `GitHub might have more changed files than the ${received} it sent.`
 }
 
 // A file count that does not read as exhaustive when it is not: "first 300 files" for a capped list.

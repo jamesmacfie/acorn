@@ -11,8 +11,9 @@ import { recordedRequests } from './fixture'
 // (docs/tui.md § Keys and focus).
 //
 // The worked example in that folder's focus-model.md is the sequence below. Phase 0 reached the first
-// stop of a panel; phase 2 reaches the rest of them, so `[Merge]` — the second stop in Details — is
-// asserted here too, along with the wall at the end of the panel and the Escape that climbs out.
+// stop of a panel; phase 2 reaches the rest of them, so the merge method — the second stop in Details,
+// after `[Merge]` — is asserted here too, along with the wall at the end of the panel and the Escape
+// that climbs out.
 
 /** Every run drawn in the focused form: `strong` in the `accent` tone (../kit/roles.ts § litControl).
  *
@@ -32,7 +33,7 @@ describe('the pull request from the keyboard', () => {
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
     try {
       const opened = await screen.until('[Merge]', 45)
-      expect(opened).toContain('[ squash ▾ ]')
+      expect(opened).toContain('[ Squash and merge ▾ ]')
       const { focusedRegion } = await import('./keys/regions')
 
       // Tab to the pane strip, Down into the pane's own region, which lands on the Details strip.
@@ -42,9 +43,14 @@ describe('the pull request from the keyboard', () => {
       expect(focusedRegion()).toEqual({ paneId: 'pr', regionId: 'body' })
 
       // …and Down again into the panel under the strip, where before this phase there was nothing
-      // focusable at all: the merge-method `Select` is the panel's first stop.
+      // focusable at all: `[Merge]` is the panel's first stop.
       await screen.press('ARROW_DOWN')
-      expect(await litRuns(screen)).toContain('[ squash ▾ ]')
+      expect(await litRuns(screen)).toContain('[Merge]')
+
+      // Down again reaches the panel's second stop, which is the whole of phase 2: the arrows move
+      // between the stops of one panel in reading order. The merge method sits beside `[Merge]`.
+      await screen.press('ARROW_DOWN')
+      expect(await litRuns(screen)).toContain('[ Squash and merge ▾ ]')
 
       // The footer says `open`, because this control opens a list. A plain button beside it would
       // say `press`, and a row in the rail would say `open` for the other reason
@@ -55,15 +61,12 @@ describe('the pull request from the keyboard', () => {
       // And pressing it opens the method list, which is what a `Select` does.
       await screen.press('RETURN')
       const list = await screen.frame()
-      expect(list).toContain('rebase')
+      expect(list).toContain('Rebase and merge')
       await screen.press('ESCAPE')
 
-      // Down again reaches the panel's second stop, which is the whole of phase 2: the arrows move
-      // between the stops of one panel in reading order.
+      // …and on to the row under it, in the panel's own reading order rather than by screen position.
       await screen.press('ARROW_DOWN')
-      expect(await litRuns(screen)).toContain('[Merge]')
-
-      // …and on to the one after it, in the panel's own reading order rather than by screen position.
+      expect(await litRuns(screen)).toContain('[Convert to draft]')
       await screen.press('ARROW_DOWN')
       expect(await litRuns(screen)).toContain('[Close]')
 
@@ -92,7 +95,7 @@ describe('the pull request from the keyboard', () => {
       await screen.press('ARROW_DOWN')
       // Right along the strip to Comments, which is the seventh tab.
       for (let step = 0; step < 6; step += 1) await screen.press('ARROW_RIGHT')
-      expect(await screen.frame()).toContain('[Comments/Commits]')
+      expect(await screen.frame()).toContain('[Conversation]')
 
       // Down into the panel lands on the composer's field, because it is the first stop in it.
       await screen.press('ARROW_DOWN')

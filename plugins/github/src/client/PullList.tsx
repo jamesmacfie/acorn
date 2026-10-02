@@ -2,9 +2,10 @@ import { createEffect, createMemo, createSignal, For, on, onCleanup, onMount, Sh
 import { createInfiniteQuery, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams } from '@solidjs/router'
 import {
-  activateTaskSignals, CHECK_TONE, checksState, clientEvents, contextMenuItems, formatRelativeTime,
-  integrationsOptions, pathForTask, projectsOptions, railDotProps, registerContextMenuItems,
-  runContextMenuItem, workspaceForProject, workspacesOptions, type ItemRowTarget,
+  activateTaskSignals, CHECK_TONE, checksState, checksSummary, clientEvents, contextMenuItems,
+  formatRelativeTime, integrationsOptions, pathForTask, projectsOptions, railDotProps,
+  registerContextMenuItems, runContextMenuItem, tasksOptions, workspaceForProject,
+  workspacesOptions, type ItemRowTarget,
 } from '@acorn/plugin-api/client'
 import {
   Alert, Button, EmptyState, Icon, Inline, Input, Menu, Row, RowActions, Rows, sidebarCollapsed,
@@ -16,13 +17,33 @@ import { type Pull } from '../shared/api'
 import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterStore'
 import { githubBrowsePath } from './clientRoutes'
-import { promotePullToTask } from './pullTasks'
+import { activeTaskForPull, promotePullToTask } from './pullTasks'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
 // REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
 // the closed icon here. The detail header, which reads the GraphQL mirror, still says "merged".
+// Open draws no glyph: on the Open tab it said "open" on every row.
 const prState = (pull: Pull): 'draft' | 'open' | 'closed' => (pull.draft ? 'draft' : pull.state === 'open' ? 'open' : 'closed')
-const PR_STATE_ICON = { draft: 'git-pull-request-draft', open: 'git-pull-request', closed: 'git-pull-request-closed' }
+const PR_STATE_MARK = {
+  draft: { icon: 'git-pull-request-draft', word: 'Draft' },
+  closed: { icon: 'git-pull-request-closed', word: 'Closed' },
+} as const
+
+/** The checks dot, always drawn so every row's leading marks line up. Muted when there are none. */
+function ChecksDot(props: { checks: readonly { status: string | null }[] }) {
+  return (
+    <Show when={props.checks.length} fallback={<StatusDot tone="muted" tip="No checks" />}>
+      <StatusDot
+        {...railDotProps(CHECK_TONE[checksState(props.checks)])}
+        label={checksSummary(props.checks)}
+        tip={checksSummary(props.checks)}
+      />
+    </Show>
+  )
+}
+
+// "14m ago" says less in less room as "14m". The row's tip carries the age in full.
+const shortAge = (at: number | null) => formatRelativeTime(at).replace(/ ago$/, '')
 
 const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed' }]
 
@@ -61,6 +82,12 @@ export default function PullList() {
   const list = () => (tab() === 'open' ? (openPulls.data ?? []) : closedRows())
   const ready = () => (tab() === 'open' ? openPulls.data !== undefined : closedPulls.data !== undefined)
   const isError = () => (tab() === 'open' ? openPulls.isError : closedPulls.isError)
+  const listErrorCode = () => {
+    const error = tab() === 'open' ? openPulls.error : closedPulls.error
+    const code = (error as { code?: unknown } | null)?.code
+    return typeof code === 'string' ? code : undefined
+  }
+  const retry = () => (tab() === 'open' ? openPulls.refetch() : closedPulls.refetch())
   // Whether this node holds a GitHub credential at all. The list already reads the integrations query
   // for the Linear seeding, so this costs nothing extra.
   const integrations = createQuery(() => integrationsOptions(true))
@@ -121,7 +148,7 @@ export default function PullList() {
       activateTaskSignals(task, { pane: 'pr' })
       navigate(pathForTask(task))
     } catch (error) {
-      setTaskError(error instanceof Error ? error.message : 'Could not create a task for this PR.')
+      setTaskError(error instanceof Error ? error.message : "Couldn't create a task for this pull request.")
     }
   }
 
@@ -143,11 +170,18 @@ export default function PullList() {
     item: pull,
   })
 
+  // Whether a task already tracks a row's pull, so its menu says Open task rather than offering to
+  // make a second one. The same rule `promotePullToTask` uses to find that task.
+  const tasks = createQuery(() => tasksOptions(true))
+  const tracked = (target: ItemRowTarget) =>
+    !!params.projectId && !!activeTaskForPull(tasks.data ?? [], params.projectId, Number(target.id))
+
   onMount(() => {
     // This list's own row, on the registry rather than written into the menu below. It keeps
     // `openAsTask` exactly as it was — find the PR's task or make one, with its Linear links — and
     // it now sits beside whatever else offers an `item.row` action, "Start workflow…" first among
-    // them.
+    // them. Two registrations with opposite checks, so the label says which of the two it will do.
+    const isPull = (target: ItemRowTarget) => target.providerId === 'github' && !!(target.item as Pull).headRef
     const rows = registerContextMenuItems([
       {
         id: 'github.pull.create-task',
@@ -155,7 +189,16 @@ export default function PullList() {
         label: 'Create task',
         icon: 'square-plus',
         order: 10,
-        when: (target) => target.providerId === 'github' && !!(target.item as Pull).headRef,
+        when: (target) => isPull(target) && !tracked(target),
+        run: (target) => void openAsTask(target.item as Pull),
+      },
+      {
+        id: 'github.pull.open-task',
+        location: 'item.row',
+        label: 'Open task',
+        icon: 'list-checks',
+        order: 10,
+        when: (target) => isPull(target) && tracked(target),
         run: (target) => void openAsTask(target.item as Pull),
       },
     ])
@@ -197,23 +240,48 @@ export default function PullList() {
         fallback={
           <Show
             when={!githubConnected() && (isError() || repoKnown())}
-            fallback={<EmptyState align="start" busy={!isError()}>{isError() ? 'Failed to load PRs.' : 'Loading…'}</EmptyState>}
+            fallback={
+              <Show when={isError()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
+                <EmptyState
+                  align="start"
+                  size="sm"
+                  title="Couldn't load pull requests."
+                  action={
+                    <Show
+                      when={listErrorCode() === 'reauth'}
+                      fallback={<Button size="sm" onPress={() => void retry()}>Try again</Button>}
+                    >
+                      <Button size="sm" onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
+                        Reconnect GitHub
+                      </Button>
+                    </Show>
+                  }
+                />
+              </Show>
+            }
           >
             <EmptyState
               align="start"
-              title="Not connected to GitHub"
+              title="GitHub isn't connected"
               action={
                 <Button onPress={() => clientEvents.emit('presentation:open-settings', { tab: 'integrations' })}>
                   Connect GitHub
                 </Button>
               }
             >
-              This node has no GitHub credential, so it cannot list pull requests.
+              Connect GitHub to see this project's pull requests.
             </EmptyState>
           </Show>
         }
       >
-        <Show when={items().length} fallback={<EmptyState align="start">No matching PRs.</EmptyState>}>
+        <Show
+          when={items().length}
+          fallback={
+            <EmptyState align="start" size="sm">
+              {!collapsed() && filter().trim() ? 'No pull requests match.' : tab() === 'open' ? 'No open pull requests.' : 'No closed pull requests.'}
+            </EmptyState>
+          }
+        >
           <Rows
             virtual
             rowHeight={collapsed() ? 'rail' : 'default'}
@@ -251,6 +319,8 @@ export default function PullList() {
                       offset={place.offset}
                       height={place.height}
                       title={pull().title}
+                      tip={pull().title}
+                      tipAt={pull().updatedAt ?? undefined}
                       label={item.label}
                       // Collapsed: the author's avatar over the number, which is how a pull request is
                       // named in conversation. The checks dot stays, because "is it green" is the
@@ -266,7 +336,7 @@ export default function PullList() {
                             <Inline gap="inline">
                               <UserAvatar login={pull().author} />
                               <Show when={checks().length}>
-                                <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
+                                <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={checksSummary(checks())} />
                               </Show>
                             </Inline>
                             <Text emphasis="muted">#{item.key}</Text>
@@ -275,17 +345,15 @@ export default function PullList() {
                         : undefined}
                       leading={
                         <>
-                          <Show when={checks().length}>
-                            <StatusDot {...railDotProps(CHECK_TONE[checksState(checks())])} label={`Checks: ${checksState(checks())}`} />
+                          <ChecksDot checks={checks()} />
+                          <Show when={prState(pull()) !== 'open' ? PR_STATE_MARK[prState(pull()) as 'draft' | 'closed'] : undefined}>
+                            {(mark) => <Icon name={mark().icon} title={mark().word} size={14} />}
                           </Show>
-                          <Icon name={PR_STATE_ICON[prState(pull())]} title={prState(pull())} size={14} />
                           {/* The author column is gone, so the avatar carries the login on hover. */}
                           <UserAvatar login={pull().author} />
-                          <Text emphasis="muted">#{item.key}</Text>
                         </>
                       }
-                      meta={<Text emphasis="muted">{formatRelativeTime(pull().updatedAt)}</Text>}
-                      metaFields={1}
+                      meta={<Text emphasis="muted">{shortAge(pull().updatedAt)}</Text>}
                       trailing={
                         <Show when={contextMenuItems('item.row', rowTarget(pull())).length}>
                           <RowActions ariaLabel={`Actions for pull request #${item.key}`}>
@@ -306,7 +374,9 @@ export default function PullList() {
                         </Show>
                       }
                     >
-                      {pull().title}
+                      {/* The number leads the title and keeps its width; the title gives way. */}
+                      <Text emphasis="mono" tone="muted">#{item.key}</Text>
+                      <Text>{pull().title}</Text>
                     </Row>
                   )}
                 </Show>
@@ -317,7 +387,8 @@ export default function PullList() {
         {/* Load-more only on closed; hidden while filtering, since the filter only sees loaded pages. */}
         <Show when={tab() === 'closed' && closedPulls.hasNextPage && !filter().trim()}>
           <Button
-            variant="bare"
+            variant="ghost"
+            size="sm"
             disabled={closedPulls.isFetchingNextPage}
             onPress={() => void closedPulls.fetchNextPage()}
           >

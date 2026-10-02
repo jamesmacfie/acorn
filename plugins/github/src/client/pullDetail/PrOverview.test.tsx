@@ -31,20 +31,26 @@ const opened: string[] = []
 // Read-only, open, no body and no labels, checks or refs, so the only thing rendered below the
 // heading is the facts table. Cast because `PrModel` is what `build()` returns: nothing here needs
 // the twenty-odd mutations the toolbar would have asked for.
-const model = (title: string): PrModel => ({
+const idle = { isPending: false, mutateAsync: async () => {} }
+const model = (title: string, overrides: Record<string, unknown> = {}): PrModel => ({
   scope: { taskId: 't1', owner: 'runn-fast', repo: 'acorn', number: 7 },
   readOnly: true,
   pull: () => ({ title, state: 'open', draft: false, updatedAt: null }),
   fileSummary: () => ({ count: 0, additions: 0, deletions: 0 }),
   reviewers: () => [],
+  reviewDecision: () => ({ state: 'none', reviewers: [] }),
   labels: () => [],
   checks: () => [],
   linearRefs: () => [],
   conflicting: () => false,
   actionError: () => '',
+  actionNeedsReconnect: () => false,
   mergeMethod: () => 'squash',
   refPrefixes: () => new Map([['CRA', 'linear']]),
   showLinearIssue: (id: string) => opened.push(id),
+  merge: idle, autoMergeEnable: idle, autoMergeDisable: idle, close: idle, reopen: idle, draft: idle,
+  run: () => {},
+  ...overrides,
 } as unknown as PrModel)
 
 let host: HTMLElement
@@ -61,9 +67,9 @@ afterEach(() => {
   opened.length = 0
 })
 
-const draw = (title: string) => {
+const draw = (title: string, overrides?: Record<string, unknown>) => {
   disposers.push(render(
-    () => <PrOverview model={model(title)} onOpenFile={() => {}} onLinkClick={() => {}} />,
+    () => <PrOverview model={model(title, overrides)} onOpenFile={() => {}} onLinkClick={() => {}} />,
     host,
   ))
   return host
@@ -92,3 +98,61 @@ describe('a ref token in a pull title', () => {
     expect(draw('Fix the rail').querySelector('.ui-link')).toBeNull()
   })
 })
+
+describe('the merge box', () => {
+  const buttons = (node: HTMLElement) => [...node.querySelectorAll<HTMLButtonElement>('button.ui-btn')]
+  const named = (node: HTMLElement, text: string) => buttons(node).find((button) => button.textContent?.trim() === text)
+
+  it('makes Merge the one solid button, with the method beside it and not in its label', () => {
+    const node = draw('Fix the rail', { readOnly: false })
+    const merge = named(node, 'Merge')!
+    expect(merge.dataset.variant).toBe('solid')
+    expect(buttons(node).filter((button) => button.dataset.variant === 'solid')).toHaveLength(1)
+    expect(node.textContent).toContain('Squash and merge')
+    expect(node.textContent).not.toContain('(squash)')
+    expect(named(node, 'Convert to draft')?.dataset.variant).toBe('ghost')
+    expect(named(node, 'Close')?.dataset.variant).toBe('ghost')
+  })
+
+  it('offers Ready for review instead of Merge on a draft', () => {
+    const node = draw('Fix the rail', { readOnly: false, pull: () => ({ title: 'Fix the rail', state: 'open', draft: true, updatedAt: null }) })
+    expect(named(node, 'Merge')).toBeUndefined()
+    expect(named(node, 'Ready for review')?.dataset.variant).toBe('solid')
+    expect(node.querySelector('[aria-label="Merge method"]')).toBeNull()
+  })
+
+  it('disables Merge while the branch conflicts', () => {
+    const node = draw('Fix the rail', { readOnly: false, conflicting: () => true, conflicts: () => undefined, conflictsLoading: () => true })
+    expect(named(node, 'Merge')?.disabled).toBe(true)
+    expect(node.textContent).toContain('This branch has conflicts')
+  })
+
+  it('says a related pull is read-only instead of drawing the box', () => {
+    const node = draw('Fix the rail')
+    expect(named(node, 'Merge')).toBeUndefined()
+    expect(node.textContent).toContain('Related pull request.')
+  })
+})
+
+describe('the overview facts', () => {
+  it('states the review decision and the checks in words', () => {
+    const node = draw('Fix the rail', {
+      reviewDecision: () => ({ state: 'changes-requested', reviewers: ['grace'] }),
+      checks: () => [{ name: 'test', status: 'FAILURE' }, { name: 'lint', status: 'SUCCESS' }],
+    })
+    const text = node.textContent ?? ''
+    expect(text).toContain('Open')
+    expect(text).toContain('Changes requested')
+    expect(node.querySelector('[data-tip="Changes requested by grace"]')).not.toBeNull()
+    expect(text).toContain('1 check failing')
+    expect(text).not.toContain('Reviewers')
+    expect(text).not.toContain('Files')
+  })
+
+  it('says when there are no reviews and no checks', () => {
+    const text = draw('Fix the rail').textContent ?? ''
+    expect(text).toContain('No reviews')
+    expect(text).toContain('No checks')
+  })
+})
+

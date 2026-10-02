@@ -18,10 +18,10 @@ import { focusedRegion } from './keys/regions'
 describe('a surface drawn as sections', () => {
   it('is a strip of tabs, enters with Down, and takes main into the strip when narrow', async () => {
     const screen = await renderFixture({ width: 160, height: 38, pane: 'pr' })
-    const wide = await screen.until('Comments', 45)
+    const wide = await screen.until('Conversation', 45)
 
     // Every section is on the strip, and the header is the first tab rather than a fold.
-    for (const tab of ['Details', 'Description', 'Labels', 'Checks', 'Reviewers', 'Files', 'Comments']) {
+    for (const tab of ['Details', 'Description', 'Labels', 'Checks', 'Reviewers', 'Files', 'Conversation']) {
       expect(wide, tab).toContain(tab)
     }
     // `main` has a column, so the diff is beside the strip rather than behind a tab.

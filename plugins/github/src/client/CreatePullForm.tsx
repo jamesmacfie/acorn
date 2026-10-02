@@ -2,15 +2,15 @@ import { createEffect, createSignal, on, Show } from 'solid-js'
 import { createMutation, createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useNavigate, useParams, useSearchParams } from '@solidjs/router'
 import { branchesOptions, compareOptions, mentionsOptions } from './queries'
-import { projectsOptions } from '@acorn/plugin-api/client'
+import { formatChord, projectsOptions } from '@acorn/plugin-api/client'
 import { pullsKey, type Branch } from '../shared/api'
-import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTextarea, Picker, Stack, Text, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, Checkbox, EmptyState, Field, Inline, Input, MentionTextarea, Picker, Stack, Text } from '@acorn/plugin-api/ui'
 import { createPr } from './mutations'
 import { clearPullDraft, prefillFromCompare, readPullDraft, writePullDraft } from './createPull/model'
 import { githubBrowsePath } from './clientRoutes'
 import { fileCountLabel } from './completeness'
 
-// The navigator column in create mode: base and head pickers, title, body, draft and Create. base and
+// The navigator column in create mode: head and base pickers, title, body, draft and Create. base and
 // head live in the URL (?base=&head=) so they're shareable and reactive, and the compare query and the
 // preview column both read them. Title and body prefill from the compare until the user edits.
 export default function CreatePullForm() {
@@ -84,7 +84,7 @@ export default function CreatePullForm() {
       .then((res) => {
         clearPullDraft(o(), r())
         qc.invalidateQueries({ queryKey: pullsKey(o(), r(), 'open') })
-    navigate(`${githubBrowsePath(params.projectId ?? '')}/${res.number}`)
+        navigate(`${githubBrowsePath(params.projectId ?? '')}/${res.number}`)
       })
       .catch((e) => setError(String(e.message ?? e)))
   }
@@ -101,37 +101,41 @@ export default function CreatePullForm() {
     const list = branches.data ?? []
     return q ? list.filter((b) => b.name.toLowerCase().includes(q)) : list
   }
+  const branchEmpty = () =>
+    branches.isLoading ? 'Loading branches…' : branches.isError ? "Couldn't load branches." : 'No branches match.'
+  const cancel = () => navigate(githubBrowsePath(params.projectId ?? ''))
 
   return (
-    <Show when={repoKnown()} fallback={<EmptyState align="start" busy>Loading…</EmptyState>}>
-      <Stack gap="section">
-        <Field label="Branches" hint="The pull request compares head into base.">
-          <Inline>
-            <Picker<Branch>
-              label={base() || 'base'}
-              placeholder="Filter branches…"
-              emptyText="No matching branches."
-              results={branchResults}
-              rowLabel={(branch) => branch.name}
-              isActive={(branch) => branch.name === base()}
-              onSelect={(branch) => setSearchParams({ base: branch.name })}
-            />
-            <Text emphasis="muted">←</Text>
+    <Show when={repoKnown()} fallback={<EmptyState align="start" size="sm" busy>Loading…</EmptyState>}>
+      <Stack gap="stack">
+        {/* Read in the order the change moves: from the branch with the work, into the one it joins. */}
+        <Inline even>
+          <Field label="From">
             <Picker<Branch>
               label={head() || 'Choose a branch…'}
               placeholder="Filter branches…"
-              emptyText="No matching branches."
+              emptyText={branchEmpty()}
               results={branchResults}
               rowLabel={(branch) => branch.name}
               isActive={(branch) => branch.name === head()}
               onSelect={(branch) => setSearchParams({ head: branch.name })}
             />
-          </Inline>
-        </Field>
+          </Field>
+          <Field label="Into">
+            <Picker<Branch>
+              label={base() || 'base'}
+              placeholder="Filter branches…"
+              emptyText={branchEmpty()}
+              results={branchResults}
+              rowLabel={(branch) => branch.name}
+              isActive={(branch) => branch.name === base()}
+              onSelect={(branch) => setSearchParams({ base: branch.name })}
+            />
+          </Field>
+        </Inline>
 
         <Field label="Title">
           <Input
-            placeholder="Title"
             value={title()}
             onInput={(value) => {
               setTouched(true)
@@ -139,9 +143,9 @@ export default function CreatePullForm() {
             }}
           />
         </Field>
-        <Field label="Description">
+        <Field label="Description" hint={`${formatChord('meta+enter')} to create`}>
           <MentionTextarea
-            placeholder="Describe this pull request… (⌘↵ to create)"
+            placeholder="What changed, and why?"
             value={body()}
             onInput={(value) => { setTouched(true); setBody(value) }}
             onKeyDown={onBodyKey}
@@ -151,23 +155,25 @@ export default function CreatePullForm() {
 
         <Checkbox label="Create as draft" checked={draft()} onChange={(checked) => setDraft(checked)} />
 
-        <Toolbar variant="actions">
-          <Button tone="accent" onPress={submit} disabled={!canCreate()}>
-            {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
-          </Button>
-        </Toolbar>
-
-        <Show when={comparable()} fallback={<Text emphasis="muted">Choose a branch to open a pull request.</Text>}>
+        <Show when={comparable()} fallback={<Text emphasis="muted">Choose a branch to merge from.</Text>}>
           <Show when={!compare.isLoading} fallback={<Text emphasis="muted">Comparing…</Text>}>
             <Text emphasis="muted">
               {aheadBy() > 0
                 ? `${aheadBy()} commit${aheadBy() === 1 ? '' : 's'} · ${fileCountLabel(compare.data?.document.files.length ?? 0, compare.data?.completeness)}`
-                : 'Nothing to compare — branches are identical.'}
+                : "These branches are the same, so there's nothing to merge."}
             </Text>
           </Show>
         </Show>
 
         <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
+
+        {/* A page form's footer: the primary first, then Cancel, under the last field. */}
+        <Inline gap="row">
+          <Button variant="solid" onPress={submit} disabled={!canCreate()}>
+            {create.isPending ? 'Creating…' : draft() ? 'Create draft pull request' : 'Create pull request'}
+          </Button>
+          <Button variant="ghost" onPress={cancel}>Cancel</Button>
+        </Inline>
       </Stack>
     </Show>
   )

@@ -260,8 +260,6 @@
 .diff-thread-status {
   margin-right: auto;
   font-size: var(--fs-sm);
-  text-transform: var(--label-transform);
-  letter-spacing: var(--label-tracking);
   color: var(--text-muted);
   font-weight: 600;
 }

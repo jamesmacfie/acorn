@@ -12,6 +12,7 @@ import { AGENTS_INLINE_DIFF } from '@acorn/plugin-agents/contract/inlineDiffClie
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
 import { DIFF_LINE_POINT } from './extensionPoints'
 import { incompleteFilesMessage } from './completeness'
+import { sayOnFailure } from './actionErrors'
 
 // Right (Diff) pane: the shared diff shell (client-core's DiffPane, docs/diff-rendering.md) filled in
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
@@ -102,8 +103,10 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     ...(!props.readOnly ? {
       addComment: (body: string, { row, side, lineNo }: Parameters<NonNullable<DiffSource['addComment']>>[1]) =>
         addReviewComment(owner, repo, number, body, row.path, lineNo, side),
-      reply: (databaseId: number, body: string) => replyReview(owner, repo, number, databaseId, body),
-      resolveThread: (threadId: string, resolved: boolean) => resolveThread(owner, repo, number, threadId, resolved),
+      reply: (databaseId: number, body: string) =>
+        sayOnFailure(replyReview(owner, repo, number, databaseId, body), "Couldn't save your reply."),
+      resolveThread: (threadId: string, resolved: boolean) =>
+        sayOnFailure(resolveThread(owner, repo, number, threadId, resolved), resolved ? "Couldn't resolve the thread." : "Couldn't unresolve the thread."),
     } : {}),
     invalidate: () => void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) }),
     draftPrefix: `${owner}/${repo}/${number}`,

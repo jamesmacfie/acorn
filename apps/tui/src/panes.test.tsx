@@ -137,7 +137,7 @@ describe('every pane at 80 by 24', () => {
   // to keep reading when the window is bigger rather than leaving a column stranded. The PR pane is
   // the one with two columns of its own, so it is the one worth asking.
   it('holds together at 120 by 40, where the PR pane draws both its columns', async () => {
-    const frame = await screenFor('pr', { until: 'Comments/Commits', width: 120, height: 40 })
+    const frame = await screenFor('pr', { until: 'Conversation', width: 120, height: 40 })
     expect(frame).toContain('Invalidate the old password on reset')
     expect(frame).toContain('Diff')
   }, 60_000)

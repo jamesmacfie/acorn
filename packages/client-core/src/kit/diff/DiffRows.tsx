@@ -534,7 +534,7 @@ function ThreadRow(props: {
       }}
     >
       <div class="diff-thread-head">
-        <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Conversation'}</span>
+        <span class="diff-thread-status">{resolved() ? 'Resolved' : 'Unresolved'}</span>
         <Button variant="bare" disabled={busy()} onPress={toggleResolve}>
           {resolved() ? 'Unresolve' : 'Resolve'}
         </Button>
@@ -556,7 +556,7 @@ function ThreadRow(props: {
         </For>
         <div class="diff-reply">
           <MentionTextarea
-            placeholder={replyId() == null ? 'Reply unavailable' : 'Reply\u2026'}
+            placeholder={replyId() == null ? "Can't reply to this thread" : 'Reply\u2026'}
             disabled={replyId() == null}
             value={body()}
             onInput={setBody}

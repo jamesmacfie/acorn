@@ -8,7 +8,7 @@ import { useChangedFiles } from '../changedFiles'
 import { makeContentLinkHandler } from '../contentLinks'
 import { requestFileScroll, routeKey } from '../fileNavigation'
 import ChecksPanel from '../checks/ChecksPanel'
-import { DiffForPull } from '../DiffForPull'
+import { DiffForPull, type PullRoute } from '../DiffForPull'
 import { PrOverview } from './PrOverview'
 import { prSections } from './prSections'
 import { prModel, type PrModel } from './prModel'
@@ -104,7 +104,7 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                 <Show when={kind() === 'agent'}>
                   <IconButton
                     icon="bot"
-                    label="Open creating agent session"
+                    label="Open the agent session that made this"
                     onPress={() => tabs().openAgent(selected()!)}
                   />
                 </Show>
@@ -114,7 +114,7 @@ function PullStrip(props: { tabs: PrTabsModel }) {
                     disabled={tabs().creatingTask() || !tabs().canCreateTask()}
                     tip={tabs().taskCreationTitle()}
                     onPress={() => void tabs().createSelectedTask()}
-                  >{tabs().creatingTask() ? 'Creating…' : '+ Task'}</Button>
+                  >{tabs().creatingTask() ? 'Creating…' : 'Create task'}</Button>
                 </Show>
               </>
             }
@@ -150,6 +150,18 @@ export function PrPane(props: { task: Task }) {
     },
     { router: false },
   )
+  // Keyed on the selected pull and whether it is read-only, for the reason ../PullDetail.tsx gives: a
+  // related pull otherwise showed the primary's threads with live Reply boxes.
+  const diffRoute = createMemo<(PullRoute & { readOnly: boolean }) | null>(
+    () => {
+      const scope = model()?.scope
+      return scope
+        ? { owner: scope.owner, repo: scope.repo, number: scope.number, key: routeKey(scope.owner, scope.repo, scope.number), readOnly: !tabs.isPrimary() }
+        : null
+    },
+    null,
+    { equals: (a, b) => a?.key === b?.key && a?.readOnly === b?.readOnly },
+  )
   const select = (path: string) => {
     changedFiles.selectFile(path)
     const pull = tabs.selected()?.pull
@@ -169,7 +181,7 @@ export function PrPane(props: { task: Task }) {
               render: () => (
                 <Stack gap="section">
                   <PullStrip tabs={tabs} />
-                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} />
+                  <PrOverview model={loaded()} onOpenFile={select} onLinkClick={onLinkClick} hideNumber={tabs.tabs().length > 1} />
                 </Stack>
               ),
             }}
@@ -183,17 +195,9 @@ export function PrPane(props: { task: Task }) {
               id: 'diff',
               label: 'Diff',
               render: () => (
-                <DiffForPull
-                  route={{
-                    owner: loaded().scope.owner,
-                    repo: loaded().scope.repo,
-                    number: loaded().scope.number,
-                    key: routeKey(loaded().scope.owner, loaded().scope.repo, loaded().scope.number),
-                  }}
-                  router={false}
-                  taskId={props.task.id}
-                  readOnly={!tabs.isPrimary()}
-                />
+                <Show when={diffRoute()} keyed>
+                  {(route) => <DiffForPull route={route} router={false} taskId={props.task.id} readOnly={route.readOnly} />}
+                </Show>
               ),
             }}
           />
@@ -205,6 +209,7 @@ export function PrPane(props: { task: Task }) {
                 repo={loaded().scope.repo}
                 runId={check().runId}
                 jobName={check().name}
+                    url={check().url}
                 onClose={() => loaded().setOpenCheck(null)}
               />
             )}
