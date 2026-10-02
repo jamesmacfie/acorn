@@ -1,8 +1,7 @@
 import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { basicSetup } from 'codemirror'
-import { EditorState, Prec, StateEffect, type Extension } from '@codemirror/state'
-import { EditorView, keymap } from '@codemirror/view'
+import type { EditorState, Extension } from '@codemirror/state'
+import type { EditorView } from '@codemirror/view'
 import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
 import { Alert, Button, DocumentTabs, EmptyState, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
@@ -13,7 +12,7 @@ import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, edi
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
-import { lineMarkerEffect, lineMarkerExtension } from './lineMarkerExtension'
+import { HOST } from '@acorn/plugin-api/ui/tokens'
 import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
@@ -35,6 +34,10 @@ const telemetry = telemetryFor('editor')
 // (docs/editor.md § Editing in your own editor). One device preference switches it, graphical is the
 // default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
+  let engine: typeof import('./editorEngine') | undefined
+  let surfaceGeneration = 0
+  const warmedText = new Map<string, Promise<string>>()
+  const graphical = HOST === 'dom'
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
@@ -99,7 +102,7 @@ export default function EditorPane(props: { task: Task }) {
     watchCustody(path, entry)
     entry.state = entry.custody.state ?? entry.state
     if (entry.mount === mountToken) return entry.state
-    entry.state = entry.state.update({ effects: StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
+    entry.state = entry.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(path, entry.language)) }).state
     entry.mount = mountToken
     entry.custody.state = entry.state
     return entry.state
@@ -192,11 +195,11 @@ export default function EditorPane(props: { task: Task }) {
   // has to name the file it is reporting on.
   // Grammar installation follows usable text and stays within the same document entry.
   const perFile = (path: string, language: Extension): Extension[] => [
-    basicSetup,
+    engine!.basicSetup,
     editorTheme(),
-    lineMarkerExtension(),
+    engine!.lineMarkerExtension(),
     language,
-    EditorView.updateListener.of((update) => {
+    engine!.EditorView.updateListener.of((update) => {
       if (!update.docChanged || applyingAcknowledgement || !live()) return
       const entry = pool.files.get(path)
       if (!entry) return
@@ -213,25 +216,34 @@ export default function EditorPane(props: { task: Task }) {
         void refreshLineMarkers(path)
       }
     }),
-    EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
+    engine!.EditorView.domEventHandlers({ blur: () => { scheduleSave.flush(); return false } }),
     // Highest precedence so the explicit flush wins over anything the library binds to the chord;
     // autosave still runs either way.
-    Prec.highest(keymap.of([{ key: 'Mod-s', run: () => { void save(path); return true } }])),
+    engine!.Prec.highest(engine!.keymap.of([{ key: 'Mod-s', run: () => { void save(path); return true } }])),
   ]
 
   // An empty read-only state until a file is opened: the view always has one, so "no file" is a
   // document with nothing in it rather than a special case in every handler below.
-  const emptyState = () => EditorState.create({ extensions: [basicSetup, editorTheme(), EditorState.readOnly.of(true)] })
+  const emptyState = () => engine!.EditorState.create({ extensions: [engine!.basicSetup, editorTheme(), engine!.EditorState.readOnly.of(true)] })
 
   // The graphical editor is built and torn down with its rectangle, because terminal mode replaces
   // that rectangle rather than hiding it. Nothing is lost across the swap: the per-file states stay in
   // the cache, so coming back restores the text, the undo history and the cursor.
   const mountEditor = (element: HTMLElement) => {
-    view = new EditorView({ state: emptyState(), parent: element })
-    stopTheme = watchEditorTheme(view)
-    const restore = active()
-    if (restore) void show(restore)
+    if (!graphical) return
+    const admitted = ++surfaceGeneration
+    void import('./editorEngine').then((loaded) => {
+      if (!live() || admitted !== surfaceGeneration) return
+      engine = loaded
+      view = new loaded.EditorView({ state: emptyState(), parent: element })
+      stopTheme = watchEditorTheme(view)
+      const restore = active()
+      if (restore) void show(restore)
+    }).catch((cause: unknown) => {
+      if (live() && admitted === surfaceGeneration) setSaveErr(cause instanceof Error ? cause.message : 'Unable to load editor.')
+    })
     onCleanup(() => {
+      surfaceGeneration++
       scheduleSave.flush()
       saveViewState()
       if (view && currentPath) remember(currentPath, view.state)
@@ -261,6 +273,7 @@ export default function EditorPane(props: { task: Task }) {
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
+      warmedText.clear()
       for (const unsubscribe of subscriptions.values()) unsubscribe()
       subscriptions.clear()
       // A pane replaced during navigation must not leave its remembered-file warm-up owning later
@@ -278,8 +291,13 @@ export default function EditorPane(props: { task: Task }) {
       // root gated, read the file — of which two are requests. The file the reader left open does not
       // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
       // (docs/editor.md § One round trip to text).
+      // Warm text under the host capability; imports and document state wait for surface admission.
       const remembered = active()
-      if (remembered && !imageTypeForPath(remembered)) void stateFor(remembered).catch(() => {})
+      if (graphical && mode() === 'graphical' && remembered && !imageTypeForPath(remembered)) {
+        const read = api.read(taskId, remembered)
+        warmedText.set(remembered, read)
+        void read.catch(() => { if (warmedText.get(remembered) === read) warmedText.delete(remembered) })
+      }
       // A checkout path already in the cache paints the rectangle in this tick, and the fetch below
       // returns it without a request while it is fresh. An absent root is never painted from the
       // cache: "no checkout yet" is the one thing that changes, so it is always awaited.
@@ -332,6 +350,7 @@ export default function EditorPane(props: { task: Task }) {
   // the same file in the same tick, and one of them has to be the request. An unmounted pane's read
   // is deliberately not shared with its successor; its CodeMirror extensions close over this mount.
   function stateFor(relPath: string): Promise<EditorState | null> {
+    if (!graphical || !view || !engine) return Promise.resolve(null)
     const cached = pool.files.get(relPath)
     if (cached) return Promise.resolve(adopt(relPath, cached))
     const inFlight = pool.reading.get(relPath)
@@ -347,10 +366,12 @@ export default function EditorPane(props: { task: Task }) {
 
   async function readFile(relPath: string): Promise<EditorState | null> {
     if (!api) throw new Error('Editor API is unavailable.')
+    const admitted = surfaceGeneration
     const address = [nodeId, 'file', taskId, relPath]
     const recovery = recoverDocumentCustody(address)
-    const content = recovery?.dirty ? recovery.acknowledged.toString() : await api.read(taskId, relPath)
-    if (!live() || !files().some((file) => file.path === relPath)) return null
+    const content = recovery?.dirty ? recovery.acknowledged.toString() : await (warmedText.get(relPath) ?? api.read(taskId, relPath))
+    warmedText.delete(relPath)
+    if (!live() || !view || admitted !== surfaceGeneration || !files().some((file) => file.path === relPath)) return null
     // Optional grammar and marker work never gate usable text.
     const custody = recovery ?? documentCustody(address, content)
     const language: Extension = []
@@ -361,7 +382,7 @@ export default function EditorPane(props: { task: Task }) {
     let activeLanguage: Extension = highlighted ? language : []
     let state: EditorState
     try {
-      state = telemetry.measure('editor.state.create', () => EditorState.create({
+      state = telemetry.measure('editor.state.create', () => engine!.EditorState.create({
         doc: custody.current,
         extensions: perFile(relPath, activeLanguage),
       }), { highlighted })
@@ -373,9 +394,9 @@ export default function EditorPane(props: { task: Task }) {
         'document.characters': content.length,
       })
       activeLanguage = []
-      state = EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage) })
+      state = engine!.EditorState.create({ doc: custody.current, extensions: perFile(relPath, activeLanguage) })
     }
-    if (custody.state) state = custody.state.update({ effects: StateEffect.reconfigure.of(perFile(relPath, activeLanguage)) }).state
+    if (custody.state) state = custody.state.update({ effects: engine!.StateEffect.reconfigure.of(perFile(relPath, activeLanguage)) }).state
     custody.state = state
     const entry: PooledFile = { state, custody, release: custody.retain(), language: activeLanguage, mount: mountToken, markersReadAt: 0, markersGeneration: 0 }
     saved.set(relPath, custody.acknowledged)
@@ -386,7 +407,8 @@ export default function EditorPane(props: { task: Task }) {
     if (highlighted) void languageForPath(relPath).then((grammar) => {
       if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
       entry.language = grammar
-      const effects = StateEffect.reconfigure.of(perFile(relPath, grammar))
+      if (!view) { entry.mount = {}; return }
+      const effects = engine!.StateEffect.reconfigure.of(perFile(relPath, grammar))
       if (view && currentPath === relPath) {
         view.dispatch({ effects })
         remember(relPath, view.state)
@@ -428,9 +450,9 @@ export default function EditorPane(props: { task: Task }) {
       || generation !== entry.markersGeneration || entry.custody.revision !== revision || !entry.custody.current.eq(doc)) return
     const markers = response.markers
     if (view && currentPath === relPath) {
-      view.dispatch({ effects: lineMarkerEffect(markers) })
+      view.dispatch({ effects: engine!.lineMarkerEffect(markers) })
       remember(relPath, view.state)
-    } else entry.state = entry.custody.state = entry.state.update({ effects: lineMarkerEffect(markers) }).state
+    } else entry.state = entry.custody.state = entry.state.update({ effects: engine!.lineMarkerEffect(markers) }).state
     entry.markersReadAt = Date.now()
   }
 
@@ -445,7 +467,7 @@ export default function EditorPane(props: { task: Task }) {
     if (currentPath) remember(currentPath, view.state)
     currentPath = null
     currentCustody = undefined
-    if (!view.state.readOnly) view.dispatch({ effects: StateEffect.appendConfig.of([EditorState.readOnly.of(true), EditorView.editable.of(false)]) })
+    if (!view.state.readOnly) view.dispatch({ effects: engine!.StateEffect.appendConfig.of([engine!.EditorState.readOnly.of(true), engine!.EditorView.editable.of(false)]) })
     const state = await stateFor(relPath).catch((cause: unknown) => {
       if (live() && active() === relPath) setSaveErr(cause instanceof Error ? cause.message : 'Could not load this file.')
       return null
@@ -478,7 +500,7 @@ export default function EditorPane(props: { task: Task }) {
     const doc = view.state.doc
     const line = doc.line(Math.min(Math.max(1, r.line), doc.lines))
     const pos = Math.min(line.from + Math.max(0, (r.column ?? 1) - 1), line.to)
-    view.dispatch({ selection: { anchor: pos }, effects: EditorView.scrollIntoView(pos, { y: 'center' }) })
+    view.dispatch({ selection: { anchor: pos }, effects: engine!.EditorView.scrollIntoView(pos, { y: 'center' }) })
     view.focus()
     setPendingReveal(null)
   }

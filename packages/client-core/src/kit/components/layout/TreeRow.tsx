@@ -10,6 +10,8 @@ import { Row } from './Row'
 export function TreeRow(props: {
   /** The collection's props for this row, from `Rows tree`. Forwarded to `Row`. */
   item?: ItemProps
+  offset?: number
+  height?: number
   expandable?: boolean
   expanded?: boolean
   onToggle?: () => void
@@ -36,6 +38,8 @@ export function TreeRow(props: {
   return (
     <Row
       item={props.item}
+      offset={props.offset}
+      height={props.height}
       selected={props.selected}
       depth={props.depth}
       reveal={props.reveal}

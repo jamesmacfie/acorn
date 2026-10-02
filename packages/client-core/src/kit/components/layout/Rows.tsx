@@ -1,5 +1,5 @@
 import { measureWork } from '../../lib/telemetry/workTelemetry'
-import { createEffect, createMemo, For, on, onCleanup, Show, createSignal, type JSX } from 'solid-js'
+import { createEffect, createMemo, For, on, onCleanup, createSignal, type JSX } from 'solid-js'
 import { createVirtualizer } from '@tanstack/solid-virtual'
 import { createCollection, type CollectionItem, type ItemProps } from '../../keys/collection'
 import { watchAppearance } from '../../tokens/appearance'
@@ -57,6 +57,8 @@ export function Rows<T extends CollectionItem>(props: {
   const virtual = props.virtual === true
   let virt: ReturnType<typeof createVirtualizer<HTMLDivElement, Element>> | undefined
 
+  const [pendingReveal, setPendingReveal] = createSignal<string>()
+  const [viewportHeight, setViewportHeight] = createSignal(0)
   const NO_PLACE: RowPlacement = {}
 
   // The same object back for an unchanged row, so `<For>` below reconciles instead of remounting.
@@ -90,7 +92,10 @@ export function Rows<T extends CollectionItem>(props: {
       ? {
         scrollToKey: (key: string) => {
           const index = items().findIndex((item) => item.key === key)
-          if (index >= 0) virt?.scrollToIndex(index)
+          if (index >= 0) {
+            setPendingReveal(key)
+            virt?.scrollToIndex(index)
+          }
         },
       }
       : {}),
@@ -122,6 +127,7 @@ export function Rows<T extends CollectionItem>(props: {
     getScrollElement: () => scrollEl() ?? null,
     estimateSize: () => rowH(),
     overscan: 12,
+    onChange: (instance) => setViewportHeight(instance.scrollRect?.height ?? 0),
   })
   const updateRowHeight = () => {
     const next = measuredRowHeight()
@@ -134,7 +140,8 @@ export function Rows<T extends CollectionItem>(props: {
   createEffect(on(() => props.rowHeight, updateRowHeight, { defer: true }))
 
   let frame = 0
-  onCleanup(() => cancelAnimationFrame(frame))
+  let publishFrame = 0
+  onCleanup(() => { cancelAnimationFrame(frame); cancelAnimationFrame(publishFrame) })
   const measureSoon = () => {
     cancelAnimationFrame(frame)
     frame = requestAnimationFrame(() => virt?.measure())
@@ -142,13 +149,32 @@ export function Rows<T extends CollectionItem>(props: {
   // Published after layout rather than in the ref, so the first rect the virtualizer observes is the
   // one the layout gave the scroller rather than a zero-height box.
   const publish = (element: HTMLDivElement) => {
-    cancelAnimationFrame(frame)
-    frame = requestAnimationFrame(() => {
+    cancelAnimationFrame(publishFrame)
+    publishFrame = requestAnimationFrame(() => {
       setScrollEl(element)
       virt?.measure()
     })
   }
   createEffect(on(() => items().length, measureSoon, { defer: true }))
+
+  // Key visible owners by their reconciled item, rather than by virtualizer slot index.
+  // Placement remains reactive when expansion moves a surviving row to another slot.
+  const placements = createMemo(() => new Map(virt!.getVirtualItems().flatMap((slot) => {
+    const row = items()[slot.index]
+    return row ? [[row.key, slot.start] as const] : []
+  })))
+  const visible = createMemo(() => {
+    const positions = placements()
+    return positions.size ? [...positions.keys()].map((key) => cache.get(key)!) : items().slice(0, 12)
+  })
+  createEffect(() => {
+    const key = pendingReveal()
+    const height = viewportHeight()
+    if (!key || height <= 0) return
+    const index = items().findIndex((item) => item.key === key)
+    if (index >= 0) virt!.scrollToIndex(index)
+    setPendingReveal(undefined)
+  })
 
   return (
     <div class="ui-rows-scroll" ref={publish}>
@@ -158,32 +184,16 @@ export function Rows<T extends CollectionItem>(props: {
         {...collection.containerProps}
         style={{ height: `${virt.getTotalSize()}px`, position: 'relative' }}
       >
-        <For each={virt.getVirtualItems()}>
-          {(slot) => {
-            const item = () => items()[slot.index] as T | undefined
-            const rendered = createMemo(() => {
-              const row = item()
-              return row ? { row, offset: slot.start, rowHeight: rowH() } : undefined
-            })
-            // `keyed`, because the slot is not the row. The virtualizer hands the same slot object
-            // back for a given index — its list is a store reconciled by `index` — so `For` keeps the
-            // body it already ran, and a plain `Show` only re-runs its child when the condition
-            // changes truthiness. Between them, a list that changed under a slot kept drawing the item
-            // that used to be at that index: filter a pull list down to one match and every row is
-            // built from the pull that was there before, which PullList then fails to find by key and
-            // draws as nothing at all. `children` takes the item by value, so the only way to hand it
-            // a new one is to run it again.
-            return (
-              <Show when={rendered()} keyed>
-                {(placed) => measureWork('rows.item.mount', () => props.children(
-                  placed.row,
-                  collection.itemProps(placed.row.key),
-                  () => collection.selected() === placed.row.key,
-                  { offset: placed.offset, height: placed.rowHeight },
-                ))}
-              </Show>
-            )
-          }}
+        <For each={visible()}>
+          {(item) => measureWork('rows.item.mount', () => props.children(
+            item,
+            collection.itemProps(item.key),
+            () => collection.selected() === item.key,
+            {
+              get offset() { return placements().get(item.key) ?? items().indexOf(item) * rowH() },
+              get height() { return rowH() },
+            },
+          ))}
         </For>
       </div>
     </div>

@@ -595,6 +595,49 @@ widgets, decorations and inline UI cannot, and the answer to those requests stay
 any proposed addition is "is this an LSP method". As long as every addition passes it, the contract
 grows without becoming an editor library's API in a trench coat.
 
+## Find in files
+
+Search resolves the task's authorized worktree on the Node and streams ripgrep JSON records.
+The Node retains at most 2,000 supported matches, with previews limited to 300 characters.
+An additional supported match proves truncation. Exactly 2,000 matches without another match
+produce a complete result. Paths and lines encoded as non-UTF-8 byte payloads remain unsupported
+and do not count as truncation evidence. Match columns use one-based UTF-16 offsets.
+
+A record can span output chunks and UTF-8 characters. The per-record ceiling is 64 MiB, above
+the previous 32 MiB whole-output ceiling, so previously supported minified-line matches keep their
+exact columns. An oversized or invalid record produces an error. Stderr retention is 64 KiB.
+No-match exit returns an empty result. Invalid regex, missing executable, unavailable task root,
+timeout, malformed output, and cancellation produce distinct errors. A truncated result terminates
+its owned producer and waits for process exit and both pipes before returning.
+
+The panel captures its QueryClient's Node, task, query, and options. Replaced input, toggles, and
+disposal abort its request through the client transport and a forwarded Request at the capability
+boundary. The Node owns process termination, including escalation when SIGTERM does not stop it.
+Hiding the retained panel preserves its query, results, and valid request.
+
+## File tree viewport and freshness
+
+The file tree uses the kit's virtual Rows collection and passes measured placement to TreeRow.
+Row owners follow stable keys when expansion moves them. Before viewport geometry arrives,
+at most 12 rows are admitted. A reveal waits for usable geometry, including a restored hidden pane.
+The cell host uses its own collection viewport and ignores pixel placement.
+
+Listings belong to the captured Node and task. Matching reads join, and obsolete completion cannot
+replace a listing or clear a replacement read. Collapse retains successful listings. Worktree events,
+reconnect, and window focus revalidate loaded directories in parent order. The worktree event carries
+no path, so the conservative policy refreshes every loaded directory, including collapsed cached
+branches, while unopened directories stay lazy. Transient failures preserve successful listings and
+show a retry action. Each reveal checks its revision after awaited directory reads.
+
+## Graphical admission
+
+The build's host token decides whether graphical editing is supported. Remembered text can warm
+beside the checkout-root request on the DOM host. CodeMirror engine imports, grammar admission,
+and document state construction wait until the graphical Rectangle mounts. Retiring that surface
+invalidates pending admission. The terminal host constructs no graphical document or view state;
+its shared text custody API remains available through an engine-independent entrypoint, and the
+terminal editor preference still mounts the PTY channel.
+
 ## One round trip to text
 
 Shipped 2026-09-03. Opening the editor pane on a task used to be three steps in a row: read the

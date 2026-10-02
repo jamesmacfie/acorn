@@ -31,7 +31,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 14 | [Git filesystem implementation record](../../../plans/performance/implementation-14-git-filesystem.md) | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
 | 15 | [PR markers implementation record](../../../plans/performance/implementation-15-pr-markers.md) | Through 14 | Implemented; native verification blocked by service bundle size gate |
 | 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
-| 17 | [Editor search, file tree viewport, and host admission](./17-editor-search-tree.md) | Through 16 | Pending |
+| 17 | [Editor search and tree implementation record](../../../plans/performance/implementation-17-editor-search-tree.md) | Through 16 | Implemented; native and PTY driver verification blocked by service bundle budget |
 | 18 | [Database implementation record](../../../plans/performance/implementation-18-database.md) | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
 | 19 | [Docker implementation record](../../../plans/performance/implementation-19-docker.md) | Through 18 | Implemented; native verification blocked by service bundle size gate |
 | 20 | [HTTP implementation record](../../../plans/performance/implementation-20-http.md) | Through 19 | Implemented; native verification blocked by service bundle size gate |

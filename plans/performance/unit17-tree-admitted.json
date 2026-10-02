@@ -1,0 +1,60 @@
+{
+  "fixture": "actual FileTree and Rows, synthetic listings, jsdom; no visible UI timing claims",
+  "observations": [
+    {
+      "files": 200,
+      "initial": {
+        "listingReads": 1,
+        "treeItems": 21,
+        "elements": 87,
+        "scrollElementHeight": 300,
+        "virtualCount": 21,
+        "scrollRect": {
+          "width": 0,
+          "height": 300
+        },
+        "hasScroller": true,
+        "rowHeight": "36px",
+        "projectedHeight": "7236px",
+        "nodeCpuMs": 108.913,
+        "jsdomWallMs": 138.56841699999995
+      },
+      "expanded": {
+        "treeItems": 21,
+        "firstRowRetained": true
+      },
+      "returned": {
+        "listingReads": 2,
+        "newRootFileVisible": false
+      }
+    },
+    {
+      "files": 2000,
+      "initial": {
+        "listingReads": 1,
+        "treeItems": 21,
+        "elements": 87,
+        "scrollElementHeight": 300,
+        "virtualCount": 21,
+        "scrollRect": {
+          "width": 0,
+          "height": 300
+        },
+        "hasScroller": true,
+        "rowHeight": "36px",
+        "projectedHeight": "72036px",
+        "nodeCpuMs": 14.696,
+        "jsdomWallMs": 90.42979100000002
+      },
+      "expanded": {
+        "treeItems": 21,
+        "firstRowRetained": true
+      },
+      "returned": {
+        "listingReads": 2,
+        "newRootFileVisible": false
+      }
+    }
+  ],
+  "expected": "Wide directory row DOM remains bounded by viewport; normal worktree invalidation revalidates affected mounted tree listings while retaining expansion/selection."
+}

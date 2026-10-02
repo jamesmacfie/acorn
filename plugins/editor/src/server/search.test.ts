@@ -32,8 +32,8 @@ describe('parseRgJson', () => {
     expect(out.files[0].hits[0].preview.length).toBe(300)
   })
 
-  it('drops empty/non-JSON lines and files with no surviving hits', () => {
-    const out = parseRgJson(['', 'not json', begin('empty.ts'), end('empty.ts')].join('\n'))
+  it('drops empty lines and files with no surviving hits', () => {
+    const out = parseRgJson(['', begin('empty.ts'), end('empty.ts')].join('\n'))
     expect(out.files).toEqual([])
   })
 
@@ -45,4 +45,19 @@ describe('parseRgJson', () => {
     expect(out.truncated).toBe(true)
     expect(out.files[0].hits.length).toBe(2000)
   })
+})
+
+it('reports malformed output instead of returning an empty success', () => {
+  expect(() => parseRgJson('not json')).toThrow('invalid JSON record')
+})
+
+it('does not count unsupported bytes events as evidence beyond exactly 2000 hits', () => {
+  const lines = [begin('supported.ts')]
+  for (let i = 0; i < 2000; i++) lines.push(match('supported.ts', i + 1, 'hit\n', 0, 3))
+  lines.push(JSON.stringify({ type: 'match', data: { lines: { bytes: 'aGl0' }, line_number: 2001, submatches: [{ start: 0, end: 3 }] } }))
+  lines.push(JSON.stringify({ type: 'begin', data: { path: { bytes: 'aGl0' } } }))
+  lines.push(match('ignored', 1, 'hit\n', 0, 3))
+  const result = parseRgJson(lines.join('\n'))
+  expect(result.truncated).toBe(false)
+  expect(result.files[0].hits).toHaveLength(2000)
 })

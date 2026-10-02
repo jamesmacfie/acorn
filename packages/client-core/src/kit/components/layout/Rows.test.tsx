@@ -1,8 +1,9 @@
 import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
-import { afterEach, describe, expect, it, onTestFinished } from 'vitest'
+import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Row } from '../primitives'
 import { Rows } from './Rows'
+import { revealCollectionItem } from '../../keys/collection'
 import { _resetCollectionState } from '../../keys/collectionState'
 
 // A list rebuilt from a live store hands out fresh item objects on every frame. The rows must not go
@@ -129,4 +130,63 @@ describe('Rows redraws a virtual row whose item changed', () => {
     await frame()
     expect(rows()[0]?.style.height).toBe('48px')
   })
+})
+
+it('keeps a virtual row owner and updates its placement after an insertion', async () => {
+  const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => 300 })
+  onTestFinished(() => { if (own) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', own) })
+  const [keys, setKeys] = createSignal(Array.from({ length: 100 }, (_, index) => String(index)))
+  mount(() => <Rows virtual id="rows-insertion" items={keys().map((key) => ({ key, label: key }))}>
+    {(item, props, _selected, place) => <Row item={props} offset={place.offset} height={place.height}>{item.label}</Row>}
+  </Rows>)
+  await frame()
+  const survivor = rows().find((row) => row.textContent === '1')!
+  const before = survivor.style.transform
+  setKeys(['added', ...keys()])
+  await frame()
+  expect(rows().find((row) => row.textContent === '1')).toBe(survivor)
+  expect(survivor.style.transform).not.toBe(before)
+  expect(rows().length).toBeLessThan(40)
+})
+
+it('admits a bounded first frame and replays an early reveal when geometry arrives', async () => {
+  const own = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'offsetHeight')
+  let height = 0
+  const resized: (() => void)[] = []
+  vi.stubGlobal('ResizeObserver', class {
+    constructor(callback: ResizeObserverCallback) { resized.push(() => callback([], this as unknown as ResizeObserver)) }
+    observe() {}
+    unobserve() {}
+    disconnect() {}
+  })
+  onTestFinished(() => { vi.unstubAllGlobals() })
+  Object.defineProperty(HTMLElement.prototype, 'offsetHeight', { configurable: true, get: () => height })
+  onTestFinished(() => { if (own) Object.defineProperty(HTMLElement.prototype, 'offsetHeight', own) })
+  for (const [property, value] of [['scrollHeight', 80000], ['clientHeight', 300]] as const) {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLElement.prototype, property)
+    Object.defineProperty(HTMLElement.prototype, property, { configurable: true, get: () => value })
+    onTestFinished(() => { if (descriptor) Object.defineProperty(HTMLElement.prototype, property, descriptor); else delete (HTMLElement.prototype as unknown as Record<string, unknown>)[property] })
+  }
+  HTMLElement.prototype.scrollTo ??= () => {}
+  const scroll = vi.spyOn(HTMLElement.prototype, 'scrollTo').mockImplementation(function (this: HTMLElement, options: ScrollToOptions | number) {
+    this.scrollTop = typeof options === 'object' ? options.top ?? 0 : 0
+    this.dispatchEvent(new Event('scroll'))
+  })
+  onTestFinished(() => scroll.mockRestore())
+  const [listing, setListing] = createSignal<{ key: string; label: string }[]>([])
+  mount(() => <Rows virtual id="rows-early-reveal" items={listing()}>
+    {(item, props, _selected, place) => <Row item={props} offset={place.offset} height={place.height}>{item.label}</Row>}
+  </Rows>)
+  setListing(Array.from({ length: 2001 }, (_, index) => ({ key: String(index), label: String(index) })))
+  expect(rows().length).toBeLessThanOrEqual(12)
+  revealCollectionItem('rows-early-reveal', '1999')
+  await frame()
+  expect(rows().length).toBeLessThanOrEqual(12)
+  height = 300
+  for (const resize of resized) resize()
+  await frame()
+  await vi.waitFor(() => expect(rows().some((row) => row.textContent === '1999')).toBe(true))
+  expect(rows().length).toBeLessThan(40)
+  expect(host.querySelector('[role="listbox"]')?.getAttribute('aria-activedescendant')).toBe('rows-early-reveal-item-1999')
 })

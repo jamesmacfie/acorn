@@ -130,6 +130,9 @@ export function Row(props: {
 /** `Row` indented by `depth` with `▸` or `▾`. A wrapper, as on the DOM, so `Row`'s API stays flat. */
 export function TreeRow(props: {
   item?: ItemProps
+  /** Pixel placement belongs to the DOM host; cells use their collection viewport. */
+  offset?: number
+  height?: number
   expandable?: boolean
   expanded?: boolean
   onToggle?: () => void
