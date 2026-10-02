@@ -17,7 +17,7 @@ import SaveQueryModal from './SaveQueryModal'
 // The SQL editor lives in the host, in the region above this frame (docs/editor.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Execute, `document.write()` when the picker or Generate loads a query in, and
-// `document.flush()`, which the host has already called by the time a surface action arrives.
+// `document.flush()`, which Execute also calls before reading the current SQL.
 //
 // ⌘Enter runs the query even though it is pressed with focus in the host's editor, where this plugin
 // has no keyboard. The host resolves it against the manifest's surface-scoped keybinding, flushes the
@@ -45,8 +45,12 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   const [activeRow, setActiveRow] = createSignal<number | null>(null)
   const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
-  const [generating, setGenerating] = createSignal(false)
+  const [generating, setGenerating] = createSignal<{ expectedText: string; generation: number }>()
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
+
+  let disposed = false
+  let selectionGeneration = 0
+  onCleanup(() => { disposed = true; selectionGeneration++ })
 
   const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
 
@@ -86,7 +90,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   }
 
   // The shared document, written through the host.
-  const writeSql = (sql: string) => void props.bridge.document.write(sql).catch(fail)
+  const writeSql = (sql: string) => {
+    selectionGeneration++
+    return props.bridge.document.write(sql)
+  }
 
   async function connect() {
     setStatus('connecting')
@@ -106,15 +113,21 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   async function openTable(t: DbTable) {
     if (busy()) return
+    const generation = ++selectionGeneration
     setBusy(true)
     try {
+      // Browsing rows remains available even when the sibling document is in recovery.
+      const expectedText = await props.bridge.document.read().catch((cause: unknown) => { fail(cause); return undefined })
+      if (disposed || generation !== selectionGeneration) return
       batch(() => {
         setSelected(t)
         setActiveRow(null)
       })
       const cols = await listColumns(props.taskId, t.schema, t.name)
+      if (disposed || generation !== selectionGeneration) return
       setColumns('error' in cols ? [] : cols.columns)
       const rows = await listRows(props.taskId, t.schema, t.name)
+      if (disposed || generation !== selectionGeneration) return
       if ('error' in rows) return setError(rows.error)
       batch(() => {
         setResult({ columns: rows.columns, rows: rows.rows, rowCount: rows.rowCount, command: rows.command })
@@ -122,7 +135,11 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         setFooter(`${rows.rows.length} of ${rows.total ?? '?'} rows`)
         setError('')
       })
-      writeSql(`SELECT * FROM ${quoteIdentifier(t.schema)}.${quoteIdentifier(t.name)} LIMIT 500;`)
+      if (expectedText !== undefined && !disposed && generation === selectionGeneration) {
+        await props.bridge.document.write(`SELECT * FROM ${quoteIdentifier(t.schema)}.${quoteIdentifier(t.name)} LIMIT 500;`, { expectedText })
+      }
+    } catch (e) {
+      if (!disposed) fail(e)
     } finally {
       setBusy(false)
     }
@@ -130,12 +147,12 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
 
   async function execute() {
     if (busy()) return
-    // The document as the reader sees it, including keystrokes the host's autosave has not written.
-    // On the ⌘Enter path the host has already flushed, so the plugin's scratch route agrees with this.
-    const sql = (await props.bridge.document.read().catch(() => '')).trim()
-    if (!sql) return
     setBusy(true)
     try {
+      await props.bridge.document.flush()
+      if (disposed) return
+      const sql = (await props.bridge.document.read()).trim()
+      if (disposed || !sql) return
       const res = await runQuery(props.taskId, sql)
       if ('error' in res) {
         batch(() => { setError(res.error); setFooter('') })
@@ -187,7 +204,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     // The selection that opened this pane rides in `context`; every later one is a message
     // (docs/plugins.md § The tree contract). Both land in the same signal.
     setRequested(props.bridge.context.item)
-    onCleanup(props.bridge.onSelect((item) => setRequested(item)))
+    onCleanup(props.bridge.onSelect((item) => { selectionGeneration++; setRequested(item) }))
     void connect()
   })
   onCleanup(() => void disconnectDb(props.taskId).catch(() => {}))
@@ -196,8 +213,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   // effect-free handler rather than a signal→document sync, because the document is not this frame's
   // state. It is a thing on the other side of the port that the reader may also be typing into.
   const loadSaved = (q: DbSavedQuery) => {
-    writeSql(q.sql)
-    setLoadedName(q.name)
+    const write = writeSql(q.sql)
+    const generation = selectionGeneration
+    void write.then(() => { if (!disposed && generation === selectionGeneration) setLoadedName(q.name) }).catch(fail)
   }
 
   createEffect(() => {
@@ -207,7 +225,13 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       setRequested(undefined)
       // Read the row, not the editor: this runs because the node wrote SQL the editor has not seen.
       // Loading a generated query is not running it, exactly as picking a saved one is not.
-      void readScratch(props.taskId).then((sql) => sql && writeSql(sql), fail)
+      const generation = ++selectionGeneration
+      void (async () => {
+        const expectedText = await props.bridge.document.read()
+        const sql = await readScratch(props.taskId)
+        if (disposed || generation !== selectionGeneration) return
+        await props.bridge.document.write(sql, { expectedText })
+      })().catch((cause: unknown) => { if (!disposed && generation === selectionGeneration) fail(cause) })
       return
     }
     const q = savedList().find((candidate) => candidate.id === id)
@@ -285,7 +309,12 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               Save
             </Button>
             <Show when={backends().length}>
-              <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
+              <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => {
+                const generation = ++selectionGeneration
+                void props.bridge.document.read().then((expectedText) => {
+                  if (!disposed && generation === selectionGeneration) setGenerating({ expectedText, generation })
+                }, fail)
+              }}>Generate</Button>
             </Show>
             <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
           </Toolbar>
@@ -391,8 +420,12 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               taskId={props.taskId}
               backends={backends()}
               queries={savedList()}
-              onDismiss={() => setGenerating(false)}
-              onGenerated={writeSql}
+              onDismiss={() => setGenerating(undefined)}
+              onGenerated={(sql) => {
+                const loading = generating()
+                if (disposed || !loading || loading.generation !== selectionGeneration) throw new Error('The query selection changed while generating. Generate again.')
+                return props.bridge.document.write(sql, { expectedText: loading.expectedText })
+              }}
             />
           </Show>
 

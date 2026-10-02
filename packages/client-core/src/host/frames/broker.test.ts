@@ -801,3 +801,19 @@ describe('closing with a result', () => {
     expect(h.svc.importerClose).toHaveBeenCalledWith(undefined)
   })
 })
+
+it('atomically refuses delayed document replacement after the text changes', async () => {
+  let text = 'SELECT dirty;'
+  const write = vi.fn((next: string) => { text = next })
+  const h = open({}, services({ document: { read: () => text, write, flush: async () => {} } }))
+  try {
+    h.send({ id: 1, kind: 'document', op: 'write', text: 'SELECT generated;', expectedText: 'SELECT prior;' })
+    await h.settled(2)
+    expect(replyTo(h, 1)).toMatchObject({ id: 1, ok: false, error: { code: 'conflict' } })
+    expect(write).not.toHaveBeenCalled()
+    h.send({ id: 2, kind: 'document', op: 'write', text: 'SELECT generated;', expectedText: text })
+    await h.settled(3)
+    expect(replyTo(h, 2)).toMatchObject({ id: 2, ok: true })
+    expect(text).toBe('SELECT generated;')
+  } finally { h.dispose() }
+})

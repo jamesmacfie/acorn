@@ -64,6 +64,8 @@ export class DocumentCustody {
     if (!this.readers && !this.dirty && !this.pending && documents.get(this.key) === this) documents.delete(this.key)
   }
 
+  editText(text: string): void { this.edit(textOf(text)) }
+
   edit(doc: Text): void {
     if (doc.eq(this.current)) return
     this.current = doc

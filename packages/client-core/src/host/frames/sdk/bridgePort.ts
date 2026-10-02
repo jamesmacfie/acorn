@@ -237,7 +237,7 @@ export function attach(port: MessagePort, options: { mode?: AcornBridge['treeBri
       },
       document: {
         read: async () => (await request<{ text?: string }>({ kind: 'document', op: 'read' }))?.text ?? '',
-        write: async (text) => void (await request({ kind: 'document', op: 'write', text })),
+        write: async (text, options) => void (await request({ kind: 'document', op: 'write', text, ...(options ? { expectedText: options.expectedText } : {}) })),
         flush: async () => void (await request({ kind: 'document', op: 'flush' })),
       },
       webview: {

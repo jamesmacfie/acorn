@@ -30,6 +30,8 @@ import { documentCustody, recoverDocumentCustody, type DocumentCustody } from '.
 import { languageFor, shouldHighlightDocument } from './language'
 import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
+import { saveFile } from '../../infra/platform'
+import { Button } from '../../kit/components/inputs/Button'
 import { Alert } from '../../kit/components/primitives'
 import { Rectangle } from '../../kit/components/content/Rectangle'
 import { createLogger } from '../../infra/telemetry/logger'
@@ -97,6 +99,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
   const qc = useQueryClient()
   const [error, setError] = createSignal('')
   const [ready, setReady] = createSignal(false)
+  const [oversizedText, setOversizedText] = createSignal<string>()
 
   // Read once at mount and held: a pane is rebuilt on a node switch (the shell keys on the node) and a
   // document surface serves one document per scope, so there is nothing here that can go stale underneath
@@ -273,8 +276,10 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
         }
         // Refused whole rather than trimmed: a truncated document in an editor that will save it back is
         // data loss wearing the shape of a rendering limit.
-        if (new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
-          return setError(`Document is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MiB.`)
+        if (!recovery && new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
+          if (disposed) return
+          setOversizedText(body.text)
+          return setError('Document exceeds 2 MiB. Export its full text before replacing it through the authorized storage route, then reopen this pane.')
         }
         recordSample(props.pluginId, 'editor.document.characters', body.text.length)
         text = body.text
@@ -285,7 +290,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       setReady(true) // renders the host div synchronously
       if (!host) return
 
-      const highlighted = shouldHighlightDocument(text.length)
+      const highlighted = shouldHighlightDocument(recovery?.current.length ?? text.length)
       if (!highlighted) recordSample(props.pluginId, 'editor.syntax.skipped', text.length, 'character', { reason: 'document-size' })
       const grammar: Extension = []
       custody = recovery ?? documentCustody(address, text)
@@ -364,6 +369,15 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
     // a second `contain: layout paint` nobody needed. A region of a pane is not a pane.
     <section class="document-surface">
       <Show when={error()}><Alert>{error()}</Alert></Show>
+      <Show when={ready() || oversizedText() !== undefined}>
+        <Button onPress={() => {
+          const text = custody?.current.toString() ?? oversizedText()
+          if (disposed || text === undefined) return
+          void saveFile({ bytes: new TextEncoder().encode(text), suggestedName: `${props.surfaceId}.txt`, mimeType: 'text/plain;charset=utf-8' }).catch((cause: unknown) => {
+            if (!disposed) setError(cause instanceof Error ? cause.message : 'Export failed')
+          })
+        }}>Export full text</Button>
+      </Show>
       {/* The editor owns these pixels, so the box is a rectangle: the kit owns it and the way in and out
           of it with the keyboard, which is what stops a reader who tabs into an editor region from
           being stuck there (ui/Rectangle.tsx). */}

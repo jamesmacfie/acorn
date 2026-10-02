@@ -8,6 +8,8 @@ import type { GenerateTextRequest, ModelService } from '@acorn/plugin-api/testki
 import { ProviderOperationError } from '@acorn/plugin-api/testkit'
 import type { Principal } from '@acorn/plugin-api/testkit'
 import type { PluginRequestContext } from '@acorn/plugin-api/node'
+import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
+import { dbScratch } from '../../node/schema'
 import type { PluginCompletionResponse } from '@acorn/protocol/documentSurface.ts'
 import type { DbSavedQuery } from '../../shared/database'
 import type { DatabaseBridge } from '../database'
@@ -553,5 +555,64 @@ describe('the palette routes', () => {
     f.generateText.mockResolvedValueOnce({ text: 'SELECT 1;', providerId: 'p', backendId: 'connection:conn2', modelId: 'm' })
     expect((await f.call('/palette/generate', json({ input: 'p', taskId: 'task1' }))).status).toBe(200)
     expect((f.generateText.mock.calls[0][0] as GenerateTextRequest).input.modelId).toBeUndefined()
+  })
+})
+
+// Byte boundaries use complete documents through the loaded portable carrier and disposable SQLite.
+describe('SQL scratch UTF-8 admission and legacy recovery', () => {
+  let f: Fixture
+  beforeEach(async () => { f = fixture(); await seed(f) })
+  afterEach(() => f.cleanup())
+  const put = (f: Fixture, text: string) => f.call('/tasks/task1/scratch', { ...json({ text }), method: 'PUT' })
+  const patterns = ['x', 'é', '😀', 'e\u0301']
+
+  it.each(patterns)('admits exact-cap %s text and refuses one extra byte before storage or catalog work', async (pattern) => {
+    const unitBytes = Buffer.byteLength(pattern)
+    const text = pattern.repeat(Math.floor(MAX_DOCUMENT_BYTES / unitBytes)) + 'x'.repeat(MAX_DOCUMENT_BYTES % unitBytes)
+    expect(Buffer.byteLength(text)).toBe(MAX_DOCUMENT_BYTES)
+    expect((await put(f, text)).status).toBe(200)
+    const catalog = vi.fn<DatabaseBridge['catalog']>(async () => ({ tables: [] }))
+    expect((await f.call('/tasks/task1/completions', json({ text, position: { line: 1, column: 1 } }), fake({ catalog }))).status).toBe(200)
+    expect((await put(f, text + 'x')).status).toBe(400)
+    expect((await f.call('/tasks/task1/completions', json({ text: text + 'x', position: { line: 1, column: 1 } }), fake({ catalog }))).status).toBe(400)
+    expect(catalog).toHaveBeenCalledTimes(1)
+    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text })
+  })
+
+  it('accepts an empty scratch and empty completion source', async () => {
+    expect((await put(f, '')).status).toBe(200)
+    expect((await f.call('/tasks/task1/completions', json({ text: '', position: { line: 1, column: 1 } }))).status).toBe(200)
+  })
+
+  it('keeps complete legacy oversized SQL readable only within the original task scope until valid replacement', async () => {
+    const text = 'é'.repeat(MAX_DOCUMENT_BYTES)
+    await f.plugin.db.insert(dbScratch).values({ taskId: 'task1', sql: text, updatedAt: 0 })
+    const caller: Principal = { kind: 'internal', scope: 'task', taskId: 'task1', userId: 'james' }
+    expect(await (await f.call('/tasks/task1/scratch', undefined, fake(), caller)).json()).toEqual({ text })
+    expect((await f.call('/tasks/task1/scratch', undefined, fake(), { ...caller, taskId: 'other' })).status).toBe(404)
+    expect((await put(f, text)).status).toBe(400)
+    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text })
+    expect((await put(f, 'SELECT 1;')).status).toBe(200)
+    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: 'SELECT 1;' })
+  })
+
+  it.each(['palette', 'modal'])('%s generation refuses oversized output without a success selection or durable replacement', async (entry) => {
+    await put(f, 'SELECT prior;')
+    f.available.mockResolvedValue([{ id: 'harness:test', kind: 'harness', label: 'Synthetic', models: [], defaultModelId: '' }])
+    const call = () => entry === 'palette'
+      ? f.call('/palette/generate', json({ taskId: 'task1', input: 'synthetic' }))
+      : f.call('/tasks/task1/generate', json({ backendId: 'harness:test', prompt: 'synthetic' }))
+    for (const [text, status] of [['é'.repeat(MAX_DOCUMENT_BYTES / 2), 200], ['é'.repeat(MAX_DOCUMENT_BYTES / 2) + 'x', 400]] as const) {
+      f.generateText.mockResolvedValueOnce({ text, providerId: 'anthropic', backendId: 'harness:test', modelId: 'synthetic' })
+      const response = await call()
+      expect(response.status).toBe(status)
+      const body = await response.json()
+      if (status === 400) {
+        expect(body).not.toHaveProperty('item')
+        expect(body).not.toHaveProperty('sql')
+        expect(body).toHaveProperty('error')
+      }
+    }
+    expect(await (await f.call('/tasks/task1/scratch')).json()).toEqual({ text: entry === 'palette' ? 'é'.repeat(MAX_DOCUMENT_BYTES / 2) : 'SELECT prior;' })
   })
 })

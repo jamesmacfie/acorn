@@ -3,7 +3,8 @@ import { createEffect, createSignal, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { DocumentSurfaceProps } from '@acorn/client-core/host/frames/documentSurface.ts'
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
-import { resolveDocumentRoute } from '@acorn/client-core/features/editor/documentModel.ts'
+import { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
+import { documentUri, resolveDocumentRoute } from '@acorn/client-core/features/editor/documentModel.ts'
 import { readJson, writeJson } from '@acorn/client-core/infra/node'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { toKeymapKey } from '@acorn/client-core/kit/keys'
@@ -29,40 +30,44 @@ export function DocumentSurface(props: DocumentSurfaceProps) {
   const [error, setError] = createSignal('')
   const readPath = resolveDocumentRoute(props.region.read, props.scope)
   const writePath = props.region.write ? resolveDocumentRoute(props.region.write, props.scope) : null
-  let saved = ''
+  const nodeId = props.nodeId
+  const address = [nodeId, props.scope.taskId ? 'task' : 'project', props.scope.taskId ?? props.scope.projectId ?? '', documentUri(props.pluginId, props.surfaceId), readPath, writePath]
+  let custody: DocumentCustody | undefined
+  let releaseCustody: (() => void) | undefined
+  let unsubscribe: (() => void) | undefined
   let disposed = false
-  let pending: Promise<void> = Promise.resolve()
-
-  const save = (): Promise<void> => {
-    if (!writePath || !ready()) return pending
-    const text = value()
-    // A write that has already started must finish before the next one. Otherwise a slow earlier
-    // response could leave the node holding older SQL after a later flush returned.
-    pending = pending.catch(() => {}).then(async () => {
-      if (text === saved) return
-      await writeJson<unknown>(writePath, {
-        method: 'PUT',
-        nodeId: props.nodeId,
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ text } satisfies PluginDocumentBody),
+  const save = async (): Promise<void> => {
+    if (!writePath || !custody) return
+    try {
+      await custody.flush(async (text) => {
+        if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document exceeds 2 MiB. Its full text is retained for recovery.')
+        const response = await writeJson<unknown>(writePath, {
+          method: 'PUT', nodeId, headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ text } satisfies PluginDocumentBody),
+        })
+        if (response && typeof response === 'object' && 'ok' in response && response.ok === false) throw new Error('Save failed')
+        return {}
       })
-      saved = text
       if (!disposed) setError('')
-    }).catch((cause: unknown) => {
+    } catch (cause) {
       if (!disposed) setError(cause instanceof Error ? cause.message : 'Save failed')
       throw cause
-    })
-    return pending
+    }
   }
   const scheduleSave = debounce(() => { void save().catch(() => {}) }, 1500)
-  const flush = (): Promise<void> => {
+  const flush = async (): Promise<void> => {
+    if (disposed) throw new Error('This document grant has retired.')
     scheduleSave.cancel()
-    return save()
+    const revision = custody?.revision
+    await save()
+    if (disposed || custody?.dirty || custody?.revision !== revision) throw new Error('The document changed while saving. Try again.')
   }
   const change = (next: string): void => {
     // Keep the displayed field and the sibling frame's live handle in step even if a later save
     // rejects an oversized edit. Refusing only the signal here would leave the field showing SQL
     // that `bridge.document.read()` did not return.
+    if (disposed) throw new Error('This document grant has retired.')
+    custody?.editText(next)
     setValue(next)
     scheduleSave()
   }
@@ -99,23 +104,41 @@ export function DocumentSurface(props: DocumentSurfaceProps) {
       scheduleSave.cancel()
       void save().catch(() => {})
       disposed = true
+      unsubscribe?.()
+      releaseCustody?.()
     })
     void (async () => {
       if (!readPath) return setError('This surface needs a task; open one first.')
       try {
-        const body = await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId: props.nodeId })
+        const recovery = recoverDocumentCustody(address)
+        const body = recovery?.dirty ? { text: recovery.acknowledged.toString() } : await readJson<Partial<PluginDocumentBody>>(readPath, { nodeId })
         if (typeof body?.text !== 'string') return setError('This plugin returned an unreadable document.')
-        if (new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
-          return setError(`Document is larger than ${MAX_DOCUMENT_BYTES / 1024 / 1024} MiB.`)
+        if (!recovery && new TextEncoder().encode(body.text).byteLength > MAX_DOCUMENT_BYTES) {
+          if (disposed) return
+          return setError('Document exceeds 2 MiB. Export the complete text from the authorized scratch GET route on this Node, or use Export full text in the desktop pane. See docs/database.md.')
         }
         if (disposed) return
-        saved = body.text
-        setValue(body.text)
+        custody = recovery ?? documentCustody(address, body.text)
+        releaseCustody = custody.retain()
+        setValue(custody.current.toString())
+        if (custody.error) setError(custody.error)
+        unsubscribe = custody.subscribe(() => {
+          if (disposed || !custody) return
+          setValue(custody.current.toString())
+          if (custody.error) setError(custody.error)
+        })
         setReady(true)
         props.onHandle?.({
-          read: value,
-          write: writePath ? change : () => {},
-          flush: writePath ? flush : async () => {},
+          read: () => {
+            if (disposed) throw new Error('This document grant has retired.')
+            return custody!.current.toString()
+          },
+          write: (text) => {
+            if (disposed) throw new Error('This document grant has retired.')
+            if (new TextEncoder().encode(text).byteLength > MAX_DOCUMENT_BYTES) throw new Error('Document is too large.')
+            if (writePath) change(text)
+          },
+          flush,
         })
       } catch (cause) {
         if (!disposed) setError(cause instanceof Error ? cause.message : 'Could not load this document.')

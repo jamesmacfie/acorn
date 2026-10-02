@@ -887,3 +887,22 @@ draws the file the pane is already on (§ Editing in your own editor).
 - `docs/tui.md` — the terminal host that reached the same "one host-owned template" conclusion.
 - `docs/future/remote.md` — `formFactor`, and why descriptors render on other shells for free.
 - `docs/plugins.md` — the frame contract, the CSP, and what a frame can and cannot do.
+
+## Host document export and guarded replacement
+
+The host document region offers **Export full text** through the host's file-saving seam. The export
+contains the complete live draft, including text that exceeds the editable document limit. A stored
+oversized document exposes the same export action without creating an editor or publishing a handle.
+Its declared read route remains authorized by the original Node and scope. Export supplies bytes and
+a suggested name to the host dialog; it adds no plugin filesystem or network authority.
+
+`bridge.document.write(text, { expectedText })` optionally compares the prior document text before
+replacement. The host performs that comparison and the write in one synchronous admission. A
+mismatch rejects with `conflict` and preserves the current draft. Omitting the option retains the
+intentional replacement behavior. Each replacement still uses the shared 2 MiB UTF-8 input limit.
+
+The terminal host uses the same document custody address and serialized save owner as the desktop.
+It retains failed text beyond view retirement and restores it under a freshly granted equivalent
+slot. The terminal editor does not supply CodeMirror undo. Oversized stored documents show recovery
+instructions; [Database scratch recovery](./database.md#scratch-limits-and-recovery) describes the
+complete authenticated export and explicit replacement route.

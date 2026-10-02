@@ -4,6 +4,7 @@ import { currentCompletions, startCompletion } from '@codemirror/autocomplete'
 import { EditorView } from '@codemirror/view'
 import type { PluginDocumentRegion } from '@acorn/protocol/api.ts'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
+import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 import type { DocumentHandle } from './documentModel'
 
 // The two things this surface does that nothing else does: it asks a plugin for completions and it
@@ -17,9 +18,12 @@ Range.prototype.getClientRects ??= () => Object.assign([], { item: () => null })
 Range.prototype.getBoundingClientRect ??= () => new DOMRect()
 
 const posted = vi.fn()
+const exported = vi.fn(async (_request: unknown) => true)
+let loadedText = 'select  from users'
+vi.mock('../../infra/platform', async (importOriginal) => ({ ...await importOriginal<typeof import('../../infra/platform')>(), saveFile: (request: unknown) => exported(request) }))
 let saveResponse: () => Promise<unknown> = async () => ({})
 vi.mock('../../infra/node/apiClient', () => ({
-  readJson: async () => ({ text: 'select  from users' }),
+  readJson: async () => ({ text: loadedText }),
   writeJson: async (path: string, init: { body?: string }) => {
     posted(path, init.body)
     if (!path.endsWith('/complete')) return saveResponse()
@@ -42,18 +46,20 @@ const cleanups: (() => void)[] = []
 afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
   posted.mockClear()
+  exported.mockClear()
+  loadedText = 'select  from users'
   saveResponse = async () => ({})
 })
 
 let serial = 0
-const mount = (regionValue: PluginDocumentRegion, onHandle?: (handle: DocumentHandle | null) => void, taskId = `document-${++serial}`) => {
+const mount = (regionValue: PluginDocumentRegion, onHandle?: (handle: DocumentHandle | null) => void, taskId = `document-${++serial}`, nodeId = 'node-a') => {
   const host = document.createElement('div')
   document.body.append(host)
   cleanups.push(render(() => (
     <QueryClientProvider client={new QueryClient()}><DocumentSurface
       pluginId="database"
       surfaceId="db"
-      nodeId="node-a"
+      nodeId={nodeId}
       region={regionValue}
       scope={{ taskId }}
       onHandle={onHandle}
@@ -162,4 +168,44 @@ describe('the host-owned document surface', () => {
     expect(JSON.parse(String(written)).text).toContain('-- edited')
     expect(posted.mock.invocationCallOrder[0]).toBeLessThan(ran.mock.invocationCallOrder[0])
   })
+})
+
+// Complete text is compared here; a short fixture cannot expose the byte/character mismatch.
+it('exports a legacy oversized document without mounting an editable or empty document', async () => {
+  loadedText = 'é'.repeat(MAX_DOCUMENT_BYTES)
+  const handle = vi.fn()
+  const host = mount(region(), handle)
+  await vi.waitFor(() => expect(host.textContent).toContain('exceeds 2 MiB'))
+  expect(host.querySelector('.cm-editor')).toBeNull()
+  expect(handle).not.toHaveBeenCalled()
+  const button = Array.from(host.querySelectorAll('button')).find((entry) => entry.textContent === 'Export full text')!
+  button.click()
+  await vi.waitFor(() => expect(exported).toHaveBeenCalledOnce())
+  const request = exported.mock.calls[0][0] as { bytes: Uint8Array }
+  expect(new TextDecoder().decode(request.bytes)).toBe(loadedText)
+  expect(request.bytes.byteLength).toBe(2 * MAX_DOCUMENT_BYTES)
+  expect(posted).not.toHaveBeenCalled()
+})
+
+it('recovers a complete oversized dirty draft and undo only on its originating Node', async () => {
+  const task = `oversized-recovery-${++serial}`
+  let handle: DocumentHandle | null = null
+  const first = mount(region(), (next) => { handle = next }, task)
+  const view = await editor(first)
+  const initial = view.state.doc.toString()
+  const text = '😀'.repeat(MAX_DOCUMENT_BYTES / 4) + 'x'
+  view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: text } })
+  const retired = handle!
+  await expect(retired.flush()).rejects.toThrow('full text is retained')
+  expect(retired.read()).toBe(text)
+  expect(posted).not.toHaveBeenCalled()
+  cleanups.splice(0).forEach((dispose) => dispose())
+  expect(() => retired.read()).toThrow('retired')
+  const other = await editor(mount(region(), undefined, task, 'node-b'))
+  expect(other.state.doc.toString()).toBe(initial)
+  const reopened = await editor(mount(region(), (next) => { handle = next }, task))
+  expect(reopened.state.doc.toString()).toBe(text)
+  await expect(handle!.flush()).rejects.toThrow('full text is retained')
+  reopened.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', keyCode: 90, ctrlKey: true, bubbles: true }))
+  await vi.waitFor(() => expect(reopened.state.doc.toString()).toBe(initial))
 })

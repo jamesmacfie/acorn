@@ -68,7 +68,7 @@ and completion popups are absent there.
 
 `⌘Enter` runs the query. The chord is pressed with focus in the host's editor, so the host resolves it
 against the manifest's surface-scoped keybinding, flushes the document, and then delivers the command
-to the plugin's frame. The statement that runs is always the one on screen.
+to the plugin's frame. The **Execute** button also flushes before reading the live document. Either path reports a failed save or read and does not run SQL. Execute uses the complete trimmed document, with no selection-based execution or automatic retry.
 
 Table and column completions come from the plugin's own node route. The host forwards a position and
 renders what comes back. Every judgement about SQL lives in `src/server/completions.ts`: after `FROM`
@@ -211,3 +211,39 @@ scope gate.
 Task IDs and worktree paths are revalidated by the Node. The database plugin does not expose
 credentials through its routes, and task-scoped agent tools cannot use the interactive database UI
 without the explicit tool permission and task scope.
+
+## Scratch limits and recovery
+
+Scratch writes, completion requests, and generated SQL use the shared 2 MiB UTF-8 document limit.
+ASCII, multibyte characters, emoji, and combining marks count by encoded bytes. Empty scratch text
+is valid. The Node refuses oversized text before replacing `db_scratch`; it does not truncate SQL.
+Saved-query, prompt, and model-token limits remain separate contracts. Palette generation commits
+before returning its success selection; oversized output returns an error and preserves the row.
+The generation modal waits for the host to accept its replacement before dismissing.
+
+The host retains failed dirty text, including oversized edits. Closing and reopening the same
+Node/task document restores that draft; equal task IDs on another Node have independent custody.
+The desktop retains CodeMirror undo in memory. Device recovery storage can fail or run out of quota;
+keep acorn open until the draft saves or export its full text. A retired pane's handle cannot read,
+write, or flush the recovered draft through a replacement pane.
+
+A stored scratch row above the limit opens in a recovery state with no editable empty buffer or
+execution handle. In the desktop, choose **Export full text** to save every UTF-8 byte through the
+host file dialog. The same action exports a live unsent draft. Export reads only the document
+fetched through the pane's declared route on its captured Node; the plugin receives no file path or
+filesystem grant.
+
+For the terminal client or headless recovery, use the authenticated storage route on the original
+Node: `GET /v1/p/database/tasks/<taskId>/scratch` returns `{ text }`, including complete oversized SQL.
+Decode the JSON and save the `text` value as UTF-8. Use the Node's pinned transport and a device,
+service, or signed credential for that task. A task credential cannot read or replace another task's
+scratch row. This route needs no PostgreSQL connection or provider call.
+
+After preserving the export, submit an explicit valid replacement to the same route with `PUT` and
+a JSON body of `{ text }`, then reopen the pane. A refused replacement preserves the entire row.
+Export and pane retirement make no durable replacement. No migration rewrites oversized rows.
+
+Picking a saved query intentionally replaces the host text and joins desktop undo. A palette scratch
+reload, table browse, or modal generation captures the prior host text and replaces it only if that
+text still matches when the host admits the write. Later selections and retirement discard held
+loads. A conflict retains intervening edits and asks you to select or generate again.
