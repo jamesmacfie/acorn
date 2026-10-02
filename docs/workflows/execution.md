@@ -21,6 +21,14 @@ step outcomes. `dispatch/` reserves and waits for child workflows. `processing/`
 attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
 the Node capabilities without owning execution state.
 
+Run lists and task navigation select scalar fields from SQLite. Navigation retains every historical
+descendant when choosing the latest run per task. Equal update timestamps keep insertion order.
+Reprocess roots use the source dispatch's original root when that lineage remains available.
+Task run history retains the frozen definition for the graph and reads compact parent and root
+lineage separately. Equal creation timestamps keep insertion order. Usage is grouped by run and root;
+an absent admission remains unknown, while a recorded zero remains zero. Execution graphs and
+authority stay in durable rows for execution and recovery.
+
 ### The graph
 
 A step declares `after`, the IDs of the steps it waits on. A step with no `after` key waits on the

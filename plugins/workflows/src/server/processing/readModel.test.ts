@@ -9,6 +9,73 @@ describe('workflow processing history read model', () => {
   beforeEach(() => { database = makeTestPluginDb('workflows') })
   afterEach(() => database.cleanup())
 
+  const record = (id: string, position: number, decision = 'admitted', status: string | null = 'done',
+    snapshotJson = '{}', payloadJson = '{}', state = 'terminal') => {
+    database.db.insert(schema.workflowSelectedRecords).values({ id, selectionId: 'selection', position,
+      recordKey: id, snapshotJson, decision, attemptId: `${id}-attempt` }).run()
+    database.db.insert(schema.workflowRecordAttempts).values({ id: `${id}-attempt`, stateId: `${id}-state`,
+      selectionId: 'selection', dispatchId: `${id}-dispatch`, createdAt: position }).run()
+    database.db.insert(schema.workflowDispatches).values({ id: `${id}-dispatch`, callerKey: id,
+      payloadFingerprint: id, payloadJson, parentTaskId: 'root-task', taskId: `${id}-task`, runId: `${id}-run`,
+      rootRunId: 'root', parentRunId: 'root', parentStepId: 'loop', state, createdAt: position, updatedAt: position }).run()
+    if (status) database.db.insert(schema.workflowRuns).values({ id: `${id}-run`, taskId: `${id}-task`,
+      rootRunId: 'root', name: id, status, defJson: '{}', createdAt: position, updatedAt: position }).run()
+  }
+
+  it('counts the whole selection before filtering later pages and preserves missing-run and malformed-title fallbacks', () => {
+    database.db.insert(schema.workflowSelections).values({ id: 'selection', invocationKey: 'selection', fingerprint: 'fingerprint',
+      runId: 'root', stepId: 'loop', scopeKey: 'scope', snapshotJson: '{}', createdAt: 1 }).run()
+    record('done', 0)
+    record('gate', 1, 'admitted', 'gated', '{"display":{"title":"Display title"}}', '{malformed')
+    record('failed', 2, 'admitted', 'failed')
+    record('rail', 3, 'admitted', 'safety-rail')
+    record('partial', 4, 'admitted', 'completed-with-failures')
+    record('missing', 5, 'admitted', null, '[1]', '{"task":{"title":false}}')
+    record('active', 6, 'active', null, '{}', '{}', 'reserved')
+    record('settled', 7, 'active', 'failed')
+    record('seen', 8, 'seen', 'running', '{"display":{"title":"Snapshot title"}}')
+    record('unchanged', 9, 'unchanged')
+    record('baseline', 10, 'baseline')
+    const counts = { total: 11, running: 1, attention: 1, failed: 4, skipped: 4, completed: 1 }
+    const first = workflowSelectionPage(database.db, 'root', undefined, -1, 2, 'loop', 'failed')
+    expect(first.counts).toEqual(counts)
+    expect(first.records.map(row => row.id)).toEqual(['failed', 'rail'])
+    expect(first.next).toBe(3)
+    const last = workflowSelectionPage(database.db, 'root', 'selection', 3, 2, 'loop', 'failed')
+    expect(last.counts).toEqual(counts)
+    expect(last.records.map(row => row.id)).toEqual(['partial', 'missing'])
+    expect(last.records[1]).toMatchObject({ title: 'false', status: 'cancelled', result: null, retryStepId: null })
+    expect(last.next).toBeNull()
+    const all = workflowSelectionPage(database.db, 'root').records
+    expect(all[1].title).toBe('Display title')
+    expect(all[6]).toMatchObject({ status: 'reserved', reason: 'A prior attempt is still active' })
+    expect(all[7].reason).toBe('A prior attempt was active when this run checked it')
+    expect(all[8]).toMatchObject({ title: 'Snapshot title', reason: 'Previously processed' })
+    expect(all[9].reason).toBe('Tracked fields are unchanged')
+    expect(all[10].reason).toBe('Recorded by the initial baseline')
+  })
+
+  it.each([
+    ['exact limit', 'a'.repeat(160), null, 'a'.repeat(160)],
+    ['one over limit', 'a'.repeat(161), null, `${'a'.repeat(157)}...`],
+    ['multibyte prefix', '界'.repeat(300), null, `${'界'.repeat(157)}...`],
+    ['surrogate slice', '🙂'.repeat(400), null, `${'🙂'.repeat(78)}\ud83d...`],
+    ['embedded NUL', `a\0${'z'.repeat(900)}`, null, `a\0${'z'.repeat(155)}...`],
+    ['malformed structured JSON', `{broken${'x'.repeat(900)}`, 'plain', `{broken${'x'.repeat(150)}...`],
+    ['plain result', null, 'r'.repeat(900), `${'r'.repeat(157)}...`],
+    ['empty structured value', '', 'plain', null],
+  ])('preserves the %s preview and exact retry target', (_name, structuredJson, resultJson, expected) => {
+    database.db.insert(schema.workflowSelections).values({ id: 'selection', invocationKey: 'selection', fingerprint: 'fingerprint',
+      runId: 'root', stepId: 'loop', scopeKey: 'scope', snapshotJson: '{}', createdAt: 1 }).run()
+    record('row', 0)
+    database.db.insert(schema.workflowSteps).values([
+      { id: 'earlier', runId: 'row-run', idx: 0, name: 'Earlier', status: 'safety-rail', structuredJson: 'earlier', createdAt: 1, updatedAt: 1 },
+      { id: 'result', runId: 'row-run', idx: 1, name: 'Result', status: 'failed', structuredJson, resultJson, createdAt: 1, updatedAt: 1 },
+      { id: 'nested', runId: 'row-run', idx: 2, name: 'Nested', status: 'done', parentStepId: 'result', structuredJson: 'nested', createdAt: 1, updatedAt: 1 },
+    ]).run()
+    expect(workflowSelectionPage(database.db, 'root').records[0]).toMatchObject({ result: expected, retryStepId: 'earlier' })
+  })
+
   it('keeps a 500-row selection paged and distinguishes no matches from all skipped', () => {
     expect(workflowSelectionPage(database.db, 'missing').emptyReason).toBe('no-matches')
     database.db.insert(schema.workflowSelections).values({

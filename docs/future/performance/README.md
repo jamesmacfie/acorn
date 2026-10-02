@@ -2,7 +2,8 @@
 
 Date: October 2, 2026. Status: deferred for a later session.
 The implementation checkpoint is commit `61b9994c`: units 01–08 are implemented and reviewed.
-All 16 investigations are complete. Units 09–11 are implemented. Units 12–28 and sustained-use validation remain unimplemented.
+All 16 investigations are complete. The table below tracks implementations, remaining assignments,
+and verification limits.
 This programme is separate from the performance plans retired in September 2026.
 
 ## Resume here
@@ -37,7 +38,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 21 | [SQL scratch limits and oversized draft recovery](./21-sql-recovery.md) | Through 20 | Pending |
 | 22 | [Preview listener admission, retirement, and URL resolution](./22-preview.md) | Through 21 | Pending |
 | 23 | [Memory delta indexing and fresh reconciliation](./23-memory.md) | Through 22 | Pending |
-| 24 | [Workflow history and processing read projections](./24-workflow-reads.md) | Through 23 | Pending |
+| 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
 | 25 | [Workflow authoring custody, refreshes, and stream copies](./25-workflow-custody.md) | Through 24 | Pending |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |

@@ -1,4 +1,5 @@
-import { and, asc, desc, eq, gt, inArray, or } from 'drizzle-orm'
+import { Buffer } from 'node:buffer'
+import { and, asc, desc, eq, gt, inArray, or, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type {
@@ -21,6 +22,13 @@ const OUTPUT_COUNT = 20
 const OUTPUT_CHARS = 2_000
 const SUMMARY_CHARS = 500
 const RESULT_CHARS = 160
+// A byte prefix preserves embedded NULs. Four UTF-8 bytes per preview character leave enough
+// decoded UTF-16 units for bounded(), including its length check and surrogate-pair slicing.
+const resultPrefix = (column: typeof schema.workflowSteps.structuredJson | typeof schema.workflowSteps.resultJson) =>
+  sql<Uint8Array | null>`case when ${column} = '' then cast('' as blob) else substr(cast(${column} as blob), 1, ${RESULT_CHARS * 4}) end`
+type HistoryDispatch = Pick<typeof schema.workflowDispatches.$inferSelect, 'payloadJson' | 'taskId' | 'runId' | 'state' | 'error'>
+type HistoryRun = Pick<typeof schema.workflowRuns.$inferSelect, 'id' | 'status' | 'error'>
+type HistoryStep = Pick<typeof schema.workflowSteps.$inferSelect, 'id' | 'runId' | 'status' | 'parentStepId' | 'structuredJson' | 'resultJson'>
 
 const bounded = (value: string | null | undefined, limit = SUMMARY_CHARS): string | null => {
   if (!value) return null
@@ -49,21 +57,19 @@ const namedOutputs = (
   } catch { return [] }
 }
 
-const runResult = (steps: readonly (typeof schema.workflowSteps.$inferSelect)[]): string | null => {
+const runResult = (steps: readonly HistoryStep[]): string | null => {
   const row = [...steps].reverse().find(step => !step.parentStepId && (step.structuredJson || step.resultJson))
   return bounded(row?.structuredJson ?? row?.resultJson, RESULT_CHARS)
 }
 
-const retryStep = (steps: readonly (typeof schema.workflowSteps.$inferSelect)[]): string | null =>
+const retryStep = (steps: readonly HistoryStep[]): string | null =>
   steps.find(step => step.status === 'failed' || step.status === 'safety-rail')?.id ?? null
 
 const recordHistory = (
   row: typeof schema.workflowSelectedRecords.$inferSelect,
-  attempt: typeof schema.workflowRecordAttempts.$inferSelect | undefined,
-  dispatch: typeof schema.workflowDispatches.$inferSelect | undefined,
-  run: typeof schema.workflowRuns.$inferSelect | undefined,
-  steps: readonly (typeof schema.workflowSteps.$inferSelect)[],
-  detail = false,
+  dispatch: HistoryDispatch | undefined,
+  run: HistoryRun | undefined,
+  steps: readonly HistoryStep[],
 ): WorkflowRecordHistory => {
   const snapshot = parseObject(row.snapshotJson)
   const display = snapshot ? parseObject(JSON.stringify(snapshot.display)) : null
@@ -83,7 +89,7 @@ const recordHistory = (
     reason: bounded(run?.error ?? dispatch?.error ?? (row.decision === 'seen' ? 'Previously processed' : row.decision === 'unchanged' ? 'Tracked fields are unchanged' : row.decision === 'active' ? running.has(status ?? '') ? 'A prior attempt is still active' : 'A prior attempt was active when this run checked it' : row.decision === 'baseline' ? 'Recorded by the initial baseline' : null)),
     result: runResult(steps),
     retryStepId: retryStep(steps),
-    outputs: detail ? namedOutputs(run, steps) : [],
+    outputs: [],
   }
 }
 
@@ -124,7 +130,7 @@ export function processingAttemptActive(db: PluginDatabase | WorkflowTransaction
   return run ? !terminal.has(run.status) : dispatch.state !== 'terminal'
 }
 
-const category = (row: WorkflowRecordHistory): Exclude<WorkflowRecordFilter, 'all'> | 'completed' => {
+const category = (row: Pick<WorkflowRecordHistory, 'decision' | 'status'>): Exclude<WorkflowRecordFilter, 'all'> | 'completed' => {
   if (row.decision !== 'admitted') return row.decision === 'active' && running.has(row.status ?? '') ? 'running' : 'skipped'
   if (running.has(row.status ?? '')) return 'running'
   if (row.status === 'gated') return 'attention'
@@ -143,32 +149,27 @@ export function workflowSelectionPage(
   stepId?: string,
   filter: WorkflowRecordFilter = 'all',
 ): WorkflowRecordPage {
-  const selection = db.select().from(schema.workflowSelections).where(and(eq(schema.workflowSelections.runId, runId),
+  const selection = db.select({
+    id: schema.workflowSelections.id, stepId: schema.workflowSelections.stepId, snapshotJson: schema.workflowSelections.snapshotJson,
+  }).from(schema.workflowSelections).where(and(eq(schema.workflowSelections.runId, runId),
     ...(selectionId ? [eq(schema.workflowSelections.id, selectionId)] : []),
     ...(stepId ? [eq(schema.workflowSelections.stepId, stepId)] : []))).orderBy(desc(schema.workflowSelections.createdAt)).get()
   if (!selection) return { selectionId: null, stepId: null, records: [], next: null, counts: emptyCounts(), emptyReason: 'no-matches', provenance: null }
 
-  const selected = db.select().from(schema.workflowSelectedRecords)
+  const selected = db.select({
+    id: schema.workflowSelectedRecords.id, position: schema.workflowSelectedRecords.position,
+    decision: schema.workflowSelectedRecords.decision, status: schema.workflowRuns.status,
+    dispatchState: schema.workflowDispatches.state,
+  }).from(schema.workflowSelectedRecords)
+    .leftJoin(schema.workflowRecordAttempts, eq(schema.workflowRecordAttempts.id, schema.workflowSelectedRecords.attemptId))
+    .leftJoin(schema.workflowDispatches, eq(schema.workflowDispatches.id, schema.workflowRecordAttempts.dispatchId))
+    .leftJoin(schema.workflowRuns, eq(schema.workflowRuns.id, schema.workflowDispatches.runId))
     .where(eq(schema.workflowSelectedRecords.selectionId, selection.id))
     .orderBy(asc(schema.workflowSelectedRecords.position)).all()
-  const attemptIds = selected.flatMap(row => row.attemptId ? [row.attemptId] : [])
-  const attempts = attemptIds.length ? db.select().from(schema.workflowRecordAttempts).where(inArray(schema.workflowRecordAttempts.id, attemptIds)).all() : []
-  const dispatchIds = attempts.map(attempt => attempt.dispatchId)
-  const dispatches = dispatchIds.length ? db.select().from(schema.workflowDispatches).where(inArray(schema.workflowDispatches.id, dispatchIds)).all() : []
-  const runIds = dispatches.map(dispatch => dispatch.runId)
-  const runs = runIds.length ? db.select().from(schema.workflowRuns).where(inArray(schema.workflowRuns.id, runIds)).all() : []
-  const steps = runIds.length ? db.select().from(schema.workflowSteps).where(inArray(schema.workflowSteps.runId, runIds)).all() : []
-  const attemptById = new Map(attempts.map(row => [row.id, row]))
-  const dispatchById = new Map(dispatches.map(row => [row.id, row]))
-  const runById = new Map(runs.map(row => [row.id, row]))
-
-  const all = selected.map((row): WorkflowRecordHistory => {
-    const attempt = row.attemptId ? attemptById.get(row.attemptId) : undefined
-    const dispatch = attempt ? dispatchById.get(attempt.dispatchId) : undefined
-    const run = dispatch ? runById.get(dispatch.runId) : undefined
-    const runSteps = run ? steps.filter(step => step.runId === run.id) : []
-    return recordHistory(row, attempt, dispatch, run, runSteps)
-  })
+  const all = selected.map(row => ({ ...row,
+    decision: row.decision as WorkflowRecordHistory['decision'],
+    status: row.status ?? (row.dispatchState === 'terminal' ? 'cancelled' : row.dispatchState),
+  }))
   const counts = all.reduce((total, row) => {
     const key = category(row)
     total.total += 1
@@ -177,7 +178,37 @@ export function workflowSelectionPage(
   }, emptyCounts())
   const eligible = all.filter(row => row.position > after && (filter === 'all' || category(row) === filter))
   const count = Math.min(100, Math.max(1, limit))
-  const records = eligible.slice(0, count)
+  const pageIds = eligible.slice(0, count).map(row => row.id)
+  const details = pageIds.length ? db.select({
+    selected: schema.workflowSelectedRecords,
+    dispatch: {
+      payloadJson: schema.workflowDispatches.payloadJson, taskId: schema.workflowDispatches.taskId,
+      runId: schema.workflowDispatches.runId, state: schema.workflowDispatches.state, error: schema.workflowDispatches.error,
+    },
+    run: { id: schema.workflowRuns.id, status: schema.workflowRuns.status, error: schema.workflowRuns.error },
+  }).from(schema.workflowSelectedRecords)
+    .leftJoin(schema.workflowRecordAttempts, eq(schema.workflowRecordAttempts.id, schema.workflowSelectedRecords.attemptId))
+    .leftJoin(schema.workflowDispatches, eq(schema.workflowDispatches.id, schema.workflowRecordAttempts.dispatchId))
+    .leftJoin(schema.workflowRuns, eq(schema.workflowRuns.id, schema.workflowDispatches.runId))
+    .where(inArray(schema.workflowSelectedRecords.id, pageIds))
+    .orderBy(asc(schema.workflowSelectedRecords.position)).all() : []
+  const pageRunIds = [...new Set(details.flatMap(row => row.run ? [row.run.id] : []))]
+  const steps = pageRunIds.length ? db.select({
+    id: schema.workflowSteps.id, runId: schema.workflowSteps.runId, status: schema.workflowSteps.status,
+    parentStepId: schema.workflowSteps.parentStepId,
+    structuredJson: resultPrefix(schema.workflowSteps.structuredJson), resultJson: resultPrefix(schema.workflowSteps.resultJson),
+  }).from(schema.workflowSteps).where(inArray(schema.workflowSteps.runId, pageRunIds)).all() : []
+  const stepsByRun = new Map<string, HistoryStep[]>()
+  for (const step of steps) {
+    const group = stepsByRun.get(step.runId) ?? []
+    group.push({ ...step,
+      structuredJson: step.structuredJson === null ? null : Buffer.from(step.structuredJson).toString('utf8'),
+      resultJson: step.resultJson === null ? null : Buffer.from(step.resultJson).toString('utf8'),
+    })
+    stepsByRun.set(step.runId, group)
+  }
+  const records = details.map(row => recordHistory(row.selected, row.dispatch ?? undefined, row.run ?? undefined,
+    row.run ? stepsByRun.get(row.run.id) ?? [] : []))
   return {
     selectionId: selection.id,
     stepId: selection.stepId,
@@ -245,6 +276,6 @@ export function workflowRecordSnapshot(db: PluginDatabase, runId: string, record
   return {
     snapshot: JSON.parse(selected.snapshotJson),
     provenance: provenance(selection.snapshotJson),
-    record: recordHistory(selected, attempt, dispatch, run, steps, true),
+    record: { ...recordHistory(selected, dispatch, run, steps), outputs: namedOutputs(run, steps) },
   }
 }

@@ -840,6 +840,14 @@ or named outputs. Detail and attempt payloads bound every preview. Skipped rows 
 preceding attempt. The processing ledger does not prune record identity or automatically archive
 tasks.
 
+Selection pages compute global category counts and eligible positions from compact decision,
+dispatch-state, and run-status fields before loading page details. Only the admitted page reads
+record snapshots, dispatch payloads, run errors, and step previews. Step results use a bounded
+UTF-8 byte prefix before the JavaScript preview slice, preserving Unicode, embedded NULs, and
+structured-versus-plain selection. Snapshot parsing, named outputs, and attempt history read their
+complete inputs. A missing run retains the dispatch-state fallback, and an active skipped row
+retains its prior attempt's status and retry target.
+
 ## Scheduled roots
 
 The workflows plugin registers the `workflow` target with the node's scheduler. Core stores the

@@ -11,6 +11,29 @@ describe('workflow run read model', () => {
   beforeEach(() => { store = makeTestPluginDb('workflows') })
   afterEach(() => store.cleanup())
 
+  it('retains every frozen task run with stable ties, missing lineage, and zero versus unknown usage', async () => {
+    const defJson = '{"name":"Frozen","steps":[{"id":"original","name":"Original"}]}'
+    store.db.insert(schema.workflowRuns).values(['z-first', 'a-second', 'newer'].map((id, index) => ({
+      id, taskId: 'task', name: id, status: 'failed', defJson, rootRunId: 'missing', parentRunId: 'missing',
+      depth: 1, error: 'error', createdAt: index === 2 ? at + 1 : at, updatedAt: at + 2,
+      resolvedGraphJson: 'large graph', effectiveToolsJson: '{"private":true}', effectiveBudgetJson: '{"limit":1}',
+      requiresRepoTrust: true, deadlineAt: at + 10,
+    }))).run()
+    store.db.insert(schema.workflowTurnAdmissions).values({ id: 'zero', runId: 'z-first', rootRunId: 'missing',
+      stepId: 'original', state: 'reserved', createdAt: at, costUsd: 0 }).run()
+    const rows = await workflowRunsForTask(store.db, 'task')
+    expect(rows.map(row => row.id)).toEqual(['newer', 'z-first', 'a-second'])
+    expect(rows[1]).toEqual({
+      id: 'z-first', taskId: 'task', name: 'z-first', status: 'failed', posture: 'gated', trigger: 'manual',
+      defJson, rootRunId: 'missing', parentRunId: 'missing', parentStepId: null, depth: 1,
+      invocationKey: null, payloadFingerprint: null, error: 'error', createdAt: at, updatedAt: at + 2,
+      rootTaskId: 'task', rootRunName: 'z-first', parentTaskId: null, parentRunName: null,
+      usage: { costUsd: 0, inputTokens: 0, outputTokens: 0, turns: 1 },
+    })
+    expect(rows[0].usage).toBeNull()
+    expect(rows[2].usage).toBeNull()
+  })
+
   it('projects explicit parent and root tasks and counts each provider turn once', async () => {
     await store.db.insert(schema.workflowRuns).values([
       {
