@@ -1,9 +1,8 @@
 # UI consistency: the rest of the pass
 
 **Status:** in progress. Sixteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-B06, B07a, and B07b on branch `more-ui`, merged to main, B08a on `more-ui`, committed and not merged,
-and B08b on `more-ui`, not committed. Four area batches and the final sweep remain. Written
-2026-10-01.
+and B06 to B08b on branch `more-ui`, all merged to main. Four area batches and the final sweep remain.
+Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
