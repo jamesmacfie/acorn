@@ -1,8 +1,8 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Eighteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 to B10a on branch `more-ui`. B06 to B09 are merged to main. Two area batches and the final
-sweep remain.
+**Status:** in progress. Nineteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06 to B10b on branch `more-ui`. B06 to B09 are merged to main. One area batch and the final sweep
+remain.
 Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
@@ -200,25 +200,25 @@ the chosen one, "›" marks the line that threw, and mono is only for versions a
 dashboard panel with one source keeps its field names and status words. See
 [deferred.md](./deferred.md) § B10a.
 
+**B10b, dashboards and Home.** Home has a centred empty state, "Nothing on Home yet", with one
+**Add panel**, which moves into the title row once there are panels. The "Panels" label is gone from
+Home, panels sit `--gap-stack` apart, tab names stop at 24 characters, and the strip no longer shifts
+when a tab is picked. The first panel on an empty Home measures its cells. A panel is a `Card` at the
+default pad with a level 3 title, the grip takes no room, and the menu trigger stays while its menu
+is open. The menu reads **Move or resize** and **Remove from this dashboard**, and **Delete panel**
+and **Delete dashboard** confirm. Pressing a row runs its action, and a write or execute action asks
+first. A stat counts in the source's plural at the heading weight, chart ticks draw at 10 pixels at
+any size, and an unsplit bar is the accent. Board columns stop at 320 pixels with the count beside
+the label. Move mode draws the focus ring and says which keys to use. The editor is **Add panel** or
+**Edit panel**, has no workspace id, says its save state in words, previews in a `Card`, shows board
+controls only for a board, and publishes only once a query has a source. **Edit** previews on open,
+mapping options read as labels, the per-query AI box starts closed, and the source picker names the
+provider. See [deferred.md](./deferred.md) § B10b.
+
 ## What remains, in order
 
 Run the batches in this order. Each depends on the kit batches. The GitHub
 seed below is still the screen to check B09 against in the final sweep.
-
-### B10b. Dashboards and Home
-
-- [02-7. Home has no empty state](./b10b-dashboards/02-7-home-empty-state.md)
-- [02-8. The Add panel dialog shows a raw workspace id and a preview that does not match the panel](./b10b-dashboards/02-8-add-panel-dialog.md)
-- [10-1. Dashboard rows look like buttons and do nothing](./b10b-dashboards/10-1-dashboard-rows-do-something.md)
-- [10-4. The first panel on an empty Home draws on 44-pixel cells](./b10b-dashboards/10-4-first-panel-cells.md)
-- [10-14. The dashboard panel frame: three left edges, and a menu trigger that vanishes](./b10b-dashboards/10-14-panel-frame.md)
-- [10-15. Stat and chart typography](./b10b-dashboards/10-15-stat-and-chart-type.md)
-- [10-16. Home's grid and header](./b10b-dashboards/10-16-home-grid-and-header.md)
-- [10-17. Move and resize mode is hard to see and to learn](./b10b-dashboards/10-17-move-and-resize.md)
-- [10-18. The panel editor, beyond 02-8](./b10b-dashboards/10-18-panel-editor.md)
-
-`PanelGrid` is shared by three hosts. Home-only changes go through a prop. Delete any panels and tabs
-you make, through the app, when done.
 
 ### B11. Tool panes
 
@@ -367,6 +367,12 @@ answer rows the node builds, so the fake must mirror `shared/rail.ts`. The windo
 refetches never run: open **Settings**, **Services** to refetch the connections, and switch workspace
 away and back to refetch the links. The script lived at `.acorn/agent-dev/b10a/seed.js`. Dashboards hydrate from a persisted cache at boot, so delete
 panels and tabs through the app before restoring the database, or the next boot brings them back.
+
+**Dashboards (B10b).** Publish panels through the app: **Add panel**, Workspace tasks, **Refresh
+preview**, a view, **Publish**. Nothing in the app makes a second Home tab, so B10b added one to the
+`tabs` list of the `dashboards` node preference with a `PUT /v1/core/prefs` through
+`window.acorn.nodeFetch` (the body is `{ kind: 'bytes', bytes }` and the request needs a
+`requestId`), then reloaded the window. Delete panels and tabs through their menus afterwards.
 
 **Database and API (B11).** Wrap `window.acorn.nodeFetch` in the renderer to answer the database
 connect, tables, columns, rows, and query routes with made-up rows (a `shop_dev` database with `users`,

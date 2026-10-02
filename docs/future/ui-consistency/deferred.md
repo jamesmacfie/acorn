@@ -584,6 +584,44 @@ dialog on `Modal`.
   nothing names any more.
 - **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts`, as B09 recorded.
 
+### B10b
+
+- **Seen in the window.** Every screen was shot before and after, with panels published through the
+  app over the fixture's Workspace tasks, and a second Home tab written into the `dashboards` node
+  preference. All of them were deleted through the app afterwards.
+- **02-7 and 10-16.** Home owns its **Add panel** and its own `DashboardPanelHost`. `PanelGrid` takes
+  an `empty` render prop: with it, the grid draws no "Panels" header and no add button, and draws the
+  host's state in place of an empty grid. The source panel and the extended pane are unchanged. The
+  header's **Add panel** is outline sm, so Home's title sits 2 pixels lower once panels exist. An
+  inactive tab keeps an empty spacer the width of the chevron, because `Button` takes no tab index
+  and the kit is closed. The strip measured the same before and after a tab switch. The failed
+  delete is a danger toast.
+- **10-1.** The confirmation for a `write` or `execute` row action is an `Alert` strip with **Cancel**
+  and **Make this change?** or **Run this action?**. No shipped source declares a risky record action,
+  so it was checked in code only. Pressing a tasks row opened its task.
+- **10-4.** The grid measures on the next microtask after its ref, as well as from the observer,
+  because a hidden window may never deliver the observer's first callback. The first panel on an
+  empty Home measured 104.5-pixel cells straight away.
+- **10-14.** Rows inside a panel keep their own inset. The kit's rule that rows do not pull out
+  inside a card (`:is(.ui-card, …) .ui-row`) is deliberate, so list rows start 17 pixels in from the
+  title. The title, a table, and board cards share the card's edge. "Couldn't load this panel" was
+  checked in code only.
+- **10-15.** A stat counts in the source's plural, so one row reads "1 tasks": a descriptor carries
+  no singular. Default sizes are stat 2 by 2, list 4 by 3, table 6 by 3, and board 8 by 4. An unsplit
+  bar with no declared tone is the accent; the test that gave each category an identity slot changed.
+  Ticks measured 10 pixels at full width, against 17 before.
+- **10-17.** Seen in the window, with the ring and the caption inside the panel's bottom edge.
+- **10-18.** The visible-field checkboxes already use the source's labels for one source (B10a). With
+  several sources they still read the merged role names. New queries are called "Query 1"; a draft
+  written before keeps "Data 1" in its mappings fold. The terminal's data-source seam has no plugin
+  roster, so its source picker shows the plugin id. The workflow editor's Find records step shares
+  `SourceQueryEditor` and was not checked in the window.
+- **Not fixed, seen in passing.** When Home scrolls, the sticky tab bar draws over the panels under
+  it. A start-aligned `EmptyState` inside a card sits 14 pixels in from the card's title.
+- **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts`, which `projectWorktreesRoute`
+  from `4d6805446` trips. In `@acorn/tui`, `browseLong.test.tsx` expects "#100 Older pull", but B09
+  writes the pull number with no space after it. The 13 worker reds in `src/plugins` on Node 24.11.
+
 ## Notes for later sessions
 
 - **Uncommitted file moves.** B01 renamed `features/workspaces/onboarding.css` to `projects.css`, and B05
