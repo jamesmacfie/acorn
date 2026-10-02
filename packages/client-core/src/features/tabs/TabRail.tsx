@@ -146,7 +146,7 @@ export default function TabRail() {
     async (request) => ({
       ...request,
       result: await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(request.projectId, request.branch))
-        .catch((): WorktreeAvailability => ({ available: false, reason: 'Could not check existing worktrees. Try again.' })),
+        .catch((): WorktreeAvailability => ({ available: true })),
     }),
   )
   const branchAvailability = () => {

@@ -357,6 +357,23 @@ describe('new task setup choice', () => {
 })
 
 describe('new task worktree validation', () => {
+  it('allows creation when the availability request fails', async () => {
+    setActiveTaskId('t1')
+    mount(undefined, true)
+    readJsonMock.mockRejectedValue(new Error('Worktree lookup is unavailable.'))
+    createTaskMock.mockResolvedValue(task('created', 'Cannot check'))
+    host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
+    const title = document.getElementById(label.htmlFor) as HTMLInputElement
+    title.value = 'Cannot check'
+    title.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    await vi.waitFor(() => expect(submit.disabled).toBe(false))
+    expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
+    submit.click()
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' })))
+  })
+
   it('keeps the generated branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
     setActiveTaskId('t1')
     mount([{ ...task('t1', 'Taken'), branch: 'taken' }], true)

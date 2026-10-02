@@ -10,7 +10,8 @@ import { clearHooks, registerHookHandler } from '../../pluginHost/hooks'
 import { getWorktreesRoot, setWorktreesRoot, unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { projects } from './projects'
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { chmodSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs'
+import * as git from '../../core/git'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -227,6 +228,7 @@ describe('creating a task on an existing worktree', () => {
   })
 
   afterEach(() => {
+    vi.restoreAllMocks()
     t.cleanup()
     setWorktreesRoot(previousRoot)
     rmSync(dir, { recursive: true, force: true })
@@ -260,6 +262,25 @@ describe('creating a task on an existing worktree', () => {
     body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Local task', branch }),
   })
   const availability = (branch: string) => app.request(`http://acorn.test/api/projects/p/worktree-availability?branch=${encodeURIComponent(branch)}`)
+
+  it.each(['git', 'filesystem'])('allows creation when the %s worktree check fails, but still rejects task reservations', async (failure) => {
+    const root = getWorktreesRoot()
+    if (failure === 'git') vi.spyOn(git, 'gitText').mockRejectedValue(new Error('Git is unavailable.'))
+    else {
+      mkdirSync(root, { recursive: true })
+      chmodSync(root, 0)
+    }
+    try {
+      expect(await (await availability('cannot-check')).json()).toEqual({ available: true })
+      const response = await createBranch('cannot-check')
+      expect(response.status).toBe(200)
+      expect((await response.json() as Task).worktreePath).toBeNull()
+      expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
+      expect((await createBranch('cannot-check')).status).toBe(409)
+    } finally {
+      if (failure === 'filesystem') chmodSync(root, 0o700)
+    }
+  })
 
   it.each(['main', 'feat/elsewhere', 'folder-taken'])('refuses occupied worktree %s before inserting a task', async (branch) => {
     mkdirSync(join(getWorktreesRoot(), 'p-p-folder-taken'), { recursive: true })
