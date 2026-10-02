@@ -60,8 +60,6 @@ export type SettingsContribution = {
    *  switcher. Without it a node page's header names the active node, because that is what a body
    *  bound to the ambient API client reads. */
   followsNodeSwitcher?: boolean
-  /** A table or list page that uses the whole width rather than the readable form width. */
-  fullWidth?: boolean
   /** Words search matches besides the label, at most 16. Search only. */
   keywords?: readonly string[]
   /** The page's sections, at most 16, in the order the page draws them. Each is a search result and a
