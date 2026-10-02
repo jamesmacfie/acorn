@@ -7,6 +7,7 @@ class FakePty implements PtyProcess {
   private exitListeners = new Set<(event: { exitCode: number; signal?: number }) => void>()
   readonly writes: string[] = []
   killCount = 0
+  ignorePolite = false
 
   readonly onData = (listener: (data: string) => void): IDisposable => {
     this.dataListeners.add(listener)
@@ -27,6 +28,7 @@ class FakePty implements PtyProcess {
   kill(signal?: string): void {
     this.killCount += 1
     this.signals.push(signal)
+    if (!this.ignorePolite || signal === 'SIGKILL') this.emitExit(0)
   }
 
   emitData(data: string): void {
@@ -105,13 +107,25 @@ describe('capturePty', () => {
     expect(pty.killCount).toBe(1)
   })
 
+  it('retires after a prompt write fails and leaves no capture timers', async () => {
+    vi.useFakeTimers()
+    const { pty, run } = setup()
+    vi.spyOn(pty, 'write').mockImplementation(() => { throw new Error('synthetic write failure') })
+    const result = run({ promptResponses: [{ pattern: /trust/i, response: '\r' }] })
+    const rejection = expect(result).rejects.toMatchObject({ code: 'execution_failure' })
+    pty.emitData('Trust this folder?')
+    await rejection
+    expect(pty.killCount).toBe(1)
+    expect(vi.getTimerCount()).toBe(0)
+  })
+
   it('returns on process exit and disposes listeners', async () => {
     const { pty, run } = setup()
     const result = run()
     pty.emitData('complete')
     pty.emitExit(0)
     await expect(result).resolves.toEqual({ output: expect.stringContaining('complete'), exitCode: 0 })
-    expect(pty.killCount).toBe(1)
+    expect(pty.killCount).toBe(0)
     pty.emitData('ignored')
   })
 
@@ -131,6 +145,7 @@ describe('capturePty', () => {
   // escalates. Without the escalation the child is left running and only the SIGHUP is ever sent.
   it('escalates to SIGKILL when the child ignores the polite signal', async () => {
     const pty = new FakePty()
+    pty.ignorePolite = true
     const spawnPty: PtySpawner = () => pty
     const capture = capturePty({
       command: 'claude',
@@ -146,9 +161,11 @@ describe('capturePty', () => {
       spawnPty,
     })
     pty.emitData('usage output\n')
-    // Never calls emitExit(): this is the ignored-SIGHUP case.
+    let finished = false
+    void capture.then(() => { finished = true })
+    await vi.waitFor(() => expect(pty.signals).toEqual(['SIGHUP']))
+    expect(finished).toBe(false)
     await capture
-    expect(pty.signals).toEqual([undefined]) // SIGHUP only, so far
-    await vi.waitFor(() => expect(pty.signals).toEqual([undefined, 'SIGKILL']), { timeout: 5000 })
+    expect(pty.signals).toEqual(['SIGHUP', 'SIGKILL'])
   })
 })

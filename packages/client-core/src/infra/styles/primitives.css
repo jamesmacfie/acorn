@@ -145,6 +145,11 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-select-list .ui-menu-item { padding: var(--space-2) var(--space-4); }
 .ui-select-list .ui-menu-label { overflow-wrap: anywhere; }
 .ui-select-list .ui-menu-item[aria-selected='true'] { background: var(--bg-selected); }
+/* A row with a description is two fixed lines instead: a wrapped label over a wrapped description
+   is a paragraph to read, and a list of them stops scanning as a list. */
+.ui-select-option-stack { display: flex; flex-direction: column; }
+.ui-select-option-stack > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-select-option-description { font-size: var(--fs-xs); color: var(--text-muted); }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
 .ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }

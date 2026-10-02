@@ -1,0 +1,13 @@
+{
+  "plugins/agents/src/server/sessions/runtime.ts": "a0d20d94c8dafe88353f000be3129a3aac1a1f543f4a0ff6e0ee1d3010853074",
+  "plugins/agents/src/server/sessions/runtimeEngine.ts": "7c90711caab3e32ccc41eb9dffb60d987bc7b7b071ac9bed0671b05f28f7a590",
+  "plugins/agents/src/server/sessions/store.ts": "ec181637c07557d435919d01f2a28589c90ead5c7a64dc42989876abc0790128",
+  "plugins/agents/src/server/drivers/registry.ts": "6d95453b19f0400e6b428e799a847f9324a4fdd89567ae3f30809ed0be9fd89c",
+  "plugins/agents/src/server/usage/claudeDailyUsage.ts": "75acd01707e7ccd8986c238f336bc66d5b7079400db7678ad44c383f73f190be",
+  "plugins/agents/src/shared/sessionList.ts": "43ccf5da6834268baf529ceb178a3abfa5b5562b8432ca00affa38c677043ecd",
+  "plugins/agents/src/server/routes/managed.ts": "2f4d3c80078ef7a4734ceab8c6a09951c13da41df2df9e4e0fe65a7944de235a",
+  "plugins/agents/src/client/sessions/managedClient.ts": "4d512a4c7af407045f0bfbe228b2898498ebafc9694f93fc18919615c729c6d4",
+  "plans/performance/11-runtime-probe.test.ts": "e3b81dd0e96c0f06eafa543e3fb16a073383132dd4deddde9e0d50812d3722b0",
+  "plans/performance/11-daily-probe.test.ts": "4d7635857d15d58282c8f82be829e5a810b29d2d19288cb5659563d3ece69a63",
+  "plans/performance/11-probe.config.ts": "45c42e503d3b64b823df803ffd76f58a18b62586321e0e4fb4f0f670e947173e"
+}

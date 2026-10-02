@@ -1,3 +1,4 @@
+import { sessionListQuerySchema, type SessionListFilter } from '../../shared/sessionList'
 import type { Context } from 'hono'
 import type { RunRowInput } from '@acorn/protocol/runs.ts'
 import { Hono } from 'hono'
@@ -59,15 +60,7 @@ export type ManagedAgentsBridge = {
   createSession(input: CreateAgentSessionInput, idempotencyKey?: string): Promise<AgentSession>
   importTranscript(input: ImportAgentTranscriptInput): Promise<AgentSession>
   verifyImportedResume(sessionId: string): Promise<AgentSession>
-  listSessions(filter: {
-    taskId?: string
-    workspaceId?: string
-    archived?: boolean
-    attention?: boolean
-    search?: string
-    cursor?: number
-    limit?: number
-  }): Promise<AgentSessionList>
+  listSessions(filter: SessionListFilter): Promise<AgentSessionList>
   snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
@@ -96,15 +89,6 @@ export const MANAGED_AGENTS = routeCapability<ManagedAgentsBridge>('agents.manag
 /** @internal test compatibility; production providers use CapabilityRegistry.provide. */
 export const setManagedAgentsBridge = (bridge: ManagedAgentsBridge | null): void => setRouteTestCapability(MANAGED_AGENTS, bridge)
 
-const listQuerySchema = z.object({
-  taskId: z.string().uuid().optional(),
-  workspaceId: z.string().uuid().optional(),
-  archived: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-  attention: z.enum(['true', 'false']).transform((value) => value === 'true').optional(),
-  search: z.string().trim().max(500).optional(),
-  cursor: z.coerce.number().int().positive().optional(),
-  limit: z.coerce.number().int().min(1).max(100).optional(),
-})
 
 const pageQuerySchema = z.object({
   afterSeq: z.coerce.number().int().nonnegative().default(0),
@@ -270,7 +254,7 @@ export const managedAgents = new Hono<AppEnv>()
   // than 404ing the call, since an agent legitimately lists and searches its own task's sessions;
   // `workspaceId` is left alone because the taskId pin already bounds the result either way.
   .get('/sessions', (c) => {
-    const parsed = listQuerySchema.safeParse(c.req.query())
+    const parsed = sessionListQuerySchema.safeParse(c.req.query())
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const filter = confineFilter(c, parsed.data)
     if (!filter) return respondError(c, 404, 'not_found')

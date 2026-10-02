@@ -11,6 +11,8 @@ import { getProjectConfigWithRepo, setProjectConfig, setProjectRunTargets } from
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
+import { isTaskConfined } from '../../middleware/requireUser'
+import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 
 // /v1/core/projects, the first-class folder-project surface (docs/workspaces-and-tasks.md).
 // Unlike the removed pair-keyed route, this demands nothing of the folder: facets are detected, not
@@ -113,6 +115,14 @@ export const projects = new Hono<AppEnv>()
     const result = await setProjectConfig(getDb(c.env), c.req.param('id'), parsed.data.patch)
     if (!result.ok) return respondError(c, result.reason === 'No such project.' ? 404 : 400, result.reason === 'No such project.' ? 'not_found' : 'bad_request', [result.reason])
     return c.json(result.response)
+  })
+  // Absolute paths of every free worktree are a layout disclosure, so a task-confined caller gets
+  // none, as with the task list (docs/security.md § Transport and auth).
+  .get('/:id/worktrees', async (c) => {
+    if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
+    const row = await getProject(getDb(c.env), c.req.param('id'))
+    if (!row) return respondError(c, 404, 'not_found', ['No such project.'])
+    return c.json(await unclaimedWorktrees(getDb(c.env), row))
   })
   .get('/:id/mcp', async (c) => {
     const row = await getProject(getDb(c.env), c.req.param('id'))

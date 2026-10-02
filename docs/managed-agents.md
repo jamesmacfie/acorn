@@ -76,6 +76,19 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+Session roster pages order by `updatedAt DESC, id DESC`. A reader that sends
+`cursorFormat=tuple-v1` receives a `v1:<updatedAt>:<id>` continuation cursor and seeks from both
+encoded values, including after deletion of the anchor. Numeric timestamp cursors remain accepted.
+Without the opt-in, the Node returns numeric cursors for older clients. A client requesting tuple
+pages from an older Node can continue with its numeric response, which retains that Node's
+limitation at tied timestamps. The cursor is bounded and validated before any storage read.
+Event pages retain their independent sequence cursor.
+
+Roster pagination reads live rows, rather than a database snapshot spanning requests. For unchanged
+rows and filters, tuple pages visit each match once. Deleting an anchor preserves continuation.
+Edits between pages can move rows across the cursor and omit or repeat them. Refresh the roster to
+observe those edits.
+
 A new session starts as `New agent session`. Its first accepted turn immediately replaces that with a
 deterministic label from the first non-empty text part, or the first attachment filename, so naming
 never blocks the turn. For a first interactive text prompt of at least five words, the runtime then
@@ -371,10 +384,16 @@ answer and serves it at once. Once that answer is 30 seconds old, the next read 
 probe runs behind the read to replace it; callers that arrive meanwhile share that probe
 (`ManagedAgentEngine.providers`, `plugins/agents/src/server/sessions/runtimeEngine.ts`). Three things
 wait for a fresh probe instead: the first read after boot, a read after a harness was added or
-removed, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
+removed or its factory replaced, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
 spawn that the served answer would refuse, because the harness looks missing or signed out, probes
 once more before it refuses, so installing or signing in to a CLI never needs a Node restart. Custom
 agents, MCP servers, and session defaults are not part of this answer, so editing them drops nothing.
+
+Ordinary misses join the wave for the registry generation. Each forced refresh starts a separate
+wave, including while another refresh runs. Only the latest wave from the unchanged generation can
+publish cached descriptors. Superseded and stopped waves cannot restore the cache. A rejected
+provider probe returns that provider's diagnostic descriptor and can be retried. Discovery describes
+availability; provider startup still negotiates readiness and configuration.
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
@@ -1132,10 +1151,26 @@ workspace ceiling is counted across all providers in one workspace. Both live in
 (`agents:concurrency:v1`), read per scan rather than captured, so a raise applies to the scan the write
 triggers. Absent or unreadable, the built-in 2 and 3 stand.
 
+Queued startup reserves both ceilings on the live session generation before starting a provider.
+Pending reservations count alongside active turns. Cancellation joins that generation's process
+retirement, and failure and shutdown release its reservation. Lowering a ceiling leaves accepted
+turns running. Explicit session creation and configuration negotiation retain their readiness
+contracts and can start an interactive handle without queued work.
+
+Turn acceptance ends at its durable queue write. A later startup failure records an error against
+that turn and leaves it queued, without claiming provider execution history or failing the HTTP
+acknowledgement. The pump attempts a failing session once per invocation. Before recording or sending
+input, it rechecks the durable head after workspace and startup reads, so cancellation, reorder,
+input edits, and deferred continuations cannot dispatch an obsolete head. The earliest deferred head
+blocks later turns in its session. Workflow work gets a dispatch opportunity after five interactive
+or automation turns.
+
 The dispatcher is edge-triggered: it scans the queue when a turn is enqueued, when a provider starts,
 and when a turn settles. A scan that starts nothing rescans when a call arrived while it was running,
 because that call's turn cannot be in the snapshot the scan is working from, and the reconcile pass
-runs one scan at boot. Without both, a turn queued at the wrong moment waits for an unrelated session
+runs one scan at boot. Queue heads and their session rows are selected in one plugin-database
+statement through the partial queued-head index, without mapping idle sessions or joining the core
+database. Ordinary text frames do not trigger queue scans. Without both, a turn queued at the wrong moment waits for an unrelated session
 to finish a turn before anything looks at it again.
 
 **A plan usage limit pauses the same logical turn until the account resets.** The runtime first needs
@@ -1164,6 +1199,35 @@ terminal; they continue to use the owner's Claude setting.
 Cancellation, timeout, provider disconnect, and restart are explicit states. A live stream can be
 lost without killing the provider process, and the client reattaches from the session sequence or
 terminal replay tail.
+
+Startup belongs to one session generation before its first task, workspace, or ledger read.
+Concurrent callers join the same wave. Stopping aborts pending dependency waits and driver startup,
+rejects callbacks from retired generations, and joins in-flight callbacks before storage closes.
+Explicit `createSession` still returns after provider readiness and saved settings have been applied.
+Manifest harnesses contribute executable data. Agents constructs their ACP driver locally, so the
+startup signal stays inside the compiled Agents runtime and never crosses plugin RPC.
+
+ACP and Codex initialization have a 60-second deadline. Their process owner exists at spawn, including
+when initialization rejects or never answers. Stop calls share one teardown. ACP session close and
+Codex thread unsubscribe get up to 1 second before signaling. The owner sends SIGTERM to pipe
+children or SIGHUP to usage PTYs, escalates after 2 seconds, and allows another 2 seconds for exit
+acknowledgement. Failed acknowledgement rejects teardown. Protocol closure and a sent kill signal do
+not count as process exit. JSON-RPC closure settles requests and clears their timers. ACP closure
+also drains parked permissions and forms.
+
+On macOS and Linux, pipe children launch in their own process group. The installed node-pty uses
+`forkpty`, which gives usage captures a session and process group led by the returned PID. Teardown
+signals only that owned group and waits for both parent exit and group disappearance, including
+when the parent exits before a group member. Read-only Codex usage and PTY captures acknowledge this
+retirement before returning a result or error. Output and terminal rendering retain their existing
+budgets. Durable Terminal tmux sessions keep their separate owner.
+
+Windows acknowledges direct-child exit but does not provide the Unix descendant guarantee. A native
+Windows job object is required for equivalent ownership. Descendants that deliberately leave a Unix
+process group are also outside this owner. A compiled native driver factory that ignores the start
+signal is joined until its start settles, and any late handle is stopped before teardown returns.
+Agents cannot promise a bounded stop for such a factory. Loaded manifest harnesses use the
+cancellable local ACP driver.
 
 A provider process runs until something stops it: the session is archived or deleted, its MCP servers
 change, it moves to a terminal, its task is archived, it sits idle past the owner's limit, or the node

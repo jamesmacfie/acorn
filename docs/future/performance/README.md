@@ -1,13 +1,13 @@
 # Remaining Acorn performance work
 
-Date: October 1, 2026. Status: deferred for a later session.
+Date: October 2, 2026. Status: deferred for a later session.
 The implementation checkpoint is commit `61b9994c`: units 01–08 are implemented and reviewed.
-All 16 investigations are complete. Unit 09 is implemented. Units 10–28 and sustained-use validation remain unimplemented.
+All 16 investigations are complete. Units 09–11 are implemented. Units 12–28 and sustained-use validation remain unimplemented.
 This programme is separate from the performance plans retired in September 2026.
 
 ## Resume here
 
-Start with [unit 10](./10-agent-processes.md). Assign one specialist at a time, review its result, then
+Start with [unit 12](./12-agent-search.md). Assign one specialist at a time, review its result, then
 advance in the order below. Each assignment includes the detailed coordinator brief, evidence
 references, contracts to preserve, and acceptance checks. Read [the main integration review](../../../plans/performance/merge-main-review.md) for unresolved
 verification failures deferred at the user's request. Revalidate the merged source first;
@@ -23,8 +23,8 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | Unit | Assignment | Reviewed prerequisites | Status |
 | --- | --- | --- | --- |
 | 09 | [Managed agent client implementation record](../../../plans/performance/implementation-09-agent-client.md) | 01–08 | Implemented |
-| 10 | [Managed agent startup and process ownership](./10-agent-processes.md) | Through 09 | Pending |
-| 11 | [Agent queue admission, discovery, cursors, and usage](./11-agent-queue.md) | Through 10 | Pending |
+| 10 | [Managed agent process implementation record](../../../plans/performance/implementation-10-agent-processes.md) | Through 09 | Implemented |
+| 11 | [Agent queue implementation record](../../../plans/performance/implementation-11-agent-queue.md) | Through 10 | Implemented |
 | 12 | [Streamed search projection and recovery](./12-agent-search.md) | Through 11 | Pending |
 | 13 | [Agent wait facts and complete result capture](./13-agent-results.md) | Through 12 | Pending |
 | 14 | [Git observations, filesystem admission, and exact paths](./14-git-filesystem.md) | Through 13 | Pending |

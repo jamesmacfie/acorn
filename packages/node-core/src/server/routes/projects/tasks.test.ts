@@ -7,6 +7,11 @@ import type { AppEnv } from '../../middleware/auth'
 import { tasks } from './tasks'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
 import { clearHooks, registerHookHandler } from '../../pluginHost/hooks'
+import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { execFileSync } from 'node:child_process'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 
 vi.mock('../../db', async (importOriginal) => {
   const actual = await importOriginal<typeof import('../../db')>()
@@ -185,5 +190,60 @@ describe('the active-task list route', () => {
     expect(rows).toContainEqual({ id: skippedId, skipSetup: true })
     expect(rows).toContainEqual({ id: ordinaryId, skipSetup: false })
     expect((await create({ skipSetup: 'yes' })).status).toBe(400)
+  })
+})
+
+describe('creating a task on an existing worktree', () => {
+  let t: TestDb
+  let app: Hono<AppEnv>
+  let dir: string
+  let worktree: string
+
+  beforeEach(async () => {
+    t = makeTestDb()
+    vi.mocked(getDb).mockReturnValue(t.db)
+    app = makeApp()
+    dir = mkdtempSync(join(tmpdir(), 'acorn-attach-'))
+    const checkout = join(dir, 'checkout')
+    worktree = join(dir, 'wt')
+    const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' })
+    execFileSync('git', ['init', '-q', '-b', 'main', checkout])
+    git(checkout, '-c', 'user.email=t@t.test', '-c', 'user.name=T', 'commit', '-q', '--allow-empty', '-m', 'init')
+    git(checkout, 'worktree', 'add', '-q', '-b', 'feat/elsewhere', worktree)
+    git(checkout, 'worktree', 'add', '-q', '--detach', join(dir, 'detached'))
+    const now = Date.now()
+    await t.db.insert(schema.workspaces).values({ id: 'w1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
+    await t.db.insert(schema.projects).values({
+      id: 'p', name: 'p', path: checkout, workspaceId: 'w1', sort: 0, hidden: false,
+      vcs: 'git', defaultBranch: 'main', remoteUrl: null, githubOwner: null, githubName: null, githubRepoId: null,
+      createdAt: now, updatedAt: now,
+    })
+  })
+
+  afterEach(() => {
+    t.cleanup()
+    rmSync(dir, { recursive: true, force: true })
+  })
+
+  const create = (worktreePath: string) => app.request('http://acorn.test/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Adopted', worktreePath, branch: 'ignored' }),
+  })
+
+  it('lists only branch worktrees, takes the branch from git, and refuses one already in use', async () => {
+    const project = (await t.db.select().from(schema.projects))[0]!
+    const free = await unclaimedWorktrees(t.db, project)
+    expect(free.map((wt) => wt.branch)).toEqual(['feat/elsewhere'])
+
+    const res = await create(free[0]!.path)
+    expect(res.status).toBe(200)
+    const task = await res.json() as Task
+    expect(task.branch).toBe('feat/elsewhere')
+    expect(task.worktreePath).toBe(free[0]!.path)
+
+    expect(await unclaimedWorktrees(t.db, project)).toEqual([])
+    expect((await create(free[0]!.path)).status).toBe(409)
+    expect((await create(join(dir, 'detached'))).status).toBe(409)
   })
 })

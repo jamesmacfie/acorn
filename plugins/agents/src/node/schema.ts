@@ -1,3 +1,4 @@
+import { sql } from 'drizzle-orm'
 // The agents plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
 // <data-root>/plugins/agents.sqlite with its own Drizzle chain, migrated at plugin init.
 //
@@ -96,6 +97,7 @@ export const agentTurns = sqliteTable(
     uniqueIndex('agent_turns_session_ordinal_idx').on(t.sessionId, t.ordinal),
     uniqueIndex('agent_turns_session_idempotency_idx').on(t.sessionId, t.idempotencyKey),
     index('agent_turns_session_status_idx').on(t.sessionId, t.status),
+    index('agent_turns_queued_head_idx').on(t.sessionId, t.ordinal).where(sql`${t.status} = 'queued'`),
   ],
 )
 

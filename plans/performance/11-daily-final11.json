@@ -1,0 +1,354 @@
+{
+  "at": 1790820000000,
+  "timezone": "Pacific/Auckland",
+  "reports": [
+    {
+      "files": 1,
+      "records": 1000,
+      "totalBytes": 179780,
+      "runs": [
+        {
+          "wallMs": 4.119499999999988,
+          "cpuMs": 5.591,
+          "rssDeltaBytes": 409600,
+          "tokens": 30000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 2.9777919999999938,
+          "cpuMs": 4.043,
+          "rssDeltaBytes": 1982464,
+          "tokens": 30000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 2.4233330000000137,
+          "cpuMs": 3.154,
+          "rssDeltaBytes": 2359296,
+          "tokens": 30000,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "files": 40,
+      "records": 40000,
+      "totalBytes": 7251200,
+      "runs": [
+        {
+          "wallMs": 76.99791600000003,
+          "cpuMs": 91.865,
+          "rssDeltaBytes": 27754496,
+          "tokens": 1200000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 77.364959,
+          "cpuMs": 99.182,
+          "rssDeltaBytes": 35241984,
+          "tokens": 1200000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 76.06091600000002,
+          "cpuMs": 87.123,
+          "rssDeltaBytes": 11288576,
+          "tokens": 1200000,
+          "skipped": 0
+        }
+      ]
+    },
+    {
+      "files": 200,
+      "records": 200000,
+      "totalBytes": 36536000,
+      "runs": [
+        {
+          "wallMs": 408.51083299999993,
+          "cpuMs": 464.344,
+          "rssDeltaBytes": 113639424,
+          "tokens": 6000000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 374.8667499999999,
+          "cpuMs": 420.079,
+          "rssDeltaBytes": 43352064,
+          "tokens": 6000000,
+          "skipped": 0
+        },
+        {
+          "wallMs": 451.21733300000005,
+          "cpuMs": 437.082,
+          "rssDeltaBytes": -933888,
+          "tokens": 6000000,
+          "skipped": 0
+        }
+      ]
+    }
+  ],
+  "historyMutations": [
+    {
+      "mutation": "one file appended duplicate update",
+      "wallMs": 551.3971669999999,
+      "cpuMs": 489.786,
+      "rssDeltaBytes": 14073856
+    },
+    {
+      "mutation": "one file replaced",
+      "wallMs": 1503.5054999999998,
+      "cpuMs": 619.599,
+      "rssDeltaBytes": 13402112
+    }
+  ],
+  "checks": {
+    "initial": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 10,
+        "outputTokens": 20,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 30,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.00033,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "appendPartial": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 19,
+        "outputTokens": 40,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 59,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000657,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "crossFileDedup": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 106,
+        "outputTokens": 40,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 146,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000918,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "truncate": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 99,
+        "outputTokens": 20,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 119,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000597,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "replace": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 8,
+        "outputTokens": 20,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 28,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000324,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "rollover": {
+      "today": {
+        "day": "2026-10-02",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-10-01",
+        "inputTokens": 8,
+        "outputTokens": 20,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 28,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000324,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "pricing": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 8,
+        "outputTokens": 20,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 28,
+        "workingSeconds": 0,
+        "sessionCount": 1,
+        "estimatedCostUsd": 0.000056,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    },
+    "oldMtime": {
+      "today": {
+        "day": "2026-10-01",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "yesterday": {
+        "day": "2026-09-30",
+        "inputTokens": 0,
+        "outputTokens": 0,
+        "cacheWriteTokens": 0,
+        "cacheReadTokens": 0,
+        "totalNonCacheTokens": 0,
+        "workingSeconds": 0,
+        "sessionCount": 0,
+        "estimatedCostUsd": 0,
+        "estimatedCacheSavingsUsd": 0,
+        "pricingFallback": false,
+        "unpricedModels": []
+      },
+      "skippedFileCount": 0
+    }
+  }
+}

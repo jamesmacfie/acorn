@@ -212,7 +212,7 @@ export async function analyzeClaudeDailyUsage(
   let skippedFileCount = scan.skipped
   for (const file of scan.files) {
     try {
-      records.push(...parseClaudeUsageJsonl(await readFile(file, 'utf8')))
+      for (const record of parseClaudeUsageJsonl(await readFile(file, 'utf8'))) records.push(record)
     } catch {
       skippedFileCount += 1
     }
