@@ -1,6 +1,6 @@
 # 07-10. Problems show before anyone types, twice, in one run-on line
 
-**Status:** not started. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
+**Status:** done 2026-10-02 on `more-ui`. Batch B07a. Written 2026-10-01. Line numbers are from 2026-10-01 and may
 have moved.
 
 A new **Run a command** step's Command box is red with "This one has to be filled in." before you

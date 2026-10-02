@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { WorkflowCatalog, WorkflowDef } from '../../shared/workflowContracts'
 import { newDraft, type WorkflowDraft } from './draft'
+import { RevealFieldErrors } from './FieldControl'
 
 // The inspector in jsdom, because the whole point of `describe` is that a plugin's step kind gets a
 // form nobody wrote by hand — and "the right control for the right field type" is a claim only a
@@ -41,25 +42,28 @@ const providers: AgentProviderDescriptor[] = [{
 const noActions = {
   rename: vi.fn(), setField: vi.fn(), setStep: vi.fn(), setDefinition: vi.fn(),
   setInputs: vi.fn(), connect: vi.fn(), disconnect: vi.fn(), remove: vi.fn(),
+  move: vi.fn(),
   addForEach: vi.fn(), createChild: vi.fn(),
 }
 
 let host: HTMLDivElement
 let dispose: (() => void) | undefined
 
-const mount = (def: WorkflowDef, kinds: WorkflowCatalog['kinds'], selected: string): void => {
+const mount = (def: WorkflowDef, kinds: WorkflowCatalog['kinds'], selected: string, reveal = false): void => {
   const draft: WorkflowDraft = { ...newDraft(def), selection: { kind: 'node', name: selected } }
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => (
-    <NodeInspector
-      draft={draft}
-      catalog={catalog(kinds)}
-      providers={providers}
-      projectId="p-1"
-      workspaceId="w-1"
-      actions={noActions}
-    />
+    <RevealFieldErrors.Provider value={() => reveal}>
+      <NodeInspector
+        draft={draft}
+        catalog={catalog(kinds)}
+        providers={providers}
+        projectId="p-1"
+        workspaceId="w-1"
+        actions={noActions}
+      />
+    </RevealFieldErrors.Provider>
   ), host)
 }
 
@@ -93,15 +97,22 @@ describe('a contributed kind draws its own form', () => {
   it('renders one control per field, of the type the description named', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
     expect(labels('textarea')).toContain('Command')
-    const number = host.querySelector('input[type="number"]')
+    const number = host.querySelector('input[aria-label="Timeout"]')
     expect(number?.getAttribute('aria-label')).toBe('Timeout')
     expect(number?.getAttribute('min')).toBe('1000')
     expect(host.querySelector('input[type="checkbox"]')).toBeTruthy()
   })
 
-  it('marks a required field that is empty', () => {
+  it('leaves an empty required field quiet until someone touches it', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run')
-    expect(host.querySelector('[role="alert"]')?.textContent).toContain('has to be filled in')
+    expect(host.querySelector('[role="alert"]')).toBeNull()
+    host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Command"]')!.dispatchEvent(new Event('blur'))
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Fill this in.')
+  })
+
+  it('marks an empty required field once the editor asks whether the workflow is ready', () => {
+    mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'run', kind: 'terminal:command', after: [] }] }, [kind], 'run', true)
+    expect(host.querySelector('[role="alert"]')?.textContent).toBe('Fill this in.')
   })
 
   it('does not mark it once it has a value', () => {
@@ -152,6 +163,17 @@ describe('a kind that runs an agent', () => {
     describe: { label: 'Ask an agent', description: 'Ask an agent.', icon: 'bot', output: { description: 'Agent answer.' }, runsAgent: true, fields: [{ id: 'prompt', label: 'Prompt', type: 'prompt' }] },
   }
 
+  it('edits a custom step timeout without changing the other budget limits', () => {
+    mount({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [{
+      name: 'ask', prompt: 'Investigate.', budget: { maxWallTimeMs: 1_800_000, maxTurns: 2 },
+    }] }, [kind], 'ask')
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Step timeout in minutes"]')!
+    expect(input.value).toBe('30')
+    input.value = '45'
+    input.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(noActions.setStep).toHaveBeenLastCalledWith('ask', { budget: { maxWallTimeMs: 2_700_000, maxTurns: 2 } })
+  })
+
   it('draws the harness, every option that harness advertises, and where it runs', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ name: 'ask', after: [], profileId: 'claude-code' }] }, [kind], 'ask')
     const named = labels('button.ui-select')
@@ -159,7 +181,7 @@ describe('a kind that runs an agent', () => {
     expect(named).toContain('Model')
     expect(named).toContain('Reasoning')
     const segments = [...host.querySelectorAll('.ui-segments')].map((el) => el.getAttribute('aria-label'))
-    expect(segments).toEqual(['Where it runs', 'Upstream output'])
+    expect(segments).toEqual(['Where it runs', 'Earlier results'])
   })
 
   it('offers a reference chip for each declared input and each step that runs first', () => {
@@ -246,7 +268,7 @@ describe('typed data fields', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'w', steps: [{ id: 'agent', name: 'Analyse', after: [], schema: {
       type: 'object', properties: { severity: { type: 'string' } }, required: ['severity'],
     } }] }, [], 'agent')
-    expect(host.textContent).toContain('Describe the fields the agent returns')
+    expect(host.textContent).toContain('The fields the agent must return')
     expect(labels('input')).toContain('Field name')
     expect(labels('textarea')).not.toContain('Result schema')
   })
@@ -301,6 +323,8 @@ describe('a human gate', () => {
     await settle()
     expect(host.textContent).toContain('Title: draft/title')
     expect(host.textContent).toContain('note: left for the reviewer to fill')
-    expect(host.textContent).toContain('values.title')
+    // Fields later steps can read, by their own names rather than as paths.
+    expect([...host.querySelectorAll('.ui-badge')].map((badge) => badge.textContent)).toContain('title')
+    expect(host.textContent).not.toContain('values.title')
   })
 })

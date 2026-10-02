@@ -1,7 +1,7 @@
-import { createEffect, createSignal, For, mergeProps, on, onCleanup, Show, type Component } from 'solid-js'
+import { createEffect, createSignal, For, Index, mergeProps, on, onCleanup, Show, type Component } from 'solid-js'
 import { agentToolTone } from '../../contract/toolTone'
-import { CodeBlock, Fold, Inline, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
-import { formatRelativeTime } from '@acorn/plugin-api/client'
+import { Button, CodeBlock, Fold, Inline, Stack, StackedDiff, StatusDot, Text } from '@acorn/plugin-api/ui'
+import { dispatchLayout, formatRelativeTime } from '@acorn/plugin-api/client'
 import { AGENT_TOOL_CARD_POINT, type AgentToolCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Slot } from '@acorn/plugin-api/ui/host'
 import { useAgentToolFold } from './toolFoldPrefs'
@@ -140,7 +140,22 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
             <Show when={output()}>
               {(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}
             </Show>
-            <For each={props.tool.paths ?? []}>{(path) => <Text emphasis="mono">{path}</Text>}</For>
+            <Index each={props.fileChanges ?? []}>
+              {(change) => <Show when={change().patch} fallback={
+                <Stack gap="inline">
+                  <Text emphasis="mono" wrap>{change().path}</Text>
+                  <Text emphasis="muted">{change().patchArtifactId ? 'This diff is too large to show here.' : 'No recorded diff is available.'}</Text>
+                </Stack>
+              }>
+                <StackedDiff path={change().path} patch={change().patch ?? ''} lineNumbers={!change().snippet} />
+              </Show>}
+            </Index>
+            <Show when={props.fileChanges?.length}>
+              <Inline><Button variant="bare" size="sm" onPress={() => dispatchLayout(props.taskId, { type: 'show', pane: 'changes' })}>Open in Changes</Button></Inline>
+            </Show>
+            <For each={(props.tool.paths ?? []).filter((path) => !props.fileChanges?.some((change) => change.path === path))}>
+              {(path) => <Text emphasis="mono">{path}</Text>}
+            </For>
           </Stack>
         }
       >
@@ -157,7 +172,7 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
 
 const GenericAgentTool: Component<AgentToolRendererProps> = (props) => (
   <Show
-    when={props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web}
+    when={props.tool.input || props.tool.output || props.tool.paths?.length || props.tool.web || props.fileChanges?.length}
     fallback={<AgentToolHead {...props} />}
   >
     <AgentToolFold {...props} />
@@ -196,7 +211,7 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
       // An accessor, not a value: this is what makes a redraw one message on the port rather than a
       // worker restart and a fresh tree. `taskId` rides here rather than on the bridge because a
       // worker is shared by every card its plugin draws, in every task.
-      props={() => ({ tool: props.tool, taskId: props.taskId, defaultOpen })}
+      props={() => ({ tool: props.tool, taskId: props.taskId, defaultOpen, fileChanges: props.fileChanges })}
     >
       <GenericAgentTool {...full} />
     </Slot>

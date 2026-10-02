@@ -36,14 +36,13 @@ export default function AgentNodeForm(props: {
 
   return (
     <Stack gap="row">
-      <Field label="Harness" hint="Which agent runs this step. The node's own profiles." group>
+      <Field label="Harness" group>
         <Select
-          size="sm"
           label="Harness"
           disabled={props.disabled}
           value={props.step.profileId ?? ''}
           options={[
-            { value: '', label: 'The workflow default' },
+            { value: '', label: 'Workflow default' },
             ...profiles().map((profile) => ({ value: profile.id, label: profile.label })),
           ]}
           onChange={(value) => props.onStep({ profileId: value || undefined })}
@@ -56,12 +55,11 @@ export default function AgentNodeForm(props: {
         {(option) => (
           <Field label={option.label} group>
             <Select
-              size="sm"
               label={option.label}
               disabled={props.disabled}
               value={props.step.configOptions?.[option.id] ?? ''}
               options={[
-                { value: '', label: option.currentValue ? `The harness default (${option.currentValue})` : 'The harness default' },
+                { value: '', label: option.currentValue ? `Default (${option.currentValue})` : 'Default' },
                 ...option.values.map((value) => ({ value: value.value, label: value.label, title: value.description })),
               ]}
               onChange={(value) => setOption(option.id, value)}
@@ -71,24 +69,23 @@ export default function AgentNodeForm(props: {
       </For>
       <Show when={props.step.profileId && !provider()}>
         <Field
-          hint="This harness is not installed on this node, so its model and thinking levels cannot be listed here."
+          hint="This agent isn't installed on this computer, so its models can't be listed."
           group
         >
-          <Select size="sm" label="Options" disabled options={[{ value: '', label: 'Nothing to choose' }]} value="" />
+          <Select label="Options" disabled options={[{ value: '', label: 'Nothing to choose' }]} value="" />
         </Field>
       </Show>
 
       <Field
         label="Where it runs"
-        hint="A shared step runs in the task's own checkout beside its siblings. Its own worktree gives it a child task and a branch, which is what a step that writes code needs."
+        help="In its own worktree, a step gets a child task and branch. Use it for steps that change code."
         group
       >
         <SegmentedControl
-          size="sm"
           ariaLabel="Where it runs"
           value={props.step.isolation ?? 'shared'}
           options={[
-            { value: 'shared', label: 'Shared task' },
+            { value: 'shared', label: "Task's folder" },
             { value: 'worktree', label: 'Own worktree' },
           ]}
           onChange={(value) => props.onStep({ isolation: value === 'shared' ? undefined : 'worktree' })}
@@ -96,18 +93,16 @@ export default function AgentNodeForm(props: {
       </Field>
 
       <Field
-        label="Upstream output"
-        hint="Append puts what every step it waits on returned after the prompt. Only where referenced expects the prompt to place them itself."
+        label="Earlier results"
         group
       >
         <SegmentedControl
-          size="sm"
-          ariaLabel="Upstream output"
+          ariaLabel="Earlier results"
           value={props.step.inputs ?? 'append'}
           options={[
-            { value: 'append', label: 'Append' },
-            { value: 'template', label: 'Only where referenced' },
-            { value: 'none', label: 'None' },
+            { value: 'append', label: 'After the prompt' },
+            { value: 'template', label: 'Where I reference them' },
+            { value: 'none', label: 'Leave out' },
           ]}
           onChange={(value) => props.onStep({ inputs: value === 'append' ? undefined : (value as 'template' | 'none') })}
         />

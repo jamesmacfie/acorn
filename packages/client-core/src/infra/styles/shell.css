@@ -11,6 +11,7 @@
 
 /* Independently-scrolling panes, and the hosts that draw nothing until something opens. */
 .app { flex: 1; min-width: 0; display: grid; grid-template-rows: 1fr; height: 100%; }
+.ui-slot-contribution { display: contents; }
 
 .topbar {
   /* Stated rather than left to the content, because `.pane-switcher` is fixed at this same offset

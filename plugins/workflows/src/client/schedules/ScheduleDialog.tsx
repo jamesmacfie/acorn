@@ -149,9 +149,10 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
     const value = Number(raw)
     setRequestedLimits(current => ({ ...current, [key]: value }))
   }
-  const wallHours = (limits: WorkflowScheduleLimits): number => (requestedLimits()?.budget?.maxWallTimeMs ?? limits.budget.maxWallTimeMs) / 3_600_000
-  const setWallHours = (raw: string): void => {
-    setRequestedLimits(current => ({ ...current, budget: { ...current?.budget, maxWallTimeMs: Number(raw) * 3_600_000 } }))
+  // Shown in minutes, the unit the Definition inspector uses; stored in milliseconds.
+  const wallMinutes = (limits: WorkflowScheduleLimits): number => (requestedLimits()?.budget?.maxWallTimeMs ?? limits.budget.maxWallTimeMs) / 60_000
+  const setWallMinutes = (raw: string): void => {
+    setRequestedLimits(current => ({ ...current, budget: { ...current?.budget, maxWallTimeMs: Number(raw) * 60_000 } }))
   }
 
   const effectiveLimits = () => requestedLimits() as WorkflowScheduleLimits | undefined ?? preparation()?.limits ?? schedule()?.limits
@@ -214,6 +215,7 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
             <TypedValueField
               label={item.required ? `${item.label ?? item.name} *` : item.label ?? item.name}
               schema={item.schema}
+              hint={item.description}
               value={values()[item.name]}
               required={item.required}
               onValidity={valid => setInvalid(current => ({ ...current, [item.name]: !valid }))}
@@ -305,9 +307,9 @@ function ScheduleDialog(props: { request: ScheduleRequest }) {
               <Alert title="Effective limits">{limitsSummary(effectiveLimits() ?? reviewed().limits)}</Alert>
               <Fold label="Execution limits" level="group">
                 <Stack gap="row">
-                  <Field label="Maximum descendants" group><Input label="Maximum descendants" value={String(limitValue('maxDescendants', reviewed().limits.maxDescendants))} onInput={raw => setLimit('maxDescendants', raw)} /></Field>
-                  <Field label="Maximum concurrent work" group><Input label="Maximum concurrent work" value={String(limitValue('maxConcurrency', reviewed().limits.maxConcurrency))} onInput={raw => setLimit('maxConcurrency', raw)} /></Field>
-                  <Field label="Maximum hours" group><Input label="Maximum hours" value={String(wallHours(reviewed().limits))} onInput={setWallHours} /></Field>
+                  <Field label="Most child tasks" group><Input type="number" width="narrow" label="Most child tasks" value={String(limitValue('maxDescendants', reviewed().limits.maxDescendants))} onInput={raw => setLimit('maxDescendants', raw)} /></Field>
+                  <Field label="Agents at once" group><Input type="number" width="narrow" label="Agents at once" value={String(limitValue('maxConcurrency', reviewed().limits.maxConcurrency))} onInput={raw => setLimit('maxConcurrency', raw)} /></Field>
+                  <Field label="Time limit in minutes" group><Input type="number" width="narrow" label="Time limit in minutes" value={String(wallMinutes(reviewed().limits))} onInput={setWallMinutes} /></Field>
                 </Stack>
               </Fold>
               <Show when={reviewed().changes.length}>

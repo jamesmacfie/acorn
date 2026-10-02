@@ -1,7 +1,7 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Twelve of twenty-one batches shipped: eleven on branch `ui-inconsistency`, and
-B06 on branch `more-ui`, uncommitted. Eight area batches and the final sweep remain. Written 2026-10-01.
+**Status:** in progress. Thirteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06 and B07a on branch `more-ui`, uncommitted. Seven area batches and the final sweep remain. Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
 This programme is a UX and UI consistency pass over the acorn desktop app. The worry behind it was that
@@ -115,12 +115,27 @@ the page that opened it. Rail and surfaces says only a row's exception. Copy acr
 Review after archive, custom agents, and Workflows was rewritten. See [deferred.md](./deferred.md)
 § B06 for what changed from the plan.
 
+**B07a, the workflow editor.** The editor header is a 48 bar with a level 2 title, one save badge
+(**Saved**, **Saving…**, **Not saved**), and **Published** with its version in a tip. **← Workflows** is
+gone, and **Copy to database** reads **Make an editable copy**. The inspector opens with a header bar
+that spans its column: the kind's icon, the step name with the kind's description behind its help
+mark, the kind badge, and **Move up**, **Move down**, and **Delete**, which left the outline header.
+Its form stops at 720, and its fields are md. Form sections are `sub` headings, and only optional
+groups fold. The outline header reads **Steps** with **Add step**. Its menu groups kinds as Ask AI,
+Records, Flow, and one group per plugin, with an icon on every item. A step row is two lines, and only
+a fork indents, in the editor and the run pane alike. A required field stays quiet until it is
+touched or **Publish…** or **Run…** is pressed, and the footer shows one problem and a count. Limits
+share one set of names and minutes in the Definition inspector and the schedule dialog. The graph's
+port and edge control are 20, the edge control draws `x` and names cards, and zoom stops at 0.6. A
+bar that heads a scrolling detail column sits on its top edge. See [deferred.md](./deferred.md)
+§ B07a.
+
 ## What remains, in order
 
 Run the batches in this order. Each depends on the kit batches; B07b depends on B07a, B08b on B08a, and
 B10b on B10a.
 
-### B07a. Workflows: editor
+### B07a. Workflows: editor (shipped)
 
 - [07-2. The workflow editor's header is a 26-pixel row with no bar](./b07a-workflow-editor/07-2-editor-header.md)
 - [07-5. The graph: tiny targets, text that shrinks past reading, and ids for names](./b07a-workflow-editor/07-5-graph-small-part.md)

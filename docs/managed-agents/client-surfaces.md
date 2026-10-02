@@ -273,18 +273,22 @@ it fails for any reason a selection can break, not only for the one it was writt
   transcript folds snapshots from one turn into the card the first one opened; a new turn starts a new
   card. Each step has one structured status marker and renders its text through the transcript Markdown
   policy, in a status-and-text grid that keeps wrapped lines inside the card.
-- **A file change opens in place to show that step's diff.** People open these rows to ask what that
-  step just did, which the Changes pane cannot answer: it shows what is different in the worktree now.
-  So a change that carries a patch is a fold. Closed, it names the file. Open, it draws the diff with
-  `StackedDiff`, the kit's read-only diff, stacked, in plain text, with no comments and no gap expansion,
-  and an **Open in Changes** button for the whole picture. The rows are built on first open, so a long
-  thread of closed changes costs nothing. A change whose line numbers came from an excerpt draws them
-  blank. A patch that went to an artifact says the diff is too large to show and keeps the button. A
-  change with no patch, including every one stored before patches were kept, is still the flat row
-  that opens Changes. The transcript folds a change's reports by change id and path, like a tool call's
-  updates, so Codex's whole-turn diff is one row per turn and not one per update
-  ([managed-agents.md](../managed-agents.md) § File changes). The terminal client draws the same card
-  through its own `StackedDiff`.
+- **A file tool opens onto its recorded diffs.** The transcript matches per-file changes to a
+  tool by turn and change id, then passes them through the `agents:tool-card` contribution as
+  `fileChanges`. The Changes plugin's file-tool card and the generic fallback draw these patches
+  with `StackedDiff`, the kit's read-only unified diff, with addition and deletion backgrounds,
+  line numbers, and an **Open in Changes** button. Paths covered by a patch are not listed again
+  beneath it. The Changes card shortens paths in its disclosure label to the final two components;
+  the diff header keeps the complete recorded path. Rows are built on first open. A streamed patch
+  updates the open card without closing it. Excerpts leave their line numbers blank. Oversized
+  patches report that they are too large to show; missing patches report that no recorded diff is
+  available. Both keep the Changes action.
+  The associated standalone file-change row is hidden only after its tool can display it. Unmatched
+  changes, including truncated history and events without change ids, remain visible. Whole-turn
+  diffs keep their own disclosure. The recorded patch describes that edit when it ran; the Changes
+  pane reads the working tree. The ledger remains unchanged, and each change still folds by change
+  id and path ([managed-agents.md](../managed-agents.md#file-changes)). The terminal client draws the
+  same cards through its own `StackedDiff`.
 - Usage folds the same way, one line per turn. A turn's last usage update can arrive after the turn is
   marked complete and so carries no turn id; it updates the line it belongs to rather than starting
   another. That is how a cost joins a line that started with only a context count. **The fold happens

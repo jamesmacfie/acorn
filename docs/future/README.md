@@ -22,6 +22,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
+| [pi/](./pi/README.md) | What acorn takes from oh-my-pi: run `omp` as a harness, then widen the edges acorn owns with a permission hook, plugin session messages, unattended model calls, an advisor, plugin skills, and a resource-read experiment. | Proposed, 2026-10-02; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [ui-consistency/](./ui-consistency/README.md) | The desktop UI consistency pass: house patterns, one file per open finding in nine area batches, and the deferred list (its `refused.md`) with the product calls it needs. | Kit, onboarding, shell, and settings batches shipped, 2026-10-01; nine area batches and the final sweep remain. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |

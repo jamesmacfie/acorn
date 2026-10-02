@@ -60,6 +60,13 @@ export function largeSessionTurns(profile: LargeSessionProfile, seed = 1): Large
       list.push({ type: 'tool', tool: { id, title, kind: 'read', status: 'running', input: `{"path":"src/module-${index}.ts"}` } })
       list.push({ type: 'tool', tool: { id, title, status: 'completed', output: tool === 2 && index % 5 === 0 ? CODE : `Read ${40 + tool} lines.` } })
     }
+    if (index % 5 === 0 || index === shape.turns - 1) {
+      const id = `edit-${tag}`
+      const path = `src/pkg-${index % 40}/queue.ts`
+      list.push({ type: 'tool', tool: { id, title: `Changed ${path}`, kind: 'edit', status: 'running', paths: [path] } })
+      list.push({ type: 'file_change', changeId: id, path, patch: '@@ -1,3 +1,3 @@\n export function take(queue: string[]) {\n-  return queue.pop()\n+  return queue.shift()\n }' })
+      list.push({ type: 'tool', tool: { id, title: '', status: 'completed' } })
+    }
     if (index % 4 === 1) {
       const requestId = `request-${tag}`
       list.push({ type: 'request', requestId, kind: 'permission', title: 'Run the test suite?', options: [{ id: 'allow', label: 'Allow once', kind: 'allow_once' }, { id: 'reject', label: 'Reject', kind: 'reject_once' }] })

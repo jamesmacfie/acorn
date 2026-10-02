@@ -5,7 +5,7 @@ import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { BindingCandidate, BindingOrigin } from '@acorn/plugin-api/client'
 import { TypedBindingPicker } from '@acorn/plugin-api/ui/data-sources'
-import { Alert, Button, Field, Fold, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Alert, Button, Field, Fold, Icon, Inline, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import TypedValueField from './TypedValueField'
 
 type Comparison = Extract<DataPredicate, { kind: 'comparison' }>
@@ -45,13 +45,13 @@ function ComparisonRow(props: {
   const [candidate, setCandidate] = createSignal<BindingCandidate>()
   const schema = () => candidate()?.schema ?? { type: 'string' as const }
   const presence = () => ['missing', 'present'].includes(props.value.operator)
-  return <Fold label="Condition" level="group" defaultOpen>
+  return <Fold label="Condition" level="sub" defaultOpen>
     <Stack gap="row">
       <TypedBindingPicker label="Field" origins={props.origins} value={props.value.left} disabled={props.disabled}
         destinationRequired={!presence()} onCandidateChange={setCandidate}
         onChange={left => left && props.onChange({ ...props.value, left })} />
       <Field label="Comparison" group>
-        <Select size="sm" label="Comparison" disabled={props.disabled} value={props.value.operator}
+        <Select label="Comparison" disabled={props.disabled} value={props.value.operator}
           options={operatorsFor(candidate()?.schema).map(value => ({ value, label: operatorLabel[value] }))}
           onChange={value => {
             const operator = value as DataOperator
@@ -64,10 +64,10 @@ function ComparisonRow(props: {
         <TypedValueField label="Value" schema={schema()} value={literalValue(props.value.right)} disabled={props.disabled}
           onChange={value => props.onChange({ ...props.value, right: literal(value ?? '') })} />
         <Show when={props.value.right && props.value.right.address.from !== 'literal'}>
-          <Alert tone="warn">This advanced comparison value is preserved. Edit it in the code view, or enter a fixed value here.</Alert>
+          <Alert tone="warn">This value comes from another step. Edit it on the Code tab, or type a fixed value.</Alert>
         </Show>
       </Show>
-      <Show when={props.onRemove}><Button size="sm" variant="bare" disabled={props.disabled} onPress={props.onRemove}>Remove condition</Button></Show>
+      <Show when={props.onRemove}><Inline gap="row"><Button size="sm" variant="ghost" disabled={props.disabled} onPress={props.onRemove}>Remove condition</Button></Inline></Show>
     </Stack>
   </Fold>
 }
@@ -105,12 +105,12 @@ export default function ConditionEditor(props: {
   return <Stack gap="row">
     <Text emphasis="muted" wrap>Choose a typed field, compare it directly, then name the If and Otherwise destinations below.</Text>
     <Show when={advanced()}>
-      <Alert tone="warn">This condition contains a nested group. It is preserved; use the Code view to edit that advanced shape.</Alert>
+      <Alert tone="warn">This condition has nested groups. Edit it on the Code tab.</Alert>
     </Show>
     <Show when={!advanced()}>
     <Show when={props.value && props.value.kind !== 'comparison'}>
       <Field label="Match" group>
-        <Select size="sm" label="Match" disabled={props.disabled} value={props.value?.kind ?? 'all'}
+        <Select label="Match" disabled={props.disabled} value={props.value?.kind ?? 'all'}
           options={[{ value: 'all', label: 'All conditions' }, { value: 'any', label: 'Any condition' }]}
           onChange={kind => props.onChange({ kind: kind as 'all' | 'any', predicates: comparisons() })} />
       </Field>
@@ -118,8 +118,8 @@ export default function ConditionEditor(props: {
     <For each={comparisons()}>{(comparison, at) => <ComparisonRow value={comparison} origins={props.origins}
       disabled={props.disabled} onChange={value => setAt(at(), value)}
       onRemove={comparisons().length > 1 ? () => removeAt(at()) : undefined} />}</For>
-    <Show when={props.origins.length} fallback={<Alert tone="warn">Add a workflow input or a structured predecessor before configuring this condition.</Alert>}>
-      <Button size="sm" disabled={props.disabled} onPress={add}>{comparisons().length ? 'Add condition' : 'Choose condition'}</Button>
+    <Show when={props.origins.length} fallback={<Alert tone="warn">To set a condition, add an input, or a step before this one that returns fields.</Alert>}>
+      <Inline gap="row"><Button size="sm" disabled={props.disabled} onPress={add}><Icon name="plus" /> {comparisons().length ? 'Add condition' : 'Choose condition'}</Button></Inline>
     </Show>
     </Show>
   </Stack>

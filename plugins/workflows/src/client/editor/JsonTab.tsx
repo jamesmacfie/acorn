@@ -1,5 +1,5 @@
 import { createEffect, createSignal, on, onCleanup, Show } from 'solid-js'
-import { Alert, Button, Inline, Only, Rectangle, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
+import { Alert, Button, Only, Rectangle, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import { mountEmbeddedEditor, type EmbeddedEditor } from '@acorn/plugin-api/ui/editor'
 
 // The escape hatch: the definition as the runner's own JSON.
@@ -62,6 +62,13 @@ export default function JsonTab(props: {
 
   return (
     <Stack gap="row" grow>
+      {/* Above the box, as a bar, so the actions sit on the pane's inset rather than its edge. Apply
+          is the one that changes the draft, so it is the solid one. */}
+      <Toolbar size="sm" ariaLabel="Code actions">
+        <Button size="sm" variant="solid" disabled={props.readOnly} onPress={apply}>Apply</Button>
+        <Button size="sm" variant="ghost" onPress={format}>Format</Button>
+        <Button size="sm" variant="ghost" onPress={revert}>Revert</Button>
+      </Toolbar>
       <Show when={error()}>
         {(message) => <Alert tone="danger">{message()}</Alert>}
       </Show>
@@ -102,11 +109,6 @@ export default function JsonTab(props: {
           />
         </Only>
       </Rectangle>
-      <Inline gap="inline">
-        <Button size="sm" disabled={props.readOnly} onPress={apply}>Apply</Button>
-        <Button size="sm" variant="bare" onPress={format}>Format</Button>
-        <Button size="sm" variant="bare" onPress={revert}>Revert</Button>
-      </Inline>
     </Stack>
   )
 }
