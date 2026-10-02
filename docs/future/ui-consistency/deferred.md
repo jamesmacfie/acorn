@@ -135,7 +135,10 @@ The performance work owns these. Fix batches leave their structure alone.
 - **09-10 (part).** A markdown heading scale and task-list ticks. The kit's `Markdown` renders the agent
   transcript, and `SanitizedHtml` renders measured diff threads.
 - **11-1 (part).** The Database row editor beside the virtual grid. `ListDetail` would put the grid in
-  the narrow column; needs a layout decision.
+  the narrow column; needs a layout decision. The same decision holds 11-6's inset for the editor:
+  B11 tried `DetailColumn scroll`, and the grid then grew to its full 1,231 pixels and drew all 41
+  rows, which ends the virtualisation. Without it the editor's fields start on the divider, and a
+  table with many columns pushes the editor past the region's bottom edge.
 - **11-18g (part).** Fixed 200-pixel `Grid` columns. The virtualiser needs fixed tracks.
 - **11-5 (part).** A host header region for document layouts, so the Database bar sits above the SQL
   editor (and the pane's pin and close have a bar to sit in). Changes the layout contract.
@@ -227,8 +230,8 @@ dialog on `Modal`.
 
 - **11-3, no live check.** Starting a local HTTP server was refused by the permission system, so the
   number fix rests on tests. The loaded bundles were not rebuilt by hand; the host sanitiser covers
-  bundles built before the fix. The plugin-side template strings in `ResponseView.tsx` are picked up in
-  [11-12](./b11-tool-panes/11-12-api-response.md).
+  bundles built before the fix. B11 built the status and time as template strings in
+  `ResponseView.tsx` and checked them against a local server.
 - **The `Picker` list cap applies to every `Picker`,** not only the icon picker, because the closed kit
   has no per-call-site hook.
 
@@ -621,6 +624,41 @@ dialog on `Modal`.
 - **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts`, which `projectWorktreesRoute`
   from `4d6805446` trips. In `@acorn/tui`, `browseLong.test.tsx` expects "#100 Older pull", but B09
   writes the pull number with no space after it. The 13 worker reds in `src/plugins` on Node 24.11.
+
+### B11
+
+- **Seen in the window.** Every screen was shot before and after, with the fake database, a local
+  HTTP server, and the real Docker, read only. A saved query, a request, and a variable were each
+  made through the app and deleted through it.
+- **11-4 has no before shot.** The node started after the carrier fix, so the delete worked the first
+  time. The check is the new `pluginRpc.test.ts` case, which throws without the fix. A 204 from any
+  loaded plugin reaches the window as a 204.
+- **Changed from the plan.** The Save query fields stay md, because fields in a dialog are md. The
+  primary key is in the field's hint ("uuid · Primary key"), not a badge, because a `Field` label is a
+  string. Docker keeps **Terminal** and **Copy exec** as labels, with "Open shell" and "Copy shell
+  command" as tips. The list's **Requests** and **Variables** switch and **New request** share a bar
+  with no spacer: in the 300-pixel column the second gap wrapped the button onto its own line.
+- **Kit and stylesheet fixes it needed.** An armed xs icon button kept its 20-pixel width, because
+  the xs width rule came after the armed rule, so a row's armed prompt overlapped its text; the xs
+  rule now skips an armed button. A `sub` heading in a host list region takes the pane inset, as it
+  already did in the kit's list column. A banner in a detail column that does not scroll takes the
+  pane inset; it reaches the editor's save error banner too. `formatChord` is exported from
+  `@acorn/plugin-api/ui/tree`, an additive export, so a tree can write a `tipKey`.
+- **Not done.** Generate SQL's backend and model selects still show no labels: `ModelBackendPicker`
+  gives each `Select` an accessible name only, so B06's 06-10 did not reach it. The meter's pace mark
+  still has no legend, because `Meter` takes no tip. Settings still calls the project tab's section
+  "Browser preview"; the copy table only renamed the pane.
+- **Seen in passing.** The API request's tab panel and the response share the region's height, so a
+  short request leaves an empty half above a long response. Timeline's **Sent** and **Received**
+  groups each size their own label column. The usage list has no gap between one provider's last row
+  and the next provider's name. Docker's image rows still spend their meta on "1.64GB · in use (2)".
+  A failed reconnect leaves the last query's rows on screen. Once, closing Generate SQL left the
+  Database frame blank until the pane was switched away and back.
+- **Not seen in the window.** Preview's empty states, the session cost badge, the terminal's error
+  banner, and the API pane with no project. Each was checked in code or by test.
+- **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts`, as before. Under Node
+  24.11, 52 node-core cases in five plugin-loader files fail because loaded plugins need a patched
+  Node; all six files pass under Node 26.8.1.
 
 ## Notes for later sessions
 

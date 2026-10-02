@@ -1,8 +1,7 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Nineteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 to B10b on branch `more-ui`. B06 to B10b are merged to main. One area batch and the final sweep
-remain.
+**Status:** in progress. Twenty of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06 to B11 on branch `more-ui`. B06 to B10b are merged to main. The final sweep remains.
 Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
@@ -215,30 +214,30 @@ controls only for a board, and publishes only once a query has a source. **Edit*
 mapping options read as labels, the per-query AI box starts closed, and the source picker names the
 provider. See [deferred.md](./deferred.md) § B10b.
 
-## What remains, in order
+**B11, tool panes.** Database, API, and Docker logs scroll inside their regions instead of clipping:
+a 40-row table, a 120-item response, and a long log are all in reach, and **Follow** has a scroller.
+A plugin route that answers 204 reaches the window as a 204, so deleting a saved request or a
+variable no longer says it failed. The Database pane is one bar: a level 2 title, the connection as a
+badge, **Saved queries**, **Save**, **Generate**, a solid **Run** with ⌘↩ in its tip, and a reconnect
+icon. The table list has a **Tables** header with a count and a filter strip, and shows nothing
+without a connection. The row editor labels each field with its column name in its own case, with
+the type and "Primary key" as the hint, **Set to NULL**, and a reason by cause when a row is read
+only. Running a query clears the table highlight. A saved query's remove asks first. The API
+request bar is sm throughout, the name bar has **In this task** and **Unsaved** badges, and the list
+reads **Requests** with a **Requests** and **Variables** switch and **New request**. Folder names keep
+their case, and Variables has a level 2 header bar. The response's copy button shows, headers and
+the timeline are rows, and the timeline reads **Sent** and **Received** with each header under its
+own name. Both save dialogs label every field. Docker's detail title is level 2, row meta reads
+"Up 7h" with the whole status in the tip, **Remove unused** sits at the end of its bar, and an empty
+detail says "Choose a container". Shells are "Shell", "Shell 2", with the task in the tip, and an
+empty drawer offers **New terminal**. Preview's empty states point at the project's Preview settings.
+The usage popover is one list, so both providers' values line up, Codex's plan reads "Pro Lite", and
+estimates are whole dollars. The session cost is a badge with a tip and two decimals. See
+[deferred.md](./deferred.md) § B11.
 
-Run the batches in this order. Each depends on the kit batches. The GitHub
-seed below is still the screen to check B09 against in the final sweep.
+## What remains
 
-### B11. Tool panes
-
-- [11-1. Three panes cut off whatever does not fit, and nothing scrolls](./b11-tool-panes/11-1-panes-that-clip.md)
-- [11-4. Deleting a saved request or variable says it failed, and the row stays](./b11-tool-panes/11-4-bodiless-delete-responses.md)
-- [11-5. The Database pane is three bars with a header nested in one](./b11-tool-panes/11-5-one-database-bar.md)
-- [11-6. The Database frame has no inset, and its list has no header](./b11-tool-panes/11-6-database-frame.md)
-- [11-8. The API detail: md controls in a bar, and the name in an 11-pixel button](./b11-tool-panes/11-8-api-detail.md)
-- [11-9. Buttons in the tool panes come in four heights](./b11-tool-panes/11-9-button-heights.md)
-- [11-11. Docker's detail: a level-3 title, long row meta, and a prune button in the wrong place](./b11-tool-panes/11-11-docker-detail.md)
-- [11-12. The API response: an invisible copy button, and a timeline in tiles with machine labels](./b11-tool-panes/11-12-api-response.md)
-- [11-13. Two save dialogs, two ways to label a field](./b11-tool-panes/11-13-save-dialogs.md)
-- [11-14. The Database row editor uppercases column names and keeps a stale selection](./b11-tool-panes/11-14-row-editor.md)
-- [11-15. The terminal drawer names every shell after the task](./b11-tool-panes/11-15-terminal-drawer.md)
-- [11-16. Preview: an empty state that points the wrong way, and three names](./b11-tool-panes/11-16-preview-copy.md)
-- [11-17. The usage popover and the session cost badge](./b11-tool-panes/11-17-usage-and-cost.md)
-- [11-18. Smaller tool-pane defects](./b11-tool-panes/11-18-smaller-defects.md)
-
-Rebuild the database, http, and agent-cost bundles. Restart the node for the node-core and `send.ts`
-changes. Docker is read only.
+The GitHub seed below is still the screen to check B09 against in the final sweep.
 
 ### F. Final sweep
 
@@ -343,6 +342,10 @@ The agent driver runs the real window hidden. These traps cost earlier batches t
 - **The window follows the system theme,** so shots can switch to dark mid-batch.
 - **For a pure CSS check,** a static HTML page that links the repo stylesheets, opened with the
   Playwright browser tools, is faster than a restart.
+- **Client schedules never run in a hidden window.** `host/registries/shell/schedules.ts` skips a
+  run while `document.hidden` is true, so pane availability and other polled reads stay at their boot
+  answer. Through `execute`, redefine `document.hidden` to return `false` and dispatch a
+  `visibilitychange` event; every schedule runs once.
 
 ## Seeds for populated views
 
@@ -374,11 +377,15 @@ preview**, a view, **Publish**. Nothing in the app makes a second Home tab, so B
 `window.acorn.nodeFetch` (the body is `{ kind: 'bytes', bytes }` and the request needs a
 `requestId`), then reloaded the window. Delete panels and tabs through their menus afterwards.
 
-**Database and API (B11).** Wrap `window.acorn.nodeFetch` in the renderer to answer the database
-connect, tables, columns, rows, and query routes with made-up rows (a `shop_dev` database with `users`,
-`orders`, and five more tables). Saved queries and model backends go to the real node. A reload removes
-the patch. For the API pane, run a small local HTTP server on `127.0.0.1` and point requests at it; a
-closed port gives the network error. Delete any saved query, request, or variable you create.
+**Database and API (B11).** The Database pane shows only on a task with a database source, so B11
+wrote `DATABASE_URL=postgres://127.0.0.1:1/shop_dev` into the fixture's `fixture/repo/.env` and ran
+the schedules once (see the driver quirks). Then wrap `window.acorn.nodeFetch` in the renderer to
+answer the database availability, connect, tables, columns, rows, and query routes with made-up rows
+(a `shop_dev` database with `users`, `orders`, and five more tables). Saved queries and model backends
+go to the real node. A reload removes the patch. The script lived at `.acorn/agent-dev/b11h/dbseed.js`.
+For the API pane, run a small local HTTP server on `127.0.0.1` and point requests at it; a closed
+port gives the network error. Delete any saved query, request, or variable you create, and the
+`.env`.
 
 ## Hazards in the running app
 
