@@ -25,8 +25,19 @@ names that route as the pane's `availability` (docs/panes.md § Contributions). 
 gets `403`, because the answer lists every task.
 
 Pools are task-scoped and owned by `CoreServices.data`. Core resolves the URL, opens the `pg` socket,
-normalizes cells, enforces timeouts and row caps, and closes the task pools the plugin opened when the
-plugin is disposed. The loaded plugin receives no URL, driver, socket, project-config grant,
+normalizes cells, and enforces timeouts and row caps. Concurrent implicit readers share one pending
+connection. Explicit **Connect** requests resolve the source in sequence, so each refresh reads the
+script or `.env` again. A successful refresh replaces the task pool. A failed refresh leaves a
+previously established pool available.
+
+Each granted data service holds its own claim on the shared task pool. The Database plugin records
+pending connections before awaiting them. **Disconnect** and plugin disposal revoke that plugin's
+claim and explicit connection state, including pending operations. Another granted consumer or a
+headless core caller can retain the pool independently of whether a pane is drawn. Releasing the last
+claim retires the pool; the unscoped core service's disconnect retires every claim for the task.
+Retirement refuses readers waiting for admission, and lets already admitted queries finish their
+transaction and release their client before closing the pool. Late connection completions cannot
+restore a retired plugin's state. The loaded plugin receives no URL, driver, socket, project-config grant,
 `DATABASE_URL` environment grant, or process broker.
 
 HTTP routes compare task IDs in CLI bodies, palette queries, and context requests with the verified
@@ -61,10 +72,17 @@ to the plugin's frame. The statement that runs is always the one on screen.
 
 Table and column completions come from the plugin's own node route. The host forwards a position and
 renders what comes back. Every judgement about SQL lives in `src/server/completions.ts`: after `FROM`
-offer tables, after `alias.` offer that table's columns. The introspected catalog is cached per task
-inside the core data service and dropped on connect, on disconnect, and after any statement whose
-command was not a plain read or write, so a migration run in the editor does not leave stale columns
-in the popup.
+offer tables, after `alias.` offer that table's columns. The introspected catalog is cached per task pool
+inside the core data service. A cold catalog wave shares one SQL statement among concurrent readers.
+Its table and column visibility comes from `information_schema`; primary-key membership comes from
+`pg_index`. A successful connection refresh, pool retirement, or statement whose final command was
+not a plain read or write invalidates the catalog. A held wave fails after invalidation and cannot
+publish into the replacement cache. Failed waves can be retried. There is no timed cache expiry, so
+DDL performed outside this service requires **Connect** to refresh the catalog.
+
+Core applies the returned row cap before converting cells. Columns, total row count, the final
+statement's command, truncation status, and elapsed time retain their driver semantics. The cap
+reduces conversion work, but the driver still buffers the full result.
 
 The model-provider capability is optional. If no compatible provider is connected, the database pane
 keeps manual SQL available and hides **Generate**. The frame learns which connections exist from a

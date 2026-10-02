@@ -1,12 +1,13 @@
 import { readFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { join } from 'node:path'
-import pg from 'pg'
 import type { QueryResult, QueryResultRow } from 'pg'
 import { loadRepoConfig } from '../runConfig'
 import type { ProjectService } from './projectRefs'
 import type { ProcResult, ProcSpec } from './proc'
 import type { TaskService } from './tasks'
+import { taskDataPools } from './dataPools'
+import { dataCatalog, invalidateDataCatalog } from './dataCatalog'
 
 export type DataCell = string | null
 export type DataColumn = { name: string; dataType: string; nullable: boolean; isPk: boolean }
@@ -52,10 +53,6 @@ export const DATA_DEFAULT_TIMEOUT_MS = 15_000
 export const DATA_MAX_TIMEOUT_MS = 60_000
 
 const SCHEMA_CHAR_CAP = 80_000
-const { Pool } = pg
-
-type PoolInstance = InstanceType<typeof Pool>
-type PoolEntry = { pool: PoolInstance; url: string; database: string }
 type DataCore = {
   tasks: TaskService
   projects: ProjectService
@@ -196,174 +193,119 @@ export async function resolveTaskDataUrl(core: DataCore, taskId: string): Promis
 
 const resultSet = (result: QueryResult<QueryResultRow>, maxRows: number, ms: number): DataQueryResult => {
   const columns = result.fields?.map((field) => field.name) ?? []
-  const allRows = (result.rows ?? []).map((row) =>
+  const driverRows = result.rows ?? []
+  const rows = driverRows.slice(0, maxRows).map((row) =>
     columns.map((column) => cell((row as Record<string, unknown>)[column])),
   )
   return {
     columns,
-    rows: allRows.slice(0, maxRows),
+    rows,
     rowCount: result.rowCount ?? null,
     command: result.command ?? '',
-    truncated: allRows.length > maxRows,
+    truncated: driverRows.length > maxRows,
     ms,
   }
 }
 
-async function liveSchema(pool: PoolInstance): Promise<DataTable[]> {
-  const tables = await pool.query<{ table_schema: string; table_name: string }>(
-    `SELECT table_schema, table_name FROM information_schema.tables
-     WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema')
-     ORDER BY table_schema, table_name`,
-  )
-  return Promise.all(tables.rows.map(async (table) => {
-    const columns = await pool.query<{ column_name: string; data_type: string; is_nullable: string }>(
-      `SELECT column_name, data_type, is_nullable FROM information_schema.columns
-       WHERE table_schema = $1 AND table_name = $2 ORDER BY ordinal_position`,
-      [table.table_schema, table.table_name],
-    )
-    const pk = await pool.query<{ attname: string }>(
-      `SELECT a.attname FROM pg_index i
-         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-       WHERE i.indrelid = $1::regclass AND i.indisprimary`,
-      [`${qid(table.table_schema)}.${qid(table.table_name)}`],
-    )
-    const primaryKeys = new Set(pk.rows.map((row) => row.attname))
-    return {
-      schema: table.table_schema,
-      name: table.table_name,
-      columns: columns.rows.map((column) => ({
-        name: column.column_name,
-        dataType: column.data_type,
-        nullable: column.is_nullable === 'YES',
-        isPk: primaryKeys.has(column.column_name),
-      })),
-    }
-  }))
-}
+// Permission projections share the manager but receive distinct consumer claims. This private
+// factory keeps pool ownership out of the loaded-plugin API and its wire surface.
+const consumerServices = new WeakMap<DataSourceService, () => DataSourceService>()
 
 export function createDataSourceService(core: DataCore): DataSourceService {
-  const pools = new Map<string, PoolEntry>()
-  const catalogs = new Map<string, DataTable[]>()
-
-  const connect = async (taskId: string, refresh = false): Promise<PoolEntry> => {
-    const current = pools.get(taskId)
-    // Querying an open task must not re-run a repository URL script on every statement. Only the
-    // explicit Connect action refreshes the source and notices a changed .env or script result.
-    if (current && !refresh) return current
-    const url = await resolveTaskDataUrl(core, taskId)
-    if (!url) {
-      throw new Error('No database found. Set a connection script in Workspace Settings, or add DATABASE_URL to the worktree .env.')
-    }
-    if (current) await current.pool.end().catch(() => {})
-    const pool = new Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
-    pool.on('error', () => {})
-    try {
-      const result = await pool.query<{ database: string }>('SELECT current_database() AS database')
-      const entry = { pool, url, database: result.rows[0]?.database ?? '' }
-      pools.set(taskId, entry)
-      catalogs.delete(taskId)
-      return entry
-    } catch (error) {
-      await pool.end().catch(() => {})
-      throw error
-    }
-  }
-
-  const catalog = async (taskId: string): Promise<DataTable[]> => {
-    const cached = catalogs.get(taskId)
-    if (cached) return cached
-    const tables = await liveSchema((await connect(taskId)).pool)
-    catalogs.set(taskId, tables)
-    return tables
-  }
-
-  return {
-    configured: (taskId) => hasTaskDataSource(core, taskId),
-    connect: async (taskId) => ({ database: (await connect(taskId, true)).database }),
-    disconnect: async (taskId) => {
-      catalogs.delete(taskId)
-      const entry = pools.get(taskId)
-      if (!entry) return
-      pools.delete(taskId)
-      await entry.pool.end().catch(() => {})
-    },
-    query: async (taskId, sql, options = {}) => {
-      if (typeof sql !== 'string' || !sql.trim()) throw new Error('Empty query.')
-      const readOnly = options.readOnly !== false
-      if (readOnly) {
-        const refusal = dataReadOnlyRefusal(sql)
-        if (refusal) throw new Error(`This query is refused: ${refusal}.`)
-      }
-      const timeoutMs = boundedTimeout(options.timeoutMs)
-      const maxRows = boundedRows(options.maxRows)
-      const pool = (await connect(taskId)).pool
-      const started = process.hrtime.bigint()
-      let raw: QueryResult<QueryResultRow> | QueryResult<QueryResultRow>[]
-      const client = await pool.connect()
-      try {
-        await client.query(readOnly ? 'BEGIN READ ONLY' : 'BEGIN')
-        await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`)
-        raw = await client.query(sql, options.parameters ?? []) as QueryResult<QueryResultRow> | QueryResult<QueryResultRow>[]
-        await client.query(readOnly ? 'ROLLBACK' : 'COMMIT')
-      } catch (error) {
-        await client.query('ROLLBACK').catch(() => {})
-        throw error
-      } finally {
-        client.release()
-      }
-      const ms = Math.round(Number(process.hrtime.bigint() - started) / 1e6)
-      const last = Array.isArray(raw) ? raw[raw.length - 1] : raw
-      if (!last) throw new Error('The database returned no result.')
-      const result = resultSet(last, maxRows, ms)
-      if (!new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']).has(result.command.toUpperCase())) {
-        catalogs.delete(taskId)
-      }
-      return result
-    },
-    catalog,
-    schema: async (taskId) => {
-      const task = await core.tasks.load(taskId)
-      if (!task) throw new Error('Task not found.')
-      const config = task.projectId ? (await core.projects.config(task.projectId))?.config : null
-      const mode = config?.dbSchemaMode === 'script' || config?.dbSchemaMode === 'file' ? config.dbSchemaMode : 'auto'
-      const value = config?.dbSchemaValue?.trim()
-      const notesText = config?.dbSchemaNotes?.trim()
-      const notes = notesText ? { notes: notesText } : {}
-      if (mode === 'script') {
-        if (!value) throw new Error('No schema script configured in the repo settings.')
-        const root = await core.tasks.root(taskId)
-        if (!root) throw new Error('No worktree for this task yet.')
-        await core.projects.assertConfigTrusted(taskId)
-        const { stdout } = await core.proc.runProcessOrThrow({
-          file: 'bash',
-          args: ['-lc', value],
-          cwd: root,
-          timeoutMs: DATA_DEFAULT_TIMEOUT_MS,
-          maxOutputBytes: 4 << 20,
+  const pools = taskDataPools((taskId) => resolveTaskDataUrl(core, taskId))
+  const forConsumer = (administrative = false): DataSourceService => {
+    const owner = {}
+    const catalog = (taskId: string) => pools.use(taskId, owner, dataCatalog)
+    const service: DataSourceService = {
+      configured: (taskId) => hasTaskDataSource(core, taskId),
+      connect: async (taskId) => ({ database: (await pools.connect(taskId, owner, true)).database }),
+      disconnect: (taskId) => pools.disconnect(taskId, owner, administrative),
+      query: async (taskId, sql, options = {}) => {
+        if (typeof sql !== 'string' || !sql.trim()) throw new Error('Empty query.')
+        const readOnly = options.readOnly !== false
+        if (readOnly) {
+          const refusal = dataReadOnlyRefusal(sql)
+          if (refusal) throw new Error(`This query is refused: ${refusal}.`)
+        }
+        const timeoutMs = boundedTimeout(options.timeoutMs)
+        const maxRows = boundedRows(options.maxRows)
+        return pools.use(taskId, owner, async (entry) => {
+          const pool = entry.pool
+          const started = process.hrtime.bigint()
+          let raw: QueryResult<QueryResultRow> | QueryResult<QueryResultRow>[]
+          const client = await pool.connect()
+          try {
+            await client.query(readOnly ? 'BEGIN READ ONLY' : 'BEGIN')
+            await client.query(`SET LOCAL statement_timeout = ${timeoutMs}`)
+            raw = await client.query(sql, options.parameters ?? []) as QueryResult<QueryResultRow> | QueryResult<QueryResultRow>[]
+            await client.query(readOnly ? 'ROLLBACK' : 'COMMIT')
+          } catch (error) {
+            await client.query('ROLLBACK').catch(() => {})
+            throw error
+          } finally {
+            client.release()
+          }
+          const ms = Math.round(Number(process.hrtime.bigint() - started) / 1e6)
+          const last = Array.isArray(raw) ? raw[raw.length - 1] : raw
+          if (!last) throw new Error('The database returned no result.')
+          const result = resultSet(last, maxRows, ms)
+          if (!new Set(['SELECT', 'INSERT', 'UPDATE', 'DELETE']).has(result.command.toUpperCase())) {
+            invalidateDataCatalog(entry)
+          }
+          return result
         })
-        const text = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').trim()
-        if (!text) throw new Error('Schema script produced no output.')
-        return { tables: [], text: capSchema(text), source: 'script', ...notes }
-      }
-      if (mode === 'file') {
-        if (!value) throw new Error('No schema file configured in the repo settings.')
-        const root = await core.tasks.root(taskId)
-        if (!root) throw new Error('No worktree for this task yet.')
-        const path = core.fs.resolveInRoot(root, value)
-        if (!path) throw new Error('Schema file path escapes the worktree.')
-        const text = (await readFile(path, 'utf8')).trim()
-        if (!text) throw new Error('Schema file is empty.')
-        return { tables: [], text: capSchema(text), source: 'file', ...notes }
-      }
-      const tables = await catalog(taskId)
-      if (!tables.length) throw new Error('No tables found in the connected database.')
-      return { tables, text: capSchema(formatSchema(tables)), source: 'auto', ...notes }
-    },
+      },
+      catalog,
+      schema: async (taskId) => {
+        const valid = pools.claim(taskId, owner)
+        const task = await core.tasks.load(taskId)
+        if (!task) throw new Error('Task not found.')
+        const config = task.projectId ? (await core.projects.config(task.projectId))?.config : null
+        const mode = config?.dbSchemaMode === 'script' || config?.dbSchemaMode === 'file' ? config.dbSchemaMode : 'auto'
+        const value = config?.dbSchemaValue?.trim()
+        const notesText = config?.dbSchemaNotes?.trim()
+        const notes = notesText ? { notes: notesText } : {}
+        if (mode === 'script') {
+          if (!value) throw new Error('No schema script configured in the repo settings.')
+          const root = await core.tasks.root(taskId)
+          if (!root) throw new Error('No worktree for this task yet.')
+          await core.projects.assertConfigTrusted(taskId)
+          const { stdout } = await core.proc.runProcessOrThrow({
+            file: 'bash',
+            args: ['-lc', value],
+            cwd: root,
+            timeoutMs: DATA_DEFAULT_TIMEOUT_MS,
+            maxOutputBytes: 4 << 20,
+          })
+          const text = stdout.replace(/\x1b(?:\[[0-9;]*[A-Za-z]|\(B)/g, '').trim()
+          if (!text) throw new Error('Schema script produced no output.')
+          return { tables: [], text: capSchema(text), source: 'script', ...notes }
+        }
+        if (mode === 'file') {
+          if (!value) throw new Error('No schema file configured in the repo settings.')
+          const root = await core.tasks.root(taskId)
+          if (!root) throw new Error('No worktree for this task yet.')
+          const path = core.fs.resolveInRoot(root, value)
+          if (!path) throw new Error('Schema file path escapes the worktree.')
+          const text = (await readFile(path, 'utf8')).trim()
+          if (!text) throw new Error('Schema file is empty.')
+          return { tables: [], text: capSchema(text), source: 'file', ...notes }
+        }
+        if (!valid()) throw new Error('Database connection retired. Connect again.')
+        const tables = await catalog(taskId)
+        if (!tables.length) throw new Error('No tables found in the connected database.')
+        return { tables, text: capSchema(formatSchema(tables)), source: 'auto', ...notes }
+      },
+    }
+    consumerServices.set(service, () => forConsumer())
+    return service
   }
+  return forConsumer(true)
 }
 
 /** Apply the loaded-plugin permission boundary without exposing a second service implementation. */
 export function dataSourceFor(service: DataSourceService, canWrite: boolean): DataSourceService {
+  service = consumerServices.get(service)?.() ?? service
   return {
     configured: (taskId) => service.configured(taskId),
     connect: (taskId) => service.connect(taskId),

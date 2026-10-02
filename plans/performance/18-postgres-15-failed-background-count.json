@@ -1,0 +1,56 @@
+{
+  "version": 15,
+  "syntheticOnly": true,
+  "port": 63358,
+  "catalog": {
+    "readers": 8,
+    "tables": 100,
+    "statements": 1,
+    "elapsedMs": 10.56762499999968
+  },
+  "originalCatalog": {
+    "readers": 8,
+    "tables": 100,
+    "statements": 1608,
+    "elapsedMs": 527.5119160000013
+  },
+  "permissionLimitedTables": 3,
+  "unexpectedSessions": [
+    {
+      "pid": 51923,
+      "application_name": "",
+      "state": null,
+      "query": ""
+    },
+    {
+      "pid": 51924,
+      "application_name": "unit18-observer",
+      "state": "active",
+      "query": "SELECT pid, application_name, state, query FROM pg_stat_activity WHERE usename = 'fixture_owner'"
+    },
+    {
+      "pid": 51941,
+      "application_name": "unit18-observer",
+      "state": "idle",
+      "query": "SELECT a.attname FROM pg_index i\n      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)\n      WHERE i.indrelid = $1::regclass AND i.indisprimary"
+    },
+    {
+      "pid": 51943,
+      "application_name": "unit18-observer",
+      "state": "idle",
+      "query": "SELECT a.attname FROM pg_index i\n      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)\n      WHERE i.indrelid = $1::regclass AND i.indisprimary"
+    },
+    {
+      "pid": 51945,
+      "application_name": "unit18-observer",
+      "state": "idle",
+      "query": "SELECT a.attname FROM pg_index i\n      JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)\n      WHERE i.indrelid = $1::regclass AND i.indisprimary"
+    }
+  ],
+  "cleanup": {
+    "serverPid": 51917,
+    "pidGone": true,
+    "socketGone": true,
+    "postmasterFileGone": true
+  }
+}

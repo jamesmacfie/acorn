@@ -32,7 +32,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 15 | [Shared pull request comparisons and marker identity](./15-pr-markers.md) | Through 14 | Pending |
 | 16 | [Editor saves, document custody, reloads, and text fidelity](./16-editor-custody.md) | Through 15 | Pending |
 | 17 | [Editor search, file tree viewport, and host admission](./17-editor-search-tree.md) | Through 16 | Pending |
-| 18 | [Database pool ownership, catalog, and row normalization](./18-database.md) | Through 17 | Pending |
+| 18 | [Database implementation record](../../../plans/performance/implementation-18-database.md) | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
 | 19 | [Docker process ownership, log tails, and Node scope](./19-docker.md) | Through 18 | Pending |
 | 20 | [HTTP decoding, draft custody, and cancellation](./20-http.md) | Through 19 | Pending |
 | 21 | [SQL scratch limits and oversized draft recovery](./21-sql-recovery.md) | Through 20 | Pending |
