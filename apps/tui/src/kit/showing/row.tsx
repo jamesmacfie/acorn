@@ -117,7 +117,12 @@ export function Row(props: {
           when={hasNode(props.children)}
           fallback={<Line role={props.selected ? 'match' : 'body'}>{props.children}</Line>}
         >
-          {slot(props.children)}
+          {/* A title written as several texts, such as a pull's number and then its title, holds
+              its natural width in a box that does not shrink, and the box above clips it. Shrunk
+              texts each clip their own content, and the gap between them closed: "#100Older pull". */}
+          <Show when={props.variant !== 'stacked'} fallback={slot(props.children)}>
+            <box flexDirection="row" gap={1} flexShrink={0}>{slot(props.children)}</box>
+          </Show>
         </Show>
       </box>
       <box flexGrow={1} />
