@@ -1,0 +1,27 @@
+{
+  "runtime": "v24.11.0",
+  "sourceHash": "ef62c023cd3350f036aee495e563d9cb3808861c121a97c1716655ef6bae3347",
+  "note": "Node/V8 native atob; sampled transient heap and array buffers, not retained memory or WebKit latency",
+  "records": [
+    {
+      "mode": "fallback",
+      "size": 1048576,
+      "elapsedMs": 54.64304099999998,
+      "cpuMs": 68.804,
+      "heapDeltaBytes": 2096264,
+      "arrayBufferDeltaBytes": 1048592,
+      "exactBytes": true,
+      "exactText": true
+    },
+    {
+      "mode": "fallback",
+      "size": 5242880,
+      "elapsedMs": 294.34250000000003,
+      "cpuMs": 295.379,
+      "heapDeltaBytes": 153016840,
+      "arrayBufferDeltaBytes": 5242880,
+      "exactBytes": true,
+      "exactText": true
+    }
+  ]
+}

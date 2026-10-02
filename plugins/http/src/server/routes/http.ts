@@ -567,7 +567,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
       const parsed = sendBody.safeParse(await c.req.json().catch(() => null))
       if (!parsed.success) return respondError(c, 400, 'bad_request', parsed.error.issues.map((i) => i.message))
       try {
-        return c.json(await send(db, core, owner(c), project.id, parsed.data))
+        return c.json(await send(db, core, owner(c), project.id, parsed.data, c.req.raw.signal))
       } catch (err) {
         // Preparation failures (invalid resolved URL, command/secret resolution) have no attempted
         // request to display, so they stay a 422. Network attempts return a typed SendFailure above.

@@ -7,12 +7,13 @@
 //             renderer, so the field shows a placeholder
 //   command - a stored shell command run in the task worktree, or the project checkout, when a
 //             request references it. Its output is never stored.
-import { createEffect, createResource, createSignal, Index, Show } from 'solid-js'
+import { Index, Show } from 'solid-js'
 import {
   Button, Checkbox, ConfirmButton, Heading, Icon, Inline, Input, Select, Stack, Text,
 } from '@acorn/plugin-api/ui/tree'
-import { variableKinds, type HttpVariable, type VariableKind } from '../shared/model'
+import { variableKinds, type VariableKind } from '../shared/model'
 import type { HttpClient } from './httpClient'
+import { createVariableModel } from './variableModel'
 
 const KIND_HINT: Record<VariableKind, string> = {
   value: 'Used exactly as typed.',
@@ -29,56 +30,8 @@ const PLACEHOLDER: Record<VariableKind, string> = {
   command: 'op read op://vault/api/token',
 }
 
-type Row = { id: string | null; name: string; kind: VariableKind; value: string; enabled: boolean; hasStoredSecret: boolean }
-
-const toRow = (v: HttpVariable): Row => ({ id: v.id, name: v.name, kind: v.kind, value: v.value, enabled: v.enabled, hasStoredSecret: v.kind === 'secret' })
-const blankRow = (): Row => ({ id: null, name: '', kind: 'value', value: '', enabled: true, hasStoredSecret: false })
-
 export default function HttpVariables(props: { client: HttpClient; projectId: string; projectName: string }) {
-  const { createVariable, deleteVariable, listVariables, updateVariable } = props.client
-  const [error, setError] = createSignal<string | null>(null)
-  const [busy, setBusy] = createSignal<string | null>(null)
-  const [stored] = createResource(() => props.projectId, listVariables)
-
-  // One local list, seeded from the server load and then edited in place: each save patches its row
-  // from the response, so nothing refetches under a cursor. Rows are addressed by position. A
-  // stored-plus-drafts merge rebuilds every row object per keystroke and moves an edited row to the
-  // end of the list, which tears the input out from under the caret.
-  const [rows, setRows] = createSignal<Row[]>([])
-  createEffect(() => {
-    const saved = stored()
-    if (saved) setRows(saved.map(toRow))
-  })
-
-  const editRow = (index: number, patch: Partial<Row>) => setRows((current) => current.map((r, i) => (i === index ? { ...r, ...patch } : r)))
-  const dropRow = (index: number) => setRows((current) => current.filter((_, i) => i !== index))
-
-  async function save(index: number) {
-    const row = rows()[index]
-    if (!row.name.trim()) return setError('A variable needs a name.')
-    setBusy(row.id ?? row.name)
-    setError(null)
-    try {
-      const body = { name: row.name.trim(), kind: row.kind, value: row.value, enabled: row.enabled }
-      const next = row.id ? await updateVariable(props.projectId, row.id, body) : await createVariable(props.projectId, body)
-      setRows((current) => current.map((r, i) => (i === index ? toRow(next) : r)))
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not save the variable')
-    } finally {
-      setBusy(null)
-    }
-  }
-
-  async function remove(index: number) {
-    const row = rows()[index]
-    if (!row.id) return dropRow(index)
-    try {
-      await deleteVariable(props.projectId, row.id)
-      dropRow(index)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Could not delete the variable')
-    }
-  }
+  const { rows, error, busy, editRow, save, remove, add } = createVariableModel(() => props.client, () => props.projectId)
 
   return (
     <Stack gap="section">
@@ -119,12 +72,12 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
                 placeholder={row().kind === 'secret' && row().hasStoredSecret ? 'Saved. Leave blank to keep it.' : PLACEHOLDER[row().kind]}
                 onChange={(value: string) => editRow(index, { value })}
               />
-              <Button size="sm" busy={busy() === (row().id ?? row().name)} onPress={() => void save(index)}>
+              <Button size="sm" busy={busy().includes(row().key)} onPress={() => void save(index)}>
                 Save
               </Button>
               {/* Index reuses this position after a deletion. Key only the confirmation control by
                   row identity so an armed button cannot move onto another variable. */}
-              <Show when={row().id ?? row()} keyed>
+              <Show when={row().key} keyed>
                 <ConfirmButton
                   variant="bare"
                   size="sm"
@@ -143,7 +96,7 @@ export default function HttpVariables(props: { client: HttpClient; projectId: st
 
       {/* Under the list and on its start edge, where the next row will appear. */}
       <Inline>
-        <Button size="sm" variant="ghost" onPress={() => setRows((r) => [...r, blankRow()])}>
+        <Button size="sm" variant="ghost" onPress={add}>
           <Icon name="plus" /> Add variable
         </Button>
       </Inline>
