@@ -24,7 +24,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Proposed, 2026-10-01; nothing built. |
 | [pi/](./pi/README.md) | What acorn takes from oh-my-pi: run `omp` as a harness, then widen the edges acorn owns with a permission hook, plugin session messages, unattended model calls, an advisor, plugin skills, and a resource-read experiment. | Proposed, 2026-10-02; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
-| [ui-consistency/](./ui-consistency/README.md) | The desktop UI consistency pass: house patterns, one file per open finding in nine area batches, and the deferred list (its `refused.md`) with the product calls it needs. | Every fix batch shipped by 2026-10-02; the final sweep remains. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 
 ## The single files
@@ -84,6 +83,11 @@ inspector and generation, [security](../security.md) records that a gate answer 
 [API reference](../api-reference.md) owns the gate route. The manual check is part of item 52 in
 [testing](../testing.md). The deferred rejection branch, rejection note, and tool-call gates remain
 in git history.
+
+`ui-consistency/` shipped its 20 fix batches by 2026-10-02 and was deleted. [UI design](../ui-design.md)
+owns the help mark, tooltips, dialogs, states, and the heading levels; [the closed kit](../ui-design/closed-kit.md)
+owns the `description` against `help` rule; and [frontend](../frontend.md) owns the page forms. The
+house patterns, the deferred findings, and the open product decisions remain in git history.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,

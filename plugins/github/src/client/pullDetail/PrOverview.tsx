@@ -151,8 +151,9 @@ export function PrOverview(props: {
               >Turn off auto-merge</Button>
               <Text emphasis="muted">Merges on its own when checks pass.</Text>
             </Show>
-            {/* What a blocked pull's primary should be is a product call still open, so it keeps the
-                verb it had (docs/future/ui-consistency/deferred.md § B09). */}
+            {/* A blocked pull keeps the verb it had. "Merge when ready" would turn on auto-merge,
+                which fails on a repository that does not allow it, and choosing its primary is a
+                product call nobody has made. */}
             <Show when={!model().pull()?.draft && !model().pull()?.autoMergeEnabled && model().pull()?.mergeStateStatus === 'BLOCKED'}>
               <Button
                 disabled={model().autoMergeEnable.isPending}
