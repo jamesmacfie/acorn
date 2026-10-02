@@ -123,6 +123,20 @@ longer and costs more than it did.
 
 ### A turn that ends early
 
+Managed execution flushes accepted buffered deltas, then captures every retained canonical event belonging to the step's target turns
+before parsing the final assistant response. It reads pages of 500 rows in one SQLite transaction,
+with a fixed committed session sequence ceiling. A later turn cannot extend that read. Ordinary
+client snapshots retain their page cap. Workflow result parsing retains the complete response
+instead of applying the delegation summary's text bound. The assistant message's established
+replacement, append, and outer-whitespace trimming rules still apply.
+
+Live forwarding subscribes before enqueue and holds events until the accepted turn ID is known.
+It forwards each canonical sequence once. Final capture supplies the complete event list to the
+outcome and does not replay it through the callback. Cancellation and timeout capture committed
+partial text and tool events. Usage and cost reflect the last target turn at capture time; execution
+does not wait for missing provider usage. Later usage remains in the durable ledger, and a usage
+event explicitly bound to a turn updates that turn without mutating an already returned capture.
+
 A managed step is a turn, and the step's result is that turn's final message. A model can end a turn
 on a progress report instead of the finished work, so acorn guards the step three ways
 (`plugins/agents/src/server/sessions/sessionExecute.ts`):

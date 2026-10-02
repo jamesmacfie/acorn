@@ -1,10 +1,11 @@
 import { randomUUID } from 'node:crypto'
 import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, schema, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { InternalEnvFactory } from '@acorn/plugin-api/node'
-import type { AgentConfigOption, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { StreamEvent } from '@acorn/plugin-api/node'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from '../drivers/types'
 import { AgentDriverRegistry } from '../drivers/registry'
@@ -41,7 +42,8 @@ class ConfigDriver implements AgentDriver {
   readonly turns: AgentDriverTurnOptions[] = []
   readonly envs: Record<string, string>[] = []
   // What each turn answers, in order. Past the end of the script every turn answers 'Done.'.
-  replies: Array<{ text: string; stopReason: string }> = []
+  replies: Array<{ text: string; stopReason: string; events?: AgentNormalizedEvent[]; hang?: boolean; afterEvents?: () => void }> = []
+  push: (event: AgentNormalizedEvent) => Promise<void> = async () => {}
 
   async probe(): Promise<AgentProviderDescriptor> {
     return {
@@ -62,6 +64,7 @@ class ConfigDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    this.push = async (event) => { await options.onEvent(event) }
     this.envs.push(options.env)
     const providerSessionRef = options.session.providerSessionRef ?? `cfg-${randomUUID()}`
     let active = false
@@ -78,7 +81,10 @@ class ConfigDriver implements AgentDriver {
         active = true
         driver.turns.push(turn)
         const reply = driver.replies.shift() ?? { text: 'Done.', stopReason: 'end_turn' }
+        for (const event of reply.events ?? []) await options.onEvent(event)
         if (reply.text) await options.onEvent({ type: 'assistant_message', text: reply.text })
+        reply.afterEvents?.()
+        if (reply.hang) return { providerTurnRef: `turn-${turn.turn.id}` }
         await options.onEvent({ type: 'turn_completed', stopReason: reply.stopReason })
         active = false
         return { providerTurnRef: `turn-${turn.turn.id}` }
@@ -281,6 +287,7 @@ describe('agents.sessionExecute config options', () => {
       driver.replies = [1, 2, 3, 4].map(() => ({ text: 'Still working.', stopReason: 'end_turn' }))
       const outcome = await executeWithSchema()
       expect(outcome?.status).toBe('malformed')
+      expect(outcome?.capture.result).toBe('Still working.')
       expect(driver.turns).toHaveLength(3)
     })
 
@@ -292,4 +299,106 @@ describe('agents.sessionExecute config options', () => {
       expect(driver.turns).toHaveLength(1)
     })
   })
+  describe('complete workflow capture', () => {
+    const normalized = (event: StreamEvent): AgentNormalizedEvent | undefined =>
+      event.type === 'managed-agent' ? event.event as AgentNormalizedEvent : undefined
+    const run = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) => createSessionExecute(runtime)({
+      taskId, profileId: 'claude-code', title: 'Capture', prompt: 'Answer.', timeoutMs: 5_000, ...extra,
+    })
+    const progress = (count: number): AgentNormalizedEvent[] => Array.from({ length: count }, (_, n) => ({
+      type: 'reasoning', text: `reason ${n}`, messageId: `reason-${n}`,
+    }))
+
+    it.each([501, 2_001])('captures results beyond %i events and parses a JSON token across pages', async (count) => {
+      const expected = '```json\n{"answer":"' + 'x'.repeat(300_000) + 'token"}\n```'
+      driver.replies = [{ text: '', stopReason: 'end_turn', events: [
+        ...progress(498),
+        { type: 'assistant_message', text: expected.slice(0, -10), append: true, messageId: 'answer' },
+        { type: 'diagnostic', level: 'info', message: 'page boundary' },
+        { type: 'assistant_message', text: expected.slice(-10), append: true, messageId: 'answer' },
+        ...progress(count - 501),
+      ] }]
+      const streamed: StreamEvent[] = []
+      // Force the entire accepted stream into the enqueue/turn-id gap.
+      const enqueue = runtime.enqueueTurn.bind(runtime)
+      vi.spyOn(runtime, 'enqueueTurn').mockImplementation(async (...args) => {
+        const turn = await enqueue(...args)
+        await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('completed'), { timeout: 5_000 })
+        return turn
+      })
+      const result = await run({ onEvent: (event) => streamed.push(event),
+        schema: { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] } })
+      expect(result?.status).toBe('ok')
+      expect(result?.capture.result).toBe(expected)
+      expect(result?.capture.structuredOutput).toEqual({ answer: 'x'.repeat(300_000) + 'token' })
+      const captured = result!.capture.events.filter((event) => event.type === 'managed-agent')
+      const live = streamed.filter((event) => event.type === 'managed-agent')
+      expect(captured.length).toBeGreaterThan(count)
+      expect(live.map((event) => event.sequence)).toEqual(captured.map((event) => event.sequence))
+      expect(new Set(live.map((event) => event.sequence)).size).toBe(live.length)
+      const ordinary = await runtime.store.snapshot(result!.agentSessionId!)
+      expect(ordinary.events).toHaveLength(500)
+      vi.restoreAllMocks()
+    })
+
+    it.each(['cancelled', 'timeout', 'error', 'interrupted'] as const)('retains the full response and tool events for %s', async (status) => {
+      const controller = new AbortController()
+      driver.replies = [{ text: '', stopReason: 'end_turn', hang: true, events: [
+        ...progress(501), { type: 'tool', tool: { id: 'tool', title: 'Read', status: 'completed', output: 'exact tool output' } },
+        { type: 'assistant_message', text: 'exact partial response' },
+        ...(['error', 'interrupted'].includes(status) ? [{ type: 'error', code: 'failed', message: 'provider failed', retryable: status === 'interrupted' } as const] : []),
+      ] }]
+      const result = await run({ signal: controller.signal, timeoutMs: status === 'timeout' ? 200 : 5_000,
+        onEvent: (event) => { if (status === 'cancelled' && normalized(event)?.type === 'assistant_message') controller.abort() },
+      })
+      expect(result?.status).toBe(status === 'interrupted' ? 'error' : status)
+      expect(result?.capture.result).toBe('exact partial response')
+      expect(result?.capture.events.some((event) => {
+        const value = normalized(event)
+        return value?.type === 'tool' && value.tool.output === 'exact tool output'
+      })).toBe(true)
+    })
+
+    it('keeps both target turns complete and excludes unrelated session history', async () => {
+      driver.replies = [{ text: 'unrelated', stopReason: 'end_turn' }]
+      const previous = await run()
+      driver.replies = [
+        { text: 'malformed', stopReason: 'end_turn', events: progress(501) },
+        { text: '```json\n{"answer":"complete"}\n```', stopReason: 'end_turn', events: progress(2_001) },
+      ]
+      const result = await run({ managedSessionId: previous!.agentSessionId!, schema: { type: 'object', required: ['answer'], properties: { answer: { type: 'string' } } } })
+      expect(result?.status).toBe('ok')
+      expect(result?.capture.structuredOutput).toEqual({ answer: 'complete' })
+      expect(result?.capture.events.length).toBeGreaterThan(2_500)
+      expect(result?.capture.events.some((event) => {
+        const value = normalized(event)
+        return value?.type === 'assistant_message' && value.text === 'unrelated'
+      })).toBe(false)
+    })
+
+    it('flushes accepted append deltas before cancellation capture without waiting for the buffer timer', async () => {
+      const controller = new AbortController()
+      driver.replies = [{ text: '', stopReason: 'end_turn', hang: true,
+        events: [{ type: 'assistant_message', text: 'accepted buffered text', append: true }],
+        afterEvents: () => controller.abort(),
+      }]
+      const result = await run({ signal: controller.signal })
+      expect(result?.status).toBe('cancelled')
+      expect(result?.capture.result).toBe('accepted buffered text')
+    })
+
+    it('returns without waiting for usage and retains late usage without changing the capture', async () => {
+      const result = await run()
+      expect(result?.status).toBe('ok')
+      expect(result?.capture.usage).toBeUndefined()
+      await driver.push({ type: 'usage', usage: { inputTokens: 12, outputTokens: 34 } })
+      const late = (await runtime.store.eventPage(result!.agentSessionId!)).events.at(-1)!
+      expect(late.event).toEqual({ type: 'usage', usage: { inputTokens: 12, outputTokens: 34 } })
+      expect(late.turnId).toBeNull()
+      await runtime.store.recordEvent(result!.agentSessionId!, driver.turns[0]!.turn.id, late.event)
+      expect((await runtime.store.turn(driver.turns[0]!.turn.id))?.usage).toMatchObject({ inputTokens: 12, outputTokens: 34 })
+      expect(result?.capture.usage).toBeUndefined()
+    })
+  })
+
 })

@@ -144,8 +144,8 @@ export function managedAgentsBridge(
     handoffToTerminal: (sessionId) => guarded(() => runtime.handoffToTerminal(sessionId)),
     resumeManaged: (sessionId) => guarded(() => runtime.resumeManaged(sessionId)),
     exportSession: (sessionId, format) => guarded(() => runtime.exportSession(sessionId, format)),
-    wait: (sessionId, afterSeq, until, timeoutMs) =>
-      guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs)),
+    wait: (sessionId, afterSeq, until, timeoutMs, signal) =>
+      guarded(() => runtime.wait(sessionId, afterSeq, until, timeoutMs, signal)),
     search: (query, filter) => guarded(() => runtime.store.searchSessions(query, filter)),
   }
 }

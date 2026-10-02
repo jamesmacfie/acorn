@@ -7,7 +7,6 @@ import type {
   AgentNormalizedEvent,
   AgentProviderDescriptor,
   AgentSession,
-  AgentSessionSnapshot,
   AgentWsFrame,
 } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
@@ -182,7 +181,7 @@ export type AgentRuntimeOptions = {
   usageContinuationGraceMs?: number
 }
 
-export type WaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
+export type WaitCondition = import('../../contract/wire').AgentWaitCondition
 type RuntimeListener = (frame: AgentWsFrame) => void
 
 const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
@@ -1095,13 +1094,6 @@ export class ManagedAgentEngine {
     const session = await this.store.requireSession(frame.event.sessionId)
     if (this.stopped) return
     this.publish?.({ channel: 'agent-session:changed', taskId: session.taskId, sessionId: session.id, event })
-  }
-
-  protected conditionMet(snapshot: AgentSessionSnapshot, until: WaitCondition): boolean {
-    if (until === 'ready') return snapshot.session.runtimeState === 'ready'
-    if (until === 'attention') return !['none', 'unread'].includes(snapshot.session.attention)
-    if (until === 'stopped') return ['stopped', 'failed', 'archived'].includes(snapshot.session.runtimeState)
-    return snapshot.events.some((event) => event.event.type === 'turn_completed' || event.event.type === 'error')
   }
 
   /** A turn's span, opened where the turn is dispatched to a provider. Not where it was enqueued:

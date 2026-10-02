@@ -1,7 +1,9 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { and, asc, desc, eq, getTableColumns, gt, inArray, isNotNull, isNull, like, lt, ne, notInArray, or, sql } from 'drizzle-orm'
 import * as schema from '../../node/schema'
-import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn } from '../../contract/wire.ts'
+import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSession, AgentSessionList, AgentSessionSnapshot, AgentTurn, AgentWaitCondition, AgentWaitFacts } from '../../contract/wire.ts'
+import { readWaitFacts } from './waitFacts'
+import { readExecutionCapture } from './executionCapture'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
 import { clientEventRecord, mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'
@@ -240,11 +242,28 @@ export class AgentStore extends AgentSessionRepository {
     return this.readSnapshot(sessionId, afterSeq, Math.min(Math.max(eventLimit, 1), 2_000), true)
   }
 
+  async waitFacts(sessionId: string, afterSeq: number, until: AgentWaitCondition): Promise<AgentWaitFacts> {
+    return this.db.transaction((tx) => readWaitFacts(tx, sessionId, afterSeq, until))
+  }
+
+  async waitSnapshot(sessionId: string, afterSeq: number, until: AgentWaitCondition): Promise<AgentSessionSnapshot> {
+    await this.requireSession(sessionId)
+    return this.readSnapshot(sessionId, afterSeq, 500, false, until)
+  }
+
+  async executionSnapshot(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {
+    const projection = await this.ensureSearchProjection()
+    return this.db.transaction((tx) => {
+      projection.catchUp(tx, sessionId)
+      return readExecutionCapture(tx, sessionId, turnIds)
+    })
+  }
+
   async exportSnapshot(sessionId: string): Promise<AgentSessionSnapshot> {
     return this.readSnapshot(sessionId, 0, undefined, false)
   }
 
-  private async readSnapshot(sessionId: string, afterSeq: number, limit: number | undefined, client: boolean): Promise<AgentSessionSnapshot> {
+  private async readSnapshot(sessionId: string, afterSeq: number, limit: number | undefined, client: boolean, until?: AgentWaitCondition): Promise<AgentSessionSnapshot> {
     const projection = client ? null : await this.ensureSearchProjection()
     return this.db.transaction((tx) => {
       projection?.catchUp(tx, sessionId)
@@ -254,13 +273,21 @@ export class AgentStore extends AgentSessionRepository {
         .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, afterSeq)))
         .orderBy(asc(schema.agentEvents.seq))
       const rows = limit === undefined ? events.all() : events.limit(limit).all()
+      const mappedSession = mapAgentSession(session)
       return {
-        session: mapAgentSession(session),
+        session: mappedSession,
         turns: tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.sessionId, sessionId))
           .orderBy(asc(schema.agentTurns.ordinal)).all().map(mapAgentTurn),
         events: rows.map((row) => client ? clientEventRecord(mapAgentEvent(row)) : mapAgentEvent(row)),
         requests: tx.select().from(schema.agentRequests).where(eq(schema.agentRequests.sessionId, sessionId))
           .orderBy(asc(schema.agentRequests.createdAt)).all().map(mapAgentRequest),
+        ...(until ? { wait: {
+          ...readWaitFacts(tx, sessionId, afterSeq, until, mappedSession),
+          eventsThroughSeq: session.lastEventSeq,
+          eventsComplete: !tx.select({ seq: schema.agentEvents.seq }).from(schema.agentEvents)
+            .where(and(eq(schema.agentEvents.sessionId, sessionId), gt(schema.agentEvents.seq, rows.at(-1)?.seq ?? afterSeq)))
+            .limit(1).get(),
+        } } : {}),
       }
     })
   }

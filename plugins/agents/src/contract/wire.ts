@@ -423,6 +423,17 @@ export type AgentSessionSnapshot = {
   turns: AgentTurn[]
   events: AgentEventRecord[]
   requests: AgentRequest[]
+  /** Authoritative wait outcome; ordinary snapshots and older Nodes omit this field. */
+  wait?: AgentWaitFacts & { eventsThroughSeq: number; eventsComplete: boolean }
+}
+
+export type AgentWaitCondition = 'ready' | 'attention' | 'turn_completed' | 'stopped'
+
+export type AgentWaitFacts = {
+  until: AgentWaitCondition
+  afterSeq: number
+  matched: boolean
+  terminal: { seq: number; turnId: string | null; type: 'turn_completed' | 'error' } | null
 }
 
 /** Display-only delegation lineage projected by the Agents plugin for sessions in a list page.

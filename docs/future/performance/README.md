@@ -8,7 +8,7 @@ This programme is separate from the performance plans retired in September 2026.
 
 ## Resume here
 
-Start with [unit 13](./13-agent-results.md). Assign one specialist at a time, review its result, then
+Use the table below to select the next pending unit. Assign one specialist at a time, review its result, then
 advance in the order below. Each assignment includes the detailed coordinator brief, evidence
 references, contracts to preserve, and acceptance checks. Read [the main integration review](../../../plans/performance/merge-main-review.md) for unresolved
 verification failures deferred at the user's request. Revalidate the merged source first;
@@ -27,7 +27,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 10 | [Managed agent process implementation record](../../../plans/performance/implementation-10-agent-processes.md) | Through 09 | Implemented |
 | 11 | [Agent queue implementation record](../../../plans/performance/implementation-11-agent-queue.md) | Through 10 | Implemented |
 | 12 | [Streamed search implementation record](../../../plans/performance/implementation-12-agent-search.md) | Through 11 | Implemented |
-| 13 | [Agent wait facts and complete result capture](./13-agent-results.md) | Through 12 | Pending |
+| 13 | [Agent results implementation record](../../../plans/performance/implementation-13-agent-results.md) | Through 12 | Implemented |
 | 14 | [Git filesystem implementation record](../../../plans/performance/implementation-14-git-filesystem.md) | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
 | 15 | [PR markers implementation record](../../../plans/performance/implementation-15-pr-markers.md) | Through 14 | Implemented; native verification blocked by service bundle size gate |
 | 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
