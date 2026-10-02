@@ -55,8 +55,7 @@
      on a wide display, and a transcript line 480 characters long is a line nobody reads. A pack
      may raise or lower it; zeroing it is not a thing, so it carries a length rather than a switch. */
   --pane-measure: 1200px;
-  /* How wide a form in a detail column gets. A settings page has the whole main column, so it reads
-     --pane-measure instead. */
+  /* How wide a form in a detail column gets. */
   --page-measure: 720px;
   --gap-inline: var(--space-3);
   --gap-row: var(--space-4);
