@@ -337,13 +337,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
-    if (session.runtimeState === 'failed' || session.runtimeState === 'stopped') {
-      await this.stopLive(session.id)
-    }
-    // Acceptance ends at the durable write. A startup failure is recorded against the queued turn.
-    void this.ensureSession(session)
-      .then(() => this.pump())
-      .catch(() => undefined)
+    // The pump owns startup and admission after the durable acceptance boundary.
+    void this.pump().catch(() => undefined)
     if (
       outcome.inserted
       && turn.ordinal === 0
@@ -375,7 +370,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       const updated = await this.store.requireSession(sessionId)
       this.emit({ channel: 'agent:session', session: updated })
       this.emit({ channel: 'agent:turn', turn })
-      void this.ensureSession(updated).then(() => this.pump()).catch(() => undefined)
+      void this.pump().catch(() => undefined)
     }
     return turn
   }
@@ -405,6 +400,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     }
     if (!active || active.id !== target) {
       await this.store.cancelTurn(target)
+      if (this.live.get(sessionId)?.admissionTurnId === target) await this.stopLive(sessionId)
       void this.pump()
       return
     }

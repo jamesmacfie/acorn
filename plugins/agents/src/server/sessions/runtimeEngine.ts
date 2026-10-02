@@ -124,6 +124,7 @@ type LiveSession = {
   retirementFailure: ProcessRetirementError | null
   callbacks: Set<Promise<void>>
   activeTurnId: string | null
+  admissionTurnId: string | null
   // So archiving a task can find its processes without a read per live session.
   taskId: string
   workspaceId: string
@@ -270,9 +271,9 @@ export class ManagedAgentEngine {
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
   // The last probe answer, when that probe started, and which drivers it asked. See providers().
-  protected providerCache: { probedAt: number; driverIds: string; descriptors: AgentProviderDescriptor[] } | null = null
+  protected providerCache: { probedAt: number; generation: number; descriptors: AgentProviderDescriptor[] } | null = null
   // The probe running now, which every caller that needs one joins.
-  protected providerProbe: Promise<AgentProviderDescriptor[]> | null = null
+  protected providerProbe: { generation: number; promise: Promise<AgentProviderDescriptor[]> } | null = null
   protected pumping = false
   private readonly pumpIdleWaiters = new Set<() => void>()
   // Set when pump() is called while a scan is already running. That call cannot be a no-op: the scan's
@@ -330,7 +331,7 @@ export class ManagedAgentEngine {
    */
   async providers(force = false): Promise<AgentProviderDescriptor[]> {
     const cached = this.providerCache
-    if (!force && cached && cached.driverIds === this.registry.providers().join('\n')) {
+    if (!force && cached && cached.generation === this.registry.generation) {
       if (Date.now() - cached.probedAt > PROVIDER_FRESH_MS) void this.probeProviders(false).catch(() => undefined)
       return cached.descriptors
     }
@@ -353,9 +354,11 @@ export class ManagedAgentEngine {
   // install or sign-in the caller is asking about. Any other caller joins the one running.
   protected probeProviders(force: boolean): Promise<AgentProviderDescriptor[]> {
     if (this.stopped) return Promise.reject(this.shutdown.signal.reason)
-    if (this.providerProbe && !force) return this.providerProbe
+    const generation = this.registry.generation
+    if (this.providerProbe?.generation === generation && !force) return this.providerProbe.promise
     const probedAt = Date.now()
     const driverIds = this.registry.providers()
+    const wave = { generation, promise: null as unknown as Promise<AgentProviderDescriptor[]> }
     const probe = Promise.all(driverIds.map(async (providerId) => {
       const driver = this.registry.create(providerId)
       if (!driver) throw new Error(`Agent driver disappeared during discovery: ${providerId}`)
@@ -380,14 +383,15 @@ export class ManagedAgentEngine {
       }
     })).then((descriptors) => {
       // An older probe that finishes last must not replace a newer answer.
-      if (!this.stopped && (!this.providerCache || this.providerCache.probedAt <= probedAt)) {
-        this.providerCache = { probedAt, driverIds: driverIds.join('\n'), descriptors }
+      if (!this.stopped && (this.providerProbe === wave && this.registry.generation === generation)) {
+        this.providerCache = { probedAt, generation, descriptors }
       }
       return descriptors
     }).finally(() => {
-      if (this.providerProbe === probe) this.providerProbe = null
+      if (this.providerProbe === wave) this.providerProbe = null
     })
-    this.providerProbe = probe
+    wave.promise = probe
+    this.providerProbe = wave
     return probe
   }
 
@@ -495,11 +499,12 @@ export class ManagedAgentEngine {
     return awaitWithSignal(query(), this.shutdown.signal)
   }
 
-  protected async ensureSession(session: AgentSession): Promise<LiveSession> {
+  protected async ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<LiveSession> {
     if (this.stopped) throw new Error('The managed agent runtime is shutting down.')
     const existing = this.live.get(session.id)
     if (existing?.retirementFailure) throw existing.retirementFailure
     if (existing?.stopping) throw new Error('The managed agent session is stopping.')
+    if (admission && existing) existing.admissionTurnId = admission.turnId
     if (existing?.handle) return existing
     if (existing?.startPromise) {
       await existing.startPromise
@@ -517,8 +522,9 @@ export class ManagedAgentEngine {
       retirementFailure: null,
       callbacks: new Set(),
       activeTurnId: null,
+      admissionTurnId: admission?.turnId ?? null,
       taskId: session.taskId,
-      workspaceId: '',
+      workspaceId: admission?.workspaceId ?? '',
       providerId: session.providerId,
       stopping: false,
       closing: false,
@@ -545,7 +551,7 @@ export class ManagedAgentEngine {
     let span: SpanHandle | undefined
     try {
       const cwd = await read(() => this.core.tasks.requireRoot(session.taskId))
-      live.workspaceId = await read(() => this.core.tasks.workspaceId(session.taskId))
+      if (!live.workspaceId) live.workspaceId = await read(() => this.core.tasks.workspaceId(session.taskId))
       const noProviderExecutionHistory = !(await read(() => this.store.hasProviderExecutionHistory(session.id)))
       signal.throwIfAborted()
       // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
@@ -610,7 +616,7 @@ export class ManagedAgentEngine {
       span?.end('error')
       if (error instanceof ProcessRetirementError) live.retirementFailure = error
       if (this.stopped || live.stopping) throw error
-      await this.record(session.id, null, {
+      await this.record(session.id, live.admissionTurnId, {
         type: 'error',
         code: 'provider_start_failed',
         message: safeProviderMessage(
@@ -807,6 +813,7 @@ export class ManagedAgentEngine {
       return
     }
     this.pumping = true
+    const failedStarts = new Set<string>()
     try {
       for (;;) {
         this.pumpRequested = false
@@ -825,7 +832,7 @@ export class ManagedAgentEngine {
         const workspaceActive = new Map<string, number>()
         const providerActive = new Map<string, number>()
         for (const live of this.live.values()) {
-          if (!live.activeTurnId) continue
+          if (!live.activeTurnId && !live.admissionTurnId) continue
           workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
           providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
         }
@@ -843,123 +850,158 @@ export class ManagedAgentEngine {
             this.armQueueWake(item.turn.notBefore)
             continue
           }
-          const live = await this.ensureSession(item.session).catch(() => null)
-          if (!live?.handle?.ready || live.activeTurnId || live.stopping || this.stopped) continue
-          const currentSession = await this.store.requireSession(item.session.id)
-          if (!this.ownsSession(item.session.id, live)) continue
-          const decision = decideAgentCommand({
-            runtimeState: currentSession.runtimeState,
-            attention: currentSession.attention,
-            activeTurnId: live.activeTurnId,
-            pendingRequestIds: [],
-          }, { type: 'dispatch_turn', turnId: item.turn.id })
-          if (!decision.ok) continue
-          if ((workspaceActive.get(live.workspaceId) ?? 0) >= limits.workspace) continue
-          if ((providerActive.get(live.providerId) ?? 0) >= limits.provider) continue
-          live.activeTurnId = item.turn.id
-          live.acceptedResponse = false
-          live.lastActivityAt = Date.now()
-          workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
-          providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
-          this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
-          await this.store.dispatchTurn(item.turn.id)
+          const existing = this.live.get(item.session.id)
+          if (failedStarts.has(item.session.id) || existing?.activeTurnId || existing?.admissionTurnId || existing?.stopping) continue
+          const workspaceId = existing?.workspaceId || await this.readWhileRunning(() => this.core.tasks.workspaceId(item.session.taskId))
+          if (this.stopped) return
+          if ((workspaceActive.get(workspaceId) ?? 0) >= limits.workspace) continue
+          if ((providerActive.get(item.session.providerId) ?? 0) >= limits.provider) continue
+          const current = await this.store.getSession(item.session.id)
+          const head = await this.store.nextQueuedTurn(item.session.id)
+          if (!current || current.controller !== 'acorn' || current.archivedAt || head?.id !== item.turn.id) continue
+          if (head.notBefore != null && head.notBefore > Date.now()) {
+            this.armQueueWake(head.notBefore)
+            continue
+          }
+          item.session = current
+          // Admission lives on the startup/process generation, including while ensureSession joins it.
+          if (item.session.runtimeState === 'failed' || item.session.runtimeState === 'stopped') {
+            await this.stopLive(item.session.id)
+            if (this.stopped) return
+          }
+          const starting = this.ensureSession(item.session, { turnId: item.turn.id, workspaceId })
+          const owner = this.live.get(item.session.id)
           try {
-            const input = item.turn.continuationInput ?? item.turn.input
-            await this.record(item.session.id, item.turn.id, {
-              type: 'user_message',
-              text: agentTurnInputText({ ...item.turn, input }),
-              ...(item.turn.continuationInput ? { automatic: true } : {}),
+            const live = await starting.catch(() => {
+              if (!owner?.stopping && !this.stopped) failedStarts.add(item.session.id)
+              return null
             })
-            const attachments = Object.fromEntries((await Promise.all(
-              [...new Set(input.flatMap((part) =>
-                part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
-                .map(async (attachmentId) => {
-                  const attachment = await this.attachments.resolve(attachmentId)
-                  if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
-                  return [attachmentId, {
-                    id: attachment.id,
-                    filename: attachment.filename,
-                    mediaType: attachment.mediaType,
-                    byteSize: attachment.byteSize,
-                    localPath: attachment.localPath,
-                  }] as const
-                }),
-            )))
-            if (!this.ownsSession(item.session.id, live)) continue
-            await this.store.startTurn(item.turn.id)
-            if (!this.ownsSession(item.session.id, live)) continue
-            this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
-            void live.handle.sendTurn({ turn: item.turn, input, attachments })
-            .then((result) => this.providerCallback(item.session.id, live, async () => {
-              if (!this.ownsSession(item.session.id, live)) return
-              if (result.providerTurnRef) await this.store.setTurnProviderRef(item.turn.id, result.providerTurnRef)
-            }))
-            .catch((error) => this.providerCallback(item.session.id, live, async () => {
-              if (!this.ownsSession(item.session.id, live) || live.activeTurnId !== item.turn.id) return
-              live.activeTurnId = null
-              const failure = live.driver.classifyTurnFailure?.(error) ?? 'uncertain'
-              if (
-                failure === 'safe_transient'
-                && !live.acceptedResponse
-                && item.turn.attempt + 1 < 3
-              ) {
-                const message = safeProviderMessage(
-                  error,
-                  'Safe transient provider failure.',
-                  this.mintedSecrets,
-                )
-                // The same turn id starts again, so its first attempt's span has to close here or
-                // the next attempt would replace an open handle in the map.
-                this.endTurnSpan(item.turn.id, 'requeued')
-                await this.store.requeueTransientTurn(item.turn.id, message)
-                await this.record(item.session.id, item.turn.id, {
-                  type: 'diagnostic',
-                  level: 'warning',
-                  message: `Provider rejected the turn before accepting output; retrying (${item.turn.attempt + 2}/3).`,
-                })
-                await this.record(item.session.id, item.turn.id, {
-                  type: 'session_state',
-                  state: 'ready',
-                  detail: 'Safely retrying an undispatched provider turn.',
+            if (!live?.handle?.ready || live.activeTurnId || live.stopping || this.stopped) continue
+            const currentSession = await this.store.requireSession(item.session.id)
+            const currentHead = await this.store.nextQueuedTurn(item.session.id)
+            if (!this.ownsSession(item.session.id, live) || currentHead?.id !== item.turn.id
+              || currentSession.controller !== 'acorn' || currentSession.archivedAt) continue
+            if (currentHead.notBefore != null && currentHead.notBefore > Date.now()) {
+              this.armQueueWake(currentHead.notBefore)
+              continue
+            }
+            item.turn = currentHead
+            const decision = decideAgentCommand({
+              runtimeState: currentSession.runtimeState,
+              attention: currentSession.attention,
+              activeTurnId: live.activeTurnId,
+              pendingRequestIds: [],
+            }, { type: 'dispatch_turn', turnId: item.turn.id })
+            if (!decision.ok) continue
+            live.activeTurnId = item.turn.id
+            live.acceptedResponse = false
+            live.lastActivityAt = Date.now()
+            workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
+            providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
+            this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
+            await this.store.dispatchTurn(item.turn.id)
+            try {
+              const input = item.turn.continuationInput ?? item.turn.input
+              await this.record(item.session.id, item.turn.id, {
+                type: 'user_message',
+                text: agentTurnInputText({ ...item.turn, input }),
+                ...(item.turn.continuationInput ? { automatic: true } : {}),
+              })
+              const attachments = Object.fromEntries((await Promise.all(
+                [...new Set(input.flatMap((part) =>
+                  part.type === 'attachment' || part.type === 'image' ? [part.attachmentId] : []))]
+                  .map(async (attachmentId) => {
+                    const attachment = await this.attachments.resolve(attachmentId)
+                    if (!attachment) throw new Error(`Attachment is unavailable: ${attachmentId}`)
+                    return [attachmentId, {
+                      id: attachment.id,
+                      filename: attachment.filename,
+                      mediaType: attachment.mediaType,
+                      byteSize: attachment.byteSize,
+                      localPath: attachment.localPath,
+                    }] as const
+                  }),
+              )))
+              if (!this.ownsSession(item.session.id, live)) continue
+              await this.store.startTurn(item.turn.id)
+              if (!this.ownsSession(item.session.id, live)) continue
+              this.beginTurnSpan(item.turn.id, item.session.id, live.providerId, item.turn.source)
+              void live.handle.sendTurn({ turn: item.turn, input, attachments })
+              .then((result) => this.providerCallback(item.session.id, live, async () => {
+                if (!this.ownsSession(item.session.id, live)) return
+                if (result.providerTurnRef) await this.store.setTurnProviderRef(item.turn.id, result.providerTurnRef)
+              }))
+              .catch((error) => this.providerCallback(item.session.id, live, async () => {
+                if (!this.ownsSession(item.session.id, live) || live.activeTurnId !== item.turn.id) return
+                live.activeTurnId = null
+                const failure = live.driver.classifyTurnFailure?.(error) ?? 'uncertain'
+                if (
+                  failure === 'safe_transient'
+                  && !live.acceptedResponse
+                  && item.turn.attempt + 1 < 3
+                ) {
+                  const message = safeProviderMessage(
+                    error,
+                    'Safe transient provider failure.',
+                    this.mintedSecrets,
+                  )
+                  // The same turn id starts again, so its first attempt's span has to close here or
+                  // the next attempt would replace an open handle in the map.
+                  this.endTurnSpan(item.turn.id, 'requeued')
+                  await this.store.requeueTransientTurn(item.turn.id, message)
+                  await this.record(item.session.id, item.turn.id, {
+                    type: 'diagnostic',
+                    level: 'warning',
+                    message: `Provider rejected the turn before accepting output; retrying (${item.turn.attempt + 2}/3).`,
+                  })
+                  await this.record(item.session.id, item.turn.id, {
+                    type: 'session_state',
+                    state: 'ready',
+                    detail: 'Safely retrying an undispatched provider turn.',
+                  })
+                  void this.pump()
+                  return
+                }
+                await this.providerEvents.accept({
+                  sessionId: item.session.id,
+                  turnId: item.turn.id,
+                  event: {
+                  type: 'error',
+                  code: 'turn_dispatch_failed',
+                  message: safeProviderMessage(
+                    error,
+                    'Provider turn failed.',
+                    this.mintedSecrets,
+                  ),
+                  retryable: false,
+                  },
                 })
                 void this.pump()
-                return
-              }
+              }))
+            } catch (error) {
+              live.activeTurnId = null
               await this.providerEvents.accept({
                 sessionId: item.session.id,
                 turnId: item.turn.id,
                 event: {
-                type: 'error',
-                code: 'turn_dispatch_failed',
-                message: safeProviderMessage(
-                  error,
-                  'Provider turn failed.',
-                  this.mintedSecrets,
-                ),
-                retryable: false,
+                  type: 'error',
+                  code: 'turn_dispatch_failed',
+                  message: safeProviderMessage(error, 'Agent turn preparation failed.', this.mintedSecrets),
+                  retryable: false,
                 },
               })
-              void this.pump()
-            }))
-          } catch (error) {
-            live.activeTurnId = null
-            await this.providerEvents.accept({
-              sessionId: item.session.id,
-              turnId: item.turn.id,
-              event: {
-                type: 'error',
-                code: 'turn_dispatch_failed',
-                message: safeProviderMessage(error, 'Agent turn preparation failed.', this.mintedSecrets),
-                retryable: false,
-              },
-            })
+            }
+            started = true
+          } finally {
+            if (owner?.admissionTurnId === item.turn.id) owner.admissionTurnId = null
           }
-          started = true
         }
         // Rescan while there is a reason to: a start moves that session on to its next queued head, and
         // a pump call raised during the pass wants a queue snapshot newer than the one it read.
         if (!started && !this.pumpRequested) return
       }
+    } catch (error) {
+      if (!this.stopped) throw error
     } finally {
       this.pumping = false
       for (const resolve of this.pumpIdleWaiters) resolve()

@@ -1,0 +1,13 @@
+$ node scripts/db.mjs check
+
+✓ packages/node-core (2 file(s)) applies cleanly to a fresh DB
+✓ plugins/agents (8 file(s)) applies cleanly to a fresh DB
+✓ plugins/browser (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/changes (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/database (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/findings (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/github (2 file(s)) applies cleanly to a fresh DB
+✓ plugins/http (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/memory (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/terminal (1 file(s)) applies cleanly to a fresh DB
+✓ plugins/workflows (1 file(s)) applies cleanly to a fresh DB

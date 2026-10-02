@@ -152,6 +152,17 @@ describe('analyzeClaudeDailyUsage', () => {
     expect(report.today.unpricedModels).toEqual([])
   })
 
+  it('includes 200,000 compact accepted records without skipping the file', async () => {
+    const { root, project } = await fixtureRoot()
+    const line = JSON.stringify({ type: 'assistant', timestamp: new Date(now).toISOString(),
+      message: { model: 'x', usage: {} } }) + '\n'
+    await writeFile(join(project, 'compact.jsonl'), line.repeat(200_000))
+    const report = await analyzeClaudeDailyUsage(root, now)
+    expect(report.skippedFileCount).toBe(0)
+    expect(report.today.sessionCount).toBe(1)
+    expect(report.today.unpricedModels).toEqual(['x'])
+  })
+
   it('handles a missing root and skips old or oversized files', async () => {
     const { root, project } = await fixtureRoot()
     const old = join(project, 'old.jsonl')

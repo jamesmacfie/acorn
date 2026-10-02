@@ -16,15 +16,7 @@ export type EnqueueTurnOutcome = {
   sessionAfterRename: AgentSession | null
 }
 
-type SessionListFilter = {
-  taskId?: string
-  workspaceId?: string
-  archived?: boolean
-  attention?: boolean
-  search?: string
-  cursor?: number
-  limit?: number
-}
+import { sessionCursor, type SessionListFilter } from '../../shared/sessionList'
 
 const now = (): number => Date.now()
 
@@ -191,6 +183,7 @@ export class AgentStore extends AgentSessionRepository {
   }
 
   async listSessions(filter: SessionListFilter = {}): Promise<AgentSessionList> {
+    const cursor = filter.cursor == null ? null : sessionCursor(filter.cursor, filter.cursorFormat)
     const limit = Math.min(Math.max(filter.limit ?? 50, 1), 100)
     // The fourth workspace-scoped read (sessionRepository.ts holds the other three). Resolved to task
     // ids through core rather than joined, because `tasks` lives in core's database and this table
@@ -213,7 +206,9 @@ export class AgentStore extends AgentSessionRepository {
         ? or(isNotNull(schema.agentSessions.archivedAt), retiredTask || undefined)
         : and(isNull(schema.agentSessions.archivedAt), liveTask || undefined),
       filter.attention ? sql`${schema.agentSessions.attention} NOT IN ('none', 'unread')` : undefined,
-      filter.cursor ? lt(schema.agentSessions.updatedAt, filter.cursor) : undefined,
+      cursor == null ? undefined : typeof cursor === 'number'
+        ? lt(schema.agentSessions.updatedAt, cursor)
+        : or(lt(schema.agentSessions.updatedAt, cursor.updatedAt), and(eq(schema.agentSessions.updatedAt, cursor.updatedAt), lt(schema.agentSessions.id, cursor.id))),
       filter.search ? like(schema.agentSessions.title, `%${filter.search.replace(/[%_]/g, '\\$&')}%`) : undefined,
     ].filter((item): item is Exclude<typeof item, undefined> => item != null)
 
@@ -221,11 +216,14 @@ export class AgentStore extends AgentSessionRepository {
       .select()
       .from(schema.agentSessions)
       .where(conditions.length ? and(...conditions) : undefined)
-      .orderBy(desc(schema.agentSessions.updatedAt))
+      .orderBy(desc(schema.agentSessions.updatedAt), desc(schema.agentSessions.id))
       .limit(limit + 1)
     const hasMore = rows.length > limit
     const page = rows.slice(0, limit).map(mapAgentSession)
-    return { sessions: page, delegations: [], nextCursor: hasMore ? String(page.at(-1)?.updatedAt ?? '') : null }
+    const last = page.at(-1)
+    return { sessions: page, delegations: [], nextCursor: hasMore && last
+      ? filter.cursorFormat === 'tuple-v1' ? `v1:${last.updatedAt}:${last.id}` : String(last.updatedAt)
+      : null }
   }
 
   async snapshot(sessionId: string, afterSeq = 0, eventLimit = 500): Promise<AgentSessionSnapshot> {
@@ -679,19 +677,17 @@ export class AgentStore extends AgentSessionRepository {
   }
 
   async queuedHeads(): Promise<Array<{ session: AgentSession; turn: AgentTurn }>> {
-    const sessions = await this.db
-      .select()
-      .from(schema.agentSessions)
-      .where(and(
-        isNull(schema.agentSessions.archivedAt),
-        eq(schema.agentSessions.controller, 'acorn'),
-      ))
-    const result: Array<{ session: AgentSession; turn: AgentTurn }> = []
-    for (const row of sessions) {
-      const turn = await this.nextQueuedTurn(row.id)
-      if (turn) result.push({ session: mapAgentSession(row), turn })
-    }
-    return result
+    const heads = this.db.select({
+      sessionId: schema.agentTurns.sessionId,
+      ordinal: sql<number>`min(${schema.agentTurns.ordinal})`.as('head_ordinal'),
+    }).from(schema.agentTurns).where(eq(schema.agentTurns.status, 'queued'))
+      .groupBy(schema.agentTurns.sessionId).as('heads')
+    const rows = await this.db.select({ session: schema.agentSessions, turn: schema.agentTurns })
+      .from(heads)
+      .innerJoin(schema.agentTurns, and(eq(schema.agentTurns.sessionId, heads.sessionId), eq(schema.agentTurns.ordinal, heads.ordinal)))
+      .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, heads.sessionId))
+      .where(and(isNull(schema.agentSessions.archivedAt), eq(schema.agentSessions.controller, 'acorn')))
+    return rows.map(({ session, turn }) => ({ session: mapAgentSession(session), turn: mapAgentTurn(turn) }))
   }
 
   async hasProviderExecutionHistory(sessionId: string): Promise<boolean> {
