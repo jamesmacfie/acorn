@@ -1,7 +1,7 @@
 # UI consistency: the rest of the pass
 
 **Status:** in progress. Nineteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 to B10b on branch `more-ui`. B06 to B09 are merged to main. One area batch and the final sweep
+and B06 to B10b on branch `more-ui`. B06 to B10b are merged to main. One area batch and the final sweep
 remain.
 Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
