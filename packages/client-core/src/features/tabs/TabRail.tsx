@@ -22,9 +22,8 @@ import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
-import { slugifyBranch } from '@acorn/protocol/branch.ts'
+import { slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
-import { defaultBranchForTask } from '../tasks/defaultBranch'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { keybindingRegistry, registerKeybindings, resolveKeybindings } from '../../host/registries/commands/keybindings'
 import { formatChord } from '../../kit/lib/rendering/formatChord'
@@ -49,7 +48,7 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import { Tabs } from '../../kit/components/layout/Tabs'
 import { Text } from '../../kit/components/content/Text'
 import { readJson } from '../../infra/node/apiClient'
-import { projectWorktreesRoute, type ProjectWorktree } from '@acorn/protocol/api.ts'
+import { projectWorktreeAvailabilityRoute, projectWorktreesRoute, type ProjectWorktree, type WorktreeAvailability } from '@acorn/protocol/api.ts'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
@@ -101,7 +100,7 @@ export default function TabRail() {
   // already selected, and the task lands in the wrong workspace.
   const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
   // Custom branch name (docs/workspaces-and-tasks.md § Task creation and navigation). Defaults to
-  // a de-duped slug of the title until the user edits the field, then their value wins.
+  // a slug of the title until the user edits the field, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
   // Where a git task's files come from, one tab each (docs/workspaces-and-tasks.md § Task creation and
@@ -134,11 +133,31 @@ export default function TabRail() {
     const list = freeWorktrees() ?? []
     return list.find((wt) => wt.path === pickedWorktree()) ?? list[0]
   }
-  const branchesInProject = (projectId: string) =>
-    (query.data ?? []).filter((task) => task.projectId === projectId).flatMap((task) => task.branch ? [task.branch] : [])
   const defaultBranch = (title: string) =>
-    defaultBranchForTask(title, branchPrefix(), branchesInProject(newProject()))
+    withBranchPrefix(branchPrefix(), slugifyBranch(title))
   const effectiveBranch = () => (branchTouched() ? slugifyBranch(branchText()) : defaultBranch(text()))
+  const [availability] = createResource(
+    () => {
+      if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git' || source() !== 'new' || !effectiveBranch()) return undefined
+      // Recheck when another window creates or archives a task while this dialog is open.
+      query.data
+      return { projectId: newProject(), branch: effectiveBranch() }
+    },
+    async (request) => ({
+      ...request,
+      result: await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(request.projectId, request.branch))
+        .catch((): WorktreeAvailability => ({ available: false, reason: 'Could not check existing worktrees. Try again.' })),
+    }),
+  )
+  const branchAvailability = () => {
+    const checked = availability()
+    return checked?.projectId === newProject() && checked.branch === effectiveBranch() ? checked.result : undefined
+  }
+  const branchError = () => {
+    const result = branchAvailability()
+    return !availability.loading && result && !result.available ? result.reason : ''
+  }
+  const [savingDraft, setSavingDraft] = createSignal(false)
   // What the icon picker shows while no icon is chosen: the same default the rail row would derive.
   const draftFallbackIcon = () => {
     const d = draft()
@@ -305,6 +324,7 @@ export default function TabRail() {
     setSource('new')
     setPickedWorktree('')
     setSkipSetup(false)
+    setDraftErr('')
     setDraft({ mode: 'new' })
   }
 
@@ -318,10 +338,10 @@ export default function TabRail() {
   // Enter in a field and the footer button both land here, so it checks what the button's
   // `disabled` checks.
   const canSubmitDraft = () => {
-    if (!text().trim()) return false
+    if (savingDraft() || !text().trim()) return false
     if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git') return true
     if (source() === 'worktree') return !!chosenWorktree()
-    return noBranch() || !!effectiveBranch()
+    return noBranch() || (!!effectiveBranch() && !prefixRow.loading && !availability.loading && branchAvailability()?.available === true)
   }
 
   async function submitDraft() {
@@ -330,6 +350,7 @@ export default function TabRail() {
     const d = draft()
     const value = text().trim()
     if (!d || !value) return setDraft(null)
+    setSavingDraft(true)
     try {
       if (d.mode === 'new') {
         const project = selectedProject()
@@ -355,6 +376,8 @@ export default function TabRail() {
       setDraft(null)
     } catch (error) {
       setDraftErr(error instanceof Error ? error.message : 'Could not save the task.')
+    } finally {
+      setSavingDraft(false)
     }
   }
 
@@ -631,7 +654,7 @@ export default function TabRail() {
                 {/* The body's column gap, again, so the wrapper does not squash the fields inside it together. */}
                 <div id={`new-task-panel-${source()}`} role="tabpanel" aria-labelledby={`new-task-tab-${source()}`} style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}>
                   <Show when={source() === 'new'}>
-                    <Field label="Branch">
+                    <Field label="Branch" error={branchError()} hint={availability.loading ? 'Checking worktree availability…' : undefined}>
                       <Input
                         value={branchTouched() ? branchText() : effectiveBranch()}
                         onInput={(value) => {

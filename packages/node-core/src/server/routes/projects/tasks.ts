@@ -18,6 +18,7 @@ import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { resolve } from 'node:path'
+import { worktreeAvailability, worktreeNameConflict } from '../../worktrees/worktreeAvailability'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
@@ -201,7 +202,13 @@ export const tasks = new Hono<AppEnv>()
     const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
     const sort = (value ?? -1) + 1
     const icon = cleanIcon(seed.icon)
-    await db.insert(schema.tasks).values({
+    if (branch && !worktreePath) {
+      const availability = await worktreeAvailability(db, project, branch)
+      if (!availability.available) return respondError(c, 409, 'worktree-unavailable', [availability.reason])
+      const conflict = worktreeNameConflict(db, project, branch)
+      if (conflict) return respondError(c, 409, 'worktree-unavailable', [conflict])
+    }
+    db.insert(schema.tasks).values({
       id,
       title,
       icon,
@@ -216,7 +223,7 @@ export const tasks = new Hono<AppEnv>()
       createdAt: now,
       updatedAt: now,
       archivedAt: null,
-    })
+    }).run()
     if (links.length) {
       await db
         .insert(schema.taskLinks)
