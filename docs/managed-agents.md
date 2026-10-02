@@ -76,6 +76,19 @@ A workspace-scoped list or search resolves the task ids first, through
 result narrows the answer to nothing rather than falling back to unfiltered, because unfiltered is
 how a workspace-scoped read leaks another workspace's sessions into the caller's view.
 
+Session roster pages order by `updatedAt DESC, id DESC`. A reader that sends
+`cursorFormat=tuple-v1` receives a `v1:<updatedAt>:<id>` continuation cursor and seeks from both
+encoded values, including after deletion of the anchor. Numeric timestamp cursors remain accepted.
+Without the opt-in, the Node returns numeric cursors for older clients. A client requesting tuple
+pages from an older Node can continue with its numeric response, which retains that Node's
+limitation at tied timestamps. The cursor is bounded and validated before any storage read.
+Event pages retain their independent sequence cursor.
+
+Roster pagination reads live rows, rather than a database snapshot spanning requests. For unchanged
+rows and filters, tuple pages visit each match once. Deleting an anchor preserves continuation.
+Edits between pages can move rows across the cursor and omit or repeat them. Refresh the roster to
+observe those edits.
+
 A new session starts as `New agent session`. Its first accepted turn immediately replaces that with a
 deterministic label from the first non-empty text part, or the first attachment filename, so naming
 never blocks the turn. For a first interactive text prompt of at least five words, the runtime then
@@ -371,10 +384,16 @@ answer and serves it at once. Once that answer is 30 seconds old, the next read 
 probe runs behind the read to replace it; callers that arrive meanwhile share that probe
 (`ManagedAgentEngine.providers`, `plugins/agents/src/server/sessions/runtimeEngine.ts`). Three things
 wait for a fresh probe instead: the first read after boot, a read after a harness was added or
-removed, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
+removed or its factory replaced, and `?force=true`, which the New menu's Refresh button sends. A session start or a delegated
 spawn that the served answer would refuse, because the harness looks missing or signed out, probes
 once more before it refuses, so installing or signing in to a CLI never needs a Node restart. Custom
 agents, MCP servers, and session defaults are not part of this answer, so editing them drops nothing.
+
+Ordinary misses join the wave for the registry generation. Each forced refresh starts a separate
+wave, including while another refresh runs. Only the latest wave from the unchanged generation can
+publish cached descriptors. Superseded and stopped waves cannot restore the cache. A rejected
+provider probe returns that provider's diagnostic descriptor and can be retried. Discovery describes
+availability; provider startup still negotiates readiness and configuration.
 
 The Node probes harness availability and usage on bounded intervals. Usage and pricing details are
 displayed in the Agent pane; pricing overrides are local preferences and provider prompts/responses
@@ -1132,10 +1151,26 @@ workspace ceiling is counted across all providers in one workspace. Both live in
 (`agents:concurrency:v1`), read per scan rather than captured, so a raise applies to the scan the write
 triggers. Absent or unreadable, the built-in 2 and 3 stand.
 
+Queued startup reserves both ceilings on the live session generation before starting a provider.
+Pending reservations count alongside active turns. Cancellation joins that generation's process
+retirement, and failure and shutdown release its reservation. Lowering a ceiling leaves accepted
+turns running. Explicit session creation and configuration negotiation retain their readiness
+contracts and can start an interactive handle without queued work.
+
+Turn acceptance ends at its durable queue write. A later startup failure records an error against
+that turn and leaves it queued, without claiming provider execution history or failing the HTTP
+acknowledgement. The pump attempts a failing session once per invocation. Before recording or sending
+input, it rechecks the durable head after workspace and startup reads, so cancellation, reorder,
+input edits, and deferred continuations cannot dispatch an obsolete head. The earliest deferred head
+blocks later turns in its session. Workflow work gets a dispatch opportunity after five interactive
+or automation turns.
+
 The dispatcher is edge-triggered: it scans the queue when a turn is enqueued, when a provider starts,
 and when a turn settles. A scan that starts nothing rescans when a call arrived while it was running,
 because that call's turn cannot be in the snapshot the scan is working from, and the reconcile pass
-runs one scan at boot. Without both, a turn queued at the wrong moment waits for an unrelated session
+runs one scan at boot. Queue heads and their session rows are selected in one plugin-database
+statement through the partial queued-head index, without mapping idle sessions or joining the core
+database. Ordinary text frames do not trigger queue scans. Without both, a turn queued at the wrong moment waits for an unrelated session
 to finish a turn before anything looks at it again.
 
 **A plan usage limit pauses the same logical turn until the account resets.** The runtime first needs

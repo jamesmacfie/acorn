@@ -1,0 +1,38 @@
+{
+  "records": 200000,
+  "bytes": 19000000,
+  "wallMs": 130.8036659999998,
+  "cpuMs": 174.354,
+  "rssDeltaBytes": -344064,
+  "value": {
+    "today": {
+      "day": "2026-10-01",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheWriteTokens": 0,
+      "cacheReadTokens": 0,
+      "totalNonCacheTokens": 0,
+      "workingSeconds": 0,
+      "sessionCount": 0,
+      "estimatedCostUsd": 0,
+      "estimatedCacheSavingsUsd": 0,
+      "pricingFallback": false,
+      "unpricedModels": []
+    },
+    "yesterday": {
+      "day": "2026-09-30",
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "cacheWriteTokens": 0,
+      "cacheReadTokens": 0,
+      "totalNonCacheTokens": 0,
+      "workingSeconds": 0,
+      "sessionCount": 0,
+      "estimatedCostUsd": 0,
+      "estimatedCacheSavingsUsd": 0,
+      "pricingFallback": false,
+      "unpricedModels": []
+    },
+    "skippedFileCount": 1
+  }
+}

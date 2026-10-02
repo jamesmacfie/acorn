@@ -1,3 +1,4 @@
+import type { SessionListFilter } from '../../shared/sessionList'
 import { activeNodeId, readBytes, readJson, sendForm, writeJson } from '@acorn/plugin-api/client'
 import type {
   AgentAttachment,
@@ -78,10 +79,13 @@ export const managedAgentApi = {
   // Explicit origin options bind continuation reads and delayed draft/media work to their Node.
   // Omitting the origin retains the active-Node behavior for synchronous surface actions.
   sessions: (
-    filter: { taskId?: string; workspaceId?: string; attention?: boolean; archived?: boolean } = {},
+    filter: SessionListFilter = {},
     options: AgentOrigin = {},
   ) => {
-    const query = new URLSearchParams()
+    const query = new URLSearchParams({ cursorFormat: 'tuple-v1' })
+    if (filter.cursor != null) query.set('cursor', String(filter.cursor))
+    if (filter.limit != null) query.set('limit', String(filter.limit))
+    if (filter.search) query.set('search', filter.search)
     if (filter.taskId) query.set('taskId', filter.taskId)
     if (filter.workspaceId) query.set('workspaceId', filter.workspaceId)
     if (filter.attention != null) query.set('attention', String(filter.attention))

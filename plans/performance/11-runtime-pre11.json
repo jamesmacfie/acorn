@@ -1,0 +1,189 @@
+{
+  "plans": [
+    {
+      "id": 4,
+      "parent": 0,
+      "notused": 216,
+      "detail": "SCAN t"
+    },
+    {
+      "id": 8,
+      "parent": 0,
+      "notused": 46,
+      "detail": "SEARCH s USING INDEX sqlite_autoindex_agent_sessions_1 (id=?)"
+    },
+    {
+      "id": 19,
+      "parent": 0,
+      "notused": 0,
+      "detail": "CORRELATED SCALAR SUBQUERY 1"
+    },
+    {
+      "id": 25,
+      "parent": 19,
+      "notused": 61,
+      "detail": "SEARCH h USING INDEX agent_turns_session_ordinal_idx (session_id=?)"
+    }
+  ],
+  "scans": [
+    {
+      "sessions": 100,
+      "runs": [
+        {
+          "wallMs": 13.590791999999965,
+          "cpuMs": 20.105,
+          "statements": 101,
+          "heads": 0
+        },
+        {
+          "wallMs": 11.131542000000081,
+          "cpuMs": 16.05,
+          "statements": 101,
+          "heads": 0
+        },
+        {
+          "wallMs": 16.520125000000007,
+          "cpuMs": 33.91,
+          "statements": 101,
+          "heads": 0
+        }
+      ]
+    },
+    {
+      "sessions": 1000,
+      "runs": [
+        {
+          "wallMs": 89.88591599999995,
+          "cpuMs": 129.896,
+          "statements": 1001,
+          "heads": 0
+        },
+        {
+          "wallMs": 81.88479099999995,
+          "cpuMs": 82.703,
+          "statements": 1001,
+          "heads": 0
+        },
+        {
+          "wallMs": 81.97812500000009,
+          "cpuMs": 90.639,
+          "statements": 1001,
+          "heads": 0
+        }
+      ]
+    },
+    {
+      "sessions": 5000,
+      "runs": [
+        {
+          "wallMs": 404.7100840000003,
+          "cpuMs": 420.511,
+          "statements": 5001,
+          "heads": 0
+        },
+        {
+          "wallMs": 424.9428750000002,
+          "cpuMs": 468.595,
+          "statements": 5001,
+          "heads": 0
+        },
+        {
+          "wallMs": 408.0193330000002,
+          "cpuMs": 414.952,
+          "statements": 5001,
+          "heads": 0
+        }
+      ]
+    }
+  ],
+  "launch": {
+    "wallMs": 15.972291999999925,
+    "cpuMs": 20.887
+  },
+  "initial": {
+    "live": 20,
+    "active": 2,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "launches": 20,
+    "stops": 0,
+    "sends": [
+      "s0",
+      "s1"
+    ],
+    "cancels": 0,
+    "probes": 0
+  },
+  "raised": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "sends": [
+      "s0",
+      "s1",
+      "s2",
+      "s3"
+    ]
+  },
+  "fairness": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "sends": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s19"
+    ]
+  },
+  "blockedCancellation": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "launches": 20,
+    "stops": 0
+  },
+  "lowered": {
+    "live": 20,
+    "active": 4,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "sends": [
+      "s0",
+      "s1",
+      "s2",
+      "s3",
+      "s4",
+      "s19"
+    ]
+  },
+  "providers": {
+    "concurrentRequests": 20,
+    "probes": 1,
+    "wallMs": 11.317209000000275,
+    "cpuMs": 41.195
+  },
+  "beforeStop": {
+    "live": 20,
+    "active": 3,
+    "reconnectTimers": 1,
+    "quietTimers": 0
+  },
+  "stop": {
+    "wallMs": 0.4066250000000764,
+    "cpuMs": 0.49
+  },
+  "afterStop": {
+    "live": 0,
+    "active": 0,
+    "reconnectTimers": 0,
+    "quietTimers": 0,
+    "stops": 20,
+    "callbacks": 0
+  }
+}

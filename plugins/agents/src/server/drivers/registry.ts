@@ -9,6 +9,10 @@ import type { AgentDriver, AgentDriverFactory } from './types'
 //   registerNative  a driver factory, for a vendor protocol that carries product value ACP cannot
 //                   express. First-party only, and named so that writing one is a deliberate act.
 export class AgentDriverRegistry {
+  private revision = 0
+
+  get generation(): number { return this.revision }
+
   readonly #factories = new Map<string, AgentDriverFactory>()
 
   register(spec: HarnessLaunchSpec): () => void {
@@ -18,8 +22,12 @@ export class AgentDriverRegistry {
   registerNative(providerId: string, factory: AgentDriverFactory): () => void {
     if (this.#factories.has(providerId)) throw new Error(`Agent driver already registered: ${providerId}`)
     this.#factories.set(providerId, factory)
+    this.revision++
     return () => {
-      if (this.#factories.get(providerId) === factory) this.#factories.delete(providerId)
+      if (this.#factories.get(providerId) === factory) {
+        this.#factories.delete(providerId)
+        this.revision++
+      }
     }
   }
 
@@ -32,7 +40,10 @@ export class AgentDriverRegistry {
   }
 
   clear(): void {
-    this.#factories.clear()
+    if (this.#factories.size) {
+      this.#factories.clear()
+      this.revision++
+    }
   }
 }
 

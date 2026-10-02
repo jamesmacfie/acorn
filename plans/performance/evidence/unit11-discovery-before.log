@@ -1,0 +1,47 @@
+
+ RUN  v4.1.11 /tmp/acorn-unit11-before
+
+ ❯ src/server/sessions/runtimeProviders.test.ts (10 tests | 1 failed | 9 skipped) 128ms
+     × only caches the latest forced wave when both start in the same millisecond 127ms
+
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  src/server/sessions/runtimeProviders.test.ts > the providers answer > only caches the latest forced wave when both start in the same millisecond
+AssertionError: expected [ { id: 'fake', …(12) } ] to be [ { id: 'fake', …(12) } ] // Object.is equality
+
+- Expected
++ Received
+
+@@ -13,11 +13,11 @@
+      "configOptions": [],
+      "diagnostics": [],
+      "driverKind": "acp",
+      "driverVersion": "test-1",
+      "id": "fake",
+-     "installed": false,
++     "installed": true,
+      "label": "Fake managed agent",
+      "profileId": "fake",
+      "skills": [],
+      "statusAuthority": "protocol",
+    },
+
+ ❯ ../../private/tmp/acorn-unit11-before/src/server/sessions/runtimeProviders.test.ts:144:39
+    142|     first(undefined as never)
+    143|     expect((await old)[0]?.installed).toBe(true)
+    144|     expect(await runtime.providers()).toBe(descriptors)
+       |                                       ^
+    145|     expect(descriptors[0]?.installed).toBe(false)
+    146|   })
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+
+ Test Files  1 failed (1)
+      Tests  1 failed | 9 skipped (10)
+   Start at  14:05:06
+   Duration  1.54s (transform 850ms, setup 0ms, import 1.33s, tests 128ms, environment 0ms)
+
+undefined
+/Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/agents:
+ ERR_PNPM_RECURSIVE_EXEC_FIRST_FAIL  Command failed with exit code 1: vitest run --config /tmp/acorn-unit11-before/vitest.config.ts --root /tmp/acorn-unit11-before src/server/sessions/runtimeProviders.test.ts -t 'same millisecond'

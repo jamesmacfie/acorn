@@ -111,6 +111,59 @@ describe('the providers answer', () => {
     release()
   })
 
+  it('invalidates same-ID replacement and does not join or cache its superseded wave', async () => {
+    const old = runtime.providers()
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+    registry.clear()
+    const replacement = new CountedDriver()
+    replacement.installed = false
+    registry.registerNative('fake', () => replacement)
+    const fresh = runtime.providers()
+    await vi.waitFor(() => expect(replacement.pending).toHaveLength(1))
+    replacement.answer()
+    const descriptors = await fresh
+    expect(descriptors[0]?.installed).toBe(false)
+    driver.answer()
+    expect((await old)[0]?.installed).toBe(true)
+    expect(await runtime.providers()).toBe(descriptors)
+  })
+
+  it('only caches the latest forced wave when both start in the same millisecond', async () => {
+    const timestamp = Date.now()
+    const old = runtime.providers(true)
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+    driver.installed = false
+    vi.setSystemTime(timestamp)
+    const fresh = runtime.providers(true)
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(2))
+    const first = driver.pending.shift()!, second = driver.pending.shift()!
+    second(undefined as never)
+    const descriptors = await fresh
+    first(undefined as never)
+    expect((await old)[0]?.installed).toBe(true)
+    expect(await runtime.providers()).toBe(descriptors)
+    expect(descriptors[0]?.installed).toBe(false)
+  })
+
+  it('does not restore discovery after shutdown with a probe still pending', async () => {
+    const pending = runtime.providers()
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+    await runtime.stop()
+    driver.answer()
+    await pending
+    await expect(runtime.providers()).rejects.toThrow('shutting down')
+  })
+
+  it('returns provider diagnostics after a rejected probe and permits a forced retry', async () => {
+    vi.spyOn(driver, 'probe').mockRejectedValueOnce(new Error('Synthetic probe failure'))
+    expect((await runtime.providers())[0]).toMatchObject({ installed: false, authenticated: null,
+      diagnostics: ['Synthetic probe failure'] })
+    const retry = runtime.providers(true)
+    await vi.waitFor(() => expect(driver.pending).toHaveLength(1))
+    driver.answer()
+    expect((await retry)[0]?.installed).toBe(true)
+  })
+
   it('checks again before refusing a provider the served answer calls unavailable', async () => {
     driver.installed = false
     await warm()
