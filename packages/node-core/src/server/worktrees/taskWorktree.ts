@@ -8,12 +8,13 @@ import { and, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { TaskStatus } from '@acorn/protocol/task.ts'
+import type { ProjectWorktree } from '@acorn/protocol/api.ts'
 import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import { loadRepoConfig, type LayoutRecipe, type RunTarget } from '../runConfig'
 import { getProject, type ProjectRow } from '../projects'
 import { getProjectConfig } from '../projectConfig'
 import { readRepoConfigSnapshot, type RepoConfigSnapshot } from '../repoConfigSnapshot'
-import { copyWorktreeFiles, ensureWorktree, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
+import { copyWorktreeFiles, ensureWorktree, listWorktrees, staleWorktreeReason, worktreeBranch, worktreePorcelain } from './worktrees'
 import { isTaskArchiving } from './archiveGate'
 import { broadcastHeadChanged, broadcastTasksChanged } from '../notify'
 import { runHook } from '../pluginHost/hooks'
@@ -99,6 +100,19 @@ export const contextInjectionEnabled = async (db: AppDatabase, userId: string): 
     .where(and(eq(schema.prefs.userId, userId), eq(schema.prefs.key, 'startup_context_injection')))
     .limit(1)
   return row?.value !== 'false'
+}
+
+// The project's linked worktrees that no active task points at, which a new task may attach to.
+// Both the list route and task creation ask this, so a client can only attach what git itself
+// reports for the project's checkout.
+export async function unclaimedWorktrees(db: AppDatabase, project: ProjectRow): Promise<ProjectWorktree[]> {
+  if (project.vcs !== 'git' || !project.path || !isDir(project.path)) return []
+  const claimed = await db
+    .select({ worktreePath: schema.tasks.worktreePath })
+    .from(schema.tasks)
+    .where(and(eq(schema.tasks.status, 'active'), isNotNull(schema.tasks.worktreePath)))
+  const taken = new Set(claimed.map((row) => resolve(row.worktreePath!)))
+  return (await listWorktrees(project.path)).filter((wt) => !taken.has(resolve(wt.path)))
 }
 
 // Live worktree status for every active task that has a worktree (docs/workspaces-and-tasks.md):

@@ -46,6 +46,10 @@ import { Inline } from '../../kit/components/layout/Inline'
 import { FieldProvider, NO_FIELD } from '../../kit/components/inputs/controlAttrs'
 import { Menu } from '../../kit/components/overlays/Menu'
 import { Modal } from '../../kit/components/overlays/Modal'
+import { Tabs } from '../../kit/components/layout/Tabs'
+import { Text } from '../../kit/components/content/Text'
+import { readJson } from '../../infra/node/apiClient'
+import { projectWorktreesRoute, type ProjectWorktree } from '@acorn/protocol/api.ts'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
@@ -100,10 +104,13 @@ export default function TabRail() {
   // a de-duped slug of the title until the user edits the field, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
-  // Opt out of the branch entirely: a task with no branch runs in the project folder on whatever is
-  // already checked out, no worktree (docs/workspaces-and-tasks.md § Worktrees and setup). Non-git
-  // projects are always like this, so the toggle only shows for git.
-  const [noBranch, setNoBranch] = createSignal(false)
+  // Where a git task's files come from, one tab each (docs/workspaces-and-tasks.md § Task creation and
+  // navigation). `folder` opts out of the branch entirely: the task runs in the project folder on
+  // whatever is already checked out, no worktree. `worktree` adopts a linked worktree git already
+  // has. Non-git projects are always `folder`, so the tabs only show for git.
+  const [source, setSource] = createSignal<'new' | 'folder' | 'worktree'>('new')
+  const noBranch = () => source() === 'folder'
+  const [pickedWorktree, setPickedWorktree] = createSignal('')
   const [skipSetup, setSkipSetup] = createSignal(false)
   // The selected project's branch prefix. Desktop only, because project config sits behind the
   // main-process bridge and the web build has no checkout. Read through taskBridge rather than the
@@ -115,6 +122,18 @@ export default function TabRail() {
   const branchPrefix = () => prefixRow()?.config.branchPrefix ?? null
 
   const selectedProject = () => projects.data?.find((project) => project.id === newProject())
+  // Fetched while the dialog is open on a git project, not only on the tab, so the tab can show a count.
+  const [freeWorktrees] = createResource(
+    () => (draft()?.mode === 'new' && selectedProject()?.vcs === 'git' ? newProject() : undefined),
+    // null on failure: a resource that errors throws on read and would take the dialog down with it.
+    (id) => readJson<ProjectWorktree[]>(projectWorktreesRoute(id)).catch(() => null),
+  )
+  // The pick if it is still in the list, else the first one, so a project switch never submits a
+  // worktree from the previous project.
+  const chosenWorktree = () => {
+    const list = freeWorktrees() ?? []
+    return list.find((wt) => wt.path === pickedWorktree()) ?? list[0]
+  }
   const branchesInProject = (projectId: string) =>
     (query.data ?? []).filter((task) => task.projectId === projectId).flatMap((task) => task.branch ? [task.branch] : [])
   const defaultBranch = (title: string) =>
@@ -283,7 +302,8 @@ export default function TabRail() {
     setIconDraft(randomIconName())
     setBranchText('')
     setBranchTouched(false)
-    setNoBranch(false)
+    setSource('new')
+    setPickedWorktree('')
     setSkipSetup(false)
     setDraft({ mode: 'new' })
   }
@@ -297,8 +317,12 @@ export default function TabRail() {
 
   // Enter in a field and the footer button both land here, so it checks what the button's
   // `disabled` checks.
-  const canSubmitDraft = () => !!text().trim()
-    && !(draft()?.mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch() && !effectiveBranch())
+  const canSubmitDraft = () => {
+    if (!text().trim()) return false
+    if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git') return true
+    if (source() === 'worktree') return !!chosenWorktree()
+    return noBranch() || !!effectiveBranch()
+  }
 
   async function submitDraft() {
     if (!canSubmitDraft()) return
@@ -310,8 +334,10 @@ export default function TabRail() {
       if (d.mode === 'new') {
         const project = selectedProject()
         if (!project) return setDraft(null)
-        const branch = project.vcs === 'git' && !noBranch() ? effectiveBranch() : undefined
-        const seed = { origin: 'local' as const, projectId: project.id, branch, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
+        const git = project.vcs === 'git'
+        const worktreePath = git && source() === 'worktree' ? chosenWorktree()?.path : undefined
+        const branch = git && source() === 'new' ? effectiveBranch() : undefined
+        const seed = { origin: 'local' as const, projectId: project.id, branch, worktreePath, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
         const w = await createTask(seed)
         await invalidate()
         activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
@@ -567,6 +593,19 @@ export default function TabRail() {
       <Show when={draft()}>
         {(d) => (
           <Modal title={d().mode === 'new' ? 'New task' : 'Rename task'} autoFocus={() => draftTitle} onDismiss={() => setDraft(null)}>
+            <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
+              <Tabs
+                tabs={[
+                  { id: 'new', label: 'New worktree' },
+                  { id: 'folder', label: 'Project folder' },
+                  { id: 'worktree', label: 'Existing worktree', count: freeWorktrees()?.length },
+                ]}
+                active={source()}
+                onChange={(id) => setSource(id as 'new' | 'folder' | 'worktree')}
+                idPrefix="new-task"
+                ariaLabel="Where the task works"
+              />
+            </Show>
             <Modal.Body>
               <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
               <Show when={d().mode === 'new'}>
@@ -590,28 +629,38 @@ export default function TabRail() {
                 </Inline>
               </Field>
               <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
-                <Show when={!noBranch()}>
-                  <Field label="Branch">
-                    <Input
-                      value={branchTouched() ? branchText() : effectiveBranch()}
-                      onInput={(value) => {
-                        setBranchTouched(true)
-                        setBranchText(value)
-                      }}
-                      onSubmit={() => void submitDraft()}
-                    />
-                  </Field>
-                </Show>
-                <Checkbox
-                  size="sm"
-                  label="Use the project folder and its current branch"
-                  hint="No new branch. The task uses whatever is checked out."
-                  checked={noBranch()}
-                  onChange={(checked) => setNoBranch(checked)}
-                />
-              </Show>
-              <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git' && !noBranch()}>
-                <Checkbox size="sm" label="Skip setup script" checked={skipSetup()} onChange={setSkipSetup} />
+                {/* The body's column gap, again, so the wrapper does not squash the fields inside it together. */}
+                <div id={`new-task-panel-${source()}`} role="tabpanel" aria-labelledby={`new-task-tab-${source()}`} style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}>
+                  <Show when={source() === 'new'}>
+                    <Field label="Branch">
+                      <Input
+                        value={branchTouched() ? branchText() : effectiveBranch()}
+                        onInput={(value) => {
+                          setBranchTouched(true)
+                          setBranchText(value)
+                        }}
+                        onSubmit={() => void submitDraft()}
+                      />
+                    </Field>
+                    <Checkbox size="sm" label="Skip setup script" checked={skipSetup()} onChange={setSkipSetup} />
+                  </Show>
+                  <Show when={source() === 'folder'}>
+                    <Text tone="muted" wrap>No new branch. The task uses whatever is checked out in the project folder.</Text>
+                  </Show>
+                  <Show when={source() === 'worktree'}>
+                    <Field
+                      label="Worktree"
+                      hint={freeWorktrees.loading ? 'Asking git for worktrees.' : freeWorktrees() === null ? 'Could not list the worktrees for this project.' : freeWorktrees()?.length ? 'The task uses this folder and its branch. Setup does not run.' : 'Every worktree git lists for this project is already a task.'}
+                    >
+                      <Select
+                        value={chosenWorktree()?.path ?? ''}
+                        onChange={setPickedWorktree}
+                        disabled={!freeWorktrees()?.length}
+                        options={(freeWorktrees() ?? []).map((wt) => ({ value: wt.path, label: `${wt.branch} · ${wt.path}` }))}
+                      />
+                    </Field>
+                  </Show>
+                </div>
               </Show>
             </Modal.Body>
             <Modal.Actions>
