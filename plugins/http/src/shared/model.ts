@@ -47,7 +47,16 @@ export type HttpVariable = {
   updatedAt: number
 }
 
-export type TimelineEntry = { label: string; detail: string }
+/** One line of the send timeline. `group` says which side of the exchange it belongs to; a line with
+ *  none (an error, the time a failure took) sits after both. */
+export type TimelineEntry = { label: string; detail: string; group?: 'sent' | 'received' }
+
+/** A byte count as people read it: "6.6 KB". */
+export const formatSize = (bytes: number): string => {
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+}
 
 // Sending has its own task context (docs/http-client.md § Data model): `taskId` says where an
 // ad-hoc request is stored, `executionTaskId` says which task worktree supplies builtins and runs

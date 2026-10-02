@@ -13,11 +13,17 @@ import { containers, dockerInfo, loadError, loading, refreshDocker, wireDockerRe
 import ContainerDetail from './ContainerDetail'
 import { CONTAINER_POINT } from './extensionPoints'
 import {
-  Alert, Badge, Button, ConfirmButton, EmptyState, IconButton, Input, ListDetail, Row, Rows, Section,
+  Alert, Badge, Button, ConfirmButton, EmptyState, IconButton, Inline, Input, ListDetail, Row, Rows, Section,
   SectionHeader, Stack, StatusDot, TabPanel, Tabs, Text, Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui'
+import { shortStatus } from './shortStatus'
 import { AnnotationMarks, requestAnnotations } from '@acorn/plugin-api/ui/host'
 import { consumeDockerReveal, containerTone, dockerReveal } from './dockerViewStore'
+
+// What each prune runs, for the tip on its button.
+const PRUNE_COMMAND: Record<DockerPruneKind, string> = {
+  containers: 'docker container prune', images: 'docker image prune', volumes: 'docker volume prune', networks: 'docker network prune', builder: 'docker builder prune',
+}
 
 type SectionId = 'containers' | 'images' | 'volumes' | 'networks'
 const SECTIONS: { id: SectionId; label: string }[] = [
@@ -104,9 +110,9 @@ export default function DockerBrowse() {
   const dockerPrefs = () => readDockerPrefs(prefs.data)
 
   async function prune(kind: DockerPruneKind) {
-    setPruneNote('pruning…')
+    setPruneNote('Removing…')
     const result = await failing(dockerPrune(kind))
-    setPruneNote(result ? `reclaimed ${result.reclaimed}` : '')
+    setPruneNote(result ? `Freed ${result.reclaimed}` : '')
     if (kind === 'images') void imagesCtl.refetch()
     if (kind === 'volumes') void volumesCtl.refetch()
     if (kind === 'networks') void networksCtl.refetch()
@@ -183,9 +189,10 @@ export default function DockerBrowse() {
         reveal
         selected={selected() === c.id}
         onPress={() => setSelected(c.id)}
-        title={c.name}
+        // The short status in the row, the whole sentence in its tip.
+        title={`${c.name} · ${c.status}`}
         leading={<StatusDot tone={containerTone(c.state)} />}
-        meta={c.status}
+        meta={shortStatus(c.status)}
         trailing={
           <>
             <IconButton
@@ -230,12 +237,12 @@ export default function DockerBrowse() {
           // The stale badge rides in `meta`, not the body: a Row's body ellipsises, so a warning after
           // a long project name is the first thing clipped.
           meta={
-            <>
+            <Inline gap="inline">
               <Show when={g.containers.some((c) => c.workingDirMissing)}>
-                <Badge tone="warn" shape="pill" size="xs">stale</Badge>
+                <Badge tone="warn" shape="pill" size="xs" tip="Its worktree was deleted">Left over</Badge>
               </Show>
               {g.running}/{g.containers.length} running
-            </>
+            </Inline>
           }
           trailing={
             <>
@@ -251,8 +258,9 @@ export default function DockerBrowse() {
                 size="sm"
                 iconOnly
                 tone="danger"
-                label="Compose down"
-                title="Compose down (remove the project's containers and networks; volumes kept)"
+                label="Remove project"
+                tip="Remove this project"
+                tipSub="Its containers and networks go. Volumes stay."
                 confirmLabel="Remove project?"
                 skipConfirm={skipConfirm()}
                 disabled={groupBusy() === g.project}
@@ -270,17 +278,20 @@ export default function DockerBrowse() {
     </Show>
   )
 
-  const ObjectBar = (barProps: { count: number; noun: string; kind: DockerPruneKind; confirmLabel: string; pruneLabel: string }) => (
+  // The prune is the one destructive button in the column, so it sits at the end of the bar.
+  const ObjectBar = (barProps: { count: number; noun: string; kind: DockerPruneKind; confirmLabel: string }) => (
     <Toolbar size="sm" ariaLabel={`${barProps.noun} actions`}>
       <Text emphasis="muted">{barProps.count} {barProps.noun}</Text>
+      <Show when={pruneNote()}>{(note) => <Text emphasis="muted">{note()}</Text>}</Show>
+      <Toolbar.Spacer />
       <ConfirmButton
         size="sm"
-        label={barProps.pruneLabel}
+        label="Remove unused"
+        tip={`Runs ${PRUNE_COMMAND[barProps.kind]}`}
         confirmLabel={barProps.confirmLabel}
         skipConfirm={skipConfirm()}
         onConfirm={() => void prune(barProps.kind)}
-      >{barProps.pruneLabel}</ConfirmButton>
-      <Show when={pruneNote()}>{(note) => <Text emphasis="muted">{note()}</Text>}</Show>
+      >Remove unused</ConfirmButton>
     </Toolbar>
   )
 
@@ -299,12 +310,12 @@ export default function DockerBrowse() {
         when={dockerInfo()?.available !== false}
         fallback={
           <EmptyState
-            title="Docker is unavailable"
+            title="Docker isn't available"
             action={<Button onPress={() => void refreshDocker()}>Try again</Button>}
           >
             {unavailableReason() === 'not_installed'
-              ? 'The docker CLI was not found on PATH.'
-              : 'The docker daemon is not reachable — is Docker/OrbStack running?'}
+              ? "acorn can't find the docker command. Install Docker or OrbStack, then try again."
+              : "Docker isn't running. Start Docker or OrbStack, then try again."}
           </EmptyState>
         }
       >
@@ -327,14 +338,14 @@ export default function DockerBrowse() {
               variant="banner"
               actions={
                 <ConfirmButton
-                  label="Clean up"
+                  label="Remove them"
                   confirmLabel="Remove stale projects?"
                   skipConfirm={skipConfirm()}
                   onConfirm={() => void cleanUpStale()}
-                >Clean up</ConfirmButton>
+                >Remove them</ConfirmButton>
               }
             >
-              {staleProjects().length} stale project{staleProjects().length === 1 ? '' : 's'} — worktree gone.
+              {staleProjects().length} project{staleProjects().length === 1 ? '' : 's'} left over from deleted worktrees
             </Alert>
           </Show>
           <Show when={containers().length} fallback={<EmptyState align="start" busy={loading()}>{loading() ? 'Loading…' : 'No containers.'}</EmptyState>}>
@@ -350,7 +361,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="images" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(images() ?? []).length} noun="images" kind="images" pruneLabel="Prune dangling" confirmLabel="Prune images?" />
+          <ObjectBar count={(images() ?? []).length} noun="images" kind="images" confirmLabel="Prune images?" />
           <Rows
             id="docker.images"
             ariaLabel="Images"
@@ -387,7 +398,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="volumes" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" pruneLabel="Prune unused" confirmLabel="Remove unused volumes?" />
+          <ObjectBar count={(volumes() ?? []).length} noun="volumes" kind="volumes" confirmLabel="Remove unused volumes?" />
           <Rows
             id="docker.volumes"
             ariaLabel="Volumes"
@@ -424,7 +435,7 @@ export default function DockerBrowse() {
         </TabPanel>
 
         <TabPanel id="networks" active={section()} idPrefix="docker-section">
-          <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" pruneLabel="Prune unused" confirmLabel="Prune networks?" />
+          <ObjectBar count={(networks() ?? []).length} noun="networks" kind="networks" confirmLabel="Prune networks?" />
           <Rows
             id="docker.networks"
             ariaLabel="Networks"
@@ -467,9 +478,10 @@ export default function DockerBrowse() {
 
   return (
     <ListDetail listLabel="Docker objects" list={list}>
+      {/* Only containers have a detail, so the other tabs leave the column empty. */}
       <Show
         when={section() === 'containers' && selected()}
-        fallback={<EmptyState align="start">{section() === 'containers' ? 'Select a container.' : `Docker ${section()}.`}</EmptyState>}
+        fallback={<Show when={section() === 'containers'}><EmptyState title="Choose a container" /></Show>}
       >
         {(id) => <ContainerDetail target={id()} onRemoved={() => setSelected(null)} />}
       </Show>

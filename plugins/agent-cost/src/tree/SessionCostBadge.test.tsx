@@ -53,11 +53,11 @@ async function emitted(props: SessionHeaderProps): Promise<TreeNode[]> {
 describe('session cost remote tree', () => {
   it('draws a compact estimated price using only host kit nodes', async () => {
     const nodes = await emitted(context())
-    expect(nodes.find((node) => node.type === 'Chip')?.props).toMatchObject({
+    expect(nodes.find((node) => node.type === 'Badge')?.props).toMatchObject({
       size: 'xs',
-      title: expect.stringContaining('Estimated API-equivalent session cost'),
+      tip: expect.stringContaining('Estimated from the tokens used'),
     })
-    expect(nodes.find((node) => node.type === '#text')?.props.value).toBe('≈$0.2530')
+    expect(nodes.find((node) => node.type === '#text')?.props.value).toBe('≈$0.25')
   })
 
   it('draws nothing when the owner cannot resolve a model price', async () => {

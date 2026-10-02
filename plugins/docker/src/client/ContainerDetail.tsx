@@ -141,7 +141,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
   async function openExec(name: string) {
     if (!props.taskId) {
       void navigator.clipboard.writeText(execCommand(name))
-      toast('Copied exec command')
+      toast('Copied the shell command')
       return
     }
     setError('')
@@ -153,20 +153,22 @@ export default function ContainerDetail(props: { target: string; taskId?: string
       })
       requestTerminalFocusIntent(props.taskId, session.id)
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'could not open a terminal session')
+      setError(e instanceof Error ? e.message : "Couldn't open a terminal.")
     }
   }
 
   const running = () => detail()?.state === 'running'
 
+  // `grow`, so the region gives the log its height and the log scrolls inside it. Without it the
+  // column clipped the newest lines, and Follow had no scroller to follow.
   return (
-    <Stack gap="row">
+    <Stack gap="row" grow>
       <Show when={detail()} fallback={<EmptyState align="start" busy={!detail.error}>{detail.error ? 'Container not found.' : 'Loading…'}</EmptyState>}>
         {(d) => (
           <>
             <Toolbar ariaLabel="Container">
               <StatusDot tone={containerTone(d().state)} />
-              <Heading level={3}>{d().name}</Heading>
+              <Heading level={2}>{d().name}</Heading>
               <Toolbar.Spacer />
               <Show when={!running()}>
                 <Button size="sm" disabled={busy()} onPress={() => void act('start')}>Start</Button>
@@ -176,7 +178,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                 <Button size="sm" disabled={busy()} onPress={() => void act('restart')}>Restart</Button>
                 <Button
                   size="sm"
-                  title={props.taskId ? 'Open a shell in this container in the task terminal' : 'Copy a docker exec command'}
+                  tip={props.taskId ? 'Open shell' : 'Copy shell command'}
                   onPress={() => void openExec(d().name)}
                 >
                   {props.taskId ? 'Terminal' : 'Copy exec'}
@@ -287,7 +289,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                     onNext={() => navMatch(1)}
                     onPrev={() => navMatch(-1)}
                     onClose={() => setLogQuery('')}
-                    status={logEnded() ? 'stream ended' : 'live'}
+                    status={logEnded() ? 'Log stream ended' : 'Live'}
                     toggles={
                       <>
                         <Checkbox
@@ -299,10 +301,10 @@ export default function ContainerDetail(props: { target: string; taskId?: string
                           }}
                         />
                         <Button
-                          variant="bare"
+                          variant="ghost"
                           size="sm"
-                          tip="Clear the current log view"
-                          tipSub="The stream keeps appending"
+                          tip="Clear the log"
+                          tipSub="New lines keep coming in."
                           onPress={() => logBuf()?.clear()}
                         >
                           Clear
@@ -320,7 +322,7 @@ export default function ContainerDetail(props: { target: string; taskId?: string
             </TabPanel>
 
             <TabPanel id="stats" active={tab()} idPrefix="docker-detail">
-              <Show when={stats()} fallback={<EmptyState align="start" busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stream ended (container stopped?).' : running() ? 'Sampling…' : 'Container is not running.'}</EmptyState>}>
+              <Show when={stats()} fallback={<EmptyState align="start" busy={!statsEnded() && running()}>{statsEnded() ? 'Stats stopped. The container may have stopped.' : running() ? 'Reading stats…' : "The container isn't running."}</EmptyState>}>
                 {(s) => (
                   <Inline gap="section" wrap>
                     <Facts

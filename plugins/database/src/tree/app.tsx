@@ -14,7 +14,7 @@ export function DatabasePaneApp(props: { taskId?: string; bridge: AcornBridge })
   return (
     <Show
       when={props.taskId}
-      fallback={<EmptyState align="start">This pane needs a task — its database comes from the task's worktree.</EmptyState>}
+      fallback={<EmptyState align="start">Open a task to see its database.</EmptyState>}
     >
       {(id) => <DatabasePanel bridge={props.bridge} taskId={id()} />}
     </Show>

@@ -253,7 +253,7 @@ another way to read, since a plain `--bg-selected` alone is too quiet once rows 
 rather than a flat list. Modern's filled-button override also has to exclude both the `bare` and
 `solid` variants: the override selector is `(0,3,0)` and a variant's own `background` rule is
 `(0,2,0)`, so without the exclusion Modern would repaint an already-solid button (the Database pane's
-Save, Generate, and Execute buttons, for example) in `--bg-subtle` and leave its `--accent-fg` label
+**Run** button, for example) in `--bg-subtle` and leave its `--accent-fg` label
 invisible against it. Cozy's serif body copy needs a taller line height than the fixed `--pane-pad`
 gives a nested prose block, so it sets `line-height` on `.markdown` directly, one of the few pack
 overrides that reaches a class outside its own token block.

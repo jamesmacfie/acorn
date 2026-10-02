@@ -6,7 +6,7 @@
 // ./panelModel.ts, which one worker holds for both.
 import { Show } from 'solid-js'
 import {
-  Button, Input, Select, StatusDot, Text, Toolbar, ToolbarSpacer,
+  Badge, Button, Heading, Input, Select, Text, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import { httpMethods } from '../shared/model'
 import type { Draft } from './draft'
@@ -22,10 +22,20 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
     <>
       <Show
         when={model().selection().kind !== 'variables'}
-        fallback={<HttpVariables client={model().client} projectId={model().projectId} projectName={model().projectName} />}
+        fallback={
+          <>
+            <Toolbar ariaLabel="Variables">
+              <Heading level={2}>Variables</Heading>
+            </Toolbar>
+            <HttpVariables client={model().client} projectId={model().projectId} />
+          </>
+        }
       >
+        {/* The bar holds a field, so the kit leaves its sizes alone; all three are sm here, the height
+            of every other chrome bar's controls. */}
         <Toolbar ariaLabel="Request">
           <Select
+            size="sm"
             width="narrow"
             value={model().draft().method}
             label="Method"
@@ -33,8 +43,9 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
             options={[...httpMethods.map((m) => ({ value: m, label: m }))]}
           />
           <Input
+            size="sm"
             value={model().draft().url}
-            placeholder="{{BASE_URL}}/users  ·  or paste a curl command"
+            placeholder="{{BASE_URL}}/users, or paste a curl command"
             assist={false}
             label="URL"
             onChange={(value: string) => model().commitUrl(value)}
@@ -44,7 +55,7 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
               if (!model().commitUrl(value)) void model().fire()
             }}
           />
-          <Button variant="solid" tone="accent" busy={model().sending()} onPress={() => void model().fire()}>
+          <Button size="sm" variant="solid" tone="accent" busy={model().sending()} onPress={() => void model().fire()}>
             Send
           </Button>
         </Toolbar>
@@ -52,17 +63,15 @@ export default function HttpDetail(props: { model: HttpPanelModel }) {
         <Toolbar size="sm" ariaLabel="Request meta">
           {/* The name is a label, not a field: it opens the save dialog, which is also the rename
               and the move-into-the-repo path. */}
-          <Button variant="bare" size="sm" title="Rename, move or file this request" onPress={() => model().openSave()}>
+          <Button variant="ghost" size="sm" tip="Rename, or save to the project" onPress={() => model().openSave()}>
             <Show when={model().draft().folder}>
               <Text emphasis="muted">{model().draft().folder}/</Text>
             </Show>
             <Text>{model().draft().name || 'Untitled request'}</Text>
-            <Show when={model().draft().taskId}><Text emphasis="eyebrow">task</Text></Show>
           </Button>
+          <Show when={model().draft().taskId}><Badge size="xs">In this task</Badge></Show>
+          <Show when={model().dirty()}><Badge size="xs" tone="accent">Unsaved</Badge></Show>
           <ToolbarSpacer />
-          <Show when={model().dirty()}>
-            <StatusDot tone="accent" label="Unsaved changes" />
-          </Show>
           <Button size="sm" variant="ghost" onPress={() => model().copyAsCurl()}>
             Copy as curl
           </Button>

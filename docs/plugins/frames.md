@@ -286,7 +286,7 @@ untrusted code.
 
 What is deliberately *not* a region: the button bar. `plugins/database`'s bar holds a searchable
 saved-query picker with per-row delete chips, a Generate button visible only when a model connection
-exists, and an Execute button disabled on connection status. A host-drawn "action bar" descriptor
+exists, and a Run button disabled on connection status. A host-drawn "action bar" descriptor
 sounds cheap until it needs all three. The bar is common, not impossible, so it is the plugin's — the
 first row of its own frame region. Modals are the one honest compromise: a frame confined to the
 bottom region can only overlay the bottom region, and the escape hatch if that grates is the

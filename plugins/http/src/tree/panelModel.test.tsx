@@ -65,7 +65,7 @@ describe('the model both regions share', () => {
   })
 
   // The palette's `New request` row. It is a surface action rather than a node route because a new
-  // request is a draft in the pane, not a row on the node — the same thing the "+ Request" button does.
+  // request is a draft in the pane, not a row on the node — the same thing the New request button does.
   it('starts a new draft on the palette’s new-request command, and ignores any other', () => {
     const model = httpPanelModel(subject({ taskId: 't1' }))
     model.setSelection({ kind: 'variables' })

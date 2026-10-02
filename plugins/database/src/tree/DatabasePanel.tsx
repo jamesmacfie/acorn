@@ -1,7 +1,7 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
-  Alert, Button, Checkbox, ConfirmButton, DetailColumn, EmptyState, Grid, Input, Inline,
-  ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Textarea, Toolbar, ToolbarSpacer,
+  Alert, Badge, Button, Checkbox, ConfirmButton, DetailColumn, EmptyState, Field, formatChord, Grid, Heading,
+  IconButton, Input, ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Textarea, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
@@ -16,18 +16,20 @@ import SaveQueryModal from './SaveQueryModal'
 //
 // The SQL editor lives in the host, in the region above this frame (docs/editor.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
-// behind Execute, `document.write()` when the picker or Generate loads a query in, and
+// behind Run, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which the host has already called by the time a surface action arrives.
 //
 // ⌘Enter runs the query even though it is pressed with focus in the host's editor, where this plugin
 // has no keyboard. The host resolves it against the manifest's surface-scoped keybinding, flushes the
-// document, and posts `execute` here, handled below exactly as the Execute button's click is.
+// document, and posts `execute` here, handled below exactly as the Run button's click is.
 //
 // The results grid is the kit's `Grid` now, not a virtualizer this plugin shipped. It was the same
 // component twice — a sticky header, a fixed row height read from the density token, an overscan of
 // sixteen — and one of the two had to go.
 
 type Selected = { schema: string; name: string } | null
+
+const count = (n: number): string => new Intl.NumberFormat().format(n)
 
 export default function DatabasePanel(props: { bridge: AcornBridge; taskId: string }) {
   const client = createDatabaseClient(props.bridge.api)
@@ -119,7 +121,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       batch(() => {
         setResult({ columns: rows.columns, rows: rows.rows, rowCount: rows.rowCount, command: rows.command })
         setResultTable(t)
-        setFooter(`${rows.rows.length} of ${rows.total ?? '?'} rows`)
+        setFooter(`${count(rows.rows.length)} of ${rows.total == null ? '?' : count(rows.total)} rows`)
         setError('')
       })
       writeSql(`SELECT * FROM ${quoteIdentifier(t.schema)}.${quoteIdentifier(t.name)} LIMIT 500;`)
@@ -144,9 +146,13 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       batch(() => {
         setResult({ columns: res.columns, rows: res.rows, rowCount: res.rowCount, command: res.command })
         setResultTable(null) // ad-hoc query → rows aren't tied to one table, so no row editing
+        // The grid shows the query's rows now, so the list no longer marks the table opened before, and
+        // the row editor no longer describes the query's columns with that table's types.
+        setSelected(null)
+        setColumns([])
         setActiveRow(null)
         setError('')
-        setFooter(`${res.command || 'OK'} · ${res.rows.length ? `${res.rows.length} rows` : `${res.rowCount ?? 0} affected`} · ${res.ms}ms`)
+        setFooter(`${res.command || 'OK'} · ${res.rows.length ? `${count(res.rows.length)} rows` : `${count(res.rowCount ?? 0)} affected`} · ${res.ms}ms`)
       })
     } catch (e) {
       fail(e)
@@ -216,88 +222,101 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     loadSaved(q)
   })
 
-  return (
-    <Stack gap="row">
-      <Toolbar variant="bar" ariaLabel="Connection">
-        <SectionHeader>Database</SectionHeader>
-        <Text tone={status() === 'error' ? 'danger' : status() === 'connected' ? 'ok' : 'muted'}>
-          {status() === 'connected' ? dbName() || 'connected' : status() === 'connecting' ? 'connecting…' : 'error'}
-        </Text>
-        <ToolbarSpacer />
-        <Button size="sm" title="Reconnect" label="Reconnect" onPress={() => void connect()}>⟳</Button>
-      </Toolbar>
+  const connected = () => status() === 'connected'
 
-      <Show when={error()}>
-        <Alert>{error()}</Alert>
-      </Show>
+  // `grow`, so the frame's region gives the list and the grid their height and each scrolls inside
+  // it. A plain stack grew past the region, which clipped the table list and the rows below the fold.
+  return (
+    <Stack gap="none" grow>
+      {/* One bar: the pane's title, the connection, and every query action. It sits below the SQL
+          editor because a document layout has no header region of its own yet. */}
+      <Toolbar variant="bar" ariaLabel="Database">
+        <Heading level={2}>Database</Heading>
+        <Badge size="xs" tone={connected() ? 'ok' : status() === 'error' ? 'danger' : 'neutral'}>
+          {connected() ? dbName() || 'Connected' : status() === 'connecting' ? 'Connecting…' : 'Not connected'}
+        </Badge>
+        <ToolbarSpacer />
+        {/* The data form of the picker: rows as items, filtering in the host. A tree cannot hand
+            over a `results(query)` callback, because a function does not cross a message port. The
+            trigger keeps one name, so loading a query does not widen it. */}
+        <Picker
+          size="sm"
+          label="Saved queries"
+          placeholder="Filter saved queries…"
+          emptyText="No saved queries. Use Save to keep the one in the editor."
+          removeLabel="Delete saved query"
+          items={savedList().map((q) => ({
+            id: q.id,
+            label: savedQueryLabel(q),
+            active: q.name === loadedName(),
+            removable: true,
+          }))}
+          onPick={(id: string) => {
+            const q = savedList().find((candidate) => candidate.id === id)
+            if (q) loadSaved(q)
+          }}
+          onRemove={(id: string) => {
+            const q = savedList().find((candidate) => candidate.id === id)
+            if (q) void deleteSaved(q)
+          }}
+        />
+        {/* The editor's content is on the other side of a port, so this cannot be
+            disabled-when-empty without polling it — an empty document just makes the click a
+            no-op. Same trade the compiled version made against an editor document that was not a signal. */}
+        <Button
+          size="sm"
+          onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
+        >
+          Save
+        </Button>
+        <Show when={backends().length}>
+          <Button size="sm" disabled={busy() || !connected()} onPress={() => setGenerating(true)}>Generate</Button>
+        </Show>
+        <Button size="sm" variant="solid" tip="Run query" tipKey={formatChord('meta+enter')} disabled={busy() || !connected()} onPress={() => void execute()}>
+          Run
+        </Button>
+        <IconButton size="sm" icon="refresh-cw" label="Reconnect" onPress={() => void connect()} />
+      </Toolbar>
 
       <ListDetail split listLabel="Tables">
         <ListColumn label="Tables">
-          <Input kind="filter" placeholder="Filter tables…" value={filter()} onChange={(value: string) => setFilter(value)} />
-          <For each={filtered()} fallback={<EmptyState align="start">{status() === 'connected' ? 'No tables.' : ''}</EmptyState>}>
-            {(t) => (
-              <Row
-                density="compact"
-                selected={selected()?.schema === t.schema && selected()?.name === t.name}
-                onPress={() => void openTable(t)}
-                title={`${t.schema}.${t.name}`}
-              >
-                {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
-              </Row>
-            )}
-          </For>
+          <SectionHeader count={connected() ? tables().length : undefined}>Tables</SectionHeader>
+          {/* With no connection there is nothing to list, and the detail column says why. */}
+          <Show when={connected()}>
+            <Toolbar size="sm" ariaLabel="Filter tables">
+              <Input kind="filter" label="Filter tables" placeholder="Filter tables…" value={filter()} onChange={(value: string) => setFilter(value)} />
+            </Toolbar>
+            <For each={filtered()} fallback={<EmptyState align="start" size="sm">No tables</EmptyState>}>
+              {(t) => (
+                <Row
+                  density="compact"
+                  selected={selected()?.schema === t.schema && selected()?.name === t.name}
+                  onPress={() => void openTable(t)}
+                  title={`${t.schema}.${t.name}`}
+                >
+                  {t.schema === 'public' ? t.name : `${t.schema}.${t.name}`}
+                </Row>
+              )}
+            </For>
+          </Show>
         </ListColumn>
 
         <DetailColumn>
-          {/* The bar sits below the splitter. It stays the PLUGIN's because it is a searchable picker
-              with per-row delete controls and a conditionally-visible button — common, not impossible,
-              which is the bar a host-drawn region has to clear (docs/plugins.md § Document surfaces). */}
-          <Toolbar variant="actions" ariaLabel="Query actions">
-            <Text tone="muted">⌘↵ to run</Text>
-            {/* The data form of the picker: rows as items, filtering in the host. A tree cannot hand
-                over a `results(query)` callback, because a function does not cross a message port. */}
-            <Picker
-              label={loadedName() || 'Queries'}
-              placeholder="Filter saved queries…"
-              emptyText="No saved queries yet."
-              items={savedList().map((q) => ({
-                id: q.id,
-                label: savedQueryLabel(q),
-                active: q.name === loadedName(),
-                removable: true,
-              }))}
-              onPick={(id: string) => {
-                const q = savedList().find((candidate) => candidate.id === id)
-                if (q) loadSaved(q)
-              }}
-              onRemove={(id: string) => {
-                const q = savedList().find((candidate) => candidate.id === id)
-                if (q) void deleteSaved(q)
-              }}
-            />
-            {/* The editor's content is on the other side of a port, so this cannot be
-                disabled-when-empty without polling it — an empty document just makes the click a
-                no-op. Same trade the compiled version made against an editor document that was not a signal. */}
-            <Button
-              variant="solid"
-              onPress={() => void props.bridge.document.read().then((sql) => sql.trim() && setSaving(sql.trim()), fail)}
-            >
-              Save
-            </Button>
-            <Show when={backends().length}>
-              <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => setGenerating(true)}>Generate</Button>
-            </Show>
-            <Button variant="solid" disabled={busy() || status() !== 'connected'} onPress={() => void execute()}>Execute</Button>
-          </Toolbar>
+          {/* The not-configured error stays an alert until the node sends a code for it. */}
+          <Show when={error()}>
+            <Alert variant="banner">{error()}</Alert>
+          </Show>
 
-          <Toolbar size="sm" ariaLabel="Result actions">
-            <Text tone="muted">{footer()}</Text>
-            <ToolbarSpacer />
-            <Show when={resultTable() && columns().some((c) => c.isPk)}>
-              <Button size="sm" disabled={busy()} onPress={() => setInserting(true)}>+ Row</Button>
-            </Show>
-          </Toolbar>
-          <Show when={result()} fallback={<EmptyState align="start">Select a table or run a query.</EmptyState>}>
+          <Show when={result()}>
+            <Toolbar size="sm" ariaLabel="Result actions">
+              <Text tone="muted">{footer()}</Text>
+              <ToolbarSpacer />
+              <Show when={resultTable() && columns().some((c) => c.isPk)}>
+                <Button size="sm" variant="ghost" disabled={busy()} onPress={() => setInserting(true)}>Add row</Button>
+              </Show>
+            </Toolbar>
+          </Show>
+          <Show when={result()} fallback={<Show when={!error()}><EmptyState title="Choose a table, or run a query" /></Show>}>
             {(r) => (
               <Grid
                 ariaLabel="Query results"
@@ -466,47 +485,53 @@ function RowDetail(props: {
   return (
     <Stack gap="row">
       <Toolbar variant="bar" size="sm">
-        <SectionHeader>
-          {props.insert ? `${props.table?.name ?? ''} · new row` : props.table ? `${props.table.name} · row` : 'Row'}
-        </SectionHeader>
+        <Heading level={3}>
+          {props.insert ? `New row in ${props.table?.name ?? ''}` : props.table ? `Row in ${props.table.name}` : 'Row'}
+        </Heading>
         <ToolbarSpacer />
-        <Button size="sm" title="Close" label="Close" onPress={props.onClose}>✕</Button>
+        <IconButton size="sm" icon="x" label="Close" onPress={props.onClose} />
       </Toolbar>
       <For each={props.columns}>
         {(col) => {
           const m = metaByName.get(col)
           return (
             <Stack gap="none">
-              <Inline>
-                <Text emphasis="eyebrow">{col}</Text>
-                <Show when={m?.isPk}><Text emphasis="eyebrow" tone="accent">PK</Text></Show>
-                <Text tone="muted">{m?.dataType}</Text>
-              </Inline>
-              <Textarea
-                rows={1}
-                assist={false}
-                disabled={!editable() || draft()[col]?.isNull}
-                value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
-                placeholder={draft()[col]?.isNull ? 'NULL' : ''}
-                onChange={(value: string) => set(col, { value })}
-              />
+              {/* The column's own name as the label, in its own case: `created_at`, not CREATED_AT.
+                  The field names the textarea; the null box is a second control beside it. */}
+              <Field label={col} hint={[m?.dataType, m?.isPk ? 'Primary key' : ''].filter(Boolean).join(' · ')}>
+                <Textarea
+                  rows={1}
+                  assist={false}
+                  disabled={!editable() || draft()[col]?.isNull}
+                  value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
+                  placeholder={draft()[col]?.isNull ? 'NULL' : ''}
+                  onChange={(value: string) => set(col, { value })}
+                />
+              </Field>
               {/* Insert mode always offers the null toggle (columns start null so untouched ones take
                   their DB default); edit mode only for nullable columns. */}
               <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
-                <Checkbox label="null" checked={draft()[col]?.isNull} onChange={(checked: boolean) => set(col, { isNull: checked })} />
+                <Checkbox label="Set to NULL" checked={draft()[col]?.isNull} onChange={(checked: boolean) => set(col, { isNull: checked })} />
               </Show>
             </Stack>
           )
         }}
       </For>
       <Toolbar variant="actions" size="sm">
-        <Show when={editable()} fallback={<Text tone="muted">Read-only (no single-table PK).</Text>}>
-          <Button variant="solid" disabled={props.busy} onPress={save}>Save</Button>
+        <Show
+          when={editable()}
+          fallback={
+            <Text tone="muted">
+              {props.table ? "This table has no primary key, so its rows can't be edited here." : 'To edit a row, open its table from the list.'}
+            </Text>
+          }
+        >
+          <Button size="sm" variant="solid" disabled={props.busy} onPress={save}>Save</Button>
           <Show when={!props.insert}>
             {/* RowDetail stays mounted when selection changes. Remount the armed control with its
                 row so a second press cannot delete a different row. */}
             <Show when={props.row} keyed>
-              <ConfirmButton tone="danger" disabled={props.busy} confirmLabel="Delete row?" onConfirm={() => void props.onDelete?.()}>
+              <ConfirmButton size="sm" tone="danger" disabled={props.busy} confirmLabel="Delete row?" onConfirm={() => void props.onDelete?.()}>
                 Delete
               </ConfirmButton>
             </Show>

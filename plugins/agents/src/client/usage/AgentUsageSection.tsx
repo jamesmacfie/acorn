@@ -1,12 +1,12 @@
-import { For, onCleanup, onMount, Show } from 'solid-js'
+import { onCleanup, onMount, Show } from 'solid-js'
 import { Alert, Facts, IconButton, Inline, Meter, SectionHeader, Stack, StatusDot, Text } from '@acorn/plugin-api/ui'
 import { agentUsageStore } from './usageStore'
 import { providerMetaLine, providerUsageRows } from './usageModel'
 import { usageMeterTone, usageTone } from '../sessions/stateTone'
 
 // What each harness's own plan has left, read off the provider's CLI rather than any acorn record
-// (docs/managed-agents.md § Plan usage). One block per provider: a health dot, whose account it is,
-// and the numbers as `Facts`. It is drawn inside a popover, which is why it carries no pane chrome.
+// (docs/managed-agents.md § Plan usage). One list of `Facts` for every provider: a row that names it,
+// with its health dot and whose account it is, then its numbers. It is drawn inside a popover, which is why it carries no pane chrome.
 export default function AgentUsageSection(props: { showHeader?: boolean }) {
   onMount(() => onCleanup(agentUsageStore.init()))
 
@@ -21,58 +21,57 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
       </Show>
       <Show when={agentUsageStore.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       <Show when={!agentUsageStore.snapshot() && agentUsageStore.loading()}>
-        <Text emphasis="muted">Reading local provider usage…</Text>
+        <Text emphasis="muted">Reading usage…</Text>
       </Show>
-      <For each={providers()}>
-        {/* An eyebrow line rather than a `Section`, which is what the changes plugin's model picker
-            does in its own popover: a Section indents its label past its body, so the name sat a
-            step right of the numbers under it. One name per block, and it used to be drawn twice. */}
-        {(provider) => (
-          <Stack gap="row">
-            <Inline>
-              <StatusDot tone={usageTone(provider.health)} label={provider.health} />
-              <Text emphasis="eyebrow">{provider.label}</Text>
-              <IconButton
-                icon="refresh-cw"
-                label={`Refresh ${provider.label} usage`}
-                title={`Refresh ${provider.label} usage`}
-                spin={agentUsageStore.refreshingProviderId() === provider.provider}
-                disabled={agentUsageStore.refreshing()}
-                onPress={() => void agentUsageStore.refreshProvider(provider.provider)}
-              />
-            </Inline>
-            <Text emphasis="muted">{providerMetaLine(provider)}</Text>
-            <Show when={provider.error}>{(error) => <Alert tone="warn">{error().message}</Alert>}</Show>
-            {/* `rows`, not the default tiles: every value here is a number with a qualifier after
-                it ("47% remaining · resets Sep 18 at 12am"), which is wider than a tile, so the
-                auto-fitting grid wrapped each one mid-phrase and left the two columns ragged. */}
-            <Facts
-              size="sm"
-              grouping="rows"
-              items={providerUsageRows(provider).map((row) => ({
-                label: row.label,
-                // A quota row carries a bar under its sentence; the cost and token rows below it are
-                // not a share of anything, so they stay text. The mark on the bar is where a steady
-                // spend would have left the fill by now, so "27% left" reads as comfortable or not
-                // without doing the arithmetic against the reset time beside it.
-                value: row.meter
-                  ? (
-                    <Stack gap="inline">
-                      <Text>{row.value}</Text>
-                      <Meter
-                        value={row.meter.fill}
-                        mark={row.meter.pace ?? undefined}
-                        tone={usageMeterTone(row.meter.health)}
-                        label={`${row.label}: ${row.value}`}
-                      />
-                    </Stack>
-                  )
-                  : row.value,
-              }))}
-            />
-          </Stack>
-        )}
-      </For>
+      {/* One `Facts` for every provider, so the values share one column and the meters line up. Each
+          provider's first row is its name, with the account line, the health dot and its refresh.
+          `rows`, not the default tiles: every value here is a number with a qualifier after it ("47%
+          remaining · resets Sep 18 at 12am"), which is wider than a tile. */}
+      <Facts
+        size="sm"
+        grouping="rows"
+        items={providers().flatMap((provider) => [
+          {
+            label: provider.label,
+            value: (
+              <Stack gap="inline">
+                <Inline wrap>
+                  <StatusDot tone={usageTone(provider.health)} label={provider.health} />
+                  <Text emphasis="muted">{providerMetaLine(provider)}</Text>
+                  <IconButton
+                    icon="refresh-cw"
+                    label={`Refresh ${provider.label} usage`}
+                    spin={agentUsageStore.refreshingProviderId() === provider.provider}
+                    disabled={agentUsageStore.refreshing()}
+                    onPress={() => void agentUsageStore.refreshProvider(provider.provider)}
+                  />
+                </Inline>
+                <Show when={provider.error}>{(error) => <Alert tone="warn">{error().message}</Alert>}</Show>
+              </Stack>
+            ),
+          },
+          ...providerUsageRows(provider).map((row) => ({
+            label: row.label,
+            // A quota row carries a bar under its sentence; the cost and token rows below it are not a
+            // share of anything, so they stay text. The mark on the bar is where a steady spend would
+            // have left the fill by now, so "27% left" reads as comfortable or not without doing the
+            // arithmetic against the reset time beside it.
+            value: row.meter
+              ? (
+                <Stack gap="inline">
+                  <Text>{row.value}</Text>
+                  <Meter
+                    value={row.meter.fill}
+                    mark={row.meter.pace ?? undefined}
+                    tone={usageMeterTone(row.meter.health)}
+                    label={`${row.label}: ${row.value}`}
+                  />
+                </Stack>
+              )
+              : row.value,
+          })),
+        ])}
+      />
     </Stack>
   )
 }

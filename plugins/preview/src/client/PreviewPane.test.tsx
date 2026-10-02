@@ -54,7 +54,7 @@ afterEach(() => {
 it('shows a remote-node explanation without creating or loading a native view', () => {
   dispose = render(() => <PreviewPane taskId="task-1" url="http://192.168.1.1/admin" remoteBlocked />, host)
 
-  expect(host.textContent).toContain('Preview unavailable on remote Nodes')
+  expect(host.textContent).toContain('Preview works on this computer only')
   expect(host.querySelector('input')).toBeNull()
   expect(views.ensure).not.toHaveBeenCalled()
   expect(views.load).not.toHaveBeenCalled()

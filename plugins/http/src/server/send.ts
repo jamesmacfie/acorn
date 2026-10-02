@@ -16,6 +16,7 @@ import {
   type SendFailure,
   type SendResult,
   type TimelineEntry,
+  formatSize,
 } from '../shared/model'
 import { openHttpValue } from './storage'
 
@@ -388,10 +389,12 @@ function buildTimeline(
   sensitiveValues: string[],
 ): TimelineEntry[] {
   const out = buildRequestTimeline(method, url, sent, sensitiveValues)
-  if (res.redirected && res.url && res.url !== url) out.push({ label: 'info', detail: `redirected to ${redactResolved(res.url, sensitiveValues)}` })
-  out.push({ label: 'response', detail: `${res.status} ${res.statusText}` })
-  for (const [k, v] of res.headers.entries()) out.push({ label: 'response-header', detail: `${k}: ${v}` })
-  out.push({ label: 'info', detail: `${size} bytes in ${durationMs}ms${truncated ? ' (body truncated at 5 MB)' : ''}` })
+  const received = (label: string, detail: string) => out.push({ label, detail, group: 'received' })
+  if (res.redirected && res.url && res.url !== url) received('Redirected to', redactResolved(res.url, sensitiveValues))
+  received('Status', `${res.status} ${res.statusText}`)
+  // A header row is labelled by the header's own name, so the list reads as the response did.
+  for (const [k, v] of res.headers.entries()) received(k, v)
+  received('Size and time', `${formatSize(size)} in ${durationMs} ms${truncated ? ', cut off at 5 MB' : ''}`)
   return out
 }
 
@@ -404,15 +407,15 @@ function buildFailureTimeline(
   sensitiveValues: string[],
 ): TimelineEntry[] {
   const out = buildRequestTimeline(method, url, sent, sensitiveValues)
-  out.push({ label: 'error', detail: `${failure.error}${failure.code ? ` [${failure.code}]` : ''}` })
-  if (failure.detail && failure.detail !== failure.error) out.push({ label: 'error-detail', detail: failure.detail })
-  out.push({ label: 'info', detail: `failed after ${durationMs}ms without an HTTP response` })
+  out.push({ label: 'Error', detail: `${failure.error}${failure.code ? ` [${failure.code}]` : ''}` })
+  if (failure.detail && failure.detail !== failure.error) out.push({ label: 'Detail', detail: failure.detail })
+  out.push({ label: 'Time', detail: `Failed after ${durationMs} ms with no response` })
   return out
 }
 
 function buildRequestTimeline(method: string, url: string, sent: Headers, sensitiveValues: string[]): TimelineEntry[] {
-  const out: TimelineEntry[] = [{ label: 'request', detail: `${method} ${redactResolved(url, sensitiveValues)}` }]
-  for (const [k, v] of sent.entries()) out.push({ label: 'request-header', detail: `${redactResolved(k, sensitiveValues)}: ${redact(k, redactResolved(v, sensitiveValues))}` })
+  const out: TimelineEntry[] = [{ label: 'Request', detail: `${method} ${redactResolved(url, sensitiveValues)}`, group: 'sent' }]
+  for (const [k, v] of sent.entries()) out.push({ label: redactResolved(k, sensitiveValues), detail: redact(k, redactResolved(v, sensitiveValues)), group: 'sent' })
   return out
 }
 

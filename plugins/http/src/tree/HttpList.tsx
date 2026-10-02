@@ -6,54 +6,67 @@
 // confirmation stays on each row so it cannot follow selection to another request.
 import { For, Show } from 'solid-js'
 import {
-  Button, ConfirmButton, EmptyState, Icon, Inline, SectionHeader, Section, Stack, Text, Toolbar, TreeRow,
+  Button, ConfirmButton, EmptyState, Icon, IconButton, Inline, SectionHeader, Section, SegmentedControl, Stack, Text,
+  Toolbar, TreeRow,
 } from '@acorn/plugin-api/ui/tree'
 import type { HttpRequest } from '../shared/model'
-import type { HttpPanelModel } from './panelModel'
+import type { HttpPanelModel, Selection } from './panelModel'
 
 export default function HttpList(props: { model: HttpPanelModel }) {
   const model = () => props.model
+  // The request the reader was on before Variables, so switching back lands on it again.
+  let back: Selection = { kind: 'new' }
+  const view = () => (model().selection().kind === 'variables' ? 'variables' : 'requests')
   return (
     <>
-      <SectionHeader level="pane">{model().projectName}</SectionHeader>
+      <SectionHeader level="pane">Requests</SectionHeader>
+      {/* A second bar, because a tree cannot fill a header's actions slot. No spacer: in the default
+          300-pixel column the second gap is what wrapped the button onto its own line. */}
       <Toolbar variant="actions" size="sm">
-        <Button size="sm" variant="ghost" onPress={() => model().startNew()}>+ Request</Button>
+        <SegmentedControl
+          size="sm"
+          ariaLabel="Show"
+          value={view()}
+          options={[{ value: 'requests', label: 'Requests' }, { value: 'variables', label: 'Variables' }]}
+          onChange={(value: string) => {
+            if (value === view()) return
+            if (value === 'variables') {
+              back = model().selection()
+              model().setSelection({ kind: 'variables' })
+            } else model().setSelection(back)
+          }}
+        />
+        <Button size="sm" variant="ghost" onPress={() => model().startNew()}>
+          <Icon name="plus" /> New request
+        </Button>
       </Toolbar>
 
       <Stack gap="row">
         <Show when={model().taskId}>
-          <Section label="This task">
+          <Section label="This task" help="Requests you make here stay with this task until you save them to the project.">
             <Show
               when={(model().adhoc() ?? []).length}
-              fallback={<EmptyState align="start" size="sm">Nothing yet — new requests you make here stay with this task until you file them.</EmptyState>}
+              fallback={<EmptyState align="start" size="sm">No requests in this task</EmptyState>}
             >
               <For each={model().adhoc()}>{(row) => <RequestRow model={model()} row={row} />}</For>
             </Show>
           </Section>
         </Show>
 
+        {/* A folder name is content, so it keeps its own case. */}
         <For each={model().groups()}>
           {(group) => (
-            <Section label={group.folder || 'Ungrouped'}>
+            <Stack gap="none">
+              <SectionHeader level="sub">{group.folder || 'Ungrouped'}</SectionHeader>
               <For each={group.requests}>{(row) => <RequestRow model={model()} row={row} />}</For>
-            </Section>
+            </Stack>
           )}
         </For>
 
         <Show when={model().saved.state === 'ready' && !(model().saved() ?? []).length && !model().taskId}>
-          <EmptyState align="start" size="sm">No saved requests for this project yet.</EmptyState>
+          <EmptyState align="start" size="sm">No saved requests in this project</EmptyState>
         </Show>
       </Stack>
-
-      <Toolbar variant="actions" size="sm">
-        <Button
-          size="sm"
-          variant={model().selection().kind === 'variables' ? 'solid' : 'bare'}
-          onPress={() => model().setSelection({ kind: 'variables' })}
-        >
-          <Icon name="braces" /> Variables
-        </Button>
-      </Toolbar>
     </>
   )
 }
@@ -74,16 +87,15 @@ function RequestRow(props: { model: HttpPanelModel; row: HttpRequest }) {
     >
       <Inline>
         <Text>{props.row.name}</Text>
-        <Button variant="bare" size="sm" title="Duplicate as a new request" label="Duplicate" onPress={() => props.model.startNew(props.row)}>
-          <Icon name="copy" />
-        </Button>
+        <IconButton size="xs" icon="copy" label="Duplicate" onPress={() => props.model.startNew(props.row)} />
         {/* Two clicks, not a dialog. The label changes so the second click is not a surprise, and it is
             the affordance rather than a tooltip because a tooltip is not an answer to "did that do
             anything". */}
         <ConfirmButton
-          variant="bare"
-          size="sm"
-          title={`Delete ${props.row.name}`}
+          variant="ghost"
+          size="xs"
+          iconOnly
+          tip={`Delete ${props.row.name}`}
           label="Delete"
           confirmLabel="Delete request?"
           onConfirm={() => void props.model.remove(props.row)}

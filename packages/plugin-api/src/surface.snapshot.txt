@@ -138,7 +138,9 @@ client: canPickFolder
 client: canonicalDataEncoding
 client: canonicalDataProjection
 client: checkStatusTone
+client: checkStatusWord
 client: checksState
+client: checksSummary
 client: clearLocal
 client: clientCapability
 client: clientCapabilityId
@@ -870,6 +872,7 @@ ui/tree: createElement
 ui/tree: createTextNode
 ui/tree: defaultModelIdFor
 ui/tree: effect
+ui/tree: formatChord
 ui/tree: insert
 ui/tree: insertNode
 ui/tree: memo

@@ -615,8 +615,9 @@ describe('architecture boundaries', () => {
       // split into Services and AI models the same day. One more for the shared model picker popover
       // (settings/models/ModelPickerPopover.tsx), merged in from main the same day. One more for
       // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
-      // others, merged in from perf the same day.
-      '@acorn/client-core': 164, // PaneModelHost and QueryCacheProvider are renderer composition seams.
+      // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
+      // remote tree can write a `tipKey` without the renderer-only barrel.
+      '@acorn/client-core': 165, // PaneModelHost and QueryCacheProvider are renderer composition seams.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 10,

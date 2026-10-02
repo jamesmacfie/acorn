@@ -1,6 +1,6 @@
 import { createHttpClient } from './httpClient'
 import { createResource, createSignal, Match, Show, Switch, type JSX } from 'solid-js'
-import { EmptyState, Heading, Select, SettingRow, SettingsSection, Stack, Text } from '@acorn/plugin-api/ui/tree'
+import { Button, EmptyState, Select, SettingRow, SettingsSection } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
 import { projectRoute, projectsRoute, type Project, type ProjectsResponse } from '@acorn/protocol/api.ts'
 import HttpDetail from './HttpDetail'
@@ -27,7 +27,6 @@ import { httpPanelModel } from './panelModel'
 // A selection into an already-mounted project pane arrives as `onSelect`, which the model subscribes
 // to once, because remounting per click would throw away the draft the panel is holding.
 
-const nameOf = (project: Project | undefined): string => project?.name ?? ''
 
 /** What the host mounts a pane region with: the surface's subject, minted by the shell per slot. */
 export type HttpPaneProps = { taskId?: string; projectId?: string; item?: string }
@@ -37,7 +36,7 @@ export type HttpPaneProps = { taskId?: string; projectId?: string; item?: string
 function WithProject(props: HttpPaneProps & { bridge: AcornBridge; children: (model: ReturnType<typeof httpPanelModel>) => JSX.Element }) {
   // The project is read from core rather than carried in the mount props, which hold an id and not a
   // name. One read, no refetch: a region is remounted when its subject changes.
-  const [project] = createResource(
+  const [project, { refetch }] = createResource(
     () => props.projectId,
     (id) => props.bridge.api.get<Project>(projectRoute(id)),
   )
@@ -45,21 +44,15 @@ function WithProject(props: HttpPaneProps & { bridge: AcornBridge; children: (mo
   return (
     <Switch>
       <Match when={!props.projectId}>
-        {/* A pane with no project. Reachable in principle — the host binds `projectId` from the task or
+        {/* A pane with no project. Reachable in principle: the host binds `projectId` from the task or
             the route, and a task whose project row has gone is not a state this plugin can fix. */}
-        <Stack gap="row">
-          <Heading level={2}>API</Heading>
-          <Text tone="muted" wrap>This surface needs a project. Open it from a task or from a project's rail.</Text>
-        </Stack>
+        <EmptyState title="No project">Open this from a task or a project.</EmptyState>
       </Match>
       <Match when={project.loading}>
         <EmptyState align="start" busy>Loading project…</EmptyState>
       </Match>
       <Match when={project.error}>
-        <Stack gap="row">
-          <Heading level={2}>API</Heading>
-          <Text tone="muted" wrap>Could not load this project.</Text>
-        </Stack>
+        <EmptyState title="Couldn't load this project" action={<Button onPress={() => void refetch()}>Try again</Button>} />
       </Match>
       <Match when={project()}>
         {(row) => props.children(httpPanelModel({
@@ -106,7 +99,7 @@ export function HttpSettingsApp(props: { bridge: AcornBridge }) {
         />
       </SettingRow>
       <Show when={chosen()}>
-        {(candidate) => <HttpVariables client={client} projectId={candidate().id} projectName={nameOf(candidate())} />}
+        {(candidate) => <HttpVariables client={client} projectId={candidate().id} />}
       </Show>
     </SettingsSection>
   )

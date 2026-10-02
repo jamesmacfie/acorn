@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { AgentProviderUsage, AgentUsageQuota, AgentUsageSnapshot } from '../../shared/usage'
 import { usageHealth } from '../../shared/usage'
-import { formatReset, formatTokens, providerMetaLine, providerUsageRows, quotaPace, usageSummaryEntries } from './usageModel'
+import { formatEstimateUsd, formatReset, formatTokens, planName, providerMetaLine, providerUsageRows, quotaPace, usageSummaryEntries } from './usageModel'
 
 const provider = (id: 'claude' | 'codex', percent: number): AgentProviderUsage => ({
   provider: id,
@@ -109,9 +109,21 @@ describe('agent usage detail formatting', () => {
       'Cache write / read',
       'Working time',
       'Sessions',
-      'Est. cache savings',
+      'Saved by caching (estimate)',
     ])
-    expect(providerUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('≈$0.42')
+    expect(providerUsageRows(claude).find((row) => row.label === 'Estimated today')?.value).toBe('<$1')
+  })
+
+  it('writes an estimate in whole dollars with a separator', () => {
+    expect(formatEstimateUsd(1918.12)).toBe('≈$1,918')
+    expect(formatEstimateUsd(0.42)).toBe('<$1')
+  })
+
+  it('names known plan ids and keeps a name the provider already wrote', () => {
+    expect(planName('prolite')).toBe('Pro Lite')
+    expect(planName('team')).toBe('Team')
+    expect(planName('Claude Max')).toBe('Claude Max')
+    expect(planName('enterprise')).toBe('Enterprise')
   })
 
   it('keeps a decimal on every compacted token count', () => {
@@ -187,7 +199,7 @@ describe('agent usage detail formatting', () => {
       },
     }
     expect(providerUsageRows(claude)).toEqual(expect.arrayContaining([
-      { label: 'Estimated today', value: 'pricing unavailable' },
+      { label: 'Estimated today', value: 'No price for this model' },
       { label: 'Unpriced models', value: 'claude-new-model' },
     ]))
   })
