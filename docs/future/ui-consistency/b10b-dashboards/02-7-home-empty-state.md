@@ -24,7 +24,7 @@ Home in the left rail, on a workspace with no panels (the fixture's state).
   must not live there.
 - The header's **Add panel** ([10-16](./10-16-home-grid-and-header.md)) shows only once panels exist, so
   the empty page has one **Add panel**, not two.
-- [10-12](../b10a-linear-and-rollbar/10-12-states.md)'s empty Home tab uses this same state.
+- An empty Home tab uses this same state. B10a's 10-12 left it to this batch.
 
 ## Copy
 

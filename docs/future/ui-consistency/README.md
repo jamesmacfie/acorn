@@ -1,8 +1,8 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Seventeen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 to B09 on branch `more-ui`, all merged to main. Three area batches and the final sweep
-remain.
+**Status:** in progress. Eighteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06 to B10a on branch `more-ui`. B06 to B09 are merged to main. Two area batches and the final
+sweep remain.
 Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
@@ -184,24 +184,26 @@ titled and say what failed. A thread links to "RailBadge.tsx, line 14" with the 
 importer is a titled card of setting rows with **Link folder**. The check run dialog has **Open on
 GitHub**. Not seen in the window: see [deferred.md](./deferred.md) § B09.
 
+**B10a, Linear and Rollbar.** A rail row is the state or severity icon, the title, and one field: the
+key for Linear, the occurrence count with a thousands separator for Rollbar. Row titles went from 59
+to 123 pixels in the 300-pixel list. A row's title is its tip and its accessible name. The list shows
+no count until it answers, and a filter that hides every row says "Nothing matches that filter." The
+row menu offers **Open task** when an active task already tracks the row. The sources read **Linear
+issues** and **Rollbar errors**, and Rollbar declares its own empty sentence. Picking another Linear
+issue clears the one on screen, and a refresh keeps it with a banner above. Load failures are a
+titled state with the reason in words and **Try again**, from a code table per plugin. The detail
+headers are level 2 with a refresh icon button, and **Back to {identifier}**. Status is a toned badge:
+Linear's from its state type and priority, Rollbar's from a word map. Activity and done marks are
+icons, dates read "Oct 7", and the sub-issue bar is a ratio with "1 of 2 done" above it. Rollbar's
+Overview shows the newest occurrence's message and stack, occurrence rows lead with the time and mark
+the chosen one, "›" marks the line that threw, and mono is only for versions and hosts. A mapped
+dashboard panel with one source keeps its field names and status words. See
+[deferred.md](./deferred.md) § B10a.
+
 ## What remains, in order
 
-Run the batches in this order. Each depends on the kit batches; B10b depends on B10a. The GitHub
+Run the batches in this order. Each depends on the kit batches. The GitHub
 seed below is still the screen to check B09 against in the final sweep.
-
-### B10a. Linear and Rollbar
-
-- [10-5. Linear and Rollbar list rows spend their width on everything except the title](./b10a-linear-and-rollbar/10-5-list-rows.md)
-- [10-6. Three status vocabularies, and dashboards print raw ids](./b10a-linear-and-rollbar/10-6-status-vocabularies.md)
-- [10-9. The Linear and Rollbar detail headers: an 18-pixel title and three button looks](./b10a-linear-and-rollbar/10-9-detail-header.md)
-- [10-10. The sub-issue bar is full as soon as one sub-issue is done](./b10a-linear-and-rollbar/10-10-sub-issue-bar.md)
-- [10-11. Linear shows the last issue while the next one loads](./b10a-linear-and-rollbar/10-11-linear-keeps-last-issue.md)
-- [10-12. Linear and Rollbar states: false claims, corner text, and raw codes](./b10a-linear-and-rollbar/10-12-states.md)
-- [10-13. A Rollbar item hides the error two clicks away](./b10a-linear-and-rollbar/10-13-rollbar-shows-its-error.md)
-- [10-19. Linear task panes list bare ids, and the menu offers Create task twice](./b10a-linear-and-rollbar/10-19-task-panes.md)
-- [10-20. Smaller Linear and Rollbar defects](./b10a-linear-and-rollbar/10-20-smaller-defects.md)
-
-Rail items are built on the node side. Rebuild the linear and rollbar bundles and restart the node.
 
 ### B10b. Dashboards and Home
 
@@ -356,13 +358,14 @@ through the plugin's own `mirrorPr` and `mirrorFiles`, with every `fetched_at` t
 node never asks GitHub. Relaunch with `--reuse`. Revert by deleting every row and blob the script wrote.
 The **Closed** tab asks GitHub live and stays on "Loading…" with a fake token.
 
-**Linear and Rollbar (B10a).** Back up `core.sqlite`, then write a connected Linear and a connected
-Rollbar `integrations` row (fake keys sealed with `session.key`), a `workspace_external_projects` link
-for each to the Default workspace, and two tasks with linked items (one Linear link; two Linear and two
-Rollbar links). Task ids must be UUIDs, or every tasks preview fails. Serve the data from the renderer:
-the transport reads `window.acorn.nodeFetch` on every request, so wrap it to answer the
-`/v1/p/linear/*` and `/v1/p/rollbar/*` routes with fake data, a chosen delay, or a chosen error code.
-The tree panes use the same transport. Dashboards hydrate from a persisted cache at boot, so delete
+**Linear and Rollbar (B10a).** B10a seeded everything from the renderer, with no database writes.
+Wrap `window.acorn.nodeFetch` to add a fake Linear and Rollbar connection to `/v1/core/integrations`,
+a link for each to `/v1/core/workspaces/:id/external-projects`, and `links` on two fixture tasks in
+`/v1/core/tasks`, and to answer the `/v1/p/linear/*` and `/v1/p/rollbar/*` routes with fake data, a
+chosen delay, or a chosen error code. The tree panes use the same transport. The rail-items routes
+answer rows the node builds, so the fake must mirror `shared/rail.ts`. The window is hidden, so focus
+refetches never run: open **Settings**, **Services** to refetch the connections, and switch workspace
+away and back to refetch the links. The script lived at `.acorn/agent-dev/b10a/seed.js`. Dashboards hydrate from a persisted cache at boot, so delete
 panels and tabs through the app before restoring the database, or the next boot brings them back.
 
 **Database and API (B11).** Wrap `window.acorn.nodeFetch` in the renderer to answer the database

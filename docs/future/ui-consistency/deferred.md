@@ -65,7 +65,7 @@ own item.
   whether a source that needs re-auth stays in the rail. Area 10's host-list rows wait with it: "Stale"
   becoming a muted "Out of date" badge (with the stale-data phrase "Showing the last data we got." as its
   tip), "{node} unavailable — {reason}" naming the source, "no answer within 5s", and "No cached
-  items.". B10a's [10-20](./b10a-linear-and-rollbar/10-20-smaller-defects.md) only drops the em dash.
+  items.". B10a found the em dash already gone and only moved the banner into the inset.
 - **07-10 (part) and the 07 step blurbs.** Validator messages and step-type descriptions are read by
   the authoring model, a matcher, and tests (`generate/kinds.ts:97`, `ground.ts:6`,
   `generationRequest.ts:78, 114`). Rewriting them for people needs structured problems and a
@@ -540,6 +540,49 @@ dialog on `Modal`.
 - **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts` fails on
   `projectWorktreesRoute`, which main's "create a task on an existing git worktree" commit added
   without a frame scope. The terminal suite's 13 worker reds are the known Node 24.11 ones.
+
+### B10a
+
+- **Seen in the window.** The node build was 3,063,547 bytes against its 3,062,000-byte ceiling,
+  so `pnpm dev:agent` would not start (the B09 wall). The user chose to raise the ceiling for real:
+  `apps/node/scripts/check-service-budget.mjs` is 3,217,000, the measured figure plus about 5%. Every
+  screen was shot before and after with a renderer-only seed (see the README's seeds).
+- **10-5.** Rollbar's one field is the count, not `#id`: two 84-pixel tracks left Linear's title 31
+  pixels, and the same would happen here. The `#id` is the collapsed row's `short` and heads the
+  detail. Row tips were not seen to flash under a moving pointer, because the driver cannot move one.
+  A row with a tip drops its native `title`, which had been its accessible name, so the row takes
+  `label` as well.
+- **10-6.** Canceled is neutral, because `Badge` has no muted tone. Rollbar's Active is neutral; the
+  level badge carries the severity. Labels stay `Chip` with the team's colour, which the finding did
+  not cover and the house rule ("Chip is never a label") still flags. The dashboards change applies
+  to a mapped panel with one source only. With several sources and no columns, the board still builds
+  its columns from what arrived, which an existing test pins. Not checked across a table, list,
+  board, and chart in the window; checked by test.
+- **10-10.** "1 of 2 done" sits above the bar, not beside it, because a `Meter` fills its line and a
+  remote tree cannot size it.
+- **10-12.** Load failures are a centred, titled `EmptyState` rather than a banner in the inset, the
+  shape B09 gave GitHub's list. **Try again** is a child of the state, because a tree's props are JSON
+  and `action` never arrives (11-7 is the same wall). "Nothing to show." is the host's fallback, not
+  "Nothing here yet."; it kept its words. The loading count was the only 0 claim; a filtered list
+  still counts its matches.
+- **10-12 (part), still deferred.** **Reconnect** from a tree. The auth reasons say "Reconnect Linear
+  in Settings." in words instead.
+- **10-13.** Overview reads the newest occurrence through the cached `/occurrences/:id` route the
+  Occurrences tab uses, not the compatibility composite. The heading is **Newest occurrence**, a label
+  the plan did not give. The request URL spans its row (`wide`), which keeps it on one line at 1440;
+  a URL longer than the row still breaks anywhere, since a URL has no word boundaries.
+- **10-19.** Linear's rows show the title with the key as meta. In the 150-pixel task list the title
+  still truncates; the tip holds it whole.
+- **10-20.** "No description." and Rollbar's empty Overview line are muted text, not the small
+  `EmptyState`: that one takes the row inset and sat 14 pixels in from the facts. "Resolved in" reads
+  "Not resolved" rather than an em dash. The cycle reads "Ends Oct 7", or "Cycle 14" with no end date.
+- **Not fixed, seen in passing.** In a task pane, a tree's first `Toolbar` does not reserve room for
+  the pane's pin, so Rollbar's refresh icon and Linear's **Copy link** sit under it. This was true of
+  the old **Refresh** button too. A list or detail `Section` header in a tree pane starts 14 pixels in
+  from the content beside it ("Links", "Sub-issues", "Newest occurrence").
+- **Census.** `tag` joined the eager icon set, and the census dropped `git-commit-horizontal`, which
+  nothing names any more.
+- **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts`, as B09 recorded.
 
 ## Notes for later sessions
 
