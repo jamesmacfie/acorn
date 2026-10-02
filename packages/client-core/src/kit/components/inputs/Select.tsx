@@ -15,6 +15,9 @@ const FILTER_FROM = 8
 export type SelectOption = {
   value: string
   label: string
+  /** A muted second line in the open list, under the label. With one, each line stays on one line
+   *  and ends in an ellipsis, rather than wrapping. The trigger shows the label alone. */
+  description?: string
   /** The long form, on hover. Agents' model list uses it for the model's description. */
   title?: string
   disabled?: boolean
@@ -35,7 +38,7 @@ function SelectList(props: {
   const filtered = () => {
     const text = query().trim().toLowerCase()
     if (!text) return props.options()
-    return props.options().filter((option) => option.label.toLowerCase().includes(text))
+    return props.options().filter((option) => `${option.label}\n${option.description ?? ''}`.toLowerCase().includes(text))
   }
   // Measured against the whole list, not the filtered one: a box that disappeared once you had
   // narrowed the list to seven rows would take the text you typed with it.
@@ -108,7 +111,14 @@ function SelectList(props: {
                 data-tip={option.title}
                 onClick={() => props.onPick(option)}
               >
-                <span class="ui-menu-label">{option.label}</span>
+                <Show when={option.description} fallback={<span class="ui-menu-label">{option.label}</span>}>
+                  {(description) => (
+                    <span class="ui-menu-label ui-select-option-stack">
+                      <span>{option.label}</span>
+                      <span class="ui-select-option-description">{description()}</span>
+                    </span>
+                  )}
+                </Show>
               </button>
             )}
           </For>
