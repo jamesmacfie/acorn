@@ -1373,7 +1373,8 @@ describe('styles', () => {
       ['--row-h', 'url(https://example.com/x)'],
       ['--space-1', 'var(--shadow-1)'],
       ['--shadow-2', '0 4px 8px #000'],
-      ['--gap-row', '5px'],
+      ['--surface-border', '1px solid'],
+      ['--card-bg', 'var(--accent)'],
       ['--unknown', '1px'],
     ]) {
       expect(manifest({ styles: [style({ [token]: value })] }).success, `${token}: ${value}`).toBe(false)

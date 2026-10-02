@@ -23,9 +23,10 @@ describe('confirmTaskArchive', () => {
   })
 
   it('asks before archiving a task with no reported concerns', async () => {
-    const decision = confirmTaskArchive({ id: 'task-1', branch: 'feature', worktreePath: '/tmp/worktrees/feature' })
+    const decision = confirmTaskArchive({ id: 'task-1', title: 'Add task search', branch: 'feature', worktreePath: '/tmp/worktrees/feature' })
 
     await expect.poll(() => dialog()?.textContent).toContain('deletes its worktree')
+    expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Add task search')
     expect(footer().map((button) => button.textContent)).toEqual(['Cancel', 'Archive task'])
 
     footer()[0]!.click()
@@ -33,9 +34,10 @@ describe('confirmTaskArchive', () => {
   })
 
   it('says the project folder stays when the task has no worktree of its own', async () => {
-    const decision = confirmTaskArchive({ id: 'task-2', branch: null, worktreePath: '/tmp/project' })
+    const decision = confirmTaskArchive({ id: 'task-2', title: 'Review release notes', branch: null, worktreePath: '/tmp/project' })
 
     await expect.poll(() => dialog()?.textContent).toContain('leaves the project folder as it is')
+    expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Review release notes')
     expect(dialog()?.textContent).not.toContain('worktree')
 
     footer()[0]!.click()

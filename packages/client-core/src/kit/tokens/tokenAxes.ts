@@ -49,7 +49,7 @@ export const STYLE_TOKENS = [
   '--bw-0', '--bw', '--bw-strong', '--bw-marker',
   '--divider-w', '--chrome-divider-w', '--pane-divider-w', '--pane-bw',
   '--control-bw', '--surface-bw', '--marker-w', '--stripe-w', '--tab-active-w',
-  '--divider', '--chrome-divider', '--control-border', '--surface-border',
+  '--divider', '--chrome-divider', '--control-border', '--surface-border', '--surface-border-style',
   // space
   '--space-0', '--space-1', '--space-2', '--space-3', '--space-4', '--space-5',
   '--space-6', '--space-7', '--space-8', '--space-9', '--space-10', '--space-11',

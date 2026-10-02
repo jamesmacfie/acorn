@@ -16,7 +16,7 @@ describe('plugin styles', () => {
   it('refuses the entire pack when any token is invalid', () => {
     expect(() => registerPluginStyle('board', { ...descriptor, tokens: { '--row-h': '28px', '--shadow-2': '0 4px 8px red' } })).toThrow()
     expect(pluginStyleStyleSheet()).toBe('')
-    expect(() => pluginStyleBlock('plugin:board:dense', { ...descriptor, tokens: { '--gap-row': '5px' } })).toThrow('host-derived')
+    expect(() => pluginStyleBlock('plugin:board:dense', { ...descriptor, tokens: { '--surface-border': '1px solid' } })).toThrow('host-derived')
   })
 
   it('falls back without changing the saved id, and resumes when registered', () => {

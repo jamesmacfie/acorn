@@ -18,7 +18,7 @@ const families = {
   shadow: '--shadow-0 --shadow-1 --shadow-2 --shadow-3 --shadow-4 --shadow-5 --shadow-drawer-l --shadow-drawer-l-sm --ring --ring-highlight',
   elevation: '--elev-popover --elev-menu --elev-modal --elev-drawer --elev-panel --elev-card --elev-pane --elev-row-hover',
   border: '--divider --chrome-divider --control-border --surface-border',
-  borderStyle: '--focus-ring-style',
+  borderStyle: '--focus-ring-style --surface-border-style',
   themeColor: '--card-bg --pane-bg --popover-bg --input-bg --chip-bg --scrim',
   alpha: '--scrim-alpha',
   duration: '--dur-instant --dur-short --dur-med --dur-long',
@@ -32,22 +32,15 @@ export const STYLE_TOKEN_FAMILIES: Readonly<Record<string, StyleTokenFamily>> = 
   Object.entries(families).flatMap(([family, tokens]) => tokens.split(' ').map((token) => [token, family])),
 ) as Record<string, StyleTokenFamily>
 
-// These recipes and role aliases remain host-owned. Packs can set their primitive inputs, and the
-// aliases follow through the cascade. In particular a plugin cannot redirect a border to a colour.
+// These are recipes the host owns. A pack sets their inputs, and the recipes follow through the
+// cascade. In particular a plugin cannot redirect a border to a colour, zero the stripe that carries
+// state, or take the glyph stack off monospace. The role aliases a built-in pack restates, such as
+// `--radius-surface` and `--elev-card`, are not on this list: a plugin pack may set them too.
 export const DERIVED_STYLE_TOKENS = [
-  '--radius-control', '--radius-surface', '--radius-popover', '--radius-chip',
-  '--radius-pill-fixed', '--radius-marker', '--radius',
-  '--divider-w', '--chrome-divider-w', '--pane-divider-w', '--pane-bw', '--control-bw',
-  '--surface-bw', '--marker-w', '--stripe-w', '--tab-active-w',
+  '--radius-pill-fixed', '--radius', '--stripe-w',
   '--divider', '--chrome-divider', '--control-border', '--surface-border',
-  '--pane-pad', '--pane-pad-y', '--gap-inline', '--gap-row', '--gap-stack', '--gap-section',
-  '--pad-control', '--pad-control-lg', '--pad-chip', '--pad-cell', '--pad-surface', '--pad-body',
-  '--tabrail-w', '--font-ui', '--font-glyph', '--font-display',
-  '--label-weight', '--label-size', '--heading-weight',
-  '--elev-popover', '--elev-menu', '--elev-modal', '--elev-drawer', '--elev-panel',
-  '--elev-card', '--elev-pane', '--elev-row-hover', '--ring', '--ring-highlight', '--scrim',
-  '--card-bg', '--pane-bg', '--popover-bg', '--input-bg', '--chip-bg',
-  '--pane-radius', '--ease-interactive', '--transition-color',
+  '--pane-pad-y', '--pad-body', '--tabrail-w', '--font-glyph',
+  '--ring', '--ring-highlight', '--scrim', '--transition-color',
 ] as const
 
 const derived = new Set<string>(DERIVED_STYLE_TOKENS)
@@ -69,7 +62,7 @@ export const styleValueAlphabet: Readonly<Record<StyleTokenFamily, (value: strin
   transform: (v) => /^(?:none|uppercase|lowercase|capitalize)$/.test(v),
   tracking: (v) => length.test(v),
   shadow: (v) => v === 'none' || shadow.test(v),
-  elevation: () => false,
+  elevation: (v) => v === 'none' || shadow.test(v),
   border: () => false,
   borderStyle: (v) => /^(?:none|solid|dashed|dotted)$/.test(v),
   themeColor: () => false,
@@ -81,11 +74,30 @@ export const styleValueAlphabet: Readonly<Record<StyleTokenFamily, (value: strin
   motion: (v) => v === 'none' || /^translateY\(-?\d+(?:\.\d+)?px\)$/.test(v) || /^scale\(0?\.\d+\)$/.test(v),
 }
 
+// A pack may point a token at another of the same kind instead of restating a literal, the way the
+// built-in packs write `--radius-surface: var(--radius-lg)`. A card or chip surface may only name a
+// theme surface, which is how a style picks a slot without ever naming a colour.
+const reference = /^var\((--[a-z0-9-]+)\)$/
+const referable: Partial<Record<StyleTokenFamily, readonly StyleTokenFamily[]>> = {
+  radius: ['radius'], length: ['length'], space: ['space'], font: ['font'], weight: ['weight'],
+  elevation: ['shadow'], easing: ['easing'],
+}
+const themeSurfaces = new Set(['--bg', '--bg-subtle', '--bg-hover', '--bg-selected'])
+
+function isReference(token: string, family: StyleTokenFamily, value: string): boolean {
+  const target = reference.exec(value)?.[1]
+  if (!target || target === token) return false
+  if (family === 'themeColor') return themeSurfaces.has(target)
+  const targetFamily = STYLE_TOKEN_FAMILIES[target]
+  return !!targetFamily && !derived.has(target) && (referable[family] ?? []).includes(targetFamily)
+}
+
 export function styleValueProblem(token: string, value: unknown): string | null {
   const family = STYLE_TOKEN_FAMILIES[token]
   if (!family) return `unknown style token ${token}`
   if (derived.has(token)) return `${token} is host-derived`
-  if (typeof value !== 'string' || value.length > 160 || value.trim() !== value || !styleValueAlphabet[family](value)) {
+  if (typeof value !== 'string' || value.length > 160 || value.trim() !== value
+    || !(styleValueAlphabet[family](value) || isReference(token, family, value))) {
     return `${token} requires a ${family} value`
   }
   if (token === '--font-mono' && !/\bmonospace$/.test(value)) return '--font-mono must end in monospace'

@@ -52,7 +52,9 @@ A client-only package may declare `contributions.styles` alongside themes. A sty
 `{ "--row-h": "28px", "--font-mono": "'JetBrains Mono', monospace" }`. The host generates the CSS;
 the manifest cannot contain selectors. The supported token families and value rules live in
 `@acorn/protocol/styleValues.ts`. A bad token rejects the pack during installation, and the client
-checks it again before adding any style to the shell.
+checks it again before adding any style to the shell. A pack may set the role aliases the built-in
+packs set, such as `--radius-surface: var(--radius-lg)` and `--font-ui`; see
+[Plugin style packs](./ui-design/appearance.md#plugin-style-packs) for the list it may not set.
 
 <a id="requiring-another-plugin"></a>
 <a id="what-the-builder-normally-supplies-and-you-now-supply-yourself"></a>

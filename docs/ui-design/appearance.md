@@ -52,6 +52,16 @@ value alphabet. Unknown and host-derived tokens, CSS declaration syntax, `url()`
 are refused. Shadows may name `var(--shadow-popover)` for their colour, never a literal colour.
 Plugin CSS never enters the shell.
 
+A plugin pack may set the same role aliases a built-in pack does: `--radius-surface`, `--font-ui`,
+`--divider-w`, `--elev-card`, `--card-bg`, `--ease-interactive`, and the rest of that layer. Each one
+takes a literal from its family's alphabet or a `var()` naming another token of the same kind, as in
+`--radius-surface: var(--radius-lg)` or `--elev-card: var(--shadow-2)`. An elevation may name a
+shadow rung, and a surface slot such as `--card-bg` may name only `--bg`, `--bg-subtle`, `--bg-hover`,
+or `--bg-selected`. Host recipes stay refused: the four border recipes, `--stripe-w`, `--radius` and
+`--radius-pill-fixed`, `--font-glyph`, `--ring`, `--ring-highlight`, `--scrim`, `--tabrail-w`, and
+`--transition-color`. These are `DERIVED_STYLE_TOKENS`. A pack that wants stitched floating surfaces
+sets `--surface-border-style` to `dashed` or `dotted`; `--surface-border` reads it.
+
 Packs are partial. Unset tokens retain the Terminal defaults, and a rejected value refuses the
 whole pack. Settings lists accepted packs with their owner. A stored choice falls back to Terminal
 while its plugin is absent or untrusted and returns when it becomes available; the preference is

@@ -248,7 +248,8 @@ while that claim is held, and archive waits for a worktree creation that was alr
 it reads the path to remove. An archived task also returns no root. This keeps a pane refresh from
 reading a half-removed tree or recreating the directory between removal and the final status write.
 
-Before any of that, archive always opens a confirmation dialog. The dialog asks every plugin what it
+Before any of that, archive always opens a confirmation dialog with the task title above the
+confirmation text. Long titles wrap. The dialog asks every plugin what it
 has to say about this task, such as running containers, uncommitted files, or live sessions, and
 offers whatever cleanup each one declared. With no reported concerns it remains as the explicit
 archive barrier. A plugin contribution called a task check is the only way anything else reaches that

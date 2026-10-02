@@ -40,7 +40,8 @@
   --divider: var(--divider-w) solid var(--border);              /* row / list separators */
   --chrome-divider: var(--chrome-divider-w) solid var(--border); /* topbar, section headers */
   --control-border: var(--control-bw) solid var(--border-strong); /* inputs, buttons */
-  --surface-border: var(--surface-bw) solid var(--border-strong); /* popovers, modals, cards */
+  --surface-border-style: solid;  /* a pack may stitch the floating surfaces with dashed or dotted */
+  --surface-border: var(--surface-bw) var(--surface-border-style) var(--border-strong); /* popovers, modals, cards */
 
   /* ── Space ─────────────────────────────────────────────────────────────────────────────────
      Semantics are restated per pack, not derived from a --density multiplier. calc() against a

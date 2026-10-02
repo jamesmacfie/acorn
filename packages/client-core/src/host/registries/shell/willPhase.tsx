@@ -3,6 +3,7 @@ import { createSignal, For, Show } from 'solid-js'
 import { collectConcerns, type Concern, DETAILS_MAX, type WillEventMap } from './willPhaseModel'
 import { Button, Checkbox } from '../../../kit/components/primitives'
 import Icon from '../../../kit/components/content/Icon'
+import { Heading } from '../../../kit/components/content/Heading'
 import { Modal } from '../../../kit/components/overlays/Modal'
 import { createLogger } from '../../../infra/telemetry/logger'
 export { collectConcerns, registerWillHandler } from './willPhaseModel'
@@ -12,6 +13,7 @@ const log = createLogger('will')
 
 type Prompt = {
   title: string
+  subject?: string
   actionLabel: string
   message?: string
   /** What the action leaves in place, said apart from what it removes. */
@@ -33,6 +35,7 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
   kind: K
   payload: WillEventMap[K]
   title: string
+  subject?: string
   actionLabel: string
   message?: string
   /** What the action leaves in place, said apart from what it removes. */
@@ -44,6 +47,7 @@ export async function confirmWillEvent<K extends keyof WillEventMap>(options: {
   if (!options.alwaysConfirm && !concerns.length) return { confirmed: true, checked: [] }
   return new Promise<WillDecision>((resolve) => setPrompt({
     title: options.title,
+    subject: options.subject,
     actionLabel: options.actionLabel,
     message: options.message,
     ...(options.stays ? { stays: options.stays } : {}),
@@ -122,6 +126,7 @@ export function WillConfirmationHost() {
       {(current) => (
         <Modal title={current.title} size="sm" role="alertdialog" autoFocus={() => action(current)} onDismiss={() => finish(false)}>
           <Modal.Body>
+            <Show when={current.subject}>{(subject) => <div class="will-subject"><Heading level={2}>{subject()}</Heading></div>}</Show>
             <Show when={current.message}>{(message) => <p>{message()}</p>}</Show>
             <Show when={current.stays}>{(stays) => <p class="muted">{stays()}</p>}</Show>
             <Show when={current.concerns.length}>
