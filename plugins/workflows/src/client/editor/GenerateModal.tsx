@@ -19,7 +19,7 @@ import {
   type WorkflowGenerateResult,
 } from '../../shared/api'
 import type { WorkflowDef } from '../../shared/workflowContracts'
-import { workflowApi } from '../workflowsClient'
+import { createWorkflowApi } from '../workflowsClient'
 
 // Describe a workflow or changes to one, get the whole definition (docs/workflows.md § Authoring).
 // The prompt, grounding and repair pass all live on the node; this collects the instruction and
@@ -58,6 +58,8 @@ export default function GenerateModal(props: {
   onGenerated: (result: WorkflowGenerateResult) => void
 }) {
   const qc = useQueryClient()
+  const workflowApi = createWorkflowApi(qc)
+  let disposed = false
   const prefs = createQuery(() => prefsOptions(true))
   const [description, setDescription] = createSignal('')
   // The shared default until the reader chooses in this dialog, and their choice from then on. A
@@ -75,7 +77,7 @@ export default function GenerateModal(props: {
   // A count, not a spinner. Two model calls at a 60-second ceiling each means a press that sits for
   // two minutes is working, and a spinner that long reads as wedged.
   let ticker: ReturnType<typeof setInterval> | undefined
-  onCleanup(() => clearInterval(ticker))
+  onCleanup(() => { disposed = true; clearInterval(ticker) })
 
   // Escape and a backdrop click go through the same gate the Cancel button does. Nothing calls a
   // generation off once it has been asked for, so a dialog that vanished on a stray press would let
@@ -89,6 +91,7 @@ export default function GenerateModal(props: {
 
   const generate = async (): Promise<void> => {
     if (busy() || !description().trim() || !backendId()) return
+    const context = props.context
     setBusy(true)
     setError('')
     setSeconds(0)
@@ -110,12 +113,13 @@ export default function GenerateModal(props: {
             name: props.context.draft.name,
             ...(props.context.draft.inputs ? { inputs: props.context.draft.inputs } : {}),
           }
-      props.onGenerated(await workflowApi.generateDef(request))
+      const result = await workflowApi.generateDef(request)
+      if (!disposed && props.context.defId === context.defId && props.context.projectId === context.projectId && props.context.draft === context.draft) props.onGenerated(result)
     } catch (failure) {
-      setError(generateReason(failure, props.backends.find((backend) => backend.id === backendId())))
+      if (!disposed) setError(generateReason(failure, props.backends.find((backend) => backend.id === backendId())))
     } finally {
       clearInterval(ticker)
-      setBusy(false)
+      if (!disposed) setBusy(false)
     }
   }
 

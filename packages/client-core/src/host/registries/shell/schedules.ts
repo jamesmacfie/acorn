@@ -1,4 +1,5 @@
 import { createEffect, createMemo, createRoot, onCleanup, untrack } from 'solid-js'
+import { activeNodeId } from '../../../infra/node/activeNode'
 import { hasHostCapability, type HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
@@ -27,22 +28,48 @@ export function startClientSchedules(): () => void {
       const next = clientScheduleRegistry.entries().filter((entry) => hasHostCapability(entry.requires))
       return next.length === previous.length && next.every((entry, index) => entry === previous[index]) ? previous : next
     })
+    const owners = new Map<ClientScheduleContribution, () => void>()
+    let previousNode = activeNodeId()
+    onCleanup(() => { [...owners.values()].reverse().forEach(stop => stop()); owners.clear() })
     createEffect(() => {
-      const disposers = active().map((entry) => {
+      const nodeId = activeNodeId()
+      const entries = active()
+      for (const [entry, stop] of owners) {
+        if (nodeId !== previousNode || !entries.includes(entry)) { stop(); owners.delete(entry) }
+      }
+      previousNode = nodeId
+      for (const entry of entries) {
+        if (owners.has(entry)) continue
+        let stopped = false
+        let running = false
+        let dirty = false
         const refresh = () => {
-          if (!document.hidden) void Promise.resolve(entry.run()).catch((error) => log.error(entry.id, error, { 'schedule.id': entry.id }))
+          if (stopped || activeNodeId() !== nodeId || document.hidden || !hasHostCapability(entry.requires)) return
+          if (running) { dirty = true; return }
+          running = true
+          void (async () => {
+            try {
+              do {
+                dirty = false
+                try { await entry.run() }
+                catch (error) { log.error(entry.id, error, { 'schedule.id': entry.id }) }
+              } while (dirty && !stopped && activeNodeId() === nodeId && !document.hidden && hasHostCapability(entry.requires))
+            } finally { running = false }
+          })()
         }
-        untrack(refresh)
         const timer = window.setInterval(refresh, entry.intervalMs)
         const off = entry.subscribe?.(refresh)
+        untrack(refresh)
         document.addEventListener('visibilitychange', refresh)
-        return () => {
+        owners.set(entry, () => {
+          if (stopped) return
+          stopped = true
+          dirty = false
           document.removeEventListener('visibilitychange', refresh)
           off?.()
           clearInterval(timer)
-        }
-      })
-      onCleanup(() => [...disposers].reverse().forEach((stop) => stop()))
+        })
+      }
     })
     return dispose
   })

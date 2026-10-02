@@ -345,6 +345,9 @@ the header only picks the view.
 
 **Save** flushes the draft at the revision it was read at. Autosave uses the same operation.
 A stale revision answers 409 and opens conflict choices without discarding the local draft.
+The editor keeps pending edits on their originating Node through navigation and cleanup. A held save
+acknowledges only its submitted content. For ownership and recovery rules, see
+[draft recovery and publication](../workflows.md#draft-recovery-and-publication).
 **Publish…** opens a review dialog that names the dependency set. **Publish** makes the set
 executable only after all writes complete. **Resume publishing** continues an interrupted operation.
 For a repository or user file, Save persists the visual draft on the Node; **Publish…** checks

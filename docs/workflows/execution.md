@@ -299,3 +299,20 @@ diagnostic; they do not execute. Ordinary graph convergence uses `after` edges.
 
 This replay protection is limited to one root run. Starting a fresh root can process the same
 business item again; cross-run business deduplication is deliberately not part of workflow dispatch.
+
+
+### Client run refreshes and live output
+
+A run pane captures the Node from its QueryClient. Each run-list and selected-step read has one
+active snapshot and a dirty follow-up flag. An invalidation during the follow-up schedules another
+read. Commands wait for a snapshot taken after the command. Step-status frames update the displayed
+row without fetching and survive a snapshot that started before the frame.
+
+The selected run owns live events, command tails, and status edges. Selecting another run retires
+those dictionaries. Unsent gate form fields retain the pane model lifetime across selections. The host retains one task model per pane and retires it with the task or Node shell. Returning reads
+the durable step results, including full
+canonical command output. The command tail holds the exact last 4,000 characters of stdout and
+stderr together. Stream chunks do not also occupy the generic event ring. Other event types,
+including managed-agent and unknown events, retain the 200-event window. The detail view reports how
+many earlier events left that window. These display limits do not shorten durable results or events
+sent to other consumers.

@@ -20,6 +20,7 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ invalidateQueries: calls.invalidate }),
 }))
 vi.mock('@acorn/plugin-api/client', () => ({
+  activeNodeId: () => null,
   activateTaskSignals: calls.activate,
   pathForTask: (task: Task) => `/t/${task.id}`,
   tasksKey: ['tasks'],

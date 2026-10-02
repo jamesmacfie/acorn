@@ -39,7 +39,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 22 | [Preview listener admission, retirement, and URL resolution](./22-preview.md) | Through 21 | Pending |
 | 23 | [Memory delta indexing and fresh reconciliation](./23-memory.md) | Through 22 | Pending |
 | 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
-| 25 | [Workflow authoring custody, refreshes, and stream copies](./25-workflow-custody.md) | Through 24 | Pending |
+| 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |
 | 28 | [Telemetry retirement and total histogram bounds](./28-telemetry.md) | Through 27 | Pending |

@@ -31,7 +31,7 @@ let currentKinds: import('../../shared/workflowContracts').WorkflowCatalog['kind
 let pluginChanged: (() => void) | undefined
 
 vi.mock('../workflowsClient', () => ({
-  workflowApi: {
+  createWorkflowApi: () => ({
     files: async (request: { action: string }) => request.action === 'list' ? { operations: [] } : { draft: { id: 'file', revision: 1, def: currentDef } },
     def: async (route: string) => ({
       id: 'abc', workspaceId: 'w1', projectId: null, name: original.name,
@@ -43,7 +43,7 @@ vi.mock('../workflowsClient', () => ({
     fieldOptions: async () => ({ options: [] }),
     modelBackends: () => modelBackends(),
     generateDef: async () => { throw new Error('legacy generation should not be called') },
-  },
+  }),
 }))
 vi.mock('@acorn/plugin-api/ui/data-sources', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@acorn/plugin-api/ui/data-sources')>()

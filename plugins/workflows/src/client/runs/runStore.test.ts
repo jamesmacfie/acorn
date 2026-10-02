@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 
 const api = vi.hoisted(() => ({ allRuns: vi.fn(), taskNavigation: vi.fn() }))
-vi.mock('../workflowsClient', () => ({ workflowApi: api }))
+vi.mock('../workflowsClient', () => ({ createWorkflowApi: () => api }))
 
 const { rememberWorkflowRun, taskHasWorkflowRuns, workflowRunCountsSchedule, workflowTaskGroups } = await import('./runStore')
 
@@ -49,4 +49,33 @@ describe('workflow run navigation cache', () => {
     await workflowRunCountsSchedule.run()
     expect(taskHasWorkflowRuns('new-confirmed-run')).toBe(false)
   })
+})
+
+it('joins held navigation waves and still reads a follow-up after invalidation', async () => {
+  let finish!: (value: { runs: { taskId: string }[] }) => void
+  api.allRuns.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+    .mockResolvedValueOnce({ runs: [{ taskId: 'after-wave' }] })
+  api.taskNavigation.mockResolvedValue({ groups: [] })
+  const before = api.allRuns.mock.calls.length
+  const reads = Array.from({ length: 30 }, () => workflowRunCountsSchedule.run())
+  expect(api.allRuns.mock.calls.length - before).toBe(1)
+  finish({ runs: [] }); await Promise.all(reads)
+  expect(api.allRuns.mock.calls.length - before).toBe(2)
+  expect(taskHasWorkflowRuns('after-wave')).toBe(true)
+})
+
+it('does not publish a disposed read and does not cancel a surviving schedule owner', async () => {
+  let finish!: (value: { runs: { taskId: string }[] }) => void
+  const first = workflowRunCountsSchedule.subscribe!(() => {})
+  const second = workflowRunCountsSchedule.subscribe!(() => {})
+  api.allRuns.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  api.taskNavigation.mockResolvedValue({ groups: [] })
+  const surviving = workflowRunCountsSchedule.run()
+  first(); finish({ runs: [{ taskId: 'survivor' }] }); await surviving
+  expect(taskHasWorkflowRuns('survivor')).toBe(true)
+
+  api.allRuns.mockReturnValueOnce(new Promise(resolve => { finish = resolve }))
+  const departed = workflowRunCountsSchedule.run()
+  second(); finish({ runs: [{ taskId: 'obsolete' }] }); await departed
+  expect(taskHasWorkflowRuns('obsolete')).toBe(false)
 })

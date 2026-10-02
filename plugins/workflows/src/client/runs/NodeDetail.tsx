@@ -351,6 +351,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 </Match>
               </Switch>
 
+              <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
+                <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
+              </Show>
               <Show when={otherEvents().length}>
                 <Fold label="Events" count={otherEvents().length}>
                   <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
@@ -396,6 +399,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
               />
               <Show when={structured()}>
                 {(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}
+              </Show>
+              <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
+                <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
               </Show>
               <Show when={otherEvents().length}>
                 <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
