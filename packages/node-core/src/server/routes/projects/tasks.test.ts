@@ -7,9 +7,10 @@ import type { AppEnv } from '../../middleware/auth'
 import { tasks } from './tasks'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
 import { clearHooks, registerHookHandler } from '../../pluginHost/hooks'
-import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { getWorktreesRoot, setWorktreesRoot, unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { projects } from './projects'
 import { execFileSync } from 'node:child_process'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdirSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 
@@ -37,6 +38,7 @@ const makeApp = () => {
     await next()
   })
   app.route('/api/tasks', tasks)
+  app.route('/api/projects', projects)
   return app
 }
 
@@ -180,7 +182,7 @@ describe('the active-task list route', () => {
     })
 
     const skipped = await create({ title: 'Skip setup', skipSetup: true })
-    const ordinary = await create({ title: 'Run setup' })
+    const ordinary = await create({ title: 'Run setup', branch: 'other-feature' })
     expect(skipped.status).toBe(200)
     expect(ordinary.status).toBe(200)
     const skippedId = ((await skipped.json()) as Task).id
@@ -198,12 +200,16 @@ describe('creating a task on an existing worktree', () => {
   let app: Hono<AppEnv>
   let dir: string
   let worktree: string
+  let previousRoot: string
 
   beforeEach(async () => {
     t = makeTestDb()
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
     dir = mkdtempSync(join(tmpdir(), 'acorn-attach-'))
+    previousRoot = getWorktreesRoot()
+    setWorktreesRoot(join(dir, 'managed'))
+    broadcasts.length = 0
     const checkout = join(dir, 'checkout')
     worktree = join(dir, 'wt')
     const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'ignore' })
@@ -222,6 +228,7 @@ describe('creating a task on an existing worktree', () => {
 
   afterEach(() => {
     t.cleanup()
+    setWorktreesRoot(previousRoot)
     rmSync(dir, { recursive: true, force: true })
   })
 
@@ -245,5 +252,57 @@ describe('creating a task on an existing worktree', () => {
     expect(await unclaimedWorktrees(t.db, project)).toEqual([])
     expect((await create(free[0]!.path)).status).toBe(409)
     expect((await create(join(dir, 'detached'))).status).toBe(409)
+  })
+
+  const createBranch = (branch: string) => app.request('http://acorn.test/api/tasks', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ origin: 'local', projectId: 'p', title: 'Local task', branch }),
+  })
+  const availability = (branch: string) => app.request(`http://acorn.test/api/projects/p/worktree-availability?branch=${encodeURIComponent(branch)}`)
+
+  it.each(['main', 'feat/elsewhere', 'folder-taken'])('refuses occupied worktree %s before inserting a task', async (branch) => {
+    mkdirSync(join(getWorktreesRoot(), 'p-p-folder-taken'), { recursive: true })
+    expect(await (await availability(branch)).json()).toMatchObject({ available: false, reason: 'This branch name already exists in another worktree' })
+    const response = await createBranch(branch)
+    expect(response.status).toBe(409)
+    expect(await response.json()).toMatchObject({ error: { code: 'worktree-unavailable', message: 'This branch name already exists in another worktree' } })
+    expect(await t.db.select().from(schema.tasks)).toEqual([])
+    expect(broadcasts).toEqual([])
+  })
+
+  it('reserves lazy worktree names, including branches that map to the same directory, until archive', async () => {
+    const created = await createBranch('feature/login')
+    expect(created.status).toBe(200)
+    const task = await created.json() as Task
+    expect(task.worktreePath).toBeNull()
+    expect((await createBranch('feature/login')).status).toBe(409)
+    expect((await createBranch('feature-login')).status).toBe(409)
+    expect(await (await availability('feature-login')).json()).toMatchObject({ available: false })
+    await t.db.update(schema.tasks).set({ status: 'archived' }).where(eq(schema.tasks.id, task.id))
+    expect((await createBranch('feature-login')).status).toBe(200)
+  })
+
+  it('admits only one simultaneous request for a worktree name', async () => {
+    const responses = await Promise.all([createBranch('racing/name'), createBranch('racing-name')])
+    expect(responses.map((response) => response.status).sort()).toEqual([200, 409])
+    expect(await t.db.select().from(schema.tasks)).toHaveLength(1)
+    expect(broadcasts).toHaveLength(1)
+  })
+
+  it('uses an attached task’s persisted path instead of reserving another directory from its branch', async () => {
+    const project = (await t.db.select().from(schema.projects))[0]!
+    const [free] = await unclaimedWorktrees(t.db, project)
+    expect((await create(free!.path)).status).toBe(200)
+    expect((await createBranch('feat/elsewhere')).status).toBe(409)
+    expect((await createBranch('feat-elsewhere')).status).toBe(200)
+  })
+
+  it('allows a branch that exists without a worktree and branchless tasks', async () => {
+    execFileSync('git', ['branch', 'unused'], { cwd: join(dir, 'checkout') })
+    expect(await (await availability('unused')).json()).toEqual({ available: true })
+    expect((await createBranch('unused')).status).toBe(200)
+    expect((await createBranch('')).status).toBe(200)
+    expect((await createBranch('')).status).toBe(200)
   })
 })
