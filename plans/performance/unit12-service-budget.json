@@ -1,0 +1,9 @@
+{
+  "ceilingBytes": 3062000,
+  "cumulativeTreeWithPreUnit12AgentsBytes": 3071580,
+  "finalLazyUnit12Bytes": 3070664,
+  "beforeCommand": "pnpm --filter @acorn/node exec vite build --outDir /tmp/acorn-unit12-build-before; node apps/node/scripts/check-service-budget.mjs --dir /tmp/acorn-unit12-build-before",
+  "afterCommand": "pnpm --filter @acorn/node build",
+  "node": "v24.21.0",
+  "ceilingChanged": false
+}

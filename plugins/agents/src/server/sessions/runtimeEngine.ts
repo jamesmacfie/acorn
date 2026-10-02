@@ -471,6 +471,7 @@ export class ManagedAgentEngine {
     }
     await Promise.allSettled([...this.providerCallbacks])
     await this.providerEvents.flushAll()
+    await this.store.flushSearch()
     await this.webhooks.stop()
     this.turnSpans.clear()
     this.listeners.clear()
@@ -1310,6 +1311,7 @@ export class ManagedAgentEngine {
       if (live.handle) await live.handle.stop()
       await Promise.allSettled([...live.callbacks])
       await this.providerEvents.flush(sessionId)
+      await this.store.flushSearch(sessionId)
       if (this.live.get(sessionId) === live) this.live.delete(sessionId)
     })()
   }

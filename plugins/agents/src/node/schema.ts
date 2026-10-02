@@ -4,8 +4,8 @@ import { sql } from 'drizzle-orm'
 //
 // The companion FTS5 virtual table (`agent_events_fts` and its three triggers over `agent_events`) is
 // hand-written into the migration rather than declared here. See docs/data-layer.md § Migrations.
-// migrations/0000_*.sql is the only place its shape is stated, server/sessions/sessionRepository.ts reads it with
-// raw SQL, and node/ftsSchema.test.ts keeps the two in step.
+// Migration 0005 owns its shape, migration 0012 owns dirty progress, and
+// server/ftsSchema.test.ts checks the actual migrated objects.
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Managed agent sessions are task-scoped execution records. Provider-specific resumability remains
@@ -125,6 +125,13 @@ export const agentEvents = sqliteTable(
     index('agent_events_created_idx').on(t.createdAt),
   ],
 )
+
+// SQLite triggers commit this marker with canonical mutations. SearchProjection clears it only
+// after complete message materialization and FTS updates commit.
+export const agentSearchDirty = sqliteTable('agent_search_dirty', {
+  sessionId: text('session_id').primaryKey(),
+  fromSeq: integer('from_seq').notNull(),
+})
 
 export const agentRequests = sqliteTable(
   'agent_requests',

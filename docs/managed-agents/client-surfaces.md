@@ -587,8 +587,9 @@ each deleted row left a tombstone there. The file does not shrink; see docs/data
 
 ### Transcript search
 
-`agent_events_fts` is a SQLite full-text index over `agent_events.search_text`, kept in step by triggers
-written by hand into the migrations (docs/data-layer.md § Migrations). Agent Center's search and the
+`agent_events_fts` is a SQLite full-text index over `agent_events.search_text`. Migration-owned triggers
+project standalone rows and explicit search-text changes. The Node-owned `AgentSearchProjection`
+materializes streamed message heads before reads that require them. Agent Center's search and the
 archive page's search provider (docs/plugins.md § Search providers) both read it. When the retention
 pass removes a session's history, the delete trigger takes its rows out of the index, so archive search
 stops finding it. The session's title still matches, and so does the note left in its place
@@ -609,9 +610,31 @@ own. Migration `0005_agent_events_fts_messages.sql` applied the same rule to exi
 148,570 became 7,410 messages averaging 445 characters, in 11 seconds on a 1.4 GB database. No
 harness writes a final full-text event beside its fragments, so there was nothing simpler to index.
 
-Each fragment rewrites its message's search row, so indexing a message costs its length times its
-fragment count. That is small for replies of a few kilobytes. Indexing when the stream closes is the
-upgrade if very long replies make writes slow.
+A continuation commits its canonical JSON and sequence without concatenating or reindexing the head.
+Migration `0012_agent_search_progress.sql` records the earliest dirty sequence per session in the
+same SQLite transaction, including direct inserts, canonical updates, and deletions. The projector
+starts at the preceding materialized head, reads 128 canonical rows at a time, joins each complete
+message, and writes only changed heads. It retains one page and one message head's materialization during catch-up, with
+no message cache or timer. Whole messages retain phrase, split-word, stemming, prefix, and ranking
+semantics. A query after every fragment still pays the full growing-message indexing cost.
+
+Both search entrypoints catch up every dirty session before ranking, including sessions outside the
+task filter because they affect corpus statistics. Catch-up, ranked rows, snippets, and session reads
+share a synchronous SQLite transaction. Agent Center resolves workspace task IDs through CoreServices
+before entering that transaction. Its tied ranks still sort by descending session update time; the
+archive provider retains FTS rank order for ties.
+
+Raw `snapshot`, `eventPage`, `eventsForTurn`, and `exportSnapshot` reads catch up their session inside
+the read transaction. Wait, execution, delegation, fork context, and transcript export therefore keep
+complete derived heads. Client snapshots and event pages select no search-text bytes and skip this
+barrier; their records omit `searchText`. A stream boundary, provider retirement, and runtime shutdown
+also flush committed dirty work. Failed projection rolls back without discarding its dirty marker.
+
+Before the first projection read or event write, the Node reinstalls missing derived objects, checks index integrity and event-row
+identity, and marks canonical sessions for reconciliation. This covers lost markers and stale
+progress after interruption. A missing, inconsistent, or corrupt index is rebuilt from canonical
+message JSON and the ledger's folded-card exclusions. Recovery holds no asynchronous projection task,
+so deleting a session cannot revive it. Applied migrations remain unchanged.
 
 **A tool call is indexed once, on its latest row.** That row holds the whole call, so the opener gives
 up its search text when the first update folds onto it. A file change does the same.
@@ -624,7 +647,8 @@ for a command someone ran still works.
 **Search rows are keyed by the event's rowid.** The triggers used to find a row by `event_id`, which
 FTS5 cannot look up, so every update or delete scanned the whole index. Inserts replace on rowid and
 deletes also check `event_id`, so an event table whose rowids a VACUUM renumbered repairs itself on the
-next write instead of failing it.
+next write instead of failing it. Recovery reconciliation also detects rowid drift and rebuilds the index
+before search reads it.
 
 The index still stores its own copy of the text: 203 MB on the measured database once the tool rows
 were folded, down from 326 MB. Pointing it at `agent_events` as external content would save that, and
