@@ -16,6 +16,8 @@ import { isTaskConfined, mayActOnTask, ownerId } from '../../middleware/requireU
 import { integrationProviderRegistry } from '../../integrations/registry'
 import { warmItemDetails } from '../../integrations/itemDetail'
 import { getProject, type ProjectRow } from '../../projects'
+import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
+import { resolve } from 'node:path'
 
 // Tasks (docs/workspaces-and-tasks.md): the single-project unit of work. Machine-scoped like projects
 // and terminal_sessions, no user_id, but still auth-gated (it's a logged-in app). CRUD: create /
@@ -73,6 +75,7 @@ const taskSeedBody = z.object({
   origin: z.string().min(1),
   projectId: z.string().min(1),
   branch: z.string().optional(),
+  worktreePath: z.string().min(1).optional(),
   skipSetup: z.boolean().optional(),
   pullNumber: z.int().positive().optional(),
   links: z.array(z.object({
@@ -177,10 +180,23 @@ export const tasks = new Hono<AppEnv>()
       if (isProviderOperationError(error)) return providerRefusal(c, error)
       throw error
     }
+    // Attaching an existing worktree: the path must be one git lists for this project and no active
+    // task already uses, and the branch is whatever that worktree has checked out. Setup never runs,
+    // because resolveTaskCwd only runs it for a worktree it created.
+    let worktreePath: string | null = null
+    let attachedBranch: string | null = null
+    if (seed.worktreePath) {
+      if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
+      const wanted = resolve(seed.worktreePath)
+      const match = (await unclaimedWorktrees(db, project)).find((wt) => resolve(wt.path) === wanted)
+      if (!match) return respondError(c, 409, 'worktree-unavailable', ['That worktree is not a free worktree of this project.'])
+      worktreePath = match.path
+      attachedBranch = match.branch
+    }
     const [{ value }] = await db.select({ value: max(schema.tasks.sort) }).from(schema.tasks)
     const now = Date.now()
     const id = randomUUID()
-    const branch = project.vcs === 'git' ? seed.branch?.trim() || null : null
+    const branch = attachedBranch ?? (project.vcs === 'git' ? seed.branch?.trim() || null : null)
     const projectLabel = project.githubName ?? project.name
     const title = seed.title?.trim() || (seed.pullNumber ? `#${seed.pullNumber} ${projectLabel}` : branch ? `${project.name} · ${branch}` : project.name)
     const sort = (value ?? -1) + 1
@@ -194,7 +210,7 @@ export const tasks = new Hono<AppEnv>()
       branch,
       skipSetup: seed.skipSetup ?? false,
       pullNumber: seed.pullNumber ?? null,
-      worktreePath: null,
+      worktreePath,
       status: 'active',
       sort,
       createdAt: now,
@@ -214,7 +230,7 @@ export const tasks = new Hono<AppEnv>()
     broadcastTasksChanged({ taskId: id })
     return c.json(
       rowToTask(
-        { id, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath: null, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
         project,
       ),

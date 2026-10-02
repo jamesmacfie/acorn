@@ -151,6 +151,9 @@ export type TaskSeed = {
   origin: Task['origin']
   projectId: string
   branch?: string
+  // An existing linked worktree from projectWorktreesRoute. The node checks it against git and
+  // takes the branch from it, so `branch` is ignored when this is set.
+  worktreePath?: string
   skipSetup?: boolean
   pullNumber?: number
   links?: TaskLinkSeed[]
@@ -171,6 +174,10 @@ export const projectRoute = (id: string) => `${projectsRoute}/${encodeURICompone
 export const projectDetectRoute = (id: string) => `${projectRoute(id)}/detect`
 export const projectConfigRoute = (id: string) => `${projectRoute(id)}/config`
 export const projectRunTargetsRoute = (id: string) => `${projectRoute(id)}/run-targets`
+// Linked git worktrees of the project's checkout that no active task uses yet, for the new-task
+// dialog's "Existing worktree" tab.
+export const projectWorktreesRoute = (id: string) => `${projectRoute(id)}/worktrees`
+export type ProjectWorktree = { path: string; branch: string }
 // The MCP config files the agents in this project load, and the empty .mcp.json Settings can seed
 // (docs/mcp.md § Configuration).
 export const projectMcpRoute = (id: string) => `${projectRoute(id)}/mcp`
