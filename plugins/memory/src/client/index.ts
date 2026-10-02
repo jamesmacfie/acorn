@@ -1,13 +1,12 @@
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
 import { memoryCommands } from './commands'
+import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { memoryApi } from './memoryClient'
 import { activateMemoryNoticeTargets, MEMORY_SOURCE_ID } from './proposalTarget'
 
 const MemoryCenter = lazy(() => import('./MemoryCenter'))
-// Lazy as well: the section draws only inside the Context pane, and it carries the Findings review,
-// which is most of this plugin's weight.
-const MemorySection = lazy(() => import('./MemorySection'))
+const MemoryToolCard = lazy(async () => ({ default: (await import('./MemoryToolCard')).MemoryToolCard }))
 
 const reviewAttentionTitle = (ready: number, failed: number): string => {
   const readyText = `${ready} memory suggestion${ready === 1 ? '' : 's'} ready`
@@ -21,16 +20,9 @@ export const memoryClientPlugin: ClientPlugin = {
   init: (ctx) => {
     // Register Memory search and review commands (./commands.ts).
     for (const contribution of memoryCommands) ctx.commands.register(contribution)
-    // Into the section slot the context pane opens, matched on the node-side `memory` section id, which
-    // plugins/memory's own node part registers. Both halves key on that id, and neither plugin imports
-    // the other: the host carries the props and mounts the component.
     ctx.extensions.register({
-      id: 'memory.section',
-      point: 'context:section',
-      label: 'Memory review and add form',
-      order: 10,
-      matches: ['memory'],
-      component: MemorySection,
+      id: 'memory.tool-card', point: AGENT_TOOL_CARD_POINT, label: 'Memory changes',
+      order: 10, matches: ['memory_write', 'memory_delete'], component: MemoryToolCard,
     })
     // The Memory page (./MemoryCenter.tsx). On the rail rather than reachable only from a
     // notification: reviewing what a project has learned is something an owner goes and does, and a

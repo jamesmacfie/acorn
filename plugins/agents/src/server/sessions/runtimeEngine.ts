@@ -154,6 +154,7 @@ export type AgentRuntimeOptions = {
   // answer on a standalone node: it receives no service handshake, so it learns no staging directory.
   mcp?: () => { name: string; launcher: Launcher } | null
   secrets: SecretService
+  standingContext?(taskId: string): Promise<string | null>
   currentUserId(): string | null
   registry?: AgentDriverRegistry
   // Any frame, not only the plugin's own: the core-named `agent-session:changed` goes out through the
@@ -223,6 +224,7 @@ export class ManagedAgentEngine {
   protected readonly mintedSecrets: string[] = []
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
+  protected readonly standingContext?: (taskId: string) => Promise<string | null>
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
   protected readonly publish?: (frame: PublishedFrame) => void
@@ -291,6 +293,7 @@ export class ManagedAgentEngine {
     this.core = options.core
     this.internalEnv = options.internalEnv
     this.mcp = options.mcp ?? (() => null)
+    this.standingContext = options.standingContext
     this.currentUserId = options.currentUserId
     this.registry = options.registry ?? agentDriverRegistry
     this.publish = options.publish

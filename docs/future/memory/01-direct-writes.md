@@ -1,6 +1,6 @@
 # Phase 1: agents write memory directly
 
-Status: proposed, 2026-10-01. Read [design.md](./design.md) first. This phase builds the write path,
+Status: implemented for verification, 2026-10-02. The two-week usage measurement remains open. Read [design.md](./design.md) first. This phase builds the write path,
 standing context, and the transcript card from that design.
 
 ## Goal
@@ -30,7 +30,7 @@ if direct writes turn out badly, one revert restores the proposal path.
   `plugins/memory/src/server/agentTools.ts`.
 - The launch block is built in `plugins/memory/src/server/knowledgeChannel.ts` and delivered by
   Terminal through `terminal:launch-context`.
-- The memory context section is registered from `plugins/memory/src/server/contextSection.ts`, with
+- The memory context section is registered from the retired memory context-section contribution, with
   `defaultIncluded: false`.
 - Custom agent instructions already reach each harness's system prompt, stored on the session config
   so a resume sends the same text: `plugins/agents/src/server/drivers/claudeHarness.ts`,
@@ -140,6 +140,46 @@ memory until it calls `memory_list`, and its earlier turns stay intact.
 Stop registering the memory context section and update the `task_context` description.
 
 **Checkpoint 7.** The Context pane has no memory section, and `task_context` output has no memory index.
+
+## Implementation record
+
+Direct tools use the file store with hash conflicts, safety checks, attribution, history, and Undo.
+Standing context is supplied through the Agents-owned `agents.standingContext.v1` contract, which
+keeps Agents independent of the optional Memory provider. The Markdown contract is embedded by the
+Node build and read directly by source launches. Terminal Claude reads the launch contribution before
+PTY spawn; managed drivers read the persisted admission snapshot.
+
+The Context pane memory section is removed. Manual additions and body reading are on the Memory
+page; review bundles remain there during measurement. The SQLite index and Findings producers remain
+for phase 2. Agent reads scan the two direct-memory scope folders.
+
+Claude Code documents `autoMemoryEnabled: false` in settings and
+`CLAUDE_CODE_DISABLE_AUTO_MEMORY=1` for an environment override
+([official memory documentation](https://code.claude.com/docs/en/memory#enable-or-disable-auto-memory),
+checked 2026-10-02). This phase keeps the native setting unchanged. No external harness
+session or account was used to measure agent behavior during implementation.
+
+### Verification on 2026-10-02
+
+- `pnpm lint`: all 37 packages pass.
+- Memory: 72 tests pass, including scope isolation, safety, conflicts, history rotation, Undo,
+  capped indexes, page scope from a task, and transcript actions.
+- Node integration: 280 tests pass. Agents: 1,028 tests pass, with one skipped; the subsequent
+  provider tool-name regression run passes 81 tests. Terminal launch and lifetime: 25 tests pass.
+- Real production Tauri window: manual Add writes under the isolated session data directory;
+  transcript Open selects the saved body in the correct project; Undo removes a newly created
+  file and index entry, logs an owner restore, and disables the completed Undo action. The
+  Context pane has no Memory section.
+- Node production build passes its startup budget. Renderer compilation passes, but its budget
+  check fails: 921,922 script bytes against 906,000, and the unchanged Workflow `stepFields.ts`
+  is in the startup graph.
+- The full `pnpm test` run has 13 failures outside the changed Memory paths: three backup timeouts,
+  two client scope/layout assertions, six desktop renderer-connection fixtures, and two desktop
+  display-label assertions. The full suite is not green.
+
+External-provider checkpoints 2 and 4–6 still need ordinary Claude, Codex, and terminal use. Driver
+and admission tests verify prompt delivery and snapshot persistence; they do not establish whether
+an external model chooses useful memories. The two-week owner measurement below remains required.
 
 ## Measure before phase 2
 

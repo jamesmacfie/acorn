@@ -281,8 +281,12 @@ export async function startAcpSession(
   // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
   // provider session this driver creates, and never to one it picks back up, which already has them.
   const customAgent = sessionCustomAgent(options.session.config)
-  const fallbackInstructions = !spec.systemPromptInstructions && customAgent?.instructions
-    ? contextBlock({ source: 'context.agent.instructions', label: `${customAgent.name} instructions`, content: customAgent.instructions })
+  const standing = options.session.config.standingContext
+  const fallbackInstructions = !spec.systemPromptInstructions
+    ? [
+        customAgent?.instructions ? contextBlock({ source: 'context.agent.instructions', label: `${customAgent.name} instructions`, content: customAgent.instructions }) : null,
+        typeof standing === 'string' && standing ? contextBlock({ source: 'context.memory', label: 'Memory at session start', content: standing }) : null,
+      ].filter(Boolean).join('\n\n') || null
     : null
   let instructionsOwed = false
   const createSession = async (): Promise<void> => {

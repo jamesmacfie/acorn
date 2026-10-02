@@ -15,6 +15,12 @@ const toolEvent = (update: SessionUpdate) => {
 }
 
 describe('ACP tool call normalization', () => {
+  it('keeps the MCP tool identity separate from its provider title', () => {
+    expect(toolEvent({ sessionUpdate: 'tool_call', toolCallId: 'memory', title: 'Save a memory',
+      _meta: { claudeCode: { toolName: 'mcp__acorn__memory_write' } },
+    })).toMatchObject({ name: 'memory_write', title: 'Save a memory' })
+  })
+
   it('carries inline text content through as the call output', () => {
     expect(toolEvent({
       sessionUpdate: 'tool_call_update',

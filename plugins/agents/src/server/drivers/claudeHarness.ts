@@ -49,6 +49,7 @@ export const claudeHarness: HarnessLaunchSpec = {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
       UNATTENDED_KINDS.has(session.kind) ? UNATTENDED_TURN_ENDINGS : undefined,
+      typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
     ].filter(Boolean).join('\n\n')
     return {
       claudeCode: { options: { settings: { autoContinueAtUsageLimit: false } } },

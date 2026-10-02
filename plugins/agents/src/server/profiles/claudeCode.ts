@@ -9,13 +9,10 @@ export const claudeCodeProfile: AgentProfileContribution = {
   backendPreference: 'tmux',
   transport: 'pty',
   mcpRegistration: (name, launcher) => registerAcornMcp(claudeMcpCommands, name, launcher),
-  // Pull, not push (docs/notes-and-memory.md): a system-prompt instruction to fetch the task's own
-  // context through the projected MCP tools. A pushed block queues 'after-ready', so it lands after the
-  // user's first ask whenever the CLI is busy. A system prompt cannot race.
-  // Tools are named bare, because the acorn server's name is build-flavoured (acorn or acorn-dev).
-  launchArgs: [
+  // Terminal builds standing context before spawn; no first-turn recall tool call is needed.
+  launchContextArgs: (context) => [
     '--append-system-prompt',
-    'This session runs inside acorn, which projects the current task as MCP tools. Before starting work, call task_context to read the task: its pull request, linked issues, workspace notes and the repo memory index. Follow up with notes_read for any note it lists, and memory_search / memory_get for relevant repo memory — conventions and past feedback live there. Re-read them when the task shifts; the user edits notes while you work. Never ask the user for context you can pull yourself.',
+    [context, 'This session runs inside acorn. Use task_context for the task, pull request and linked issues, and notes_read for task notes. Re-read notes when the task shifts; the user edits them while you work. Never ask the user for context you can pull yourself.'].filter(Boolean).join('\n\n'),
   ],
   // `auto` rather than `dontAsk`, which is what this was until an agent tool got called and denied.
   // `dontAsk` does not mean "do not prompt", it means "deny anything not already in a `permissions.allow`

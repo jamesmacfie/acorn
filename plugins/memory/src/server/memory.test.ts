@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, utimesSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import {
   contentHashId,
@@ -35,7 +35,7 @@ describe('memory frontmatter round-trip (docs/notes-and-memory.md — the Claude
   it('serialize → parse preserves the convention fields incl. nested metadata', () => {
     const m = mem({})
     const parsed = parseMemory(serializeMemory(m), 'fallback')
-    expect(parsed).toEqual(m)
+    expect(parsed).toEqual({ ...m, type: 'project' })
   })
   it('degrades junk safely: bad type → reference, missing description → first body line', () => {
     const parsed = parseMemory('---\nname: x\nmetadata:\n  type: novel\n---\nThe first line.\nmore', 'x')
@@ -62,6 +62,7 @@ describe('memory store + index over temp checkouts', () => {
   ]
 
   beforeEach(() => {
+    vi.stubEnv('ACORN_DATA_DIR', undefined)
     dir = mkdtempSync(join(tmpdir(), 'acorn-mem-'))
     checkoutA = join(dir, 'a')
     checkoutB = join(dir, 'b')
@@ -71,6 +72,7 @@ describe('memory store + index over temp checkouts', () => {
   })
 
   afterEach(() => {
+    vi.unstubAllEnvs()
     t.cleanup()
     rmSync(dir, { recursive: true, force: true })
   })
@@ -80,7 +82,7 @@ describe('memory store + index over temp checkouts', () => {
     await writeMemoryFile(memDir, mem({}))
     await writeMemoryFile(memDir, mem({ name: 'login-flow', description: 'the login redirect order', type: 'architecture' }))
     const index = readFileSync(join(memDir, 'MEMORY.md'), 'utf8')
-    expect(index).toBe('- [auth-conventions](auth-conventions.md) — how auth flows work in this repo\n- [login-flow](login-flow.md) — the login redirect order\n')
+    expect(index).toBe('- [login-flow](login-flow.md) — the login redirect order\n- [auth-conventions](auth-conventions.md) — how auth flows work in this repo\n')
 
     await reconcileMemories(t.db, sources())
     const all = await listMemories(t.db, {})

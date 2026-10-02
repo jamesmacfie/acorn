@@ -56,8 +56,8 @@ const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'in
 // must vanish when it's disabled, and by omission every entry that must not. Recorded in
 // pluginDisable.snapshot.json. See docs/plugins.md § The golden lists.
 //
-// No optional plugin owns a context section. All four belong to required plugins (`pr` → github,
-// `notes` → notes, `memory` → memory) or to core itself (`issues`), so `sections` is identical in
+// No optional plugin owns a context section. The three belong to compiled plugins (`pr` → github,
+// `notes` → notes) or to core itself (`issues`), so `sections` is identical in
 // every case below.
 type Golden = { full: Snapshot; owned: Record<string, Partial<Snapshot>> }
 const GOLDEN = join(import.meta.dirname, 'pluginDisable.snapshot.json')

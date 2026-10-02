@@ -18,8 +18,12 @@ const candidate = (payload: FindingCandidateRevision['payload'], payloadHash: st
 
 describe('memory-owned findings promotion receipts', () => {
   let store: TestPluginDb, home: string
-  beforeEach(() => { store = makeTestPluginDb('memory'); home = mkdtempSync(join(tmpdir(), 'acorn-findings-memory-')); mkdirSync(home, { recursive: true }) })
-  afterEach(() => { store.cleanup(); rmSync(home, { recursive: true, force: true }) })
+  beforeEach(() => {
+    vi.stubEnv('ACORN_DATA_DIR', undefined)
+    store = makeTestPluginDb('memory'); home = mkdtempSync(join(tmpdir(), 'acorn-findings-memory-')); mkdirSync(home, { recursive: true }) })
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    store.cleanup(); rmSync(home, { recursive: true, force: true }) })
 
   it('describes the exact add and update operations to synthesis models', async () => {
     const memory = { reconciled: async () => {}, list: async () => [] } as unknown as MemoryKnowledge
@@ -119,7 +123,7 @@ describe('memory-owned findings promotion receipts', () => {
     target.contribution.connect({ submitProposal: async () => { throw new Error('unused') }, applying: async () => ({ ...row, status: 'applying' }), applied: async () => ({ ...row, status: 'applied' }), conflict: conflicted })
     const validated = await target.contribution.validate({ scope: { kind: 'project', projectId: 'project-1' }, payload: { operation: 'add', name: 'owner-boundaries', type: 'architecture', description: 'Revised.', body: 'Revised body.', scope: { kind: 'project', projectId: 'project-1' } } })
     row = { ...candidate(validated.payload, validated.payloadHash), base: validated.base ?? null }
-    await writeMemoryFile(dir, { name: 'owner-boundaries', type: 'decision', description: 'Original.', body: 'Original body.', originSessionId: null, commitSha: null, supersededBy: null, createdAt: 1 })
+    await writeMemoryFile(dir, { name: 'owner-boundaries', type: 'feedback', description: 'Original.', body: 'Original body.', originSessionId: null, commitSha: null, supersededBy: null, createdAt: 1 })
     expect(await target.approve({ candidateId: row.candidateId, revision: 1, payloadHash: row.payloadHash, idempotencyKey: 'operation-type-conflict', deviceId: 'device-1' })).toMatchObject({ ok: false })
     expect(conflicted).toHaveBeenCalledOnce()
   })

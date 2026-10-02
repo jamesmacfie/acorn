@@ -11,12 +11,10 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   projectPath: mocks.projectPath,
 }))
 
+import { selectedMemory } from './memorySelection'
 import { memoryCommands } from './commands'
 
-// The two memory commands. What is pinned is the scope each carries, the fact that a search row
-// reveals by the memory's NAME (the context section keys its rows that way, and revealing by the
-// database id would silently scroll to nothing), and the fact that the proposals row goes to the
-// Memory page rather than into a task's Context pane.
+// Search and review open the Memory page. Selection uses the scope and filename identity.
 
 const memory = (over: Partial<MemoryRow> = {}): MemoryRow & { rank: number } => ({
   id: 'm1', scope: 'project', projectId: 'p-1', name: 'no-ponytail-comments', type: 'convention',
@@ -45,7 +43,7 @@ describe('the memory plugin catalogue', () => {
     expect(at('memory.learnings.review').requires).toEqual({ plugin: 'findings' })
     expect(at('memory.search').requires).toEqual({ plugin: 'memory' })
     expect(at('memory.proposals.open').requires).toEqual({ plugin: 'memory' })
-    // A search hit opens in a task's Context pane, so it needs one. A pending proposal is not
+    // A search captures the task's project scope. A pending proposal is not
     // task-scoped and its page is a rail source, so it stays offered with no task in hand.
     expect(at('memory.search').scope).toBe('task')
     expect(at('memory.learnings.review').scope).toBe('task')
@@ -58,8 +56,8 @@ describe('the memory plugin catalogue', () => {
   it('asks about the captured project and badges each row with its type', async () => {
     mocks.search.mockResolvedValue([memory(), memory({ id: 'm2', name: 'rtk-grep', type: 'fix', description: 're-run through rtk proxy' })])
     expect(await find().query('grep', context(), signal())).toEqual([
-      { id: 'm1', title: 'no-ponytail-comments', subtitle: 'strip the marker before committing', badge: 'convention', ref: 'no-ponytail-comments' },
-      { id: 'm2', title: 'rtk-grep', subtitle: 're-run through rtk proxy', badge: 'fix', ref: 'rtk-grep' },
+      { id: 'm1', title: 'no-ponytail-comments', subtitle: 'strip the marker before committing', badge: 'convention', ref: '{"name":"no-ponytail-comments","scope":"project"}' },
+      { id: 'm2', title: 'rtk-grep', subtitle: 're-run through rtk proxy', badge: 'fix', ref: '{"name":"rtk-grep","scope":"project"}' },
     ])
     expect(mocks.search).toHaveBeenCalledWith('grep', 'p-1')
   })
@@ -69,14 +67,15 @@ describe('the memory plugin catalogue', () => {
     await expect(find().query('grep', context(), signal())).rejects.toThrow('memory index is not built')
   })
 
-  it('reveals the picked memory by name, which is how the context section keys its rows', async () => {
+  it('opens the picked memory on the Memory page', async () => {
     mocks.search.mockResolvedValue([memory()])
-    const world = context()
+    const navigate = vi.fn()
+    const world = context({ navigate })
     const rows = await find().query('pony', world, signal())
     expect(find().select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.openPane).toHaveBeenCalledWith('task-1', 'context', {
-      kind: 'context:reveal', sectionId: 'memory', itemId: 'no-ponytail-comments',
-    })
+    expect(mocks.setSelectedSource).toHaveBeenCalledWith('memory')
+    expect(navigate).toHaveBeenCalledWith('/p/p-1')
+    expect(selectedMemory()).toEqual({ name: 'no-ponytail-comments', scope: 'project' })
   })
 
   it('sends the proposals row to the routed project’s Memory page, not into a task', () => {

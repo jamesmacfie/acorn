@@ -19,6 +19,7 @@ export const mergeToolCall = (previous: AgentToolCall, next: AgentToolCall): Age
   id: previous.id,
   parentId: next.parentId ?? previous.parentId,
   title: next.title || previous.title,
+  ...(next.name || previous.name ? { name: next.name ?? previous.name } : {}),
   kind: next.kind ?? previous.kind,
   status: next.status ?? previous.status,
   input: next.input ?? previous.input,

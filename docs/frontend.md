@@ -821,7 +821,7 @@ it. And a budget that only counts bytes lets the next heavy chunk in as long as 
 The denylist is `shiki`, `wasm`, `DiffPane`, `prModel`, `prSections`, `viewState` and `icon-nodes`:
 each is a lazy surface that leaked into the eager graph, and a chunk with one of those names being
 fetched at startup is wrong whatever it weighs. The renderer's list adds plugin code a registration
-needs only when it draws: `MemorySection`, `FindingsBundleReview`, the workflow editor's `draft-` and
+needs only when it draws: `MemoryAddForm`, `FindingsBundleReview`, the workflow editor's `draft-` and
 `draftStore`, `stepFields`, `GithubImporter`, `PreviewTaskPane` and `PreviewPane`. All of those were
 on the renderer's startup graph until 2026-09-25.
 

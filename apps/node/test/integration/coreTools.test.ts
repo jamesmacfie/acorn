@@ -74,7 +74,7 @@ describe('the full agent-tool manifest', () => {
   const BROWSER_TOOLS = ['browser_navigate', 'browser_snapshot', 'browser_click', 'browser_fill', 'browser_screenshot', 'browser_console']
   const CHANGES_TOOLS = ['local_changes', 'local_diff', 'git_log']
   const NOTES_TOOLS = ['notes_list', 'notes_read', 'notes_write', 'notes_append']
-  const MEMORY_TOOLS = ['memory_search', 'memory_list', 'memory_get', 'memory_write']
+  const MEMORY_TOOLS = ['memory_list', 'memory_search', 'memory_get', 'memory_write', 'memory_delete']
   const TERMINAL_TOOLS = ['run_targets', 'run_start', 'run_stop', 'run_restart', 'run_status']
 
   it('is the same set of tool names whichever contributor declares them', () => {
@@ -85,7 +85,7 @@ describe('the full agent-tool manifest', () => {
         ...buildAgentTools({ db: testDb.db, secrets: testDb.secrets }).map((tool) => tool.name),
         ...browserAgentTools({} as never).map((tool) => tool.name),
         ...localGitAgentTools(core).map((tool) => tool.name),
-        ...memoryAgentTools({} as never, {} as never, core).map((tool) => tool.name),
+        ...memoryAgentTools({} as never, core).map((tool) => tool.name),
         ...notesAgentTools({} as never, core).map((tool) => tool.name),
         ...runAgentTools({} as never).map((tool) => tool.name),
       ]
@@ -99,7 +99,7 @@ describe('the full agent-tool manifest', () => {
 
   it('leaves each moved group owned by exactly one plugin', () => {
     expect(localGitAgentTools({ tasks: {} } as never).map((tool) => tool.name)).toEqual(CHANGES_TOOLS)
-    expect(memoryAgentTools({} as never, {} as never, {} as never).map((tool) => tool.name)).toEqual(MEMORY_TOOLS)
+    expect(memoryAgentTools({} as never, {} as never).map((tool) => tool.name)).toEqual(MEMORY_TOOLS)
     expect(notesAgentTools({} as never, {} as never).map((tool) => tool.name)).toEqual(NOTES_TOOLS)
     expect(runAgentTools({} as never).map((tool) => tool.name)).toEqual(TERMINAL_TOOLS)
     expect(browserAgentTools({} as never).map((tool) => tool.name)).toEqual(BROWSER_TOOLS)

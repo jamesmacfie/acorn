@@ -218,6 +218,8 @@ export type AgentWebActivity = {
 export type AgentToolCall = {
   id: string
   parentId?: string
+  /** Stable MCP tool name, separate from the provider’s display title. */
+  name?: string
   title: string
   kind?: string
   /** Absent means "unchanged": a provider update that only carries output must not drag a finished

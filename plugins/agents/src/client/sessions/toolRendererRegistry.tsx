@@ -196,13 +196,13 @@ export const AgentToolCallCard: Component<Omit<AgentToolRendererProps, 'defaultO
   // paths arrive here: a compiled contributor's component and a sandboxed plugin's worker tree fill the
   // same `replace` point, and the host arbitrates between them.
   //
-  // Keyed on `kind`, which is the harness's own name for what the call did — ACP's tool kind, or
+  // Keyed on the stable MCP name when available, otherwise `kind`, which is the harness's own name for what the call did — ACP's tool kind, or
   // whatever a driver normalised to it. It is the only name for a call that reaches a transcript;
   // `title` is a sentence the provider wrote for a person to read.
   return (
     <Slot
       point={AGENT_TOOL_CARD_POINT}
-      key={props.tool.kind ?? ''}
+      key={props.tool.name ?? props.tool.kind ?? ''}
       // The task this card is drawn in, so a contributor's buttons can open a pane and resolve a link
       // rather than being inert (tree/Slot.tsx § taskId). It rides `props` as well, because the owner
       // chose to tell the contributor which task it is looking at; that is the owner's word and this is

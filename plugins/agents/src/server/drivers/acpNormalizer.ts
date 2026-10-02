@@ -514,6 +514,7 @@ export function normalizeAcpUpdate(update: SessionUpdate, harness: string): Agen
         type: 'tool',
         tool: {
           id: update.toolCallId,
+          ...(meta.toolName?.startsWith('mcp__') ? { name: meta.toolName.split('__').at(-1) } : {}),
           // Empty rather than a made-up name: a tool_call always names itself, an update need not,
           // and the fold keeps the name the call arrived with. A web call is the exception: its row
           // is named after what it did, so the adapter's `"query" (allowed: host)` title never

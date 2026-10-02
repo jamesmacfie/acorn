@@ -3,4 +3,3 @@
 //   apps/node/test/integration/coreTools.test.ts   memoryAgentTools
 export { memoryAgentTools } from '../server/agentTools'
 export { contentHashId, privateMemoryRoot, projectMemoryDir } from '../server/memory'
-export { memorySection, type ContextMemorySource } from '../server/contextSection'

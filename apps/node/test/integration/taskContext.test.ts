@@ -16,7 +16,6 @@ import { makeTestDb, makeTestPluginDb, type TestDb, type TestPluginDb } from '@a
 // that plugin's testkit. Core keeps only `issues`.
 import { mirroredPullRequest, prFiles, pullRequests, pullRequestSection, repos } from '@acorn/plugin-github/testkit'
 import { notesSection, type ContextNotesSource } from '@acorn/plugin-notes/testkit'
-import { memorySection, type ContextMemorySource } from '@acorn/plugin-memory/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 import { buildAgentTools } from '@acorn/node-core/server/agentTools'
 
@@ -36,23 +35,20 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
   let gh: TestPluginDb
   let app: Hono<AppEnv>
   let notesSource: ContextNotesSource
-  let memorySource: ContextMemorySource
 
   beforeEach(async () => {
     t = makeTestDb()
     gh = makeTestPluginDb('github')
     notesSource = async () => []
-    memorySource = async () => []
     // Sections are registered per owner now (server/pluginHost/types.ts § PluginContextSectionRegistry), so the
-    // fixture registers them the way production does: core's `issues` under 'core', and the three
+    // fixture registers them the way production does: core's `issues` under 'core', and the two
     // plugin-owned ones under the plugin that owns their rows. `PluginContextSection.assemble` takes no `db`,
-    // which is why these three read only what their source gives them.
+    // which is why these two read only what their source gives them.
     removeContextSections('core')
     for (const owner of ['github', 'notes', 'memory']) removeContextSections(owner)
     registerContextSection('core', linkedIssuesSection)
     registerContextSection('github', asContextSection(pullRequestSection((userId, owner, name, number) => mirroredPullRequest(gh.db, userId, owner, name, number))))
     registerContextSection('notes', asContextSection(notesSection((...args) => notesSource(...args))))
-    registerContextSection('memory', asContextSection(memorySection((...args) => memorySource(...args))))
     vi.mocked(getDb).mockReturnValue(t.db)
     const now = Date.now()
     await t.db.insert(schema.workspaces).values({ id: 'workspace-1', name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
@@ -150,7 +146,7 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     return res.json() as Promise<TaskContext>
   }
 
-  it('composes task + PR (from the mirror) + linked issues; note/memory seams return []', async () => {
+  it('composes task, PR, linked issues and notes without duplicating standing memory', async () => {
     const ctx = await fetchCtx()
     expect(ctx.task).toEqual({
       id: 'task1',
@@ -170,13 +166,13 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
       { kind: 'Linear', providerId: 'linear', label: expect.stringContaining('ENG-42'), jump: { pane: 'linear', ref: { providerId: 'linear', displayId: 'ENG-42' } } },
       { kind: 'Rollbar', providerId: 'rollbar', details: ['Cache: missing'] },
     ])
-    expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes', 'memory'])
+    expect(ctx.sections.map((section) => section.id)).toEqual(['pr', 'issues', 'notes'])
     expect(ctx.sections.find((section) => section.id === 'issues')).toMatchObject({
       defaultIncluded: true,
       absent: { reason: 'missing-cache' },
     })
     expect(ctx.sections.find((section) => section.id === 'notes')?.items).toEqual([])
-    expect(ctx.sections.find((section) => section.id === 'memory')?.items).toEqual([])
+    expect(ctx.sections.some((section) => section.id === 'memory')).toBe(false)
   })
 
   it('include filters slices', async () => {
@@ -201,12 +197,10 @@ describe('GET /api/tasks/:id/context (docs/agent-tools.md §4)', () => {
     expect(await call('linked_issues', { provider: 'linear' })).toEqual(issues.filter((item) => item.providerId === 'linear'))
   })
 
-  it('composes the M4 seams when sources are registered', async () => {
+  it('composes notes when its source is registered', async () => {
     notesSource = async () => [{ slug: 'plan', scope: 'task', title: 'plan', kind: 'plan', body: 'do the thing', author: 'user' }]
-    memorySource = async () => [{ name: 'auth-conventions', description: 'how auth flows work' }]
     const ctx = await fetchCtx()
     expect(ctx.sections.find((section) => section.id === 'notes')?.items).toMatchObject([{ id: 'task:plan', label: 'plan', body: 'do the thing' }])
-    expect(ctx.sections.find((section) => section.id === 'memory')?.items).toMatchObject([{ id: 'auth-conventions', details: ['how auth flows work'] }])
   })
 
   it('gives workflow assembly only its own run-scoped handoff note', async () => {

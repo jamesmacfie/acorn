@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
+import { FINDINGS_AGENT_PROPOSAL } from '@acorn/plugin-findings/contract/review.ts'
 import { findingsPlugin } from '@acorn/plugin-findings/node/index.ts'
 import { AGENTS_SESSIONS, type AgentSessionRosterEntry } from '@acorn/plugin-agents/contract/lifecycle.ts'
 import { memoryPlugin } from '@acorn/plugin-memory/node/index.ts'
@@ -21,7 +22,7 @@ import { loadExternalPlugins, type LoadedPlugin } from '@acorn/node-core/server/
 import { installPlugin, pluginDir, uninstallPlugin } from '@acorn/node-core/server/plugins'
 import { pluginDbPath } from '@acorn/node-core/server/plugins'
 import { schema } from '@acorn/node-core/server/db/index.ts'
-import { makeTestDb, testEnv, type TestDb } from '@acorn/node-core/testkit'
+import { makeTestDb, testEnv, issueAgentToolProvenance, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -94,6 +95,7 @@ describe('findings as a loaded plugin', () => {
 
   beforeAll(async () => {
     dataRoot = mkdtempSync(join(tmpdir(), 'acorn-findings-loaded-'))
+    vi.stubEnv('ACORN_DATA_DIR', dataRoot)
     core = makeTestDb()
     const now = Date.now()
     core.db.insert(schema.workspaces).values({ id: 'ws', name: 'Workspace', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
@@ -113,8 +115,9 @@ describe('findings as a loaded plugin', () => {
     // Populate the stable database through the former compiled execution path before the package is
     // installed. The wrapper supplies only that path's historical migration declaration.
     const compiled = { ...findingsPlugin(), migrationsModule: FINDINGS_MODULE }
+    const compiledCapabilities = capabilities()
     running = await initPlugins([compiled, memoryPlugin()], {
-      capabilities: capabilities(),
+      capabilities: compiledCapabilities,
       core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore('owner') }),
       dataDir: dataRoot,
       env,
@@ -124,11 +127,13 @@ describe('findings as a loaded plugin', () => {
     }))
     expect(recorded.status).toBe(200)
     observationId = (await recorded.json() as { id: string }).id
-    const submitted = await call('/v1/core/tasks/task-a/tools/memory_write', task({
-      name: 'compiled-proposal', type: 'reference', description: 'Review this memory.', body: 'Persist this review across cutover.',
-    }, 'session-1'))
-    expect(submitted.status).toBe(200)
-    candidateId = ((await submitted.json()) as { ok: boolean; proposal: { candidateId: string } }).proposal.candidateId
+    // Seed the retained proposal seam directly: Memory tools now save files instead of proposals.
+    const submitted = await compiledCapabilities.get(FINDINGS_AGENT_PROPOSAL)!.submit({
+      taskId: 'task-a', sessionId: 'session-1', proof: issueAgentToolProvenance('task-a', 'session-1', 'memory_write'),
+      sourceKey: 'compiled-proposal', title: 'Review this memory.', body: 'Persist this review across cutover.',
+      payload: { operation: 'add', scope: { kind: 'project', projectId: 'project' }, name: 'compiled-proposal', type: 'reference', description: 'Review this memory.', body: 'Persist this review across cutover.' },
+    })
+    candidateId = submitted.candidateId
     expect(existsSync(join(dataRoot, 'memory-proposals'))).toBe(false)
     expect(candidateId).not.toBe('')
     const currentCandidate = await call(`/v1/p/findings/review/candidates/${candidateId}`, device())
@@ -156,6 +161,7 @@ describe('findings as a loaded plugin', () => {
     await running?.dispose()
     core.cleanup()
     rmSync(dataRoot, { recursive: true, force: true })
+    vi.unstubAllEnvs()
   })
 
   it('loads its packaged node, migrations, portable tree, permissions, and stable carriers', async () => {
@@ -248,22 +254,21 @@ describe('findings as a loaded plugin', () => {
     expect((await call('/v1/p/findings/tasks/task-b/observations/' + observationId, device())).status).toBe(404)
   })
 
-  it('creates a canonical review immediately through the authenticated Memory tool', async () => {
+  it('saves direct memory without producing a review candidate', async () => {
+    const before = await (await call('/v1/p/findings/export', device())).json() as { candidates: unknown[] }
     const submitted = await call('/v1/core/tasks/task-a/tools/memory_write', task({
-      name: 'loaded-proposal', type: 'reference', description: 'Review a loaded tool write.', body: 'The review is available before restart.',
+      scope: 'project', name: 'loaded-memory', type: 'reference', description: 'Save a loaded tool write.', body: 'The memory is available before restart.',
     }, 'session-1'))
-    const result = await submitted.json() as { ok: boolean; proposal: { candidateId: string; observationId: string; bundleId: string } }
+    const result = await submitted.json() as { changeId: string; hash: string }
     expect(submitted.status, JSON.stringify(result)).toBe(200)
-    expect(result.ok).toBe(true)
-    expect((await call(`/v1/p/findings/review/candidates/${result.proposal.candidateId}`, device())).status).toBe(200)
-    const observation = await call(`/v1/p/findings/tasks/task-a/observations/${result.proposal.observationId}`, device())
-    expect(await observation.json()).toMatchObject({ origin: { kind: 'agent', sessionId: 'session-1' } })
-    expect(existsSync(join(dataRoot, 'memory-proposals'))).toBe(false)
-
-    const mismatched = await call('/v1/core/tasks/task-a/tools/memory_write', task({
-      name: 'spoofed-proposal', type: 'reference', description: 'Do not accept.', body: 'Wrong session.',
-    }, 'session-2'))
-    expect(mismatched.status).not.toBe(200)
+    expect(result.changeId).toEqual(expect.any(String))
+    expect(existsSync(join(dataRoot, 'memory/projects/project/loaded-memory.md'))).toBe(true)
+    const after = await (await call('/v1/p/findings/export', device())).json() as { candidates: unknown[] }
+    expect(after.candidates).toHaveLength(before.candidates.length)
+    const unsigned = await call('/v1/core/tasks/task-a/tools/memory_write', task({
+      scope: 'project', name: 'unsigned-memory', type: 'reference', description: 'Do not accept.', body: 'Missing session.',
+    }))
+    expect(unsigned.status).not.toBe(200)
   })
 
   it('keeps maximum legal records readable through byte-aware loaded carriers', async () => {
@@ -374,10 +379,11 @@ describe('findings as a loaded plugin', () => {
     }))
     expect(disconnected.status).toBe(503)
     const unavailable = await call('/v1/core/tasks/task-a/tools/memory_write', task({
-      name: 'disabled-proposal', type: 'reference', description: 'No fallback queue.', body: 'Findings is disabled.',
+      scope: 'project', name: 'disabled-memory', type: 'reference', description: 'No review queue needed.', body: 'Findings is disabled.',
     }, 'session-1'))
     expect(unavailable.status).toBe(200)
-    expect(await unavailable.json()).toEqual({ ok: false, reason: 'findings_unavailable' })
+    expect(await unavailable.json()).toMatchObject({ changeId: expect.any(String) })
+    expect(existsSync(join(dataRoot, 'memory/projects/project/disabled-memory.md'))).toBe(true)
     expect((await call('/v1/p/memory/tasks/task-a/memory', device({
       scope: 'project', name: 'manual-while-disabled', type: 'reference', description: 'Owner-authored memory.', body: 'Saved directly by the owner.',
     }))).status).toBe(200)

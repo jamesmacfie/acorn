@@ -169,6 +169,7 @@ function toolFromItem(item: JsonObject, completed: boolean): AgentToolCall | nul
         id,
         title: `${stringValue(item.server) ?? 'MCP'} · ${stringValue(item.tool) ?? 'tool'}`,
         kind: 'mcp',
+        name: stringValue(item.tool) ?? undefined,
         status,
         input: item.arguments == null ? undefined : JSON.stringify(item.arguments),
         output: completed && item.result != null ? JSON.stringify(item.result) : undefined,

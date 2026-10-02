@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest'
-import { deliverLaunchContext } from './launchContext'
+import { deliverLaunchContext, readLaunchContext } from './launchContext'
 
 describe('terminal launch context', () => {
   it('delivers contributions in registry order within one UTF-8 byte budget', async () => {
     const sent: string[] = []
-    const large = vi.fn(async () => '€'.repeat(7_000))
+    const large = vi.fn(async () => '€'.repeat(100_000))
     await deliverLaunchContext('task', 'session', [
       { id: 'first', value: { read: async () => 'First' } },
       { id: 'second', value: { read: async () => 'Second' } },
@@ -13,8 +13,13 @@ describe('terminal launch context', () => {
     expect(large).toHaveBeenCalledOnce()
     expect(sent.slice(0, 2)).toEqual(['First', 'Second'])
     expect(sent).toHaveLength(3)
-    expect(Buffer.byteLength(sent.join(''), 'utf8')).toBeLessThanOrEqual(16_384)
+    expect(Buffer.byteLength(sent.join(''), 'utf8')).toBeLessThanOrEqual(262_144)
     expect(sent[2]).not.toContain('�')
+  })
+
+  it('reads the complete system-prompt block before launch, including both maximum Unicode indexes', async () => {
+    const text = '😀'.repeat(32_000) + '\n[MEMORY.md truncated: call memory_list.]'
+    expect(await readLaunchContext('task', [{ id: 'memory', value: { read: async () => text } }], vi.fn())).toBe(text)
   })
 
   it('continues after a contributor fails', async () => {

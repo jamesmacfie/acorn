@@ -148,8 +148,10 @@ seconds, so 3 seconds of silence is a safe "boot settled" signal without waiting
 mid-session window.
 
 Terminal reads `terminal:launch-context` contributions in their registered order and applies one
-16 KiB byte budget across them before queuing text. Memory contributes the task and memory block
-through that point.
+256 KiB byte budget across them before queuing text. Memory contributes the task and memory block
+through that point. Claude Code's compiled `launchContextArgs` profile reads the contribution before
+spawn and puts it in `--append-system-prompt`. Other profiles receive the queued block. For the
+snapshot and index contract, see [Notes and memory](./notes-and-memory.md#context-integration).
 
 A separate "blocked" status looks for a prompt the agent is waiting on. It scans the last 12 lines of
 recent output, with ANSI codes and spinner frames stripped, for known confirmation patterns (`(y/n)`,

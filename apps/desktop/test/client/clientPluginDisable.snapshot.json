@@ -81,7 +81,7 @@
       "agents.storage",
       "changes.tool-card",
       "github.push-actions",
-      "memory.section"
+      "memory.tool-card"
     ],
     "refPanels": [
       "github-pull"

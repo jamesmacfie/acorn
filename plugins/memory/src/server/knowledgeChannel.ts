@@ -1,11 +1,10 @@
-import { type CoreServices, gitOrThrow, isDir, type PluginDatabase } from '@acorn/plugin-api/node'
-import { existsSync } from 'node:fs'
+import { BridgeError, ToolError, type CoreServices, isDir, type PluginDatabase } from '@acorn/plugin-api/node'
 import { homedir } from 'node:os'
-import { join } from 'node:path'
 import type { KnowledgeBridge } from '../server/routes/knowledge'
-import { formatMemoryInjection, getMemory, listMemories, memoryIndexSlice, memorySources, MEMORY_TYPES, privateMemoryRoot, projectMemoryDir, reconcileMemories, searchMemories, writeMemoryFile, type MemoryType } from './memory'
+import { listMemories, memorySources, MEMORY_TYPES, privateMemoryRoot, reconcileMemories, searchMemories, normalizeMemoryType, type MemoryType } from './memory'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
-import type { MemoryHit, MemoryRow } from './memory'
+import type { MemoryRow } from './memory'
+import type { MemoryStoreAccess } from './memoryStore'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
 export type KnowledgeDeps = {
@@ -13,25 +12,23 @@ export type KnowledgeDeps = {
   emit?(frame: { channel: string } & Record<string, unknown>): void
 }
 
-export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity'>
+export type KnowledgeCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'context' | 'identity' | 'prefs'>
 
 // Reads over the derived index, bound to this plugin's own database (docs/data-layer.md § Plugin
-// databases). Agent tools and context sections read memory through this rather than the files
-// (docs/notes-and-memory.md § Memory).
+// databases). Findings and the legacy page read through this during phase 1 measurement.
+// Direct agent tools and standing context read the files (docs/notes-and-memory.md § Memory).
 export type MemoryIndex = {
   // Exposed as well as used internally: a caller that then reads through a different path (core's
   // context assembler) still needs the index fresh.
   reconciled(): Promise<void>
   list(opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryRow[]>
-  get(opts: { projectId?: string | null; name: string }): Promise<MemoryRow | null>
-  search(query: string, opts: { projectId?: string | null; type?: MemoryType }): Promise<MemoryHit[]>
-  // The always-safe injection slice: index lines only (name + description), capped.
-  indexSlice(projectId: string, cap?: number): Promise<{ name: string; description: string }[]>
 }
 
 export type MemoryKnowledge = MemoryIndex & {
   // Builds the bounded task and memory block. Terminal owns delivery to its new session.
   launchContext(taskId: string): Promise<string | null>
+  standingContext(taskId: string): Promise<string | null>
+  store: MemoryStoreAccess
 }
 
 export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCoreServices, deps: KnowledgeDeps): MemoryKnowledge & { route: KnowledgeBridge } {
@@ -60,15 +57,30 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
     ...(projectId ? { scope: 'project' as const, projectId } : { scope: 'private' as const, projectId: null }),
   })
 
+  // Writes and session prompts are first-use work, outside the Node's cold-boot graph.
+  let storePromise: Promise<MemoryStoreAccess> | undefined
+  const loadStore = () => storePromise ??= import('./memoryStore').then(({ MemoryStore }) => new MemoryStore(privateMemoryRoot(homedir()), announceMemories))
+  const store: MemoryStoreAccess = {
+    list: async (...args) => (await loadStore()).list(...args),
+    get: async (...args) => (await loadStore()).get(...args),
+    search: async (...args) => (await loadStore()).search(...args),
+    write: async (...args) => (await loadStore()).write(...args),
+    delete: async (...args) => (await loadStore()).delete(...args),
+    undo: async (...args) => (await loadStore()).undo(...args),
+  }
+  const standingContext = async (taskId: string) => {
+    const { standingContextBuilder } = await import('./standingContext')
+    return standingContextBuilder(store, core)(taskId)
+  }
+
   const launchContext = async (taskId: string): Promise<string | null> => {
     // Launch injection (docs/notes-and-memory.md § Context integration): task context is gated by
-    // the startup_context_injection pref; the memory block is the MEMORY.md index slice plus
-    // feedback/convention bodies. Queued 'after-ready'. Best-effort: never blocks a launch.
+    // the startup_context_injection pref. Memory is always the contract and capped indexes.
+    // Terminal reads this before spawn where the profile supports it. Best-effort on failure.
     try {
       const t = await core.tasks.load(taskId)
       if (!t) return null
-      const projectId = t.projectId
-      if (!projectId) return null
+
       const blocks: string[] = []
 
       const userId = core.identity.active()
@@ -78,10 +90,7 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
         if (contextBlock) blocks.push(contextBlock)
       }
 
-      await reconciled()
-      const slice = await memoryIndexSlice(db, projectId)
-      const key = (await listMemories(db, { projectId })).filter((m) => m.type === 'feedback' || m.type === 'convention')
-      const memoryBlock = formatMemoryInjection(slice, key)
+      const memoryBlock = await standingContext(taskId)
       if (memoryBlock) blocks.push(memoryBlock)
 
       return blocks.join('\n\n') || null
@@ -114,37 +123,29 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
     // repo's diff. Project scope is keyed by the task's project id; private scope applies everywhere.
     memoryAdd: (taskId, p) =>
       guard(async () => {
-        const type: MemoryType = MEMORY_TYPES.includes(p.type as MemoryType) ? (p.type as MemoryType) : 'reference'
         const t = await core.tasks.load(taskId)
-        let dir: string
-        if (p.scope === 'private') dir = privateMemoryRoot(homedir())
-        else {
-          if (!t?.projectId) throw new Error('Project memory needs a task that names a project.')
-          dir = projectMemoryDir(homedir(), t.projectId)
-        }
-        let commitSha: string | null = null
-        if (t?.worktreePath && isDir(t.worktreePath) && existsSync(join(t.worktreePath, '.git'))) {
-          try {
-            const { stdout } = await gitOrThrow(['rev-parse', 'HEAD'], { cwd: t.worktreePath, timeoutMs: 5_000 })
-            commitSha = stdout.trim()
-          } catch {
-            // no commit yet; continue without one
-          }
-        }
-        const res = await writeMemoryFile(dir, {
+        if (p.scope === 'project' && !t?.projectId) throw new Error('Project memory needs a task that names a project.')
+        const res = await store.write({ scope: p.scope, projectId: p.scope === 'project' ? t!.projectId! : null, name: p.name.trim() }, {
           name: p.name.trim(),
           description: p.description.trim(),
-          type,
-          originSessionId: null,
-          commitSha,
-          supersededBy: null,
-          createdAt: Date.now(),
+          type: normalizeMemoryType(p.type),
           body: p.body,
-        })
+        }, { by: 'owner', taskId })
         await reconciled()
-        announceMemories(p.scope === 'private' ? null : t!.projectId!)
         return res
       }),
+    memoryProjectAdd: (projectId, input) => guard(async () => {
+      if (!await core.projects.byId(projectId)) throw new Error('No such project.')
+      return store.write({ scope: input.scope, projectId: input.scope === 'project' ? projectId : null, name: input.name },
+        { ...input, type: normalizeMemoryType(input.type) }, { by: 'owner' })
+    }),
+    memoryUndo: async (changeId) => {
+      try { return await store.undo(changeId) }
+      catch (error) {
+        if (error instanceof ToolError) throw new BridgeError(error.kind === 'conflict' ? 409 : error.kind === 'not_found' ? 404 : 400, error.kind, error.message)
+        throw error
+      }
+    },
     memoryApproveFinding: async () => ({ ok: false, reason: 'Findings review is unavailable.' }),
   }
 
@@ -152,11 +153,10 @@ export function registerKnowledgeChannel(db: PluginDatabase, core: KnowledgeCore
   // contribution and the other reads stay inside Memory.
   return {
     route,
+    store,
+    standingContext,
     reconciled,
     launchContext,
     list: (opts) => listMemories(db, opts),
-    get: (opts) => getMemory(db, opts),
-    search: (query, opts) => searchMemories(db, query, opts),
-    indexSlice: (projectId, cap) => memoryIndexSlice(db, projectId, cap),
   }
 }

@@ -573,10 +573,19 @@ owner's provider key, and the whole `/defs` family is already device-only, which
 /v1/p/notes/tasks/:id/notes[/*]
 /v1/p/notes/workspaces/:wsId/notes[/*]
 /v1/p/memory/memory[/*]
+/v1/p/memory/tasks/:id/memory
+/v1/p/memory/projects/:id/memory
 ```
 
 The notes plugin owns the notes namespace. Workspace and global notes require a device principal;
 task-scoped credentials can reach only their own task notes.
+
+Memory lists and searches enforce the signed task's project scope for task credentials. Manual
+additions (`POST /tasks/:id/memory` and `POST /projects/:id/memory`) require a device principal and
+use the guarded file store. `POST /memory/changes/:id/undo` also requires a device principal. It
+restores the prior version or removes a newly created memory; a later write or an external file
+edit returns a conflict. The paths in this paragraph are relative to `/v1/p/memory`.
+
 
 ### Other feature plugins
 

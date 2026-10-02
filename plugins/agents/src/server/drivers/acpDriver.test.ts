@@ -232,15 +232,15 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     }
 
     it('sends them once, ahead of the first prompt of a new session', async () => {
-      const said = await echoes({ ...sessionWithRef(''), providerSessionRef: null, config: { customAgent } }, 2)
+      const said = await echoes({ ...sessionWithRef(''), providerSessionRef: null, config: { customAgent, standingContext: 'Stored memory.' } }, 2)
       expect(said).toEqual([
-        'echo:<acorn-context source="context.agent.instructions" label="Bug reviewer instructions">\nReview for correctness only.\n</acorn-context>',
+        'echo:<acorn-context source="context.agent.instructions" label="Bug reviewer instructions">\nReview for correctness only.\n</acorn-context>\n\n<acorn-context source="context.memory" label="Memory at session start">\nStored memory.\n</acorn-context>',
         'echo:go 1',
       ])
     })
 
     it('does not send them again to a session it picks back up', async () => {
-      const said = await echoes({ ...sessionWithRef('kept-session'), config: { customAgent } }, 1)
+      const said = await echoes({ ...sessionWithRef('kept-session'), config: { customAgent, standingContext: 'Stored memory.' } }, 1)
       expect(said).toEqual(['echo:go 0'])
     })
   })

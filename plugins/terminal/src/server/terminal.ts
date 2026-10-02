@@ -128,6 +128,7 @@ export const sessionControl = {
   list: async (): Promise<TerminalSession[]> => [...sessions.values()].filter(s => s.admitted && !s.retired).map((s) => s.meta),
 }
 
+let launchContextText: ((taskId: string) => Promise<string | null>) | null = null
 let launchContext: ((taskId: string, sessionId: string) => Promise<void>) | null = null
 let completed: ((event: TerminalCompletedEvent) => void) | null = null
 let archiveReview: ((input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>) | null = null
@@ -145,6 +146,7 @@ type EngineOwner = {
   env: InternalEnvFactory
   status: () => void
   worktree: (taskId: string) => void
+  launchText: ((taskId: string) => Promise<string | null>) | null
   launch: ((taskId: string, sessionId: string) => Promise<void>) | null
   complete: ((event: TerminalCompletedEvent) => void) | null
   archive: ((input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>) | null
@@ -154,7 +156,7 @@ let engineToken: object | null = null
 function owner(): EngineOwner {
   if (!engineToken || !store) throw new Error('The terminal engine has not been initialized.')
   return { token: engineToken, db: store, core: services(), env: internalEnv,
-    status: statusBroadcast, worktree: worktreeBroadcast, launch: launchContext, complete: completed, archive: archiveReview, seed: seedNotes }
+    status: statusBroadcast, worktree: worktreeBroadcast, launch: launchContext, launchText: launchContextText, complete: completed, archive: archiveReview, seed: seedNotes }
 }
 function assertOwner(engine: EngineOwner): void {
   if (engine.token !== engineToken) throw new Error('The terminal engine has been disposed.')
@@ -526,7 +528,9 @@ async function spawnOne(
 
   // Profile launchArgs apply only to the profile's own binary; a command override is a different
   // program. meta.command stays the bare line the UI shows, and the args are launch-only.
-  const launchArgs = opts.command ? [] : (profile.launchArgs ?? [])
+  const context = !opts.command && profile.launchContextArgs ? await engine.launchText?.(opts.taskId) ?? null : null
+  assertOwner(engine)
+  const launchArgs = opts.command ? [] : profile.launchContextArgs ? profile.launchContextArgs(context) : (profile.launchArgs ?? [])
 
   let pty: IPty | undefined
   let session: Session | undefined
@@ -577,10 +581,9 @@ async function spawnOne(
     }
     throw error
   }
-  // A fresh agent session gets the combined task-context and repo-memory block queued for its idle edge
-  // (docs/notes-and-memory.md), unless the profile was launched with a pull instruction, in which case
-  // it fetches the same material itself and a racing push would duplicate it.
-  if (profile.kind === 'agent' && !launchArgs.length) {
+  // Profiles without a system-prompt seam receive launch context on their idle edge.
+  // An explicit command or profile launch instruction owns its delivery instead.
+  if (profile.kind === 'agent' && !opts.command && !profile.launchContextArgs && !launchArgs.length) {
     void engine.launch?.(opts.taskId, id).catch((error: unknown) =>
       log.warn(`launch context for session ${id} failed: ${describeError(error).message}`))
   }
@@ -707,6 +710,7 @@ export function terminalRunGlue(): RunSessionGlue {
 
 export type TerminalChannelDeps = {
   internalEnv: InternalEnvFactory
+  launchContextText?: (taskId: string) => Promise<string | null>
   launchContext: (taskId: string, sessionId: string) => Promise<void>
   completed: (event: TerminalCompletedEvent) => void
   archiveReview: (input: { taskId: string; sessionIds: string[]; terminalOutput: string; diff: string }) => Promise<void>
@@ -747,6 +751,7 @@ export function disposeTerminal(): void {
   store = null
   core = null
   internalEnv = () => ({})
+  launchContextText = null
   launchContext = null
   completed = null
   archiveReview = null
@@ -770,6 +775,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   store = pluginDb
   core = coreServices
   internalEnv = deps.internalEnv
+  launchContextText = deps.launchContextText ?? null
   launchContext = deps.launchContext
   completed = deps.completed
   archiveReview = deps.archiveReview

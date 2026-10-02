@@ -1,19 +1,20 @@
 # Simple memory
 
-Status: proposed, 2026-10-01. Nothing in this programme is built or scheduled. Where a file here
+Status: phase 1 implemented for verification, 2026-10-02. The two-week measurement remains open.
+Phases 2 and 3 are gated by that measurement; phase 4 also waits on cloud teams. Where a file here
 disagrees with a shipped contract, the owning reference document wins until the implementation
 changes that contract.
 
 ## What this is
 
 Agents write memory directly, in the turn where they learn something, and every new session starts
-with the memory index already in its system prompt. The review queue, the Findings plugin, and the
-search index behind them go away. Memory becomes Markdown files, one index file per scope, a handful
+with the memory index already in its system prompt. After the phase 1 measurement, phase 2 removes the review queue, the Findings plugin, and the
+search index behind them. Memory becomes Markdown files, one index file per scope, a handful
 of agent tools, and a page where the owner can read, edit, delete, and undo.
 
 This is the shape Claude Code, Lemma, and bb all use. Acorn's shipped memory stores its files the same
-way. What differs is everything around the files: agents can only propose, a person has to approve
-each proposal, and recall depends on the agent choosing to look. For the evidence that this is why
+way. Before phase 1, agents could only propose, a person had to approve each proposal, and recall
+depended on the agent choosing to look. For the evidence that this is why
 memory barely gets used, read [the problem](./design.md#the-problem).
 
 ## Read this programme

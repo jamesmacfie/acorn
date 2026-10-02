@@ -13,13 +13,13 @@ difference is the path in and the path out.
 **Agents cannot write.** `memory_write` only proposes (`plugins/memory/src/server/agentTools.ts`). The
 proposal goes to Findings, which records an observation, prepares a candidate, and publishes a review
 bundle. The owner approves each candidate on the Memory page, with a revision, a payload hash, an
-idempotency key, and a prepared receipt ([notes and memory](../../notes-and-memory.md#the-memory-page)).
+idempotency key, and a prepared receipt ([notes and memory](../../notes-and-memory.md#the-memory-page-and-transcript)).
 Archive-time review needs a configured backend and model, and without one Findings records evidence and
 prepares nothing ([findings](../../findings.md#completion-boundaries)).
 
 **Recall depends on the agent choosing to look.** A managed chat receives memory only if the owner
 ticked the Context pane's memory section, which is off by default
-(`plugins/memory/src/server/contextSection.ts`). Terminal Claude Code gets a system prompt asking it to
+(the retired memory context-section contribution). Terminal Claude Code gets a system prompt asking it to
 call `task_context`, then `memory_search` and `memory_get`
 (`plugins/agents/src/server/profiles/claudeCode.ts`). Other terminal profiles get a block pushed after
 the first idle edge, which can land after the user's first message.

@@ -24,6 +24,8 @@
 export type AgentToolCardCall = {
   id: string
   parentId?: string
+  /** Stable MCP tool name, separate from the provider’s display title. */
+  name?: string
   title: string
   kind?: string
   status?: 'pending' | 'running' | 'completed' | 'failed'

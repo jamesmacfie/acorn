@@ -5,7 +5,7 @@ import { TERMINAL_SEND_TO_AGENT } from '../contract/sendToAgent'
 import { TERMINAL_SESSIONS } from '../contract/sessions'
 import { TERMINAL_LAUNCH_CONTEXT } from '../contract/launchContext'
 import { TERMINAL_REVIEW_INPUT } from '../contract/reviewInput'
-import { deliverLaunchContext } from '../server/launchContext'
+import { deliverLaunchContext, readLaunchContext } from '../server/launchContext'
 import { runAgentTools } from '../server/agentTools'
 import { WORKFLOW_STEP_KIND } from '../contract/workflowSteps'
 import { commandStep, runTargetStep } from '../server/workflowSteps'
@@ -42,6 +42,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // its on-task-created hook, and the worktree-created hook that runs a repo's setup script.
       const registrations = registerTerminalChannel(db, ctx.core, {
         ...deps,
+        launchContextText: (taskId) => readLaunchContext(taskId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT), (message) => ctx.log.warn(message)),
         launchContext: async (taskId, sessionId) => {
           await deliverLaunchContext(taskId, sessionId, ctx.extensionPoints.handlers(TERMINAL_LAUNCH_CONTEXT),
             (id, text) => sendToAgent(id, text, 'after-ready'), (message) => ctx.log.warn(message))

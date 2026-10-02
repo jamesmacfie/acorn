@@ -64,6 +64,21 @@ describe('memory routes', () => {
     expect(calls).toEqual(['candidate-1:3:device-1'])
   })
 
+  it('keeps Undo and manual writes behind device authority', async () => {
+    const undo = vi.fn(async () => ({ ok: true }))
+    const add = vi.fn(async () => ({ path: '/memory' }))
+    setKnowledgeBridge(bridge({ memoryUndo: undo, memoryAdd: add, memoryProjectAdd: add }))
+    for (const app of [task(), service()]) {
+      expect((await app.fetch(req('/memory/changes/change-1/undo', 'POST'), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req('/tasks/task1/memory', 'POST', { scope: 'private', name: 'n', description: 'd', type: 'user', body: 'b' }), {} as Env)).status).toBe(403)
+      expect((await app.fetch(req('/projects/project-widget/memory', 'POST', { scope: 'project', name: 'n', description: 'd', type: 'project', body: 'b' }), {} as Env)).status).toBe(403)
+    }
+    expect(undo).not.toHaveBeenCalled()
+    expect(add).not.toHaveBeenCalled()
+    expect((await device().fetch(req('/memory/changes/change-1/undo', 'POST'), {} as Env)).status).toBe(200)
+    expect(undo).toHaveBeenCalledWith('change-1')
+  })
+
   it('has no Notes routes', async () => {
     setKnowledgeBridge(bridge())
     for (const path of ['/workspaces/global/notes', '/workspaces/ws1/notes/slug', '/tasks/task1/notes']) {

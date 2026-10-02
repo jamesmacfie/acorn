@@ -5,12 +5,12 @@ import type { FindingReviewTargetContribution } from '@acorn/plugin-findings/con
 import { FINDINGS_REVIEW, type FindingTargetController } from '@acorn/plugin-findings/contract/review.ts'
 import { memoryPromotionReceipts } from '../node/schema'
 import { memoryChangePayloadSchema, resolveMemoryScope, type MemoryChangePayload } from '../contract/findingsReview'
-import { privateMemoryRoot, projectMemoryDir, writeMemoryFile, type MemoryRow } from './memory'
+import { normalizeMemoryType, privateMemoryRoot, projectMemoryDir, writeMemoryFile, type MemoryRow } from './memory'
 import type { MemoryKnowledge } from './knowledgeChannel'
 
 const digest = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex')
 const normalize = (text: string): string => text.trim().replace(/\s+/g, ' ')
-const fingerprint = (payload: MemoryChangePayload): string => digest({ scope: payload.scope, name: payload.name.toLowerCase(), type: payload.type, description: normalize(payload.description), body: normalize(payload.body) })
+const fingerprint = (payload: MemoryChangePayload): string => digest({ scope: payload.scope, name: payload.name.toLowerCase(), type: normalizeMemoryType(payload.type), description: normalize(payload.description), body: normalize(payload.body) })
 const rowPayload = (row: MemoryRow): MemoryChangePayload => ({ operation: 'add', name: row.name, type: row.type as MemoryChangePayload['type'], description: row.description, body: row.body, scope: row.scope === 'private' ? { kind: 'private' } : { kind: 'project', projectId: row.projectId! } })
 const rowVersionHash = (row: MemoryRow): string => digest(rowPayload(row))
 const SYNTHESIS_CONTEXT_BYTES = 32 * 1024

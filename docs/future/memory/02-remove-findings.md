@@ -62,7 +62,7 @@ are listed below by owner.
 - The approval route and `memoryApproveFinding` in `plugins/memory/src/server/routes/knowledge.ts`:
   delete.
 - The review section of `plugins/memory/src/client/MemoryCenter.tsx`, and of the Context pane's
-  memory contribution in `plugins/memory/src/client/MemorySection.tsx`: delete.
+  memory contribution in the retired Context pane memory component: delete.
 - The index table, full-text table, reconciliation, and recall counters in
   `plugins/memory/src/server/memory.ts` and `plugins/memory/src/node/schema.ts`: replaced by a file
   scan. The plugin's migration folder goes with the schema.

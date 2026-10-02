@@ -326,7 +326,9 @@ export class CodexAgentDriver implements AgentDriver {
 
     // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
     // well as start, and unchanged, for the reason Claude's appended system prompt is.
-    const instructions = sessionCustomAgent(options.session.config)?.instructions
+    const instructions = [sessionCustomAgent(options.session.config)?.instructions,
+      typeof options.session.config.standingContext === 'string' ? options.session.config.standingContext : undefined,
+    ].filter(Boolean).join('\n\n')
     const developerInstructions = instructions ? { developerInstructions: instructions } : {}
     const startThread = () => rpc.request<Record<string, unknown>>('thread/start', {
       cwd: options.cwd,

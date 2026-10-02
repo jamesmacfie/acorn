@@ -2,9 +2,10 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   ptys: [] as Array<{ data: Set<(s: string) => void>; exits: Set<(e: { exitCode: number }) => void>; kills: number; kill(): void; writes: string[]; throwDispose: boolean }>,
-  tmux: false, agent: false, warnThrows: false, aliveTmux: '', failExitRegistration: false, exec: [] as string[][],
+  systemPrompt: false, spawnArgs: [] as string[][], tmux: false, agent: false, warnThrows: false, aliveTmux: '', failExitRegistration: false, exec: [] as string[][],
 }))
-vi.mock('node-pty', () => ({ spawn: () => {
+vi.mock('node-pty', () => ({ spawn: (_command: string, args: string[]) => {
+  state.spawnArgs.push(args)
   const pty = {
     data: new Set<(s: string) => void>(), exits: new Set<(e: { exitCode: number }) => void>(), kills: 0, writes: [] as string[], throwDispose: false,
     onData(fn: (s: string) => void) { this.data.add(fn); return { dispose: () => { this.data.delete(fn); if (this.throwDispose) throw Error('disposer failed') } } },
@@ -16,7 +17,7 @@ vi.mock('node-pty', () => ({ spawn: () => {
 } }))
 vi.mock('node:child_process', () => ({ execFileSync: (_file: string, args: string[]) => { state.exec.push(args); return args[0] === 'list-sessions' ? state.aliveTmux : '' } }))
 vi.mock('@acorn/plugin-api/node', () => ({
-  getProfile: () => ({ id: 'shell', label: 'Shell', kind: state.agent ? 'agent' : 'shell', backendPreference: state.tmux ? 'tmux' : 'node-pty' }),
+  getProfile: () => ({ id: 'shell', label: 'Shell', kind: state.agent ? 'agent' : 'shell', backendPreference: state.tmux ? 'tmux' : 'node-pty', launchContextArgs: state.systemPrompt ? (context: string | null) => ['--append-system-prompt', context ?? ''] : undefined }),
   interactiveProfile: () => true, resolveCommand: () => '/bin/sh', tmuxAvailable: () => state.tmux,
   buildSessionEnv: () => ({}), rendererBaseCheckout: () => undefined,
   taskContext: () => ({ repo: null, pull: null }),
@@ -28,7 +29,7 @@ vi.mock('@acorn/plugin-api/node', () => ({
 import { disposeTerminal, registerTerminalChannel, terminalRunGlue, sendToAgent, reconcileTmux } from './terminal'
 
 const deferred = <T>() => { let resolve!: (value: T) => void; const promise = new Promise<T>(yes => { resolve = yes }); return { promise, resolve } }
-function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Promise<unknown>; project?: () => Promise<unknown>; insert?: () => Promise<void>; remove?: () => Promise<void>; root?: () => Promise<string>; archive?: () => Promise<void>; status?: () => void } = {}) {
+function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Promise<unknown>; project?: () => Promise<unknown>; insert?: () => Promise<void>; remove?: () => Promise<void>; root?: () => Promise<string>; archive?: () => Promise<void>; status?: () => void; launchText?: () => Promise<string | null>; launch?: () => Promise<void> } = {}) {
   const rows = new Map<string, Record<string, unknown>>()
   const mutations: string[] = []
   let rosterEvents = 0
@@ -45,12 +46,12 @@ function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Pr
   }
   const streams = vi.fn()
   const reg = registerTerminalChannel(db as never, core as never, {
-    internalEnv: () => ({}), launchContext: async () => {}, completed() {}, archiveReview: options.archive ?? (async () => {}),
+    internalEnv: () => ({}), launchContextText: options.launchText, launchContext: options.launch ?? (async () => {}), completed() {}, archiveReview: options.archive ?? (async () => {}),
     seedTaskNotes: async () => {}, reconciled: Promise.resolve(), streams, status: () => { rosterEvents++; options.status?.() },
   })
   return { ...reg, db, core, rows, mutations, events: () => rosterEvents, streams: streams.mock.calls[0][0] }
 }
-afterEach(() => { disposeTerminal(); vi.useRealTimers(); state.ptys.length = 0; state.exec.length = 0; state.tmux = false; state.agent = false; state.aliveTmux = ''; state.warnThrows = false; state.failExitRegistration = false })
+afterEach(() => { disposeTerminal(); vi.useRealTimers(); state.ptys.length = 0; state.spawnArgs.length = 0; state.systemPrompt = false; state.exec.length = 0; state.tmux = false; state.agent = false; state.aliveTmux = ''; state.warnThrows = false; state.failExitRegistration = false })
 
 it('publishes structure once, retires both reader sinks, and drains callbacks and output timers', async () => {
   vi.useFakeTimers()
@@ -328,4 +329,22 @@ it('retires a failed reconciliation attachment without deleting its preexisting 
   expect(await next.terminal.list()).toEqual([])
   expect(f.rows.size).toBe(1)
   expect(state.exec.some(args => args[0] === 'kill-session')).toBe(false)
+})
+
+
+it('waits for standing context before spawn and avoids a duplicate idle-edge push', async () => {
+  state.agent = true; state.systemPrompt = true
+  const context = deferred<string | null>()
+  const launch = vi.fn(async () => {})
+  const f = fixture({ launchText: () => context.promise, launch })
+  const creating = f.terminal.create({ taskId: 'task' })
+  await vi.waitFor(() => expect(state.ptys).toHaveLength(0))
+  const text = 'Standing memory 😀'.repeat(2_000)
+  context.resolve(text)
+  await creating
+  expect(state.spawnArgs[0]).toEqual(['--append-system-prompt', text])
+  expect(launch).not.toHaveBeenCalled()
+  await f.terminal.create({ taskId: 'task', command: 'echo fixture' })
+  expect(state.spawnArgs[1]).toEqual(['-lc', 'echo fixture'])
+  expect(launch).not.toHaveBeenCalled()
 })

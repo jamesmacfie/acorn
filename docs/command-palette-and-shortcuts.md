@@ -159,6 +159,9 @@ open action each; and onboarding none. Each plugin's own document has the whole 
 note, merging a pull request and approving a workflow gate all need context and a confirmation that a
 low-context row cannot carry, so they stay in the surfaces that have both.
 
+Memory search results open the selected scope and name on the Memory page. They no longer reveal a
+Context pane section. The review commands remain during phase 1 measurement.
+
 **A surface may lend the palette its own menu while it is on screen.** The agent pane registers the
 open session's `•••` actions from the region that draws them and disposes them when it unmounts
 (`plugins/agents/src/client/commands.ts`, [managed-agents.md](./managed-agents.md) § From the command

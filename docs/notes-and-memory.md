@@ -62,99 +62,90 @@ stay in the library. Only the workflow-plus-scratch combination counts as a seed
 
 ## Memory
 
-Memory is durable reviewed knowledge. Every entry acorn accepts is a Markdown file under the owner's
-private memory root, `~/.acorn/memory`. Scope decides reach rather than storage: a project entry goes
-to `projects/<projectId>/` and applies to that project alone, and through it to that project's
-workspace, while a private entry sits in the root and applies wherever the owner is working. Nothing
-is written into a repo checkout, so a task's diff and its pull request never carry a `.acorn/`
-directory the reviewer did not ask for.
+Agents save memory directly with task-scoped tools. The files live under `~/.acorn/memory`, or
+`<ACORN_DATA_DIR>/memory` when the Node has an explicit data root. Development sessions therefore
+use their isolated data folder. Project memories live in `projects/<projectId>/`; private memories
+live in the root and apply across projects. Memory writes do not change a repository checkout.
 
-Reconciliation still reads two more places, and only reads them: `.acorn/memory/` in each active task
-worktree and in each primary checkout. That is what lets a team commit shared memory into its own
-repo, and it keeps entries written before the store moved. The memory plugin owns file
-reconciliation, hash deduplication, supersession, an FTS index, and recall metadata. Plain
-folders are supported: they use project scope without Git revision/diff anchoring.
+Each Markdown file has `name`, `description`, and `metadata.type` frontmatter. Writes stamp
+`metadata.updatedAt` and `metadata.updatedBy`, with `agent:SESSION_ID` for agent writes. Types are
+`user`, `feedback`, `project`, and `reference`. Reads map the legacy `convention`, `architecture`,
+`decision`, `fix`, and `task` labels to `project` without rewriting files.
 
-Agents can search memory and submit proposed changes, but cannot write accepted knowledge directly.
-`memory_write` sends its validated payload to Findings immediately. Findings creates one observation,
-candidate, and review bundle, then returns their IDs to the tool. The host derives agent provenance
-from the signed task session and checks that the session belongs to the task. If Findings is disabled,
-the tool returns an explicit unavailable result and creates no local queue. The index is rebuildable;
-the Markdown files remain the durable content.
+`memory_list` lists names, descriptions, types, scopes, and update dates. `memory_search` scans names,
+descriptions, and bodies and returns up to 10 matches with excerpts. Both accept an optional scope.
+`memory_get` requires a scope and name and returns the content and its SHA-256 hash. Tools derive the
+project from the signed task and accept no project ID. A projectless task can use private memory.
 
-After a manual write or accepted proposal, the plugin first reconciles the file and derived index,
-then publishes `plugin:memory:memories-changed`. Its payload is only the affected project scope, or
-the private scope with `projectId: null`; recall counters and ordinary reconciliation reads stay
-silent. A node-side consumer re-reads `memory.library`, which returns authorized entry content and
-metadata but no file paths or recall bookkeeping.
+`memory_write` creates or replaces a file directly. Replacing a name requires its current hash from
+`memory_get`. `memory_delete` also requires the hash. A stale hash fails with a conflict and the current
+hash. Mutations serialize within the Node, write files atomically, regenerate that scope's `MEMORY.md`,
+and publish `plugin:memory:memories-changed`. Index lines sort by the file's update time, newest first.
 
-A search hit or a `memory_get` read bumps that row's recall stats (last-accessed time and access
-count), the inputs for future decay and ranking. Listing the index does not count as a read. The
-stats survive reconciliation because rows are keyed by a content-hash id.
+Names follow the memory filename rule and cannot use the reserved `MEMORY` name. Descriptions must be
+one line of at most 200 characters, and bodies have a 16 KiB byte limit. Writes reject invisible and
+bidirectional controls, role-like tags, instruction overrides, private keys, token-shaped secrets,
+and credential assignments. These checks help catch unsafe memory content; they do not replace the
+contract's instruction that the person's request and repository guidance take precedence.
 
-### The Memory page
+Replacement and deletion preserve the prior file under `.history/NAME/` for private memory, or
+`.history/projects/PROJECT_ID/NAME/` for project memory. Each name keeps 20 prior versions. The root's
+`changes.jsonl` keeps the last 1,000 mutations, with action, scope, name, timestamp, task, and session.
+Undo restores prior content, or deletes a file created by that change, and records a restore change.
+It refuses if a later logged mutation or an external edit changed the memory.
 
-Memory list and search routes constrain a task credential's `projectId` to the signed task's project.
-The plugin resolves the task and project through core services before reconciling or querying the
-memory index. Foreign scope, missing task or referenced project state, and scope lookup failures return the same
-`404 not_found`. Omitted `projectId` reads only shared private memories for an existing task.
-Device and service credentials can select any project or the private-only scope. Agent read tools
-derive project scope from their host-supplied task instead of accepting a project ID from tool input.
+### The Memory page and transcript
 
-Memory has a project-scoped rail page in `plugins/memory/src/client/MemoryCenter.tsx`. It shows
-Findings review bundles above accepted memories. The memory list includes entries for the routed
-project and private entries, which apply everywhere. The page filters the fetched list by name or
-description. The task Context pane shows the same canonical review beside the manual add-memory form.
+The project Memory page lists project and private memories, lets the owner open their bodies, and
+provides **Add memory**. It refreshes on memory change events. The memory section is absent from the
+Context pane. Search results open the selected memory on the Memory page.
 
-The review shows preparing, failed, ready, and empty bundles. Ready suggestions stay in the project's
-attention list after the source task is archived. Each candidate has an exact preview before approval.
-The owner can edit the proposed name, type, description, body, and project or private reach; an edit
-creates a new candidate revision. Dismissal, undo, snooze, source evidence, and review history remain
-attached to the canonical candidate. An omitted observation can be restored, and a grouped source can
-be split into its own candidate.
+The memory plugin renders `memory_write` and `memory_delete` through `agents:tool-card`. Successful
+calls show the scope, name, description, **Open**, and **Undo**. Undo calls
+`POST /v1/p/memory/memory/changes/:id/undo`, which requires a paired device. Manual additions also
+require a device and use the same validation, history, and change log as agent writes.
 
-Approval uses `/v1/p/memory/memory/findings/:candidateId/approve` and requires a paired device. The
-request names the exact candidate revision, payload hash, and idempotency key. Memory persists a
-prepared receipt before the atomic Markdown write. The receipt binds the payload, scope, target,
-accepted-memory version hash, and device identity. A retry reconciles an already-written file and
-finishes Findings linkage without writing twice. A stale revision or changed update base conflicts.
-Manual owner-authored memory remains available when Findings is disabled.
+Findings review remains available during phase 1's measurement period. Its review bundles, archive
+producers, approval route, and durable promotion receipts remain supported. The review fingerprints
+compare normalized type labels. The Memory page shows review bundles above the library.
+`memory_write` does not submit a Findings proposal. Removing Findings and the derived SQLite index
+is gated by the measurement in [the memory programme](./future/memory/01-direct-writes.md).
 
-The optional ready-bundle notice opens the Memory review through a `findings-bundle` destination.
-A candidate destination names its canonical candidate ID. The Memory page clears a one-time candidate
-highlight when it unmounts.
+The page and Findings review still use the derived SQLite index, including its read-only repository
+sources. Agent tools and standing context scan only the private root and the task's project folder.
+Repository folders are outside the direct-write tool contract.
 
 ## Context integration
 
-Notes and memory each register a context section. Core assembles sections with GitHub, task, Linear,
-and Rollbar contributions under a deterministic byte/token budget. Section failure or stale data is
-reported independently. The context pane previews the exact snapshot and can send it to a selected
-managed agent session.
+Notes contribute to `task_context` and the Context pane alongside task, PR, and linked-issue sections.
+Memory does not register a context section or duplicate its index in `task_context`.
 
-Memory also draws in the pane. Its canonical review and add-memory form are a component registered
-against the `context:section` extension point with `matches: ['memory']`, which the context plugin
-opens and the host mints. For more information, see the cooperative extension points in
-[the plugins doc](./plugins.md). Context draws its own rows for the section and memory's review joins
-them, because the point stacks. Neither plugin imports the other, and disabling memory leaves the
-section drawing its rows.
+Memory supplies `agents.standingContext.v1` with a `build(taskId)` operation. Agents reads that optional
+capability once at session admission and stores `config.standingContext`. A resume sends the stored
+text unchanged. Generic configuration updates cannot replace it. A fresh session builds another
+snapshot; another live session can call `memory_list` or `memory_search` to see subsequent writes.
+With Memory disabled, admission stores no memory text.
 
-A fresh agent session can receive that snapshot two ways. The _push_ queues the assembled block for
-the session's first idle edge. It is delivered `'after-ready'`, so if the CLI is still busy when the
-user types, the block lands after the first ask, as reference material for work already underway. A
-Memory contribution supplies the bounded launch text through `terminal:launch-context`; Terminal
-orders the contributors and sends their text. The separate `terminal.sendToAgent` action remains for
-explicit sends. A
-profile that can carry a standing instruction avoids the race by _pulling_ instead. It sets
-`launchArgs` on its `AgentProfileContribution` (Claude Code uses `--append-system-prompt`, telling it
-to call `task_context`, `notes_read`, or `memory_search` before starting), and `spawnOne` skips the
-push for that session. A system prompt cannot lose the race, and a pull sees notes edited
-mid-session. The push still governs profiles with no such flag. `launchArgs` reach node-pty as argv,
-and the tmux and `-lc` paths as a quoted line (`launchCommandLine`). A command override, such as the
-dev-server pane, is a different binary and gets none.
+Standing context contains the single memory contract, the private index, and the signed task's project
+index. It includes descriptions, not bodies. The per-scope caps default to 4,000 and 12,000 characters.
+The `memory:index-caps:v1` preference can set each cap from 200 through 32,000 characters. Caps apply
+at whole-line boundaries, with an explicit marker naming the omitted count and `memory_list`.
+
+Managed Claude appends the snapshot after custom instructions and unattended turn instructions.
+Managed Codex appends it to developer instructions. A contributed ACP harness without a system prompt
+seam receives it before its first prompt, using the custom-instructions fallback. Workflow managed
+sessions use those same paths. Structured generation has no memory injection.
+
+Terminal Claude Code uses the compiled `launchContextArgs` profile seam. Terminal reads launch
+contributions before spawning the PTY, then the profile carries the text in `--append-system-prompt`.
+The remaining launch instruction points to task context, linked issues, and notes. Other terminal
+profiles receive the combined task context and standing memory at the first idle edge through
+`terminal:launch-context`. The queued path has a 256 KiB aggregate ceiling, allowing both configured
+index caps and the contract. Command overrides receive no automatic agent context.
 
 ## From the command palette
 
-Four rows across the two plugins, all registered by their own client half.
+Five rows across the two plugins, all registered by their own client half.
 [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
 search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
 
@@ -176,11 +167,9 @@ note is a pane intent addressed at a task even when the note is a global one.
 
 Memory contributes a search and two actions (`plugins/memory/src/client/commands.ts`). **Search
 memory** goes through the existing full-text path, so the ordering is that index's own rank and the
-device does not re-rank it, and a row reveals by the memory's name rather than its id, because the
-name is what the context section keys its rows by. It is task-scoped even though the query is about
-the project: the query carries the captured project, but the surface a hit opens in belongs to a task,
-and a row that cannot be opened is not worth offering. **Review memory suggestions** goes to the Memory
-page instead, and so is offered with no task in hand.
+device does not re-rank it. Selecting a row opens its scope and filename on the Memory page. The
+search is task-scoped and carries the captured project. **Review memory suggestions** opens the
+Memory page and is offered with no task in hand.
 **Review learnings** is task-scoped and explicitly prepares findings from that task, then routes to
 the owning project's Memory page. The Node resolves the same saved backend and model used by archive
 review; without one it asks the owner to configure review instead of creating unfiltered candidates.
@@ -202,5 +191,5 @@ not create review cards or notices. Terminal exit and top-level workflow complet
 evidence through their own completion events and bounded read capabilities. Task archive freezes the
 task's evidence through an awaited pre-teardown hook and queues one project-scoped review when a backend
 and target are configured. Workflow handoff notes remain notes and are read only as bounded input for
-the workflow boundary. If Findings is disabled, task completion and manual Memory editing continue;
-proposals require Findings and return unavailable when it is disabled.
+the workflow boundary. If Findings is disabled, task completion and direct Memory writes continue. Legacy review preparation
+requires Findings.

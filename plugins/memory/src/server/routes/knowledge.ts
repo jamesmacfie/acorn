@@ -9,6 +9,8 @@ export type KnowledgeBridge = {
   memoryList(projectId?: string): Promise<unknown>
   memorySearch(query: string, projectId?: string, type?: string): Promise<unknown>
   memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
+  memoryProjectAdd?(projectId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
+  memoryUndo?(changeId: string): Promise<unknown>
   memoryApproveFinding?(id: string, input: { revision: number; payloadHash: string; idempotencyKey: string; deviceId: string }): Promise<unknown>
 }
 
@@ -52,12 +54,24 @@ export const knowledge = new Hono<AppEnv>()
     if (!q) return respondError(c, 400, 'bad_request')
     return readMemory(c, (b, projectId) => b.memorySearch(q, projectId, c.req.query('type') ?? undefined))
   })
+  .post('/memory/changes/:id/undo', requireDevice, (c) => viaBridge(c, KNOWLEDGE, (bridge) => {
+    if (!bridge.memoryUndo) throw new BridgeError(404, 'not_found')
+    return bridge.memoryUndo(c.req.param('id'))
+  }))
   .post('/memory/findings/:id/approve', requireDevice, async (c) => {
     const parsed = approveFindingBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, KNOWLEDGE, (bridge) => bridge.memoryApproveFinding ? bridge.memoryApproveFinding(c.req.param('id'), { ...parsed.data, deviceId: c.get('principal')!.deviceId! }) : Promise.resolve({ ok: false, reason: 'Findings review is unavailable.' }))
   })
-  .post('/tasks/:id/memory', async (c) => {
+  .post('/projects/:id/memory', requireDevice, async (c) => {
+    const parsed = addBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, KNOWLEDGE, (bridge) => {
+      if (!bridge.memoryProjectAdd) throw new BridgeError(404, 'not_found')
+      return bridge.memoryProjectAdd(c.req.param('id'), parsed.data)
+    })
+  })
+  .post('/tasks/:id/memory', requireDevice, async (c) => {
     const p = addBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     return viaBridge(c, KNOWLEDGE, (b) => b.memoryAdd(c.req.param('id'), p.data))

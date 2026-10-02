@@ -4,7 +4,7 @@ import type { FindingScope } from '@acorn/plugin-findings/contract/records.ts'
 export const memoryChangePayloadSchema = z.strictObject({
   operation: z.enum(['add', 'update']),
   name: z.string().trim().min(1).max(120).regex(/^[a-z0-9][a-z0-9._-]*$/i),
-  type: z.enum(['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user']),
+  type: z.enum(['convention', 'architecture', 'decision', 'fix', 'reference', 'feedback', 'task', 'user', 'project']),
   description: z.string().trim().min(1).max(1_000),
   body: z.string().refine((body) => body.trim().length > 0, 'body cannot be blank'),
   scope: z.discriminatedUnion('kind', [z.strictObject({ kind: z.literal('project'), projectId: z.string().min(1).optional() }), z.strictObject({ kind: z.literal('private') })]),

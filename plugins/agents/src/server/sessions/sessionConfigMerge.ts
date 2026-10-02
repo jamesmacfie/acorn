@@ -5,7 +5,7 @@ const owns = (value: Record<string, unknown>, key: string): boolean =>
 
 // Written by admission or a dedicated authority operation, not generic provider configuration.
 const serverOwnedKeys = [
-  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent',
+  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent', 'standingContext',
 ] as const
 
 export function retainSessionAuthority(

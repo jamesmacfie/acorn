@@ -310,12 +310,12 @@ not approve or answer child requests.
 Plugins register context sections through the Node context-section registry. Each contribution
 declares its wire order and the registry sorts by that value, so core keeps no list of plugin IDs.
 Core applies byte and token budgets, records section status and freshness, and returns a
-deterministic snapshot. GitHub, notes, memory, Linear, Rollbar, and task sections are optional
+deterministic snapshot. GitHub, notes, Linear, Rollbar, and task sections are optional
 contributions, and one failing section does not discard its siblings.
 
 A section is also *shaped* by the plugin that owns its rows, not just registered by it: `pr` lives in
-`plugins/github/src/server/contextSection.ts`, `notes` and `memory` in the same file under their own
-packages. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
+`plugins/github/src/server/contextSection.ts`, `notes` in the same file under its own
+package. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
 section's own `format` applies the same ceiling arithmetic core applies to items, and keeps the
 assembly, the declared order and the 512 KiB budget. It also offers `pastedContent`, which wraps text
 the reader didn't write in `<pasted_content>` tags that Claude Code's system prompt explains: follow
@@ -331,7 +331,7 @@ too.
 
 Orders are spaced by 10 so a new section slots between two without renumbering. The order is
 load-bearing: every prompt, the client's Manifest preview, and the byte-exactness rule below assume
-`pr`, `issues`, `notes`, `memory` in that sequence, so changing a number changes what an agent reads.
+`pr`, `issues`, `notes` in that sequence, so changing a number changes what an agent reads.
 
 A section's `compact` rendering must not depend on which other sections ship alongside it. That lets
 the client assemble the exact context block a send will produce from a single `include=*` inventory,
@@ -349,10 +349,9 @@ the pane answers it with an extension point rather than a private registry: `con
 `remote` point that stacks, keyed by the section id. For more information, see the cooperative
 extension points in [the plugins doc](./plugins.md).
 
-Memory is the one contributor. Its canonical Findings review and add-memory form are a component registered
-against `context:section` with `matches: ['memory']`, so context draws its own rows for the section and
-memory's review joins them. Neither plugin imports the other. Disable memory and the section still draws
-its rows.
+Memory uses standing session context instead of this section slot. Its tool card shows direct saves
+with **Open** and **Undo**. `memory_get` returns a hash; updating or deleting a memory requires that
+hash. For the scopes, checks, and history contract, see [Notes and memory](./notes-and-memory.md#memory).
 
 A compiled plugin contributes a component and the host mounts it. A loaded plugin contributes a bundle
 entry and the host runs it in a worker. The owner writes one `Slot` and cannot tell which answered.

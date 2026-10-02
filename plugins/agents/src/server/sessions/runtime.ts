@@ -162,8 +162,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     // programs a session starts is the owner's setting, not something a request body can widen.
     const withAgent = await this.readWhileRunning(() => this.withCustomAgent(input))
     const mcpServers = await this.readWhileRunning(() => this.mcpServers.enabledNames())
+    const standingContext = await this.readWhileRunning(() => this.standingContext?.(input.taskId) ?? Promise.resolve(null))
     this.shutdown.signal.throwIfAborted()
-    const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers } }, provider)
+    const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers, standingContext } }, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
   }

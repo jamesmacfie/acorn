@@ -53,6 +53,7 @@
       "github_pull_create",
       "local_changes",
       "local_diff",
+      "memory_delete",
       "memory_get",
       "memory_list",
       "memory_search",
@@ -73,7 +74,6 @@
       "pr",
       "issues",
       "notes",
-      "memory",
       "plugin-authoring"
     ],
     "connectionProviders": [
@@ -96,6 +96,7 @@
       "agents.sessionControl",
       "agents.sessionExecute",
       "agents.sessions",
+      "agents.standingContext.v1",
       "agents.turns",
       "agents.usageRoute",
       "browser.captures",

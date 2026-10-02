@@ -75,7 +75,7 @@ const STARTUP_IMPORTS = ['src/client/index.tsx']
 // 2026-09-25. The terminal client's graph was not checked for them, so only this list has them.
 const DENYLIST = [
   'shiki', 'wasm', 'DiffPane', 'prModel', 'prSections', 'viewState', 'icon-nodes',
-  'MemorySection', 'FindingsBundleReview', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
+  'MemoryAddForm', 'FindingsBundleReview', 'draft-', 'draftStore', 'stepFields', 'GithubImporter', 'PreviewTaskPane', 'PreviewPane',
 ]
 
 // The denylist entries that are allowed in the startup list for now, reported loudly rather than

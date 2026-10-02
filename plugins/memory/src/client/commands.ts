@@ -1,32 +1,16 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
-  openPane,
   projectPath,
   setSelectedSource,
   type CommandOutcome,
   type ContributedCommand,
 } from '@acorn/plugin-api/client'
+import { selectMemory } from './memorySelection'
 import { memoryApi } from './memoryClient'
 import { MEMORY_SOURCE_ID } from './proposalTarget'
 
-// Memory in the palette: search what this project can see and open canonical review.
-//
-// A search hit is a
-// memory this task's context could be drawing on, so it reveals in the Context pane's memory section:
-// the reader is shown it where they are already working (client-core/host/registries/commands/
-// clientEvents.ts § `context:reveal`). Review opens the Memory page.
-//
-// Only search is task-scoped. The search itself is project-visible, that is the
-// node route's own scope, but the surface a hit opens in belongs to a task and a row that cannot be
-// opened is not worth offering. The project the query names is the captured one.
-//
-// Review actions stay on the Memory page, with the candidate body in front of the reader.
-// Adding a memory needs a name, a type, a scope and a body,
-// which is four fields rather than one line (docs/command-palette-and-shortcuts.md § What the palette refuses).
-
-const CONTEXT_PANE = 'context'
-const MEMORY_SECTION = 'memory'
+// Search results and review actions open this project's Memory page.
 const openMemory = (context: { projectId: string | null; navigate?: (path: string) => void }, projectId = context.projectId): void => {
   setSelectedSource(MEMORY_SOURCE_ID)
   if (projectId) context.navigate?.(projectPath(projectId))
@@ -70,15 +54,17 @@ export const memoryCommands: readonly ContributedCommand[] = [
         title: memory.name,
         subtitle: memory.description,
         badge: memory.type,
-        // The context section keys its rows by the memory's name, not its id
-        // (../server/contextSection.ts), so that is what the reveal has to name.
-        ref: memory.name,
+        // Name and scope distinguish same-named private and project memories.
+        ref: JSON.stringify({ name: memory.name, scope: memory.scope }),
       }))
     },
     select: (item, context): CommandOutcome => {
-      const taskId = context.taskId
-      if (!taskId || !item.ref) return COMMAND_CLOSED
-      openPane(taskId, CONTEXT_PANE, { kind: 'context:reveal', sectionId: MEMORY_SECTION, itemId: item.ref })
+      if (!item.ref) return COMMAND_CLOSED
+      try {
+        const selected = JSON.parse(item.ref) as { name: string; scope: string }
+        selectMemory(selected)
+        openMemory(context)
+      } catch { /* An obsolete search row is safe to ignore. */ }
       return COMMAND_CLOSED
     },
   },

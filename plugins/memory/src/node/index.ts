@@ -1,19 +1,17 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { memorySection } from '../server/contextSection'
+import { AGENT_STANDING_CONTEXT } from '@acorn/plugin-agents/contract/standingContext.ts'
 import { TERMINAL_LAUNCH_CONTEXT } from '@acorn/plugin-terminal/contract/launchContext.ts'
 import { memoryAgentTools } from '../server/agentTools'
 import { registerKnowledgeChannel } from '../server/knowledgeChannel'
 import { MEMORY_LIBRARY, type MemoryLibraryEntry, type MemoryType } from '../contract/library'
 import { knowledge, KNOWLEDGE } from '../server/routes/knowledge'
 import { FINDINGS_REVIEW_TARGET } from '@acorn/plugin-findings/contract/extensions.ts'
-import { createMemoryFindingsTarget } from '../server/findingsReview'
+import type { MemoryFindingsTarget } from '../server/findingsReview'
+import type { FindingTargetController } from '@acorn/plugin-findings/contract/review.ts'
 import { homedir } from 'node:os'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
-// No deps: Terminal owns launch delivery.
-//
-// `dataDir` stays a parameter, unlike changes' and github's, because the knowledge index reads source
-// files under the data root.
+// Terminal owns launch delivery; Agents owns the optional standing-context contract.
 export const memoryPlugin = (): NodePlugin => {
   let routeCapability: { dispose(): void } | null = null
   return {
@@ -32,13 +30,33 @@ export const memoryPlugin = (): NodePlugin => {
       const db = ctx.storage.open()
       const runtime = registerKnowledgeChannel(db, ctx.core, { emit: ctx.events.send })
       ctx.extensionPoints.handle(TERMINAL_LAUNCH_CONTEXT, { id: 'memory', value: { read: runtime.launchContext } })
-      const findingsTarget = createMemoryFindingsTarget({
-        db, memory: runtime, capabilities: ctx.capabilities, homeDir: homedir(),
-        announce: (projectId) => ctx.events.send({ channel: pluginChannel('memory', 'memories-changed'), ...(projectId ? { scope: 'project', projectId } : { scope: 'private', projectId: null }) }),
+      // Boot needs the review descriptor; validation and approval load on the first review.
+      let findingsTarget: MemoryFindingsTarget | undefined
+      let targetPromise: Promise<MemoryFindingsTarget> | undefined
+      let controller: FindingTargetController | undefined
+      let disconnect: (() => void) | undefined
+      const loadTarget = () => targetPromise ??= import('../server/findingsReview').then(({ createMemoryFindingsTarget }) => {
+        findingsTarget = createMemoryFindingsTarget({
+          db, memory: runtime, capabilities: ctx.capabilities, homeDir: homedir(),
+          announce: (projectId) => ctx.events.send({ channel: pluginChannel('memory', 'memories-changed'), ...(projectId ? { scope: 'project', projectId } : { scope: 'private', projectId: null }) }),
+        })
+        if (controller) disconnect = findingsTarget.contribution.connect(controller) || undefined
+        return findingsTarget
       })
       // The host qualifies contribution IDs with this plugin owner, producing `memory:change`.
-      ctx.extensionPoints.handle(FINDINGS_REVIEW_TARGET, { id: 'change', value: findingsTarget.contribution })
-      runtime.route.memoryApproveFinding = (id, input) => findingsTarget.approve({ candidateId: id, ...input })
+      ctx.extensionPoints.handle(FINDINGS_REVIEW_TARGET, { id: 'change', value: {
+        version: 1, label: 'Memory changes',
+        validate: async (input) => (await loadTarget()).contribution.validate(input),
+        acceptedFingerprints: async (scope) => (await loadTarget()).contribution.acceptedFingerprints(scope),
+        synthesisContext: async (scope) => (await loadTarget()).contribution.synthesisContext!(scope),
+        connect: (next) => {
+          disconnect?.()
+          controller = next
+          disconnect = findingsTarget?.contribution.connect(next) || undefined
+          return () => { if (controller === next) { disconnect?.(); disconnect = undefined; controller = undefined } }
+        },
+      } })
+      runtime.route.memoryApproveFinding = async (id, input) => (await loadTarget()).approve({ candidateId: id, ...input })
       // The SQLite table is a derived index. Rebuild it once after migration so a fresh node has a warm
       // index and the project checkout and task-worktree source set is exercised at startup.
       await runtime.reconciled()
@@ -63,15 +81,11 @@ export const memoryPlugin = (): NodePlugin => {
             }))
         },
       })
+      ctx.capabilities.provide(AGENT_STANDING_CONTEXT, { build: runtime.standingContext })
       routeCapability = ctx.capabilities.provide(KNOWLEDGE, runtime.route)
       ctx.routes.register(knowledge, { prefix: '', note: 'memory pane' })
-      for (const tool of memoryAgentTools(runtime, ctx.capabilities, ctx.core)) ctx.tools.register(tool)
-      ctx.contextSections.register(
-        memorySection(async (_taskId, projectId) => {
-          await runtime.reconciled()
-          return runtime.indexSlice(projectId)
-        }),
-      )
+      for (const tool of memoryAgentTools(runtime.store, ctx.core)) ctx.tools.register(tool)
+
     },
     // The route bridge only. The SQLite handle is the host's to drain, right after this returns.
     dispose: () => {

@@ -8,7 +8,7 @@ export async function deliverLaunchContext(
   send: (sessionId: string, text: string) => void,
   warn: (message: string) => void,
 ): Promise<void> {
-  let remainingBytes = 16_384
+  let remainingBytes = 262_144
   for (const contributor of contributors) {
     if (remainingBytes <= 0) break
     try {
@@ -22,4 +22,16 @@ export async function deliverLaunchContext(
       warn(`launch context from ${contributor.id} failed: ${error instanceof Error ? error.message : String(error)}`)
     }
   }
+}
+
+// System-prompt profiles get the complete standing block before the PTY starts.
+export async function readLaunchContext(taskId: string, contributors: readonly { id: string; value: TerminalLaunchContext }[], warn: (message: string) => void): Promise<string | null> {
+  const blocks: string[] = []
+  for (const contributor of contributors) {
+    try {
+      const text = await contributor.value.read(taskId)
+      if (text?.trim()) blocks.push(text)
+    } catch (error) { warn(`launch context from ${contributor.id} failed: ${error instanceof Error ? error.message : String(error)}`) }
+  }
+  return blocks.join('\n\n') || null
 }

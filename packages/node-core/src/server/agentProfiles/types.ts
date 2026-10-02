@@ -45,6 +45,8 @@ export type AgentProfileContribution = {
   mcpRegistration?: (name: string, launcher: Launcher) => Promise<{ ok: boolean; reason?: string }>
   // Extra argv for the interactive launch (docs/notes-and-memory.md § Context integration).
   launchArgs?: string[]
+  /** Compiled profile seam for context that must reach the system prompt before the first turn. */
+  launchContextArgs?: (context: string | null) => string[]
   // Whether `command` can be opened as a terminal. Omitted means yes, which is every built-in profile:
   // a shell, and three agent CLIs that all run interactively. `false` is for a profile that exists only
   // to answer one prompt, where running `command` bare would fail in front of whoever picked it. The

@@ -7,6 +7,12 @@ import {
 import capture from './__fixtures__/codexWebSearchWire.json' with { type: 'json' }
 
 describe('Codex app-server normalization', () => {
+  it('preserves the MCP tool identity for contributed transcript actions', () => {
+    expect(normalizeCodexNotification({ method: 'item/completed', params: {
+      item: { id: 'memory', type: 'mcpToolCall', server: 'acorn', tool: 'memory_delete', arguments: { name: 'stale', scope: 'project', hash: 'hash' }, result: { changeId: 'change' } },
+    } })).toMatchObject([{ type: 'tool', tool: { name: 'memory_delete', status: 'completed' } }])
+  })
+
   it('maps protocol readiness without terminal heuristics', () => {
     expect(normalizeCodexNotification({
       method: 'thread/status/changed',

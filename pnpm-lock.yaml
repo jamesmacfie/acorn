@@ -1474,6 +1474,9 @@ importers:
 
   plugins/memory:
     dependencies:
+      '@acorn/plugin-agents':
+        specifier: workspace:*
+        version: link:../agents
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
@@ -1483,21 +1486,18 @@ importers:
       '@acorn/plugin-findings':
         specifier: workspace:*
         version: link:../findings
-      '@acorn/plugin-notes':
-        specifier: workspace:*
-        version: link:../notes
       '@acorn/plugin-terminal':
         specifier: workspace:*
         version: link:../terminal
-      '@acorn/plugin-workflows':
-        specifier: workspace:*
-        version: link:../workflows
       '@acorn/protocol':
         specifier: workspace:*
         version: link:../../packages/protocol
       '@solidjs/router':
         specifier: ^0.16.1
         version: 0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
+      '@tanstack/solid-query':
+        specifier: ^5.101.0
+        version: 5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))
       drizzle-orm:
         specifier: 'catalog:'
         version: 0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)

@@ -1,10 +1,18 @@
+import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import { defineConfig } from 'vite'
 import { isRuntimeResolved } from './externals'
 import { thirdPartyNotices } from './thirdPartyNotices'
 
 export default defineConfig({
-  plugins: [thirdPartyNotices('THIRD-PARTY-NOTICES.txt')],
+  plugins: [thirdPartyNotices('THIRD-PARTY-NOTICES.txt'), {
+    name: 'memory-contract',
+    transform(code, id) {
+      if (!id.endsWith('/plugins/memory/src/server/standingContext.ts')) return
+      const contract = readFileSync(resolve(__dirname, '../../plugins/memory/src/server/memoryContract.md'), 'utf8')
+      return code.replace("readFileSync(new URL('./memoryContract.md', import.meta.url), 'utf8')", JSON.stringify(contract))
+    },
+  }],
   // Node resolution, not browser: prefer the `node` condition and never the `browser` field.
   resolve: {
     conditions: ['node'],

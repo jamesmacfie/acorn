@@ -121,7 +121,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     },
     {
       name: 'task_context',
-      description: 'The assembled context for the current task: PR detail, linked issues, notes and the repo memory index. Compact by design.',
+      description: 'The assembled context for the current task: PR detail, linked issues and notes. Compact by design.',
       input: z.object({ include: z.string().optional().describe('comma list of context section ids (default: registry defaults)') }),
       scope: 'task',
       risk: 'read',

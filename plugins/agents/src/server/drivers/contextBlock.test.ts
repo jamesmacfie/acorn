@@ -27,9 +27,9 @@ describe('claudeHarness session metadata', () => {
 
   it('appends a custom agent’s instructions, ahead of the unattended text, from the session’s snapshot', () => {
     const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
-    expect(meta('interactive', { customAgent }).systemPrompt).toEqual({ append: 'Review for correctness only.' })
-    expect(meta('delegated', { customAgent }).systemPrompt)
-      .toEqual({ append: `Review for correctness only.\n\n${UNATTENDED_TURN_ENDINGS}` })
+    expect(meta('interactive', { customAgent, standingContext: 'Stored memory.' }).systemPrompt).toEqual({ append: 'Review for correctness only.\n\nStored memory.' })
+    expect(meta('delegated', { customAgent, standingContext: 'Stored memory.' }).systemPrompt)
+      .toEqual({ append: `Review for correctness only.\n\n${UNATTENDED_TURN_ENDINGS}\n\nStored memory.` })
     // An agent with no instructions adds nothing.
     expect(meta('interactive', { customAgent: { id: 'a1', name: 'Bug reviewer' } }).systemPrompt).toBeUndefined()
   })

@@ -81,10 +81,11 @@ and finds this in Settings later.
 
 ## Notes, memory, and context
 
-Notes are Markdown at task, workspace, and global scope. Memory is durable reviewed knowledge with an
-index, search, proposals, and agent tools. Agents propose memory changes; accepting a proposal is a
-human-gated action. The context feature assembles provider, task, notes, and memory sections within
-byte/token budgets and can sync an immutable snapshot to an agent session.
+Notes are Markdown at task, workspace, and global scope. Agents write durable Memory directly with
+hash conflicts, guarded content, history, and transcript Undo. Each new session starts with the
+memory contract and capped private and project indexes. Findings review remains during phase 1
+measurement. The context feature assembles provider, task, and notes sections within byte/token
+budgets and can sync an immutable snapshot to an agent session.
 
 Findings retains evidence discovered during a task without notifying the owner or creating a review
 obligation. Managed agents, paired devices, and registered plugin producers can record bounded,

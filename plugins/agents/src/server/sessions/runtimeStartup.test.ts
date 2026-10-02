@@ -29,6 +29,8 @@ describe('managed startup generations', () => {
   let tokens: number
   let user: string | null
   let expectedStopError: Error | null
+  let memory: string | null
+  let memoryReads: number
   let launch: (options: AgentDriverStartOptions) => Promise<Awaited<ReturnType<FakeAgentDriver['start']>>>
 
   beforeEach(async () => {
@@ -42,6 +44,8 @@ describe('managed startup generations', () => {
     tokens = 0
     user = null
     expectedStopError = null
+    memory = null
+    memoryReads = 0
     launch = (options) => new FakeAgentDriver().start(options)
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => ({
@@ -53,7 +57,8 @@ describe('managed startup generations', () => {
       },
     }))
     engine = new Engine({ db: plugin.db, dataDir: plugin.dataDir, core, registry,
-      internalEnv: () => { tokens++; return {} }, secrets: new SecretService('11'.repeat(32)), currentUserId: () => user })
+      internalEnv: () => { tokens++; return {} }, secrets: new SecretService('11'.repeat(32)), currentUserId: () => user,
+      standingContext: async () => { memoryReads++; return memory } })
     session = await engine.store.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
   })
   afterEach(async () => {
@@ -70,6 +75,21 @@ describe('managed startup generations', () => {
     cwd.resolve(plugin.dataDir)
     expect(await a).toBe(await b)
     expect(starts).toHaveLength(1)
+  })
+
+  it('snapshots memory at admission, preserves it across configuration and resume, and refreshes for a fresh session', async () => {
+    memory = 'Memory at creation.'
+    const created = await engine.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { standingContext: 'Forged context.' } })
+    expect(created.config.standingContext).toBe('Memory at creation.')
+    memory = 'Memory after another agent wrote.'
+    await engine.patchSession(created.id, { config: { standingContext: 'Client replacement.' } })
+    await engine.disconnect(created)
+    await engine.connect(await engine.store.requireSession(created.id))
+    expect(starts.at(-1)?.session.config.standingContext).toBe('Memory at creation.')
+    expect(memoryReads).toBe(1)
+    const fresh = await engine.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+    expect(fresh.config.standingContext).toBe('Memory after another agent wrote.')
+    expect(memoryReads).toBe(2)
   })
 
   it.each(['cwd', 'workspace', 'history', 'mcp'])('cancels a held %s read without spawning or using closed storage later', async (stage) => {

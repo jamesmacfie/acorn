@@ -29,6 +29,14 @@ filtered core run list. Managed delegation and workflow execution call guarded c
 the runtime directly. These HTTP controls do not replace tool permissions, signed ceilings, or
 delegation admission.
 
+## Standing memory
+
+Session admission reads Memory's optional `agents.standingContext.v1` capability and stores the result
+as `config.standingContext`. The drivers replay that snapshot on resume; configuration patches cannot
+replace it. Claude uses `systemPrompt.append`, Codex uses developer instructions, and contributed ACP
+harnesses use the first-prompt fallback. For the contents and caps, see
+[Notes and memory](./notes-and-memory.md#context-integration).
+
 ## Session model
 
 A session belongs to one task and provider profile. It contains turns, normalized events, permission

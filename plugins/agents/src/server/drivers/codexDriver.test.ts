@@ -182,14 +182,14 @@ describe('Codex collaboration modes', () => {
   })
 
   // The same text on start and on resume, from the snapshot the session was created with.
-  it('gives a custom agent’s instructions to the thread as developer instructions', async () => {
+  it('sends identical custom instructions and standing memory on thread start and resume', async () => {
     const customAgent = { id: 'a1', name: 'Bug reviewer', instructions: 'Review for correctness only.' }
-    await (await start(null, false, { customAgent })).handle.stop()
+    await (await start(null, false, { customAgent, standingContext: 'Stored memory.' })).handle.stop()
     expect(wire.requests.find((request) => request.method === 'thread/start')?.params)
-      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
-    await (await start(null, true, { customAgent })).handle.stop()
+      .toMatchObject({ developerInstructions: 'Review for correctness only.\n\nStored memory.' })
+    await (await start(null, true, { customAgent, standingContext: 'Stored memory.' })).handle.stop()
     expect(wire.requests.find((request) => request.method === 'thread/resume')?.params)
-      .toMatchObject({ developerInstructions: 'Review for correctness only.' })
+      .toMatchObject({ developerInstructions: 'Review for correctness only.\n\nStored memory.' })
     wire.requests.length = 0
     await (await start()).handle.stop()
     expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
