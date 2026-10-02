@@ -1,7 +1,8 @@
 # UI consistency: the rest of the pass
 
-**Status:** in progress. Sixteen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
-and B06 to B08b on branch `more-ui`, all merged to main. Four area batches and the final sweep remain.
+**Status:** in progress. Seventeen of twenty-one batches shipped: eleven on branch `ui-inconsistency`,
+and B06 to B09 on branch `more-ui`, all merged to main. Three area batches and the final sweep
+remain.
 Written 2026-10-01.
 Line numbers in these files are from 2026-10-01 and may have moved.
 
@@ -170,29 +171,23 @@ entry, a `StackedDiff` of the change, and alert buttons in `actions`. The editor
 icon buttons, its code is 12 like the diff's, and its search sits on the pane inset with paths in
 their own case. Group labels with an icon button are 34 high. See [deferred.md](./deferred.md) § B08b.
 
+**B09, GitHub.** Picking another pull request remounts its diff, so a reply can't land on the wrong
+pull. Checks, states, and threads read as words (**Passed**, **2 checks running**, **Draft**,
+**Resolved**) from `checkStatusWord` and `checksSummary`. A failed write says a sentence, with
+**Reconnect GitHub** for a refused sign-in. The merge box is two left-aligned rows with one solid
+primary, and a draft offers **Ready for review** instead of **Merge**. The facts are State, Author,
+Branch, Review, Checks, and Updated. A pull row gives its title the room, with the number in front
+and a short age. The list is **Pull requests** with **New**, the pane is **Pull request**, and the
+sections are **Linked issues** and **Conversation**. The empty, loading, and failure states are
+titled and say what failed. A thread links to "RailBadge.tsx, line 14" with the path in a tip
+(`Link tip`). The new pull request form reads **From** then **Into** with a left-aligned footer. The
+importer is a titled card of setting rows with **Link folder**. The check run dialog has **Open on
+GitHub**. Not seen in the window: see [deferred.md](./deferred.md) § B09.
+
 ## What remains, in order
 
-Run the batches in this order. Each depends on the kit batches; B10b depends on B10a.
-
-### B09. GitHub
-
-- [09-1. Picking another pull request leaves the previous one's diff on screen](./b09-github/09-1-stale-pull-diff.md)
-- [09-2. GitHub status is machine words, drawn five different ways](./b09-github/09-2-status-words.md)
-- [09-3. A failed GitHub action prints the server's error code](./b09-github/09-3-error-codes.md)
-- [09-4. The merge box has no primary button, wraps, and offers the wrong verbs](./b09-github/09-4-merge-box.md)
-- [09-7. A pull list row gives the title 61 of its 300 pixels](./b09-github/09-7-pull-list-rows.md)
-- [09-8. GitHub's empty, loading, and error states: a mascot, corner text, and failures that say "none"](./b09-github/09-8-github-states.md)
-- [09-9. A conversation thread's file link wraps and centres on two lines](./b09-github/09-9-thread-file-link.md)
-- [09-10. The description's copy button sits on a line of its own](./b09-github/09-10-description-copy-button.md)
-- [09-11. The overview repeats reviewers and file counts, and leaves out the review decision](./b09-github/09-11-overview-facts.md)
-- [09-12. The new pull request form reads right to left and repeats itself](./b09-github/09-12-new-pull-request-form.md)
-- [09-13. The GitHub importer has no frame](./b09-github/09-13-importer.md)
-- [09-14. One thing, several names](./b09-github/09-14-one-name-each.md)
-- [09-15. The task's PR pane says the number twice and hides that a related pull is read-only](./b09-github/09-15-task-pr-pane.md)
-- [09-16. The check run dialog uppercases its steps and has no link to GitHub](./b09-github/09-16-check-run-dialog.md)
-- [09-17. Smaller GitHub defects](./b09-github/09-17-smaller-defects.md)
-
-09-1 is a correctness bug, not a looks problem: a reply can land on the wrong pull request. Do it first.
+Run the batches in this order. Each depends on the kit batches; B10b depends on B10a. The GitHub
+seed below is still the screen to check B09 against in the final sweep.
 
 ### B10a. Linear and Rollbar
 

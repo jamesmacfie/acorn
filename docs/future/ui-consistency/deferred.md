@@ -492,6 +492,55 @@ dialog on `Modal`.
 - **The Memory page hung the window once.** The first visit in a fresh session timed out a screenshot
   and the window went down. The second visit, after a relaunch, was fine. Not traced.
 
+### B09
+
+- **Not seen in the window.** `pnpm dev:agent` would not start: the node build is 3,063,527 bytes
+  against its 3,062,000-byte ceiling in `apps/node/scripts/check-service-budget.mjs`, on main as well
+  as this branch, so the stage step fails before a window opens. Raising the ceiling was out of scope,
+  so the batch has no before or after shots and no measurements. Every finding was checked by test
+  and against the code. Take the screens in the final sweep, with the seed rebuilt.
+- **09-1.** Both diff columns mount `DiffForPull` in a keyed `Show` over a memo of the route, and the
+  pane's key includes whether the pull is read-only. `PullDetail.test.tsx` and a `PrPane.test.tsx`
+  case fail against the old code. `DiffView.tsx` was unimported and is deleted.
+- **09-2.** `checkStatusWord` and `checksSummary` live beside `checkStatusTone` and are exported on
+  `@acorn/plugin-api/client`, because GitHub reads its helpers there. `startup_failure` joined the
+  failed set, and `requested`, `waiting`, and `expected` joined the running set, so the dot and the
+  word agree. `checksSummary` also says "{n} checks need action" for `action_required`, which the
+  plan's list did not have. A review's verdict is the colour of its card's stripe (09-17c) and the
+  byline verb is plain muted text; a separate state badge would repeat the verb.
+- **09-3.** The table lives in `client/actionErrors.ts`, which the model and `DiffForPull` share. A
+  message that is GitHub's own prose is kept. Unresolving a thread says "Couldn't unresolve the
+  thread." About 20 other client files print a route's `error.message` as-is and have the same
+  problem, mostly in agents, plus changes, docker, memory, and notes. Not fixed here.
+- **09-4.** The blocked state keeps **Enable auto-merge (squash)** at outline, as the plan held it.
+  With auto-merge on, **Turn off auto-merge** sits beside "Merges on its own when checks pass." In
+  the terminal, **Merge** is the first stop in Details and the method `Select` the second, and four
+  terminal tests changed to match.
+- **09-7.** The row's styled tip is the full title with its age under it, rather than the full date,
+  because the title is what the row truncates and a row with a tip drops its native `title`. The row
+  tips on this virtual list were not judged for flashing. The header count shows on the Open tab
+  only, because the Closed list arrives a page at a time.
+- **09-8.** The no-project and no-remote states show in the detail only; the list region stays empty
+  beside them. The loading mark (`Acorn`) stays for the first paint. The branch pickers say "Loading
+  branches…" and "Couldn't load branches." through `emptyText`, the way the label and reviewer
+  pickers already do, because `Picker status` draws above an empty list's own line and would say
+  both.
+- **09-9.** `Link` gained an optional `tip` on both hosts, with its 80 by 24 sentence. The terminal
+  draws nothing for it. No `props.test-d.ts` line, because the prop is a plain string rather than a
+  role token.
+- **09-11.** `reviewDecision` lives in `pullDetail/model.ts` beside `reviewAction`, so it is tested as
+  a pure function, and the model exposes it as a memo.
+- **09-12.** The chord is the description field's string `hint` ("⌘↵ to create"), because `Field`
+  takes no element there. **Cancel** returns to the pull list with nothing selected.
+- **09-13.** The card and its title draw only when the importer draws its own close control. In the
+  first-run wizard, which passes `showClose={false}`, the wizard is the frame. "Added as" comes from
+  the projects query, matched on owner and name without case, so the per-visit marker is gone.
+- **09-15.** The number leaves the title whenever the strip has more than one tab. The terminal does
+  not draw the strip, so there a task with related pulls loses the number on its heading.
+- **Pre-existing reds seen.** `client-core` `host/frames/scopes.test.ts` fails on
+  `projectWorktreesRoute`, which main's "create a task on an existing git worktree" commit added
+  without a frame scope. The terminal suite's 13 worker reds are the known Node 24.11 ones.
+
 ## Notes for later sessions
 
 - **Uncommitted file moves.** B01 renamed `features/workspaces/onboarding.css` to `projects.css`, and B05

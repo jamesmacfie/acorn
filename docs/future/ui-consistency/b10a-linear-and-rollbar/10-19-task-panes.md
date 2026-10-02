@@ -34,8 +34,9 @@ The partial fix. Rollbar titles in the task pane need a batch title read, and ar
 | `rollbar/src/tree/app.tsx:143` | Could not read this task. | Rewrite | Couldn't load this task. |
 | `rollbar/src/tree/app.tsx:172` | Linked Rollbar items | Rewrite | Linked Rollbar errors |
 
-GitHub's row menu uses the same two-registration pattern in
-[09-14](../b09-github/09-14-one-name-each.md).
+GitHub's row menu uses the same two-registration pattern, shipped in B09:
+`plugins/github/src/client/PullList.tsx`, the `github.pull.create-task` and `github.pull.open-task`
+items.
 
 ## Risk and checks
 
