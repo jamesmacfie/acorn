@@ -59,9 +59,8 @@ export default function AgentComposer(props: {
   disabled?: boolean
   /** Startup keeps the draft editable, but cannot accept a turn until metadata and defaults settle. */
   submitDisabled?: boolean
-  /** Whether this composer answers the one-shot focus request below. Off for every surface but the one
-   *  a session is started from: the request is consumed once, so two visible composers would take the
-   *  caret by whichever effect ran first. */
+  /** Focus on navigation and answer explicit session selections. Only the Agent pane opts in,
+   *  so another composer showing the same session cannot take its caret. */
   autoFocus?: boolean
   previousAutomaticContext?: AgentContextSnapshot
   /** Desktop controls for the transcript above, drawn beside the config selects. The terminal uses
@@ -161,12 +160,21 @@ export default function AgentComposer(props: {
     ].join(':')
   })
 
-  // A session started from the header, the provider cards or the palette hands the caret straight to
-  // the draft, so the first thing you do with a new agent is type at it (managedSelection.ts).
+  // Navigation mounts a composer or changes its session. A selection request also covers clicking
+  // the session already on screen. Session metadata and streamed events must not move the caret.
   let field: HTMLTextAreaElement | undefined
+  let focusedSessionId: string | undefined
   createEffect(() => {
-    if (!props.autoFocus || !consumeComposerFocus(composerSessionId())) return
-    queueMicrotask(() => field?.focus())
+    if (!props.autoFocus) { focusedSessionId = undefined; return }
+    const id = composerSessionId()
+    const requested = consumeComposerFocus(id)
+    if (focusedSessionId === id && !requested) return
+    focusedSessionId = id
+    const target = field
+    queueMicrotask(() => {
+      if (target?.isConnected && !target.disabled && props.autoFocus && composerSessionId() === id)
+        target.focus({ preventScroll: true })
+    })
   })
 
   // Two halves, because they have two owners. This composer's view state resets on every mount that

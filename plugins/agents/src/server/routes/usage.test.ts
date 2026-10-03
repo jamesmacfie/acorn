@@ -265,6 +265,7 @@ describe('agent usage routes', () => {
       )
       expect(pinned.status).toBe(200)
       expect(await (await app.fetch(request('/api/agents/session-defaults'), env)).json()).toEqual({
+        ...defaultAgentSessionDefaults(),
         continueAfterUsageLimit: true,
         stopIdleAfterMinutes: 30,
         keepArchivedHistoryDays: 0,
@@ -273,6 +274,13 @@ describe('agent usage routes', () => {
         pinned: { codex: { model: 'gpt-5.1-codex-max' } },
         last: { codex: { reasoning: 'high' } },
       })
+
+      const spawned = { mode: 'explicit', profileId: 'codex', pinned: { codex: { reasoning: 'high' } } }
+      expect((await app.fetch(request('/api/agents/session-defaults', 'PUT', { spawned }), env)).status).toBe(200)
+      const saved = await (await app.fetch(request('/api/agents/session-defaults'), env)).json() as AgentSessionDefaults
+      expect(saved.spawned).toEqual(spawned)
+      expect(saved.pinned).toEqual({ codex: { model: 'gpt-5.1-codex-max' } })
+      expect(saved.last).toEqual({ codex: { reasoning: 'high' } })
 
       // A value that is not a string is refused, and nothing stored moves.
       const refused = await app.fetch(

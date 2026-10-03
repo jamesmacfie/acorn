@@ -8,6 +8,7 @@ import type { ManagedAgentRuntime } from '../sessions/runtime'
 import { AgentDelegationStore } from './store'
 import { AgentDelegationService } from './service'
 import type { CustomAgent } from '../../shared/customAgents'
+import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../shared/sessionDefaults'
 
 const PROVIDER: AgentProviderDescriptor = {
   id: 'codex',
@@ -24,6 +25,7 @@ const PROVIDER: AgentProviderDescriptor = {
   skills: [],
   diagnostics: [],
 }
+const CLAUDE = { ...PROVIDER, id: 'claude', profileId: 'claude-code', label: 'Claude Code' }
 
 const terminal = (id: string, taskId: string): TerminalSession => ({
   id,
@@ -51,6 +53,7 @@ describe('agent delegation service', () => {
   let terminals: TerminalSession[]
   let runtime: ManagedAgentRuntime
   let customAgents: CustomAgent[]
+  let defaults: SpawnedAgentDefaults
   let childTasks: Map<string, { parentTaskId: string; title: string; branch: string }>
   let createChildTask: ReturnType<typeof vi.fn<(
     parentTaskId: string,
@@ -78,11 +81,14 @@ describe('agent delegation service', () => {
       return intendedChildId
     })
     customAgents = []
+    defaults = defaultSpawnedAgentDefaults()
     runtime = {
       store: sessions,
-      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER].find(pick),
+      usableProvider: async (pick: (provider: typeof PROVIDER) => boolean) => [PROVIDER, CLAUDE].find(pick),
+      spawnedAgentDefaults: async () => defaults,
       customAgents: async () => customAgents,
-      acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) => sessions.createSession(input, PROVIDER)),
+      acceptSession: vi.fn(async (input: Parameters<ManagedAgentRuntime['acceptSession']>[0]) =>
+        sessions.createSession(input, input.providerId === 'claude' ? CLAUDE : PROVIDER)),
       enqueueTurn: vi.fn(async (sessionId: string, input: Parameters<ManagedAgentRuntime['enqueueTurn']>[1]) =>
         (await sessions.enqueueTurn(sessionId, input)).turn),
       applyRequestedConfig: vi.fn(async () => undefined),
@@ -179,7 +185,52 @@ describe('agent delegation service', () => {
     expect((await sessions.turn(first.turnId!))?.source).toBe('delegation')
   })
 
+  it.each(['shared', 'worktree'] as const)('inherits the parent model and effort for %s children without inheriting permission or mode', async (isolation) => {
+    const parent = await managedCaller(undefined, { configOptions: [
+      { id: 'model', category: 'model', currentValue: 'parent-model' },
+      { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
+      { id: 'permissions', category: 'permission', currentValue: 'full' },
+      { id: 'mode', category: 'mode', currentValue: 'plan' },
+    ] })
+    const result = await service.spawn({ title: 'Inherited child', prompt: 'Inspect.', isolation }, context(parent.taskId, parent.id))
+    const child = await sessions.requireSession(result.sessionId!)
+    expect(child.profileId).toBe('codex')
+    expect(child.config.requestedConfigOptions).toEqual({ model: 'parent-model', reasoning: 'high' })
+    expect((await sessions.turn(result.turnId!))?.effectivePolicy.configOptions)
+      .toEqual({ model: 'parent-model', reasoning: 'high' })
+  })
+
+  it('uses saved explicit harness options, and lets each spawn override both harness and options', async () => {
+    defaults = { mode: 'explicit', profileId: 'claude-code', pinned: {
+      claude: { model: 'opus', effort: 'high' }, codex: { model: 'saved-codex', reasoning: 'medium' },
+    } }
+    const parent = await managedCaller()
+    const saved = await service.spawn({ title: 'Saved defaults', prompt: 'Inspect.', isolation: 'worktree' }, context(parent.taskId, parent.id, 'saved'))
+    const child = await sessions.requireSession(saved.sessionId!)
+    expect(child.profileId).toBe('claude-code')
+    expect(child.config.requestedConfigOptions).toEqual({ model: 'opus', effort: 'high' })
+
+    const requested = await service.spawn({ title: 'Override', prompt: 'Inspect.', isolation: 'shared',
+      profileId: 'codex', configOptions: { model: 'requested-codex', reasoning: 'high' },
+    }, context(parent.taskId, parent.id, 'override'))
+    const override = await sessions.requireSession(requested.sessionId!)
+    expect(override.profileId).toBe('codex')
+    expect(override.config.requestedConfigOptions).toEqual({ model: 'requested-codex', reasoning: 'high' })
+  })
+
+  it('does not carry provider-specific parent options into another harness', async () => {
+    const parent = await managedCaller(undefined, { configOptions: [
+      { id: 'model', category: 'model', currentValue: 'codex-only' },
+      { id: 'reasoning', category: 'reasoning', currentValue: 'high' },
+    ] })
+    const result = await service.spawn({ title: 'Another harness', prompt: 'Inspect.', isolation: 'shared',
+      profileId: 'claude-code', configOptions: { model: 'opus' },
+    }, context(parent.taskId, parent.id))
+    expect((await sessions.requireSession(result.sessionId!)).config.requestedConfigOptions).toEqual({ model: 'opus' })
+  })
+
   it('starts a custom agent by name, with its options and a ceiling no wider than its own', async () => {
+    defaults = { mode: 'explicit', profileId: 'claude-code', pinned: { codex: { model: 'saved-model', reasoning: 'low' } } }
     customAgents = [{
       id: 'agent-1', name: 'Bug reviewer', providerId: 'codex', profileId: 'codex',
       options: { reasoning: 'high', model: 'gpt-codex' }, maxToolRisk: 'read', source: { kind: 'user' },

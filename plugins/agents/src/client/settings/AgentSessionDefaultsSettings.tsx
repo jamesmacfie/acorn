@@ -24,6 +24,7 @@ import {
   saveAgentToolFoldMode,
 } from '../sessions/toolFoldPrefs'
 import { saveStartupContextInjection, startupContextInjection } from './startupContext'
+import SpawnedAgentDefaultsSettings from './SpawnedAgentDefaultsSettings'
 
 /** The line under a harness's name: its version and sign-in, or why it is missing. The row's badge says
  *  whether it is installed. */
@@ -253,6 +254,9 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
           )}
         </For>
       </Show>
+
+      <SpawnedAgentDefaultsSettings value={record().spawned} providers={providers() ?? []}
+        advertised={advertised()} onSave={(spawned) => save({ spawned })} />
 
       <SettingsSection id="inline" label="Inline diff chats">
         <SettingRow label="Provider" error={inlineProviderSave.error()}>

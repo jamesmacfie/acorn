@@ -116,6 +116,7 @@ export const agentsClientPlugin: ClientPlugin = {
         // use for it would miss, so the section names them and search lands on the switch's section.
         { id: 'new-sessions', label: 'New sessions', rows: ["Carry my last session's settings forward", 'Send task context at startup', 'MCP servers'], keywords: ['startup context', 'task context'] },
         { id: 'inline', label: 'Inline diff chats', rows: ['Provider'] },
+        { id: 'spawned', label: 'Spawned agents', rows: ['Spawn settings', 'Spawned agent harness'], keywords: ['subtasks', 'subagents', 'inherit', 'model', 'effort', 'reasoning'] },
         { id: 'transcript', label: 'Transcript', rows: ['Tool call display'], keywords: ['tool output'] },
       ],
       component: AgentSessionDefaultsSettings,

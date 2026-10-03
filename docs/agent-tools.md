@@ -250,9 +250,25 @@ An agent learns how to use these tools only from their descriptions and the `des
 field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
 below changes, change that text too.
 
+Settings > Agents > Harnesses and defaults > Spawned agents controls the defaults for shared-task
+and worktree spawns. Inherit from parent copies the parent's harness and its live model and reasoning
+options at spawn time. Use explicit defaults selects a harness and separate model and effort choices.
+An omitted explicit harness means the parent's harness. Changing these settings affects future spawns.
+
+The parent can override the harness with `profileId` and model and effort with `configOptions`.
+For example, `{ profileId: 'codex', configOptions: { model: '<model id>', reasoning: 'high' } }`
+selects all three for one child. Option IDs belong to the provider; use the IDs it advertises.
+The precedence is spawn-call choices, then custom-agent choices, then the configured spawn defaults.
+Inheritance copies model and reasoning only, leaving permissions and collaboration mode to their
+separate policies. It does not copy provider-specific options when the spawn selects another harness.
+A terminal-drawer parent has no live managed model metadata, so inheritance supplies its harness only.
+In those cases the child's provider selects unspecified model and effort values.
+Resolved worktree settings are recorded in the provisioning ledger, so restart recovery retains the
+choices made at spawn time. Unsupported option values produce a warning in the child's transcript.
+
 `agent_spawn` can start a custom agent by passing its name or id as `agent`
 ([managed-agents.md](./managed-agents.md) § Custom agents). The agent picks the harness, so naming a
-different `profileId` beside it is refused. The agent's options apply first and the call's
+different `profileId` beside it is refused. The agent's options override the spawn defaults and the call's
 `configOptions` go on top, and its tool ceiling narrows between the caller's and the call's own. The
 child's system prompt gets the agent's instructions the same way an interactive session does.
 

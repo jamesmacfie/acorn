@@ -31,6 +31,7 @@ import {
   type AgentSpawn,
 } from './store'
 import { WorktreeProvisioning, type WorktreeTaskService } from './worktreeProvisioning'
+import { spawnConfigOptions, spawnProfileId } from './spawnConfiguration'
 
 type Caller = {
   taskId: string
@@ -295,7 +296,8 @@ export class AgentDelegationService {
       return spawnResult(replay)
     }
     const custom = await this.customAgentFor(input)
-    const profileId = custom?.profileId ?? input.profileId ?? caller.profileId
+    const defaults = await this.runtime.spawnedAgentDefaults()
+    const profileId = spawnProfileId(defaults, caller.profileId, input.profileId, custom)
     const provider = await this.runtime.usableProvider((candidate) => candidate.profileId === profileId)
     if (!provider) throw new ToolError('bad_request', `Profile '${profileId}' does not support managed sessions.`)
     if (!provider.installed || provider.authenticated === false) {
@@ -306,9 +308,9 @@ export class AgentDelegationService {
       custom?.maxToolRisk ? delegatedToolCeiling(context.toolCeiling, { maxRisk: custom.maxToolRisk }) : context.toolCeiling,
       input.toolCeiling,
     )
-    // The agent's options first, so a value the caller names for this one child wins.
-    const configOptions = custom ? { ...custom.options, ...input.configOptions } : input.configOptions
-    if (configOptions) input = { ...input, configOptions }
+    // Resolve before reserving the worktree so retries keep the same model and effort snapshot.
+    const configOptions = spawnConfigOptions(defaults, provider.id, caller.managedSession, input.configOptions, custom)
+    if (Object.keys(configOptions).length) input = { ...input, configOptions }
     let reserved: ReturnType<AgentDelegationStore['reserveShared']>
     try {
       reserved = input.isolation === 'worktree'

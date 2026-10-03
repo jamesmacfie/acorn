@@ -21,6 +21,9 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { writeAgentConcurrency } from '../concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
+import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
+import { AgentDelegationService } from '../delegation/service'
+import { AgentDelegationStore } from '../delegation/store'
 import { saveCustomAgent } from '../customAgents'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 
@@ -1998,7 +2001,7 @@ describe('managed agent runtime conformance', () => {
     },
   ]
 
-  const defaultsRuntime = (owner: string) => new ManagedAgentRuntime({
+  const defaultsRuntime = (owner: string, driver: () => AgentDriver = () => new FakeAgentDriver()) => new ManagedAgentRuntime({
     db: pluginDb.db,
     dataDir,
     core,
@@ -2007,7 +2010,7 @@ describe('managed agent runtime conformance', () => {
     currentUserId: () => owner,
     registry: (() => {
       const registry = new AgentDriverRegistry()
-      registry.registerNative('fake', () => new FakeAgentDriver())
+      registry.registerNative('fake', driver)
       return registry
     })(),
   })
@@ -2016,6 +2019,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const owner = 'owner-defaults'
     await writeAgentSessionDefaults(core.prefs, owner, {
+      ...defaultAgentSessionDefaults(),
       continueAfterUsageLimit: true,
       stopIdleAfterMinutes: 30,
       keepArchivedHistoryDays: 0,
@@ -2046,6 +2050,49 @@ describe('managed agent runtime conformance', () => {
       .toBeGreaterThan(startupEvents.findIndex((record) =>
         record.event.type === 'diagnostic' && record.event.message === 'Model changed to Opus 5'))
     // Applying a stored default is not the owner switching anything.
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
+  })
+
+  it('applies a spawned child’s resolved settings before its first turn without changing ordinary session defaults', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-spawn-defaults'
+    await writeAgentSessionDefaults(core.prefs, owner, {
+      ...defaultAgentSessionDefaults(),
+      spawned: { mode: 'explicit', profileId: 'fake', pinned: { fake: { model: 'opus', reasoning: 'high' } } },
+    })
+    const sentSettings: Record<string, string>[] = []
+    class AdvertisingDriver extends FakeAgentDriver {
+      override async start(options: AgentDriverStartOptions) {
+        let configOptions = advertised()
+        await options.onEvent({ type: 'session_metadata', configOptions })
+        const handle = await super.start(options)
+        return { ...handle,
+          async setConfig(id: string, value: string) {
+            configOptions = configOptions.map((option) => option.id === id ? { ...option, currentValue: value } : option)
+            return configOptions
+          },
+          async sendTurn(input: Parameters<typeof handle.sendTurn>[0]) {
+            sentSettings.push(Object.fromEntries(configOptions.map((option) => [option.id, option.currentValue])))
+            return handle.sendTurn(input)
+          },
+        }
+      }
+    }
+    runtime = defaultsRuntime(owner, () => new AdvertisingDriver())
+    const parent = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake',
+      kind: 'interactive', config: { configOptions: advertised() } })
+    const delegation = new AgentDelegationService(runtime, new AgentDelegationStore(pluginDb.db), async () => [])
+    const spawned = await delegation.spawn({ title: 'Child', prompt: 'Inspect.', isolation: 'shared' }, {
+      taskId: seed.taskId, sessionId: parent.id, callId: 'spawn-settings', userLogin: owner,
+    })
+    await vi.waitFor(async () => expect((await runtime!.store.turn(spawned.turnId!))?.status).toBe('completed'))
+    const child = await runtime.store.requireSession(spawned.sessionId!)
+    const options = child.config.configOptions as Array<{ id: string; currentValue: string }>
+    expect(options.find((option) => option.id === 'model')?.currentValue).toBe('opus')
+    expect(options.find((option) => option.id === 'reasoning')?.currentValue).toBe('high')
+    expect(sentSettings).toEqual([{ model: 'opus', reasoning: 'high', mode: 'default' }])
+    expect((await runtime.store.turn(spawned.turnId!))?.effectivePolicy.configOptions)
+      .toEqual({ model: 'opus', reasoning: 'high' })
     expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
   })
 
@@ -2108,6 +2155,7 @@ describe('managed agent runtime conformance', () => {
     const seed = await seedTask(testDb, dataDir)
     const owner = 'owner-custom-agent'
     await writeAgentSessionDefaults(core.prefs, owner, {
+      ...defaultAgentSessionDefaults(),
       continueAfterUsageLimit: true,
       stopIdleAfterMinutes: 30,
       keepArchivedHistoryDays: 0,

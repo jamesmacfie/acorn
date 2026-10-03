@@ -40,6 +40,7 @@ export function selectManagedSession(taskId: string, sessionId: string): void {
     agentTelemetry.startRenderTransition('agents.session.select')
   }
   setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
+  requestComposerFocus(sessionId)
 }
 
 export function clearManagedSession(taskId: string, expectedSessionId?: string): void {
@@ -105,10 +106,8 @@ export function activateManagedAgentPaneIntents(): () => void {
   })
 }
 
-// A session you just started is a session you are about to type into, so the composer takes the
-// caret the moment it appears. One-shot and keyed by session: the composer is not remounted when you
-// switch sessions, so a plain "focus on mount" would miss the second session you start and steal the
-// caret when you step back out of a subagent's transcript.
+// Selecting a session hands the caret to its composer, including selecting the session already on
+// screen. One-shot and keyed by session, so later metadata updates do not replay the request.
 const [pendingComposerFocus, setPendingComposerFocus] = createSignal<string>()
 
 export function requestComposerFocus(sessionId: string): void {

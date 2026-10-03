@@ -39,6 +39,7 @@ describe('optionsWithDefaults', () => {
 describe('stored defaults', () => {
   it('reads the last values while following, and the pinned ones otherwise', () => {
     const record = {
+      ...defaultAgentSessionDefaults(),
       continueAfterUsageLimit: true,
       stopIdleAfterMinutes: 30,
       keepArchivedHistoryDays: 0,
@@ -54,7 +55,7 @@ describe('stored defaults', () => {
 
   it('merges a remembered change into the provider it came from', () => {
     const record = rememberAgentDefaults(
-      { continueAfterUsageLimit: true, stopIdleAfterMinutes: 30, keepArchivedHistoryDays: 0, followLastSession: true, pinned: {}, last: { codex: { model: 'a', reasoning: 'low' } }, inline: { providerId: null, pinned: {} } },
+      { ...defaultAgentSessionDefaults(), last: { codex: { model: 'a', reasoning: 'low' } } },
       'codex',
       { reasoning: 'high' },
     )
@@ -69,7 +70,7 @@ describe('stored defaults', () => {
 
   it('fills the fields a write left out', () => {
     expect(parseAgentSessionDefaults('{"followLastSession":false}'))
-      .toEqual({ continueAfterUsageLimit: true, stopIdleAfterMinutes: 30, keepArchivedHistoryDays: 0, followLastSession: false, pinned: {}, last: {}, inline: { providerId: null, pinned: {} } })
+      .toEqual({ ...defaultAgentSessionDefaults(), followLastSession: false })
   })
 
   it('refuses a value that is not a string, and an over-long id', () => {
@@ -87,5 +88,23 @@ describe('stored defaults', () => {
   it('drops an empty choice rather than storing it as a value', () => {
     const result = validateAgentSessionDefaults({ pinned: { codex: { model: '' } } })
     expect(result.ok && result.value.pinned).toEqual({})
+  })
+
+  it('upgrades an earlier saved row with parent inheritance without losing its ordinary defaults', () => {
+    const saved = parseAgentSessionDefaults(JSON.stringify({
+      followLastSession: false, pinned: { codex: { reasoning: 'high' } },
+    }))
+    expect(saved.spawned).toEqual({ mode: 'inherit', profileId: null, pinned: {} })
+    expect(saved.pinned).toEqual({ codex: { reasoning: 'high' } })
+  })
+
+  it('accepts independent spawn defaults and refuses malformed or unbounded choices', () => {
+    const spawned = { mode: 'explicit', profileId: 'claude-code', pinned: { claude: { model: 'opus', effort: 'high' } } }
+    expect(validateAgentSessionDefaults({ spawned })).toEqual({ ok: true, value: { spawned } })
+    for (const invalid of [
+      [], { ...spawned, mode: 'last' }, { ...spawned, profileId: 1 },
+      { ...spawned, pinned: { claude: { model: 1 } } },
+      { ...spawned, pinned: { claude: { model: 'x'.repeat(501) } } },
+    ]) expect(validateAgentSessionDefaults({ spawned: invalid }).ok).toBe(false)
   })
 })

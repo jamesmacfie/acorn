@@ -886,7 +886,7 @@ when a session starts, so a default is a value keyed by the provider id and the 
 from. A harness added later is defaultable the moment it advertises anything, and a new kind of
 option, a fast mode say, needs no change on the acorn side to be remembered.
 
-One `prefs` row (`agents:session-defaults:v1`) holds seven fields. `followLastSession`, on by
+One `prefs` row (`agents:session-defaults:v1`) holds the ordinary, inline, and spawned-session defaults. `followLastSession`, on by
 default, decides which of `last` and `pinned` applies. `last` is written by the runtime whenever a session's
 option changes, and `pinned` is written by the owner under Settings > Harnesses and defaults. Neither writer
 sends the other's field, and the write merges server-side, so the Settings page cannot flatten a
@@ -906,6 +906,17 @@ holds **Send task context at startup**, core's `startup_context_injection` prefe
 whether an agent started in the terminal drawer is sent the task's pull request, linked issues, and
 notes. It moved from the Terminal page because it is part of what a session starts with. It also
 holds **Tool call display**, which is this device's and carries a **This device** chip.
+
+The **Spawned agents** section has separate defaults for agents created through `agent_spawn`,
+including child tasks with worktree isolation. **Inherit from parent** copies the parent's harness,
+model, and reasoning effort at spawn time. **Use explicit defaults** stores a harness and model and
+effort options per provider in the preference's `spawned` field. The built-in choice is inheritance,
+including when reading a preference written before this field existed.
+Spawn-call overrides take precedence over custom-agent options, which take precedence over these
+defaults. Model and effort inheritance applies within the same provider; a harness override or a
+terminal-drawer parent leaves unspecified options to the child's provider. Permission and mode
+options are not inherited. The spawn contract and recovery rules belong to
+[agent tools](./agent-tools.md#managed-session-orchestration).
 
 Both halves hang off `ManagedAgentRuntime`, which is where every path that opens a session and every
 path that changes one already meets:

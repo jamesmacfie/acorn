@@ -292,8 +292,8 @@ export default function AgentPaneDetail(props: { task: Task; model: AgentPaneMod
       <Show when={model.error()}>{(message) => <Alert>{message()}</Alert>}</Show>
       {/* The transcript, the queue and the composer, addressed by session id alone
           (./AgentConversation.tsx). The run pane draws the same three through a capability, so a
-          session reads the same way wherever you found it. `autoFocus` is this pane's: a session
-          started here is one you are about to type into. */}
+          session reads the same way wherever you found it. This pane focuses the composer whenever
+          the reader navigates to a session or returns to its task. */}
       {/* An archived task opens read-only in the archive page's preview. Its transcripts are all still
           here, but it has no worktree to start or continue a session in, so there is nothing to type
           into and no new session to offer. */}

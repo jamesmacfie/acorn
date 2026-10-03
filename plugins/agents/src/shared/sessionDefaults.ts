@@ -12,6 +12,17 @@ export const agentSessionDefaultsPreferenceKey = 'agents:session-defaults:v1'
 /** providerId to optionId to the value that option is set to. */
 export type AgentDefaultValues = Record<string, Record<string, string>>
 
+export type SpawnedAgentDefaults = {
+  mode: 'inherit' | 'explicit'
+  /** A harness profile, independent of the provider id used to key its options. */
+  profileId: string | null
+  pinned: AgentDefaultValues
+}
+
+export const defaultSpawnedAgentDefaults = (): SpawnedAgentDefaults => ({
+  mode: 'inherit', profileId: null, pinned: {},
+})
+
 /**
  * "Stop idle agents after", in minutes, where 0 is Never. A closed list rather than a number field,
  * because each choice is a label the transcript repeats when it stops a session.
@@ -52,6 +63,8 @@ export type AgentSessionDefaults = {
   last: AgentDefaultValues
   /** Choices for sessions opened from a diff line, independent of ordinary sessions. */
   inline: { providerId: string | null; pinned: AgentDefaultValues }
+  /** Separate choices for agent_spawn, including agents in child task worktrees. */
+  spawned: SpawnedAgentDefaults
 }
 
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
@@ -65,6 +78,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   pinned: {},
   last: {},
   inline: { providerId: null, pinned: {} },
+  spawned: defaultSpawnedAgentDefaults(),
 })
 
 // The client is the less-trusted side and this decides which model a provider child runs, so the
@@ -148,6 +162,23 @@ export function validateAgentSessionDefaults(
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
   const inlineRecord = record.inline
+  let spawned: SpawnedAgentDefaults | undefined
+  if (record.spawned != null) {
+    if (typeof record.spawned !== 'object' || Array.isArray(record.spawned)) errors.push('spawned must be an object.')
+    else {
+      const fields = record.spawned as Record<string, unknown>
+      if (fields.mode !== 'inherit' && fields.mode !== 'explicit') errors.push('spawned.mode must be inherit or explicit.')
+      if (fields.profileId != null && (typeof fields.profileId !== 'string' || fields.profileId.length > MAX_ID)) {
+        errors.push('spawned.profileId must be a harness profile id.')
+      }
+      const pinnedSpawned = values(fields.pinned, 'spawned.pinned', errors)
+      if (pinnedSpawned && (fields.mode === 'inherit' || fields.mode === 'explicit')) spawned = {
+        mode: fields.mode,
+        profileId: typeof fields.profileId === 'string' && fields.profileId ? fields.profileId : null,
+        pinned: pinnedSpawned,
+      }
+    }
+  }
   let inline: AgentSessionDefaults['inline'] | undefined
   if (inlineRecord != null) {
     if (typeof inlineRecord !== 'object' || Array.isArray(inlineRecord)) errors.push('inline must be an object.')
@@ -176,6 +207,7 @@ export function validateAgentSessionDefaults(
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
       ...(inline ? { inline } : {}),
+      ...(spawned ? { spawned } : {}),
     },
   }
 }
