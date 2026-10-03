@@ -1,5 +1,7 @@
+import { recordSetupDecision } from '../../taskScripts/setup'
 import { Hono } from 'hono'
 import { z } from 'zod'
+import type { TeardownResult } from '../../storage/archive'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
 import { archiveTask, restoreTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
@@ -26,7 +28,7 @@ export type TaskSessionsBridge = {
   runningCount(taskId: string): number
   killRunning(taskId: string): void
   dropTaskSessions(taskId: string): Promise<void>
-  runTeardown(script: string, cwd: string, env: Record<string, string>, taskId: string): Promise<{ exitCode: number | null; output: string }>
+  runTeardown(script: string, cwd: string, env: Record<string, string>, taskId: string, attempt?: { attemptId: string; generation: number }): Promise<TeardownResult>
 }
 
 export const TASK_SESSIONS = routeCapability<TaskSessionsBridge>('terminal.taskSessionsRoute')
@@ -132,6 +134,7 @@ export const worktree = new Hono<AppEnv>()
     if (!task) return c.json({ ok: true })
     // Best-effort and independent of worktree setup: seeds PR/ticket context into curatable notes.
     await routeCapabilityFor(c, TASK_CREATED)?.(taskId).catch((error) => log.warn(`task-created hook failed: ${describeError(error).message}`))
+    await recordSetupDecision(db, taskId)
     const project = await projectForTask(db, task)
     if (!project || !task.branch || !project.path) return c.json({ ok: true })
     const { script, trigger } = await projectSetup(db, project.id)

@@ -58,7 +58,8 @@ function fixture(tmux: boolean, failInsert = false, realDatabase = false) {
   }
   const real = realDatabase ? makeTestPluginDb('terminal') : null
   if (real) { real.db.$client.pragma('query_only = ON'); databaseCleanup = real.cleanup }
-  const core = { tasks: { load: async () => ({ id: 'synthetic', projectId: null }), resolveCwd: async () => ({ cwd: state.dir, isWorktree: false }) }, projects: {}, proc: {}, git: {} }
+  const core = {
+    taskScripts: { takeSetup: () => null, report: () => {}, forSession: () => null, reconcile: () => {} }, tasks: { load: async () => ({ id: 'synthetic', projectId: null }), resolveCwd: async () => ({ cwd: state.dir, isWorktree: false }) }, projects: {}, proc: {}, git: {} }
   let rosterEvents = 0
   const { terminal } = registerTerminalChannel((real?.db ?? db) as never, core as never, {
     internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {},

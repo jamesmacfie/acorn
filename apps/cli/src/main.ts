@@ -1,6 +1,6 @@
 import { parseCliArgs, helpFor } from './args'
 import { runCommand, validateCommand } from './commands'
-import { reportError } from './error'
+import { CliError, reportError } from './error'
 import { openCliNode } from './node'
 import { writeOutput } from './output'
 import { nodeServiceStatus, startNodeService, stopNodeService } from './supervision/lifecycle'
@@ -16,6 +16,7 @@ export async function main(argv: string[] = process.argv.slice(2)): Promise<numb
     output = args.output
     if ((args.help && !(args.positionals[0] === 'plugin' && args.positionals.length === 3)) || !args.positionals.length) { process.stdout.write(helpFor(args.positionals)); return 0 }
     validateCommand(args)
+    if ((process.env.ACORN_TASK_ID || process.env.ACORN_API_TOKEN) && !(args.positionals[0] === 'task' && args.positionals[1] === 'scripts')) throw new CliError('task_scope', 'Task launch credentials permit task scripts commands only; run other CLI commands outside this session.', 4)
     if (args.positionals[0] === 'node' && args.positionals[1] !== 'info') {
       const verb = args.positionals[1]
       const result = verb === 'start' ? await startNodeService()

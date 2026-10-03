@@ -454,3 +454,23 @@ event so a missed frame or retention deletion self-heals on re-read.
 The user's preview pane and the agent's browser are two surfaces on purpose. The shell's child
 webview is view-only for the person, covered by host-owned webviews in [the shell doc](./shell.md),
 and when the agent needs to see what the user sees, it points its own browser at the same tunnel URL.
+
+## Task script tools
+
+Core registers three read-tier tools, scoped to the authenticated task:
+
+- `task_scripts_status {}` returns both current phases and bounded attempt summaries.
+- `task_scripts_wait { phase, timeoutMs, attemptId? }` waits at most 30,000 ms for the selected
+  attempt and generation. Timeout returns `matched: false`; it does not cancel the process.
+- `task_scripts_logs { phase, tailLines, maxBytes?, attemptId? }` returns bounded diagnostic output
+  and explicit availability/truncation metadata (100 lines by default).
+
+`phase` is `setup` or `teardown`. Inputs cannot select another task. All three tools call the
+same service as the Core task API and CLI; none starts setup or creates a worktree. Before work
+that needs installed dependencies, reread setup status and, when it is starting or running,
+wait for that attempt. Confirmed script success does not establish general environment readiness.
+
+`task_current` includes a compact snapshot of both phases. The `task-scripts` context section
+includes the phase states and tool discovery guidance without script bodies or log tails.
+Launch context is a captured snapshot; use the tools for current authority. Older tasks without
+trustworthy history remain `unknown` rather than being inferred successful from an existing root.

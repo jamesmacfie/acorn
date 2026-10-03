@@ -1,3 +1,4 @@
+import { taskScripts } from '../taskScripts/service'
 import { Buffer } from 'node:buffer'
 import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
@@ -204,6 +205,19 @@ export const removeContextSections = (owner: string): void => registry.remove(ow
 export const getContextSections = (): readonly ContextSectionContribution[] => registry.list()
 
 registerContextSection('core', linkedIssuesSection)
+registerContextSection('core', {
+  id: 'task-scripts', order: 5, label: 'Task scripts', defaultIncluded: true,
+  budget: { maxItems: 2, maxBytesPerItem: 256, overflow: 'omit-with-marker' },
+  async assemble({ db, task }) {
+    const status = taskScripts(db).status(task.id)
+    return { items: [status.setup, status.teardown].map(snapshot => ({ id: snapshot.phase, kind: 'task-script',
+      label: `${snapshot.phase}: ${snapshot.state} (${snapshot.reason})`, details: [`generation ${snapshot.generation}; attempt ${snapshot.attemptId ?? 'none'}`] })) }
+  },
+  format(items) {
+    return ['## Task scripts (snapshot)', ...items.map(item => `- ${item.label}; ${item.details?.[0]}`),
+      'Reread task_scripts_status for current authority. Use task_scripts_wait before dependency-dependent work and task_scripts_logs for diagnostics. Reads never start scripts; running setup may still be installing dependencies.'].join('\n')
+  },
+})
 
 export function parseInclude(raw: string | undefined): Set<string> {
   const sections = registry.list()

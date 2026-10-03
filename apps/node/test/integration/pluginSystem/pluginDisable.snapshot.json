@@ -71,6 +71,7 @@
       "run_targets"
     ],
     "sections": [
+      "task-scripts",
       "pr",
       "issues",
       "notes",

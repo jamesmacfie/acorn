@@ -29,6 +29,9 @@ acorn [--node NODE] project rename ID --name NAME|move ID --workspace ID|hide ID
 acorn [--node NODE] project config show ID|set ID --patch-file FILE|-
 acorn [--node NODE] task list [--project ID] [--status active|archived|all]
 acorn [--node NODE] task show ID|create --project ID --title TEXT [--branch NAME] [--base BRANCH] [--skip-setup]
+acorn [--node NODE] task scripts status [TASK_ID] [--output json]
+acorn [--node NODE] task scripts wait [TASK_ID] --phase setup|teardown [--attempt ID] [--timeout 5m] [--check]
+acorn [--node NODE] task scripts logs [TASK_ID] --phase setup|teardown [--attempt ID] [--tail 100] [--max-bytes 32768]
 acorn [--node NODE] agent providers|list [--task ID|--workspace ID]|show ID
 acorn [--node NODE] agent start --task ID --profile ID [--provider ID] --prompt TEXT|--prompt-file FILE|-
 acorn [--node NODE] agent send ID --prompt TEXT|--prompt-file FILE|-
@@ -186,6 +189,35 @@ acorn task create --project "$PROJECT_ID" --title 'Review API' --output json |
   acorn agent wait - --until turn-completed --check --output json
 ```
 
+## Task scripts
+
+```sh
+acorn task scripts status "$TASK_ID" --output json
+acorn task scripts wait "$TASK_ID" --phase setup --timeout 5m --check --output json
+acorn task scripts logs "$TASK_ID" --phase setup --tail 100
+```
+
+These reads never create a worktree or start a script. Text status prints one row per phase; JSON
+includes bounded attempt history. Status returns `TaskScripts`, wait returns
+`TaskScriptWait`, and logs return `TaskScriptLogs` resources. `--attempt ID` selects a retained
+execution for waits/logs; omission selects the current phase and binds the wait to that identity
+and generation. Both phases support the same commands. Logs show when capture is unavailable
+or earlier output was truncated; queries are capped at 1,000 lines and 32 KiB.
+
+Wait composes Node calls of at most 30 seconds under an overall deadline (default five minutes,
+seconds or `s`/`m`/`h`, maximum 24 hours). Timeout exits 5. `--check` exits 6 for failure,
+interruption, unknown history, or no request, while printing the inspectable resource. Confirmed
+exit zero and intentional skips (`user_skipped`, `disabled`, `not_configured`, `not_applicable`)
+are acceptable checked outcomes. Skips preserve their reason; acceptance does not imply installed
+dependencies. Ctrl+C exits 130 and stops only local waiting.
+
+Inside a task-scoped launch, `TASK_ID` may be omitted. The CLI uses `ACORN_TASK_ID`, the task
+`ACORN_API_TOKEN`, expected `ACORN_NODE_ID`, and `NODE_EXTRA_CA_CERTS` from authoritative launch
+context. It verifies the pinned TLS certificate and Node identity before sending the token.
+An explicit different task or Node is rejected. This connection permits only that task's script
+reads and never loads or falls back to device credentials. Other commands are refused in a
+task-scoped launch. Ordinary interactive device CLI behavior is unchanged.
+
 ## Local service
 
 ```sh
@@ -249,7 +281,8 @@ candidate; an installed candidate may be waiting for a restart.
 Text is a tab-separated table. It retains IDs and supports `--no-header`. `--output json` writes
 one JSON object for `show` or one array for `list`, followed by one newline. Resources have
 `apiVersion: "acorn.cli/v1"`, `kind`, and `nodeId` when connected to a Node. Individual resources
-also have an `id`; service status and aggregate list envelopes do not. Documented CLI fields are
+also have an `id`; service status and aggregate list envelopes do not. Task script resources use
+`taskId` or `snapshot.taskId`, with execution identity in `attemptId`. Documented CLI fields are
 projected from the Node response. JSON Lines is available for `agent events`, plugin command
 discovery, and plugin command results.
 Service commands return a `NodeService` state object; a stopped service has null identity
@@ -267,7 +300,7 @@ The [resource schema](../apps/cli/schemas/resources-v1.schema.json) and
 | 3 | Node connection, pairing, authentication, certificate, or protocol failure. |
 | 4 | Missing resource or other domain refusal. |
 | 5 | Lifecycle or wait timeout. |
-| 6 | A failed or canceled checked wait. |
+| 6 | An unsuccessful checked wait, including unknown or unrequested script outcomes. |
 | 7 | An ambiguous mutation or composed write with a partial result. |
 
 ```sh

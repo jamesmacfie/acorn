@@ -1,3 +1,4 @@
+import { TaskScriptDetails } from './TaskScriptDetails'
 import { For, Show, type JSX } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
@@ -199,6 +200,7 @@ export default function TaskPaneHost(props: {
 
       <nav class="pane-switcher" aria-label="Task panes">
         <ExclusiveSlotHost slot="pane.switcher" value={switcherProps()} />
+        <TaskScriptDetails taskId={props.task.id} />
         {props.extraButtons}
         {/* Whole-control busy rather than a marker: while the teardown runs there is no close
             action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable

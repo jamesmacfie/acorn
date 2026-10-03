@@ -49,7 +49,6 @@ export const terminalClientPlugin: ClientPlugin = {
         nodeId: sessionNode()!, sessionId: session.id, taskId: session.taskId,
         title: session.title, running: session.status === 'running', createdAt: session.createdAt,
         agent: session.kind === 'agent', idle: session.idle,
-        settingUp: session.title === 'Setup',
       }]),
       send: (id, text, submit) => terminalApi().send(id, text, submit),
       refresh: refreshSessions,

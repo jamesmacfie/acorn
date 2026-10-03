@@ -2,14 +2,15 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const state = vi.hoisted(() => ({
   ptys: [] as Array<{ data: Set<(s: string) => void>; exits: Set<(e: { exitCode: number }) => void>; kills: number; kill(): void; writes: string[]; throwDispose: boolean }>,
-  systemPrompt: false, spawnArgs: [] as string[][], tmux: false, agent: false, warnThrows: false, aliveTmux: '', failExitRegistration: false, exec: [] as string[][],
+  immediateExit: null as number | null, spawnThrows: false, systemPrompt: false, spawnArgs: [] as string[][], tmux: false, agent: false, warnThrows: false, aliveTmux: '', failExitRegistration: false, exec: [] as string[][],
 }))
 vi.mock('node-pty', () => ({ spawn: (_command: string, args: string[]) => {
+  if (state.spawnThrows) throw Error('spawn unavailable')
   state.spawnArgs.push(args)
   const pty = {
     data: new Set<(s: string) => void>(), exits: new Set<(e: { exitCode: number }) => void>(), kills: 0, writes: [] as string[], throwDispose: false,
     onData(fn: (s: string) => void) { this.data.add(fn); return { dispose: () => { this.data.delete(fn); if (this.throwDispose) throw Error('disposer failed') } } },
-    onExit(fn: (e: { exitCode: number }) => void) { if (state.failExitRegistration) throw Error('exit registration failed'); this.exits.add(fn); return { dispose: () => { this.exits.delete(fn) } } },
+    onExit(fn: (e: { exitCode: number }) => void) { if (state.failExitRegistration) throw Error('exit registration failed'); this.exits.add(fn); if (state.immediateExit !== null) fn({ exitCode: state.immediateExit }); return { dispose: () => { this.exits.delete(fn) } } },
     kill() { this.kills++ }, write(s: string) { this.writes.push(s) }, resize() {}, pause() {}, resume() {},
   }
   state.ptys.push(pty)
@@ -40,6 +41,7 @@ function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Pr
     delete: () => ({ where: async () => { mutations.push('delete'); await options.remove?.(); rows.clear() } }),
   }
   const core = {
+    taskScripts: { takeSetup: () => null, report: vi.fn(), forSession: () => null, reconcile: () => {} },
     tasks: { load: options.load ?? (async () => ({ id: 'task', projectId: options.project ? 'project' : null })), resolveCwd: options.resolveCwd ?? (async () => ({ cwd: '/tmp/fixture', isWorktree: false })), root: options.root ?? (async () => '/tmp/fixture') },
     projects: { byId: options.project ?? (async () => null), setup: async () => ({ trigger: 'off' }) }, proc: {},
     git: { gitText: vi.fn(async () => 'synthetic diff') },
@@ -51,7 +53,7 @@ function fixture(options: { load?: () => Promise<unknown>; resolveCwd?: () => Pr
   })
   return { ...reg, db, core, rows, mutations, events: () => rosterEvents, streams: streams.mock.calls[0][0] }
 }
-afterEach(() => { disposeTerminal(); vi.useRealTimers(); state.ptys.length = 0; state.spawnArgs.length = 0; state.systemPrompt = false; state.exec.length = 0; state.tmux = false; state.agent = false; state.aliveTmux = ''; state.warnThrows = false; state.failExitRegistration = false })
+afterEach(() => { disposeTerminal(); vi.useRealTimers(); state.ptys.length = 0; state.spawnArgs.length = 0; state.systemPrompt = false; state.exec.length = 0; state.tmux = false; state.agent = false; state.aliveTmux = ''; state.warnThrows = false; state.failExitRegistration = false; state.immediateExit = null; state.spawnThrows = false })
 
 it('publishes structure once, retires both reader sinks, and drains callbacks and output timers', async () => {
   vi.useFakeTimers()
@@ -166,7 +168,7 @@ it.each(['remove', 'dispose', 'deadline'] as const)('settles teardown and clears
   if (reason === 'remove') await f.terminal.remove(rows[0]!.id)
   if (reason === 'dispose') disposeTerminal()
   if (reason === 'deadline') vi.advanceTimersByTime(100)
-  expect(await pending).toEqual({ exitCode: null, output: '' })
+  expect(await pending).toEqual({ exitCode: null, output: '', reason: reason === 'deadline' ? 'timeout' : 'cancelled' })
   expect(state.ptys[0]!.kills).toBe(1)
   expect(state.ptys[0]!.exits.size).toBe(0)
   disposeTerminal()
@@ -222,7 +224,7 @@ it('keeps timed-out teardown history honestly exited and restores its output wit
   const pty = state.ptys[0]!
   for (const data of pty.data) data('timeout history')
   vi.advanceTimersByTime(100)
-  expect(await pending).toEqual({ exitCode: null, output: 'timeout history' })
+  expect(await pending).toEqual({ exitCode: null, output: 'timeout history', reason: 'timeout' })
   const rows = await f.terminal.list()
   expect(rows).toHaveLength(1)
   expect(rows[0]).toMatchObject({ status: 'exited', exitCode: null })
@@ -244,7 +246,8 @@ it('preserves fresh tmux work when a rejected metadata operation actually commit
   const db = { insert: () => ({ values: async (row: Record<string, unknown>) => { f.rows.set(row.id as string, row); throw Error('after commit') } }),
     select: () => ({ from: () => ({ where: () => ({ limit: async () => [...f.rows.values()] }) }) }) }
   disposeTerminal()
-  const core = { tasks: { load: async () => ({ id: 'task', projectId: null }), resolveCwd: async () => ({ cwd: '/tmp', isWorktree: false }) }, projects: {}, proc: {}, git: {} }
+  const core = {
+    taskScripts: { takeSetup: () => null, report: () => {}, forSession: () => null, reconcile: () => {} }, tasks: { load: async () => ({ id: 'task', projectId: null }), resolveCwd: async () => ({ cwd: '/tmp', isWorktree: false }) }, projects: {}, proc: {}, git: {} }
   const reg = registerTerminalChannel(db as never, core as never, { internalEnv: () => ({}), launchContext: async () => {}, completed() {}, seedTaskNotes: async () => {}, reconciled: Promise.resolve() })
   await expect(reg.terminal.create({ taskId: 'task' })).rejects.toThrow('after commit')
   expect(f.rows.size).toBe(1)
@@ -340,4 +343,44 @@ it('waits for standing context before spawn and avoids a duplicate idle-edge pus
   await f.terminal.create({ taskId: 'task', command: 'echo fixture' })
   expect(state.spawnArgs[1]).toEqual(['-lc', 'echo fixture'])
   expect(launch).not.toHaveBeenCalled()
+})
+
+const attempt = { attemptId: 'setup-attempt', generation: 2 }
+it('reports process start and an immediate confirmed exit before teardown spawning returns', async () => {
+  state.immediateExit = 0
+  const f = fixture()
+  expect(await f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).toMatchObject({ exitCode: 0 })
+  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toEqual([
+    { type: 'started', terminalSessionId: expect.any(String) }, { type: 'exit', exitCode: 0, signal: undefined },
+  ])
+})
+it('reports output and terminal removal through the attempt evidence seam', async () => {
+  const f = fixture()
+  const pending = f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)
+  await vi.waitFor(() => expect(state.ptys).toHaveLength(1))
+  for (const data of state.ptys[0]!.data) data('diagnostic')
+  const [meta] = await f.terminal.list()
+  await f.terminal.remove(meta!.id)
+  expect(await pending).toMatchObject({ exitCode: null, reason: 'cancelled' })
+  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toContainEqual({ type: 'output', data: 'diagnostic' })
+  expect(f.core.taskScripts.report.mock.calls.map(call => call[1])).toContainEqual({ type: 'interrupted', reason: 'terminal_removed' })
+})
+it('reports a spawn error and timeout distinctly without pretending to observe exit zero', async () => {
+  state.spawnThrows = true
+  const f = fixture()
+  await expect(f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).rejects.toThrow('spawn unavailable')
+  expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'failed', reason: 'spawn_failed' })
+  state.spawnThrows = false; vi.useFakeTimers()
+  const pending = f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)
+  for (let i = 0; i < 12; i++) await Promise.resolve()
+  vi.advanceTimersByTime(100)
+  expect(await pending).toMatchObject({ exitCode: null, reason: 'timeout' })
+  expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'failed', reason: 'timeout' })
+})
+
+it('does not treat a successful tmux attachment exit as confirmed teardown command success', async () => {
+  state.tmux = true; state.immediateExit = 0
+  const f = fixture()
+  expect(await f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).toMatchObject({ exitCode: null })
+  expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'interrupted', reason: 'process_lost' })
 })

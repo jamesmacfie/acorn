@@ -4,7 +4,7 @@ import { randomUUID } from 'node:crypto'
 import { dirname, resolve } from 'node:path'
 import { homedir } from 'node:os'
 import { eq } from 'drizzle-orm'
-import { acornMcp, buildSessionEnv, childEnv, type CoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, interactiveProfile, invalidateWorktreeStatus, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
+import { acornMcp, buildSessionEnv, childEnv, type CompiledCoreServices, createLogger, describeError, getProfile, type InternalEnvFactory, interactiveProfile, invalidateWorktreeStatus, launcherSpec, listProfileDefs, listProfiles, type CompiledPluginBroadcast, type PluginDatabase, rendererBaseCheckout, resolveCommand, resolveMcpEntry, serverName, taskContext, type TaskCreatedHook, type TaskRef, type TaskSessionsBridge, TEARDOWN_TIMEOUT_MS, tmuxAvailable } from '@acorn/plugin-api/node'
 import { terminalSessions } from '../node/schema'
 import type { TerminalBridge } from './routes/terminal'
 import type { CreateOpts, ServerMsg, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
@@ -47,6 +47,8 @@ const log = createLogger('terminal', 'terminal')
 
 type Session = {
   meta: TerminalSession
+  script?: { attemptId: string; generation: number }
+  evidence: TerminalCoreServices['taskScripts']
   pty: IPty
   ring: OutputRing
   display: TerminalDisplay
@@ -71,7 +73,7 @@ const sessions = new Map<string, Session>()
 // What this engine needs from core, now that it can't read core's tables: resolve a taskId to a row and
 // to the cwd its commands run in, and read the project's setup script. `proc` and
 // `projects.assertConfigTrusted` are for the run-target service built over this engine (runChannel.ts).
-export type TerminalCoreServices = Pick<CoreServices, 'tasks' | 'projects' | 'proc' | 'git'>
+export type TerminalCoreServices = Pick<CompiledCoreServices, 'tasks' | 'projects' | 'proc' | 'git' | 'taskScripts'>
 
 // This engine is a process singleton by construction (one PTY table, one idle watch, one session map
 // per node), so its database handle and core services live in module state rather than being threaded
@@ -175,8 +177,9 @@ function settleSession(s: Session, exitCode: number | null): void {
   drain(settlers.map(settle => () => settle(exitCode)))
 }
 // Retirement closes this Node's attachment. Explicit Stop/remove separately destroys tmux state.
-function retireSession(s: Session): void {
+function retireSession(s: Session, reason: 'terminal_removed' | 'shutdown' = 'terminal_removed'): void {
   if (s.retired) return
+  if (s.script && s.meta.status === 'running' && !(reason === 'shutdown' && s.meta.backend === 'tmux')) s.evidence.report(s.script, { type: 'interrupted', reason })
   s.retired = true
   releaseCallbacks(s)
   s.pendingOut = ''
@@ -343,10 +346,10 @@ function rowToMeta(row: typeof terminalSessions.$inferSelect, ctx: Pick<Terminal
 
 // --- session lifecycle ---
 
-function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner): Session {
+function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner, script?: Session['script']): Session {
   assertOwner(engine)
   const s: Session = {
-    meta,
+    meta, script, evidence: engine.core.taskScripts,
     pty,
     ring: new OutputRing(),
     display: new TerminalDisplay(meta.cols, meta.rows),
@@ -357,6 +360,7 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner): Ses
     callbacks: [], settlers: new Set(), retired: false, admitted: false, persisted: false, discardRow: false,
   }
   sessions.set(meta.id, s)
+  if (script) engine.core.taskScripts.report(script, { type: 'started', terminalSessionId: meta.id })
   try {
     s.callbacks.push(pty.onData((data) => {
       if (s.retired || engine.token !== engineToken || sessions.get(meta.id) !== s) return
@@ -366,11 +370,15 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner): Ses
         s.meta.agentState = ptyState(s.meta.kind, s.meta.status, false)
         if (s.admitted) drain([() => engine.status()])
       }
+      if (s.script) s.evidence.report(s.script, { type: 'output', data })
       queueOutput(s, data) // append to ring now; coalesce the wire frame onto the ~16ms tick
     }))
     s.callbacks.push(pty.onExit(({ exitCode, signal }) => {
       // A PTY from a disposed engine may exit after the next boot has installed a new store.
       if (s.retired || engine.token !== engineToken || sessions.get(s.meta.id) !== s) return
+      if (s.script) s.evidence.report(s.script, s.meta.backend === 'tmux'
+        ? { type: 'interrupted', reason: 'process_lost' } // attach-client exit is not command exit evidence
+        : { type: 'exit', exitCode, signal })
       s.meta.status = 'exited'
       s.meta.idle = false
       s.meta.agentState = ptyState(s.meta.kind, 'exited', false)
@@ -386,7 +394,7 @@ function wireSession(meta: TerminalSession, pty: IPty, engine: EngineOwner): Ses
           const event = { taskId: s.meta.taskId, sessionId: s.meta.id, exitCode, completedAt: Date.now() }
           engine.complete?.(event)
         },
-        () => settleSession(s, exitCode),
+        () => settleSession(s, s.script && s.meta.backend === 'tmux' ? null : exitCode),
         () => releaseCallbacks(s),
         () => { if (s.admitted) engine.status() },
       ])
@@ -427,17 +435,20 @@ function startIdleWatch() {
   idleWatch = timer
 }
 
-// Run the workspace setup script as a "Setup" session in the freshly-created worktree, unless it's blank
-// or disabled. Registered as the taskWorktree onWorktreeCreated hook, so it fires exactly once whichever
+// Run Core's admitted setup as a "Setup" session in the freshly-created worktree.
+// Registered as the taskWorktree onWorktreeCreated hook, so it fires exactly once whichever
 // path creates the worktree. Ordered before any requested session, so a setup spawned from create() is
 // tab #1.
 async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Promise<void> {
   assertOwner(engine)
-  if (!t.projectId || t.skipSetup) return
-  const { script, trigger } = await engine.core.projects.setup(t.projectId)
-  assertOwner(engine)
-  if (trigger === 'off' || !script?.trim()) return
-  await spawnOne({ taskId: t.id, command: script, title: 'Setup' }, cwd, true, taskContext(t), t, engine)
+  const setup = engine.core.taskScripts.takeSetup(t.id)
+  if (!setup) return
+  try {
+    await spawnOne({ taskId: t.id, command: setup.script, title: 'Setup' }, cwd, true, taskContext(t), t, engine, setup.identity)
+  } catch (error) {
+    engine.core.taskScripts.report(setup.identity, { type: 'failed', reason: 'spawn_failed' })
+    throw error
+  }
   assertOwner(engine)
   // Roster publication belongs to spawnOne.
   invalidateWorktreeStatus(cwd)
@@ -465,6 +476,7 @@ async function spawnOne(
   ctx: Pick<TerminalSession, 'repo' | 'pull'>,
   task?: TaskRef,
   engine = owner(),
+  script?: Session['script'],
 ): Promise<TerminalSession> {
   assertOwner(engine)
   const profile = getProfile(opts.profileId)
@@ -543,7 +555,7 @@ async function spawnOne(
       pty = spawn(command, launchArgs, { name: 'xterm-256color', cols, rows, cwd, env })
     }
     assertOwner(engine)
-    session = wireSession(meta, pty, engine)
+    session = wireSession(meta, pty, engine, script)
     if (backend === 'tmux') {
       persistAttempted = true
       await persistSession(meta, engine.db)
@@ -557,6 +569,7 @@ async function spawnOne(
     session.admitted = true
     drain([() => engine.status()])
   } catch (error) {
+    if (script) engine.core.taskScripts.report(script, { type: 'failed', reason: 'spawn_failed' })
     if (session) {
       if (sessions.get(meta.id) === session) sessions.delete(meta.id)
       retireSession(session)
@@ -617,6 +630,7 @@ export async function refreshAcornMcpRegistrations(): Promise<void> {
 // Killing a tmux session's attach PTY only detaches it and the session keeps running. Stopping a tmux
 // agent means killing the tmux session itself, which then EOFs the PTY and fires onExit.
 function killSession(s: Session) {
+  if (s.script) s.evidence.report(s.script, { type: 'interrupted', reason: 'cancelled' })
   if (s.meta.backend === 'tmux' && s.meta.tmuxSession) killTmuxSession(s.meta.tmuxSession)
   s.pty.kill()
 }
@@ -633,7 +647,7 @@ export async function reconcileTmux() {
   } catch {
     return
   }
-  if (!rows.length) return
+  if (!rows.length) { engine.core.taskScripts.reconcile([]); return }
   const alive = tmuxAvailable() ? listTmuxSessions() : new Set<string>()
   let reattached = 0
   for (const row of rows) {
@@ -649,7 +663,7 @@ export async function reconcileTmux() {
         const isWorktree = !!task?.worktreePath && resolve(row.cwd) === resolve(task.worktreePath)
         const pty = attachTmuxPty(row.tmuxSession, row.cols, row.rows)
         let session: Session
-        try { session = wireSession(rowToMeta(row, taskContext(task), isWorktree), pty, engine) }
+        try { session = wireSession(rowToMeta(row, taskContext(task), isWorktree), pty, engine, engine.core.taskScripts.forSession(row.id) ?? undefined) }
         catch (error) { drain([() => pty.kill()]); throw error }
         session.admitted = true
         session.persisted = true
@@ -661,6 +675,7 @@ export async function reconcileTmux() {
       drain([() => log.warn(`tmux reconcile failed for session ${row.id}: ${describeError(e).message}`)])
     }
   }
+  engine.core.taskScripts.reconcile([...sessions.values()].filter(s => s.admitted && !s.retired && s.meta.status === 'running').map(s => s.meta.id))
   // This runs after the window, so the client's initial term:list has already fired. Ping it to
   // re-list, or resurrected sessions stay invisible until some unrelated broadcast.
   if (reattached && engine.token === engineToken) engine.status()
@@ -737,7 +752,7 @@ export function disposeTerminal(): void {
     idleWatch = null
   }
   for (const session of sessions.values()) {
-    retireSession(session) // queued 'after-ready' blocks can never fire against a disposed engine
+    retireSession(session, 'shutdown') // queued 'after-ready' blocks can never fire against a disposed engine
   }
   sessions.clear()
   // Back to the "never initialized" state, so nothing that survives teardown (a PTY exit callback, a late
@@ -869,23 +884,24 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     },
     // Teardown streams to the task drawer as a "Teardown" tab, and its exit code plus ring buffer are the
     // result. A ~2 min timeout kills it, surfacing exitCode null as a timeout.
-    runTeardown: async (script, cwd, env, taskId) => {
+    runTeardown: async (script, cwd, env, taskId, attempt) => {
       assertOwner(engine)
       const t = await engine.core.tasks.load(taskId)
       assertOwner(engine)
-      const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t, engine)
+      const meta = await spawnOne({ taskId, command: script, title: 'Teardown', env }, cwd, true, taskContext(t), t, engine, attempt)
       assertOwner(engine)
       const s = sessions.get(meta.id)
       if (!s) return { exitCode: null, output: 'Could not start the teardown session.' }
-      if (s.meta.status === 'exited') return { exitCode: s.meta.exitCode, output: s.ring.tail() }
+      if (s.meta.status === 'exited') return { exitCode: s.script && s.meta.backend === 'tmux' ? null : s.meta.exitCode, output: s.ring.tail() }
       return new Promise((resolveTeardown) => {
-        const finish = (exitCode: number | null) => {
+        const finish = (exitCode: number | null, reason?: 'timeout') => {
           clearTimeout(timer)
           s.settlers.delete(finish)
-          resolveTeardown({ exitCode, output: s.ring.tail() })
+          resolveTeardown({ exitCode, output: s.ring.tail(), ...(exitCode === null ? { reason: reason ?? 'cancelled' as const } : {}) })
         }
         const timer = setTimeout(() => {
           // Deadline is an honest timeout result, even if the PTY never emits an exit.
+          if (attempt) engine.core.taskScripts.report(attempt, { type: 'failed', reason: 'timeout' })
           s.settlers.delete(finish)
           releaseCallbacks(s)
           drain([() => killSession(s)])
@@ -898,7 +914,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
             () => { if (s.persisted) void markExited(s.meta.id, null, engine.db) },
             () => worktreeSettled(s),
             () => engine.status(),
-            () => finish(null),
+            () => finish(null, 'timeout'),
           ])
         }, TEARDOWN_TIMEOUT_MS)
         s.settlers.add(finish)

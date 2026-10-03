@@ -186,3 +186,12 @@ from any variable (`env_http_headers`), but forwards a stdio server's environmen
 different secrets under one name are refused, so neither runs with the other's value. The terminal
 passes that environment the way it passes acorn's own token, which with the tmux backend means
 `tmux new-session -e` for the moment the session is created.
+
+## Reading task scripts
+
+The Node tool registry automatically projects Core's `task_scripts_status`, `task_scripts_wait`,
+and `task_scripts_logs` through the existing task MCP transport. These read-tier tools use the
+launch token's task identity; no input can substitute another task. They do not launch scripts.
+Use status and a bounded setup wait before dependency-dependent work. Wait timeouts leave the
+script running. See [task script tools](./agent-tools.md#task-script-tools) for their inputs and
+[durable task script results](./workspaces-and-tasks.md#durable-task-script-results) for state meanings.

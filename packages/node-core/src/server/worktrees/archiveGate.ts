@@ -1,3 +1,4 @@
+import { broadcastTasksChanged } from '../notify'
 // Serializes a task's worktree creation against archive teardown.
 //
 // Archive cannot mark the database row archived before teardown succeeds, but leaving the row active
@@ -12,6 +13,7 @@ export function beginTaskArchive(taskId: string): boolean {
   if (archiving.has(taskId)) return false
   archiving.add(taskId)
   retireTaskHead(taskId)
+  broadcastTasksChanged({ taskId })
   return true
 }
 
@@ -20,4 +22,5 @@ export const isTaskArchiving = (taskId: string): boolean => archiving.has(taskId
 /** Releases a claim after success or any refusal, so a failed teardown can be retried. */
 export function finishTaskArchive(taskId: string): void {
   archiving.delete(taskId)
+  broadcastTasksChanged({ taskId })
 }
