@@ -15,6 +15,8 @@ import {
 } from './registry'
 import { confinePluginPath } from '../pluginHost/dispatch'
 import { DataSourceError, validateDescription, validateSourceQuery } from './validation'
+import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
+import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 
 function parse<T>(schema: { parse(value: unknown): T }, input: unknown, response = true): T {
   try { return schema.parse(input) } catch { throw new DataSourceError(response ? 'invalid-response' : 'invalid-request') }
@@ -24,18 +26,39 @@ const bounded = (invocation: DataSourceInvocation, timeoutMs: number = DATA_LIMI
 })
 const publicSource = ({ handler: _handler, coreHandler: _coreHandler, ...source }: RegisteredDataSource) => source
 
-const dispatchRegistered = (
+const sourceRequestScheduler = new ProviderRequestScheduler()
+
+const dispatchRegistered = async (
   env: Env,
   source: RegisteredDataSource,
   request: DataSourceRequest,
   invocation: DataSourceInvocation,
   maxBytes?: number,
-) => source.coreHandler
-  ? source.coreHandler(request, env, invocation.signal)
-  : dispatchSource(env, source.pluginId, source.handler, request, invocation, maxBytes, {
-    providerId: source.providerId,
-    connectionId: request.operation === 'query' ? request.query.scope.connectionId : request.operation === 'details' ? request.scope.connectionId : request.scope.connectionId,
+) => {
+  const execute = () => source.coreHandler
+    ? source.coreHandler(request, env, invocation.signal)
+    : dispatchSource(env, source.pluginId, source.handler, request, invocation, maxBytes, {
+      providerId: source.providerId,
+      connectionId: request.operation === 'query' ? request.query.scope.connectionId : request.scope.connectionId,
+    })
+  const connectionId = request.operation === 'query' ? request.query.scope.connectionId : request.scope.connectionId
+  const provider = source.providerId ? connectionProviderRegistry.get(source.providerId) : undefined
+  if (request.operation !== 'query' || !provider || !connectionId) return execute()
+  return sourceRequestScheduler.run(provider.id, connectionId, provider.budgets, async () => {
+    for (let attempt = 0; ; attempt++) {
+      try { return await execute() }
+      catch (error) {
+        if (!(error instanceof DataSourceError) || error.code !== 'rate-limited' || attempt >= 2) throw error
+        await new Promise<void>((resolve, reject) => {
+          if (invocation.signal.aborted) { reject(new DataSourceError('cancelled')); return }
+          const onAbort = () => { clearTimeout(timer); reject(new DataSourceError('cancelled')) }
+          const timer = setTimeout(() => { invocation.signal.removeEventListener('abort', onAbort); resolve() }, 500 * 2 ** attempt)
+          invocation.signal.addEventListener('abort', onAbort, { once: true })
+        })
+      }
+    }
   })
+}
 
 export async function listDataSources(env: Env, input: unknown, invocation: DataSourceInvocation) {
   const scope = parse(dataSourceScopeSchema, input, false)

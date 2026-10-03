@@ -15,20 +15,20 @@ import { rowPress, type PanelViewProps } from './props'
 // allowed.
 
 export default function TableView(props: PanelViewProps) {
-  return (
+  const table = (rows: typeof props.rows) => (
     <Show
-      when={props.rows.length && props.fields.length}
+      when={rows.length && props.fields.length}
       fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}
     >
       <Table size="sm" stickyHead>
         <TableRow head>
           <For each={props.fields}>{(field) => <TableHead>{field.name}</TableHead>}</For>
         </TableRow>
-        <For each={props.rows}>
+        <For each={rows}>
           {(row) => (
             <TableRow onPress={rowPress(props, row)}>
               <For each={props.fields}>
-                {(field) => <TableCell><Cell field={field} value={row.values[field.id]} /></TableCell>}
+                {(field) => <TableCell><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></TableCell>}
               </For>
             </TableRow>
           )}
@@ -36,4 +36,6 @@ export default function TableView(props: PanelViewProps) {
       </Table>
     </Show>
   )
+  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4>{`${group.label} · ${group.count}`}</h4>{group.children?.length ? sections(group.children) : table(group.rows)}</section>}</For>
+  return props.groups?.length ? sections(props.groups) : table(props.rows)
 }

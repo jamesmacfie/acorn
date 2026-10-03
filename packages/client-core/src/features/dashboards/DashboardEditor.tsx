@@ -1,24 +1,22 @@
 import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
-import {
-  dashboardPanelContentSchema,
-  dashboardViewKinds,
-  fitDashboardDisplay,
-  type DashboardDraft,
-  type DashboardPanelContent,
-  type DashboardView,
-} from '@acorn/protocol/dashboards.ts'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import { panelPlanSchema, type DashboardDraft, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
+import { dashboardFields } from '@acorn/dashboards-core/projection'
+import { describePanelPlan, displayPlanGroups, displayPlanRun } from '@acorn/dashboards-core/plan.ts'
+import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../dataSources/SourceQueryEditor'
 import AuthoringConversation from '../dataSources/AuthoringConversation'
 import { mergeAuthoringCandidate } from '../dataSources/authoringMerge'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
-import { projectDashboardPanel, suggestStateCategoryMapping, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { ApiError } from '../../infra/node/apiClient'
+import { ApiError, writeJson } from '../../infra/node/apiClient'
+import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+import { queriesClient } from '../queries/queriesClient'
 import { Alert, Badge, Button, Card, Checkbox, EmptyState, Field, Input, Select } from '../../kit/components/primitives'
 import { Heading } from '../../kit/components/content/Heading'
-import Icon from '../../kit/components/content/Icon'
 import { Fold } from '../../kit/components/layout/Fold'
 import { Inline } from '../../kit/components/layout/Inline'
 import { Stack } from '../../kit/components/layout/Stack'
@@ -27,36 +25,30 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import PanelBody from './views/PanelBody'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
-import {
-  addStatusColumns,
-  applyCategoryColumns,
-  availableDashboardViews,
-  displaySchema,
-  emptyDashboardContent,
-  exactStatusOptions,
-  latestUnpublishedDashboard,
-  mapExactStatus,
-  removeDashboardQuery,
-  setDashboardQuery,
-  setFieldVisible,
-  setRoleField,
-  suggestRoleFields,
-  unavailableViewReason,
-} from './dashboardEditorModel'
+import { latestUnpublishedDashboard } from './dashboardEditorModel'
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from './persist'
-import type { PanelViewKind } from './model'
 import './dashboards.css'
 
 const AUTOSAVE_MS = 750
-type SaveState = 'not-saved' | 'saved-on-device' | 'saving' | 'draft-saved' | 'conflict'
-const SAVE_WORDS: Record<SaveState, string> = {
-  'not-saved': 'Not saved',
-  'saved-on-device': 'Saved on this computer',
-  saving: 'Saving…',
-  'draft-saved': 'Saved',
-  conflict: "Couldn't save",
+const blank = (): PanelPlan => ({
+  version: 2, title: 'New panel', time: { zone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', mode: 'fixed', weekStart: 'monday' },
+  sources: [], columns: [], stages: [], view: { kind: 'list' },
+})
+const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
+const safeId = (value: string): string => value.replace(/^\//, '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100) || crypto.randomUUID()
+const firstPredicate = (column: string): DataPredicate => ({
+  kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator: 'eq', right: { address: { from: 'literal', value: '' } },
+})
+type Comparison = Extract<DataPredicate, { kind: 'comparison' }>
+const comparison = (predicate: DataPredicate): Comparison | undefined => predicate.kind === 'comparison' ? predicate : undefined
+const filterColumn = (predicate: DataPredicate): string => {
+  const address = comparison(predicate)?.left.address
+  return address?.from === 'item' ? address.pointer.slice(1) : ''
 }
-const AI_MISFIT = "The AI's suggestion doesn't fit this panel, so it wasn't applied."
+const operand = (predicate: DataPredicate): string => {
+  const right = comparison(predicate)?.right?.address
+  return right?.from === 'literal' ? String(right.value ?? '') : ''
+}
 
 export default function DashboardEditor(props: {
   scope: PlacementScope
@@ -68,312 +60,306 @@ export default function DashboardEditor(props: {
   const scope = { workspaceId: props.scope.workspaceId ?? '' }
   const client = dashboardClient(nodeId, scope)
   const queryClient = useQueryClient()
-  const storage = typeof localStorage === 'undefined' ? undefined : localStorage
-  const recovery = dashboardRecoveryStore(storage)
+  const recovery = dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage)
   const recoveryId = props.dashboardId ?? `new:${scope.workspaceId}`
-  const [content, setContent] = createSignal<DashboardPanelContent>(emptyDashboardContent())
-  const [slots, setSlots] = createSignal<string[]>([])
-  const [states, setStates] = createSignal<Record<string, SourceQueryEditorState | undefined>>({})
+  const [plan, setPlan] = createSignal<PanelPlan>(blank())
   const [draft, setDraft] = createSignal<DashboardDraft>()
-  const [saveState, setSaveState] = createSignal<SaveState>('not-saved')
+  const [states, setStates] = createSignal<Record<string, SourceQueryEditorState | undefined>>({})
+  const [starters, setStarters] = createSignal<Record<string, PanelPlan[]>>({})
+  const [entrance, setEntrance] = createSignal<'pick' | 'describe' | undefined>(props.dashboardId ? 'pick' : undefined)
+  const [saveState, setSaveState] = createSignal('Not saved')
   const [problem, setProblem] = createSignal<string>()
-  const [aiUndo, setAiUndo] = createSignal<DashboardPanelContent>()
+  const [aiUndo, setAiUndo] = createSignal<PanelPlan>()
+  const [aiSummary, setAiSummary] = createSignal('')
+  const [confirmedRequirements, setConfirmedRequirements] = createSignal<string[]>([])
   const [placement, setPlacement] = createSignal(props.scope.ownerId ?? '')
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   onCleanup(() => saveTimer && clearTimeout(saveTimer))
 
-  const addSlot = () => setSlots(current => [...current, crypto.randomUUID()])
-  onMount(async () => {
-    const restore = (loaded: DashboardDraft): void => {
-      const copy = recovery.read(nodeId, loaded.id)
-      const restored = copy?.content ?? loaded.content
-      setDraft(loaded)
-      setContent(restored)
-      setSlots(restored.queries.length ? restored.queries.map(query => query.id) : [crypto.randomUUID()])
-      setSaveState(copy ? 'saved-on-device' : 'draft-saved')
-    }
-    if (!props.dashboardId) {
-      const local = recovery.read(nodeId, recoveryId)
-      if (local) {
-        setContent(local.content)
-        setSlots(local.content.queries.length ? local.content.queries.map(query => query.id) : [crypto.randomUUID()])
-        setSaveState('saved-on-device')
-        return
-      }
-      try {
-        const existing = latestUnpublishedDashboard(await client.list())
-        if (existing) { restore(existing); return }
-      } catch { /* A new local draft can still begin while the Node reconnects. */ }
-      addSlot()
-      return
-    }
-    try {
-      const loaded = await client.get(props.dashboardId)
-      restore(loaded)
-    } catch { setProblem("Couldn't load this panel's draft. The panel on your dashboard hasn't changed.") }
-  })
-
-  const copyFor = (next: DashboardPanelContent, current = draft()) => ({
+  const tabs = () => props.scope.surface === 'home' ? homeTabs(dashboards(), props.scope.workspaceId) : []
+  const destination = (): PlacementScope => props.scope.surface === 'home' ? homeTabScope(placement(), props.scope.workspaceId) : props.scope
+  const recoveryCopy = (content: PanelPlan, current = draft()) => ({
     nodeId, entityId: current?.id ?? recoveryId, baseRevision: current?.draftRevision ?? 0,
-    baseContent: current?.content ?? emptyDashboardContent(), content: next, savedAt: Date.now(),
+    baseContent: current?.content ?? blank(), content, savedAt: Date.now(),
   })
-
-  const persist = (next: DashboardPanelContent): void => {
-    setSaveState(recovery.save(copyFor(next)))
+  const persist = (next: PanelPlan): void => {
+    setSaveState(recovery.save(recoveryCopy(next)) === 'saved-on-device' ? 'Saved on this computer' : 'Not saved')
     if (saveTimer) clearTimeout(saveTimer)
-    if (!dashboardPanelContentSchema.safeParse(next).success) return
-    saveTimer = setTimeout(() => void flush(next), AUTOSAVE_MS)
+    if (!panelPlanSchema.safeParse(next).success) return
+    saveTimer = setTimeout(() => void flush(next).catch(() => {}), AUTOSAVE_MS)
   }
-
-  const change = (update: (current: DashboardPanelContent) => DashboardPanelContent): void => {
-    setContent(current => {
-      // A query removed or remapped can turn panel field ids into stale references.
-      const next = fitDashboardDisplay(update(current))
-      persist(next)
-      return next
-    })
-  }
-
-  async function flush(next = content()): Promise<DashboardDraft> {
-    setSaveState('saving')
-    setProblem(undefined)
+  const change = (update: (current: PanelPlan) => PanelPlan): void => { setPlan(current => {
+    const next = update(current)
+    if (next !== current) persist(next)
+    return next
+  }) }
+  async function flush(next = plan()): Promise<DashboardDraft> {
+    setSaveState('Saving…')
     try {
       const current = draft()
-      const saved = current
-        ? await client.save(current.id, current.draftRevision, next)
-        : await client.create(next)
+      const saved = current ? await client.save(current.id, current.draftRevision, next) : await client.create(next)
       setDraft(saved)
-      recovery.acknowledge(copyFor(next, current), saved.content)
-      if (!current && recoveryId !== saved.id) recovery.discard(nodeId, recoveryId)
-      setSaveState('draft-saved')
+      recovery.acknowledge(recoveryCopy(next, current), saved.content)
+      if (!current) recovery.discard(nodeId, recoveryId)
+      setSaveState('Saved')
       return saved
     } catch {
-      setSaveState('conflict')
-      setProblem("Couldn't save. The panel changed somewhere else, or the node didn't answer. Your edits are kept on this computer.")
+      setSaveState("Couldn't save")
+      setProblem("Couldn't save. Your edits remain on this computer.")
       throw new Error('dashboard-save-failed')
     }
   }
+  onMount(async () => {
+    try {
+      const loaded = props.dashboardId ? await client.get(props.dashboardId) : latestUnpublishedDashboard(await client.list())
+      if (loaded) {
+        setDraft(loaded)
+        const restored = recovery.read(nodeId, loaded.id)?.content
+        setPlan(restored && 'version' in restored ? restored : loaded.content)
+        setEntrance('pick')
+        setSaveState(restored ? 'Saved on this computer' : 'Saved')
+        return
+      }
+    } catch { /* A local draft can begin while the Node reconnects. */ }
+    const local = recovery.read(nodeId, recoveryId)?.content
+    if (local && 'version' in local) { setPlan(local); setEntrance('pick'); setSaveState('Saved on this computer') }
+  })
 
-  const removeSlot = (id: string) => {
-    setSlots(current => current.filter(candidate => candidate !== id))
-    setStates(current => { const { [id]: _removed, ...rest } = current; return rest })
-    change(current => removeDashboardQuery(current, id))
-  }
-
-  const updateState = (id: string, state: SourceQueryEditorState): void => {
-    setStates(current => ({ ...current, [id]: state }))
-    if (!state.description) return
-    const mapping = suggestRoleFields(content().mapping, id, state.description.fields)
-    if (JSON.stringify(mapping.fields[id]) !== JSON.stringify(content().mapping.fields[id])) {
-      change(current => ({ ...current, mapping: suggestRoleFields(current.mapping, id, state.description!.fields) }))
-    }
-  }
-
-  const previews = createMemo((): DashboardQueryProjection[] => content().queries.flatMap(entry => {
-    const state = states()[entry.id]
-    return state?.query && state.description && state.preview
-      ? [{ instanceId: entry.id, label: entry.label, query: state.query, description: state.description, result: state.preview }]
-      : []
+  const addSource = (): void => change(current => ({ ...current, sources: [...current.sources, {
+    id: crypto.randomUUID(), label: `Source ${current.sources.length + 1}`, role: 'primary',
+    reference: { kind: 'inline', content: { name: 'Choose data', parameters: { type: 'object' }, query: { source: { pluginId: 'core', sourceId: 'choose' }, scope: { ...scope, parameters: {} }, sort: [] }, sourceParameters: {} }, bindings: {} },
+  }] }))
+  const setSource = (id: string, reference: QueryReference | undefined): void => change(current => ({
+    ...current, sources: reference
+      ? current.sources.map(source => source.id === id ? { ...source, reference } : source)
+      : current.sources.filter(source => source.id !== id),
+    columns: reference ? current.columns : current.columns.map(column => { const { [id]: _removed, ...bind } = column.bind; return { ...column, bind } }),
   }))
-  const projected = createMemo(() => previews().length === content().queries.length && previews().length
-    ? projectDashboardPanel(content(), previews()) : undefined)
-  const available = createMemo(() => availableDashboardViews(states(), content().mapping))
-  const tabs = () => props.scope.surface === 'home' ? homeTabs(dashboards(), props.scope.workspaceId) : []
-  const destination = (): PlacementScope => props.scope.surface === 'home'
-    ? homeTabScope(placement(), props.scope.workspaceId)
-    : props.scope
-
-  const addColumnsFromStates = (): void => change(current => addStatusColumns(current, states()))
-
-  const suggestCategories = (entryId: string): void => {
-    const state = states()[entryId]
-    const preview = previews().find(candidate => candidate.instanceId === entryId)
-    const status = content().mapping.fields[entryId]?.status
-    const category = state?.description?.fields.find(field => /category/i.test(field.label) || /category/i.test(field.pointer))
-    if (!preview || !status || !category) return
-    const suggestion = suggestStateCategoryMapping(preview, status, category.pointer)
-    change(current => applyCategoryColumns(current, entryId, suggestion))
+  const updateState = (id: string, state: SourceQueryEditorState): void => {
+    const priorRevision = states()[id]?.description?.revision
+    setStates(current => ({ ...current, [id]: state }))
+    if (!state.description || !state.query) return
+    if (priorRevision !== state.description.revision) void Promise.all((state.description.starterPlans ?? []).flatMap(candidate => {
+      const parsed = panelPlanSchema.safeParse(candidate)
+      return parsed.success ? [client.validate(parsed.data).then(result => result.problems.length ? undefined : parsed.data).catch(() => undefined)] : []
+    })).then(values => setStarters(current => ({ ...current, [id]: values.filter((value): value is PanelPlan => !!value) })))
+    const available = dashboardFields(state.description)
+    change(current => {
+      const source = current.sources.find(entry => entry.id === id)
+      if (!source) return current
+      const label = state.source?.name ?? source.label
+      const sources = current.sources.map(entry => entry.id === id ? { ...entry, label } : entry)
+      if (current.sources.length !== 1 || current.columns.length) return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
+      const columns = available.slice(0, 30).map(field => ({ id: safeId(field.id), label: field.name, type: field.type, bind: { [id]: { field: field.id } }, ...(field.unit ? { unit: field.unit } : {}), ...(field.values ? { choices: field.values } : {}) }))
+      return { ...current, sources, columns }
+    })
   }
+  const addColumn = (): void => change(current => ({ ...current, columns: [...current.columns, { id: `column_${crypto.randomUUID().replaceAll('-', '')}`, label: 'New column', type: 'text', bind: {} }] }))
+  const bindColumn = (columnId: string, sourceId: string, pointer: string): void => change(current => ({ ...current, columns: current.columns.map(column => {
+    if (column.id !== columnId) return column
+    const bind = { ...column.bind }
+    if (pointer) bind[sourceId] = { field: pointer }
+    else delete bind[sourceId]
+    return { ...column, bind }
+  }) }))
+  const suggestedBinding = (column: PanelPlan['columns'][number], sourceId: string): { pointer: string; name: string } | undefined => {
+    if (column.bind[sourceId]) return undefined
+    const description = states()[sourceId]?.description
+    if (!description) return undefined
+    const fields = dashboardFields(description)
+    const match = fields.find(field => field.type === column.type && field.name.toLowerCase() === column.label.toLowerCase())
+      ?? fields.find(field => field.type === column.type && field.role === column.id)
+    return match ? { pointer: match.id, name: match.name } : undefined
+  }
+  const mapChoice = (columnId: string, sourceId: string, valueId: string, choiceId: string): void => change(current => ({
+    ...current, columns: current.columns.map(column => {
+      if (column.id !== columnId) return column
+      const binding = column.bind[sourceId]
+      if (!binding || !('field' in binding)) return column
+      const values = Object.fromEntries(Object.entries(binding.values ?? {}).map(([id, sourceValues]) => [id, sourceValues.filter(value => value !== valueId)]))
+      if (choiceId) values[choiceId] = [...(values[choiceId] ?? []), valueId]
+      return { ...column, bind: { ...column.bind, [sourceId]: { ...binding, values } } }
+    }),
+  }))
+  const addFilter = (): void => {
+    const column = plan().columns[0]
+    if (column) change(current => ({ ...current, stages: [...current.stages, { op: 'filter', where: firstPredicate(column.id) }] }))
+  }
+  const editFilter = (index: number, changes: { column?: string; operator?: Comparison['operator']; value?: string }): void => change(current => ({
+    ...current, stages: current.stages.map((stage, at) => {
+      if (at !== index) return stage
+      const old = comparison(stage.where)
+      const column = changes.column ?? (old?.left.address.from === 'item' ? old.left.address.pointer.slice(1) : current.columns[0]?.id ?? '')
+      const operator = changes.operator ?? old?.operator ?? 'eq'
+      const raw = changes.value ?? operand(stage.where)
+      const type = current.columns.find(entry => entry.id === column)?.type
+      const value = operator === 'in' ? raw.split(',').map(item => item.trim()).filter(Boolean)
+        : type === 'number' && raw.trim() && Number.isFinite(Number(raw)) ? Number(raw)
+          : type === 'boolean' && ['true', 'false'].includes(raw.toLowerCase()) ? raw.toLowerCase() === 'true' : raw
+      return { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator,
+        ...(['missing', 'present'].includes(operator) ? {} : { right: { address: { from: 'literal', value } } }),
+      } }
+    }),
+  }))
 
+  const preview = createQuery(() => ({
+    queryKey: ['dashboard-preview', nodeId, scope.workspaceId, JSON.stringify(plan())],
+    queryFn: ({ signal }: { signal: AbortSignal }) => client.run({ kind: 'draft', content: copy(plan()) }, 'preview', Intl.DateTimeFormat().resolvedOptions().timeZone, signal),
+    enabled: !!entrance() && plan().sources.length > 0 && panelPlanSchema.safeParse(plan()).success,
+    staleTime: 0,
+  }))
+  const run = createMemo(() => preview.data ? copy(preview.data) : undefined)
+  const display = createMemo(() => run() ? displayPlanRun(run()!.plan, run()!.rows) : undefined)
   const applyAiProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
-    const current = content()
-    const merged = mergeAuthoringCandidate(proposal.base as DashboardPanelContent, proposal.candidate as DashboardPanelContent, current)
-    if (merged.conflicts.length) return 'This panel changed since you opened it.'
-    const parsed = dashboardPanelContentSchema.safeParse(merged.value)
-    if (!parsed.success) return AI_MISFIT
-    try { if ((await client.validate(parsed.data)).problems.length) return AI_MISFIT }
-    catch { return AI_MISFIT }
-    setAiUndo(structuredClone(current))
+    const merged = mergeAuthoringCandidate(proposal.base as PanelPlan, proposal.candidate as PanelPlan, plan())
+    if (merged.conflicts.length) return 'This panel changed while the proposal was prepared.'
+    const parsed = panelPlanSchema.safeParse(merged.value)
+    if (!parsed.success) return 'The proposed plan does not fit this panel.'
+    try { if ((await client.validate(parsed.data)).problems.length) return 'The proposed plan has source or column problems.' }
+    catch { return 'The Node could not validate this proposal.' }
+    setAiUndo(copy(plan()))
+    setAiSummary(proposal.summary)
+    setConfirmedRequirements([])
     change(() => parsed.data)
-    setSlots(parsed.data.queries.map(query => query.id))
+    setEntrance('pick')
     return undefined
   }
-
   const publish = async (): Promise<void> => {
-    if (!dashboardPanelContentSchema.safeParse(content()).success) {
-      setProblem('Choose what to show before you publish.')
-      return
+    if (plan().requirements?.some(item => !confirmedRequirements().includes(item.id))) {
+      setProblem('Confirm each requirement before publishing.'); return
     }
+    const parsed = panelPlanSchema.safeParse(plan())
+    if (!parsed.success) { setProblem('Choose data and complete the plan before publishing.'); return }
     try {
-      const saved = await flush()
-      try { await client.publish(saved.id, saved.draftRevision) }
-      catch (error) {
-        // Publication names each part that doesn't fit, one per line.
-        setProblem(error instanceof ApiError && error.code === 'invalid-dashboard' && error.message !== error.code
-          ? `This panel can't be published yet:\n${error.message}`
-          : "Couldn't publish. The node didn't answer, or the panel changed somewhere else.")
-        throw error
-      }
-      void queryClient.invalidateQueries({ queryKey: publishedDashboardPanelKey(nodeId, scope, saved.id) }).catch(() => {})
+      const saved = await flush(parsed.data)
+      const metadata = await Promise.all(plan().sources.map(async source => {
+        const resolved = await queriesClient(nodeId, scope).resolve(source.reference, {})
+        const description = await writeJson<DataSourceDescription>('/v1/core/data-sources/describe', {
+          method: 'POST', nodeId, headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }),
+        })
+        return { key: `${resolved.query.source.pluginId}:${resolved.query.source.sourceId}`, roles: description.fields.flatMap(field => field.display?.role ?? []) }
+      }))
+      const sources = [...new Set(metadata.map(entry => entry.key))]
+      const roles = [...new Set(metadata.flatMap(entry => entry.roles))]
+      await client.publish(saved.id, saved.draftRevision)
+      void queryClient.invalidateQueries({ queryKey: publishedDashboardPanelKey(nodeId, scope, saved.id).slice(0, 5) }).catch(() => {})
+      void queryClient.invalidateQueries({ queryKey: ['dashboard-revision', nodeId, scope.workspaceId, saved.id] }).catch(() => {})
       recovery.discard(nodeId, saved.id)
-      const sourceMetadata = Object.values(states()).flatMap(state => state?.query && state.description
-        ? [{ key: `${state.query.source.pluginId}:${state.query.source.sourceId}`, roles: state.description.fields.flatMap(field => field.display?.role ?? []) }]
-        : [])
-      props.onPublished(
-        saved.id,
-        content().title,
-        destination(),
-        content().display.view,
-        [...new Set(sourceMetadata.map(entry => entry.key))],
-        [...new Set(sourceMetadata.flatMap(entry => entry.roles))],
-      )
+      props.onPublished(saved.id, plan().title, destination(), plan().view, sources, roles)
       props.onClose()
-    } catch { /* flush and publication leave an actionable problem above. */ }
+    } catch (error) {
+      setProblem(error instanceof ApiError && error.code === 'invalid-dashboard' ? error.message : "Couldn't publish this panel.")
+    }
   }
-
-  // The stat's count names the source when every query reads the same kind.
-  const plural = () => {
-    const sources = new Set(Object.values(states()).flatMap(state => state?.source ? [state.source.plural.toLowerCase()] : []))
-    return sources.size === 1 ? [...sources][0] : undefined
-  }
-  const isBoard = () => content().display.view.kind === 'board'
 
   return <Modal title={props.dashboardId ? 'Edit panel' : 'Add panel'} size="lg" onDismiss={props.onClose}>
-    <Modal.Body>
-      <div class="dash-v2-editor">
-        <Stack gap="stack">
-          <Inline gap="inline" wrap>
-            <Badge tone={saveState() === 'conflict' ? 'warn' : undefined}>{SAVE_WORDS[saveState()]}</Badge>
-          </Inline>
-          <Show when={problem()}>{message => <Alert tone="warn"><Stack gap="row"><For each={message().split('\n')}>{line => <Text wrap>{line}</Text>}</For></Stack></Alert>}</Show>
-          <AuthoringConversation
-            endpoint="/v1/core/authoring/turn"
-            target="dashboard"
-            targetId={draft()?.id ?? recoveryId}
-            scope={scope}
-            baseRevision={draft()?.draftRevision ?? 0}
-            base={content()}
-            label={content().title || 'Dashboard'}
-            onApply={applyAiProposal}
-          />
-          <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => {
-            change(() => previous())
-            setSlots(previous().queries.length ? previous().queries.map(query => query.id) : [crypto.randomUUID()])
-            setAiUndo(undefined)
-          }}>Undo AI edit</Button>}</Show>
-          <Fold label="Data" level="group" defaultOpen>
-            <Stack gap="stack">
-              <For each={slots()}>{(id, index) => <Fold label={`Query ${index() + 1}`} level="sub" defaultOpen>
-                <Stack gap="row">
-                  <SourceQueryEditor
-                    workspaceId={scope.workspaceId}
-                    previewOnOpen={!!props.dashboardId}
-                    value={content().queries.find(query => query.id === id)?.reference}
-                    onChange={reference => change(current => setDashboardQuery(current, id, reference))}
-                    onStateChange={state => updateState(id, state)}
-                  />
-                  <Inline gap="row">
-                    <Button size="sm" variant="ghost" onPress={() => removeSlot(id)}>Remove data query</Button>
-                  </Inline>
-                </Stack>
-              </Fold>}</For>
-              <Inline gap="row">
-                <Button size="sm" onPress={addSlot}><Icon name="plus" /> Add another query</Button>
-              </Inline>
-            </Stack>
-          </Fold>
-
-          <Fold label="Display" level="group" defaultOpen>
-            <Stack gap="stack">
-              <Field label="Panel title"><Input label="Panel title" assist={false} value={content().title} onInput={title => change(current => ({ ...current, title }))} /></Field>
-              <Field label="View">
-                <Select label="View" size="sm" value={content().display.view.kind}
-                  options={available().map(kind => ({ value: kind, label: kind[0]!.toUpperCase() + kind.slice(1) }))}
-                  onChange={kind => change(current => ({ ...current, display: { ...current.display, view: { kind: kind as PanelViewKind } } }))} />
-                <For each={dashboardViewKinds.filter(kind => !available().includes(kind))}>{kind => <Text emphasis="muted" wrap>{unavailableViewReason(kind)}</Text>}</For>
-              </Field>
-              <Show when={isBoard()}>
-                <Inline gap="row" wrap>
-                  <Button size="sm" onPress={addColumnsFromStates}>One column per state</Button>
-                  <Button size="sm" onPress={() => change(current => ({ ...current, mapping: { ...current.mapping, columns: [...current.mapping.columns, { id: crypto.randomUUID(), label: `Column ${current.mapping.columns.length + 1}` }] } }))}><Icon name="plus" /> Add board column</Button>
-                </Inline>
+    <Modal.Body><div class="dash-v2-editor"><Stack gap="stack">
+      <Badge tone={saveState() === "Couldn't save" ? 'warn' : undefined}>{saveState()}</Badge>
+      <Show when={problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
+      <Show when={!entrance()}><Inline gap="row"><Button variant="solid" onPress={() => { setEntrance('pick'); addSource() }}>Pick data</Button><Button onPress={() => setEntrance('describe')}>Describe it</Button></Inline></Show>
+      <Show when={entrance() === 'describe' || plan().sources.length > 0}>
+        <AuthoringConversation endpoint="/v1/core/authoring/turn" target="dashboard" targetId={draft()?.id ?? recoveryId}
+          scope={scope} baseRevision={draft()?.draftRevision ?? 0} base={plan()} label={plan().title} defaultOpen={entrance() === 'describe'} onApply={applyAiProposal} />
+        <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { change(() => previous()); setAiUndo(undefined); setAiSummary(''); setConfirmedRequirements([]) }}>Undo AI edit</Button>}</Show>
+      </Show>
+      <Show when={entrance() === 'pick'}>
+        <Fold label="Data" level="group" defaultOpen><Stack gap="stack">
+          <For each={plan().sources}>{source => <Fold label={source.label} level="sub" defaultOpen><SourceQueryEditor
+            workspaceId={scope.workspaceId} value={source.reference} previewOnOpen={!!props.dashboardId}
+            hideAuthoring pickSourceAccount onChange={reference => setSource(source.id, reference)} onStateChange={state => updateState(source.id, state)} />
+            <For each={starters()[source.id] ?? []}>{starter => <Button size="sm" variant="ghost" onPress={() => change(() => starter)}>{`Start with ${starter.title} · ${describePanelPlan(starter)[0]}`}</Button>}</For>
+            <Button size="sm" variant="ghost" onPress={() => setSource(source.id, undefined)}>Remove source</Button>
+          </Fold>}</For>
+          <Button size="sm" disabled={plan().sources.length >= 8} onPress={addSource}>Add another source</Button>
+        </Stack></Fold>
+        <Fold label="Columns" level="group" defaultOpen><Stack gap="row">
+          <For each={plan().columns}>{column => <Card><Stack gap="row">
+            <Field label="Column name"><Input label="Column name" assist={false} value={column.label} onInput={label => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, label } : entry) }))} /></Field>
+            <Select label={`${column.label} type`} size="sm" value={column.type ?? 'text'} options={['text', 'number', 'boolean', 'datetime', 'enum', 'person', 'link'].map(value => ({ value, label: value }))} onChange={type => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, type: type as NonNullable<PanelPlan['columns'][number]['type']> } : entry) }))} />
+            <Checkbox label="List of values" checked={!!column.list} onChange={list => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, list } : entry) }))} />
+            <Show when={column.type === 'number'}><Input label="Fixed unit (currency, percent, ms, s, bytes)" assist={false} value={typeof column.unit === 'string' ? column.unit : ''} onInput={unit => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, unit: unit || undefined } : entry) }))} />
+              <Select label="Or unit from column" size="sm" value={typeof column.unit === 'object' ? column.unit.column : ''} options={[{ value: '', label: 'Fixed unit' }, ...plan().columns.filter(entry => entry.id !== column.id).map(entry => ({ value: entry.id, label: entry.label }))]} onChange={unitColumn => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, unit: unitColumn ? { column: unitColumn } : undefined } : entry) }))} /></Show>
+            <Show when={column.type === 'datetime'}><Select label="Date precision" size="sm" value={column.precision ?? 'instant'} options={[{ value: 'instant', label: 'Instant' }, { value: 'day', label: 'Calendar day' }]} onChange={precision => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, precision: precision as 'instant' | 'day' } : entry) }))} /></Show>
+            <Show when={column.type === 'enum'}><Select label="New values" size="sm" value={column.unmatched ?? 'catch-all'} options={[{ value: 'catch-all', label: 'Show unmatched' }, { value: 'hidden', label: 'Hide unmatched' }]} onChange={unmatched => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, unmatched: unmatched as 'catch-all' | 'hidden' } : entry) }))} />
+              <For each={column.choices ?? []}>{(choice, index) => <Inline gap="inline" wrap>
+                <Input label="Choice name" assist={false} value={choice.label} onInput={label => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, label } : value) } : entry) }))} />
+                <Select label="Choice tone" size="sm" value={choice.tone ?? 'muted'} options={['ok', 'warn', 'bad', 'muted', 'accent'].map(value => ({ value, label: value }))} onChange={tone => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, tone: tone as NonNullable<typeof choice.tone> } : value) } : entry) }))} />
+                <Input label="Choice rank" assist={false} value={String(choice.rank ?? '')} onInput={rank => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, rank: rank ? Number(rank) : undefined } : value) } : entry) }))} />
+              </Inline>}</For>
+              <Button size="sm" onPress={() => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: [...(entry.choices ?? []), { id: crypto.randomUUID(), label: 'New choice' }] } : entry) }))}>Add choice</Button>
+            </Show>
+            <For each={plan().sources}>{source => <Field label={`${source.label} binding`}><Select size="sm" label={`${column.label} from ${source.label}`}
+              value={'field' in (column.bind[source.id] ?? {}) ? (column.bind[source.id] as { field: string }).field : ''}
+              options={[{ value: '', label: 'No binding' }, ...((() => { const binding = column.bind[source.id]; return binding && 'field' in binding && !states()[source.id]?.description?.fields.some(field => field.pointer === binding.field) ? [{ value: binding.field, label: `Missing field ${binding.field} · rebind` }] : [] })()), ...(states()[source.id]?.description?.fields ?? []).map(field => ({ value: field.pointer, label: field.label }))]}
+              onChange={pointer => bindColumn(column.id, source.id, pointer)} />
+              <Show when={suggestedBinding(column, source.id)}>{suggestion => <Button size="sm" variant="bare" onPress={() => bindColumn(column.id, source.id, suggestion().pointer)}>{`Bind suggested ${suggestion().name}`}</Button>}</Show>
+              <Show when={column.type === 'enum' && 'field' in (column.bind[source.id] ?? {})}>
+                <For each={(() => {
+                  const binding = column.bind[source.id]
+                  const field = binding && 'field' in binding ? states()[source.id]?.description?.fields.find(item => item.pointer === binding.field) : undefined
+                  return field?.choices?.kind === 'static' ? field.choices.values : []
+                })()}>{value => <Select label={`Map ${value.label}`} size="sm"
+                  value={(() => { const binding = column.bind[source.id]; return binding && 'field' in binding ? Object.entries(binding.values ?? {}).find(([, ids]) => ids.includes(value.id))?.[0] ?? '' : '' })()}
+                  options={[{ value: '', label: 'Unmatched' }, ...(column.choices ?? []).map(choice => ({ value: choice.id, label: choice.label }))]}
+                  onChange={choiceId => mapChoice(column.id, source.id, value.id, choiceId)} />}</For>
               </Show>
-              <For each={content().queries}>{entry => <Fold label={`${entry.label} mappings`} level="sub">
-                <Stack gap="row">
-                  <For each={(['title', 'status', 'assignee', 'updated', 'url'] as const)}>{role => <Select
-                    label={role[0]!.toUpperCase() + role.slice(1)} size="sm"
-                    value={content().mapping.fields[entry.id]?.[role] ?? ''}
-                    options={(() => {
-                      const described = states()[entry.id]?.description?.fields ?? []
-                      const retained = content().mapping.fields[entry.id]?.[role]
-                      return [
-                        { value: '', label: 'Not mapped' },
-                        ...(retained && !described.some(field => field.pointer === retained) ? [{ value: retained, label: `${retained} (no longer in the source)` }] : []),
-                        ...described.map(field => ({ value: field.pointer, label: field.label, title: field.pointer })),
-                      ]
-                    })()}
-                    onChange={pointer => change(current => ({ ...current, mapping: setRoleField(current.mapping, entry.id, role, pointer) }))}
-                  />}</For>
-                  <For each={exactStatusOptions(states()[entry.id], content().mapping.fields[entry.id]?.status)}>{status => <Select
-                    label={`State: ${status.label}`} size="sm"
-                    value={content().mapping.columns.find(column => content().mapping.values[entry.id]?.[column.id]?.includes(status.id))?.id ?? ''}
-                    options={[{ value: '', label: 'No column' }, ...content().mapping.columns.map(column => ({ value: column.id, label: column.label }))]}
-                    onChange={columnId => change(current => ({ ...current, mapping: mapExactStatus(current.mapping, entry.id, status.id, columnId) }))}
-                  />}</For>
-                  <Show when={(() => {
-                    const described = new Set(exactStatusOptions(states()[entry.id], content().mapping.fields[entry.id]?.status).map(value => value.id))
-                    const retained = Object.values(content().mapping.values[entry.id] ?? {}).flat().filter(id => !described.has(id))
-                    return retained.length ? [...new Set(retained)] : undefined
-                  })()}>{retained => <Alert tone="warn">{`Some states no longer exist in the source: ${retained().join(', ')}. Map them again or remove them.`}</Alert>}</Show>
-                  <Show when={states()[entry.id]?.description?.fields.some(field => /category/i.test(field.label) || /category/i.test(field.pointer))}>
-                    <Button size="sm" variant="bare" onPress={() => suggestCategories(entry.id)}>Suggest columns from state categories</Button>
-                  </Show>
-                </Stack>
-              </Fold>}</For>
-              <Show when={displaySchema(states(), content().mapping).fields.length}>
-                <Field label="Visible fields">
-                  <Inline gap="inline" wrap>
-                    <For each={displaySchema(states(), content().mapping).fields}>{field => <Checkbox label={field.name} checked={!content().display.fields.length || content().display.fields.includes(field.id)}
-                      onChange={checked => change(current => setFieldVisible(current, states(), field.id, checked))} />}</For>
-                  </Inline>
-                </Field>
-              </Show>
-              <Show when={!props.dashboardId && tabs().length > 1}><Select label="Dashboard" size="sm" value={placement()} options={tabs().map(tab => ({ value: tab.id, label: tab.name }))} onChange={setPlacement} /></Show>
-            </Stack>
-          </Fold>
-        </Stack>
-
-        <div class="dash-v2-preview" aria-label="Panel preview">
-          <Card>
-            <div class="dash-panel-head">
-              <Heading level={3}>{content().title}</Heading>
-              <Show when={Object.values(states()).some(state => state?.stale)}><Badge tone="warn">Preview is out of date</Badge></Show>
-            </div>
-            <div class="dash-panel-body">
-              <Show when={projected()} fallback={<EmptyState align="start" size="sm" title="No preview yet">Choose Refresh preview on each query to see it here.</EmptyState>}>
-                {value => <PanelBody view={value().definition.view} schema={value().schema} fields={value().fields} rows={value().rows}
-                  {...(value().definition.shaping.groupBy ? { groupBy: value().definition.shaping.groupBy } : {})}
-                  {...(plural() ? { plural: plural() } : {})}
-                  provenance={content().queries.length > 1} />}
-              </Show>
-            </div>
-          </Card>
-        </div>
-      </div>
-    </Modal.Body>
-    <Modal.Actions>
-      <Button variant="ghost" onPress={props.onClose}>Close</Button>
-      <Button variant="solid" tone="accent" disabled={!content().queries.length} onPress={() => void publish()}>Publish</Button>
-    </Modal.Actions>
+            </Field>}</For>
+            <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, columns: current.columns.filter(entry => entry.id !== column.id) }))}>Remove column</Button>
+          </Stack></Card>}</For>
+          <Button size="sm" onPress={addColumn}>Add column</Button>
+        </Stack></Fold>
+        <Fold label="Stages" level="group" defaultOpen><Stack gap="row">
+          <For each={plan().stages}>{(stage, index) => <Fold label={`Keep matching rows · ${index() + 1}`} level="sub"><Stack gap="row">
+            <Select label="Column" size="sm" value={filterColumn(stage.where)}
+              options={plan().columns.map(column => ({ value: column.id, label: column.label }))} onChange={column => editFilter(index(), { column })} />
+            <Select label="Comparison" size="sm" value={comparison(stage.where)?.operator ?? 'eq'}
+              options={['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'contains', 'in', 'missing', 'present'].map(value => ({ value, label: value }))}
+              onChange={operator => editFilter(index(), { operator: operator as Comparison['operator'] })} />
+            <Show when={!['missing', 'present'].includes(comparison(stage.where)?.operator ?? '')}><Input label="Value" assist={false} value={operand(stage.where)} onInput={value => editFilter(index(), { value })} /></Show>
+            <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, stages: current.stages.filter((_entry, at) => at !== index()) }))}>Remove stage</Button>
+          </Stack></Fold>}</For>
+          <Button size="sm" disabled={!plan().columns.length || plan().stages.length >= 12} onPress={addFilter}>Add stage · {PANEL_CAPABILITIES.operations[0].label}</Button>
+          <Show when={!plan().columns.length}><Text emphasis="muted">Add a column before filtering rows.</Text></Show>
+        </Stack></Fold>
+        <Fold label="View and timing" level="group" defaultOpen><Stack gap="row">
+          <Field label="Panel title"><Input label="Panel title" assist={false} value={plan().title} onInput={title => change(current => ({ ...current, title }))} /></Field>
+          <Select label="View" size="sm" value={plan().view.kind} options={Object.keys(PANEL_CAPABILITIES.views).map(kind => ({ value: kind, label: kind }))} onChange={kind => change(current => ({ ...current, view: { ...current.view, kind: kind as PanelPlan['view']['kind'] } }))} />
+          <Select label="Aggregate" size="sm" value={plan().view.aggregate ?? 'count'} options={['count', 'sum', 'avg', 'min', 'max'].map(value => ({ value, label: value }))} onChange={aggregate => change(current => ({ ...current, view: { ...current.view, aggregate: aggregate as NonNullable<PanelPlan['view']['aggregate']> } }))} />
+          <For each={(['field', 'x', 'series'] as const)}>{key => <Select label={key} size="sm" value={plan().view[key] ?? ''} options={[{ value: '', label: 'None' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={value => change(current => ({ ...current, view: { ...current.view, [key]: value || undefined } }))} />}</For>
+          <Select label="Chart shape" size="sm" value={plan().view.shape ?? 'bar'} options={['bar', 'line'].map(value => ({ value, label: value }))} onChange={shape => change(current => ({ ...current, view: { ...current.view, shape: shape as 'bar' | 'line' } }))} />
+          <Select label="Trend" size="sm" value={plan().view.trend ?? ''} options={[{ value: '', label: 'None' }, { value: 'history', label: 'History' }, { value: 'activity', label: 'Activity' }]} onChange={trend => change(current => ({ ...current, view: { ...current.view, trend: trend ? trend as 'history' | 'activity' : undefined } }))} />
+          <Select label="Compare" size="sm" value={plan().view.compare ?? ''} options={[{ value: '', label: 'None' }, { value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} onChange={compare => change(current => ({ ...current, view: { ...current.view, compare: compare ? compare as 'day' | 'week' : undefined } }))} />
+          <Select label="Good direction" size="sm" value={plan().view.good ?? ''} options={[{ value: '', label: 'Neutral' }, { value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }]} onChange={good => change(current => ({ ...current, view: { ...current.view, good: good ? good as 'up' | 'down' : undefined } }))} />
+          <Select label="Sort column" size="sm" value={plan().sort?.[0]?.column ?? ''} options={[{ value: '', label: 'No sort' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, sort: column ? [{ column, direction: current.sort?.[0]?.direction ?? 'asc' }] : [] }))} />
+          <Select label="Sort direction" size="sm" value={plan().sort?.[0]?.direction ?? 'asc'} options={[{ value: 'asc', label: 'Ascending' }, { value: 'desc', label: 'Descending' }]} onChange={direction => change(current => ({ ...current, sort: current.sort?.[0] ? [{ ...current.sort[0], direction: direction as 'asc' | 'desc' }] : [] }))} />
+          <Select label="Group column" size="sm" value={plan().group?.[0]?.column ?? ''} options={[{ value: '', label: 'No grouping' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, group: column ? [{ column, bucket: 'value' }] : [] }))} />
+          <Select label="Group bucket" size="sm" value={plan().group?.[0]?.bucket ?? 'value'} options={PANEL_CAPABILITIES.buckets.map(value => ({ value, label: value }))} onChange={bucket => change(current => ({ ...current, group: current.group?.[0] ? [{ ...current.group[0], bucket: bucket as NonNullable<PanelPlan['group']>[number]['bucket'] }] : [] }))} />
+          <Input label="Limit" assist={false} value={String(plan().limit ?? '')} onInput={value => change(current => ({ ...current, limit: value ? Number(value) : undefined }))} />
+          <Input label="Refresh seconds" assist={false} value={String(plan().refresh ?? '')} onInput={value => change(current => ({ ...current, refresh: value ? Number(value) : undefined }))} />
+          <Input label="Time zone" assist={false} value={plan().time.zone} onInput={zone => change(current => ({ ...current, time: { ...current.time, zone } }))} />
+          <Select label="Time mode" size="sm" value={plan().time.mode} options={[{ value: 'fixed', label: 'Fixed' }, { value: 'viewer', label: 'Viewer' }]} onChange={mode => change(current => ({ ...current, time: { ...current.time, mode: mode as 'fixed' | 'viewer' } }))} />
+          <Select label="Week starts" size="sm" value={plan().time.weekStart} options={['monday', 'sunday', 'saturday'].map(value => ({ value, label: value }))} onChange={weekStart => change(current => ({ ...current, time: { ...current.time, weekStart: weekStart as PanelPlan['time']['weekStart'] } }))} />
+          <Show when={!props.dashboardId && tabs().length > 1}><Select label="Dashboard" size="sm" value={placement()} options={tabs().map(tab => ({ value: tab.id, label: tab.name }))} onChange={setPlacement} /></Show>
+        </Stack></Fold>
+      </Show>
+    </Stack>
+    <div class="dash-v2-preview" aria-label="Panel preview"><Card><div class="dash-panel-head"><Heading level={3}>{plan().title}</Heading></div><div class="dash-panel-body">
+      <For each={describePanelPlan(plan())}>{line => <Text wrap>{line}</Text>}</For>
+      <Show when={aiSummary()}>{summary => <Text wrap>{`AI summary: ${summary()}`}</Text>}</Show>
+      <Show when={plan().requirements?.length}><Fold label="Requirements to confirm" level="sub"><For each={plan().requirements}>{requirement => <Checkbox
+        label={`${requirement.status}: ${requirement.text}${requirement.reason ? ` — ${requirement.reason}` : ''}`}
+        checked={confirmedRequirements().includes(requirement.id)}
+        onChange={checked => setConfirmedRequirements(current => checked ? [...new Set([...current, requirement.id])] : current.filter(id => id !== requirement.id))}
+      />}</For></Fold></Show>
+      <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(entry => `${entry.path}: ${entry.message}`).join(' ')}</Alert></Show>
+      <For each={run()?.diagnostics.stages}>{stage => <Text emphasis="muted">{`${stage.path}: ${stage.input} → ${stage.output} rows`}</Text>}</For>
+      <Show when={display()} fallback={<EmptyState align="start" size="sm" title="No preview yet">Choose a source to see its rows.</EmptyState>}>
+        {value => <PanelBody view={plan().view} schema={value().schema} fields={value().fields} rows={value().rows} groups={displayPlanGroups(run()!.groups, value().rows)}
+          {...(plan().group?.[0] ? { groupBy: plan().group![0]!.column } : {})} provenance={plan().sources.length > 1} />}
+      </Show>
+    </div></Card></div>
+    </div></Modal.Body>
+    <Modal.Actions><Button variant="ghost" onPress={props.onClose}>Close</Button><Button variant="solid" tone="accent" disabled={!plan().sources.length} onPress={() => void publish()}>Publish</Button></Modal.Actions>
   </Modal>
 }

@@ -53,7 +53,7 @@ export function dashboardFields(description: DataSourceDescription): DashboardDi
     if (!schema) return []
     const type = displayType(field, schema)
     const values = type === 'enum' && field.choices?.kind === 'static'
-      ? field.choices.values.map(value => ({ id: value.id, label: value.label }))
+      ? field.choices.values.map(value => ({ ...value }))
       : undefined
     return [{
       id: field.pointer,

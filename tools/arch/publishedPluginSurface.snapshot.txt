@@ -410,6 +410,7 @@ acorn-plugin-types: member DataSourceDescription.parameterFields
 acorn-plugin-types: member DataSourceDescription.parameters
 acorn-plugin-types: member DataSourceDescription.revision
 acorn-plugin-types: member DataSourceDescription.schema
+acorn-plugin-types: member DataSourceDescription.starterPlans
 acorn-plugin-types: member DataSourceDescriptor.icon
 acorn-plugin-types: member DataSourceDescriptor.identityScope
 acorn-plugin-types: member DataSourceDescriptor.name

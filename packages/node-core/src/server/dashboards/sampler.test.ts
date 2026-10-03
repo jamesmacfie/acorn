@@ -111,7 +111,7 @@ describe('dashboard measure sampler', () => {
     if (partial.queries[0]!.reference.kind === 'inline') partial.queries[0]!.reference.content.query.source.sourceId = 'partial'
     const { core, env } = await sampled(partial)
     try {
-      expect(await runSamplePass(core.db, env, AbortSignal.timeout(5_000), NOW)).toMatchObject({ sampled: 0, skipped: [{ panelId: 'p1', reason: 'Records returned partial data' }] })
+      expect(await runSamplePass(core.db, env, AbortSignal.timeout(5_000), NOW)).toMatchObject({ sampled: 0, skipped: [{ panelId: 'p1', reason: 'Records returned incomplete data (upstream-cap).' }] })
       expect((await readSeries(core.db, 'p1')).samples).toEqual([])
     } finally { core.cleanup() }
   })

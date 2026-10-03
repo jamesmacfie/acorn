@@ -228,6 +228,8 @@ export default function SourceQueryEditor(props: {
    *  already has a query, such as a placed panel's Edit. A preview reads the source and writes
    *  nothing. */
   previewOnOpen?: boolean
+  hideAuthoring?: boolean
+  pickSourceAccount?: boolean
   onChange(value: QueryReference | undefined): void
   /** Lets consumers project the shared editor's exact described fields and retained preview. It is
    * observational only: display changes never flow back into query semantics. */
@@ -327,9 +329,9 @@ export default function SourceQueryEditor(props: {
     return undefined
   }
 
-  const selectSource = (next: Source): void => {
+  const selectSource = (next: Source, chosenConnectionId?: string): void => {
     const matches = (integrations.data?.integrations ?? []).filter(connection => connection.providerId === next.providerId && connection.status !== 'disabled')
-    const connectionId = next.providerId && matches.length === 1 ? matches[0]!.id : undefined
+    const connectionId = chosenConnectionId ?? (next.providerId && matches.length === 1 ? matches[0]!.id : undefined)
     const nextQuery: DataSourceQuery = {
       source: { pluginId: next.pluginId, sourceId: next.sourceId },
       scope: { ...baseScope(), ...(connectionId ? { connectionId } : {}) }, sort: [],
@@ -426,9 +428,18 @@ export default function SourceQueryEditor(props: {
         disabled={props.disabled}
         items={[
           ...(library.data ?? []).map(saved => ({ id: `saved:${saved.id}`, label: saved.content.name, note: 'Saved query', active: props.value?.kind === 'saved' && props.value.queryId === saved.id })),
-          ...sources().map(entry => ({ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') })),
+          ...sources().flatMap(entry => props.pickSourceAccount && entry.providerId
+            ? (integrations.data?.integrations ?? []).filter(connection => connection.providerId === entry.providerId && connection.status !== 'disabled').map(connection => ({
+              id: `source:${sourceKey(entry)}|${connection.id}`, label: `${entry.name} · ${connection.name ?? connection.label}`,
+              note: pluginLabel(entry.pluginId), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') && query()?.scope.connectionId === connection.id,
+            }))
+            : [{ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') }]),
         ]}
-        onPick={id => id.startsWith('saved:') ? selectSaved(id.slice(6)) : selectSource(sources().find(entry => sourceKey(entry) === id.slice(7))!)}
+        onPick={id => {
+          if (id.startsWith('saved:')) return selectSaved(id.slice(6))
+          const [key, connectionId] = id.slice(7).split('|')
+          selectSource(sources().find(entry => sourceKey(entry) === key)!, connectionId)
+        }}
       />
     </Field>
     <Show when={catalog.isError}><Alert tone="danger">Sources could not be loaded. Retry after reconnecting the Node.</Alert></Show>
@@ -455,7 +466,7 @@ export default function SourceQueryEditor(props: {
       </Stack>
     </Alert>}</Show>
     <Show when={query()}>{current => <Stack gap="stack">
-      <AuthoringConversation
+      <Show when={!props.hideAuthoring}><AuthoringConversation
         endpoint="/v1/core/authoring/turn"
         target="query"
         targetId={editingShared()?.id ?? selectedSaved()?.id ?? `inline:${sourceKey(current().source)}`}
@@ -466,19 +477,20 @@ export default function SourceQueryEditor(props: {
         disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
         defaultOpen={false}
         onApply={applyAiProposal}
-      />
+      /></Show>
       <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { emitContent(previous()); setAiUndo(undefined) }}>Undo AI edit</Button>}</Show>
       <Show when={source()?.providerId}>
         <Field label="Connection" hint="The account scope is always explicit." group>
           <Select size="sm" label="Connection" disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
             value={current().scope.connectionId ?? ''}
-            options={[{ value: '', label: connections().length ? 'Choose an account…' : 'No connected account' }, ...connections().map((connection: Integration) => ({ value: connection.id, label: connection.label }))]}
+            options={[{ value: '', label: connections().length ? 'Choose an account…' : 'No connected account' }, ...connections().map((connection: Integration) => ({ value: connection.id, label: connection.name ?? connection.label }))]}
             onChange={updateConnection} />
         </Field>
       </Show>
       <Show when={description.isPending && canDescribe()}><Text emphasis="muted">Loading source fields…</Text></Show>
       <Show when={description.isError}><Alert tone="danger">{errorMessage(description.error)}</Alert></Show>
       <Show when={description.data}>{described => <>
+        <Show when={props.pickSourceAccount}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
         <For each={described().parameterFields}>{field => <Field label={field.label} hint={field.description} group>
           <Show when={parameterSchema(field)}>{schema => field.choices?.kind === 'dynamic' ? (
             <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)}

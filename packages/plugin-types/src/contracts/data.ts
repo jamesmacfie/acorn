@@ -20,6 +20,7 @@ export type DataSourceDescription = {
   schema: DataSchema; fields: DataField[]; parameters: DataSchema; parameterFields: DataField[]
   operations: { query: true; options: boolean; details: boolean; incremental: boolean; groups: ('all' | 'any')[] }
   detailSchema?: DataSchema; incremental?: { semantics: string }; revision: string; consistency: string
+  starterPlans?: unknown[]
 }
 export type DataSourceQuery = {
   source: DataSourceRef; scope: DataSourceScope; predicate?: DataPredicate
@@ -103,5 +104,5 @@ export type DataField = {
     role?: 'title' | 'status' | 'assignee' | 'url' | 'updated'
   }
   query?: { operators: DataOperator[]; sortable: boolean }
-  choices?: { kind: 'static'; values: { id: string; label: string }[] } | { kind: 'dynamic'; dependsOn: string[] }
+  choices?: { kind: 'static'; values: { id: string; label: string; tone?: 'ok' | 'warn' | 'bad' | 'muted' | 'accent'; rank?: number }[] } | { kind: 'dynamic'; dependsOn: string[] }
 }

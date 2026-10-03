@@ -57,7 +57,7 @@ describe('authoring route failures', () => {
     const line = String(warn.mock.calls.at(-1)?.[0])
     expect(line).toContain('[authoring] turn ended without a valid candidate')
     expect(line).toContain('model=claude')
-    expect(line).toContain('after two attempts')
+    expect(line).toContain('after three attempts')
     expect(line).toContain('reply=Sure, here is a panel!')
     warn.mockRestore()
   })

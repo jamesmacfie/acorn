@@ -3,7 +3,7 @@ import { type DataField, type DataPredicate } from '@acorn/protocol/dataBindings
 import { validateDataValue, type DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { MISSING, parseDataPointer, readDataPointer } from '@acorn/protocol/dataValues.ts'
 
-export type DataSourceErrorCode = 'unavailable' | 'forbidden' | 'invalid-request' | 'invalid-response' | 'unsupported-query' | 'connection-required' | 'cancelled' | 'timeout' | 'duplicate-record' | 'cursor-loop' | 'provider-failure' | 'oversize'
+export type DataSourceErrorCode = 'unavailable' | 'forbidden' | 'invalid-request' | 'invalid-response' | 'unsupported-query' | 'connection-required' | 'cancelled' | 'timeout' | 'duplicate-record' | 'cursor-loop' | 'provider-failure' | 'rate-limited' | 'oversize'
 export class DataSourceError extends Error {
   constructor(readonly code: DataSourceErrorCode) { super(code) }
 }

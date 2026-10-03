@@ -23,8 +23,7 @@ export default function ListView(props: PanelViewProps) {
     && field.id !== status()?.id
     && !(props.provenance && field.id === PANEL_SOURCE_FIELD_ID))
 
-  return (
-    <For each={props.rows} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
+  const list = (rows: typeof props.rows) => <For each={rows} fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}>
       {(row) => (
         <Row
           density="compact"
@@ -32,24 +31,25 @@ export default function ListView(props: PanelViewProps) {
           leading={(
             <>
               <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>
-              <Show when={status()}>{(field) => <Cell field={field()} value={row.values[field().id]} />}</Show>
+              <Show when={status()}>{(field) => <Cell field={field()} value={row.values[field().id]} unit={row.units?.[field().id]} />}</Show>
             </>
           )}
           meta={
             <For each={meta()}>
               {(field) => (
                 <span class="dash-list-meta">
-                  <Cell field={field} value={row.values[field.id]} />
+                  <Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />
                 </span>
               )}
             </For>
           }
         >
           <Show when={lead()} fallback={row.id}>
-            {(field) => <Cell field={field()} value={row.values[field().id]} />}
+            {(field) => <Cell field={field()} value={row.values[field().id]} unit={row.units?.[field().id]} />}
           </Show>
         </Row>
       )}
     </For>
-  )
+  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4>{`${group.label} · ${group.count}`}</h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
+  return props.groups?.length ? sections(props.groups) : list(props.rows)
 }

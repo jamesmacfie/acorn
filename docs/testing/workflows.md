@@ -1,6 +1,12 @@
 # Workflow checks
 
 Run these checks when changing workflow authoring, execution, children, schedules, or data sources.
+
+For dashboard editor changes, also run the panel-plan and Node dashboard tests described in
+[Testing](../testing.md#dashboard-plan-checks). In an isolated Tauri session, pick a source and
+account, inspect a starter plan, edit a filter and view, publish, and inspect the placed panel. Test
+the **Describe it** entrance with two accounts, ambiguous reach, and an unavailable source; confirm
+that the conversation asks for a choice or records an unavailable requirement.
 The numbers retain their original acceptance-check IDs.
 
 ## Authoring and the run pane

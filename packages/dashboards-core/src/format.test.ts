@@ -38,6 +38,13 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'datetime' }), 'yesterday')).toEqual({ kind: 'empty' })
   })
 
+  it('keeps calendar days unchanged and formats instants in the plan zone', () => {
+    expect(formatCell(field({ type: 'datetime' }), '2026-10-03')).toMatchObject({ kind: 'datetime', absolute: '2026-10-03' })
+    const inUtc = formatCell(field({ type: 'datetime', zone: 'UTC' }), Date.UTC(2026, 9, 3, 0, 30))
+    const inAuckland = formatCell(field({ type: 'datetime', zone: 'Pacific/Auckland' }), Date.UTC(2026, 9, 3, 0, 30))
+    expect(inUtc.kind === 'datetime' && inAuckland.kind === 'datetime' && inUtc.absolute).not.toBe(inAuckland.kind === 'datetime' ? inAuckland.absolute : '')
+  })
+
   it('tones an enum from its declared value, and still renders one that was never declared', () => {
     const declared = field({ type: 'enum', values: [{ id: 'ready', label: 'Ready to merge', tone: 'ok' }] })
     expect(formatCell(declared, 'ready')).toEqual({ kind: 'enum', label: 'Ready to merge', tone: 'ok' })

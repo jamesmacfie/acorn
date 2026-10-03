@@ -11,6 +11,8 @@
     "./layout.ts": "./src/layout.ts",
     "./mapping.ts": "./src/mapping.ts",
     "./model.ts": "./src/model.ts",
+    "./plan.ts": "./src/plan.ts",
+    "./capabilities.ts": "./src/capabilities.ts",
     "./projection": "./src/projection/public.ts",
     "./relativeTime.ts": "./src/relativeTime.ts",
     "./render": "./src/render/public.ts",

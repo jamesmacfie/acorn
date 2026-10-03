@@ -38,7 +38,11 @@ export const dataFieldSchema = z.object({
   }).strict().optional(),
   query: z.object({ operators: z.array(z.enum(DATA_OPERATORS)).max(DATA_OPERATORS.length), sortable: z.boolean() }).strict().optional(),
   choices: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('static'), values: z.array(z.object({ id, label: z.string().min(1).max(DATA_LIMITS.labelChars) }).strict()).max(DATA_LIMITS.options) }).strict(),
+    z.object({ kind: z.literal('static'), values: z.array(z.object({
+      id, label: z.string().min(1).max(DATA_LIMITS.labelChars),
+      tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(),
+      rank: z.number().finite().optional(),
+    }).strict()).max(DATA_LIMITS.options) }).strict(),
     z.object({ kind: z.literal('dynamic'), dependsOn: z.array(dataPointerSchema).max(DATA_LIMITS.fields) }).strict(),
   ]).optional(),
 }).strict().superRefine((field, ctx) => {

@@ -4,6 +4,7 @@ import type {
   DashboardDisplaySchema,
 } from '@acorn/dashboards-core/render'
 import type { PanelTone, PanelView } from '../model'
+import type { DisplayPlanGroup } from '@acorn/dashboards-core/plan.ts'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
    *  layer runs once per panel, not once per view, which is what lets a person flip between views
@@ -17,6 +18,7 @@ export type PanelViewProps = {
   schema: DashboardDisplaySchema
   fields: DashboardDisplayField[]
   rows: DashboardDisplayRow[]
+  groups?: DisplayPlanGroup[]
   /** The shaping layer's group-by, which only the board draws with. It lives in shaping rather than
    *  in the view for the same reason the filters do, so it arrives the same way. */
   groupBy?: string

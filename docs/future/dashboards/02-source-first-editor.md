@@ -1,3 +1,11 @@
+> **Completed 2026-10-03** by the "Phase 02 source-first editor" task.
+>
+> **What landed:** Version 2 panel plans, a pure version 1 upgrade with fixed UTC policy, Node-owned runs and shared reads, and a source-first editor with columns, stages, preview, authoring, and requirements confirmation. Published version 1 revision digests remain unchanged; new saves write version 2. Scripted authoring evaluation and an on-demand real-model recorder were added.
+>
+> **Deviations:** The real Tauri window, `pnpm lint`, and `pnpm test` could not start because this checkout's pnpm wrapper tried a noninteractive dependency reinstall and aborted; direct type checks, focused suites, and a renderer build passed. The evaluation cases are implementation fixtures, not human-annotated acceptance cases, and real-model and 20 unseen-request runs remain outstanding.
+>
+> **For later phases:** Build on `packages/dashboards-core/src/plan.ts` and `capabilities.ts`, and `packages/node-core/src/server/dashboards/run.ts`; the V2 schema deliberately accepts primary sources and filter stages only. The on-demand recorder is `scripts/dashboard-authoring-eval.mjs`; add human-labelled cases and run it against configured models. Source-side projection remains at milestone 3 as planned. A graphical host with a working pnpm install is needed for the desktop acceptance path.
+
 # Workstream 2: the editor and the panel plan
 
 Status: proposed, 2026-10-02, revised the same day. Depends on

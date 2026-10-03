@@ -6,28 +6,27 @@ query execution, or a second record cache.
 
 ## Published panels
 
-The dashboard editor builds a `DashboardPanelContent` draft from one or more saved or inline typed
-queries. A publication freezes those query references, mapping, and display rules in the Node
-dashboard library. A placed `PanelDefinition` contains only the publication ID and small indexing
-metadata (`sources`, `fieldRoles`, and the view). The renderer resolves the immutable publication and
-executes its queries through the shared data-source runtime.
+The dashboard editor builds a version 2 `PanelPlan` from saved or inline typed queries. Its columns
+bind source fields into panel-owned values. Filter stages, sorting, grouping, limits, view options,
+and a time policy operate on those values. The Node stores drafts and immutable published revisions.
+A placed `PanelDefinition` carries the publication ID and derived indexing metadata (`sources`,
+`fieldRoles`, and the view).
 
 There is one execution path:
 
 1. Resolve the dashboard publication in its workspace or project scope.
 2. Resolve each saved or inline query, including typed parameter bindings.
-3. Ask the Node data-source runtime to describe and query its source.
-4. Project the typed records with `dashboards-core`.
+3. Ask the Node data-source runtime to describe each source and validate column bindings.
+4. Plan and share authorized reads, query each source, and run the plan on the Node.
 5. Render the declared list, table, board, stat, or chart view.
 
 Missing plugins, connections, publications, or fields are unavailable states. They are never
 silently replaced with an empty result or a guessed schema. Source identity is
 `(pluginId, sourceId)`; record identity and provenance remain the source contract's responsibility.
 
-A placed panel refetches when the Node announces a change to an account one of its queries read, or
-any plugin change on that Node, because the plugin frame names only the Node. A panel that has no
-data yet refetches on either change. It also refetches when the window regains focus, once its last
-read is older than 30 seconds.
+A placed panel caches a Node run by Node, scope, panel, revision, and viewer time zone. It refetches
+after a reported account or plugin changes, when the window regains focus, and at the plan's refresh
+interval. The Node shares identical authorized reads briefly across panels.
 
 Pressing a row in a placed panel runs the record's declared action through `runChromeAction`, the
 same dispatcher a rail row uses. An action whose `risk` is `write` or `execute` asks first, in a strip
@@ -35,32 +34,28 @@ above the rows. Rows in the editor's preview are not pressable.
 
 ## Editor
 
-The editor uses the shared data controls for source choice, scope, parameters, predicates, sort,
-and preview. Mapping and display configuration are pure `dashboards-core` projections. Publication
-is the boundary between mutable authoring state and a panel that can be placed or sampled.
-**Edit** on a placed panel runs **Refresh preview** once on open. A preview reads the source and
-writes nothing to the draft.
+**Add panel** starts with **Pick data** or **Describe it**. The source picker shows source and account
+pairs; the AI conversation asks for missing choices and proposes the same plan used by the forms.
+The editor shows columns, filter stages, view options, the host's plan description, and a live Node
+preview. Source descriptions may offer starter plans, which the host validates before showing them.
+Each change autosaves the draft and a device recovery copy.
 
-Until workstream 2 replaces both with column IDs, `display.fields` and `display.groupBy` name the
-panel's own fields (`title`, `status`, `assignee`, `updated`, `url`, and `source`) when the panel has
-a mapping, and source JSON Pointers when it doesn't. A panel has a mapping when it has more than one
-query, board columns, or a field or value mapping for any query. The schema enforces the rule, and the
-editor drops references that stop fitting when a query is removed. Rows stored before the rule was
-enforced are read the same way, so they never fail the library list.
+`PanelPlan` version 2 permits primary sources and `filter` stages. The closed capability list in
+`dashboards-core/capabilities.ts` defines the available operations and view options. Columns can
+inherit choice tones and ranks, display lists as chips, and carry fixed or per-row units. The time
+policy stores an IANA zone, fixed or viewer display mode, and week start. Calendar days stay calendar
+days. Validation reports JSON Pointer paths for missing or retyped bindings, incompatible operations,
+sorts, groups, and view fields. A run leaves a changed column unavailable and reports a rebind notice;
+new enum values appear in an unmatched-value notice.
 
-**Validate** and **Publish** describe each query's source, project the panel over no records, and
-refuse it when:
+The Node pushes supported filters to source queries only when their semantics match. It applies a
+source's own limit before panel filters, and warns when that order could hide rows. A final sort and
+limit may become a source `take` when no later stage changes the result. Per-provider scheduling,
+rate-limit backoff, and record, time, intermediate-row, and byte budgets bound reads. The sampler
+uses the same Node runner and the plan's stored time policy.
 
-- A display field or the grouping isn't a field of the projected schema.
-- The view kind isn't one `viewsForSchema` allows for that schema.
-- A view option names a missing field or one of the wrong type: `field` needs a number, `x` needs an
-  enum for a bar or a date for a line, and `series` needs an enum. A sum, average, minimum, or maximum
-  without a `field` is refused too.
-- A mapped role points at a pointer the source doesn't describe.
-
-Each problem names its JSON Pointer path, such as `/display/groupBy`, and what to change. A query
-that can't be resolved or described is reported at `/queries/<index>/reference`. The authoring route
-runs the same check on every AI candidate.
+Version 1 panels read through a pure upgrade with a fixed UTC policy. Saving a draft writes version
+2. Stored published version 1 bytes and digests remain unchanged.
 
 The old flat panel form and client collection registry do not exist. Old definitions are rejected by
 the versioned persistence parser and are recoverable only from the workflow-v2 transition export.

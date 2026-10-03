@@ -2,6 +2,11 @@
 
 Follow [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md), then use the manifest and node references as needed.
 
+Dashboard-capable sources can return `starterPlans` from `describe`. Each card must be a valid
+version 2 panel plan for the chosen source and account; the host validates it before display.
+Static field choices can set `tone` (`ok`, `warn`, `bad`, `muted`, or `accent`) and numeric `rank`.
+Those hints flow to panel enum columns unless the author overrides them.
+
 Create a loaded plugin as plain JavaScript files, install the directory, and iterate without a build
 step. The host uses the same manifest parser, loader, permissions, and route namespace as a bundled
 plugin.

@@ -68,6 +68,8 @@ export const dataSourceDescriptionSchema = z.object({
   }).strict().optional(),
   revision: id,
   consistency: z.string().min(1).max(2048),
+  /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
+  starterPlans: z.array(z.unknown()).max(10).optional(),
 }).strict()
 export const dataSourceQuerySchema = z.object({
   source: dataSourceRefSchema,

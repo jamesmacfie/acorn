@@ -4,7 +4,7 @@ import { invalidatePublishedPanels, publishedDashboardPanelKey } from './dashboa
 
 const scope = { workspaceId: 'workspace' }
 const read = (pluginId: string, connectionId?: string) => ({
-  query: { source: { pluginId, sourceId: 'records' }, scope: { parameters: {}, ...(connectionId ? { connectionId } : {}) }, sort: [] },
+  diagnostics: { plugins: [pluginId], accounts: connectionId ? [connectionId] : [] },
 })
 
 it('refetches the placed panels that read a changed account or plugin', async () => {
@@ -12,9 +12,9 @@ it('refetches the placed panels that read a changed account or plugin', async ()
   const work = publishedDashboardPanelKey('node', scope, 'work')
   const personal = publishedDashboardPanelKey('node', scope, 'personal')
   const elsewhere = publishedDashboardPanelKey('other-node', scope, 'work')
-  client.setQueryData(work, { results: [read('github', 'work-account')] })
-  client.setQueryData(personal, { results: [read('linear', 'personal-account')] })
-  client.setQueryData(elsewhere, { results: [read('github', 'work-account')] })
+  client.setQueryData(work, read('github', 'work-account'))
+  client.setQueryData(personal, read('linear', 'personal-account'))
+  client.setQueryData(elsewhere, read('github', 'work-account'))
 
   await invalidatePublishedPanels(client, 'node', { connectionId: 'work-account' })
   expect(client.getQueryState(work)?.isInvalidated).toBe(true)

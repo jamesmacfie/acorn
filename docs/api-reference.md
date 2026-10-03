@@ -3,8 +3,14 @@
 The [workspace query library](./data-sources.md#workspace-query-library) exposes scoped draft,
 publication, resolution, and consumer operations under `/v1/core/queries/:operation`.
 Typed dashboard panels use the matching device-only `/v1/core/dashboards/:operation` surface for
-`list`, `get`, `create`, compare-and-swap `save`, `publish`, immutable `published`, and `delete`.
+`list`, `get`, `create`, compare-and-swap `save`, `validate`, `publish`, immutable `published`, `run`, and `delete`.
 `GET /v1/core/dashboards/history` remains the separate measure-series read.
+
+`POST /v1/core/dashboards/run` accepts a scoped published revision or a draft `PanelPlan`, `preview`
+or `execution` mode, and an optional viewer time zone. It returns the resolved plan, rows, groups,
+plain-language description, and diagnostics for sources, stages, and budgets. Dashboard authoring's
+`list-accounts` metadata operation returns account IDs, provider IDs, and display names without
+reading provider records.
 
 The Node exposes one Hono application under `/v1`. It serves JSON routes and one authenticated
 WebSocket. It serves no HTML, JavaScript, or static assets.

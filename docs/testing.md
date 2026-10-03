@@ -1,5 +1,23 @@
 # Testing
 
+## Dashboard plan checks
+
+Run the protocol, dashboards-core, Node dashboard, and client dashboard tests after changing panel
+plans. `packages/dashboards-core/src/plan.test.ts` checks version 2 schema examples, binding, sorting,
+grouping, and version 1 upgrades. Node dashboard tests cover publication and sampling through the
+shared runner. Run the editor in an isolated Tauri window with `pnpm dev:agent -- --session <name>`;
+use `pnpm dev:agent:ui -- --session <name> snapshot` after each transition and stop the session when
+done. Check account choice, starter cards, stages, rebind notices, preview, publish, and a placed run.
+
+Dashboard authoring evaluation has scripted cases in
+`packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
+`node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,
+`ACORN_EVAL_TOKEN`, `ACORN_EVAL_BACKEND_ID`, and `ACORN_EVAL_WORKSPACE_ID`; optionally set
+`ACORN_EVAL_MODEL_ID`. The report records outcomes per model without provider rows. The scripted
+cases are implementation fixtures, not acceptance labels collected from people. Product acceptance
+also requires at least 20 previously unseen requests collected from people and reviewed against
+[dashboard acceptance](./future/dashboards/design.md#acceptance). Record failures as evaluation cases.
+
 Tests are organized by runtime and boundary. The suite uses real temporary SQLite roots, real TLS
 listeners, and real child processes where those seams are part of the behavior.
 

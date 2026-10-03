@@ -1,4 +1,4 @@
-import type { DashboardPanelContent, DashboardRecovery } from '@acorn/protocol/dashboards.ts'
+import type { DashboardContent, DashboardRecovery } from '@acorn/protocol/dashboards.ts'
 
 const PREFIX = 'acorn:dashboard-recovery:'
 const key = (copy: Pick<DashboardRecovery, 'nodeId' | 'entityId'>) => `${PREFIX}${copy.nodeId}:${copy.entityId}`
@@ -15,7 +15,7 @@ export function dashboardRecoveryStore(storage?: Pick<Storage, 'getItem' | 'setI
       try { storage?.setItem(key(copy), JSON.stringify(copy)); return storage ? 'saved-on-device' : 'not-saved' }
       catch { return 'not-saved' }
     },
-    acknowledge(copy: DashboardRecovery, acknowledged: DashboardPanelContent): void {
+    acknowledge(copy: DashboardRecovery, acknowledged: DashboardContent): void {
       const current = this.read(copy.nodeId, copy.entityId)
       if (current && current.savedAt === copy.savedAt && JSON.stringify(current.content) === JSON.stringify(acknowledged)) {
         storage?.removeItem(key(copy))

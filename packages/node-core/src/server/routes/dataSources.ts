@@ -21,7 +21,7 @@ export const dataSources = new Hono<AppEnv>()
       return c.json(await invokeDataSource(c.env, input, invocation))
     } catch (error) {
       if (!(error instanceof DataSourceError)) return respondError(c, 500, 'source-error')
-      const status = error.code === 'forbidden' ? 403 : error.code === 'unavailable' ? 404 : error.code === 'timeout' ? 504 : 400
+      const status = error.code === 'forbidden' ? 403 : error.code === 'unavailable' ? 404 : error.code === 'timeout' ? 504 : error.code === 'rate-limited' ? 429 : 400
       return respondError(c, status, error.code)
     }
   })

@@ -117,6 +117,12 @@ store's cursor, up to the host's 5,000-record selection budget, and reports `inc
 No client registration or cold-cache schema discovery path exists: every consumer describes and
 queries through this runtime.
 
+A source description may include `starterPlans` for dashboard authoring. The host parses and
+validates each version 2 plan before offering it. Static field choices may declare a `tone` and
+numeric `rank`; panel columns inherit these until the author overrides them. The source query
+contract does not yet offer projection lists; source-side projection belongs to the later report
+volume milestone.
+
 ## Shared authoring controls
 
 `packages/client-core/src/features/dataSources/SourceQueryEditor.tsx` is the host-owned source/query

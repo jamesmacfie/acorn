@@ -1,14 +1,16 @@
 import { createHash, randomUUID } from 'node:crypto'
 import { and, eq, isNull, or } from 'drizzle-orm'
 import {
-  dashboardPanelContentSchema,
+  panelPlanSchema,
   storedDashboardPanelContentSchema,
   type DashboardDraft,
-  type DashboardPanelContent,
+  type DashboardContent,
+  type PanelPlan,
   type DashboardRevision,
   type DashboardScope,
 } from '@acorn/protocol/dashboards.ts'
 import type { DashboardProblem } from '@acorn/dashboards-core/projection'
+import { upgradePanelContent } from '@acorn/dashboards-core/plan.ts'
 import { canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import type { AppDatabase } from '../db'
 import { dashboardDrafts, dashboardRevisions } from './schema'
@@ -25,15 +27,21 @@ const scopeWhere = (scope: DashboardScope) => and(
   eq(dashboardDrafts.workspaceId, scope.workspaceId),
   scope.projectId ? or(isNull(dashboardDrafts.projectId), eq(dashboardDrafts.projectId, scope.projectId)) : isNull(dashboardDrafts.projectId),
 )
+const readContent = (raw: string): PanelPlan => {
+  const value: unknown = JSON.parse(raw)
+  return value && typeof value === 'object' && 'version' in value && value.version === 2
+    ? panelPlanSchema.parse(value)
+    : upgradePanelContent(storedDashboardPanelContentSchema.parse(value))
+}
 const parseDraft = (row: typeof dashboardDrafts.$inferSelect): DashboardDraft => ({
   ...row,
   projectId: row.projectId ?? undefined,
-  content: storedDashboardPanelContentSchema.parse(JSON.parse(row.content)),
+  content: readContent(row.content),
 })
 const parseRevision = (row: typeof dashboardRevisions.$inferSelect): DashboardRevision => ({
   ...row,
   projectId: row.projectId ?? undefined,
-  content: storedDashboardPanelContentSchema.parse(JSON.parse(row.content)),
+  content: readContent(row.content),
 })
 
 export function dashboardStore(db: AppDatabase) {
@@ -46,18 +54,18 @@ export function dashboardStore(db: AppDatabase) {
       if (!row) throw new DashboardLibraryError('not-found')
       return parseDraft(row)
     },
-    create(scope: DashboardScope, content: DashboardPanelContent): DashboardDraft {
+    create(scope: DashboardScope, content: DashboardContent): DashboardDraft {
       const now = Date.now()
       const id = randomUUID()
       db.insert(dashboardDrafts).values({
-        ...scope, id, content: JSON.stringify(dashboardPanelContentSchema.parse(content)),
+        ...scope, id, content: JSON.stringify(panelPlanSchema.parse('version' in content ? content : upgradePanelContent(content))),
         draftRevision: 1, createdAt: now, updatedAt: now,
       }).run()
       return store.get(scope, id)
     },
-    save(scope: DashboardScope, id: string, expectedRevision: number, content: DashboardPanelContent): DashboardDraft {
+    save(scope: DashboardScope, id: string, expectedRevision: number, content: DashboardContent): DashboardDraft {
       const result = db.update(dashboardDrafts).set({
-        content: JSON.stringify(dashboardPanelContentSchema.parse(content)),
+        content: JSON.stringify(panelPlanSchema.parse('version' in content ? content : upgradePanelContent(content))),
         draftRevision: expectedRevision + 1,
         updatedAt: Date.now(),
       }).where(and(eq(dashboardDrafts.id, id), scopeWhere(scope), eq(dashboardDrafts.draftRevision, expectedRevision))).run()

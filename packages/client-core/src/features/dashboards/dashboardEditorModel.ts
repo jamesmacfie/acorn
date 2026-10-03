@@ -1,4 +1,4 @@
-import { isMappedDashboard, type DashboardDraft, type DashboardMapping, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
+import { isMappedDashboard, type DashboardMapping, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import { DATA_SOURCE_PREVIEW_MODE } from '@acorn/protocol/dataSources.ts'
@@ -14,7 +14,7 @@ export const emptyDashboardContent = (): DashboardPanelContent => ({
   display: { view: { kind: 'list' }, fields: [] },
 })
 
-export const latestUnpublishedDashboard = (drafts: readonly DashboardDraft[]): DashboardDraft | undefined =>
+export const latestUnpublishedDashboard = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T | undefined =>
   drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)[0]
 
 export function setDashboardQuery(

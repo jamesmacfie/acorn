@@ -70,7 +70,7 @@ describe('dashboard publication', () => {
     expect(impact.consumers).toEqual([expect.objectContaining({ kind: 'panel', id: draft.id })])
     const detached = dashboardStore(db).save(scope, draft.id, 2, {
       ...draft.content,
-      queries: [{ id: 'first', label: 'Items', reference: { kind: 'inline', content: query.content, bindings: {} } }],
+      sources: [{ id: 'first', label: 'Items', role: 'primary', reference: { kind: 'inline', content: query.content, bindings: {} } }],
     })
     await publishDashboard(env, scope, draft.id, detached.draftRevision, invocation())
     expect(queryStore(db).consumers(scope, query.id)).toEqual([])
@@ -88,7 +88,7 @@ describe('dashboard publication', () => {
     })
     const refused = await publishDashboard(env, scope, draft.id, draft.draftRevision, invocation()).catch((error: unknown) => error)
     expect(refused).toBeInstanceOf(DashboardLibraryError)
-    expect((refused as DashboardLibraryError).problems).toEqual([expect.objectContaining({ path: '/display/fields/1' })])
+    expect((refused as DashboardLibraryError).problems).toEqual([expect.objectContaining({ path: '/columns/1/bind/first' })])
     expect(dashboardStore(db).get(scope, draft.id).publishedRevision).toBeNull()
   })
 })

@@ -1,5 +1,7 @@
 import { z } from 'zod'
 import { queryReferenceSchema, queryScopeSchema, type QueryReference, type QueryScope } from '../data/queries/dataQueries'
+import { parseDataPredicate, type DataPredicate } from '../data/values/dataBindings'
+import { parseDataValue, type DataValue } from '../data/values/dataValues'
 import { dashboardViewSchema } from './dashboardViews'
 
 export { dashboardViewKinds, dashboardViewSchema, type DashboardView } from './dashboardViews'
@@ -79,6 +81,52 @@ function checkDashboardContent(content: DashboardContentShape, ctx: z.Refinement
 
 export const dashboardPanelContentSchema = dashboardPanelContentObject.superRefine(checkDashboardContent)
 
+const dataValueSchema = z.unknown().transform((value, ctx): DataValue => {
+  try { return parseDataValue(value) }
+  catch { ctx.addIssue({ code: 'custom', message: 'Invalid data value' }); return z.NEVER }
+})
+const predicateSchema = z.unknown().transform((value, ctx): DataPredicate => {
+  try { return parseDataPredicate(value) }
+  catch { ctx.addIssue({ code: 'custom', message: 'Invalid filter predicate' }); return z.NEVER }
+})
+const columnId = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)
+const panelPlanViewSchema = dashboardViewSchema.omit({ field: true, x: true, series: true }).extend({
+  field: columnId.optional(), x: columnId.optional(), series: columnId.optional(),
+}).strict()
+const choiceSchema = z.object({ id, label, tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(), rank: z.number().finite().optional() }).strict()
+const bindingSchema = z.union([
+  z.object({ field: pointer, values: z.record(id, z.array(id).max(100)).optional() }).strict(),
+  z.object({ value: dataValueSchema }).strict(),
+])
+export const panelPlanSchema = z.object({
+  version: z.literal(2),
+  title: label,
+  request: z.string().max(8000).optional(),
+  time: z.object({ zone: z.string().min(1).max(100), mode: z.enum(['fixed', 'viewer']), weekStart: z.enum(['monday', 'sunday', 'saturday']) }).strict(),
+  sources: z.array(z.object({ id: columnId, label, role: z.literal('primary'), reference: queryReferenceSchema }).strict()).min(1).max(8),
+  columns: z.array(z.object({
+    id: columnId, label,
+    type: z.enum(['text', 'number', 'boolean', 'datetime', 'enum', 'person', 'link']).optional(),
+    list: z.boolean().optional(),
+    unit: z.union([z.string().min(1).max(16), z.object({ column: columnId }).strict()]).optional(),
+    precision: z.enum(['instant', 'day']).optional(),
+    choices: z.array(choiceSchema).max(100).optional(),
+    unmatched: z.enum(['catch-all', 'hidden']).optional(),
+    bind: z.record(columnId, bindingSchema),
+  }).strict()).max(100),
+  stages: z.array(z.object({ op: z.literal('filter'), where: predicateSchema }).strict()).max(12),
+  sort: z.array(z.object({ column: columnId, direction: z.enum(['asc', 'desc']), empty: z.enum(['first', 'last']).optional() }).strict()).max(8).optional(),
+  group: z.array(z.object({ column: columnId, bucket: z.enum(['value', 'day', 'week', 'month', 'relative']).optional(), order: z.enum(['declared', 'label', 'count', 'explicit']).optional(), values: z.array(z.string()).max(100).optional() }).strict()).max(2).optional(),
+  limit: z.number().int().min(1).max(5000).optional(),
+  view: panelPlanViewSchema,
+  refresh: z.number().int().min(30).max(86400).optional(),
+  requirements: z.array(z.object({ id: columnId, text: label, status: z.enum(['covered', 'partial', 'choice', 'unavailable']), reason: z.string().max(1000).optional(), paths: z.array(pointer).max(20).optional() }).strict()).max(100).optional(),
+}).strict()
+export type PanelPlan = z.infer<typeof panelPlanSchema>
+export type PanelPlanColumn = PanelPlan['columns'][number]
+export const dashboardContentSchema = z.union([panelPlanSchema, dashboardPanelContentSchema])
+export type DashboardContent = PanelPlan | DashboardPanelContent
+
 /** Rows written before the display rule existed may name a source pointer on a mapped panel. Reading
  * them drops what can't resolve, rather than failing the whole library list. */
 export const storedDashboardPanelContentSchema = dashboardPanelContentObject
@@ -91,7 +139,7 @@ export type DashboardPanelQuery = { id: string; label: string; reference: QueryR
 export type DashboardScope = QueryScope
 export type DashboardDraft = QueryScope & {
   id: string
-  content: DashboardPanelContent
+  content: PanelPlan
   draftRevision: number
   basePublishedRevision: number | null
   publishedRevision: number | null
@@ -101,7 +149,7 @@ export type DashboardDraft = QueryScope & {
 export type DashboardRevision = QueryScope & {
   dashboardId: string
   revision: number
-  content: DashboardPanelContent
+  content: PanelPlan
   digest: string
   createdAt: number
 }
@@ -109,8 +157,8 @@ export type DashboardRecovery = {
   nodeId: string
   entityId: string
   baseRevision: number
-  baseContent: DashboardPanelContent
-  content: DashboardPanelContent
+  baseContent: DashboardContent
+  content: DashboardContent
   savedAt: number
 }
 
@@ -118,11 +166,20 @@ const revision = z.number().int().positive()
 export const dashboardLibraryRequestSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('list'), scope: queryScopeSchema }).strict(),
   z.object({ operation: z.literal('get'), scope: queryScopeSchema, id }).strict(),
-  z.object({ operation: z.literal('create'), scope: queryScopeSchema, content: dashboardPanelContentSchema }).strict(),
-  z.object({ operation: z.literal('save'), scope: queryScopeSchema, id, expectedRevision: revision, content: dashboardPanelContentSchema }).strict(),
-  z.object({ operation: z.literal('validate'), scope: queryScopeSchema, content: dashboardPanelContentSchema }).strict(),
+  z.object({ operation: z.literal('create'), scope: queryScopeSchema, content: panelPlanSchema }).strict(),
+  z.object({ operation: z.literal('save'), scope: queryScopeSchema, id, expectedRevision: revision, content: panelPlanSchema }).strict(),
+  z.object({ operation: z.literal('validate'), scope: queryScopeSchema, content: panelPlanSchema }).strict(),
   z.object({ operation: z.literal('publish'), scope: queryScopeSchema, id, expectedRevision: revision }).strict(),
   z.object({ operation: z.literal('published'), scope: queryScopeSchema, id, revision: revision.optional() }).strict(),
+  z.object({
+    operation: z.literal('run'), scope: queryScopeSchema,
+    target: z.discriminatedUnion('kind', [
+      z.object({ kind: z.literal('published'), id, revision: revision.optional() }).strict(),
+      z.object({ kind: z.literal('draft'), content: dashboardContentSchema }).strict(),
+    ]),
+    mode: z.enum(['preview', 'execution']), viewerZone: z.string().max(100).optional(),
+    evaluationTime: z.number().finite().optional(),
+  }).strict(),
   z.object({ operation: z.literal('delete'), scope: queryScopeSchema, id, expectedRevision: revision }).strict(),
 ])
 export type DashboardLibraryRequest = z.infer<typeof dashboardLibraryRequestSchema>
