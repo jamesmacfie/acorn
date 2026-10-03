@@ -5,7 +5,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import { recordAudit, type AuditActor } from '../audit'
 
-// Device tokens: issue / authenticate / list / revoke (docs/api-reference.md § Pairing).
+// Device tokens: issue / authenticate / list / revoke (docs/api-reference/transport.md § Pairing).
 //
 // The raw token is returned exactly once, at pairing; only sha256(secret) is stored. A 256-bit
 // random secret makes offline hash guessing infeasible, so nothing reversible is layered on.
@@ -50,7 +50,7 @@ export type DeviceService = {
   // unpaired this one?" is the question the trail exists to answer.
   revoke(id: string, actor?: AuditActor): Promise<boolean>
   // Fires after a successful revoke so live sockets for that device close immediately
-  // (docs/api-reference.md § Pairing: "open sockets are closed").
+  // (docs/api-reference/transport.md § Pairing: "open sockets are closed").
   onRevoked(listener: (deviceId: string) => void): () => void
   // Is this device still allowed? The 60s stream re-check reads this rather than re-authenticating,
   // because a long-lived socket holds no bearer to re-present.

@@ -25,7 +25,7 @@ import { createSlotChoice } from './slotChoice'
 //
 // Cooperative slots remain one level. The special `Slot` tree node for replaceable chrome is outside
 // KIT_NODES and needs a host-minted reference; a cooperative contributor receives no such reference.
-// The chrome host clears that reference before mounting the child. See docs/security.md § Rung 0.
+// The chrome host clears that reference before mounting the child. See docs/security/plugin-client-sandbox.md § Refused for good.
 
 export type SlotProps = {
   /** `<owner>:<point>`, the id the host minted from the owner's manifest. */

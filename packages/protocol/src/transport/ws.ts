@@ -1,5 +1,5 @@
 // The one authenticated WebSocket that carries every live stream: PTY, docker, workflow and agent
-// events, plus preview tunnels (docs/api-reference.md § WebSocket). One socket per node per client, on
+// events, plus preview tunnels (docs/api-reference/websocket.md § WebSocket). One socket per node per client, on
 // the loopback origin at WS_PATH, token-authenticated at upgrade.
 //
 // The envelope is kind-tagged and open: every frame is a plain serializable object with a stable
@@ -25,7 +25,7 @@ export const MAX_TUNNEL_MESSAGE_BYTES = 64 * 1024
 export type WsFrame = { channel: string } & Record<string, unknown>
 
 // The envelope stays open for plugin-owned payloads, but the channel tag is still a mutation boundary
-// for term input/attach/detach (docs/security.md § Transport and auth). This validates the one field
+// for term input/attach/detach (docs/security/transport-and-auth.md § Transport and auth). This validates the one field
 // core dispatches on before any plugin or terminal handler sees a peer-supplied frame.
 export const wsFrameSchema = z.object({ channel: z.string().min(1) }).passthrough()
 

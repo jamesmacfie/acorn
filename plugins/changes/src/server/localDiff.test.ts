@@ -149,7 +149,7 @@ describe('the remote argv (pure)', () => {
   })
 
   // `--set-upstream` on every push, which is what makes Publish and Push one call. `--force-with-lease`
-  // and never a bare `--force` (docs/security.md § Process, path, and configuration controls).
+  // and never a bare `--force` (docs/security/process-and-paths.md § Process, path, and configuration controls).
   it('pushes with an upstream always, and with a lease when forced', () => {
     expect(pushArgs()).toEqual(['push', '--set-upstream', 'origin', 'HEAD'])
     expect(pushArgs({ force: true })).toEqual(['push', '--force-with-lease', '--set-upstream', 'origin', 'HEAD'])

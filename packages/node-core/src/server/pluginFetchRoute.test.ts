@@ -6,7 +6,7 @@ import type { PluginRequestContext } from './pluginHost/types'
 import { registerRoute, removePluginRoutes } from './routes/registry'
 
 // The fetch-shaped route seam a loaded plugin gets instead of a Hono router
-// (docs/security.md § Design rules: a Hono instance cannot cross a process
+// (docs/security/plugin-storage-and-supply-chain.md § Design rules: a Hono instance cannot cross a process
 // boundary, a (Request) → Response function can). What matters here is that the seam behaves like
 // the router seam it replaces: same mount, same auth envelope, same relative paths.
 

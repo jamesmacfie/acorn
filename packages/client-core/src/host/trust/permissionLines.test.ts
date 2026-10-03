@@ -45,7 +45,7 @@ describe('the two permission groups', () => {
 
   it('names the disclosure hiding inside core.projects', () => {
     // "Read projects" does not sound like "list every codebase on this machine and where it lives", but
-    // that is what checkouts() returns (docs/security.md § Rung 1).
+    // that is what checkouts() returns (docs/security/plugin-node-realm.md § Rung 1: permission-shaped context).
     expect(texts(nodePermissionLines(permissions({ node: { core: ['projects:read'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } })))).toEqual([
       'Read projects, including where every codebase lives on disk',
     ])
@@ -74,7 +74,7 @@ describe('the two permission groups', () => {
   it('names what a telemetry sink can see, because it is every owner and not just this plugin', () => {
     // The one read-everything grant on `ctx.core`. Writing telemetry gets no line at all: it needs
     // no token, because a plugin measuring its own work reads nobody else's
-    // (docs/security.md § Telemetry sinks).
+    // (docs/security/plugin-node-realm.md § Telemetry sinks).
     const lines = nodePermissionLines(permissions({ node: { core: ['telemetry'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
     expect(texts(lines)).toEqual([
       'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin',

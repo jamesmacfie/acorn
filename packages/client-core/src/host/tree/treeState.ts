@@ -295,7 +295,7 @@ export function createTreeState(input: TreeStateInput) {
     if (!ops.length) return
     // A histogram, owned by the plugin whose tree this is. One coalesced batch per frame while a
     // remote pane is animating is well past the ten-a-second line a span has to stay under
-    // (docs/telemetry.md § Hot seams are metrics), and what the number answers is "whose tree is
+    // (docs/telemetry/model.md § Hot seams are metrics), and what the number answers is "whose tree is
     // making the shell drop frames".
     if (queuedAt) recordDuration(input.pluginId, 'tree.queue.wait', performance.now() - queuedAt)
     recordSample(input.pluginId, 'tree.batch.operations', ops.length)

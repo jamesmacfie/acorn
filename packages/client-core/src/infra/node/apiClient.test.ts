@@ -151,7 +151,7 @@ describe('the headers every request carries', () => {
     const during = parseTraceparent(headers[0].traceparent)
     // The trace is the interaction's, so the click and everything the node did for it read as one
     // thing. The parent is the request's own `api.request` span rather than the interaction, so
-    // the node's `http.request` hangs at the right depth (docs/telemetry.md § Traces).
+    // the node's `http.request` hangs at the right depth (docs/telemetry/model.md § Traces).
     expect(during?.traceId).toBe(interaction.traceId)
     expect(during?.parentSpanId).not.toBe(interaction.spanId)
     interaction.end()

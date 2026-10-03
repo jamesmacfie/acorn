@@ -264,7 +264,7 @@ export type StepKindDescription = {
 export type StepKindContribution = { handler: StepHandler; validate?: StepValidator; describe: StepKindDescription }
 
 /** What the editor and the palette need to offer every kind this node can run
- *  (docs/api-reference.md § Workflows). `pluginId` is null for a built-in. */
+ *  (docs/api-reference/workflow-routes.md § Runs). `pluginId` is null for a built-in. */
 export type WorkflowCatalog = {
   kinds: { id: string; pluginId: string | null; describe: StepKindDescription | null }[]
   policies: { id: string; pluginId: string | null }[]

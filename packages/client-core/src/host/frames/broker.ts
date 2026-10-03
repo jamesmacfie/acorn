@@ -667,7 +667,7 @@ export function createFrameBridge(input: {
       return
     }
     // A histogram and never a span: a frame doing real work sends a handful of messages per
-    // interaction, and one drawing a chart sends thousands (docs/telemetry.md § Hot seams are
+    // interaction, and one drawing a chart sends thousands (docs/telemetry/model.md § Hot seams are
     // metrics). The kind is in the seam name rather than an attribute, because a histogram is
     // keyed by seam and `api` and `state.set` are different questions.
     const kind = MEASURED_KINDS.has(data.kind) ? data.kind : 'other'

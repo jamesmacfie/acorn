@@ -4,7 +4,7 @@ import { makeTestPluginDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { agentEvents } from '../node/schema'
 import { AgentSearchProjection } from './sessions/searchProjection'
 
-// FTS5 schema drift guard. See docs/data-layer.md § Migrations for why this table and its triggers are
+// FTS5 schema drift guard. See docs/data-layer/migrations.md § Migrations for why this table and its triggers are
 // hand-written into the migration instead of the Drizzle schema.
 //
 // Uses a per-plugin database, because the migration chain that creates these four objects

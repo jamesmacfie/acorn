@@ -691,7 +691,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
   /**
    * Removes the stored history of the sessions of the tasks `taskIds` names, for the retention
-   * schedule (docs/data-layer.md § Retention). The rows stay, each with `note` as its transcript, so
+   * schedule (docs/data-layer/backup-and-retention.md § Retention). The rows stay, each with `note` as its transcript, so
    * the task still lists them. Provider-side sessions are left alone: deleting one would mean
    * starting its CLI, and the node's disk is what this is for.
    *

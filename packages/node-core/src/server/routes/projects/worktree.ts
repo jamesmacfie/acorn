@@ -112,7 +112,7 @@ async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: Archi
 export const worktree = new Hono<AppEnv>()
   // Live dirty/changed-file status for every active task with a worktree, polled by the rail/footer.
   //
-  // Filtered rather than gated, the same answer terminal's session roster gives (docs/security.md §
+  // Filtered rather than gated, the same answer terminal's session roster gives (docs/security/transport-and-auth.md §
   // Transport and auth). A task-scoped credential has a legitimate reason to ask about its own task,
   // and no reason to be handed every other active task's id, absolute worktree path and dirty count.
   // The filter also covers the plugin-frame caller, since `core.tasks:read` grants this path.

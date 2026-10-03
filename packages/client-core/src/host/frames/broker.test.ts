@@ -10,7 +10,7 @@ import { createFrameBridge, type FrameBinding, type FrameServices } from './brok
 // the happy path of the protocol rather than the enforcement.
 //
 // The enforcement itself is docs/plugins.md § Loaded plugins: the client half (the scope table, the
-// focus-gated and throttled `openUrl`, the importer/overlay-only close verb) and docs/security.md §
+// focus-gated and throttled `openUrl`, the importer/overlay-only close verb) and docs/security/plugin-bundles.md §
 // Third-party plugin bundles (the code-execution routes this suite asserts stay unmappable).
 
 const BINDING: FrameBinding = {

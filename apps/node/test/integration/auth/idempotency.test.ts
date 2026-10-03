@@ -14,7 +14,7 @@ import { requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
-// Idempotency-Key semantics (docs/api-reference.md § HTTP conventions) over a counting stub route,
+// Idempotency-Key semantics (docs/api-reference/transport.md § Request processing) over a counting stub route,
 // mounted in the same order createApp() uses: seed the principal → requireUser → idempotency → route.
 // A stub rather than a real route because the property under test is "how many times did the handler
 // run", which no product route exposes.

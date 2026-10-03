@@ -45,7 +45,7 @@ describe('pairing codes', () => {
     expect(codes.isOpen()).toBe(false)
   })
 
-  // docs/api-reference.md § Pairing: failures are uniform, no oracle for "right code, wrong
+  // docs/api-reference/transport.md § Pairing: failures are uniform, no oracle for "right code, wrong
   // something". Every one of these must be the same `false` to the caller.
   it('fails identically for no window, expired, wrong and malformed', () => {
     expect(codes.consume('AAAAAAAAAAAAAAAAAAAAAA')).toBe(false) // no window open

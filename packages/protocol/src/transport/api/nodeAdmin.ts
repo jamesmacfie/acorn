@@ -9,7 +9,7 @@ export const corePairRoute = '/v1/core/pair'
 export const coreDevicesRoute = '/v1/core/devices'
 export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeURIComponent(deviceId)}`
 
-// Settings → Security and backup, and Settings → Audit log (docs/security.md § Audit, § Filesystem and backup).
+// Settings → Security and backup, and Settings → Audit log (docs/security/audit.md § Audit, § Filesystem and backup).
 //
 // `diskEncrypted` is three-valued. `null` means "this node can't tell", the honest answer off macOS,
 // where LUKS, dm-crypt, ZFS native encryption and a dozen NAS arrangements all count. A security
@@ -17,7 +17,7 @@ export const coreDeviceRoute = (deviceId: string) => `/v1/core/devices/${encodeU
 export type NodeSecurityPosture = { diskEncrypted: boolean | null; platform: string }
 export const coreSecurityRoute = '/v1/core/security'
 
-// Settings > Storage and memory (docs/data-layer.md § What the node reports). Device-only, like
+// Settings > Storage and memory (docs/data-layer/backup-and-retention.md § What the node reports). Device-only, like
 // security: sizes and memory describe the machine. `rssBytes` is the node process's own resident
 // memory. Each database counts its `-wal` and `-shm` files. Disk sizes are measured at most every 30
 // seconds. Worktrees are left out, because walking them costs more than the answer is worth.
@@ -77,7 +77,7 @@ export type AuditVocabularyEntry = { action: string; label: string }
 export type AuditPage = { entries: AuditEntry[]; nextBefore: number | null; vocabulary?: AuditVocabularyEntry[] }
 export const coreAuditRoute = '/v1/core/audit'
 
-// `POST /v1/core/backup` (docs/data-layer.md § Backup). `destPath` is a path on the node's filesystem,
+// `POST /v1/core/backup` (docs/data-layer/backup-and-retention.md § Backup and import). `destPath` is a path on the node's filesystem,
 // which is why the client offers a native save dialog only for the local node. `excluded` is echoed
 // back and written into the archive's manifest, so "why is my GitHub token gone" is answered for
 // whoever restores it a year later.

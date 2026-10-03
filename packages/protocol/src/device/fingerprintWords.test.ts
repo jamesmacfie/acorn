@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { FINGERPRINT_WORD_COUNT, fingerprintPhrase, fingerprintWords } from './fingerprintWords'
 
-// The comparison is the security of pairing (docs/api-reference.md § Pairing): two 64-character hex
+// The comparison is the security of pairing (docs/api-reference/transport.md § Pairing): two 64-character hex
 // strings differing in the middle look identical to a person, which is exactly the substitution an
 // attacker wants. Six words make that comparison practical.
 

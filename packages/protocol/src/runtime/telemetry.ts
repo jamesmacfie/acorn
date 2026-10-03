@@ -2,7 +2,7 @@
 //
 // Here rather than in node-core because from phase 1 the renderer, the terminal client and the
 // desktop helper all build batches and post them to the node, and protocol is the one package every
-// runtime imports (docs/telemetry.md § The five kinds).
+// runtime imports (docs/telemetry/model.md § The five kinds).
 //
 // The field names are OpenTelemetry's and none of its code is here. That is the whole reason a
 // second exporter is cheap: Better Stack, Coralogix and Datadog all take OTLP, so a sink that speaks
@@ -55,7 +55,7 @@ export const telemetrySpanSchema = z.object({
   spanId: spanIdSchema,
   parentSpanId: spanIdSchema.optional(),
   // A pattern, never one instance: `http.request` with the route as an attribute, not a hundred URLs
-  // (docs/telemetry.md § The admission rule for a span).
+  // (docs/telemetry/model.md § The admission rule for a span).
   name: z.string().min(1),
   // Milliseconds since the epoch, and milliseconds of duration.
   start: z.number(),
@@ -84,7 +84,7 @@ export const telemetryEventSchema = z.object({
 
 /** A histogram arrives pre-aggregated over one flush window. That is how a seam firing a thousand
  *  times a second costs one record every five seconds instead of a thousand spans a sink has to
- *  drop (docs/telemetry.md § Hot seams are metrics). */
+ *  drop (docs/telemetry/model.md § Hot seams are metrics). */
 export const telemetryHistogramSchema = z.object({
   count: z.number(),
   sum: z.number(),

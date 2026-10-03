@@ -85,12 +85,12 @@ const wrapStatement = (stmt: StatementSync): SqliteStatement => {
 //
 // The statement text is not the key: bound parameters are out of it already, but a hundred distinct
 // `SELECT`s would be a hundred histograms nobody reads, and a metric name has to be a pattern
-// (docs/telemetry.md § The attribute vocabulary). The verb alone answers the question worth asking
+// (docs/telemetry/model.md § The attribute vocabulary). The verb alone answers the question worth asking
 // before anyone tunes a statement — is this node's time going into reads, writes or transactions.
 // Finding the statement itself is what the request duration and a debugger are for.
 //
 // A histogram and not a span: this is the hottest seam in the node by a wide margin
-// (docs/telemetry.md § Hot seams are metrics). The owner is `'core'` here and resolved against the
+// (docs/telemetry/model.md § Hot seams are metrics). The owner is `'core'` here and resolved against the
 // ambient context inside `recordDuration`, which is the only way a statement eleven frames below a
 // plugin's route can name that plugin (../telemetry/context.ts). Reading the context costs about 8
 // nanoseconds, so a statement can afford to ask.

@@ -7,7 +7,7 @@ import { brokerEnv } from '@acorn/plugin-api/node'
 
 const exec = promisify(execFile)
 
-// The env the docker CLI sees (docs/security.md § Process, path, and configuration controls).
+// The env the docker CLI sees (docs/security/process-and-paths.md § Process, path, and configuration controls).
 // DOCKER_HOST and DOCKER_CONTEXT are how OrbStack, colima, and Docker Desktop differ, so they ride
 // the DOCKER_* and COMPOSE_* passthrough below.
 export function dockerEnv(): NodeJS.ProcessEnv {

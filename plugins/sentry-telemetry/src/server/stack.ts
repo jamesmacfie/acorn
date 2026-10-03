@@ -12,7 +12,7 @@
 //   of the issue. A frame is in-app when its path is not inside `node_modules`.
 //
 // The paths here have already been through core's scrubber, so a home directory reads as `~` and
-// the data root as `<data>` (docs/telemetry.md § What never leaves the machine).
+// the data root as `<data>` (docs/telemetry/model.md § What never leaves the machine).
 //
 // No acorn imports.
 

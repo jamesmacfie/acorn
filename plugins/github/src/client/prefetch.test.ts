@@ -74,7 +74,7 @@ describe('open PR warmup', () => {
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       // `objectContaining`, because `apiClient.send()` names every request with an
-      // `x-request-id` header now (docs/telemetry.md § The renderer).
+      // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
       headers: expect.objectContaining({ 'content-type': 'application/json' }),
       signal,
     }))
@@ -96,7 +96,7 @@ describe('open PR warmup', () => {
     expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/pulls/batch', expect.objectContaining({
       method: 'POST',
       // `objectContaining`, because `apiClient.send()` names every request with an
-      // `x-request-id` header now (docs/telemetry.md § The renderer).
+      // `x-request-id` header now (docs/telemetry/renderer.md § Renderer seams).
       headers: expect.objectContaining({ 'content-type': 'application/json' }),
       signal,
     }))

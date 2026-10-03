@@ -1,5 +1,5 @@
 // One telemetry record out of a sandboxed frame, checked and emitted with the host's own owner
-// stamped on it (docs/telemetry.md § A frame's own records).
+// stamped on it (docs/telemetry/plugins-and-sinks.md § A frame's own records).
 //
 // Beside the broker rather than inside it for the reason the broker's own comment gives: that file
 // is the security choke point and stays a readable switch over verbs. This is the one verb whose

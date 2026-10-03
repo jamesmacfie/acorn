@@ -41,6 +41,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [rail-context-menus.md](./rail-context-menus.md) | Desktop source and pane icon menus, plugin ownership, replacement providers, and verification gates. | Implementation on isolated branch, 2026-10-03; integration acceptance open. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
+| [schedules.md](./schedules.md) | Unattended backup and an `agent-run` schedule target. | Proposals moved from schedules.md, 2026-10-03. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
 

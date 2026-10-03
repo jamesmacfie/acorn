@@ -62,7 +62,7 @@ export type FleetBridge = {
   tunnelClose(match: { nodeId?: string; taskId?: string }): void
 }
 
-// Custody of third-party plugin bundles. See docs/security.md § Third-party plugin bundles for
+// Custody of third-party plugin bundles. See docs/security/plugin-bundles.md § Third-party plugin bundles for
 // why the bytes and cache paths stay with the host and the renderer only ever names a bundle by
 // hash.
 export type PluginCustody = {
@@ -72,7 +72,7 @@ export type PluginCustody = {
   remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
   trustForget(request: { pluginId: string; hash: string }): Promise<void>
-  // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
+  // Enter or leave development mode for one plugin on one node. See docs/security/plugin-install.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>
 }
@@ -224,12 +224,12 @@ export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
   // Old on-disk approvals have no declaration. They cannot authorize a loaded UI until reviewed.
   declaration?: string
   decidedAt: number
-  // The decision was recorded but its disclosure snapshot could not be. See docs/security.md §
+  // The decision was recorded but its disclosure snapshot could not be. See docs/security/plugin-install.md §
   // The dev grant for why such a row never becomes the baseline of a later "what changed" diff.
   partial?: true
   dev?: true
 }
-// Which plugins this device is developing, and against which node. See docs/security.md § The dev
+// Which plugins this device is developing, and against which node. See docs/security/plugin-install.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
 export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
 export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
@@ -312,7 +312,7 @@ export const hostPlatform = (): string | undefined => acornGlobal()?.platform
 // covers it.
 //
 // `nodeFetch` alone discriminates "there is a broker". The rest degrade individually rather than
-// nulling the whole group, the same tolerance docs/api-reference.md § Versioning describes.
+// nulling the whole group, the same tolerance docs/api-reference/transport.md § Versioning describes.
 export const nodeTransport = (): NodeTransport | null => {
   const acorn = acornGlobal()
   if (!acorn?.nodeFetch) return null

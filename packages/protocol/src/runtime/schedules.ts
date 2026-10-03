@@ -73,8 +73,8 @@ export type SchedulesResponse = {
   schedules: ScheduleRow[]
 }
 
-/** One thing a person may put on a schedule, as the creation flow sees it (docs/schedules.md §
- *  Targets).
+/** One thing a person may put on a schedule, as the creation flow sees it (docs/schedules/user-schedules.md §
+ *  Targets: what a user schedule may do).
  *
  *  The list is what resolves on this node right now, which is the whole promise the picker makes: a
  *  schedule can never be created against something this node cannot run, so there is nothing for the

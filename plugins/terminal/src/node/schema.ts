@@ -1,4 +1,4 @@
-// The terminal plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
+// The terminal plugin's own tables (docs/data-layer/plugin-databases.md § Plugin databases). Lives in
 // <data-root>/plugins/terminal.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Moved out of @acorn/node-core's schema.ts: a pseudo-terminal session is this plugin's data and

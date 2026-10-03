@@ -1,4 +1,4 @@
-// Where the canvas draws each node, per device (docs/state-ownership.md § Device).
+// Where the canvas draws each node, per device (docs/state-ownership/scope-rules.md § Particular decisions).
 //
 // Positions are not in the definition, and that is a decision rather than an omission: a definition
 // saved to a repository is read on machines with different screens, and a committed x/y is noise in

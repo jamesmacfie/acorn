@@ -1,6 +1,6 @@
 import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
 
-// What a runtime that is not the node holds between flushes (docs/telemetry.md § The renderer).
+// What a runtime that is not the node holds between flushes (docs/telemetry/renderer.md § The emitter).
 //
 // The node's collector keeps 5,000 records because it is the collector and a burst there is the
 // whole fleet's. A client keeps 1,000, which is a couple of minutes of an interactive session, and

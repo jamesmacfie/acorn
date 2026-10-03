@@ -2,7 +2,7 @@ import type { QueryClient } from '@tanstack/solid-query'
 import { segmentCaches } from '../../features/diff/segmentCaches'
 import { emitMetric, telemetryEnabled } from './emitter'
 
-// A few counts about the page, as gauges every thirty seconds (docs/telemetry.md § Diagnosing an
+// A few counts about the page, as gauges every thirty seconds (docs/telemetry/diagnosis.md § Diagnosing an
 // unresponsive view). They sit beside the renderer's memory, which the shell measures from outside
 // (docs/shell.md § What the shell reports), so a rise in one can be read against the other.
 //

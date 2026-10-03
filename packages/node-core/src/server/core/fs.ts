@@ -1,4 +1,4 @@
-// Filesystem confinement: one canonical implementation (docs/security.md § Process, path, and
+// Filesystem confinement: one canonical implementation (docs/security/process-and-paths.md § Process, path, and
 // configuration controls). resolveInRoot is lexical and symlink aware; a lexical-only check lets a
 // worktree symlink escape its root.
 import { lstatSync, realpathSync } from 'node:fs'

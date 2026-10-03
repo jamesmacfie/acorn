@@ -3,7 +3,7 @@
 // It holds only what core's one switch does not. Whether anything is collected at all belongs to
 // Settings → Telemetry, and where it goes belongs to the connection in Settings → Services.
 // This page is the sink's own three questions: how much, which kinds, and how much detail
-// (docs/telemetry.md § The switch).
+// (docs/telemetry/model.md § The switch).
 //
 // Every control writes the whole settings object back through `bridge.state`, which is the
 // `plugin:sentry-telemetry:settings` preference row the node half reads on each flush. There is no

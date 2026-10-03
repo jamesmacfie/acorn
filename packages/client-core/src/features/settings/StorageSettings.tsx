@@ -14,7 +14,7 @@ import { Alert, Button, EmptyState } from '../../kit/components/primitives'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 
 // Settings > Storage and memory: what the node holds in memory and on disk, and what this device keeps
-// for it (docs/data-layer.md § What the node reports, docs/caching.md § Renderer query cache).
+// for it (docs/data-layer/backup-and-retention.md § What the node reports, docs/caching.md § Renderer query cache).
 //
 // Core draws its own numbers. A plugin that holds memory or disk on the node draws its own section
 // through CORE_STORAGE_POINT, so core never calls a plugin's route. Agents is the one that does today.

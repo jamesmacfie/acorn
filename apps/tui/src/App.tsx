@@ -96,7 +96,7 @@ function TaskArg(props: { id?: string; onMissing?: (id: string) => void; childre
 }
 
 /** The one telemetry switch, read off the node and handed to the emitter, which is the desktop's
- *  arrangement in `apps/desktop/src/client/App.tsx` (docs/telemetry.md § The switch).
+ *  arrangement in `apps/desktop/src/client/App.tsx` (docs/telemetry/model.md § The switch).
  *
  *  Under the provider rather than beside it, because it reads a query. It draws nothing: the effect
  *  is the whole of it, and a component is how this host gets a reactive scope with the client in it.

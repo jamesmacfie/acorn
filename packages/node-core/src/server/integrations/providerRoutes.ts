@@ -6,8 +6,8 @@ import { PLUGIN_NAMESPACE } from '../routes/registry'
 import { servePluginFetch } from '../pluginHost/fetchRoute'
 
 // One core projection for every provider-owned HTTP router, mounted at PLUGIN_NAMESPACE under each
-// provider's own id (docs/integrations.md § Connection lifecycle; docs/api-reference.md § HTTP
-// conventions). Built lazily at createApp() time, after the provider activation list
+// provider's own id (docs/integrations.md § Connection lifecycle; docs/api-reference/plugin-routes.md §
+// Plugin routes). Built lazily at createApp() time, after the provider activation list
 // (app/server/providers.ts) has populated the registry, so core itself never imports plugin
 // activation code.
 export function buildIntegrationProviderRoutes(): Hono<AppEnv> {

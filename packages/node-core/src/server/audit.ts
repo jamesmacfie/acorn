@@ -7,12 +7,12 @@ import { createLogger, describeError } from './telemetry/logger'
 
 const log = createLogger('audit')
 
-// The audit trail's write side (docs/security.md § Audit, docs/data-layer.md § Core DB).
+// The audit trail's write side (docs/security/audit.md § Audit, docs/data-layer/core-database.md § Tables).
 //
 // security.md names five classes of action, and this is the closed set that implements them. A closed
 // union rather than free-form strings, because the settings surface groups and filters on it, and an
 // action nobody can enumerate is one nobody reviews. Same argument as the error-code set in
-// docs/api-reference.md § Errors.
+// docs/api-reference/transport.md § Errors.
 export type CoreAuditAction =
   // Pairing and devices. The window open/close pair matters as much as the grant: a pairing window is
   // the one moment this node will hand full owner authority to a stranger who knows a code.
@@ -20,7 +20,7 @@ export type CoreAuditAction =
   | 'pairing.window.closed'
   | 'device.paired'
   | 'device.revoked'
-  // Credentials, write side only. `secret.used` is not recorded (docs/security.md § Audit explains
+  // Credentials, write side only. `secret.used` is not recorded (docs/security/audit.md § Audit explains
   // why).
   | 'secret.created'
   | 'secret.replaced'
@@ -38,7 +38,7 @@ export type CoreAuditAction =
   | 'node.detached'
   // Third-party code arriving on, changing on, or leaving this node. The versions and the archive hash
   // ride along in `details` so "what exactly was running in March" is answerable from the trail alone
-  // (docs/security.md § Supply chain).
+  // (docs/security/plugin-storage-and-supply-chain.md § Supply chain).
   | 'plugins.installed'
   | 'plugins.updated'
   | 'plugins.uninstalled'
@@ -144,7 +144,7 @@ export function recordAudit(db: AppDatabase, entry: AuditEntry): void {
   // The same row, as an event, so a sink sees "this node paired a device" without being handed read
   // access to the trail. The vocabulary is closed, so the name is a pattern by construction. The
   // actor rides along and `details` does not: those scalars are chosen for a reviewer reading one
-  // node's own trail, not for a record leaving the machine (docs/telemetry.md § What never leaves
+  // node's own trail, not for a record leaving the machine (docs/telemetry/model.md § What never leaves
   // the machine). The owner is the plugin whose verb it is, and core's own verbs contain no colon.
   emitEvent(auditOwner(entry.action), `audit.${entry.action}`, { seam: 'audit', actor: entry.actor })
   void (async () => {

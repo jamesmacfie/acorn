@@ -39,7 +39,7 @@ export const CHANGES_HOOKS = [
 
 // Takes CoreServices, not a database handle: this module shells out to git in the task's worktree
 // and needs core's task-to-worktree resolution and its model seam, nothing else
-// (docs/data-layer.md § Plugin databases).
+// (docs/data-layer/plugin-databases.md § Plugin databases).
 //
 // `models` is here for one call, the generated commit message. The alternative was a second bridge
 // for one member, and the diff that feeds the prompt is read by this module anyway
@@ -122,7 +122,7 @@ export function localGitBridge(
     // Which operation to abort is read off the tree here, not taken from the caller: `merge` and
     // `rebase` are argv, and the panel only offers Abort while its own status read says one is in
     // flight. A request that arrives after somebody finished the rebase in a terminal is refused
-    // rather than guessed at (docs/security.md § Process, path, and configuration controls).
+    // rather than guessed at (docs/security/process-and-paths.md § Process, path, and configuration controls).
     abort: (taskId) => withRoot(taskId, async (root) => {
       const operation = await gitOperation(root, { fresh: true })
       if (!operation) return { ok: false, reason: 'No merge or rebase is in progress.' }

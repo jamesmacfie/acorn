@@ -36,7 +36,7 @@ export const AGENT_IDLE_STOP_CHOICES = [
 
 /**
  * "Keep agent history for archived tasks", in days, where 0 is Forever. Past the limit, a daily
- * schedule removes the transcripts of that task's sessions for good (docs/data-layer.md § Retention).
+ * schedule removes the transcripts of that task's sessions for good (docs/data-layer/backup-and-retention.md § Retention).
  */
 export const AGENT_ARCHIVED_HISTORY_CHOICES = [
   { days: 30, label: '30 days' },

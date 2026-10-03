@@ -83,7 +83,7 @@ export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-cor
 // and a scrubbed one-line message, which is what goes in the line.
 export { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 export type { Logger } from '@acorn/node-core/server/telemetry'
-// The rule from docs/telemetry.md § What never leaves the machine, as a function, for the one
+// The rule from docs/telemetry/model.md § What never leaves the machine, as a function, for the one
 // plugin shape that needs it: a sink, which is the last thing a record passes through before the
 // network. Core scrubs at the ingest door, so a sink is re-checking rather than cleaning, and a
 // span name or a metric name is the part core takes on trust as a pattern.

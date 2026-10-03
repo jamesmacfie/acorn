@@ -70,7 +70,7 @@ export function openRefPanel(ref: RefPanelTarget): boolean {
 export const closeRefPanel = (): void => void setOpenRef(null)
 
 // A panel is not keyed by node, so without this a node switch leaves the outgoing node's plugin frame
-// over the incoming one's shell (docs/state-ownership.md § Scope rules). Not cleared on task archival, because
+// over the incoming one's shell (docs/state-ownership/scope-rules.md § Scope rules). Not cleared on task archival, because
 // the panel is not task-scoped and one opened from a rail source has no task to lose.
 onScopeEvicted((eviction) => {
   if (eviction.scope === 'node-switched') setOpenRef(null)

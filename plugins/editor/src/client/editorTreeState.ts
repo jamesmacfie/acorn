@@ -32,13 +32,13 @@ export function evictEditorTreeState(taskId: string): void {
   })
 }
 
-// Keyed by a node-minted task id; must not outlive a node switch (docs/state-ownership.md § Scope rules).
+// Keyed by a node-minted task id; must not outlive a node switch (docs/state-ownership/scope-rules.md § Scope rules).
 export function clearEditorTreeStates(): void {
   setExpandedByTask(new Map())
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list
-// (docs/state-ownership.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorTreeState(e.taskId)
   else if (e.scope === 'node-switched') clearEditorTreeStates()

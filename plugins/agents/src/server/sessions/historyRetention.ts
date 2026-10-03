@@ -3,7 +3,7 @@ import { AGENT_ARCHIVED_HISTORY_CHOICES } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { ManagedAgentRuntime } from './runtime'
 
-// The `agents:archived-history-prune` schedule (docs/data-layer.md § Retention). It reads the owner's
+// The `agents:archived-history-prune` schedule (docs/data-layer/backup-and-retention.md § Retention). It reads the owner's
 // "Keep agent history for archived tasks" and asks the runtime to remove the history of every session
 // whose task has been archived longer than that (runtime.ts § removeArchivedHistory).
 

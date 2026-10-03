@@ -1,7 +1,7 @@
 import { createLogger } from '../../../infra/telemetry/logger'
 
 // Per-scope state eviction: how a module-level signal learns that a task was archived, a workspace
-// was removed, or the active node changed underneath it (docs/state-ownership.md § Scope rules).
+// was removed, or the active node changed underneath it (docs/state-ownership/scope-rules.md § Scope rules).
 //
 // A state owner registers its own evictor next to the signal it clears, so the two are one edit apart
 // and cannot drift.
@@ -16,7 +16,7 @@ export type ScopeEviction =
   | { scope: 'task'; taskId: string }
   // A workspace was removed. Anything keyed by workspaceId should drop that key.
   | { scope: 'workspace'; workspaceId: string }
-  // The active node changed (docs/state-ownership.md § Scope rules). Live rosters clear, since they refetch for
+  // The active node changed (docs/state-ownership/scope-rules.md § Scope rules). Live rosters clear, since they refetch for
   // the new node within a tick, so clearing costs nothing and keying by node would buy nothing.
   // Durable per-task and per-workspace memory (editor scroll, the active terminal tab, the workspace
   // view) does not clear here: it is keyed by node instead, so switching back restores it.

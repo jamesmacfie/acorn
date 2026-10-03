@@ -17,7 +17,7 @@ import { isLiveRun, type RunPaneModel } from './runPaneModel'
 //
 // The steps half draws either way: a list, or the kit's `Graph` over the same model. Which one is a
 // per-device preference, because it is a reading habit rather than anything about the run
-// (docs/state-ownership.md § Device). A module signal, because the switch sits in the header region
+// (docs/state-ownership/scope-rules.md § Particular decisions). A module signal, because the switch sits in the header region
 // and the list region draws what it chose.
 
 type NodeView = 'rows' | 'graph'

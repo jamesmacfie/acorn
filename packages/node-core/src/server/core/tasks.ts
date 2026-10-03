@@ -120,7 +120,7 @@ export type CompiledTaskService = TaskService & {
   /** Replay-safe root creation for internal orchestrators such as approved workflow schedules. */
   createRoot(projectId: string, seed: RootTaskSeed, intendedTaskId: string): Promise<string>
   // Every task archived before `before`, a millisecond timestamp. plugins/agents reads it to remove the
-  // agent history of tasks archived longer than the owner keeps it (docs/data-layer.md § Retention).
+  // agent history of tasks archived longer than the owner keeps it (docs/data-layer/backup-and-retention.md § Retention).
   // Only tasks still archived: a restore clears `archivedAt`, so a restored task is never in the list.
   // First-party only, because deleting on a task's archive date is a retention policy and no loaded
   // plugin has one. plugins/permissions.ts § scopeCore strips it from the loaded tier's facet.

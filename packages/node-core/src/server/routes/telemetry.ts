@@ -4,7 +4,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { ingestTelemetry, telemetrySummary } from '../telemetry/collector'
 
-// Where every runtime that is not the node posts its records (docs/telemetry.md § Other runtimes).
+// Where every runtime that is not the node posts its records (docs/telemetry/runtimes.md § Other runtimes).
 // The renderer today, the terminal client and the desktop helper next.
 //
 // Device-only, mounted with `requireDevice` in server/index.ts. A task-scoped internal token must
@@ -45,7 +45,7 @@ export const telemetry = new Hono<AppEnv>().post('/', async (c) => {
   // stops posting on its own.
   return c.json({ accepted }, 202)
 })
-  // What Settings → Telemetry draws (docs/telemetry.md § What the page shows). Device-only along
+  // What Settings → Telemetry draws (docs/telemetry/diagnosis.md § What the page shows). Device-only along
   // with the rest of this router: the list of sinks names which plugins on this machine read the
   // stream, which is a fact about the installation rather than about a task.
   .get('/summary', (c) => c.json(telemetrySummary()))

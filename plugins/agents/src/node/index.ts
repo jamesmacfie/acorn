@@ -85,7 +85,7 @@ const shellQuote = (value: string): string => `'${value.replaceAll("'", "'\\''")
 // The one thing this plugin still cannot resolve for itself.
 export type AgentsPluginDeps = {
   // Mints the per-session loopback credential, from the composition root rather than CoreServices.
-  // See docs/security.md § Credential handling.
+  // See docs/security/credentials.md § Credential handling.
   internalEnv: InternalEnvFactory
   // Resolves after runtime and delegation recovery. Orchestration calls wait for it so a retried
   // spawn cannot race the repair of the same creating ledger row.
@@ -114,13 +114,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       { verb: 'sessions-changed', description: 'A managed agent session was created, renamed, archived, restored, or deleted' },
       { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
     ],
-    // docs/data-layer.md § Migrations: this plugin's migration chain, opened and closed by the host.
+    // docs/data-layer/migrations.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
       registerBuiltInProfiles()
       registerBuiltInDrivers()
       // Migrated before init returns, so no request or provider spawn reaches an unmigrated database.
-      // See docs/data-layer.md § Migrations.
+      // See docs/data-layer/migrations.md § Migrations.
       const store = ctx.storage.open()
       const core = ctx.core
       // The runtime and the Usage page share one service. A suspected limit failure asks only its own
@@ -333,7 +333,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
       })
 
-      // The owner's "Keep agent history for archived tasks" (docs/data-layer.md § Retention). Daily,
+      // The owner's "Keep agent history for archived tasks" (docs/data-layer/backup-and-retention.md § Retention). Daily,
       // and a no-op until the owner picks a limit, so the setting is the one switch that matters.
       ctx.schedules.register({
         scheduleId: 'archived-history-prune',

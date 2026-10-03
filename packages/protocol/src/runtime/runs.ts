@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// The unified run list (docs/data-layer.md § Runs: a merged read, and the trigger for ever making it
+// The unified run list (docs/data-layer/core-database.md § Runs: a merged read, and the trigger for ever making it
 // a table).
 //
 // Three parts of the system model "a thing that started, took time, cost money, and ended" —

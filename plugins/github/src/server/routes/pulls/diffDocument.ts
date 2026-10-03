@@ -38,7 +38,7 @@ const resolveRepo = async (db: PluginDatabase, c: Context<AppEnv>, emit: GithubE
   return resolved.ok ? null : respondError(c, resolved.failure.status, resolved.failure.error)
 }
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const diffDocument = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   .post('/:owner/:repo/diff/segments', async (c) => {

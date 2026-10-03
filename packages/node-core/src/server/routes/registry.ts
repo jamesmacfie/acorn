@@ -2,7 +2,7 @@ import type { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import type { PluginFetchHandler } from '../pluginHost/types'
 
-// The two current HTTP namespaces (docs/api-reference.md § Transport). Core owns
+// The two current HTTP namespaces (docs/api-reference/transport.md § Transport). Core owns
 // `/v1/core/*`; every plugin gets `/v1/p/<plugin>/*`. Both live under the one `/v1/*` middleware
 // envelope, so a route cannot be added outside the auth gate by choosing a prefix.
 export const CORE_NAMESPACE = '/v1/core'
@@ -23,7 +23,7 @@ const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
 //
 // Two carriers, one mount. A built-in contributes a `router`; a loaded plugin contributes a
 // `fetch` handler, because a Hono instance is a live object from the plugin's realm and cannot
-// cross the process boundary that rung 2 will put there (docs/security.md § Design
+// cross the process boundary that rung 2 will put there (docs/security/plugin-storage-and-supply-chain.md § Design
 // rules). Everything downstream, the mount path, the auth envelope, per-plugin removal, is
 // identical, which is the point: the transport changes later, the registry does not.
 export type RouteContribution = { plugin: string; prefix: string; note?: string } & (

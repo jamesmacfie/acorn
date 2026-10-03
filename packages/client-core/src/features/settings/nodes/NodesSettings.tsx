@@ -25,7 +25,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 //
 // One component with three inline steps rather than a wizard framework. Step 2 exists because comparing
 // the fingerprint against the one the node itself displays is the security of pairing
-// (docs/api-reference.md § Pairing). Making it a deliberate screen with the value in front of the owner,
+// (docs/api-reference/transport.md § Pairing). Making it a deliberate screen with the value in front of the owner,
 // rather than a checkbox next to a URL field, is the point: a checkbox is a thing people tick.
 type Step = { kind: 'idle' } | { kind: 'endpoint' } | { kind: 'confirm'; probe: NodeProbeResult } | { kind: 'code'; probe: NodeProbeResult }
 

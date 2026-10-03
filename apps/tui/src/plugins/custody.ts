@@ -77,7 +77,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       if (disclosure.success) return store.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
       // A node running a newer manifest schema than this build. The decision is exact and the snapshot
       // is not, so it is recorded `partial` and never becomes the baseline of a later "what changed"
-      // diff (docs/security.md § The dev grant).
+      // diff (docs/security/plugin-install.md § The dev grant).
       log.warn(`the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`, undefined, { 'plugin.id': decision.pluginId })
       store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },

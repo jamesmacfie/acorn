@@ -25,7 +25,7 @@ export type DbPk = Record<string, DbCell>
 export type DbCatalogTable = { schema: string; name: string; columns: { name: string; dataType: string }[] }
 export type DbCatalogResult = { tables: DbCatalogTable[] } | { error: string }
 
-// AI query generation (docs/data-layer.md § Database plugin: the Postgres pane): where the schema text
+// AI query generation (docs/data-layer/plugin-databases.md § The database plugin): where the schema text
 // in the prompt came from, and the result of a generate call. Generate errors travel as HTTP error
 // responses, not a union.
 export type DbSchemaSource = 'auto' | 'script' | 'file'
@@ -44,8 +44,7 @@ export const GENERATE_MAX_PROMPT_CHARS = 4000
 // tree/DatabasePanel.tsx). A `#` prefix so it can never collide with the UUIDs saved queries carry.
 export const SCRATCH_SELECT_ID = '#scratch'
 
-// A named SQL snippet saved against a project (docs/data-layer.md § Database plugin: the Postgres
-// pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
+// A named SQL snippet saved against a project (docs/database.md § Database pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
 
 // Database pane: per-task Postgres browse and edit over this plugin's own route namespace. Built here

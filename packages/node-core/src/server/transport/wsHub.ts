@@ -1,4 +1,4 @@
-// The single authenticated WebSocket hub (docs/api-reference.md § WebSocket). It lives in the
+// The single authenticated WebSocket hub (docs/api-reference/websocket.md § WebSocket). It lives in the
 // utility service beside the PTY engine: terminal.ts registers the stream handlers and notify.ts
 // broadcasts pings through it. Attached to the @hono/node-server http.Server's 'upgrade' event so it
 // shares the loopback listener and its Host guard.
@@ -78,7 +78,7 @@ export function registerWsChannelHandler(prefix: string, handler: WsChannelHandl
 }
 
 // `deviceId` is null for an internal-token socket, the one credential kind with no device row to
-// revoke. `seq` is this connection's own counter (docs/api-reference.md § Events), so a
+// revoke. `seq` is this connection's own counter (docs/api-reference/websocket.md § Events), so a
 // reconnect legitimately restarts at 1 and the client compares only within one socket's lifetime.
 type Conn = {
   ws: WebSocket
@@ -88,7 +88,7 @@ type Conn = {
   seq: number
   // The claims of an internal credential, when this socket authenticated with one. Retained rather
   // than discarded at the door: this is what onConnect and mayDriveStream need to enforce task scope
-  // (docs/security.md § Transport and auth).
+  // (docs/security/transport-and-auth.md § Transport and auth).
   internal?: InternalClaims
   missedPongs: number
   // Streams this connection has asked the engine to pause, and whether it has already told the client
@@ -172,7 +172,7 @@ function watchDrain(conn: Conn): void {
 // all, because one "you are behind" is the whole message.
 // Serialising and writing one frame, as a histogram per channel. At sixty frames a second across
 // every attached socket this is a metric and could never be a span
-// (docs/telemetry.md § Hot seams are metrics), and it is where the performance programme's
+// (docs/telemetry/model.md § Hot seams are metrics), and it is where the performance programme's
 // re-escaping cost showed up.
 //
 // The channel is `<owner>:<verb>`, so the prefix is the label and a plugin's own channel names the
@@ -272,7 +272,7 @@ const isConfined = isTaskConfinedWs
 
 // Session-status pings and workflow notices go to every open socket (notify.ts); a session's own
 // output goes only to attached sockets, through their per-session sink. A task-confined socket
-// receives none of this (docs/security.md § Transport and auth).
+// receives none of this (docs/security/transport-and-auth.md § Transport and auth).
 export function wsBroadcast(frame: WsServerFrame): void {
   for (const c of conns) {
     if (isConfined(c)) continue
@@ -307,7 +307,7 @@ export type WsAuthDeps = {
   allowedHosts: ReadonlySet<string>
   // Resolves the device bearer at upgrade and tells the hub when a device is revoked.
   devices: DeviceService
-  // How often the backstop sweep re-checks each connection's device. docs/api-reference.md § Pairing pins the
+  // How often the backstop sweep re-checks each connection's device. docs/api-reference/transport.md § Pairing pins the
   // production value at 60s; tests inject a short one instead of faking timers.
   revocationCheckMs?: number
   // Where a socket's buffer counts as too far behind, in bytes. Production is the 4 MiB constant above;
@@ -374,7 +374,7 @@ function onConnect(ws: WebSocket, authorized: Authorized, mark: number, multiple
 
 // Terminate every socket belonging to a revoked device. `terminate()` rather than `close()`: an
 // invalidated credential must not keep a socket alive for a graceful closing handshake
-// (docs/api-reference.md § Pairing: "open sockets are closed, in-flight requests fail").
+// (docs/api-reference/transport.md § Pairing: "open sockets are closed, in-flight requests fail").
 function dropDevice(deviceId: string): void {
   for (const conn of [...conns]) {
     if (conn.deviceId === deviceId) conn.ws.terminate()
@@ -396,7 +396,7 @@ export function attachWsHub(server: Server, deps: WsAuthDeps): void {
   }
   // Immediate path: the revoke that happened in this process tells us directly.
   const offRevoked = deps.devices.onRevoked(dropDevice)
-  // Backstop for long-lived streams (docs/api-reference.md § Pairing, docs/security.md § Transport and
+  // Backstop for long-lived streams (docs/api-reference/transport.md § Pairing, docs/security/transport-and-auth.md § Transport and
   // auth). It covers a revoke this hub never heard about, another process, or a listener registered
   // after the revoke, which is exactly the case a live socket cannot detect since it holds no bearer
   // to re-present.

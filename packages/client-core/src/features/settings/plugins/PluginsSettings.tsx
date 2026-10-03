@@ -79,7 +79,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   const reading = () => state() === undefined
   const rows = createMemo<NodePluginRow[]>(() => state()?.plugins ?? [])
   // The device's own answers, which the node knows nothing about: it served the bundle, and this machine
-  // accepted it, declined it, or put the plugin into development mode (docs/security.md § The dev grant).
+  // accepted it, declined it, or put the plugin into development mode (docs/security/plugin-install.md § The dev grant).
   const [custody, { refetch: refetchCustody }] = createResource(async () => await readPluginHostState())
 
   const plugins = createMemo(() => installedPlugins(rows(), devicePlugins()))
@@ -113,7 +113,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
     }
   }
 
-  // The node has the package; this device has not seen its bytes (docs/security.md § Third-party plugin
+  // The node has the package; this device has not seen its bytes (docs/security/plugin-bundles.md § Third-party plugin
   // bundles). Fetching and hashing them here queues the trust prompt, so an install walks straight into
   // consent instead of waiting for the next launch to ask.
   const settleNode = async () => {

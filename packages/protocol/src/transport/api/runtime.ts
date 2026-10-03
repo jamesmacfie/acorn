@@ -8,11 +8,11 @@ export const runStartRoute = (taskId: string, targetId: string) => `/v1/core/tas
 export const runStopRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
 export const runStatusRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
-// Where every runtime that is not the node posts its telemetry (docs/telemetry.md § Other runtimes).
+// Where every runtime that is not the node posts its telemetry (docs/telemetry/runtimes.md § Other runtimes).
 // Device-only, because a record admitted here reaches every sink, and a sink can send it off the
 // machine.
 export const coreTelemetryRoute = '/v1/core/telemetry'
-// What Settings → Telemetry draws: counters, never records (docs/telemetry.md § What the page
+// What Settings → Telemetry draws: counters, never records (docs/telemetry/diagnosis.md § What the page
 // shows). Device-only, like the route above, and for a smaller reason: it names which plugins are
 // reading the stream, which is a fact about this machine's installation.
 export const coreTelemetrySummaryRoute = '/v1/core/telemetry/summary'

@@ -33,7 +33,7 @@ export default function GenerateSqlModal(props: {
   // `plugin:database:*`, which is what keeps one plugin out of another's — and out of core's.
   //
   // The ceiling is that a pick made here is remembered nowhere and a pick made elsewhere is not
-  // honoured here, which docs/state-ownership.md § Scope rules records as a known limit. The upgrade
+  // honoured here, which docs/state-ownership/scope-rules.md § Scope rules records as a known limit. The upgrade
   // is a narrow pair of bridge verbs for that one key, or this dialog moving to the compiled client
   // tier, where reading a pref is one import.
   const [backendId, setBackendId] = createSignal(props.backends[0]?.id ?? '')

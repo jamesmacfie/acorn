@@ -136,7 +136,7 @@ function connect(): void {
     // re-subscribes each PTY and restores its display snapshot. Each channel owner supplies its own
     // frames (wsChannels.ts).
     for (const frame of wsReattachFrames()) rawSend(frame)
-    // Reconnect means refetch (docs/api-reference.md § WebSocket). There is no cursor into history, so
+    // Reconnect means refetch (docs/api-reference/websocket.md § WebSocket). There is no cursor into history, so
     // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
     // shell, so this announces rather than performs it.
     reconnectSubs.forEach((cb) => cb())
@@ -148,7 +148,7 @@ function dispatch(raw: unknown): void {
   const frame = raw as WsServerFrame
   // A histogram and never a span. Terminal output alone is hundreds of frames a second while an
   // agent is writing, so this is one record every five seconds however hot the socket is
-  // (docs/telemetry.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
+  // (docs/telemetry/model.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
   // `plugin:machine-stats:sample` are different questions and one channel per session is not.
   measure('core', `ws.inbound.${frame.channel.split(':')[0]}`, () => {
     // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
@@ -168,7 +168,7 @@ registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:step-changed') stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
 })
 
-// Core's third prefix (docs/api-reference.md § WebSocket). Content-free like `term:status`, so the
+// Core's third prefix (docs/api-reference/websocket.md § WebSocket). Content-free like `term:status`, so the
 // subscriber re-reads the roster route (plugins/reload.ts).
 registerWsChannel('plugins', (frame) => {
   if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())

@@ -1,7 +1,7 @@
 // The sink: batches in, envelopes out, and everything that has to happen between them.
 //
 // The collector hands a sink every record this node collected, on its own five-second timer, and
-// awaits nothing (docs/telemetry.md § Writing a sink). So `accept` does one thing: it takes the
+// awaits nothing (docs/telemetry/plugins-and-sinks.md § Writing a sink). So `accept` does one thing: it takes the
 // batch and returns. Reading the connection, reading the settings, building the envelopes and
 // posting them all happen after, on the exporter's own promise chain.
 //
@@ -15,7 +15,7 @@
 //
 // ## Nothing survives a restart
 //
-// By design (docs/telemetry.md § Deliberate limits). A durable queue
+// By design (docs/telemetry/diagnosis.md § Deliberate limits). A durable queue
 // would be a second copy of the records on disk, in a table with none of the audit trail's closed
 // vocabulary. A restart loses the collector window and every queued envelope.
 import { setTimeout as delay } from 'node:timers/promises'

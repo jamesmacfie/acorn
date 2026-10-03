@@ -4,7 +4,7 @@
 // are on every context because a plugin measuring itself is measuring its own work. This one is a
 // token, and the trust prompt draws it high, because a sink sees every record from every owner:
 // core's request timings, another plugin's schedule runs, and the logger lines of packages the owner
-// installed for a different reason (docs/security.md § Telemetry sinks).
+// installed for a different reason (docs/security/plugin-node-realm.md § Telemetry sinks).
 //
 // Batches plus a consent read for queued retries. The testkit recorder and Sentry exporter
 // subscribe here; consent must come from core because plugin prefs are namespaced.

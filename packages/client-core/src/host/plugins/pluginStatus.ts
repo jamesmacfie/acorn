@@ -22,7 +22,7 @@ const status = (tone: PluginStatusTone, text: string, needsYou = false, line?: P
   ({ tone, text, needsYou, ...(line ? { line } : {}) })
 
 /** A plugin a node reports, as the device sees it on that node. `devMode` is this device's dev grant for
- *  the plugin against that node (docs/security.md § The dev grant). */
+ *  the plugin against that node (docs/security/plugin-install.md § The dev grant). */
 export function nodePluginStatus(snapshot: PluginDistributionSnapshot, nodeId: string | null, row: NodePluginRow, devMode = false): PluginStatus {
   if (row.pendingReview) {
     return 'corrupt' in row.pendingReview

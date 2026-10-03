@@ -1,6 +1,6 @@
 // The agent's install request, on its way to the owner's decision. Full flow, the prompt-injection
 // defence, and the in-memory store's rationale: docs/agent-tools.md § plugin_request,
-// docs/plugins.md § Approval-mediated install, docs/security.md § Third-party plugin bundles.
+// docs/plugins.md § Approval-mediated install, docs/security/plugin-bundles.md § Third-party plugin bundles.
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { ToolError, type AgentToolContribution } from './registry.ts'

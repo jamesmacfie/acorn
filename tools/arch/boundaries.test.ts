@@ -274,7 +274,7 @@ describe('architecture boundaries', () => {
 
   it('spawning a child process is an enumerated exception to the broker', () => {
     // Every entry below is a considered exception to the broker, with its reason inline. See
-    // docs/architecture/packages.md § Package boundaries and docs/security.md § Process, path, and
+    // docs/architecture/packages.md § Package boundaries and docs/security/process-and-paths.md § Process, path, and
     // configuration controls.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
@@ -313,7 +313,7 @@ describe('architecture boundaries', () => {
   it('the renderer and the other client runtimes log through the logger, not console (shrinking baseline)', () => {
     // The renderer's half of the same rule. Its 66 call sites moved on 2026-09-11, and a line
     // written through `createLogger` reaches every sink and says who wrote it
-    // (docs/telemetry.md § The renderer).
+    // (docs/telemetry/logging.md § The rule).
     //
     // The terminal client is scanned with it, because it runs client-core in process and writes
     // through the same logger. The desktop helper and `packages/custody` are the other rule's,
@@ -356,7 +356,7 @@ describe('architecture boundaries', () => {
   it('the node logs through the logger, not console (shrinking baseline)', () => {
     // A log line written through `console.error` carries nothing but the prefix the author typed:
     // no owner, no scrubbing, and no way for a sink to see it. `createLogger` gives all three
-    // (docs/telemetry.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
+    // (docs/telemetry/logging.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
     // keeps them moved; the renderer and the other runtimes follow in phases 1 and 3.
     //
     // A source scan and not a graph edge: `console` is a global, so there is no import to trace.

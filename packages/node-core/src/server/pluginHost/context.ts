@@ -166,7 +166,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     name: plugin,
     routes: {
       // Absent for a loaded plugin: a live Hono instance from another realm cannot survive the process
-      // boundary rung 2 puts there (docs/security.md § Design rules). `undefined as never` rather than a
+      // boundary rung 2 puts there (docs/security/plugin-storage-and-supply-chain.md § Design rules). `undefined as never` rather than a
       // throwing stub, so the failure is the immediate "not a function" an author can act on.
       register: permissions
         ? (undefined as never)
@@ -528,7 +528,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
 
   // `telemetry` and `log` are deliberately absent from this list. A revoked context throws from
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
-  // it never fails the thing it describes (docs/telemetry.md § Never fail what you measure). A
+  // it never fails the thing it describes (docs/telemetry/runtimes.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
   for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'customAgents', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof

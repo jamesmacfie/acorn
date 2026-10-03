@@ -111,7 +111,7 @@ describe('the internal principal cannot administer devices', () => {
     expect(((await res.json()) as { error?: { code?: string } }).error?.code).toBe('interactive_user_required')
   })
 
-  // The whole escalation in one test: window → code → token (docs/security.md § Transport and auth
+  // The whole escalation in one test: window → code → token (docs/security/transport-and-auth.md § Transport and auth
   // covers why `requireDevice` exists). If this ever returns 200 at the first step, the rest follows
   // and the internal token becomes owner-permanent.
   it('cannot escalate to an owner-authority device token', async () => {
@@ -223,7 +223,7 @@ describe('the task-scope gate covers the plugin namespace', () => {
     return () => removePluginRoutes('probe')
   }
 
-  // The two mount shapes real plugins use: docs/security.md § Transport and auth covers why (the
+  // The two mount shapes real plugins use: docs/security/transport-and-auth.md § Transport and auth covers why (the
   // task-scope gate matches a `:id` out of the URL).
   for (const [label, prefix, path] of [
     ["a '/tasks' prefix router", '/tasks', '/:id/thing'],
@@ -248,7 +248,7 @@ describe('the task-scope gate covers the plugin namespace', () => {
     })
   }
 
-  // What the mount does not reach, so the limit is recorded rather than assumed: docs/security.md §
+  // What the mount does not reach, so the limit is recorded rather than assumed: docs/security/transport-and-auth.md §
   // Transport and auth covers why these opaque-id routes resolve their own owning task. If this ever
   // starts returning 404, a mount has begun covering them by accident and the in-router checks are
   // no longer what's being relied on.

@@ -339,7 +339,7 @@ export function pushArgs(options: PushOptions = {}): string[] {
   // `--force-with-lease` with no argument compares the remote ref against this node's
   // remote-tracking ref, so a commit somebody else pushed since the last fetch makes the push fail
   // with a reason instead of dropping their work. Never a bare `--force`
-  // (docs/security.md § Process, path, and configuration controls).
+  // (docs/security/process-and-paths.md § Process, path, and configuration controls).
   //
   // `--set-upstream` on every push, not only the first: it is harmless where the upstream is already
   // set, and it means a branch whose upstream was deleted republishes without a second verb. That is

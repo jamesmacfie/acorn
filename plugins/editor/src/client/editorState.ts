@@ -1,6 +1,6 @@
 // Editor session state: open-file tabs per task (ephemeral preview slot, dirty flags, active
 // file), persisted to the 'editor_open_files' pref so relaunch restores the tabs (see
-// docs/state-ownership.md § Scope rules for why open files live in Node prefs). Dirty flags reset on reload
+// docs/state-ownership/scope-rules.md § Scope rules for why open files live in Node prefs). Dirty flags reset on reload
 // since content itself is not persisted. Pure list ops plus a thin signal store, like tasks.ts.
 import { createSignal } from 'solid-js'
 import { onScopeEvicted, openPane } from '@acorn/plugin-api/client'
@@ -114,14 +114,14 @@ export function hydrateTaskEditorState(taskId: string, state: TaskEditorState): 
 export { byTask as editorStateByTask }
 
 // Every map here is keyed by a node-minted task id and must not survive a node switch
-// (docs/state-ownership.md § Scope rules). Writing each scope under the active node's storage key leaks one
+// (docs/state-ownership/scope-rules.md § Scope rules). Writing each scope under the active node's storage key leaks one
 // node's state into another's namespace.
 export function clearEditorStates(): void {
   setByTask({})
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list
-// (docs/state-ownership.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorState(e.taskId)
   else if (e.scope === 'node-switched') clearEditorStates()

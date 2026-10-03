@@ -1,78 +1,68 @@
-# Node enrollment: the node-to-control-plane protocol
+# Node enrollment
 
-A node acorn creates for you is a node nobody is sitting at. This document is how such a node
-introduces itself to whatever created it, what that costs, and how to undo it.
+This page covers how a Node that something else provisioned introduces itself to that control plane,
+what the protocol carries, and how to undo it. Read it before you build a control plane or change the
+enrollment payload.
 
-It is also a public interface. The moment a third party can write a control plane — which is the point
-of the node-provider seam in [plugins.md](./plugins.md) § Node providers — this protocol is something
-strangers build against whether or not anybody versioned it. So it is versioned, its payload has a
-published JSON schema, and a test pins the two together. That is the Headscale lesson, taken
-deliberately rather than learned later.
+The protocol is a public interface. Anyone can write a control plane through the node-provider seam
+([node providers](./plugins.md#node-providers)), so it's versioned, its payload has a published JSON
+schema, and a test pins the two together.
 
-**Nothing here runs unless somebody configured it.** With neither environment variable set, `enrollNode`
-returns before it reads a file, and an install behaves exactly as it did before this existed.
+**Nothing here runs unless someone configured it.** With neither environment variable set, `enrollNode`
+returns before it reads a file.
 
 ## The inversion
 
-Ordinary pairing has the node mint a short code and a person carry it to a client
-([api-reference.md](./api-reference.md) § Pairing). The code is the secret, the person is the channel,
-and comparing the node's fingerprint by eye is what makes it safe.
+Ordinary pairing has the Node mint a short code that a person carries to a client
+([pairing](./api-reference/transport.md#pairing)). The code is the secret, the person is the channel, and
+comparing fingerprints by eye is what makes it safe.
 
-A provisioned node has no person beside it, so the secret goes the other way: the provisioner mints a
-token *before the node exists* and passes it in through the environment. The node then hands the
-control plane a durable credential for itself.
-
-That is not registering an inventory record. It is handing a service the same credential a paired
-client of yours holds, because a device token is full owner authority with no per-token scopes. What it
-costs, and the four things bought back to bound the cost, is written down in
-[security.md](./security.md) § The control plane. Read that before designing anything that uses this.
+A provisioned Node has no person beside it, so the secret goes the other way. The provisioner mints a
+token before the Node exists and passes it in through the environment, and the Node hands the control
+plane a durable credential for itself. That credential is a device token, full owner authority with no
+per-token scopes. [The control plane](./security/control-plane.md) records what that costs and what
+bounds it. Read it before you design anything that uses this.
 
 ## The two tokens
 
-| | |
+| Token | What it is |
 | --- | --- |
-| **enrollment token** | `ACORN_ENROLLMENT_TOKEN`. Minted by the provisioner, short-lived, and single-use. It authenticates exactly one enrollment and then buys nothing. |
-| **device token** | Self-issued by the node during enrollment, and durable. This is the credential the control plane keeps and uses to reach the node afterwards. |
+| **Enrollment token** | `ACORN_ENROLLMENT_TOKEN`. Minted by the provisioner, short-lived, and single-use. It authenticates one enrollment and nothing after. |
+| **Device token** | Issued by the Node to itself during enrollment, and durable. The control plane keeps it and uses it to reach the Node. |
 
-The split is borrowed from Nomad and the CI runner families, and its whole purpose is that a leaked
-provisioning secret does not become a standing credential.
-
-acorn imposes **no format** on the enrollment token. A control plane mints whatever it likes. What the
-node records is `enrollmentTokenId`: the first twelve hex characters of the token's sha256, which is not
-a secret and is stable on both sides, so a support conversation can match a node's record against the
-provisioning record that produced it.
+The split means a leaked provisioning secret doesn't become a standing credential. acorn imposes no
+format on the enrollment token. The Node records `enrollmentTokenId`, the first 12 hex characters of
+the token's SHA-256, which isn't secret and is stable on both sides, so a support conversation can match
+a Node to the provisioning record that made it.
 
 ## The four steps
 
-At first boot, given both variables, the node (`packages/node-core/src/server/enrollment.ts`):
+At first boot, given `ACORN_ENROLLMENT_TOKEN` and `ACORN_CONTROL_PLANE_URL`, the Node
+(`packages/node-core/src/server/enrollment.ts`):
 
-1. mints its TLS certificate exactly as it always does,
-2. issues itself a device token — a device row of its own, separate from the launcher's, so detaching
-   later revokes one thing,
-3. posts `{baseline, protocolVersion, nodeId, endpoint, fingerprint, deviceToken}` to
-   `${ACORN_CONTROL_PLANE_URL}/enroll`, authenticated by the enrollment token as a bearer,
-4. records the attachment in `node.json` and writes a `node.enrolled` audit row.
+1. Mints its TLS certificate as usual.
+2. Issues itself a device token, on a device row of its own, separate from the launcher's, so detaching
+   later revokes one thing.
+3. Posts `{baseline, protocolVersion, nodeId, endpoint, fingerprint, deviceToken}` to
+   `${ACORN_CONTROL_PLANE_URL}/enroll`, with the enrollment token as a bearer.
+4. Records the attachment in `node.json` and writes a `node.enrolled` audit row.
 
-It happens after the listener has bound, because steps 3 and 4 need the endpoint and the fingerprint
-that only exist once it has. It happens before the pairing banner prints, because a node that has just
-handed its control plane a credential is a paired node and should not leave an unrequested pairing
-window open.
+It runs after the listener binds, because steps 3 and 4 need the endpoint and fingerprint, and before
+the pairing banner prints, because a Node that has handed its control plane a credential shouldn't
+leave an unrequested pairing window open.
 
-**Three attempts, roughly fifteen seconds, then a recorded failure.** Enough to ride out a control plane
-still coming up beside a node it just created; short enough that nobody would call it a hang. A node
-that fails all three boots normally, writes `enrollmentError` into `node.json`, writes an audit row,
-and shows the failure in Settings → Nodes. Retrying forever would trade a visible failure for an
-invisible one. The device row issued in step 2 is revoked on the way out, so a credential nobody
-received does not stay valid.
+**Three attempts, about fifteen seconds, then a recorded failure.** That rides out a control plane still
+starting beside a Node it has created. A Node that fails all three boots normally, writes
+`enrollmentError` into `node.json`, writes an audit row, and shows the failure in Settings → Nodes. The
+device row from step 2 is revoked on the way out, so a credential nobody received doesn't stay valid.
 
-**http is refused for anything but loopback.** There is deliberately no allowlist of permitted
-control-plane URLs — whoever set the variable made that decision — but a durable credential must not
-cross a network in the clear. Loopback http stays allowed, because that is what a test stub and a local
-development control plane are.
+**Plain `http` is refused for anything but loopback**, because a durable credential must not cross a
+network in the clear. Loopback `http` stays allowed for test stubs and local control planes. There's no
+allowlist of control-plane URLs: whoever set the variable made that decision.
 
 ## The payload
 
-Version 1. The schema is `packages/protocol/src/device/enrollment.ts` and the published form is
+This is version 1. The schema is `packages/protocol/src/device/enrollment.ts`, and the published form is
 [docs/schemas/enrollment-v1.json](./schemas/enrollment-v1.json), generated from it and pinned by
 `packages/node-core/src/server/enrollmentSchema.test.ts`.
 
@@ -87,36 +77,34 @@ Version 1. The schema is `packages/protocol/src/device/enrollment.ts` and the pu
 }
 ```
 
-Every field is find-and-vouch metadata and nothing else. `endpoint` is where a client should dial: the
-node's first advertised host, or its loopback origin when nobody set one. That distinction matters,
-because the endpoint the node reports internally is always loopback — every child process it spawns
-dials that — and a control plane handed `https://127.0.0.1:4317` would vouch for an address no other
-machine can reach. A node with no `advertiseHost` enrolls with loopback anyway, which is right for a
-control plane on the same machine and useless for one that is not; either way it is the operator's
-exposure decision ([node-distribution.md](./node-distribution.md) § Reaching a node from another
-machine). `fingerprint` is the sha256 of the node's self-signed certificate, the value a
-client pins, and repeating it back honestly is the whole of a control plane's vouching job.
+Every field is find-and-vouch metadata. `endpoint` is where a client should dial: the Node's first
+advertised host, or its loopback origin when none is set. The endpoint the Node reports internally is
+always loopback, because its child processes dial that, and a control plane handed
+`https://127.0.0.1:4317` would vouch for an address no other machine can reach. A Node with no
+`advertiseHost` enrolls with loopback anyway, which suits a control plane on the same machine
+([reaching a node from another machine](./node-distribution.md#reaching-a-node-from-another-machine)).
+`fingerprint` is the SHA-256 of the Node's certificate, the value a client pins, and repeating it
+honestly is the whole of a control plane's vouching job.
 
-A field describing tasks, repositories, runs or transcripts does not belong here and fails review by
-inspection ([the three parties](./architecture/control-plane.md)).
+A field describing tasks, repositories, runs, or transcripts doesn't belong here
+([the three parties](./architecture/control-plane.md)).
 
-The reply is an acknowledgement. A 2xx *is* the acknowledgement; the body may carry
-`{"controlPlaneName": "…"}`, which the node stores and shows its owner. The response is parsed
-tolerantly, for the same reason `GET /v1/node` is the most tolerant surface in the system: a node that
-refuses an otherwise-successful enrollment because the answer grew a field is a node no control plane
-can ever extend.
+A 2xx answer is the acknowledgement. Its body may carry `{"controlPlaneName": "…"}`, which the Node stores
+and shows its owner. The answer is parsed tolerantly, for the same reason `GET /v1/node` is: a Node that
+refused a successful enrollment because the answer grew a field would be one no control plane could
+extend.
 
 ### Versioning
 
-`ENROLLMENT_PROTOCOL_VERSION` is its own number, not `NODE_PROTOCOL_VERSION`. The two move for
-different reasons: that one is client-to-node, this one is node-to-control-plane, and a control plane
-never speaks the first. A bump means a new `docs/schemas/enrollment-v<n>.json`, not an edit to the old
-one, so a control plane built against v1 keeps reading v1.
+`ENROLLMENT_PROTOCOL_VERSION` is its own number, not `NODE_PROTOCOL_VERSION`, because one is
+client-to-Node and the other is Node-to-control-plane. A bump means a new
+`docs/schemas/enrollment-v<n>.json`, never an edit to the old one, so a control plane built against v1
+keeps reading v1.
 
 ## The attachment record
 
-One optional object on `node.json`, and the only thing a control plane leaves behind on a node
-(`nodeAttachmentSchema` in `packages/protocol/src/device/node.ts`):
+The attachment is one optional object in `node.json`, and the only thing a control plane leaves on a
+Node (`nodeAttachmentSchema` in `packages/protocol/src/device/node.ts`):
 
 ```json
 {
@@ -130,56 +118,47 @@ One optional object on `node.json`, and the only thing a control plane leaves be
 }
 ```
 
-Not a table, and not a second identity. Two things now write `node.json` — this process's data root and
-the detach route, in a later process — so every write is a read-modify-write against the file rather
-than a serialisation of a cached copy. A writer that forgot would silently drop the other's field.
+It's not a table or a second identity. Two things write `node.json`, this process's data root and the
+detach route in a later process, so every write is a read-modify-write against the file.
 
-`GET /v1/core/attachment` reads it and `DELETE /v1/core/attachment` detaches. Both are device-only, like
-devices and plugins: the read names a control plane and a device row, and the delete revokes a
-credential. There is deliberately **no attach route**. Attaching happens once, at first boot, from the
-environment the provisioner set; an HTTP attach would be a way to hand a stranger a durable credential
-for this node with one request, which is exactly what the single-use token exists to bound.
+`GET /v1/core/attachment` reads it and `DELETE /v1/core/attachment` detaches. Both are device-only,
+because the read names a control plane and a device row, and the delete revokes a credential. There's
+no attach route: attaching happens once, at first boot, from the environment. An HTTP attach would hand
+a stranger a durable credential with one request.
 
 ## Detaching
 
-Settings → Nodes shows the attachment on the node's own row, says plainly that the control plane holds a
-credential, and offers one button. Detaching:
+Settings → Nodes shows the attachment on the Node's row, says the control plane holds a credential, and
+offers one button. Detaching:
 
-- revokes the control plane's device row, so its credential stops working immediately,
-- deletes the record from `node.json`,
-- writes a `node.detached` audit row,
+- revokes the control plane's device row, so its credential stops working at once;
+- deletes the record from `node.json`;
+- writes a `node.detached` audit row;
 - changes nothing else.
 
-That last line is the promise the whole design rests on: a detached node keeps working standalone. The
-revoke happens before the record is deleted, so a failure leaves a visible attachment the owner can try
-again, rather than a live credential nobody can see.
+A detached Node keeps working on its own. The revoke happens before the record is deleted, so a failure
+leaves a visible attachment to try again, rather than a live credential nobody can see.
 
 ## Testing against a stub
 
-`packages/node-core/src/testkit/controlPlaneStub.ts` is a control plane in fifty lines. It accepts an
-enrollment, spends the token once, and remembers what it was told. It validates the payload against
-`enrollmentRequestSchema` — the same schema this document publishes — so a node that changes what it
-posts fails there rather than in a green suite. If the stub can be written from this document, so can
-somebody else's real one.
+`packages/node-core/src/testkit/controlPlaneStub.ts` is a small control plane. It accepts an enrollment,
+spends the token once, and remembers what it was told. It checks the payload against
+`enrollmentRequestSchema`, the schema this page publishes, so a Node that changes what it posts fails
+there. If the stub can be written from this page, so can a real one.
 
 Two suites use it. `packages/node-core/src/server/enrollment.test.ts` covers the unconfigured path, the
 happy path, the retry, the refusals, and enroll-once. `apps/node/test/integration/lifecycle/enrollment.test.ts`
-boots a real standalone node against it and asserts the node appears in the inventory with the endpoint
-and fingerprint it actually bound — and that a node booted without the variables writes nothing about a
-control plane at all.
+boots a real standalone Node against it and checks that the Node appears with the endpoint and
+fingerprint it bound, and that a Node booted without the variables writes nothing about a control plane.
 
-The natural home for that second test is eventually the Docker image
-[docs/future/bundle.md](./future/bundle.md) describes; the spawned standalone entry is the same node
-with one fewer layer.
+## Limits
 
-## What is deliberately not here
-
-- **No accounts in core.** A node keeps minting its own `owner-<uuid>` and knows nothing about a cloud
-  identity. The account-to-node mapping is the control plane's own database.
-- **No heartbeat, no polling, no callbacks.** Enrollment is one request at one moment. A control plane
-  that wants to know whether a node is up asks the node, with the credential it was given.
-- **No re-enrollment.** A node with an attachment skips enrollment entirely, however the environment is
-  set. Re-attaching is a detach followed by a fresh token.
-- **No relay.** Reaching a node with no public address is [remote.md](./future/remote.md)'s problem. A
-  provider returns an endpoint without saying how it was obtained, so a relayed endpoint slots in
-  without changing this protocol.
+- **No accounts in core.** A Node mints its own `owner-<uuid>` and knows nothing about a cloud identity.
+  The account-to-Node mapping lives in the control plane's database.
+- **No heartbeat, polling, or callbacks.** Enrollment is one request. A control plane that wants to know
+  whether a Node is up asks the Node, with the credential it was given.
+- **No re-enrollment.** A Node with an attachment skips enrollment however the environment is set.
+  Re-attaching is a detach and a fresh token.
+- **No relay.** Reaching a Node with no public address belongs to [remote access](./future/remote.md). A
+  provider returns an endpoint without saying how it got it, so a relayed endpoint fits this protocol
+  unchanged.

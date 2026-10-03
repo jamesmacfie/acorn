@@ -5,7 +5,7 @@ import { Alert, Button, EmptyState } from '../../kit/components/primitives'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
 
-// Settings → Audit log (docs/security.md § Audit): the security-relevant actions one node recorded,
+// Settings → Audit log (docs/security/audit.md § Audit): the security-relevant actions one node recorded,
 // newest first. Split out of Security and backup, whose other half is about the disk and the archive.
 //
 // Per node, following the settings header's node switcher. Rolling two nodes' trails into one list

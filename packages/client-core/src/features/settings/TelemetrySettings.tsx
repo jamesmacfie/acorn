@@ -13,20 +13,20 @@ import { saveTelemetryOn, telemetryOn } from './telemetrySetting'
 import './settings.css'
 
 // Settings → Telemetry: the one switch, and an honest account of what it turns on
-// (docs/telemetry.md § The switch). Per node, following the settings header's node switcher.
+// (docs/telemetry/model.md § The switch). Per node, following the settings header's node switcher.
 //
 // One control on a page of its own rather than a row buried under Appearance, because this is the
 // page a person opens to answer "what is this app sending". The page says what collection is for and
 // what it refuses, so the answer is here rather than in a changelog.
 //
 // The switch alone collects nothing. A record is only built when a plugin has subscribed as a sink,
-// which needs a permission the trust prompt draws high (docs/security.md § Telemetry sinks), so
+// which needs a permission the trust prompt draws high (docs/security/plugin-node-realm.md § Telemetry sinks), so
 // leaving this on with no exporter installed costs one boolean read at each seam.
 //
 // Under the switch is the evidence: what the node has actually collected since it started, per
 // owner and kind, and which plugins are reading it. Counters from the collector rather than a
 // window over its ring, because the ring is 5,000 records deep and a sink may have drained it a
-// second ago (docs/telemetry.md § What the page shows). They move while the page is open, which is
+// second ago (docs/telemetry/diagnosis.md § What the page shows). They move while the page is open, which is
 // what makes the switch legible: turn it on, run a command, watch a number change.
 
 /** How many owner-and-kind rows to draw before folding the rest into a line. Long enough for core
@@ -67,7 +67,7 @@ export default function TelemetrySettings(props: { nodeId: string | null }) {
       </SettingsSection>
 
       {/* What a record may hold is said here, beside the evidence, rather than in a section of its own:
-          the two answer one question (docs/telemetry.md § What never leaves the machine). */}
+          the two answer one question (docs/telemetry/model.md § What never leaves the machine). */}
       <SettingsSection id="collected" label="What this node has collected" description="Counts since the node started. The records themselves aren't shown.">
         <Stack gap="row">
           <Show

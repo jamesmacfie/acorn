@@ -16,7 +16,7 @@ import { syncState } from '../../../node/schema'
 // freshness is a TTL gate in sync_state (`pr:<repoId>:<number>`); the mirror tables are the
 // cache. The mirror logic is shared with the batch route, see prMirror.ts. Files live in
 // pr_files, owned by /files.
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullDetail = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number', async (c) => {
   const uid = ownerId(c)

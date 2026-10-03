@@ -56,7 +56,7 @@ export type Renderer = {
 // ── tui.frame ──
 //
 // A paint is far past ten a second under a held key, so it is a histogram and never a span
-// (docs/telemetry.md § Hot seams are metrics). Four series under one name: the whole frame, and the
+// (docs/telemetry/model.md § Hot seams are metrics). Four series under one name: the whole frame, and the
 // three halves of it, told apart by `phase` rather than by four seam names, so "which third is
 // slow" is a filter and not a second query (docs/tui.md § What the terminal client reports).
 //

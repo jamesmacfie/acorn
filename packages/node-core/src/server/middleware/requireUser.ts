@@ -3,7 +3,7 @@ import { createMiddleware } from 'hono/factory'
 import { respondError } from '../respond'
 import type { AppEnv, Principal } from './auth'
 
-// The single authentication gate for /v1 routes (docs/security.md § Transport and auth). Mounted once
+// The single authentication gate for /v1 routes (docs/security/transport-and-auth.md § Transport and auth). Mounted once
 // in createApp() over `/v1/*`, after authMiddleware. Either credential kind passes, so internal-token
 // callers work as device callers do.
 export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
@@ -13,7 +13,7 @@ export const requireUser = createMiddleware<AppEnv>(async (c, next) => {
 
 export const ownerId = (c: Context<AppEnv>): string => c.get('principal')!.userId
 
-// Device-only gate, for surfaces an agent-spawned child must never reach (docs/security.md §
+// Device-only gate, for surfaces an agent-spawned child must never reach (docs/security/transport-and-auth.md §
 // Transport and auth: why requireUser cannot express this on its own, the pairing-escalation finding
 // this closes, and why the response is 403 rather than 401).
 export const requireDevice = createMiddleware<AppEnv>(async (c, next) => {
@@ -34,7 +34,7 @@ export const canUseProviderCredential = (c: Context<AppEnv>): boolean =>
 // Is this principal entitled to act on `taskId`?
 //
 // A device may act on any task. An internal token may act only on the task it was minted for
-// (docs/security.md § Credential handling). Without that comparison, a credential handed to task A's
+// (docs/security/credentials.md § Credential handling). Without that comparison, a credential handed to task A's
 // agent drives task B's tools. The 'service' scope is unbound, because the node's own loopback calls
 // are not task-specific.
 export const principalMayActOnTask = (principal: Principal | null | undefined, taskId: string): boolean => {
@@ -68,7 +68,7 @@ export const isTaskConfined = (c: Context<AppEnv>): boolean => {
 }
 
 // Middleware form of mayActOnTask, for a whole router whose paths are all `/:id/...` task-scoped
-// (docs/security.md § Transport and auth: the adversarial-review finding this closes). 404, not 403,
+// (docs/security/transport-and-auth.md § Transport and auth: the adversarial-review finding this closes). 404, not 403,
 // matching the agent-tool surface: the denial reveals nothing about which tasks exist.
 //
 // A missing `:id` denies too. Hono populates the parameter under every mount this gate is used at, so
@@ -81,7 +81,7 @@ export const requireTaskScope = createMiddleware<AppEnv>(async (c, next) => {
   await next()
 })
 
-// Gate for routes that administer or spend the owner's provider connections (docs/security.md §
+// Gate for routes that administer or spend the owner's provider connections (docs/security/credentials.md §
 // Credential handling). requireDevice is too strict, because the node's own loopback calls, on the
 // 'service' scope, reach provider-backed reads to warm a mirror.
 export const requireProviderAccess = createMiddleware<AppEnv>(async (c, next) => {

@@ -28,7 +28,7 @@ import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 const TAG = 'acorn-helper'
 
 // Everything this file says that is not for Rust. The node's logger rather than the renderer's,
-// because it writes to stderr and stdout here is a wire (docs/telemetry.md § Logging). The two
+// because it writes to stderr and stdout here is a wire (docs/telemetry/logging.md § Logging). The two
 // `console.log` calls below stay console calls: they are the handshake protocol, not log lines.
 const log = createLogger('helper')
 

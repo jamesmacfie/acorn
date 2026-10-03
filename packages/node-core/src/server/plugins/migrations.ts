@@ -1,5 +1,5 @@
 // Resolves a built-in plugin's Drizzle migration chain across the three runtime layouts
-// (docs/data-layer.md § Migrations). The module URL passed in is always the plugin's own, never this
+// (docs/data-layer/migrations.md § Migrations). The module URL passed in is always the plugin's own, never this
 // file's, which stops a plugin from finding node-core's chain by proximity.
 import { existsSync } from 'node:fs'
 import { basename, dirname, join } from 'node:path'
@@ -44,7 +44,7 @@ export function pluginMigrationsChain(plugin: string, dir: string): string {
 
 // Source packages and loaded packages both have a `plugins/<id>/...` shape. The walk below stops
 // here, so a missing chain cannot adopt dataRoot/migrations, a checkout-level core chain, or any
-// other ancestor's DDL (docs/data-layer.md § Migrations).
+// other ancestor's DDL (docs/data-layer/migrations.md § Migrations).
 const pluginPackageRoot = (plugin: string, start: string): string | null => {
   let dir = start
   for (;;) {

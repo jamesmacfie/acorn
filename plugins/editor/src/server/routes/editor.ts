@@ -6,7 +6,7 @@ import { imageTypeForPath } from '../../contract/imagePreview'
 
 // Editor pane: read, write, and list files on the task's worktree. Task-scoped HTTP behind the
 // EditorBridge (../editor.ts). The bridge confines every relative path to the worktree root
-// (docs/security.md § Process, path, and configuration controls), so a traversal or symlink escape is
+// (docs/security/process-and-paths.md § Process, path, and configuration controls), so a traversal or symlink escape is
 // a 403 and an unmapped repo is a 404. See server/routes/editor.test.ts.
 
 export type EditorEntry = { name: string; dir: boolean }

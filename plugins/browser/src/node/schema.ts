@@ -1,6 +1,6 @@
 import { blob, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
-// The browser plugin's one table (docs/data-layer.md § Plugin DBs). Lives in
+// The browser plugin's one table (docs/data-layer/plugin-databases.md § Files). Lives in
 // <data-root>/plugins/browser.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Screenshot bytes are stored, not inlined into a transcript as base64, so they outlive the transcript

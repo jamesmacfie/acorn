@@ -1,9 +1,9 @@
 import { sql } from 'drizzle-orm'
-// The agents plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
+// The agents plugin's own tables (docs/data-layer/plugin-databases.md § Plugin databases). Lives in
 // <data-root>/plugins/agents.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // The companion FTS5 virtual table (`agent_events_fts` and its three triggers over `agent_events`) is
-// hand-written into the migration rather than declared here. See docs/data-layer.md § Migrations.
+// hand-written into the migration rather than declared here. See docs/data-layer/migrations.md § Migrations.
 // Migration 0005 owns its shape, migration 0012 owns dirty progress, and
 // server/ftsSchema.test.ts checks the actual migrated objects.
 import { index, integer, primaryKey, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
@@ -101,10 +101,10 @@ export const agentTurns = sqliteTable(
   ],
 )
 
-// Normalized event ledger, the durable ordered history docs/api-reference.md § Streams describes. It
+// Normalized event ledger, the durable ordered history docs/api-reference/websocket.md § Events describes. It
 // appends, and a sequence is never reused. It deletes a tool call's or a file change's superseded
 // row, once a newer row carries its whole state (server/sessions/ledgerFold.ts), and every row of a
-// session whose task was archived longer than the owner keeps history (docs/data-layer.md § Retention).
+// session whose task was archived longer than the owner keeps history (docs/data-layer/backup-and-retention.md § Retention).
 // `searchText` feeds the migration-owned FTS5 virtual table; large bytes and verbose command output
 // live in agent_artifacts instead of this row.
 export const agentEvents = sqliteTable(
@@ -213,7 +213,7 @@ export const agentArtifacts = sqliteTable(
 )
 
 // Idempotency for commands whose resource row does not carry the caller's key: session creation and
-// lifecycle changes. Internal callers get no device-keyed replay (docs/api-reference.md § Request
+// lifecycle changes. Internal callers get no device-keyed replay (docs/api-reference/transport.md § Request
 // processing), so this table stands in. Results are small normalized JSON. Core's `idempotency` table
 // is separate and keys on deviceId at the HTTP layer.
 export const agentOperations = sqliteTable(

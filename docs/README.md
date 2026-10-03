@@ -27,14 +27,40 @@ the whole plugin system in one page.
 | [architecture/fleet.md](./architecture/fleet.md) | Client state, connection states, fan-out, deadlines, and the Fleet view. |
 | [architecture/control-plane.md](./architecture/control-plane.md) | The three parties, and what a control plane may hold. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
-| [api-reference.md](./api-reference.md) | Overview of `/v1` routes, authentication, errors, and transport. |
-| [data-layer.md](./data-layer.md) | The data root, the core database, plugin databases, migrations, backup, and retention. |
+| [api-reference.md](./api-reference.md) | The map of the `/v1` API and which page owns each route, header, and frame. |
+| [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, protocol versioning, request processing, idempotency, and the error envelope. |
+| [api-reference/core-routes.md](./api-reference/core-routes.md) | Every `/v1/core` route with its gate. |
+| [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
+| [api-reference/workflow-routes.md](./api-reference/workflow-routes.md) | The workflows plugin's run, processing history, definition, and schedule binding routes. |
+| [api-reference/websocket.md](./api-reference/websocket.md) | `/v1/events`, logical viewers, the preview tunnel, and the Node event channels. |
+| [data-layer.md](./data-layer.md) | The map of Node storage, and the ownership rules for provider data, identity, and blobs. |
+| [data-layer/data-root.md](./data-layer/data-root.md) | The data root's location, contents, `node.json`, and how it opens. |
+| [data-layer/core-database.md](./data-layer/core-database.md) | Core tables, the external-item read model, the merged run list, and task script history. |
+| [data-layer/plugin-databases.md](./data-layer/plugin-databases.md) | Each plugin's SQLite file, opening a handle, cross-database ledgers, and the GitHub mirror. |
+| [data-layer/migrations.md](./data-layer/migrations.md) | Generating migrations, chain locations, the applied-history check, and loaded plugin storage. |
+| [data-layer/backup-and-retention.md](./data-layer/backup-and-retention.md) | Backup archives and restore, retention, `VACUUM`, and the storage report. |
+| [data-layer/typed-data.md](./data-layer/typed-data.md) | The shared typed-value contract, and data sources as projections. |
 | [state-ownership.md](./state-ownership.md) | Which state the node owns, which the device owns, and what is disposable. |
+| [state-ownership/scope-rules.md](./state-ownership/scope-rules.md) | Where client state is stored: the scope table, the three mechanisms, eviction, and drafts. |
+| [state-ownership/reading-places.md](./state-ownership/reading-places.md) | List, timeline, and diff reading places, heights, and parsed rows. |
 | [caching.md](./caching.md) | The client cache, its keys, and the serve-then-revalidate policy. |
 | [authentication.md](./authentication.md) | Device pairing, tokens, principals, and the internal-call scopes. |
-| [security.md](./security.md) | The threat model, the trust boundaries, the containment ladder, and the audit trail. |
+| [security.md](./security.md) | The trust boundaries, what is out of scope, and which page owns each control. |
+| [security/transport-and-auth.md](./security/transport-and-auth.md) | TLS and pins, broker limits, the auth gates, mount coverage, task scope, and the WebSocket hub. |
+| [security/credentials.md](./security/credentials.md) | Provider credentials, `SecretService.use`, child environments, and internal token scopes. |
+| [security/process-and-paths.md](./security/process-and-paths.md) | Path confinement, the process broker, config trust, workflow authority, and force push. |
+| [security/control-plane.md](./security/control-plane.md) | What enrollment and node providers cost, and what bounds it. |
+| [security/renderer.md](./security/renderer.md) | The renderer CSP, the HTML and markdown sinks, and untrusted provider and authoring input. |
+| [security/webviews.md](./security/webviews.md) | Host-owned webviews, the preview pane's remote refusal, and agent browser tools. |
+| [security/audit.md](./security/audit.md) | The audit trail, plugin audit verbs, on-disk permissions, and backups. |
 | [node-enrollment.md](./node-enrollment.md) | How a provisioned node introduces itself to a control plane, and the versioned protocol it speaks. |
-| [security/node-plugin-security.md](./security/node-plugin-security.md) | The threat model and containment rules for loaded Node plugin code. |
+| [security/node-plugin-security.md](./security/node-plugin-security.md) | The owner of plugin security: the threat model, the containment ladder, and the summary table. |
+| [security/plugin-bundles.md](./security/plugin-bundles.md) | Hash-bound consent for client bundles, custody, and the threats it closes. |
+| [security/plugin-install.md](./security/plugin-install.md) | The install route, agent install requests, folder installs, and development mode. |
+| [security/plugin-client-sandbox.md](./security/plugin-client-sandbox.md) | Rung 0: the iframe, tree worker, and terminal worker sandboxes. |
+| [security/plugin-node-realm.md](./security/plugin-node-realm.md) | Rungs 1 to 3: the permission-shaped context, the isolated worker realm, and OS sandboxing. |
+| [security/plugin-secrets-and-routes.md](./security/plugin-secrets-and-routes.md) | How plugins borrow credentials, task-token reach, and agent tool rules. |
+| [security/plugin-storage-and-supply-chain.md](./security/plugin-storage-and-supply-chain.md) | Plugin SQLite policy, install integrity, and the boundary design rules. |
 | [security/review-2026-10-01.md](./security/review-2026-10-01.md) | Ten-area security review, completed remediation ledger, verification evidence, and remaining limits. |
 
 ## The renderer
@@ -67,6 +93,8 @@ the whole plugin system in one page.
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
 | [schedules.md](./schedules.md) | Node-owned periodic work. |
+| [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
+| [schedules/user-schedules.md](./schedules/user-schedules.md) | User schedule targets, consent, workflow schedules, routes, and Settings. |
 | [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
 | [workflows/execution.md](./workflows/execution.md) | Workflow graph execution, retries, recovery, and child tasks. |
 | [workflows/authoring.md](./workflows/authoring.md) | Workflow editor, scheduling, generation, drafts, and publication. |
@@ -116,10 +144,21 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
-| [telemetry.md](./telemetry.md) | The five record kinds, the switch, the collector, the scrubber, and what a sink can see. |
+| [telemetry.md](./telemetry.md) | The map of telemetry: the record kinds, the switch, and which page owns each seam. |
+| [telemetry/model.md](./telemetry/model.md) | The switch, the five kinds, span admission, attributes, privacy, and traces. |
+| [telemetry/plugins-and-sinks.md](./telemetry/plugins-and-sinks.md) | Writing telemetry from a plugin or frame, writing a sink, and the Sentry sink. |
+| [telemetry/runtimes.md](./telemetry/runtimes.md) | The collector, ambient attribution, Node seams, and the terminal client, helper, and shell. |
+| [telemetry/renderer.md](./telemetry/renderer.md) | The renderer emitter, one trace per interaction, and every renderer seam. |
+| [telemetry/logging.md](./telemetry/logging.md) | The two loggers and the `console.*` rule. |
+| [telemetry/surface-health.md](./telemetry/surface-health.md) | The numbers a large diff or timeline keeps about itself. |
+| [telemetry/diagnosis.md](./telemetry/diagnosis.md) | What Settings → Telemetry shows, diagnosing an unresponsive view, and memory over a day. |
 | [shell.md](./shell.md) | The Tauri shell: schemes, custody, webviews, the helper, and packaging. |
 | [tui.md](./tui.md) | The terminal client: `acorn` in a terminal, its process model, its host switch, how it draws a frame, and its chrome. |
 | [cli.md](./cli.md) | Headless `acorn` commands, Node selection, read resources, output, and exit codes. |
+| [cli/workspaces-projects-tasks.md](./cli/workspaces-projects-tasks.md) | CLI core writes, retries, stdin piping, and task script reads. |
+| [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
+| [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
+| [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
 | [tui/interaction.md](./tui/interaction.md) | Terminal key handling, focus, scrolling, and interaction telemetry. |
 | [tui/chrome-and-plugins.md](./tui/chrome-and-plugins.md) | Terminal chrome, loaded plugins, and their host fallbacks. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |

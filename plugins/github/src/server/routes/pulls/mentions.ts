@@ -8,7 +8,7 @@ import { repoMatches } from '../../repoMatch'
 // best-effort: an unmirrored repo yields an empty list, so the client just gets no suggestions, which is
 // why this keeps its own lookup rather than resolveRepoForUser's live-fetch-on-miss.
 //
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const mentions = (db: PluginDatabase) => new Hono<AppEnv>().get('/:owner/:repo/mentions', async (c) => {
   const uid = ownerId(c)

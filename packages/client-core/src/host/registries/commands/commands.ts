@@ -157,7 +157,7 @@ export type ContributedCommand = WithoutOwner<CommandContribution>
 
 export const commandRegistry = new Registry<CommandContribution>('command')
 
-/** The span name for one command run (docs/telemetry.md § The renderer). A constant rather than a
+/** The span name for one command run (docs/telemetry/renderer.md § Renderer seams). A constant rather than a
  *  literal because `scripts/icon-census.mjs` reads `name: '…'` as a Lucide icon name, and `command`
  *  is one: spelling it inline would put an icon nobody draws in the startup chunk. */
 const COMMAND_SPAN = 'command'
@@ -232,7 +232,7 @@ export function executeCommand(id: string, context?: CommandExecutionContext): P
     return Promise.resolve({ effect: 'stay' })
   }
   // One command is one interaction, so every request the command makes hangs under this span and the
-  // node's own request spans join the same trace (docs/telemetry.md § Traces). The owner is the
+  // node's own request spans join the same trace (docs/telemetry/model.md § Traces). The owner is the
   // registry's stamp, never the contributor's word, so `command` rows group by the package that
   // really contributed the row.
   const span = startInteraction(command.ownerId ?? 'core', {

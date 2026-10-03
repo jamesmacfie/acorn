@@ -146,12 +146,12 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v1/core/storage'), scopes: {}, note: 'Node memory and disk sizes; owner surface.' },
   { path: shape('/v1/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
   { path: shape('/v1/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
-  // The batch route the renderer and the other runtimes post to (docs/telemetry.md § Other
+  // The batch route the renderer and the other runtimes post to (docs/telemetry/runtimes.md § Other
   // runtimes). Unmappable, and it is a write rather than a read: everything admitted there reaches
   // every subscribed sink and a sink can post it off the machine. A frame measuring its own work
   // has `ctx.telemetry` on the bridge, which files under the plugin the host bound.
   { path: shape('/v1/core/telemetry'), scopes: {}, note: 'Anything posted here reaches every sink; a frame cannot be allowed to write into that stream.' },
-  // The counters Settings draws (docs/telemetry.md § What the page shows). Unmappable because the
+  // The counters Settings draws (docs/telemetry/diagnosis.md § What the page shows). Unmappable because the
   // answer names every other plugin on this machine and how much each of them is producing, which
   // is a plugin roster with a load profile attached. A plugin's own numbers are its own to keep.
   { path: shape('/v1/core/telemetry/summary'), scopes: {}, note: 'Names every other owner on this node and what each produces.' },

@@ -35,7 +35,7 @@ import { useUnsavedChanges } from './unsavedChanges'
 import './settings.css'
 
 // Settings → Schedules, per node and following the settings header's node switcher
-// (docs/schedules.md § Settings): every piece of periodic work this node owns, in one list, whoever
+// (docs/schedules/user-schedules.md § Settings): every piece of periodic work this node owns, in one list, whoever
 // declared it. The arming confirmation for a schedule's risk tier is taken once at creation, drawn by
 // the host, and cannot be talked out of asking.
 
@@ -45,7 +45,7 @@ const ownerLabel = (row: ScheduleRow): string =>
   row.owner === 'plugin' && row.pluginId ? pluginLabel(row.pluginId) : row.owner === 'core' ? 'acorn' : row.owner === 'user' ? 'You' : row.owner
 
 /** What the arming strip says about each tier, in the register a person would use. The vocabulary is
- *  `ToolRisk` (docs/schedules.md § Settings), the same three the agent-tool permission surface
+ *  `ToolRisk` (docs/schedules/user-schedules.md § Settings), the same three the agent-tool permission surface
  *  already projects, so a person meets one scale for "how dangerous is this". */
 const RISK_COPY: Record<ToolRisk, string> = {
   read: 'only reads data.',

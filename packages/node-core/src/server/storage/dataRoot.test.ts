@@ -57,7 +57,7 @@ describe('openDataRoot', () => {
     const identity = JSON.parse(readFileSync(join(dir, 'node.json'), 'utf8'))
     expect(identity.createdAt).toBeGreaterThan(0)
     // Deliberately absent. It was written once here and read by nothing, and it went stale the moment the
-    // binary serving this root moved on (docs/api-reference.md § Versioning). The live answer is the
+    // binary serving this root moved on (docs/api-reference/transport.md § Versioning). The live answer is the
     // running binary's NODE_PROTOCOL_VERSION, reported at GET /v1/node.
     expect(identity).not.toHaveProperty('protocolVersion')
   })

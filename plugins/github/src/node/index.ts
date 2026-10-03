@@ -51,7 +51,7 @@ export const githubPlugin = (): NodePlugin => {
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
-      // than reading one off the request environment (docs/data-layer.md § Plugin databases).
+      // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
       const store = ctx.storage.open()
       ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
         id: 'pull-request',

@@ -45,7 +45,7 @@ async function readBody<S extends z.ZodType>(c: Context<AppEnv>, schema: S, miss
   return parsed.success ? parsed.data : null
 }
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.

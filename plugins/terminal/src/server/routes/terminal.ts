@@ -10,7 +10,7 @@ export type TerminalBridge = {
   // Which task owns a session, for the ownership check every /sessions/:sid route below runs.
   // Answers from the same session map that server/transport/wsHub.ts reads through StreamHandlers.streamTaskId,
   // not re-derived from list(), so the HTTP and WS halves cannot disagree about who owns a session
-  // (docs/security.md § Transport and auth). Null means no such session.
+  // (docs/security/transport-and-auth.md § Transport and auth). Null means no such session.
   taskIdFor(sessionId: string): string | null
   list(): Promise<TerminalSession[]>
   profiles(): Promise<TerminalProfile[]>
@@ -45,7 +45,7 @@ const resizeBody = z.object({ cols: z.number(), rows: z.number() })
 const sendBody = z.object({ text: z.string().min(1), submit: z.enum(['now', 'after-ready', 'draft']) })
 
 // A PTY is arbitrary command execution as the owner, so every route below that names a session must
-// answer "does this caller own that session's task?" (docs/security.md § Transport and auth).
+// answer "does this caller own that session's task?" (docs/security/transport-and-auth.md § Transport and auth).
 // requireTaskScope cannot be mounted over these paths because the task is not in them and the
 // session id is opaque, so the resolution happens here instead.
 const ownsSession = createMiddleware<AppEnv>(async (c, next) => {
@@ -55,14 +55,14 @@ const ownsSession = createMiddleware<AppEnv>(async (c, next) => {
   if (!impl) return next() // let viaBridge answer 503
   const taskId = impl.taskIdFor(sid)
   // Same 404 for unknown and foreign sessions, so a task-scoped caller cannot probe which ids exist
-  // (docs/security.md § Transport and auth).
+  // (docs/security/transport-and-auth.md § Transport and auth).
   if (!taskId || !mayActOnTask(c, taskId)) return respondError(c, 404, 'not_found')
   await next()
 })
 
 export const terminal = new Hono<AppEnv>()
   // Filtered, not gated: a task-scoped caller sees only its own task's sessions
-  // (docs/security.md § Transport and auth).
+  // (docs/security/transport-and-auth.md § Transport and auth).
   .get('/sessions', (c) =>
     viaBridge(c, TERMINAL_ROUTE, async (t) => {
       const all = await t.list()
@@ -86,7 +86,7 @@ export const terminal = new Hono<AppEnv>()
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')
     // taskId lives in the body here, not a path param, so the scope gate cannot mount over this
-    // route; the check happens by hand instead (docs/security.md § Transport and auth).
+    // route; the check happens by hand instead (docs/security/transport-and-auth.md § Transport and auth).
     if (!mayActOnTask(c, p.data.taskId)) return respondError(c, 404, 'not_found')
     return viaBridge(c, TERMINAL_ROUTE, (t) => t.create(p.data as CreateOpts))
   })

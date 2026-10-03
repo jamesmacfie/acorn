@@ -307,7 +307,7 @@ export class ManagedAgentEngine {
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
     this.artifacts = new AgentArtifactStore(options.db, options.dataDir)
     // The redaction list grows as sessions start, rather than being computed once, because each session
-    // mints its own scoped internal token (docs/security.md § Credential handling). #mintedSecrets
+    // mints its own scoped internal token (docs/security/credentials.md § Credential handling). #mintedSecrets
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
@@ -425,7 +425,7 @@ export class ManagedAgentEngine {
 
   // Tool calls and file changes stored before the ledger fold, put into the shape it writes
   // (./ledgerCompaction.ts). Startup repair rather than a schedule: it converges, and each session is
-  // done once (docs/schedules.md § What deliberately is not a schedule). Not awaited, because the first
+  // done once (docs/schedules.md § Limits). Not awaited, because the first
   // pass over a 1.3 GB database took about half a minute and boot waits on reconcile().
   protected compactLedgersInBackground(): void {
     if (this.stopped || this.ledgerCompaction) return
@@ -556,7 +556,7 @@ export class ManagedAgentEngine {
       if (!live.workspaceId) live.workspaceId = await read(() => this.core.tasks.workspaceId(session.taskId))
       const noProviderExecutionHistory = !(await read(() => this.store.hasProviderExecutionHistory(session.id)))
       signal.throwIfAborted()
-      // Scoped to this session's task (docs/security.md § Credential handling). The credential cannot
+      // Scoped to this session's task (docs/security/credentials.md § Credential handling). The credential cannot
       // drive another task's tools or read the owner's provider credentials.
       const sessionEnv = {
         ...this.internalEnv({
@@ -589,7 +589,7 @@ export class ManagedAgentEngine {
       // The session's span covers starting the provider, not the session's whole life. A session
       // lives for hours and outlives the process, and a span nobody can close is not a measurement;
       // spawning or reconnecting the child is the part something waited on
-      // (docs/telemetry.md § The admission rule for a span).
+      // (docs/telemetry/model.md § The admission rule for a span).
       span = this.telemetry?.startSpan('agent.session', {
         attrs: { seam: 'agent.session', 'session.id': session.id, provider: session.providerId, reconnect: live.reconnectAttempt > 0 },
       })
@@ -1217,7 +1217,7 @@ export class ManagedAgentEngine {
   }
 
   /**
-   * Report processFootprint() as three gauges owned by this plugin (docs/telemetry.md § Diagnosing
+   * Report processFootprint() as three gauges owned by this plugin (docs/telemetry/diagnosis.md § Diagnosing
    * an unresponsive view). Skipped whole while nothing is collecting, because the count runs `ps`
    * through the process broker. Memory is left out when the table could not be read, rather than
    * reported as zero.

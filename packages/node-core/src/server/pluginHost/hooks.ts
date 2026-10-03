@@ -212,7 +212,7 @@ export const hookHandlers = (): (HookHandlerRegistration & { matched: boolean; l
 
 // One handler's turn in the chain: when it started, and the ids its span and everything it does
 // inside it share. A chain is one trace, not one per handler, because three handlers answering one
-// question are one thing that happened (docs/telemetry.md § Traces). Empty ids when nothing is
+// question are one thing that happened (docs/telemetry/model.md § Traces). Empty ids when nothing is
 // collecting, so a chain costs no allocation it will not use.
 type HookRun = { started: number; traceId: string; spanId: string }
 const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, spanId: traceId ? newSpanId() : '' })

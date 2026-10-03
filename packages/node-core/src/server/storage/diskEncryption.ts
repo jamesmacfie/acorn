@@ -14,7 +14,7 @@ export type DiskEncryption = boolean | null
 // which prints prose whose wording has changed across macOS releases, so parsing it starts returning
 // the wrong answer after an OS upgrade.
 //
-// It runs through the process broker rather than a bare execFile (docs/security.md § Process, path,
+// It runs through the process broker rather than a bare execFile (docs/security/process-and-paths.md § Process, path,
 // and configuration controls), for the allowlisted environment and a bounded capture instead of
 // inheriting this process's environment, tokens included.
 async function probe(): Promise<DiskEncryption> {

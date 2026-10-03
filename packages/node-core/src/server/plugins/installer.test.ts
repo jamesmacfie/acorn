@@ -327,7 +327,7 @@ describe('uninstalling', () => {
 
 describe('folder installs', () => {
   // The gate this used to assert, `allowLocalPath`, dev builds only, is gone. A folder is a
-  // first-class source on every build (docs/security.md § Installing from a folder), so the absence of
+  // first-class source on every build (docs/security/plugin-install.md § Installing from a folder), so the absence of
   // any option at all is the assertion: nothing left for a composition root to get wrong.
   it('need no option to say which kind of build this is', async () => {
     const result = await installPlugin(root, { path: packageDir() })

@@ -88,7 +88,7 @@ const isWritable = (nodeId: string): boolean => {
  * `/v1/core/tasks/:id`, and sending the raw path would put a row per task in a vendor's transaction
  * list. The namespace is the part the renderer does know and the part worth grouping by: core's
  * tasks, or one plugin's sessions. The matched pattern is on the node's own `http.request` span,
- * which is this span's child (docs/telemetry.md § Traces).
+ * which is this span's child (docs/telemetry/model.md § Traces).
  */
 export const apiRouteAttr = apiRouteNamespace
 
@@ -98,7 +98,7 @@ export const apiRouteAttr = apiRouteNamespace
  * Two things happen here that `deliver` below does not know about: the request is named, so a
  * failure a person reports is findable in the node's log, and it becomes a span. The span is what
  * carries `traceparent`, which makes the node's own `http.request` span a child of this one and a
- * click one trace end to end (docs/telemetry.md § Traces).
+ * click one trace end to end (docs/telemetry/model.md § Traces).
  */
 async function send(path: string, options: SendOptions = {}): Promise<ApiResponse> {
   const method = options.method ?? 'GET'
@@ -235,7 +235,7 @@ const JSON_HEADERS = { 'content-type': 'application/json' }
 
 const parseJson = <T>(res: ApiResponse): T => (res.body.byteLength === 0 ? (undefined as T) : (JSON.parse(decoder.decode(res.body)) as T))
 
-// One place that reads the wire envelope (docs/api-reference.md § Transport). A non-JSON or
+// One place that reads the wire envelope (docs/api-reference/transport.md § Transport). A non-JSON or
 // pre-envelope body degrades to `undefined` rather than throwing over the original failure.
 function errorBody(res: ApiResponse): ApiErrorBody['error'] | undefined {
   try {
@@ -262,7 +262,7 @@ const raise = (res: ApiResponse, fallback: string): never => {
 type ReadOptions = { signal?: AbortSignal; nodeId?: string | null; owner?: string }
 
 // A cast, not a parse. Within a protocol major every change is additive, so a read tolerates fields it
-// does not know about (docs/api-reference.md § Versioning).
+// does not know about (docs/api-reference/transport.md § Versioning).
 export async function readJson<T>(url: string, options: ReadOptions = {}): Promise<T> {
   const res = await send(url, { signal: options.signal, nodeId: options.nodeId, ...(options.owner ? { owner: options.owner } : {}) })
   if (!res.ok) raise(res, `${url} ${res.status}`)
@@ -359,7 +359,7 @@ export const postJson = async <T>(url: string, body?: unknown, options?: { idemp
     method: 'POST',
     headers: {
       ...(body === undefined ? {} : JSON_HEADERS),
-      // The client mints the key, never the broker (docs/api-reference.md § Request processing).
+      // The client mints the key, never the broker (docs/api-reference/transport.md § Request processing).
       ...(options?.idempotencyKey ? { 'idempotency-key': options.idempotencyKey } : {}),
     },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),

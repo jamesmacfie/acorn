@@ -68,7 +68,7 @@ export type HeadChangedEvent = {
   dirty: boolean
 }
 
-// A declared run target was started or stopped (docs/api-reference.md § WebSocket). Only the
+// A declared run target was started or stopped (docs/api-reference/websocket.md § WebSocket). Only the
 // declared targets: generic process and port lifecycle stays off the wire
 // (docs/plugins/forward-compatibility.md § What is not an event).
 export type RunTargetChangedEvent = {

@@ -91,7 +91,7 @@ const handleFilesRead = async (
 // `?path=` narrows it to one file. GET `/diff` answers with the same files as a segmented document
 // (PullDiffResponse) for the diff viewer, whose segments come from ./diffDocument.ts. There is no
 // batch patch read any more: the viewer reads segments, never whole patches.
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls/:number/files', async (c) => {
   const path = c.req.query('path')

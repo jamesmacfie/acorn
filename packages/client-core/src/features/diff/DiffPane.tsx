@@ -161,7 +161,7 @@ export function DiffPane(props: {
   const items = view.items
 
   // Spans per batch and per coloured segment, and the batch size as a sample: what reading near the
-  // viewport costs, rather than what the whole document would (docs/telemetry.md § Rendered-surface
+  // viewport costs, rather than what the whole document would (docs/telemetry/surface-health.md § Rendered-surface
   // health). Counts and times only. The rows go into the node's segment cache, the one beside this
   // pane's query client, so they outlive the pane (docs/diff-rendering.md § Resident segments).
   const mountedAt = performance.now()

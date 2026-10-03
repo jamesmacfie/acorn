@@ -16,11 +16,11 @@ export const changesPlugin = (): NodePlugin => {
     { verb: 'review-notes-changed', description: 'A task’s local review notes or delivery state changed' },
   ],
   // migrationsModule: this module's own URL; the host resolves the chain from there
-  // (docs/data-layer.md § Migrations).
+  // (docs/data-layer/migrations.md § Migrations).
   migrationsModule: import.meta.url,
   init: async (ctx) => {
     // Opened and migrated by the host before init returns, so no request can reach an unmigrated
-    // database (docs/data-layer.md § Plugin databases).
+    // database (docs/data-layer/plugin-databases.md § Plugin databases).
     const db = ctx.storage.open()
     ctx.routes.register(reviewNotesRoutes(db, ctx.core, ctx.events.send), { prefix: '/tasks', note: '/:id/review-notes' })
     // localGit holds no tables of its own: it shells out to git in the task worktree, so it needs
@@ -44,7 +44,7 @@ export const changesPlugin = (): NodePlugin => {
     for (const tool of localGitAgentTools(ctx.core)) ctx.tools.register(tool)
   },
   // The capability slot only; the host drains the SQLite handle right after this returns
-  // (docs/data-layer.md § Migrations).
+  // (docs/data-layer/migrations.md § Migrations).
   dispose: () => {
     capability?.dispose()
   },

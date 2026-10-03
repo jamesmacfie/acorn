@@ -276,7 +276,7 @@ describe('the generated commit message', () => {
   }
 
   // An agent's credential: an internal token bound to one task. It may drive that task's tools and it
-  // may not spend the owner's provider key (docs/security.md § Credential handling).
+  // may not spend the owner's provider key (docs/security/credentials.md § Credential handling).
   const asAgent = () => {
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {

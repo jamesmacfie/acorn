@@ -142,7 +142,7 @@ describe('what gets recorded', () => {
   })
 })
 
-// ── The plugin half of the vocabulary (docs/security.md § The vocabulary is closed) ───────────────
+// ── The plugin half of the vocabulary (docs/security/audit.md § The vocabulary is closed, and a plugin can add to it) ───────────────
 
 describe('plugin-declared audit actions', () => {
   afterEach(() => clearAuditActions('demo'))

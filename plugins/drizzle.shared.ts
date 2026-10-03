@@ -1,4 +1,4 @@
-// The drizzle-kit config for every plugin that owns tables (docs/data-layer.md § Plugin DBs). Eight
+// The drizzle-kit config for every plugin that owns tables (docs/data-layer/plugin-databases.md § Files). Eight
 // byte-identical copies before this file existed.
 //
 // Each plugin's own drizzle.config.ts is `export { default } from '../drizzle.shared'`. The paths below

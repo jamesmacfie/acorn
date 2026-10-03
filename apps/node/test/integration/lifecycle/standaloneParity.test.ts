@@ -71,7 +71,7 @@ describe('plugin-state parity', () => {
     // directly.
     //
     // Read off `console.error`, not `console.log`: every line the node writes goes to stderr
-    // through the logger now, because stdout is a wire (docs/telemetry.md § Logging).
+    // through the logger now, because stdout is a wire (docs/telemetry/logging.md § Logging).
     const dataRoot = mkdtempSync(join(tmpdir(), 'acorn-parity-frozen-'))
     const lines: string[] = []
     const write = console.error

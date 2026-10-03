@@ -210,7 +210,7 @@ export class WorkflowRunner {
     }
   }
 
-  /** What the editor and the palette offer (docs/api-reference.md § Workflows). */
+  /** What the editor and the palette offer (docs/api-reference/workflow-routes.md § Runs). */
   catalog(): WorkflowCatalog {
     return {
       kinds: this.#kindEntries().map(({ id, pluginId, contribution }) => ({ id, pluginId, describe: contribution.describe ?? null })),

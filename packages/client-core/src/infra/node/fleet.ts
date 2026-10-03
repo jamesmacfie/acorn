@@ -13,7 +13,7 @@ import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
 // cache per node (docs/architecture/fleet.md § Client state and fleet behavior,
-// docs/data-layer.md § Preferences and client persistence).
+// docs/state-ownership.md § Client-owned durable state).
 //
 // Membership is main's, because main owns the device tokens and the pinned certificates
 // (docs/architecture-overview.md § Process ownership). This is a projection of `fleetList()` plus the
@@ -110,7 +110,7 @@ export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nod
 
 // The node this window opens on when nothing else is selected, and the one a notification with no node
 // of its own is attributed to. Not a prefs home: preferences follow the resource they describe
-// (docs/state-ownership.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 

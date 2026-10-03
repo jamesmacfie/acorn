@@ -1,4 +1,4 @@
-// Internal tokens: scope and signing (docs/security.md § Credential handling for the scope split and
+// Internal tokens: scope and signing (docs/security/credentials.md § Credential handling for the scope split and
 // the signing-key lifecycle).
 import { createHmac, timingSafeEqual } from 'node:crypto'
 import { z } from 'zod'
@@ -14,7 +14,7 @@ export type InternalScope = 'service' | 'task'
 export type InternalClaims = {
   scope: InternalScope
   // Present for 'task' scope. The credential's task, which is what route handlers compare against the
-  // task in the URL (docs/security.md § Transport and auth: the escalation this comparison closes).
+  // task in the URL (docs/security/transport-and-auth.md § Transport and auth: the escalation this comparison closes).
   taskId?: string
   // The terminal/agent session, when the child belongs to one. Agent-tool contributions may require
   // this signed owner rather than accepting attribution supplied as transport metadata.

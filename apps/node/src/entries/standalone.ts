@@ -47,7 +47,7 @@ installCrashHandlers()
 const log = createLogger('node')
 const pluginLog = createLogger('plugins')
 
-// ACORN_DATA_DIR names the data root (docs/data-layer.md § Data root); service/runtime.ts's
+// ACORN_DATA_DIR names the data root (docs/data-layer/data-root.md § Where it lives); service/runtime.ts's
 // internalApiEnv hands this node's own child processes the same variable, so one spelling of "which
 // root" covers the whole process tree. Opening it takes the root's exclusive lock, which is why a
 // standalone node and a running desktop app cannot share one.
@@ -62,7 +62,7 @@ const disabledPlugins = disabledPluginsStore(root.dir)
 // no start-config override here: only the supervised host passes one.
 const disabled = effectiveDisabled(disabledPlugins)
 // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
-// (docs/data-layer.md § Retention).
+// (docs/data-layer/backup-and-retention.md § Retention).
 setWorktreesRoot(join(root.dir, 'worktrees'))
 
 // Same reporter as the supervised host, before the loader scans the install directory
@@ -94,7 +94,7 @@ let finishReconcile!: () => void
 const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 const core = createCoreServices({ secrets: runtime.SECRETS, db: runtime.DB, activeIdentity: runtime.ACTIVE_IDENTITY })
 // Before the plugins, so one that declares the `telemetry` token can subscribe from its own init,
-// exactly as in the supervised root (../composition/runtime.ts, docs/telemetry.md § The switch).
+// exactly as in the supervised root (../composition/runtime.ts, docs/telemetry/model.md § The switch).
 setTelemetryDataRoot(root.dir)
 startTelemetry({
   node: root.nodeId,
@@ -216,7 +216,7 @@ const previousToken = background ? readPrivateToken() : process.env.ACORN_DEVICE
 const handshake = JSON.stringify({
     baseline: ACORN_BASELINE,
     nodeId: root.nodeId,
-    // The handshake's protocol number (docs/api-reference.md § Versioning): a launcher can refuse a
+    // The handshake's protocol number (docs/api-reference/transport.md § Versioning): a launcher can refuse a
     // node it cannot drive without pairing to it first.
     protocolVersion: NODE_PROTOCOL_VERSION,
     endpoint: listener.endpoint.origin,

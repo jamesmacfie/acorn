@@ -1,7 +1,7 @@
 // Activation. Register the connection that holds the DSN, then subscribe to the stream.
 //
 // That is the whole sink contract: a function passed to `ctx.core.telemetry.onBatch`
-// (docs/telemetry.md § Writing a sink). Everything else in this package is what happens to a batch
+// (docs/telemetry/plugins-and-sinks.md § Writing a sink). Everything else in this package is what happens to a batch
 // after it arrives.
 //
 // Inert until two things are true at once. The owner has telemetry on, so the collector builds

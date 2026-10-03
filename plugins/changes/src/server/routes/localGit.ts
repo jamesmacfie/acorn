@@ -125,7 +125,7 @@ const id = (c: { req: { param(k: string): string } }) => c.req.param('id')
 //
 // The host's own rule, restated rather than imported. `canUseProviderCredential` is not on the plugin
 // surface, and the database plugin's generate route reads the same two fields for the same reason
-// (docs/security.md § Credential handling).
+// (docs/security/credentials.md § Credential handling).
 const mayGenerate = (principal: Principal | null): boolean =>
   !!principal && (principal.kind === 'device' || principal.scope === 'service')
 
