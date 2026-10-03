@@ -118,6 +118,16 @@ const RULES: readonly RouteRule[] = [
     scopes: {},
     note: 'Absolute paths and branches of git worktrees on the machine, for the host\'s own new-task dialog.',
   },
+  {
+    path: shape(`/v1/core/projects/${SEG}/branches`),
+    scopes: {},
+    note: 'Local Git branch names belong to the host\'s new-task flow, not a sandboxed frame.',
+  },
+  {
+    path: shape(`/v1/core/projects/${SEG}/worktree-availability`),
+    scopes: {},
+    note: 'Probes local branch and worktree state for the host\'s new-task flow.',
+  },
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },

@@ -141,12 +141,10 @@ describe('loading rollbar from disk', () => {
         items: [{
           id: 'rollbar-production:142',
           title: 'Checkout failed',
-          fields: ['#142'],
-          fieldsFirst: true,
+          fields: ['12'],
           short: '#142',
           icon: 'circle-x',
           severity: 'danger',
-          badge: '12',
           task: {
             origin: 'rollbar',
             title: 'Checkout failed',

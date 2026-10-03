@@ -16,10 +16,14 @@ import { focusedRegion, focusedRenderable, type RegionRef } from './keys/regions
 //
 // Everything client-core is imported dynamically, for the reason `main.tsx` gives: a module that
 // reads `window.acorn` at its top level must not be evaluated before the seam exists.
-export async function bootFixture(): Promise<{ task: typeof TASK }> {
+export async function bootFixture(): Promise<{ task: typeof TASK; transport: ReturnType<typeof stubTransport> }> {
   _resetRequests()
   const transport = stubTransport()
+  const windowEvents = new EventTarget()
   ;(globalThis as { window?: unknown }).window = {
+    addEventListener: windowEvents.addEventListener.bind(windowEvents),
+    removeEventListener: windowEvents.removeEventListener.bind(windowEvents),
+    dispatchEvent: windowEvents.dispatchEvent.bind(windowEvents),
     acorn: {
       platform: process.platform,
       nodeFetch: transport.fetch,
@@ -62,7 +66,7 @@ export async function bootFixture(): Promise<{ task: typeof TASK }> {
   await import('./chrome/settingsPages')
   const { refreshNodePlugins } = await import('@acorn/client-core/infra/node')
   await refreshNodePlugins('node-1')
-  return { task: TASK }
+  return { task: TASK, transport }
 }
 
 /** The whole shell, rendered to a cell buffer at 80 by 24, with the keymap installed on it.
@@ -148,6 +152,10 @@ function openSurface(size: { width: number; height: number }): Surface {
       // cannot outwait: a `pty` rectangle's emulator parses on a timer and twenty turns of
       // `setImmediate` go by in two milliseconds (./tree/frames.ts § framesSettled).
       await framesSettled()
+      for (let turn = 0; turn < 20 && frameRequested(); turn += 1) {
+        await new Promise((done) => setImmediate(done))
+      }
+      if (frameRequested()) throw new Error('TUI frame remained requested after 20 render turns')
       renderer.frame()
     },
     // A trailing newline: 24 rows and an empty twenty-fifth after the split, which is the shape every
@@ -247,7 +255,7 @@ export async function renderFixture(size: {
   // would otherwise leave the next test in the file staring at the previous one's dialog.
   _resetPluginDistribution()
   if (size.trust?.length) _seedPendingTrust(size.trust)
-  await bootFixture()
+  const { transport } = await bootFixture()
   // Which pane the fixture task opens on. The roster has eight of them now, so "the pane" is a choice
   // rather than the only one there is, and a test that does not make it gets whatever the task's saved
   // layout puts first (../chrome/panes.ts § shownPane).
@@ -317,9 +325,21 @@ export async function renderFixture(size: {
   }
   previous = tearDown
 
-  // Bounded, and the frame is taken either way. A tree that never settles is itself a finding, and a
-  // capture that hangs says nothing about which node did it.
-  const settle = (ms: number) => Promise.race([flush(), new Promise((done) => setTimeout(done, ms))])
+  // A deadline that rejects an unsettled tree and clears its timer on success. The old race returned
+  // a frame on timeout and left its losing timer alive after every capture.
+  const settle = async (ms: number): Promise<void> => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([
+        flush(),
+        new Promise<never>((_resolve, reject) => {
+          timer = setTimeout(() => reject(new Error(`TUI frame did not settle within ${ms} ms`)), ms)
+        }),
+      ])
+    } finally {
+      if (timer) clearTimeout(timer)
+    }
+  }
   await settle(3000)
   // Twenty more turns of the loop, and it is measured rather than inherited: taking it out reds
   // `./browseSlow.test.tsx`'s re-suspending case and `browse at 80 by 24` in
@@ -336,22 +356,28 @@ export async function renderFixture(size: {
     return captureCharFrame()
   }
 
-  // A real wait between the press and the settle, and not for the reason it used to be. It was here
-  // because a lone Escape is the start of every escape sequence there is and a terminal's parser
-  // holds it until it is sure nothing follows — and a test pushes a `KeyEvent` straight onto the key
-  // stream, so there is no parser in front of the dispatcher and that reason is gone
-  // (./keyEvent.ts § pressedKey).
-  //
-  // What the wait was also doing, which nobody had written down, is giving real time to whatever the
-  // press started. A key lands the caret on a row whose data the fixture answers on a 50 ms timer,
-  // and flushing the render loop does not make a timer fire however many turns it is given. Taking
-  // it out reds `./browseSlow.test.tsx` and `browse at 80 by 24` in `./reachability.test.tsx` and
-  // nothing else, both on the first frame after a Tab. `./kit/render.tsx` needs none, because a
-  // fragment under test has no transport behind it.
+  // Dispatch is synchronous, but a key may start a query whose fixture timer and subsequent Solid
+  // render are asynchronous. Wait for that work and the painter rather than sleeping after every key.
   const press = async (key: string, modifiers?: { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: boolean }): Promise<void> => {
     surface.pressKey(key, modifiers)
-    await new Promise((done) => setTimeout(done, 80))
-    await settle(500)
+    const deadline = Date.now() + 3000
+    for (let turn = 0; turn < 20; turn += 1) {
+      await settle(500)
+      if (transport.pending() > 0) {
+        const controller = new AbortController()
+        const remaining = deadline - Date.now()
+        if (remaining <= 0) throw new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`)
+        const timer = setTimeout(() => controller.abort(new Error(`TUI fixture did not finish after key ${key} (pending: ${transport.pending()})`)), remaining)
+        try { await transport.idle(controller.signal) } finally { clearTimeout(timer) }
+      }
+      await new Promise((done) => setImmediate(done))
+      if (transport.pending() === 0 && !frameRequested()) {
+        await settle(500)
+        if (transport.pending() === 0 && !frameRequested()) return
+      }
+      if (Date.now() >= deadline) break
+    }
+    throw new Error(`TUI did not settle after key ${key} (fixture requests: ${transport.pending()}, frame requested: ${frameRequested()})`)
   }
 
   /**

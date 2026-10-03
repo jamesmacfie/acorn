@@ -130,6 +130,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
 - [Desktop rail context menus](./future/rail-context-menus.md) — approved PRD and dated acceptance evidence for source and pane icon menus.
+- [Faster agent test feedback](./future/test-feedback.md) — implementation evidence for focused runs, cache precision, and TUI settlement.
 - [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
   from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.

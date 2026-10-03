@@ -420,7 +420,13 @@ export const _resetRequests = (): void => { recorded.length = 0 }
 
 /** A transport that answers the routes the panes ask for and 404s the rest, so a route the pane
  *  starts asking for shows up as an empty region rather than as a silent pass. */
-export function stubTransport(): { fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }> } {
+export function stubTransport(): {
+  fetch: (nodeId: string, request: { path: string; method?: string }) => Promise<{ status: number; headers: Record<string, string>; body: Uint8Array }>
+  pending: () => number
+  idle: (signal: AbortSignal) => Promise<void>
+} {
+  let pending = 0
+  const waiters = new Set<() => void>()
   // Connected, with the one capability the pull list asks for. `providers` stays empty beside it, which
 // is what switches off the "does this workspace link a project of its?" gate — that gate only applies
 // to a provider that enumerates projects, and nothing here says GitHub does.
@@ -443,7 +449,24 @@ const json = (value: unknown) => ({
     body: new TextEncoder().encode(JSON.stringify(value)),
   })
   return {
+    pending: () => pending,
+    idle: (signal) => pending === 0 ? Promise.resolve() : new Promise((resolve, reject) => {
+      const settled = () => {
+        signal.removeEventListener('abort', aborted)
+        waiters.delete(settled)
+        resolve()
+      }
+      const aborted = () => {
+        waiters.delete(settled)
+        reject(signal.reason)
+      }
+      waiters.add(settled)
+      signal.addEventListener('abort', aborted, { once: true })
+      if (signal.aborted) aborted()
+    }),
     fetch: async (_nodeId, request) => {
+      pending += 1
+      try {
       // A transport that answers in a microtask can never hold a `Suspense` open past the tick that
       // destroys its subtree, so the failure the real app lives with — content removed, destroyed,
       // then handed back dead — was unreachable from a
@@ -537,6 +560,13 @@ const json = (value: unknown) => ({
       // between a minute and an afternoon.
       if (process.env.ACORN_FIXTURE_LOG) process.stderr.write(`MISS ${request.method ?? 'GET'} ${path}\n`)
       return { status: 404, headers: {}, body: new Uint8Array() }
+      } finally {
+        pending -= 1
+        if (pending === 0) {
+          for (const resolve of waiters) resolve()
+          waiters.clear()
+        }
+      }
     },
   }
 }

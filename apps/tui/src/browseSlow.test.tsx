@@ -28,11 +28,16 @@ const caretOn = async (
 }
 
 describe('browsing over a slow transport', () => {
-  it('keeps drawing the list and the detail after a shown Suspense suspends again', async () => {
+  // The two-pane slow-query scenario needs at least 100 columns; at 80, Browse shows the
+  // list alone and there is no re-suspending detail subtree to protect.
+  const sizes = process.env.ACORN_TUI_WIDE
+    ? [{ width: 100, height: 32 }, { width: 120, height: 40 }]
+    : [{ width: 100, height: 32 }]
+  it.each(sizes)('keeps drawing the list and detail after re-suspension at $width by $height', async (size) => {
     process.env.ACORN_FIXTURE_PULLS = '40'
     process.env.ACORN_FIXTURE_DELAY_MS = '50'
     try {
-      const screen = await renderFixture({ width: 100, height: 32 })
+      const screen = await renderFixture(size)
       expect(await caretOn(screen, 'GitHub')).toBe(true)
       await screen.until('Invalidate')
       expect(await caretOn(screen, 'Invalidate')).toBe(true)
