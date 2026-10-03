@@ -60,7 +60,7 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   if (!speaksApiVersion(manifest.apiVersion)) {
     throw new Error(`built for plugin API ${manifest.apiVersion}; this app speaks ${PLUGIN_API_MAJOR}`)
   }
-  // A harness's adapter entry is a package-relative path acorn runs (docs/managed-agents.md §
+  // A harness's adapter entry is a package-relative path acorn runs (docs/managed-agents/harnesses.md §
   // Harnesses), so it belongs under the same check as the code entrypoints.
   const declaredPaths = [
     manifest.node,

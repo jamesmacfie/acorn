@@ -7,7 +7,7 @@ import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 
 // Starting a provider and running a turn, as spans this plugin raises through `ctx.telemetry`
-// (docs/managed-agents.md § What a session reports).
+// (docs/managed-agents/session-events.md § What a session reports).
 
 /** The spans this plugin raised, from the testkit's recorder rather than a stand-in for
  *  `ctx.telemetry`: these are the records a sink would receive, built by the real verbs

@@ -1,4 +1,4 @@
-// Definitions stored as rows (docs/workflows.md § Database definitions).
+// Definitions stored as rows (docs/workflows/definitions.md § Database definitions).
 //
 // Two stores, one read. A `.acorn/workflows/*.toml` file is executable configuration somebody
 // committed, so the trust snapshot hashes it and a run from one asks for an acknowledgement. A row

@@ -15,7 +15,7 @@ export type PluginRailTask = {
   branch?: string
   // The item's own text: a Linear issue's description, a Rollbar item's facts. The task model has no
   // body column, so nothing is written with it; what reads it is the workflow start from a row menu,
-  // which puts the title and this under an `issue` input (docs/workflows.md § Starting a run).
+  // which puts the title and this under an `issue` input (docs/workflows/starting-runs.md § Starting a run).
   body?: string
   link?: Pick<TaskLinkSeed, 'connectionId' | 'identifier' | 'ref'>
 }

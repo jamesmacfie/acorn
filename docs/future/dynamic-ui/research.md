@@ -69,7 +69,7 @@ Almost every piece this programme needs has shipped for another reason.
 | A custom card in the transcript | `agents:tool-card`, a `replace` remote point keyed by tool name | [Cooperative extension points](../../plugins/cooperative-extension-points.md) |
 | The conversation inside another pane | The `agents.conversation` client capability | `plugins/agents/src/contract/conversation.ts` |
 | Cross-plugin data | Typed data sources, with host-dispatched row actions and a risk confirm | [Data sources](../../data-sources.md) |
-| A read-only archived view | Panes that declare `readsArchived` | [Workspaces and tasks](../../workspaces-and-tasks.md#restoring-a-task) |
+| A read-only archived view | Panes that declare `readsArchived` | [Workspaces and tasks](../../workspaces-and-tasks/archive.md#restoring-a-task) |
 | Project-scoped panes beside a rail list | The `/p/:projectId/x/<plugin-id>/` routes | [Panes](../../panes.md) |
 | Find or create a task for an item | The reference panel action | [Panes](../../panes.md#not-a-pane-the-reference-panel) |
 

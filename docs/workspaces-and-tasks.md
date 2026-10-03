@@ -1,442 +1,73 @@
 # Workspaces and tasks
 
-Workspaces and tasks are core Node entities. A workspace groups local projects; a project is the
-machine-scoped identity for one folder or one known remote repository.
+Workspaces, projects, and tasks are core Node entities. Read this page for the data model and to
+find the topic page that owns worktrees, archive, task creation, project configuration, and task
+script results.
 
 ## Workspace and project
 
-A workspace has a name and sort order. It deliberately carries no icon or colour: the workspace
-switcher is structural navigation, not repository identity. A project belongs to exactly one
-workspace and has a stable opaque ID, display name, optional folder path, optional colour, and
-optional Git/GitHub facets. A project may be a plain folder or a Git checkout. Facets are cached
-observations and may be refreshed; the project ID is the application identity.
+A workspace groups projects. It has a name and a sort order, and no icon or color, because the
+workspace switcher is navigation, not repository identity. The node publishes
+`workspace:changed { workspaceId }` after a create, a rename, or a delete.
 
-The project colour is an optional machine-local accent, set on the project's settings page or for
-several projects at once from Settings → Overview. Every task for
-that project draws it as the strip down the left of its left-rail tab. Clearing the colour removes the
-project strip; an active tab still uses the application theme's normal active accent.
+A project belongs to one workspace. It's a folder on the Node's machine, either a plain folder or a
+Git checkout. The project row in `packages/node-core/src/server/db/schema.ts` holds a stable opaque
+ID, a display name, an optional folder path, an optional color, and optional Git and GitHub facets.
+The facets are cached observations that the Node refreshes. The project ID is the identity. Project
+membership changes publish `project:changed`.
 
-`path` is nullable and the model tolerates a path-null project, but nothing creates one. The GitHub
-importer's "defer" action was the only producer, and it is gone. Rows that predate that stay readable
-and are repaired by giving them a folder in Settings → Overview.
-
-The `Default` workspace is created lazily by the first project, not at boot: both `createProject` and
-`createProjectRef` fall back to it when no workspace is named. The owner adds folders from Settings →
-Projects or imports repositories explicitly through the GitHub plugin. Moving or hiding a project
-changes only its core row; deleting a project never deletes its folder.
-
-Registering a local folder through the CLI requires an explicit workspace and an absolute Node-host
-path. Core compares the folder's resolved path with registered project paths, so symlink and `..`
-aliases reuse an existing project ID. The stored path remains the spelling originally registered.
-See [Command-line client](./cli.md) for the administration commands and typed pipe contract.
-
-Settings → Overview is one table of projects grouped under their workspace, because the grouping is
-what is being arranged. Selecting rows opens a bar that moves them to a workspace, the last option
-creating one, hides or shows them, or sets their colour. A row opens its project's settings page,
-which holds the name, folder, colour, workspace, visibility, and the project's configuration below. A
-workspace's own page renames and deletes it, except the default, which is where a deleted workspace's
-projects land and so can be neither renamed nor deleted. A project whose workspace has vanished
-appears under `Unassigned` so it can always be rescued. [Frontend](./frontend/settings-groups.md) § Workspaces and
-projects has the pages.
-
-Deleting a project takes its tasks and task links with it, because `tasks.project_id` has no foreign
-key and rows left behind are invisible in every rail and impossible to remove. The confirmation names
-the task count first. Nothing on disk is touched: the folder and any task worktrees remain.
-
-A node with zero projects opens the first-run wizard (`plugins/onboarding`) instead: welcome, add
-projects by folder or GitHub, name them and their workspace, pick what to generate text with, done. Its gate is `shouldShowOnboarding`,
-meaning zero projects and no `onboarded` preference, and both finishing and skipping write that
-preference, so it never opens twice. Everything it offers is also in Settings → Overview.
-
-Opening is a one-way door (`onboardingVisible`). "No projects yet" is the right trigger and the wrong
-latch, because the wizard's own first step creates a project: re-evaluating the trigger every render
-unmounted the wizard mid-flow and dropped the owner into the app on the project they had just added.
-Once open it stays open until it closes itself.
-
-The GitHub step is a batch, not a single choice. An account has many repositories and taking several
-is the normal case, so importing does not leave the screen. The list stays put with a running tally
-of what has been added, and the owner presses **Done adding** when finished. The naming step covers
-the whole batch: a name field per project, and a workspace picker per project whose last option
-creates a new workspace. One run can spread its projects across several new workspaces, each
-appearing in the next row's list as soon as it exists.
-
-The batch is whatever the adding reported, never inferred. `ProjectImporterProps.onImported` carries
-the project ids it produced, because an import may repair a path-less project rather than create one.
-Diffing the project list against a snapshot taken on entry drops exactly those, and shows only the
-last repository of several.
-
-Provider projects from Linear and Rollbar are separate external references in
-`workspace_external_projects`, keyed by the exact integration connection. They do not become local
-projects and do not change project identity.
-
-A link may name one project in the workspace instead of the whole of it. That is what lets two
-repositories in one workspace show different Linear issues or different Rollbar errors: the routed
-project names the workspace, then keeps the links that either name it or name no project at all.
-
-The map is edited in Settings > Services, on the connection's own page, and that surface is the
-host's for every provider rather than any one plugin's. Under the connection because one Linear or
-Rollbar connection usually serves every workspace on the machine, so its whole map reads better in one
-place than a checkbox list repeated on every workspace page. The host's because of ownership: the
-table is core's, the routes are core's (`PUT /v1/core/integrations/:id/mappings` replaces every row
-one connection owns; `PUT /v1/core/workspaces/:id/external-projects` is the same table from the
-workspace's side), and a plugin cannot write it at all — both are permanently unmappable on the frame
-bridge, and `CoreServices.projects` exposes a provider-scoped read with no write. When the only writer
-lived inside the Linear plugin's browse pane, deleting that pane made the mapping unwritable and left
-every integration silently unscoped.
-
-The providers decide which of them appear, not the map. A provider declares a `projects` source
-on its contribution, and one that declares none is absent rather than present and empty
-([integrations.md](./integrations.md)). A link is added and removed one at a time against the rows the
-server holds, so a connection whose list fails to load still shows its links, by external id.
-
-A rail scoped to nothing mapped is not always empty: Rollbar, which has no linked-project concept,
-reads every connection unscoped. Linear, which does have one, declares its own `emptyState` for "no
-followed projects" instead of falling back to any issues ([integrations.md § Linear](./integrations.md)).
+[Projects and workspaces](./workspaces-and-tasks/projects.md) covers registering, arranging, and
+deleting projects, the first-run wizard, and the map from Linear and Rollbar projects to local
+projects.
 
 ## Task
 
-A task contains:
+A task is the single-project unit of work, and each one is a rail row. A task holds these fields:
 
 - One required `projectId`.
-- An optional branch and optional worktree path.
-- An origin: a source id the owning plugin declared, or `local` for a task core made itself. The
-  source that tracks a task also says which pane it opens on the first time it is activated
-  (`defaultPane`); a task no source claims lands on the layout reducer's default.
-- Optional primary pull-request number, title and icon, rail sort, status, archive timestamp, and parent task.
+- An optional branch and an optional worktree path.
+- An origin. It's a source ID the owning plugin declared, or `local` for a task core made itself.
+  The source that tracks a task also names the pane it opens on first activation (`defaultPane`).
+  A task no source claims lands on the layout reducer's default.
+- An optional primary pull request number, title, and icon, plus rail sort, status, archive time,
+  and parent task.
 - Task links to external items, and feature-owned terminal, agent, and pane state.
-- Zero or more durable `task_pulls` relations for PRs Acorn created in the task. The scalar primary
-  still owns worktree, checks, and task-context behavior; related PRs are review-only neighbours.
+- Zero or more `task_pulls` relations for pull requests acorn created in the task. The primary pull
+  request owns worktree, checks, and task context behavior. Related pull requests are for review
+  only.
 
-A task can be branchless: a null branch runs in the project root. A branch creates an isolated Git
-worktree lazily, when the first filesystem-dependent surface needs one. The project row, not a copied
-owner and name pair, is the source of task identity.
+A task with a null branch runs in the project folder. A task with a branch gets its own Git
+worktree, created the first time a surface needs files. The project row, not a copied owner and
+repository name, is the source of task identity.
 
-Tasks created from external items retain a `task_links` record tied to the exact provider connection.
-This avoids collisions when two Linear or Rollbar connections expose the same visible identifier.
+A task made from an external item keeps a `task_links` row tied to the exact provider connection.
+Two Linear or Rollbar connections can expose the same visible identifier, and the connection keeps
+them apart.
 
-Core creates workflow and delegated-agent child tasks through `CoreServices.tasks.createChild()`.
-The caller may reserve the child ID before creation. Replaying the same parent, title, branch seed,
-and intended ID returns the same task; reusing that ID for another parent or seed fails. Branch
-deduplication still considers every other task, because two tasks cannot share one branch worktree.
-Creating the task does not create its worktree.
+## Pages
 
-A workflow dispatch reserves each child ID before calling this seam. The child keeps the workflow
-parent's project and records the parent through `Task.parentId`; workflow run lineage is stored
-separately by the workflows plugin and is never inferred from the task title. A Git project gets a
-unique branch and the usual lazy worktree. A non-Git project has no branch isolation, so the child
-uses the shared project folder.
+<a id="worktrees-and-setup"></a>
+<a id="worktree-status-reads"></a>
 
-Completing, failing, cancelling, or retrying a workflow does not archive its child tasks or remove
-their worktrees. The tasks remain in the rail with their final workflow runs and can be archived by
-the owner through the normal task action. Retrying a dispatch reuses the existing tasks and runs;
-starting a new root workflow creates a new set.
+[Worktrees and setup](./workspaces-and-tasks/worktrees.md) covers how the Node creates, names, and
+revalidates a worktree, the setup script, copied files, and the coalesced `git status` reads behind
+the rail markers.
 
-Workflow-created tasks carry origin `workflows:child`. Desktop and terminal navigation collapses
-those descendants under the nearest ordinary root task and shows aggregate running/attention markers
-on that root. Expanding a root shows the same parent/child order; opening a descendant reveals only
-its ancestor path. Manual children and top-level tasks keep their persisted drag order. Collapse does
-not change task identity or lifecycle: each task still has the ordinary individual archive action,
-and there is no workflow group or automatic archive operation.
+<a id="restoring-a-task"></a>
 
-## Worktrees and setup
+[Archive and restore](./workspaces-and-tasks/archive.md) covers the archive dialog, the teardown
+order, what archive keeps, and how restore rebuilds the worktree.
 
-Worktrees are created lazily for editor, changes, terminal, preview, or agent execution. The Node
-derives and revalidates the path; clients cannot choose an arbitrary worktree path. The one path a
-client may name is an existing worktree at task creation, and the Node accepts it only when Git lists
-it for that project and no active task uses it. A task with no
-branch uses the mapped project folder directly.
+<a id="task-creation-and-navigation"></a>
 
-The directory is keyed by owner, repo, and branch, so revalidation checks the branch as well as the
-path. For a worktree the task already owns, the on-disk HEAD is the fact and the row follows it: a
-live worktree checked out onto another branch updates `tasks.branch` to match and carries on, because
-work that needs a second pull request switches branch inside the one worktree. The directory keeps
-the name it was created under, since the path is persisted and only rederived from the branch when
-the task has no worktree yet.
+[Task creation and navigation](./workspaces-and-tasks/task-creation.md) covers the **New task**
+dialog, branch naming, child tasks made by workflows and delegation, and how the rails group them.
 
-A directory with no branch to adopt is refused with a `worktree-stale` 409: one that was pruned or
-moved, one left on a detached HEAD, and one that holds another branch while the task does not yet own
-it. A worktree that cannot be created is refused with `worktree-unavailable` rather than falling back
-to the main checkout. Either fallback hands the task another branch's files, which is the tree its
-agent then reads and edits.
+[Project configuration](./workspaces-and-tasks/project-config.md) covers the settings on the
+project row, the `.acorn/config.toml` layers, run targets, and layout recipes.
 
-Read-only panes can treat an unavailable worktree as an empty root. Execution surfaces, including
-managed agents, use the core task service's `requireRoot` call so a missing project mapping and a Git
-worktree failure remain distinct errors. On macOS, the Node retries Git with the standalone Command
-Line Tools binary when Apple's selected Xcode Git refuses a command solely because its license has
-not been accepted.
+<a id="durable-task-script-results"></a>
+<a id="retention-and-recovery"></a>
 
-If another worktree or the project checkout already has the task's branch checked out, Git refuses
-creation. Acorn reports the occupied branch and path from Git's worktree roster. Release that branch
-in the reported checkout, then reopen the task to retry creation. Acorn leaves the other checkout
-and its uncommitted files untouched. Setup runs only after creation succeeds.
-
-A task can select an existing local branch as its base. Acorn creates the task branch from that
-base's last commit when saving the task, then creates its worktree on first use. Uncommitted changes
-in the base's checkout do not carry over. Remote-only branches are not accepted.
-
-Without a base, `git worktree add -b` uses the mapped project folder's `HEAD` on first use.
-Remote-tracking refs such as `origin/main` do not take precedence over local commits. An unused local
-branch can be reused without a base. With a base, a local branch name is taken: a derived name gets a
-numeric suffix, and an exact name is refused. This keeps the chosen base from being ignored.
-
-The project's setup script runs in the new worktree as an ordinary terminal session titled "Setup",
-so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
-the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
-task's life ([ui-design.md](./ui-design/shell-hierarchy.md) § Rail controls).
-The New task dialog offers "Skip setup script" for a Git worktree task, and so does the box that
-makes a task from an integration's item, "Start workflow…" included. The choice is stored on the
-task, so it also skips setup if another surface creates the worktree later or the task is restored.
-Unchecked tasks keep the project's configured setup behavior.
-
-A project's `.acorn/config.toml`, committed or personal, may list `copy` paths: repo-relative files,
-usually gitignored (`.env.local` and similar), copied into a freshly created worktree so it works
-without a setup script. Missing sources warn rather than fail worktree creation, existing targets
-are never overwritten, and a repo's list wins over a personal one outright rather than merging with
-it. Both source and destination use the canonical task-root path guard: links outside either root
-and dangling links are rejected with a warning. Sources must be regular files; safe aliases inside
-the roots remain supported. Existing destination entries, including links, are never replaced.
-
-### Worktree status reads
-
-The rail and footer show a dirty marker and a changed-file count per task, and both come from
-`git status --porcelain=v2 --branch` in each active worktree. Every connected client asks for that
-sweep independently, and the changes pane asks the same question of the same directory for its own
-list, so two clients over four worktrees used to be 16 `git status` processes per ping.
-
-`packages/node-core/src/server/worktrees/worktreeStatus.ts` answers from one process per worktree per
-two seconds: concurrent callers join the run in flight, and a caller just behind one gets what that
-run produced. The changes pane's local-changes read takes the same output, which is why the command
-carries `--branch` that only the rail needs. The pane's other reads of the tree, its two
-`git diff --numstat -z` line counts and the `rev-parse --git-dir` behind its merge and rebase banner, go
-through the same window by argument list (`worktreeGitText`), so two clients on one task cost one of
-each per window rather than one per client. The node drops every entry for a path when it writes under
-it, runs in flight included, which covers a stage, a commit, a discard, a push, an editor save, a
-worktree created, and a terminal session's command going quiet. A change made outside acorn shows up
-on the next poll past the window.
-One shared expiry timer removes completed stdout when its two-second window ends, including paths
-that nobody requests again. Failed reads leave no cached entry. Invalidation retires running entries
-without cancelling their admitted callers, and a late completion cannot repopulate a retired entry.
-Fresh reads bypass both the window and running reads, then publish their answer for subsequent reads.
-
-The status sweep admits a HEAD observation generation for each authorized task before its Git wait.
-Only that task's newest generation can publish `head:changed`; an obsolete caller still receives its
-original status response. Initial HEAD observations seed silently, and an unknown HEAD preserves the
-last successful observation. Archive claims, project deletion, missing directories, complete roster
-pruning, and worktree-root initialization retire observations. A task-confined roster cannot prune
-other authorized tasks. Four workers admit the sweep's Git reads, and the client drives its clock.
-
-There is no filesystem watcher. One would be a handle per directory where recursive `fs.watch` is
-missing, a second source of truth about "dirty" beside git's, and a stream of events to debounce into
-this same coalesced read. It is worth building only when a change made outside acorn has to appear in
-under two seconds with no client asking.
-
-**The cache serves reads, never a refusal.** `removeWorktree` refuses to delete a worktree with
-uncommitted changes unless the caller forces it, and a stale "clean" reaching that guard would destroy
-somebody's work. So `worktreeDirty` passes `fresh: true`, which skips the in-flight promise and the
-window and runs git. A failure is never remembered either: "we could not tell" must not become
-"clean" for the next two seconds. `worktreeStatus.test.ts` holds the test that says so, which writes
-a file, waits 100 milliseconds, and expects the removal to be refused.
-
-Archive runs the configured teardown flow where the desktop runtime is available and reports partial
-failures instead of pretending removal succeeded. Its order is guard, review-input capture, repo
-teardown script, stop sessions, plugin cleanups, remove worktree, mark archived. Stopping sessions
-kills the task's running terminal sessions, then runs core's `core:task-archiving` hook, where the
-agents plugin stops the provider process behind each of the task's agent sessions
-([managed-agents.md § Operations and failure](./managed-agents.md)). Capture, the teardown steps, and
-the stops sit before removal, so anything that needs the worktree still has it and nothing is still
-writing into it when it goes. A failed review
-handoff does not strand the task: archive completes and the rail reports that review was not queued.
-
-Archive claims the task's worktree lifecycle before teardown starts. New root reads return no path
-while that claim is held, and archive waits for a worktree creation that was already in flight before
-it reads the path to remove. An archived task also returns no root. This keeps a pane refresh from
-reading a half-removed tree or recreating the directory between removal and the final status write.
-
-Before any of that, archive always opens a confirmation dialog with the task title above the
-confirmation text. Long titles wrap. The dialog asks every plugin what it
-has to say about this task, such as running containers, uncommitted files, or live sessions, and
-offers whatever cleanup each one declared. With no reported concerns it remains as the explicit
-archive barrier. A plugin contribution called a task check is the only way anything else reaches that
-dialog ([plugins.md § Task checks](./plugins.md)). A cleanup that fails names its plugin, and the task
-is archived anyway.
-
-The teardown takes seconds, so while it runs the task's close button and its rail row both spin,
-whichever of the two started the archive. One shared flag in `client-core/features/tasks/archiveLifecycle.ts`
-holds it, cleared when the archive finishes or fails. On the rail row the teardown is the
-highest-priority marker and it takes the slot under the task's glyph
-([ui-design.md § Rail controls and status markers](./ui-design.md)). It no longer blanks the row's
-other markers the way it used to: anything it outranks keeps its place in the hover tooltip, because a
-marker that loses its corner should lose the pixels, never the state.
-
-Where the owner lands afterwards is decided when the archive finishes, not when it starts, and only
-if they are still on the task being archived. The teardown takes long enough to walk away from, and
-moving someone who has since opened another task takes them off a task they chose. Nothing left to
-show falls back to the default browse.
-
-The same flag pauses the Changes pane's Git reads while the archive runs. The pane remains mounted so
-it can show a teardown failure, but it keeps its last stable status instead of observing worktree
-removal as a list of deleted files. A failed archive clears the flag and triggers a fresh read.
-
-Project configuration lives on `projects`: setup/dev/restart/teardown/database/preview values,
-run targets, browser rules, and branch prefix. A committed `.acorn/config.toml` can override these
-machine-local values. `GET /v1/core/projects/:id/config` returns the row as `config` and, when the
-project has a folder whose `.acorn/config.toml` exists, what that file sets as `repoConfig`: its run
-targets, and the database connection script and preview mode and value when it sets them. The
-project's settings page reads it to mark those values read-only. An older node leaves it out.
-
-The node publishes `workspace:changed { workspaceId }` after create, rename, and deletion. Project
-membership remains `project:changed`; a deletion that reassigns projects announces each affected
-project. Provider-owned workspace mappings have their own batch invalidation,
-`workspace-projects:changed { providerId, workspaceIds }`, whose workspace ids are the union of the
-old and new scopes. Connection deletion uses the same event after its cascade. Plugins re-read the
-owner-filtered `projects.externalProjects` capability instead of receiving one frame per mapping.
-
-The `dev` run target layers in this order, each entry overriding the last: `workspaces.devScript`
-and `devRestartScript` as a base target, then `projects.run_targets` (the per-project Settings
-surface), then `~/.acorn/config.toml`, then the committed `./.acorn/config.toml`, which always
-wins. The base `dev` target carries no URL and gets no `default` flag, so it never shadows a repo's
-real default target. Executable committed configuration is hash-gated by `config_acks`; changing
-the snapshot requires a new review before a task or workflow executes it.
-
-A `[layout.<id>]` block in the same config seeds a task's pane layout: known panes open left to
-right, unknown or duplicate pane ids are dropped, and a recipe naming no valid pane does nothing.
-`terminal = "<run-target-id>"` auto-starts that target and opens the terminal drawer; `browser =
-"run:<id>"` points the browser pane at that target's resolved URL once it is up.
-
-## Restoring a task
-
-Archive deletes less than it looks like. It removes the worktree folder, stops what was running
-(terminal sessions and agent provider processes), drops the terminal plugin's saved sessions, and
-clears state the client held in memory. The task row, its
-links and pull requests, its branch, its agent sessions, its notes, and every plugin's rows all stay.
-Plugins store `task_id` as a plain id and none of them deletes anything on archive. Later, if the owner
-set **Keep agent history for archived tasks**, a task archived longer than that loses its agent
-transcripts for good. Its sessions still list, each with a note saying so
-([data-layer.md § Retention](./data-layer.md#retention)). The one real delete on the spot is removing
-a project, which removes its task rows and leaves plugin rows with nothing to point at, so
-those tasks cannot be restored.
-
-The Archive entry at the bottom of the rail lists archived tasks, newest first, with a search box over
-every search provider ([plugins.md § Search providers](./plugins.md)). Selecting a task previews it
-read-only in the ordinary pane host, without adding it to the rail. A pane that reads stored history
-declares `readsArchived`; only those panes appear in the archived preview's layout and right rail.
-Agent and Notes opt in. Every other pane is absent because it would need the worktree, would start work
-on an archived task, or does not belong in the compact history view
-([panes.md § Contributions](./panes.md)). The Agent pane keeps the transcripts and turns its composer
-off. The archived-task list uses the shared browse sidebar: it starts at the default list width,
-resizes, and collapses to task icons with its state remembered on the device.
-
-Restore is `POST /v1/core/tasks/:id/restore` (`restoreTask` in `server/storage/archive.ts`). It sets the
-task active and rebuilds the worktree before answering, through the same `resolveTaskCwd` a pane would
-use, so the configured files are copied and the setup hook runs. It rebuilds eagerly rather than
-leaving that to the first pane, because the two ways it fails need the owner:
-
-- The branch is checked out in another worktree. Git refuses, the task stays archived, and the reason
-  comes back.
-- A local task's branch no longer exists, often because a merged pull request deleted it. Creating the
-  worktree anyway would cut a new branch from the project checkout with none of the task's commits, so
-  restore answers `branchMissing` and the client asks before retrying with `newBranch`. A pull request
-  task fetches its head again, so its branch cannot be lost this way.
-
-Containers, terminal sessions and scrollback do not come back. Agent sessions come back on their own:
-a session under an archived task counts as retired when the list is read, so it returns to the live
-list with its task. Its provider process stopped at archive, and the next prompt starts it again and
-resumes the conversation. A session someone archived on its own is restored from Agent Center
-([managed-agents.md § Client surfaces](./managed-agents.md)).
-
-## Task creation and navigation
-
-The rail creates local tasks from a project and derives a branch from the title when the project is
-Git-backed. **New worktree** has a collapsed **Advanced** section with **Branch name** and
-**Branch from**. The base defaults to the branch checked out in the project folder. The dropdown
-groups local branches belonging to active tasks by task title, followed by the other local branches.
-The helper text explains that uncommitted changes do not carry over. Non-Git projects hide these
-options.
-
-Editing **Branch name** preserves the typed value and stops title changes from updating it.
-**Project folder** creates a branchless task in the project folder. **Existing worktree** lists
-linked worktrees that no active task uses, skipping detached and prunable ones. The task takes that
-folder and branch, and setup does not run. Provider promotions preserve seeded branches, resolve or
-create the project and task link, and reuse a task when that exact link is already present.
-
-The Node adds `-2`, `-3`, and further suffixes to a title-derived branch until it is available. The
-dialog previews that final name without an error. An exact name instead shows
-"This branch name already exists in another worktree" when occupied. Creation stays disabled while
-the preview runs. A failed availability lookup allows submission; the create route validates again.
-
-The Node checks active task reservations, the derived directory, and Git's worktree roster,
-including the project checkout. Branches that map to the same directory conflict. With a selected
-base, every local branch name also counts as taken. Without a base, a branch without a worktree
-remains available. Task creation serializes allocation and row reservation with child tasks and
-returns a `worktree-unavailable` 409 for an exact conflict. If saving the row fails, Acorn removes
-only a branch that request created. Attaching through **Existing worktree** uses its separate
-ownership check.
-
-The desktop stores task ordering, layout, last pane/source, and drafts per Node. `⌘1`–`⌘9` activates
-the corresponding visible task. A task can be archived without deleting its historical row.
-
-The desktop and terminal rails group a child after its parent from `Task.parentId`, while retaining
-the original order among roots and siblings. The child remains a normal selectable task with its own
-panes. An orphan or a lineage cycle stays visible as a top-level row instead of being dropped.
-Workflow descendants start collapsed under their ordinary root as described above; manual descendants
-remain visible. A run-history link to an archived or missing child explains that state and retains the
-record and attempt history instead of dropping the link's context.
-
-## Durable task script results
-
-Core owns setup and teardown attempts in `task_script_attempts`; the Terminal plugin owns the
-process and reports typed evidence through the compiled `CoreServices.taskScripts` facet.
-CLI, MCP, desktop, and TUI read the same Core service. Reading status, logs, or waiting never
-resolves a worktree or executes a script. A usable task root and a successfully created agent
-session do not prove that setup has finished.
-
-Each accepted execution or explicit skip has a unique `attemptId` and task `generation`.
-Worktree creation and restoration advance the generation; teardown retries get a new attempt.
-The current phase selects the latest attempt in the current generation. Status also includes
-up to 50 recent attempt summaries and `attemptsTruncated`; an explicit attempt ID reads retained
-history. Configuration edits cannot rewrite an attempt's outcome. Late evidence from a previous
-generation cannot mutate the current cycle.
-
-| State | Evidence or meaning |
-| --- | --- |
-| `not_started` | No request in this known cycle; no invented timestamps. |
-| `starting` | Core admitted execution before spawning. |
-| `running` | The process owner reported process creation. Installation may be incomplete. |
-| `succeeded` | Confirmed command exit code 0. |
-| `failed` | `spawn_failed`, `nonzero_exit`, or `timeout`. |
-| `skipped` | `user_skipped`, `disabled`, `not_configured`, or `not_applicable`. |
-| `interrupted` | Cancellation, terminal removal, shutdown, restart, lost process, or generation change. |
-| `unknown` | No trustworthy history, including legacy or adopted worktrees. |
-
-A null exit code never means success. A configured lazy setup remains `not_started` until its
-existing trigger runs. Teardown remains unrequested until archive reaches script admission;
-archive refusals before that point do not fabricate teardown attempts. Teardown success is
-independent of later cleanup or worktree-removal failure. `archiveInProgress` covers the entire
-archive operation, rather than only script execution.
-
-The desktop's setup rail marker uses the durable snapshot. Script sessions remain accessible in the
-terminal drawer; retained diagnostics are available through the CLI and task script tools. TUI task
-chrome shows both phases.
-Offline and stale snapshots are labeled; cached running state is not evidence of a live process.
-
-### Retention and recovery
-
-Each attempt retains a UTF-8 tail of at most 64 KiB. Log queries return at most 1,000 lines and
-32 KiB (default 100 lines), with availability, retained/returned byte counts, and truncation flags.
-Acorn task/device token patterns are redacted before storage. Script bodies and inherited
-credentials are not copied into metadata or launch summaries. Arbitrary script output may still
-contain secrets printed by the script itself; avoid printing them. Capture that was unavailable
-is reported as unavailable, never as a fabricated empty successful log.
-
-Terminal removal and successful archive preserve results and tails. Project deletion removes
-its tasks and their attempts, matching the owning task's lifetime. On boot, the Terminal owner
-reattaches known live durable sessions where possible; Core interrupts unrecoverable attempts
-with reason `restart`. A tmux attach-client exit cannot prove the script command succeeded.
-Node shutdown interrupts ordinary PTYs; durable attachments retain recoverable identity.
-Recovery does not rerun scripts.
-
-Waits bind to an attempt and generation, subscribe before their authoritative reread, and clean
-up subscriptions, timers, and abort listeners on settlement. A Node call waits at most 30 seconds.
-Not requested and unknown phases return promptly; settled skips include their reason. A timeout
-returns `matched: false` and does not stop the script. Content-free task invalidations publish
-after committed writes; clients reread after notices and reconnects.
+[Task script results](./workspaces-and-tasks/task-scripts.md) covers the durable setup and
+teardown attempts that the CLI, MCP tools, desktop, and terminal client read.

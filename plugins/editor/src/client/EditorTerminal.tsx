@@ -5,7 +5,7 @@
 // The emulator is the host's. This file says what the channel is and nothing about how it is drawn, so
 // the same source runs an editor in a browser and in a terminal, where the box is cells and the
 // reader's `$EDITOR` is running inside the terminal they are already in
-// (docs/editor/editor-pane.md § Editing in your own editor, docs/terminal.md § Client).
+// (docs/editor/editor-pane.md § Editing in your own editor, docs/terminal/client.md § Client).
 import { attachPty, Rectangle, type PtyIo } from '@acorn/plugin-api/ui'
 import { wsEditorPtyInput, wsEditorPtyOpen, wsEditorPtyResize } from './wsChannel'
 

@@ -10,7 +10,7 @@ change; the handoff verifies contributed-profile workflow admission rather than 
 Every gap in this programme's [README](./README.md) comes from one fact: the agent loop belongs to
 the harness, not to acorn. `omp` is a harness whose loop is extensible all the way down, and it
 speaks the Agent Client Protocol (ACP) through `omp acp`. Acorn's tier 1 driver takes any ACP agent
-from a manifest alone ([managed-agents.md § Harnesses](../../managed-agents.md#harnesses)).
+from a manifest alone ([managed-agents.md § Harnesses](../../managed-agents/harnesses.md#harnesses)).
 
 So the cheapest way to give acorn users context rewriting, stream rules, tool shadowing, and a
 reviewer model is to let them run an agent that already has those, inside acorn's sessions,

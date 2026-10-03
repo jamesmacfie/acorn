@@ -1,5 +1,5 @@
 // The agent's install request, on its way to the owner's decision. Full flow, the prompt-injection
-// defence, and the in-memory store's rationale: docs/agent-tools.md § plugin_request,
+// defence, and the in-memory store's rationale: docs/agent-tools/plugin-tools.md § plugin_request,
 // docs/plugins.md § Approval-mediated install, docs/security/plugin-bundles.md § Third-party plugin bundles.
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
@@ -120,7 +120,7 @@ const shapeProblem = (args: ToolArgs): string | null => {
 }
 
 /**
- * The one tool that can put third-party code on a node, by asking (docs/agent-tools.md §
+ * The one tool that can put third-party code on a node, by asking (docs/agent-tools/plugin-tools.md §
  * plugin_request). Highest risk tier, so the owner's per-tier switch in Settings -> Agents turns it
  * off with everything else that executes.
  *

@@ -7,7 +7,7 @@ import type {
 import type { PanelAggregate, PanelFilter, PanelShaping, PanelTone, PanelView } from './model'
 
 // The shaping layer: filter, sort, limit, visible-field projection, generic and identical for every
-// collection. See docs/dashboards.md § Panels for why shaping is client-side with server params as
+// collection. See docs/dashboards/panels.md § Panels for why shaping is client-side with server params as
 // an optional optimisation, and § The generated editor for why this logic is pure functions tested
 // outside the component.
 
@@ -150,7 +150,7 @@ export const fieldWithRole = (
 
 // ── Grouping ──────────────────────────────────────────────────────────────────────────────────
 //
-// See docs/dashboards.md § Views are derived, not chosen from a menu for why a board is group-by
+// See docs/dashboards/views.md § Views are derived, not chosen from a menu for why a board is group-by
 // over a finite-valued field, not a component.
 
 /** The fields a board may be keyed by: the ones with finite values.
@@ -191,7 +191,7 @@ export type PanelBoardColumn = {
 
 /** The columns of a board, in the order they are drawn. Three destinations, and every row lands in
  *  exactly one of them, so a value with nowhere to go is never silently dropped. See
- *  docs/dashboards.md § Views are derived, not chosen from a menu.
+ *  docs/dashboards/views.md § Views are derived, not chosen from a menu.
  *
  *  One case is worth spelling here: an undeclared value gets a column of its own after the declared
  *  ones, and a query-shaped collection cannot always know its values ahead of the data

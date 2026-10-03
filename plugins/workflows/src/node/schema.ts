@@ -83,7 +83,7 @@ export const workflowSteps = sqliteTable(
 )
 
 // A workflow definition typed by the owner rather than committed to a repository
-// (docs/workflows.md § Database definitions). The file layer and this one are read together and a
+// (docs/workflows/definitions.md § Database definitions). The file layer and this one are read together and a
 // repo id wins, so a definition someone can review in a pull request always beats a local draft.
 //
 // `workspace_id` and `project_id` point into core's tables as plain IDs, the same way `task_id` above

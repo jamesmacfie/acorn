@@ -68,7 +68,7 @@ describe('the full agent-tool manifest', () => {
     // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
     'plugin_request',
     // Core owns the stable cross-provider tools; the provider-specific call belongs to whichever
-    // integration answers (docs/agent-tools.md § issue_detail, § issue_comment and issue_image).
+    // integration answers (docs/agent-tools/tracker-tools.md § issue_detail, § issue_comment and issue_image).
     'issue_detail',
     'issue_comment',
     'issue_image',

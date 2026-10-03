@@ -388,7 +388,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       }
       // Did this manifest reserve part of this pane for somebody else? Two locations, two contributors:
       // a `pane.footer` strip filled by other plugins' rows, and a `pane.aside` column filled by the
-      // user's own panels (docs/dashboards.md § Placements). Both are read off the manifest rather
+      // user's own panels (docs/dashboards/placements.md § Placements). Both are read off the manifest rather
       // than the registry, because the chrome pass registers points on its own schedule and asking the
       // registry here would make the wrapper depend on which pass ran first.
       //

@@ -25,7 +25,7 @@ export const DERIVED_THEME_TOKENS = [
 
 /** Series identity, for a chart mark asking "which one" rather than "how is this doing." See
  * docs/ui-design/tokens.md § Token axes for why this is neither a palette primitive nor derived, and
- * docs/dashboards.md § Views are derived, not chosen from a menu for how a chart uses it.
+ * docs/dashboards/views.md § Views are derived, not chosen from a menu for how a chart uses it.
  *
  * Three, hard cap. Series four onwards folds into `other`. */
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const

@@ -44,7 +44,7 @@ export const GENERATE_MAX_PROMPT_CHARS = 4000
 // tree/DatabasePanel.tsx). A `#` prefix so it can never collide with the UUIDs saved queries carry.
 export const SCRATCH_SELECT_ID = '#scratch'
 
-// A named SQL snippet saved against a project (docs/database.md § Database pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
+// A named SQL snippet saved against a project (docs/database/pane.md § Database pane): loaded back into the editor, and optionally fed to AI generation as a worked example.
 export type DbSavedQuery = { id: string; name: string; notes: string | null; sql: string; updatedAt: number }
 
 // Database pane: per-task Postgres browse and edit over this plugin's own route namespace. Built here

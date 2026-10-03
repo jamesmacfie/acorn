@@ -146,7 +146,7 @@ export function LinearIssueView(props: LinearIssueViewProps) {
         <IconButton icon="refresh-cw" label="Refresh issue" busy={props.refreshing} onPress={props.onRefresh} />
         {/* The clipboard, not `ui.openUrl`. The host resolves a URL through its content-link ladder,
             linear's recogniser claims `linear.app/…/issue/…`, and it resolves to the ticket already on
-            screen, so the button would re-open where the reader is. See docs/integrations.md § Linear. */}
+            screen, so the button would re-open where the reader is. See docs/integrations/linear.md § Linear. */}
         <Button size="sm" onPress={() => props.onCopy(issue().url)}>Copy link</Button>
       </Toolbar>
 

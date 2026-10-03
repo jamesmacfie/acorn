@@ -178,7 +178,7 @@ describe('assembled routes', () => {
     // provider again.
     const expected = ['github']
     expect(connectionProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)
-    // The integration registry holds only providers with mirrored resources (docs/integrations.md §
+    // The integration registry holds only providers with mirrored resources (docs/integrations/contributions.md §
     // Connection and integration contributions). github has them, so the two lists coincide. They are
     // asserted separately because a connection provider need not be an integration one.
     expect(integrationProviderRegistry.list().map((p) => p.id).sort()).toEqual(expected)

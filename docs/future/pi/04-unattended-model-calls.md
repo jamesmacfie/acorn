@@ -16,7 +16,7 @@ those two.
 Acorn already has the call. A loaded node plugin with `permissions.node.core: ["models"]` gets
 `ctx.core.models.generateText` and `available`
 (`packages/plugin-types/src/contracts/coreMisc.ts`), and core resolves the key or runs the CLI
-contained ([integrations.md § Model providers](../../integrations.md#model-providers)). What it
+contained ([integrations.md § Model providers](../../integrations/model-providers.md#model-providers)). What it
 assumes is a person in front of a picker: the caller passes the `backendId` the person picked.
 
 A plugin that reacts to an event has no person and no picker. That leaves three gaps.
@@ -118,7 +118,7 @@ requires bounded contract fields rather than access to the event ledger.
 4. Prove the grant with [05](./05-advisor.md). Findings was removed by the shipped
    [memory replacement](../../notes-and-memory.md#memory) and is no longer a grant consumer.
 5. Document the grant in [the manifest § Permissions](../../plugin-authoring/the-manifest.md#permissions)
-   beside the `models` token, and the errors in [integrations.md](../../integrations.md#model-providers).
+   beside the `models` token, and the errors in [integrations.md](../../integrations/model-providers.md#model-providers).
 
 ## Verify before building
 

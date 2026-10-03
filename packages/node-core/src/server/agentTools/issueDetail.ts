@@ -1,5 +1,5 @@
 // `issue_detail`: one linked issue or error, in full, for an agent that has to act on it
-// (docs/agent-tools.md § issue_detail).
+// (docs/agent-tools/tracker-tools.md § issue_detail).
 //
 // Core owns this stable cross-provider tool. What each provider owns is the read itself, through the
 // `detail` member on its contribution. That split is why one tool covers every connected issue tracker

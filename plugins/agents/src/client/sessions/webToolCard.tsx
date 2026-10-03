@@ -9,7 +9,7 @@ import type { AgentWebActivity, AgentWebResult, AgentWebStatus } from '../../con
  * whenever a driver filled in `AgentToolCall.web`, and nothing in here knows which executable ran.
  * There is no branch on a profile, a harness id or a provider's tool name, by design — a new driver
  * earns this card by mapping its wire shape to `AgentWebActivity` and nothing else
- * (docs/managed-agents.md § Web activity).
+ * (docs/managed-agents/activity.md § Web activity).
  *
  * Kit nodes only, so the terminal host draws the same card. At 80×24 the sections stack, and a
  * focused result link reveals its URL on the line below, which is what that host does with every

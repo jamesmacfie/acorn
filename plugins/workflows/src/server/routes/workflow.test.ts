@@ -327,7 +327,7 @@ describe('a task-scoped credential is confined to its own runs', () => {
 })
 
 
-// The definitions store (docs/workflows.md § Database definitions). Writing one is authoring
+// The definitions store (docs/workflows/definitions.md § Database definitions). Writing one is authoring
 // executable configuration, so the whole family is device-only.
 describe('workflow definition routes', () => {
   afterEach(() => setWorkflowDefsBridge(null))
@@ -412,7 +412,7 @@ describe('workflow definition routes', () => {
   })
 
   // A definition that does not validate is still storable, because that is every workflow partway
-  // through being built (docs/workflows.md § Database definitions). Only a stale revision and a gone
+  // through being built (docs/workflows/definitions.md § Database definitions). Only a stale revision and a gone
   // row turn into a status here.
   it('stores a draft that does not validate, and 409s a stale revision and 404s a gone row', async () => {
     setWorkflowDefsBridge(fakeDefs({

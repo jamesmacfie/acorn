@@ -137,11 +137,11 @@ type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProje
 
 /**
  * Which Linear scopes this rail should show, keyed by connection. A scope is a Linear project, or a
- * whole team where the workspace mapped one (docs/integrations.md § Linear); either way it is an
+ * whole team where the workspace mapped one (docs/integrations/linear.md § Linear); either way it is an
  * opaque id core stored and this plugin reads back.
  *
  * A link hangs off the workspace, and may narrow itself to one project in it
- * (docs/workspaces-and-tasks.md § Workspace and project), so the routed project decides twice: it
+ * (docs/workspaces-and-tasks/projects.md § External projects), so the routed project decides twice: it
  * names the workspace, then it filters that workspace's links down to the ones that either name it or
  * name no project at all.
  *
@@ -178,7 +178,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // passthrough.
   //
   // Enumerating a connection's projects is a provider contribution the host calls, so there is no
-  // `/projects` route here (docs/integrations.md § Project sources).
+  // `/projects` route here (docs/integrations/project-sources.md § Project sources).
   .get('/project-issues', async (c) => {
     const connections = await linearConnections(c)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
@@ -195,7 +195,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // The declarative rail source's rows (docs/plugins.md § Descriptors). Degrades to an empty list at
   // every step rather than erroring: none of these conditions is the user doing something wrong.
   // There is no fallback to the viewer's own assigned issues; the source authors an `emptyState`
-  // instead (docs/integrations.md § Linear).
+  // instead (docs/integrations/linear.md § Linear).
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
@@ -422,7 +422,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     }
     return c.json({ ok: true })
   })
-  // One image out of a ticket body, inlined as a data URL: docs/integrations.md § Linear covers why
+  // One image out of a ticket body, inlined as a data URL: docs/integrations/linear.md § Linear covers why
   // this route exists (the frame's CSP, and the private upload host) and why `url` is host-locked.
   .get('/uploads', async (c) => {
     const target = linearUploadTarget(c.req.query('url'))

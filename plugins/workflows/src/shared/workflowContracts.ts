@@ -20,7 +20,7 @@ export type WorkflowBudget = {
 }
 
 // A value the person starting the run supplies. `${inputs.<name>}` reaches it from a prompt, a child
-// prompt, and any string inside `with` (docs/workflows.md § Execution model). A run freezes the
+// prompt, and any string inside `with` (docs/workflows/execution.md § Execution model). A run freezes the
 // values it started with into its own copy of the definition, so `default` on a frozen run reads as
 // "what this run was given".
 export type WorkflowInput = import('../contract/wire').WorkflowInput
@@ -209,7 +209,7 @@ export type StepValidationContext = {
 }
 export type StepValidator = (step: WorkflowStepDef, context: StepValidationContext) => string[]
 
-// What a kind's form looks like, as data (docs/workflows.md § Contributed step kinds). The host draws
+// What a kind's form looks like, as data (docs/workflows/step-kinds.md § Contributed step kinds). The host draws
 // it, so a kind can be edited in the UI on either host without the plugin shipping a component.
 export type StepFieldType =
   | 'text'

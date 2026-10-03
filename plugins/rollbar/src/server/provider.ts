@@ -49,7 +49,7 @@ export type RollbarListResult = { items: RollbarItemSummary[]; capped: boolean }
 export type RollbarResourceOutput = RollbarListResult | RollbarItemMetadata
 
 // One project, always. `normalize` writes it onto the connection when the token is validated, so
-// there is no fetch and the secret goes unused. See docs/integrations.md § Rollbar.
+// there is no fetch and the secret goes unused. See docs/integrations/rollbar.md § Rollbar.
 const rollbarProjectSource: ProviderProjectSource = {
   list({ connection }) {
     const config = parseJson(connection.config)

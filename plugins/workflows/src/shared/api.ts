@@ -1,4 +1,4 @@
-// Generating or editing a definition with AI (docs/workflows.md § Authoring): the wire types, and
+// Generating or editing a definition with AI (docs/workflows/ai-authoring.md § Generating and editing with AI): the wire types, and
 // the one instruction cap both halves read.
 //
 // Here rather than beside the prompt for the reason the changes plugin keeps

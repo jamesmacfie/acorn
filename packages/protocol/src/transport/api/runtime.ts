@@ -1,6 +1,6 @@
 import type { TelemetryRecord } from '../../runtime/telemetry.ts'
 
-// Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
+// Run targets (docs/workflows/routes-and-ui.md § Routes and UI): the renderer shares the RunBridge routes the MCP
 // run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
@@ -57,7 +57,7 @@ export const scheduleTargetsRoute = `${schedulesRoute}/targets`
  *  the host just showed. */
 export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
-// Dashboards: the measure series behind a stat's trend (docs/dashboards.md § Trends). Read-only by
+// Dashboards: the measure series behind a stat's trend (docs/dashboards/views.md § Trends). Read-only by
 // design, not by phase: the sampler and the store share a process, so the only writer is the
 // `core:sample-measures` schedule and a write route would have nobody to serve.
 //

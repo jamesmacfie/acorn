@@ -102,7 +102,7 @@ export const pluginTaskCheckGrants = (contributions: PluginContributions): Plugi
     .sort((a, b) => a.id.localeCompare(b.id))
 
 /** What this package asks acorn to run as a managed agent, and what it carries into it. See
- *  docs/managed-agents.md § Harnesses. There is no route here: the whole grant is the program and its
+ *  docs/managed-agents/harnesses.md § Harnesses. There is no route here: the whole grant is the program and its
  *  environment.
  *
  *  A descriptor declaring neither a command nor an entry is dropped rather than disclosed, like an

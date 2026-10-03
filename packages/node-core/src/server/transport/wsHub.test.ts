@@ -457,7 +457,7 @@ describe('wsHub streaming', () => {
     await waitFor(() => bin.length >= 5 && got.length >= 2, 'five binary frames between two pings')
 
     // Five frames of output in the middle, and the two pings around them are still 1 and 2. A gap is
-    // what the broker reads as loss (docs/terminal.md § Backpressure), and output was never part of
+    // what the broker reads as loss (docs/terminal/activity.md § Backpressure), and output was never part of
     // that count.
     expect(got.map((f) => [f.channel, f.seq])).toEqual([
       ['tasks:changed', 1],

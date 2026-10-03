@@ -114,7 +114,7 @@ export const localCommitMessageRoute = (taskId: string) => `/v1/p/changes/tasks/
  *
  *  This plugin's own route rather than a read of core's roster: `/v1/core/integrations` has no bridge
  *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
- *  (docs/integrations.md § Model providers). The path still says `model-connections` after the rename:
+ *  (docs/integrations/model-providers.md § Model providers). The path still says `model-connections` after the rename:
  *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
  *  side of it. */
 export const localModelBackendsRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/model-connections`

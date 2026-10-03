@@ -119,7 +119,7 @@ export const integrations = new Hono<AppEnv>()
   // One connection's whole map: which workspace, and optionally which project inside it, follows each
   // of its external projects. Settings edits an integration from its own side rather than a workspace
   // at a time, so it needs to read and replace every row this connection owns in one go
-  // (docs/integrations.md § Project sources).
+  // (docs/integrations/project-sources.md § Project sources).
   //
   // Scoped to the connection, so a write here can never disturb a sibling integration's rows the way
   // the workspace-side replace has to be careful to avoid.

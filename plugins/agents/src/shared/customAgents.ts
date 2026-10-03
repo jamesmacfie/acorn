@@ -1,5 +1,5 @@
 // A custom agent: a saved start for a managed session. A harness, the provider options to start it on,
-// text for its system prompt, and a ceiling on acorn's own tools (docs/managed-agents.md § Custom agents).
+// text for its system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents).
 //
 // The options are the same `optionId -> value` table a session default is, because model, reasoning
 // and permission mode are all options a provider advertises about itself. Nothing here names one.

@@ -1,4 +1,4 @@
-// The terminals a reader has open, held past the drawer that drew them (docs/terminal.md § Client).
+// The terminals a reader has open, held past the drawer that drew them (docs/terminal/client.md § Client).
 //
 // A tab's xterm lives from the first frame it is shown until its session leaves the roster: the tab
 // closed, the session removed or killed from anywhere, its task archived, or the node switched. The

@@ -180,7 +180,7 @@ export const managedAgents = new Hono<AppEnv>()
     : viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
-  // Settings > Storage and memory (docs/managed-agents.md § Operations and failure). Device only: the
+  // Settings > Storage and memory (docs/managed-agents/operations.md § Operations and failure). Device only: the
   // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
   // something a task-scoped agent may ask for.
   .get('/footprint', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.footprint()))

@@ -4,7 +4,7 @@ import type { AgentPricingPreferences } from '../../shared/pricing'
 // Who can answer "how much of this harness's plan is left", keyed by harness id.
 //
 // A registry, because plan usage is per harness and the set of harnesses is open
-// (docs/managed-agents.md § Harnesses). Two feeders, indistinguishable downstream: the built-in CLI
+// (docs/managed-agents/providers.md § Plan usage). Two feeders, indistinguishable downstream: the built-in CLI
 // probes, registered by the plugin's node entry, and a contributed harness's `probes.usage` route,
 // registered by the delivery seam. A harness with no collector shows no usage section, which is the
 // honest answer for most agent CLIs.

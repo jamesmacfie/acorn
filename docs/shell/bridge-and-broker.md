@@ -101,7 +101,7 @@ and doesn't mean the Node is offline.
 Both ends run a ping and pong watchdog. A sequence gap or watchdog failure makes the Node stale, and
 the client reconnects and refetches. The exception is `ws:shed`, which says the Node dropped
 invalidation frames because this socket was behind. That's congestion, not loss, so the broker
-forwards it ([backpressure](../terminal.md#backpressure)). A write is never queued while a Node is
+forwards it ([backpressure](../terminal/activity.md#backpressure)). A write is never queued while a Node is
 offline.
 
 The helper forwards one Node's frames. It reads which Node is active from the requests it answers:

@@ -60,7 +60,7 @@ export type TaskService = {
   // collapsing to null, which is reserved for read-only panes that can show an empty state.
   requireRoot(taskId: string): Promise<string>
   // The cwd a task's commands run in, creating the worktree on first use
-  // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id, because
+  // (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup). Takes the row rather than the id, because
   // the one caller already loaded it and re-reading would be a second query across a database
   // boundary.
   resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>

@@ -38,7 +38,7 @@ export type TaskRowTarget = {
  * `item` is the provider's own row, handed back untouched to whoever contributed the action, which is
  * how one registry serves three lists that agree on nothing else. It is not a fact, so no `when` can
  * name it. `title`, `body` and `link` are the three things every tracker has and the three the
- * workflow prefill reads (docs/workflows.md § Starting a run).
+ * workflow prefill reads (docs/workflows/starting-runs.md § Starting a run).
  */
 export type ItemRowTarget = {
   location: 'item.row'

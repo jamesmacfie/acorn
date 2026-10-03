@@ -132,7 +132,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
   // The task's scratch document, written. One helper because two routes write it and they must agree
   // on the row: the host's editor autosave below, and the palette's `Generate SQL`, whose whole
   // contract is that this has committed before the reader is told it worked
-  // (docs/database.md § From the command palette, step 5).
+  // (docs/database/palette-and-workflows.md § From the command palette, step 5).
   const writeScratch = async (taskId: string, sql: string): Promise<void> => {
     documentText.parse(sql)
     const at = Date.now()
@@ -317,7 +317,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // The `Generate SQL` fast path: the modal's six steps with every choice already made
-    // (docs/database.md § From the command palette).
+    // (docs/database/palette-and-workflows.md § From the command palette).
     //
     // The choices it does not offer are the point. One text field cannot carry a backend, a model and
     // a set of worked examples, so this takes the first available backend and that backend's own
@@ -379,7 +379,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const backends = await core.models.available(owner(c))
       // `options` beside `backends`, not instead of it: the pane's dropdown reads the rows and the
       // workflow editor reads the field-option shape every `optionsRoute` answers
-      // (docs/workflows.md § Contributed step kinds).
+      // (docs/workflows/step-kinds.md § Contributed step kinds).
       return c.json({ backends, options: backends.map((backend) => ({ value: backend.id, label: backend.label })) })
     })
 

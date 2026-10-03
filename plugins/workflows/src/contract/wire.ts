@@ -18,7 +18,7 @@ export type WorkflowDefSummary = {
   id: string
   name: string
   // 'database' is a row the owner typed in the app rather than a file somebody committed
-  // (docs/workflows.md § Database definitions). The three layers are read as one list and a repo id
+  // (docs/workflows/definitions.md § Database definitions). The three layers are read as one list and a repo id
   // wins a collision.
   source: 'repo' | 'user' | 'database'
   posture?: 'gated' | 'autonomous'
@@ -31,7 +31,7 @@ export type WorkflowDefSummary = {
   problems?: string[]
 }
 
-// A definition stored as a row (docs/workflows.md § Database definitions). `def` is the plugin's own
+// A definition stored as a row (docs/workflows/definitions.md § Database definitions). `def` is the plugin's own
 // `WorkflowDef`; it is `unknown` here because that shape lives in plugins/workflows and protocol may
 // not depend on a plugin. The editor narrows it there.
 export type WorkflowDefRow = {
@@ -50,7 +50,7 @@ export type WorkflowDefRow = {
 }
 
 // A value a run is started with. The palette asks for one before it starts a definition that declares
-// any, and the editor lists them (docs/workflows.md § Execution model).
+// any, and the editor lists them (docs/workflows/execution.md § Execution model).
 export type WorkflowInput = {
   connection?: { source: import('@acorn/protocol/dataSources.ts').DataSourceRef }
   name: string

@@ -19,7 +19,7 @@ import { boxBorder } from './roles'
 // running a terminal emulator written in JavaScript inside a browser inside an app; here the emulator
 // draws in cells, and the PTY's bytes go straight into it. The PTY itself does not move: it stays on
 // the node, reached over the same `term` WebSocket channel
-// (docs/terminal.md § Sessions), and this is a second emulator for it.
+// (docs/terminal/sessions.md § Sessions), and this is a second emulator for it.
 //
 // **The emulator is `@xterm/headless`**, which three other packages in this repo already depend on
 // and which the desktop draws the same PTY through — so a program's output is parsed by the same
@@ -327,7 +327,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
       flexDirection="column"
       flexGrow={1}
       // Kept mounted and taken off the screen, which is what a tab strip over several of these asks
-      // for: the emulator and its channel survive the switch (docs/terminal.md § Client). `entered`
+      // for: the emulator and its channel survive the switch (docs/terminal/client.md § Client). `entered`
       // above already asks the screen rather than a flag, so a box hidden this way stops taking the
       // keys without anything else being told.
       visible={!props.hidden}

@@ -5,8 +5,8 @@
 // Node.
 //
 // Its two DB-shaped needs are now CoreServices calls, because this plugin has no handle to core's
-// database: `taskRunConfig` (the layered run-target config, docs/workspaces-and-tasks.md § Task) and
-// the executable-config trust gate (docs/workflows.md § Configuration trust).
+// database: `taskRunConfig` (the layered run-target config, docs/workspaces-and-tasks/project-config.md § The layers) and
+// the executable-config trust gate (docs/terminal/run-targets.md § Trust and execution).
 import { buildSessionEnv, type CoreServices, type PluginHookRegistry, type RunTarget } from '@acorn/plugin-api/node'
 import { type RuntimeDeps, RuntimeService } from './runtime'
 
@@ -21,7 +21,7 @@ export type RunSessionGlue = {
   retireSession(sessionId: string): void
 }
 
-// Runtime service: run targets as terminal sessions in the task worktree (docs/terminal.md
+// Runtime service: run targets as terminal sessions in the task worktree (docs/terminal/run-targets.md
 // § Process broker). Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_*
 // env.
 export function createRuntimeService(

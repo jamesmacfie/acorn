@@ -9,7 +9,7 @@ import { resolveInRoot } from '../core/fs'
 import { invalidateWorktreeStatus, worktreeStatus, type WorktreeStatus } from './worktreeStatus'
 
 
-// Workspace worktrees. docs/workspaces-and-tasks.md § Worktrees and setup owns why they exist and
+// Workspace worktrees. docs/workspaces-and-tasks/worktrees.md § Worktrees and setup owns why they exist and
 // how their paths are derived and revalidated.
 //
 // Every git command here runs in the main checkout, which owns the .git the worktree links to.
@@ -55,7 +55,7 @@ export const staleWorktreeReason = (path: string, branch: string, on: string | n
   `${path} is ${on ? `checked out on '${on}', not '${branch}'` : `no longer a live git worktree for '${branch}'`}. Remove the directory and reopen the task.`
 
 // `created` tells a fresh `git worktree add` from reuse of an existing directory. Only the fresh
-// path runs setup (docs/workspaces-and-tasks.md § Worktrees and setup).
+// path runs setup (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
 
 // Git stderr can contain remote URLs with credentials. Surface the one actionable local setup
@@ -113,7 +113,7 @@ export async function ensureWorktree(
   // handler validates identifiers too (docs/security.md).
   if (!isContainedPath(worktreesRoot, path)) return { ok: false, reason: 'Invalid worktree path.' }
   if (existsSync(path)) {
-    // Reuse only a live worktree still on this branch. docs/workspaces-and-tasks.md § Worktrees and
+    // Reuse only a live worktree still on this branch. docs/workspaces-and-tasks/worktrees.md § Worktrees and
     // setup covers why, and what happens otherwise.
     const on = worktreeBranch(path)
     if (on === branch) return { ok: true, path, created: false }
@@ -152,7 +152,7 @@ export async function ensureWorktree(
   }
 
   // Local-first workspace. Add a worktree on the branch, and start a new branch from the project
-  // checkout's HEAD (docs/workspaces-and-tasks.md § Worktrees and setup). Omitting a start point
+  // checkout's HEAD (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup). Omitting a start point
   // makes Git resolve HEAD in `checkout`, so the task inherits local commits even when origin's
   // remote-tracking ref is stale. `--` ends option parsing so a branch or path cannot be read as a
   // flag.
@@ -169,7 +169,7 @@ export async function ensureWorktree(
   return { ok: true, path, created: true }
 }
 
-// Copy files into a fresh worktree without a setup script (docs/workspaces-and-tasks.md § Worktrees
+// Copy files into a fresh worktree without a setup script (docs/workspaces-and-tasks/worktrees.md § Worktrees
 // and setup). Repo-relative paths only, missing sources warn, existing targets are never
 // overwritten, and a bad entry never fails worktree creation.
 export type CopyFilesResult = { copied: string[]; warnings: string[] }
@@ -214,7 +214,7 @@ export function copyWorktreeFiles(checkout: string, worktree: string, entries: s
 // `fresh: true`, always. This is what `removeWorktree` below decides on, and a cached "clean" would
 // let a destructive deletion past the guard and lose somebody's uncommitted work. The cache in
 // ./worktreeStatus.ts serves reads and never a refusal, and this is the refusal
-// (docs/workspaces-and-tasks.md § Worktrees and setup).
+// (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup).
 export async function worktreeDirty(path: string): Promise<boolean> {
   return (await worktreeStatus(path, { fresh: true })).dirty
 }

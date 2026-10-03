@@ -5,7 +5,7 @@
 // against core's `tasks`, since a query never spans database files.
 import { sqliteTable, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-// Named SQL snippets for the Database pane (docs/database.md § Database pane).
+// Named SQL snippets for the Database pane (docs/database/pane.md § Database pane).
 // Project-scoped, not task-scoped: a query written against a project's schema outlives any one task
 // worktree. Machine-scoped (no user_id). Saving under an existing project/name overwrites it.
 export const dbSavedQueries = sqliteTable(

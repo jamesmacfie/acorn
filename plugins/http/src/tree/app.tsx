@@ -8,7 +8,7 @@ import HttpList from './HttpList'
 import HttpVariables from './HttpVariables'
 import { httpPanelModel } from './panelModel'
 
-// Two regions and a settings renderer, over three manifest surfaces (docs/http-client.md § Client).
+// Two regions and a settings renderer, over three manifest surfaces (docs/http-client/client.md § Client).
 // What a pane draws is decided by the props the host mounted this region with, which is the tree
 // contract's version of what the frame contract called `context`: the host says what this region was
 // opened to look at.

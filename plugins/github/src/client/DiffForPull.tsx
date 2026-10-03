@@ -18,7 +18,7 @@ import { sayOnFailure } from './actionErrors'
 // from a pull request. Everything here answers one of the shell's questions and nothing more: which
 // document, where its segments come from, which threads to place, and what a comment does.
 //
-// The document is the node's (docs/github-integration.md § Diff documents): every file with the
+// The document is the node's (docs/github-integration/mirror.md § Diff documents): every file with the
 // segments its patch was cut into, and no patch text. The viewer asks for the segments it is near.
 // Binary and too-large files have no patch; the shell renders a "No diff" row for them. This component
 // owns the warning that GitHub's 3,000-file API limit cut the list short.

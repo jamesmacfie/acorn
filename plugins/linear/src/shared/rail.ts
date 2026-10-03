@@ -3,7 +3,7 @@ import type { LinearProjectIssue } from './api'
 
 // The encoding is the host's (protocol/api.ts § railItemId); these two name its halves for Linear. The
 // connection has to travel with the identifier because Linear issue keys are not globally unique
-// across connections (docs/integrations.md § Linear).
+// across connections (docs/integrations/linear.md § Linear).
 export type LinearRailTarget = { connectionId: string; identifier: string }
 
 export const linearRailItemId = (target: LinearRailTarget): string =>
@@ -59,7 +59,7 @@ export function linearRailItem(issue: LinearProjectIssue, connection?: string): 
       origin: 'linear',
       title: `${issue.identifier} ${issue.title}`,
       branch: issue.branchName || issue.identifier.toLowerCase(),
-      // The issue's description, already capped by the route (docs/workflows.md § Starting a run).
+      // The issue's description, already capped by the route (docs/workflows/starting-runs.md § Starting a run).
       // Nothing draws it; a workflow started from this row's menu puts it in its `issue` input.
       ...(issue.description ? { body: issue.description } : {}),
       link: {

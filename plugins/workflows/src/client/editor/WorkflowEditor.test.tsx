@@ -5,7 +5,7 @@ import type { AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/
 import type { AuthoringConversationProps } from '@acorn/plugin-api/ui/data-sources'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
-// Generate, in the tier that can answer what a press does (docs/workflows.md § Authoring): whether
+// Generate, in the tier that can answer what a press does (docs/workflows/authoring.md § Authoring): whether
 // the button is drawn at all and whether a whole definition lands as one undo entry. The prompt and
 // the grounding are pure and tested on the node side.
 

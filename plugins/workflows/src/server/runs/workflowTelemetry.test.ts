@@ -5,7 +5,7 @@ import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runn
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
 // A run and its steps as spans, raised by this plugin through `ctx.telemetry` and owned by it
-// (docs/workflows.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
+// (docs/workflows/child-runs.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
 // with a context measures its own work.
 
 const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }

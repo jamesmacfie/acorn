@@ -9,7 +9,7 @@ import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { createSettingSave } from './settingSave'
 
 // Settings > Services, on one connection's page: where that connection's external projects show up
-// (docs/integrations.md § Project sources). One connection often serves every workspace on the
+// (docs/integrations/project-sources.md § Project sources). One connection often serves every workspace on the
 // machine, so the map is edited from the connection's side rather than a workspace at a time; the
 // rows it writes are the same core-owned rows either way.
 //

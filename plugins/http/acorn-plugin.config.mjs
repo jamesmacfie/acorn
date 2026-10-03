@@ -178,7 +178,7 @@ export default {
       },
       {
         // This project's saved requests, searched from the palette
-        // (docs/http-client.md § From the command palette).
+        // (docs/http-client/client.md § From the command palette).
         //
         // `scope: 'project'` is the whole boundary: the host sends the project the palette session
         // captured, the route filters on owner and project in SQL, and the command is not offered at

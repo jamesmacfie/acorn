@@ -128,7 +128,7 @@ export const githubPlugin = (): NodePlugin => {
       // github.sqlite), so github registers it directly rather than through GITHUB_MIRROR: resolving
       // its own capability out of the registry would be a plugin asking the graph about itself.
       // Contribution semantics, including what an absent section renders as, are core's
-      // (docs/agent-tools.md § Context sections).
+      // (docs/agent-tools/context-sections.md § Context sections).
       ctx.contextSections.register(pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
         mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
       ))

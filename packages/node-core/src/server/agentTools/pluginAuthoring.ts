@@ -177,7 +177,7 @@ export function pluginAuthoringVocabulary(): PluginAuthoringVocabulary {
       node: Object.keys(at(schema, 'permissions', 'node')?.properties ?? {}),
       core: [...NODE_CORE_FACETS],
       // No list of grantable `permissions.api` scopes: that allowlist lives in the client and the node
-      // cannot import it (docs/agent-tools.md § plugin_authoring). The `note` below says what makes an
+      // cannot import it (docs/agent-tools/plugin-tools.md § plugin_authoring). The `note` below says what makes an
       // unknown scope survivable instead.
       note: 'permissions.node is least privilege for cooperative code, not a sandbox: gating is by omission, so an undeclared facet is absent from ctx and the first call is a TypeError. permissions.api is different — it IS enforced, by an allowlist of (path, method) pairs at the frame bridge. Your own /v1/p/<id>/ namespace needs no scope and is always allowed; another plugin\'s namespace is always denied; a scope this acorn does not know is denied at the bridge rather than rejected at parse, so declare only scopes you have confirmed against this node.',
     },
@@ -453,7 +453,7 @@ export const pluginAuthoringTool = (): AgentToolContribution => ({
 })
 
 // `defaultIncluded: false` is the whole reason this is affordable; order 50 keeps it after memory
-// (docs/agent-tools.md § Context sections).
+// (docs/agent-tools/context-sections.md § Context sections).
 export const pluginAuthoringSection: ContextSectionContribution = {
   id: PLUGIN_AUTHORING_SECTION,
   order: 50,

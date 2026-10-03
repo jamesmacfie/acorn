@@ -86,7 +86,7 @@ export default {
       action: { verb: 'openPane', pane: 'rollbar' },
     }, {
       // The routed project's active Rollbar items, searched from the palette
-      // (docs/integrations.md § From the command palette).
+      // (docs/integrations/rollbar.md § Palette search).
       //
       // `scope: 'project'` is what makes this safe and what makes it useful: the host sends the
       // project the palette session captured and nothing else, the route resolves only the

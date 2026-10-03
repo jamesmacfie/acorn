@@ -22,7 +22,7 @@ export type PaneIntent =
   // has to survive until it is.
   | { kind: 'plugin:select'; item: string }
   // Open a workflow run in the workflows pane, at one node when the sender knows which
-  // (docs/workflows.md § Routes and UI). Sent by a bell row, an attention row, the rail's recent
+  // (docs/workflows/routes-and-ui.md § Routes and UI). Sent by a bell row, an attention row, the rail's recent
   // runs and the agent pane's chip, all of which name a run and none of which can be sure the pane
   // is mounted.
   | { kind: 'workflows:show-run'; runId: string; stepId?: string }

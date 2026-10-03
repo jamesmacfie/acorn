@@ -58,7 +58,7 @@ decision updates the snapshot and withdraws the code.
 Saved query drafts and typed dashboard drafts are Node-owned, with compare-and-swap revisions. Their
 device recovery copies are keyed by Node, entity, and base revision, and stay until acknowledged or
 discarded. Reconnecting shows conflicts instead of overwriting Node content
-([query recovery](./data-sources.md#workspace-query-library)). The shared query editor autosaves a saved
+([query recovery](./data-sources/query-library.md#workspace-query-library)). The shared query editor autosaves a saved
 query to the Node, and a stale save opens explicit conflict choices. An inline query stays inside its
 workflow or panel draft, and **Customize for this use** copies saved content into that consumer.
 Dashboard placements reference the stable published panel ID, so publishing changes a definition, not

@@ -54,7 +54,7 @@ export type StreamHandlers = {
   streamTaskId(id: string): string | null | undefined
   // Stop and start the thing producing this stream's bytes. The hub calls this when a socket buffers
   // past its mark, so a build spewing output slows down instead of having its frames thrown away
-  // (docs/terminal.md § Backpressure). Optional because not every stream has a producer that can be
+  // (docs/terminal/activity.md § Backpressure). Optional because not every stream has a producer that can be
   // paused; a stream owner that offers none is shed instead, and told so.
   flowControl?(id: string, paused: boolean): void
 }

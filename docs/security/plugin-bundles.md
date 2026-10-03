@@ -115,4 +115,4 @@ skips bundled cache and trust setup.
   so it's disclosed under **Enforced**. The host spawns exactly the declared command and arguments,
   and the whole spawn plus its environment passthrough is the grant key. The agent CLI itself is code
   the person installed, the same trust as running it in their own terminal
-  ([harnesses](../managed-agents.md#harnesses)).
+  ([harnesses](../managed-agents/harnesses.md#harnesses)).

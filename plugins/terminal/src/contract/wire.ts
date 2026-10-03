@@ -8,8 +8,8 @@ export type TerminalSession = {
   profileId: string
   backend: 'node-pty' | 'tmux'
   status: 'running' | 'exited'
-  idle: boolean // agent has produced no output for a while (docs/terminal.md § Activity and status); always false for shells
-  agentState: AgentState // docs/terminal.md § Activity and status: PTY tier emits working|idle|blocked|unknown
+  idle: boolean // agent has produced no output for a while (docs/terminal/activity.md § Activity and status); always false for shells
+  agentState: AgentState // docs/terminal/activity.md § Activity and status: PTY tier emits working|idle|blocked|unknown
   // cwd is the task's isolated worktree, derived and never stored: `tasks.worktreePath` is the truth
   // (docs/workspaces-and-tasks.md), and main computes `cwd === task.worktreePath` at session create
   // and during `reconcileTmux`, so the flag survives app restarts. It stays on the wire as a

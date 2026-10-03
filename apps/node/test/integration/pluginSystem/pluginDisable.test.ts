@@ -36,7 +36,7 @@ const buildPlugins = (dataDir: string) =>
   } satisfies NodePluginDeps)
 
 // Every registry a node plugin can write to. For why connection and integration are separate lists,
-// see docs/integrations.md § Connection and integration contributions. github is the only
+// see docs/integrations/contributions.md § Connection and integration contributions. github is the only
 // provider-owning plugin left in this graph, so `providerRoutes` and `modelProviders` are asserted
 // empty in the baseline case.
 type Snapshot = {
@@ -137,7 +137,7 @@ describe('disabling a node plugin', () => {
         tools: agentToolContributions().map((t) => t.name).sort(),
         sections: getContextSections().map((s) => s.id),
         // The three provider registries. For why connection and integration are separate, see
-        // docs/integrations.md § Connection and integration contributions. `modelProviders` comes out
+        // docs/integrations/contributions.md § Connection and integration contributions. `modelProviders` comes out
         // empty because model-providers is a loaded package, so an entry here would mean the compiled
         // boot had started registering an adapter again. `providerRoutes` strands first if host.ts
         // clears the registries in the wrong order, being the last thing
@@ -258,14 +258,14 @@ describe('disabling a node plugin', () => {
   }
 
   // For why core's `issues` section survives a boot that never calls `wireAgentTools`, see
-  // docs/agent-tools.md § Context sections.
+  // docs/agent-tools/context-sections.md § Context sections.
   it("registers core's own 'issues' section without wireAgentTools (the standalone shape)", async () => {
     const { snapshot } = await start()
     const issues = getContextSections().find((s) => s.id === 'issues')
     expect(snapshot.sections).toContain('issues')
     expect(issues?.label).toBe('Linked issues')
     // Core's own section, so it's the one that still receives the database handle. See
-    // docs/agent-tools.md § Context sections.
+    // docs/agent-tools/context-sections.md § Context sections.
     expect(issues?.defaultIncluded).toBe(true)
   })
 

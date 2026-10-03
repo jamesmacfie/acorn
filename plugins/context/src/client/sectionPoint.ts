@@ -1,7 +1,7 @@
 import type { Task } from '@acorn/plugin-api/client'
 
 // The one place in the Context pane another plugin may draw: inside a section the node assembled,
-// keyed by that section's id (docs/agent-tools.md § Context sections).
+// keyed by that section's id (docs/agent-tools/context-sections.md § Context sections).
 //
 // This replaces the `contextSectionSlots` registry, which was a private seam with one consumer. It is
 // the same idea said in the vocabulary every other cross-plugin surface uses, so memory's add form is

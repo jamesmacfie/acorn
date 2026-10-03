@@ -1,4 +1,4 @@
-// Layout recipes (docs/workspaces-and-tasks.md § Task): a [layout.<id>] config block seeds a
+// Layout recipes (docs/workspaces-and-tasks/project-config.md § Layout recipes): a [layout.<id>] config block seeds a
 // TaskLayout, auto-starts its named run target in the drawer, and points the browser pane at a
 // target's resolved URL (`browser = "run:<id>"`). A pure executor over injected services, unit
 // tested with stubs; the palette wires the real runtime, layout and browser glue.

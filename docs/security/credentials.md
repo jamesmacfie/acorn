@@ -27,7 +27,7 @@ stores it through the connection seam and gets it back for one flush at a time t
 `ctx.providers.withConnection`. Its manifest declares `secrets: false`, which is accurate: core
 resolves the row inside its own secret scope. A DSN authenticates ingestion into one project and can
 read nothing, which is why the exporter doesn't ask for an organisation token
-([integrations.md](../integrations.md#sentry)). The DSN goes in the `X-Sentry-Auth` header and the
+([integrations.md](../integrations/sentry.md#sentry)). The DSN goes in the `X-Sentry-Auth` header and the
 envelope header, never in a payload, and the connection's label is the host and project, never the
 key.
 
@@ -40,7 +40,7 @@ the TLS trust material it needs to call the Node. A caller that needs more passe
 `passthrough: ['DOCKER_*']`, visible at the call site.
 
 **A harness generate spends the CLI's own login, never a key acorn holds.** A Generate control can
-point at an agent CLI installed on the machine ([integrations.md](../integrations.md#model-providers)),
+point at an agent CLI installed on the machine ([integrations.md](../integrations/model-providers.md#model-providers)),
 and that child gets no credential. Its environment is the broker's base allowlist plus
 `AGENT_TOOL_PASSTHROUGH` (`server/agentProfiles/toolEnv.ts`): `XDG_CONFIG_HOME`, the npm prefix, the
 proxy variables, and the TLS trust files. `ANTHROPIC_*` and `OPENAI_*` are left out on purpose,

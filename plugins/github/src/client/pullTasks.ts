@@ -106,7 +106,7 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
 /**
  * The source's promotion contract, for the one caller that is not this plugin: the shared
  * promote-to-task modal, which the workflows plugin opens from a pull request's row menu
- * (docs/workflows.md § Starting a run). Without it the modal has no way to turn a pull into a task
+ * (docs/workflows/starting-runs.md § Starting a run). Without it the modal has no way to turn a pull into a task
  * and refuses to draw.
  *
  * Deliberately thinner than `promotePullToTask` above. It keeps the half that matters — a pull that

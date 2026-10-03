@@ -342,7 +342,7 @@ export const scheduleRuns = sqliteTable(
   (t) => [primaryKey({ columns: [t.key, t.startedAt] })],
 )
 
-// ── Measure history: what a panel's number was (docs/dashboards.md § Trends) ─────────────────────
+// ── Measure history: what a panel's number was (docs/dashboards/views.md § Trends) ─────────────────────
 //
 // Why the host samples on a schedule rather than growing the plugin contract, and why this is its own
 // table rather than the `core.dashboards` prefs slice, are in docs/data-layer/core-database.md § Tables.

@@ -7,7 +7,7 @@ import type { AgentSession } from '../../contract/wire.ts'
 import type { AgentPaneModel, SessionAction } from './agentPaneModel'
 
 // The header's chip: a session a workflow started says which one, and pressing it opens the run
-// (docs/managed-agents.md § Sessions). The rest of the pane needs a snapshot and a composer, so the
+// (docs/managed-agents/sessions.md § Sessions). The rest of the pane needs a snapshot and a composer, so the
 // header is rendered on its own.
 
 const runForSession = vi.fn()
@@ -120,7 +120,7 @@ describe('managed delegation parent navigation', () => {
 })
 
 // The open session's ••• menu, mirrored into the palette while this region is mounted
-// (docs/managed-agents.md § From the command palette). What is pinned is that the pane model stays
+// (docs/managed-agents/palette.md § From the command palette). What is pinned is that the pane model stays
 // the only roster — nothing is enumerated a second time — and that a row acts on the action as it is
 // when it is picked rather than as it was when it was registered.
 

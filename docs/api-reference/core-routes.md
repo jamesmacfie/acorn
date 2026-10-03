@@ -197,4 +197,4 @@ releases the wait without cancelling the process.
 | `POST` | `/v1/core/authoring/turn` | Device | One AI authoring turn for a query or dashboard. No execution or publication |
 
 The path's operation must match the body's `operation`. `save` is a compare-and-swap on the draft
-revision. See the [workspace query library](../data-sources.md#workspace-query-library).
+revision. See the [workspace query library](../data-sources/query-library.md#workspace-query-library).

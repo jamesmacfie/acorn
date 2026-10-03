@@ -236,7 +236,7 @@ const RULES: readonly RouteRule[] = [
   // mappable to a scope: it is the whole roster, and minting a scope for it would hand every installed
   // plugin every connection the owner holds to serve one dropdown. A plugin that needs the list serves
   // it from its own `/v1/p/<id>` route over `ctx.core.models.available`, which is what the three
-  // Generate dialogs already do (docs/integrations.md § Model providers).
+  // Generate dialogs already do (docs/integrations/model-providers.md § Model providers).
   { path: shape('/v1/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
 ]
 

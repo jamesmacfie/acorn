@@ -22,7 +22,7 @@ import { WorkspaceConnections } from './ProjectConnections'
 
 // Settings → a workspace's own page: its name, its projects, and deleting it. Each project's config is
 // on the project's page, one click from the table (./ProjectSettings.tsx), because it describes one
-// codebase rather than the group (docs/workspaces-and-tasks.md § Worktrees and setup).
+// codebase rather than the group (docs/workspaces-and-tasks/project-config.md § The project row).
 //
 // Which provider projects a workspace follows is in its Connections section: the same map each
 // connection's page draws, from this workspace's side (./ProjectConnections.tsx). One project's own

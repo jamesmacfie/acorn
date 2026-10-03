@@ -41,7 +41,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   const pricing = createQuery(() => agentPricingOptions())
   // A session a workflow started says so, and the chip opens the run that started it. The session row
   // has carried `kind` and `workflowRunId` since the runtime wrote them; nothing read either until
-  // the run pane existed to open (docs/managed-agents.md § Sessions).
+  // the run pane existed to open (docs/managed-agents/sessions.md § Sessions).
   //
   // Resolved per call, never captured: a node with workflows disabled answers `undefined` here, and
   // the chip is simply absent.

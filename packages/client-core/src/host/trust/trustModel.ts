@@ -78,7 +78,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // agent, and a second line when it also declares a one-shot text mode, because that is a second
         // invocation with its own arguments. `Enforced`, because the host spawns exactly the declared
         // command with the declared arguments and the plugin never gets a process of its own
-        // (docs/managed-agents.md § Harnesses).
+        // (docs/managed-agents/harnesses.md § Harnesses).
         ...harnessPermissionLines(harnessGrants(installed.contributions)),
         ...agentToolPermissionLines(agentToolGrants(installed.contributions)),
       ],

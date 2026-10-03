@@ -2,7 +2,7 @@
 //
 // Positions are not in the definition, and that is a decision rather than an omission: a definition
 // saved to a repository is read on machines with different screens, and a committed x/y is noise in
-// every diff (docs/workflows.md § Authoring). They live under `plugin:workflows:layout:<defId>` in
+// every diff (docs/workflows/authoring.md § Authoring). They live under `plugin:workflows:layout:<defId>` in
 // device storage instead, which is the one guarded accessor for a per-device scrap and is a no-op on
 // a host with nowhere to keep one (client-core kit/lib/state/deviceStorage.ts).
 //

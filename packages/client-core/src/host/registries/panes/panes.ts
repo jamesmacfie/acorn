@@ -121,7 +121,7 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 // DOM across a task switch, exactly one pane set it, and nothing ever read it. What keeps a pane cheap
 // to leave and come back to is ./paneModels.ts within a task and the query cache across tasks, warmed
 // by `prefetch` above. A hidden element tree per task is the memory shape this codebase already
-// declined for the agent transcript (docs/managed-agents.md), so it is not coming back as a pane field.
+// declined for the agent transcript (docs/managed-agents/transcript.md), so it is not coming back as a pane field.
 //
 // There is no per-pane `freshness` hook here (docs/panes/contributions.md § Contributions has the reason).
 //

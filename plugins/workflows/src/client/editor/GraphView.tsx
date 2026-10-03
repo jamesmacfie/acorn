@@ -9,7 +9,7 @@ import { LAYOUT_WRITE_DELAY_MS, readLayout, writeLayout, type WorkflowLayout } f
 import { graphOrder, type DraftSelection, type WorkflowDraft } from './draft'
 
 // The graph view: the same nodes the list column draws, as a picture
-// (docs/workflows.md § Authoring).
+// (docs/workflows/authoring.md § Authoring).
 //
 // Everything about the graph is already the draft's — the reading order, the ranks, the edges and
 // the rules that refuse a bad one — so this file is a projection and a place to keep positions. The

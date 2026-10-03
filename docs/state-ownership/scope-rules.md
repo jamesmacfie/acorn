@@ -50,7 +50,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Workspace and task selection | Node and workspace or task |
 | Draft editor and comment text, and a Changes commit message | Client and current task |
 | Provider data and task mutations | Owning Node |
-| Computer Use app-access grants ([app-access approval](../managed-agents.md#app-access-approval)) | The Computer Use integration on the Node's computer. The Node keeps only the decision |
+| Computer Use app-access grants ([app-access approval](../managed-agents/app-access.md#app-access-approval)) | The Computer Use integration on the Node's computer. The Node keeps only the decision |
 
 ## Which mechanism holds a given fact
 

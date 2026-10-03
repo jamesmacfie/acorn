@@ -197,4 +197,4 @@ to something that isn't there yet.
 own `/v1/p/<pluginId>/` namespace. The host calls it with a verified task principal, adapts the
 bounded answer into the agent-tool registry or the context assembler, and removes the registration on
 reload or unload. They project through the core task tool and context routes. See
-[agent tools](../agent-tools.md#loaded-manifest-carriers).
+[agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers).

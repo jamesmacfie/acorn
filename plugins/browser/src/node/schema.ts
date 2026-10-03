@@ -4,7 +4,7 @@ import { blob, index, integer, sqliteTable, text } from 'drizzle-orm/sqlite-core
 // <data-root>/plugins/browser.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // Screenshot bytes are stored, not inlined into a transcript as base64, so they outlive the transcript
-// and stay addressable by id. See docs/agent-tools.md § Browser tools.
+// and stay addressable by id. See docs/agent-tools/browser-and-scripts.md § Browser tools.
 //
 // `task_id` is a plain id into core's `tasks`, dereferenced through CoreServices.tasks, never joined.
 export const browserCaptures = sqliteTable(

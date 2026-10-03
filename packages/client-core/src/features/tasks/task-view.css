@@ -117,9 +117,9 @@
    now: the list is a host-drawn descriptor rail (client-core/host/chrome/ChromeSourcePanel.tsx,
    styled by the shell's own primitives) and the detail is the plugin's frame, so none of it had a
    caller left. The project picker went with it and has nowhere to come back to, which is written
-   up in docs/integrations.md § Linear. */
+   up in docs/integrations/linear.md § Linear. */
 
-/* Run-target buttons (docs/workflows.md §2): one play/stop glyph per named target, with the target
+/* Run-target buttons (docs/terminal/activity.md § Frames from these edges): one play/stop glyph per named target, with the target
    id underneath as RailTab's `sublabel`, which owns the small-text rule. */
 .pane-switch-run { flex-direction: column; gap: 1px; }
 

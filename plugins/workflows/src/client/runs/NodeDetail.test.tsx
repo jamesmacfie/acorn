@@ -10,7 +10,7 @@ import type { RunPaneModel } from './runPaneModel'
 import type { WorkflowGateForm } from '../../shared/workflowContracts'
 
 // Which controls a node offers is the pane's whole promise: a stale button is a race, not a bug
-// (docs/workflows.md § Routes and UI). So the check is per status, in a real render.
+// (docs/workflows/routes-and-ui.md § Routes and UI). So the check is per status, in a real render.
 //
 // The second half is which shape a node draws. An agent node hands its detail to the conversation
 // plugins/agents publishes, and every other kind — and an agent node on a machine where that plugin

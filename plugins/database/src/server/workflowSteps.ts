@@ -1,5 +1,5 @@
 // This plugin's two workflow step kinds and the capability behind them
-// (docs/database.md § Workflow steps).
+// (docs/database/palette-and-workflows.md § Workflow steps).
 //
 // They live here for the reason the http step gives: the connection resolution, the pool, the schema
 // introspection and the SQL prompt are all in this package. What a workflow adds is a cap and a

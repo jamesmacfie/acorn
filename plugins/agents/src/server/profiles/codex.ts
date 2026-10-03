@@ -32,12 +32,12 @@ export const codexProfile: AgentProfileContribution = {
   }),
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['resume', sessionRef] }),
   // One turn with nothing to act on. Two callers: a workflow `decide` step, and any Generate control
-  // spending this CLI as a text backend (docs/integrations.md § Model providers).
+  // spending this CLI as a text backend (docs/integrations/model-providers.md § Model providers).
   //
   // `--skip-git-repo-check` is required, not a preference, and it is a consequence of a decision taken
   // elsewhere. A one-shot generate runs in an empty temporary directory so the CLI cannot read an
   // `AGENTS.md` and answer with some repo's house rules in front of the caller's prompt
-  // (docs/integrations.md § Model providers). Codex refuses to start in a
+  // (docs/integrations/model-providers.md § Model providers). Codex refuses to start in a
   // directory that is neither a git repo nor trusted: "Not inside a trusted directory and
   // --skip-git-repo-check was not specified". So the room we chose for it is the reason for the flag.
   //

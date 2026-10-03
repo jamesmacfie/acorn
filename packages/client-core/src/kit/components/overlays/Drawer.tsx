@@ -11,7 +11,7 @@ import type { JSX } from 'solid-js'
 //
 // Not a modal. Nothing behind it goes inert, there is no backdrop and Escape does not dismiss it: the
 // drawer is a second place to work, not an interruption. What is inside it is the caller's, and the
-// terminal's is entirely kit nodes (docs/terminal.md § Client).
+// terminal's is entirely kit nodes (docs/terminal/client.md § Client).
 export function Drawer(props: {
   /** Height in pixels while not maximized. The caller owns it because the caller owns the grip that
    *  drags it (`createSplitDrag`); ignored when `maximized`, where a top and a bottom decide it. */

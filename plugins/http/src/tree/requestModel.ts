@@ -289,7 +289,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
    * On commit rather than on paste, and that is the one visible difference the move to a tree cost
    * here: a paste event is a DOM event, so it cannot cross to a sandbox that has no DOM. Pressing
    * Enter or leaving the field does the expansion instead, which is one keystroke later and the same
-   * result (docs/http-client.md § Client).
+   * result (docs/http-client/client.md § Client).
    */
   function commitUrl(value: string): boolean {
     if (/^\s*curl\s/i.test(value)) {
@@ -303,7 +303,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
     return false
   }
 
-  // Through the bridge, not `navigator.clipboard` (docs/http-client.md § Client).
+  // Through the bridge, not `navigator.clipboard` (docs/http-client/client.md § Client).
   const copy = (text: string, origin = bridge()) => void origin.ui.copy(text)
   const copyAsCurl = (origin = bridge()) => copy(toCurl(draft()), origin)
 

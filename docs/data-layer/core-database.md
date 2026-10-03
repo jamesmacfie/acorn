@@ -36,7 +36,7 @@ Query tables are defined in `packages/node-core/src/server/queries/schema.ts`, a
 revision tables in `packages/node-core/src/server/dashboards/schema.ts`. Draft saves are
 compare-and-swap on affected-row counts. Published content and digests are immutable, and revision rows
 outlive deleted drafts. A consumer reference blocks deletion, and a saved query a panel uses registers a
-consumer record ([the query library](../data-sources.md#workspace-query-library)).
+consumer record ([the query library](../data-sources/query-library.md#workspace-query-library)).
 
 `dashboard_measure_samples` holds one sample per hour bucket per history panel, written by the
 `core:sample-measures` schedule ([trends](../dashboards.md)). It's a table, not part of the
@@ -87,4 +87,4 @@ and generation.
 
 Attempts survive archive and terminal deletion. Deleting a project deletes its tasks and their attempts.
 Status shows at most 50 summaries, and an explicit attempt can read older rows
-([durable results](../workspaces-and-tasks.md#durable-task-script-results)).
+([durable results](../workspaces-and-tasks/task-scripts.md#durable-task-script-results)).

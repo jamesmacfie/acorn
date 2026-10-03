@@ -39,7 +39,7 @@ import {
 // sessions with its workflow steps, and opening a step spawned a terminal on the harness's resume
 // command. The run pane owns a run's steps now
 // (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
-// rows had two better homes and one confusing one (docs/workflows.md § What workflows refuses).
+// rows had two better homes and one confusing one (docs/workflows/refusals.md § What workflows refuses).
 
 /** The order button in a group's header. The choice is this task's and this group's alone
  *  (./sessionOrder.ts). */
@@ -265,7 +265,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                   // off the session row, which the WebSocket pushes whenever an event this node
                   // records changes it, so these rows appear and settle live for every session in the task and
                   // not only the one that happens to be open. Nothing extra is fetched
-                  // (docs/managed-agents.md § Subagents).
+                  // (docs/managed-agents/subagents.md § Subagents).
                   <Row
                     item={itemProps}
                     variant="stacked"

@@ -4,7 +4,7 @@
 //
 // The emulator is the host's. This file says what the channel is and nothing about how it is drawn, so
 // the same source execs into a container from a browser and from a terminal, where the box is cells
-// (docs/terminal.md § Client).
+// (docs/terminal/client.md § Client).
 import { useQueryClient } from '@tanstack/solid-query'
 import { queryOwner } from '@acorn/plugin-api/client'
 import { attachPty, Rectangle, type PtyIo } from '@acorn/plugin-api/ui'

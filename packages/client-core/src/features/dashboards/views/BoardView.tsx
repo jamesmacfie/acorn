@@ -7,7 +7,7 @@ import Provenance from './Provenance'
 import { panelDotTone, rowPress, type PanelViewProps } from './props'
 
 // The board view. Kanban is not a component, it is group-by over a field with finite values
-// (docs/dashboards.md § Views are derived, not chosen from a menu), so there is almost nothing here.
+// (docs/dashboards/views.md § Views are derived, not chosen from a menu), so there is almost nothing here.
 // The columns come out of `boardColumns`, the order within a column is whatever the panel's sort
 // already produced, and the rows are whatever its filters already kept. There is no per-column sort
 // and no per-column filter in this file because there is nothing left for them to do.

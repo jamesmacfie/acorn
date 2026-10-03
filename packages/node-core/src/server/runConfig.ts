@@ -245,9 +245,9 @@ export function loadRepoConfig(repoDir: string | null, userConfigDir: string | n
   const user = readLayer(userConfigDir, 'user', errors)
 
   const run = new Map<string, RunTarget>()
-  // The `dev` target's layering: docs/workspaces-and-tasks.md § Worktrees and setup covers why.
+  // The `dev` target's layering: docs/workspaces-and-tasks/project-config.md § The layers covers why.
   // The merge order below makes toml win by inserting later:
-  //   1. workspaces.devScript/devRestartScript → a base `dev` target (lowest precedence)
+  //   1. projects.dev_script/dev_restart_script → a base `dev` target (lowest precedence)
   //   2. projects.run_targets JSON (per-project Settings surface)
   //   3. ~/.acorn/config.toml (personal defaults)
   //   4. ./.acorn/config.toml (committed, always wins)

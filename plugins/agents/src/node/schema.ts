@@ -69,7 +69,7 @@ export const agentSessions = sqliteTable(
 )
 
 // A durable queue entry and the canonical turn projection. The service scheduler enforces one active
-// turn per session (docs/managed-agents.md § Operations and failure), not a SQLite constraint, because
+// turn per session (docs/managed-agents/operations.md § Operations and failure), not a SQLite constraint, because
 // Drizzle models partial uniqueness awkwardly.
 export const agentTurns = sqliteTable(
   'agent_turns',

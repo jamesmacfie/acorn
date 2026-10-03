@@ -18,7 +18,7 @@ import { workflowApi } from './workflowsClient'
 import { startWorkflow } from './startWorkflow'
 import { closeStartFromItem, collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem, prefillFromRecord, startFromItemTarget } from './startFromItem'
 
-// "Start workflow…" on an integration's row, drawn (docs/workflows.md § Starting a run).
+// "Start workflow…" on an integration's row, drawn (docs/workflows/starting-runs.md § Starting a run).
 //
 // The box is the host's promote-to-task modal with a workflow step over its tabs, so the person picks
 // a workflow and answers its inputs in the same place they say whether this is a new task or an

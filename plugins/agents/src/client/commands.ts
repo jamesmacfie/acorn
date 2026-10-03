@@ -18,7 +18,7 @@ import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
 // task, and one search over that task's managed sessions
-// (docs/managed-agents.md § From the command palette).
+// (docs/managed-agents/palette.md § From the command palette).
 //
 // The two harness terminals are next door in ./terminalProfileCommands.ts, and the settings the
 // catalogue admits are in ./AgentCommands.tsx, which needs a query client and so has to be mounted
@@ -176,7 +176,7 @@ const SESSION_GROUP = 'agents.session'
  * actions need a selected session, which only the pane model has; two of them — rename and archive —
  * are dialogs that region draws, so a row offered while it is unmounted would run and show nothing.
  * Mounted is therefore the honest gate: you can reach these when you are looking at the run they are
- * about (docs/managed-agents.md § From the command palette).
+ * about (docs/managed-agents/palette.md § From the command palette).
  *
  * The pane model stays the only place the roster is written. Nothing is enumerated here — the labels,
  * the availability and the work are all read back out of `sessionActions()` at the moment the row is

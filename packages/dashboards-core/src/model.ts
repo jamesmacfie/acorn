@@ -9,7 +9,7 @@ import type {
 export type PanelViewKind = DashboardView['kind']
 
 // The panel definition: what a user composed, independent of where it is placed. The four layers and
-// what each one owns are in docs/dashboards.md § Panels.
+// what each one owns are in docs/dashboards/panels.md § Panels.
 //
 // Two shapes here were fixed before the mapping layer existed, because getting either wrong would
 // have been a migration rather than an addition. Both survived it unchanged:
@@ -34,7 +34,7 @@ export type PanelProjectionSource = {
 /** Mapping identity uses the provider and query-instance source id, never an array index. */
 export const panelSourceKey = (source: PanelProjectionSource): string => `${source.pluginId}:${source.sourceId}`
 
-// Shaping is generic and identical for every projected source. See docs/dashboards.md § Panels.
+// Shaping is generic and identical for every projected source. See docs/dashboards/panels.md § Panels.
 
 /** Small and all-AND. An OR or nested predicate tree is a query language, and a panel that needs one
  *  has outgrown the generic shaping layer. */
@@ -62,7 +62,7 @@ export type PanelShaping = {
   fields?: string[]
   /** The field whose values are the groups, which is a board's columns. Shaping rather than a view
    *  option, so flipping a board to a table and back keeps the grouping the way it keeps the filters.
-   *  See docs/dashboards.md § Panels. */
+   *  See docs/dashboards/panels.md § Panels. */
   groupBy?: string
 }
 
@@ -88,7 +88,7 @@ export type PanelView = {
   x?: string
   /** `chart` only, and optional there: the enum whose values split one line into several. */
   series?: string
-  /** `stat` only; other kinds ignore all three. See docs/dashboards.md § Trends.
+  /** `stat` only; other kinds ignore all three. See docs/dashboards/views.md § Trends.
    *
    *  `activity` is "when did these rows change", bucketed from the rows already on screen and needing
    *  no store. `history` is "what was this number", which only the node's measure sampler can answer,
@@ -151,7 +151,7 @@ export type PanelMapping = {
   /** The panel-local fields the user invented, drawn after the five roles in the order declared. */
   extraFields?: PanelFieldDef[]
   /** Where a value no column claims goes. Never nowhere: an unmapped value has a declared destination.
-   *  Default catch-all. See docs/dashboards.md § The mapping layer, and cross-source panels. */
+   *  Default catch-all. See docs/dashboards/mapping-and-editor.md § The mapping layer, and cross-source panels. */
   unmapped?: 'catch-all' | 'hidden'
 }
 
@@ -178,7 +178,7 @@ export type PanelDefinition = {
 //
 // Views are derived from the schema, not chosen from a widget menu: a kanban is not a component, it is
 // group-by over a field with finite values. Every view's gate is one predicate over the schema, and
-// the editor offers only what passes. See docs/dashboards.md § Views are derived, not chosen from a
+// the editor offers only what passes. See docs/dashboards/views.md § Views are derived, not chosen from a
 // menu.
 
 /** The views this build draws. The list moved to the wire when a manifest gained the ability to narrow
@@ -205,7 +205,7 @@ export const viewSupportedBy = (kind: PanelViewKind, schema: DashboardDisplaySch
 
 /** What a panel editor may offer for this schema, and nothing else. A source with no enum field is
  *  never offered a board, so a panel that cannot draw is unrepresentable rather than validated. See
- *  docs/dashboards.md § The generated editor. */
+ *  docs/dashboards/mapping-and-editor.md § The generated editor. */
 export const viewsForSchema = (schema: DashboardDisplaySchema): PanelViewKind[] =>
   PANEL_VIEW_KINDS.filter((kind) => viewSupportedBy(kind, schema))
 

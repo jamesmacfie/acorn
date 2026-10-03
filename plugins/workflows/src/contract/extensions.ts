@@ -1,7 +1,7 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
 import type { PolicyEvaluator, StepKindContribution, WorkflowTriggerContribution } from '../shared/workflowContracts'
 
-// What another plugin may add to a workflow run, and the only way in (docs/workflows.md § Contributed
+// What another plugin may add to a workflow run, and the only way in (docs/workflows/step-kinds.md § Contributed
 // step kinds). These are node extension points rather than capabilities because each of the three is
 // many-to-many: any number of plugins add step kinds, and one owner would be an arbitrary winner.
 //
@@ -17,7 +17,7 @@ export type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 export type { DataBinding } from '@acorn/protocol/dataBindings.ts'
 
 // A kind carries a `describe`: its label, icon, description, fields, and output description as data
-// (docs/workflows.md § Contributed step kinds). The host draws that form on both hosts and applies
+// (docs/workflows/step-kinds.md § Contributed step kinds). The host draws that form on both hosts and applies
 // `required`, `min`, `max` and a static select's membership before calling `validate`, so a validator
 // can assume the shape and check the meaning. Incomplete contributions are excluded from the catalog
 // and runner; other contributions from that plugin remain active.

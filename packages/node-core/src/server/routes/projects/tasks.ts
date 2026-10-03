@@ -134,7 +134,7 @@ export const tasks = new Hono<AppEnv>()
   // frame draws are entitled to it.
   //
   // `?status=archived` is the archive page's list instead: archived tasks, newest first, each with its
-  // `archivedAt` (docs/workspaces-and-tasks.md § Restoring a task). Unbounded, like the active list. A
+  // `archivedAt` (docs/workspaces-and-tasks/archive.md § Restoring a task). Unbounded, like the active list. A
   // few hundred rows is a small scan; page it if a node ever holds thousands.
   .get('/', async (c) => {
     const db = getDb(c.env)

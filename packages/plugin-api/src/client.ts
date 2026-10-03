@@ -126,7 +126,7 @@ export type {
 // `search` command and gets no debounce, no minimum query, one fetch when the frame opens and local
 // fuzzy filtering after that. A plugin querying a node instead writes its own `query`.
 export { localSearch } from '@acorn/client-core/host/registries/commands'
-// See docs/dashboards.md § Provenance, and what a row may not claim for what `openInAppUrl`
+// See docs/dashboards/panels.md § Provenance, and what a row may not claim for what `openInAppUrl`
 // answers and how a URL's destination gets resolved.
 export {
   contentLinkRegistry,

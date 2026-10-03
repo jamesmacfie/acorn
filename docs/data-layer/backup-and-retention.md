@@ -49,7 +49,7 @@ prune nothing ([schedules](../schedules.md#what-is-registered)). Times are Node-
 | Provider mirrors and blobs | Their cache policies | Refetchable. Nothing prunes the blob cache ([caching](../caching.md#immutable-blob-cache)) |
 
 Agent tool calls and file changes keep two rows each: a newer update replaces the rows before it in the
-same transaction ([the transcript store](../managed-agents/client-surfaces.md#the-transcript-store)).
+same transaction ([the transcript store](../managed-agents/transcript-store.md)).
 Rows stored before that rule are compacted once, in the background after boot. Every other agent event
 is kept for the life of its session.
 
@@ -59,14 +59,14 @@ search rows, turns, requests, attachment references, and artifacts, and the file
 The session row stays, with a note in place of its transcript. The archive date is core's
 `tasks.archived_at`, read through `ctx.core.tasks.archivedBefore`, and a restored task has none. The
 removed history is gone from archive search and from a restored task, which is why the owner has to
-choose it ([operations and failure](../managed-agents.md#operations-and-failure)).
+choose it ([operations and failure](../managed-agents/operations.md)).
 
 Deleting rows doesn't shrink a database file. Freed pages go on SQLite's free list for reuse, so the
 file stops growing until they're used up. No database here uses auto-vacuum, and nothing runs `VACUUM`.
 Turning on incremental auto-vacuum needs a full `VACUUM` first, which rewrites the whole file under an
 exclusive lock and stops the Node on the synchronous driver. On a copy of a 1.3 GB agents database it
 took 11 seconds and gave 852 MB. `VACUUM` may also renumber the rowids of a text-keyed table, and the
-agents search index finds rows by rowid ([transcript search](../managed-agents/client-surfaces.md#transcript-search)).
+agents search index finds rows by rowid ([transcript search](../managed-agents/transcript-search.md)).
 To get the space back, stop the Node and run `VACUUM` on the file.
 
 ## What the node reports

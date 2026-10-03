@@ -1,4 +1,4 @@
-// The safety boundary around AI edits (docs/workflows.md § Generating and editing with AI).
+// The safety boundary around AI edits (docs/workflows/ai-authoring.md § Generating and editing with AI).
 //
 // Edit mode has to show the model enough of the current definition to preserve it, without sending
 // literal credentials or letting the model choose provider and execution configuration. This pure

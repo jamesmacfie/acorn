@@ -10,7 +10,7 @@ import { Slot } from '@acorn/plugin-api/ui/host'
 import { collectionId, pillText, sessionLabel, type ContextModel } from './contextModel'
 import { CONTEXT_SECTION_POINT } from './sectionPoint'
 
-// The three regions of the Context pane (docs/agent-tools.md § Context sections). The host draws the
+// The three regions of the Context pane (docs/agent-tools/context-sections.md § Context sections). The host draws the
 // header, the scrolling body and the pinned footer; these fill them. Everything they share is in
 // ./contextModel.ts.
 

@@ -26,7 +26,7 @@ import { runGlyph, runTone, statusLabel } from './runs/runDisplay'
 import { workflowsSurfacePath, WORKFLOWS_SOURCE_ID } from './surfacePath'
 import { workflowApi } from './workflowsClient'
 
-// The Workflows rail source, as its two regions (docs/workflows.md § Authoring).
+// The Workflows rail source, as its two regions (docs/workflows/authoring.md § Authoring).
 //
 // The list is the workspace's definitions — the rows somebody typed here and the files their projects
 // committed, read as one — with its recent runs under them. The detail is the editor, addressed by the

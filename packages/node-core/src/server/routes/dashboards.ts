@@ -8,7 +8,7 @@ import { authorizeQueryScope } from '../queries/runtime'
 import { dashboardStore, DashboardLibraryError } from '../dashboards/store'
 import { deleteDashboard, publishDashboard, validateDashboardContent } from '../dashboards/publication'
 
-// The measure-history read route (docs/dashboards.md § Trends).
+// The measure-history read route (docs/dashboards/views.md § Trends).
 //
 // One route, GET only. There is no write route: the sampler and the store share a process, so the
 // only writer is `core:sample-measures`. An earlier design had clients PUT samples while panels

@@ -51,7 +51,7 @@ export const auditActionDescriptor = z.object({
   label: z.string().min(1).max(80),
 })
 
-// ── Managed agent harnesses (docs/managed-agents.md § Harnesses) ──────────────────────────────────
+// ── Managed agent harnesses (docs/managed-agents/harnesses.md § Harnesses) ──────────────────────────────────
 //
 // A harness is data. The contributing plugin describes the spawn, and plugins/agents owns the child
 // process, the session, and the transcript, so a data-only harness plugin needs no `exec` grant.
@@ -91,7 +91,7 @@ const harnessQuirks = z.object({
 })
 
 // One prompt in, one answer out, with no session and no tools. Declaring it is what puts the harness
-// in every Generate list beside a connected API key (docs/integrations.md § Model providers), and it
+// in every Generate list beside a connected API key (docs/integrations/model-providers.md § Model providers), and it
 // is the only argv a manifest may assemble.
 //
 // It sits beside `terminal` rather than inside it, because answering one question and holding a

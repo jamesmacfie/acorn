@@ -373,7 +373,7 @@ export default function AgentComposer(props: {
 
   /**
    * A contributor asking this composer to put a different attachment in one slot
-   * (docs/plugins.md § Asking the owner; docs/managed-agents.md § Draft attachments).
+   * (docs/plugins.md § Asking the owner; docs/managed-agents/attachments.md § Draft attachments).
    *
    * A compare-and-swap, because there is no transaction to be had. The draft is an array in this
    * component and the replacement is a row on the node, so "atomic" here can only mean: either the id

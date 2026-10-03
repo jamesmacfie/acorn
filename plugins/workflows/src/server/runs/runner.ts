@@ -463,7 +463,7 @@ export class WorkflowRunner {
   }
 
   /** Put a failed node back to pending and let the run carry on from there
-   *  (docs/workflows.md § Execution model). A device action: an agent may not retry its own run. */
+   *  (docs/workflows/execution.md § Execution model). A device action: an agent may not retry its own run. */
   async retryStep(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }> {
     const run = await this.run(runId)
     if (!run) return { ok: false, error: 'No such run.' }

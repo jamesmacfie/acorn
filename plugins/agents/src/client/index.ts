@@ -122,7 +122,7 @@ export const agentsClientPlugin: ClientPlugin = {
       component: AgentSessionDefaultsSettings,
     })
     // Saved starts for a session: a harness, its options, instructions and tool access
-    // (docs/managed-agents.md § Custom agents). "From plugins" is left out: it is only drawn while a
+    // (docs/managed-agents/custom-agents.md § Custom agents). "From plugins" is left out: it is only drawn while a
     // plugin contributes an agent.
     ctx.settingsPages.register({
       id: 'custom-agents', label: 'Custom agents', category: 'agents', scope: 'node', icon: 'bot', order: 20, requires: { plugin: 'agents' },

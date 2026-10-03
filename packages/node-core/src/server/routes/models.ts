@@ -9,7 +9,7 @@ import { ownerId } from '../middleware/requireUser'
 // The read half of the model seam: which backends this owner could generate with, and which agent CLI
 // declared a one-shot mode but is not installed here.
 //
-// docs/integrations.md § Model providers refuses a generic core generate route, and still does: that
+// docs/integrations/model-providers.md § Model providers refuses a generic core generate route, and still does: that
 // would be an unbudgeted proxy to whatever a caller asked for. This is the ids-and-labels projection
 // `/v1/core/integrations` already serves for connections, and its consumers are core's own surfaces —
 // the onboarding wizard's step, the Settings section, and the project-settings gate that used to count

@@ -50,5 +50,5 @@ system or network access.
 The terminal client uses the same custody address and save owner as the desktop. It keeps failed text
 after the view retires and restores it under a fresh grant. It has no CodeMirror undo. An oversized
 stored document shows recovery steps, and
-[database scratch recovery](../database.md#scratch-limits-and-recovery) describes the full
+[database scratch recovery](../database/pane.md#scratch-limits-and-recovery) describes the full
 authenticated export and replacement route.

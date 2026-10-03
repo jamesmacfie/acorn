@@ -289,7 +289,7 @@ export type ContentLinkPresentation = {
   // browse and a rail source have no task, and the panel rung covers them.
   taskId?: string | null
   // Which presentation the clicking surface would rather have. The surface knows where the reader is and
-  // the target does not, which is the whole argument. See docs/dashboards.md § Provenance, and what a row
+  // the target does not, which is the whole argument. See docs/dashboards/panels.md § Provenance, and what a row
   // may not claim for the ranking and the bug that produced it.
   prefer?: 'route' | 'pane' | 'refPanel'
   // The shell's navigator, for the `route` rung. Absent is normal: a surface with no navigator in scope

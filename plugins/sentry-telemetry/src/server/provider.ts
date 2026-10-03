@@ -4,7 +4,7 @@
 // mirrors nothing, browses nothing and promotes nothing to a task. It owns a credential and spends
 // it. That gets the Settings → Services form, encryption under the node's key, the
 // `secret.created` audit row, and connect, test, rotate and disconnect, with no core code
-// (docs/integrations.md § Connection and integration contributions).
+// (docs/integrations/contributions.md § Connection and integration contributions).
 //
 // The DSN is the whole credential. An organisation token, which is what release health and
 // source-map upload need, is deliberately not asked for: neither is in scope, and a token that
@@ -52,7 +52,7 @@ export function createSentryTelemetryProvider(options: {
     label: 'Sentry export',
     // This plugin's own mark, registered by the host from `icon` in acorn-plugin.config.mjs. The
     // issue-reading `sentry` integration will carry the same one, which is deliberate: two
-    // providers, two credentials, two reasons to install (docs/integrations.md § Sentry).
+    // providers, two credentials, two reasons to install (docs/integrations/sentry.md § Sentry).
     glyph: `brand:${PROVIDER_ID}`,
     kind: 'observability',
     connection: {

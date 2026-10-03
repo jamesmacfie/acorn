@@ -59,7 +59,7 @@ Agent tools and context sections are still available to a loaded package, but on
 descriptors: `contributions.agentTools` and `contributions.contextSections`. They do not become live
 registries in `ctx`. The host turns each descriptor into the same normalized registration compiled
 plugins use, binds every route to `/v1/p/<id>/`, and removes it with the package on reload or unload.
-See [Agent tools](../agent-tools.md#loaded-manifest-carriers) for the schema and response contracts.
+See [Agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers) for the schema and response contracts.
 
 Those registries are owner-bound: the host stamps your plugin id onto whatever you register, so a
 schedule, data source, task check, run source, or audit verb cannot be filed under another package's
@@ -96,7 +96,7 @@ Handle `workflows:step-kind` from your node entrypoint. The host qualifies your 
 callback only for checks the field rules cannot express. Fields read and write the step's `with`
 object; the handler receives its template strings already rendered. Return `status: 'done'` with
 `structured` for a typed result, or `status: 'failed'` with a clear error. Provide an output schema
-when the result has a stable shape. See [Contributed step kinds](../workflows.md#contributed-step-kinds)
+when the result has a stable shape. See [Contributed step kinds](../workflows/step-kinds.md#contributed-step-kinds)
 for the full contract and the HTTP plugin for a working example.
 
 If the handler needs another plugin, declare that plugin in `requires.plugins` and its capability in

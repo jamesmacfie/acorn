@@ -114,7 +114,7 @@ type PendingAttachment = { frames: ServerMsg[] }
 //
 // It used to run for every session from the moment it was spawned, and then for as long as anybody
 // was attached. The desktop client now keeps a terminal tab attached from its first open until it is
-// closed (docs/terminal.md § Client), so "while attached" came to mean "for ever" for every tab
+// closed (docs/terminal/client.md § Client), so "while attached" came to mean "for ever" for every tab
 // anybody had opened, and a build in a tab on another task paid the node's parser for a screen no
 // attach would read.
 //
@@ -122,7 +122,7 @@ type PendingAttachment = { frames: ServerMsg[] }
 // than the ring is gone and an alternate-screen program whose state depends on older bytes redraws
 // from its next output. That is the right trade: a megabyte of output costs the node the ring's 1 to
 // 2 ms of CPU rather than the parser's 45 to 120 ms, and an attach pays a rebuild of 15 to 25 ms, once
-// per tab and again after a reconnect (docs/terminal.md § The screen, and who pays for it).
+// per tab and again after a reconnect (docs/terminal/sessions.md § The screen, and who pays for it).
 export class TerminalDisplay {
   private readonly live = new Set<TerminalDisplaySink>()
   private readonly attaching = new Map<TerminalDisplaySink, PendingAttachment>()

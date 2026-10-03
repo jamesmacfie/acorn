@@ -18,7 +18,7 @@ import type {
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
 import { isRecord } from '@acorn/plugin-api/node'
 
-// Caps: docs/integrations.md § Rollbar. Exported so tests assert against the same numbers.
+// Caps: docs/integrations/rollbar.md § Rollbar. Exported so tests assert against the same numbers.
 export const CAPS = {
   traceChains: 10,
   framesTotal: 200,

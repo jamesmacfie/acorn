@@ -38,7 +38,7 @@ Most of the Mods feature list has an acorn equivalent, built on the owner-declar
 | `ui.render` of a declared component | Remote trees drawn from the closed kit; `agents:tool-card` replaces the card for a named tool | [cooperative-extension-points.md](../plugins/cooperative-extension-points.md) |
 | `AbovePrompt`, status line | `agents:composer-actions`, `agents:session-header` | [cooperative-extension-points.md](../plugins/cooperative-extension-points.md) |
 | `prompt.submit` | `agents:before-send`, with observe, transform, and veto | [node-side-extension-points.md](../plugins/node-side-extension-points.md#hooks) |
-| `prompt.context`, `prompt.section` | Context sections and `core:before-snapshot` | [agent-tools.md](../agent-tools.md#context-sections) |
+| `prompt.context`, `prompt.section` | Context sections and `core:before-snapshot` | [agent-tools.md](../agent-tools/context-sections.md#context-sections) |
 | `tool.register` | Agent tool contributions | [agent-tools.md](../agent-tools.md) |
 | `tool.check` on acorn's own tools | `core:before-tool-call` | [node-side-extension-points.md](../plugins/node-side-extension-points.md#hooks) |
 | `$` as the only door, in a worker | The permission-scoped worker and its owner-bound context | [extensibility.md](../extensibility.md#the-node-half-is-isolated) |

@@ -31,10 +31,8 @@ The database plugin's pane talks to the user's own Postgres database, which isn'
 Core resolves the task's URL without storing it, from a `db_url_script` (gated by config trust when the
 repository authored it), then the worktree's `.env`, then the Node's `DATABASE_URL`. The pane shows
 what it reads from that database live, and keeps only saved queries and the scratch document in
-`database.sqlite`. AI query generation sends the introspected schema, capped at 80,000 characters by
-`SCHEMA_CHAR_CAP`, and the schema notes and example queries, capped at 16,000 by
-`GENERATE_MAX_CONTEXT_CHARS`, so together they stay under the model runtime's 100,000-character system
-prompt limit. [Database plugin](../database.md) owns the pane.
+`database.sqlite`. [The database pane](../database/pane.md) owns the pane and the AI generation
+caps.
 
 ## Opening a handle
 

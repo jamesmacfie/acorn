@@ -5,7 +5,7 @@ import { providerMetaLine, providerUsageRows } from './usageModel'
 import { usageMeterTone, usageTone } from '../sessions/stateTone'
 
 // What each harness's own plan has left, read off the provider's CLI rather than any acorn record
-// (docs/managed-agents.md § Plan usage). One list of `Facts` for every provider: a row that names it,
+// (docs/managed-agents/providers.md § Plan usage). One list of `Facts` for every provider: a row that names it,
 // with its health dot and whose account it is, then its numbers. It is drawn inside a popover, which is why it carries no pane chrome.
 export default function AgentUsageSection(props: { showHeader?: boolean }) {
   onMount(() => onCleanup(agentUsageStore.init()))

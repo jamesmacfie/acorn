@@ -1,6 +1,6 @@
 // What every region of the run pane shares: the task's runs, the selected run's nodes, the live
 // tail of each node, and the four things a person can do to a run
-// (docs/workflows.md § Routes and UI).
+// (docs/workflows/routes-and-ui.md § Routes and UI).
 //
 // Built once per task in the host's own root (client-core registries/panes/paneModels.ts), so the
 // three socket subscriptions below are opened once for the pane and not once per region.

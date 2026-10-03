@@ -1,6 +1,6 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // The editor's draft: a definition, a selection, and the operations that change them
-// (docs/workflows.md § Authoring).
+// (docs/workflows/authoring.md § Authoring).
 //
 // Pure, and deliberately so. Every rule that makes the editor pleasant — a rename that rewrites its
 // own references, a delete that never bridges, a connect that refuses a cycle — is a function from a

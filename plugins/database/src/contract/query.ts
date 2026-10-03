@@ -1,6 +1,6 @@
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 
-// One read of a repo's database, capped and read-only (docs/database.md § Workflow steps).
+// One read of a repo's database, capped and read-only (docs/database/palette-and-workflows.md § Workflow steps).
 //
 // It exists as a capability rather than as a function inside the plugin because two callers need the
 // same path: the `database:query` and `database:generate` workflow steps, and anything later that

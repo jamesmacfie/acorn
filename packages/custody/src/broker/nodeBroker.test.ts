@@ -483,7 +483,7 @@ describe('broker WebSocket', () => {
   // A `ws:shed` marker is the node saying "you were behind, so I dropped some invalidation frames".
   // Shed load, not lost data. Closing the socket here would re-attach every terminal and refetch every
   // active query at the moment the node is busiest, which is the amplification phase 5 removed
-  // (node-core/server/transport/wsHub.ts, docs/terminal.md § Backpressure).
+  // (node-core/server/transport/wsHub.ts, docs/terminal/activity.md § Backpressure).
   it('does not reset the socket on a shed marker, even one that skipped a number', async () => {
     const { origin, server } = await listen(false)
     let connections = 0

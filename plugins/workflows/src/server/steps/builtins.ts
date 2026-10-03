@@ -106,7 +106,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   return { stepKinds: kinds, policies }
 
   // What any step that runs an agent actually sends: its own prompt, then every incoming edge's
-  // output, then the task context block that carries the handoff trail (docs/workflows.md § What an
+  // output, then the task context block that carries the handoff trail (docs/workflows/agent-steps.md § What an
   // agent step sees). The outputs and the task context travel as context items, not as prompt text,
   // so the model reads them as information and the transcript shows only the prompt. Shared by all
   // four agent-running kinds, because the editor offers the Upstream output control on all four and

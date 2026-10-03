@@ -1,7 +1,7 @@
 import { createSignal, Index, Show } from 'solid-js'
 import { Button, Field, Icon, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
 
-// A `decide` step's branches: a verdict, and the step it takes (docs/workflows.md § Execution model).
+// A `decide` step's branches: a verdict, and the step it takes (docs/workflows/execution.md § Execution model).
 //
 // Not a `StepField`, because a field is one control and this is a list of pairs. The field vocabulary
 // stays closed on purpose and the two shapes it does not cover are drawn by the editor itself, here

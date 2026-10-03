@@ -1,4 +1,4 @@
-// The `notes` context section (docs/agent-tools.md § Context sections). The rows are this plugin's
+// The `notes` context section (docs/agent-tools/context-sections.md § Context sections). The rows are this plugin's
 // files, so its shape lives here rather than in core. Core keeps the assembly, the order and the
 // byte ceiling.
 import type { NoteAuthor, NoteScope } from '@acorn/protocol/notes.ts'

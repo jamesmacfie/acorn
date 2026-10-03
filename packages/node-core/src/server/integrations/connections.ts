@@ -169,7 +169,7 @@ export async function testConnection(db: AppDatabase, userId: string, id: string
   const row = await getConnection(db, userId, id)
   if (!row) throw new ProviderOperationError('provider_not_connected', 404)
   const provider = connectionProviderRegistry.require(row.provider)
-  // The provider's own "test connection" call runs inside the secret scope (docs/integrations.md §
+  // The provider's own "test connection" call runs inside the secret scope (docs/integrations/provider-boundaries.md §
   // Provider boundaries), so an echoed credential is scrubbed before it becomes `lastError` or a log
   // line.
   const health = await secrets

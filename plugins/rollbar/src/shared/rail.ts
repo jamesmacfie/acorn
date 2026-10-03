@@ -34,7 +34,7 @@ export function rollbarRailItem(item: RollbarItemSummary): PluginRailItem {
     task: {
       origin: 'rollbar',
       title: item.title.slice(0, 120),
-      // What a workflow started from this row is told about it (docs/workflows.md § Starting a run).
+      // What a workflow started from this row is told about it (docs/workflows/starting-runs.md § Starting a run).
       // Rollbar's list route carries no prose — an item's body is its stack trace, which is a second
       // call per row — so this is the facts the row already has, which is what an investigating agent
       // needs first anyway.

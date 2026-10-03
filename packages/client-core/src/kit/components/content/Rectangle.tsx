@@ -37,7 +37,7 @@ export function Rectangle(props: {
    * rectangle holds is expensive to build and expensive to throw away — an xterm carries a WebGL
    * context and a screen the node had to serialize — so a tab strip over several of them keeps them
    * all and hides the ones nobody is looking at, the same trade `Tabs.Panel` makes for scroll
-   * position (docs/terminal.md § Client).
+   * position (docs/terminal/client.md § Client).
    */
   hidden?: boolean
   children?: JSX.Element

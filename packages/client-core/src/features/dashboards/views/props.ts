@@ -7,7 +7,7 @@ import type { PanelTone, PanelView } from '../model'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
    *  layer runs once per panel, not once per view, which is what lets a person flip between views
-   *  without losing their filters (docs/dashboards.md § Views are derived, not chosen from a menu). */
+   *  without losing their filters (docs/dashboards/views.md § Views are derived, not chosen from a menu). */
 export type PanelViewProps = {
   view: PanelView
   /** The definition's id, for the one view that reads something keyed by it: a stat's history trend

@@ -43,7 +43,7 @@ describe('the context-section registry', () => {
   it('orders sections by the wire contract, not by registration order', () => {
     // Registered backwards: the assembled block's section order must not change when the plugin
     // list is reordered by domain, which is the trap `ready()` exists to catch elsewhere
-    // (docs/agent-tools.md § Context sections).
+    // (docs/agent-tools/context-sections.md § Context sections).
     registerContextSection('a', asContextSection(section('memory')))
     registerContextSection('a', asContextSection(section('notes')))
     registerContextSection('b', asContextSection(section('issues')))
@@ -57,7 +57,7 @@ describe('the context-section registry', () => {
     expect(getContextSections().map((s) => s.id)).toEqual(['memory', 'experimental'])
   })
 
-  // A new section can land between two existing ones (docs/agent-tools.md § Context sections);
+  // A new section can land between two existing ones (docs/agent-tools/context-sections.md § Context sections);
   // under the old hardcoded list it could only go last.
   it('lets a new section slot between two existing ones', () => {
     registerContextSection('a', asContextSection(section('pr')))

@@ -4,8 +4,8 @@ import type { AgentEventRecord, AgentUsage } from '../contract/wire.ts'
 //
 // A harness reports usage as a running snapshot rather than a delta: on this developer's database
 // `usage` is a quarter of every event ever recorded, about 58 rows a turn. The transcript has always
-// folded them into a single card (client/sessions/conversationItems.ts, and docs/managed-agents.md
-// "Usage folds the same way, one line per turn"), so every client was carrying 57 rows a turn it was
+// folded them into a single card (client/sessions/conversationItems.ts, and docs/managed-agents/transcript.md
+// § Usage lines), so every client was carrying 57 rows a turn it was
 // only ever going to throw away. The HTTP snapshot now folds them before it serialises.
 //
 // The durable ledger keeps every row. Pricing, the usage settings page, `exportSnapshot` and workflow

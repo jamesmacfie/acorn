@@ -388,7 +388,7 @@ export class NodeBroker {
     // load, not lost data: the node's hub takes a sequence number for the marker so there is normally
     // no gap at all, and where there is one, closing would be the wrong answer twice over — a reconnect
     // re-attaches every terminal and refetches every active query at the moment the node is busiest
-    // (docs/terminal.md § Backpressure). The frame is forwarded either way, and the renderer answers it
+    // (docs/terminal/activity.md § Backpressure). The frame is forwarded either way, and the renderer answers it
     // by marking what it is showing stale.
     const shed = (frame as { channel?: unknown }).channel === 'ws:shed'
     if (typeof seq === 'number') {

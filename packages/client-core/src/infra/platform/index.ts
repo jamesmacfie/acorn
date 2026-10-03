@@ -211,7 +211,7 @@ export type PluginTrustDecision = {
   schedules: PluginScheduleGrant[]
   // What this package will say, and possibly do, when a task is archived.
   taskChecks: PluginTaskCheckGrant[]
-  // What this package asks acorn to run as a managed agent (docs/managed-agents.md § Harnesses).
+  // What this package asks acorn to run as a managed agent (docs/managed-agents/harnesses.md § Harnesses).
   harnesses: PluginHarnessGrant[]
   // Task-scoped tools and bounded context carried by the installed manifest.
   agentTools: PluginAgentToolGrant[]

@@ -50,7 +50,7 @@ const snapshotRefreshTimers = new Map<string, ReturnType<typeof setTimeout>>()
 const deletedSessionIds = new Set<string>()
 // Per-session bookkeeping that used to be a scan of the whole event list on every streamed frame. A
 // long session holds a few thousand events and the node coalesces text deltas at 40 ms, so this ran
-// about 25 times a second against thousands of rows (docs/managed-agents.md § The transcript store).
+// about 25 times a second against thousands of rows (docs/managed-agents/transcript-store.md § The transcript store).
 const seenEventIds = new Map<string, Set<string>>()
 const usageLines = new Map<string, { at: number; turnId: string | null }>()
 // How far each held snapshot's event list is known to be whole: every seq at or below this one is in

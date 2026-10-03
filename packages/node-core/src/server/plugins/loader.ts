@@ -385,7 +385,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   if (!manifest.node) {
     // But it may still contribute to the node, as data. A managed agent harness and a custom agent are
     // the two kinds that need no route of their own and therefore no bundle at all
-    // (docs/managed-agents.md § Harnesses), and the point of that tier is that adding an agent costs one
+    // (docs/managed-agents/harnesses.md § Harnesses), and the point of that tier is that adding an agent costs one
     // manifest.
     //
     // It goes through the host as a real plugin with an empty `init`, rather than being delivered

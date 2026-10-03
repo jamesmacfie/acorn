@@ -2,7 +2,7 @@ import type { RestoreResult } from '@acorn/protocol/task.ts'
 import { confirmWillEvent } from '../../host/registries/shell/willPhase'
 import { taskBridge } from './taskBridge'
 
-// Restore an archived task (docs/workspaces-and-tasks.md § Restoring a task). The node rebuilds the
+// Restore an archived task (docs/workspaces-and-tasks/archive.md § Restoring a task). The node rebuilds the
 // worktree before it answers, so a failure here is one the owner has to act on. A deleted branch is
 // asked about, not assumed: restoring anyway puts the task on a new branch with none of its commits.
 //

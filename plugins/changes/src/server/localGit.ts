@@ -43,7 +43,7 @@ export const CHANGES_HOOKS = [
 //
 // `models` is here for one call, the generated commit message. The alternative was a second bridge
 // for one member, and the diff that feeds the prompt is read by this module anyway
-// (docs/integrations.md § Model providers).
+// (docs/integrations/model-providers.md § Model providers).
 //
 // `hooks` is the owner's half of the two points above. Optional so a test can build the bridge with no
 // host around it, and absent means nobody objects, which is also what an empty chain means.

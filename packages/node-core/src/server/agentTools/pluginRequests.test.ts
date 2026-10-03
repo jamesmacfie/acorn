@@ -11,7 +11,7 @@ import {
 
 // The one agent tool that can put third-party code on a node, and the thing worth asserting is what
 // it cannot do: every test below is a variation on "the tool raises a question, and only a device
-// answering it makes anything happen" (docs/agent-tools.md § plugin_request).
+// answering it makes anything happen" (docs/agent-tools/plugin-tools.md § plugin_request).
 
 const ctx = { taskId: 'task-1', userLogin: 'owner' }
 

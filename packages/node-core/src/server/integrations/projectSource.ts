@@ -1,5 +1,5 @@
 // Runs a provider's declared project source for core's own workspace-project picker. See
-// docs/integrations.md § Project sources and § Provider boundaries for the credential handling and
+// docs/integrations/project-sources.md § Project sources and § Provider boundaries for the credential handling and
 // caching rules this follows.
 import type { ProviderErrorCode } from '@acorn/protocol/integrations.ts'
 import { eq } from 'drizzle-orm'
@@ -19,13 +19,13 @@ const failure = (error: ProviderErrorCode, status: RouteFailure['status']): Rout
 })
 
 // Bounds a provider's claimed project list before any of it becomes a `workspace_external_projects`
-// row. See docs/integrations.md § Project sources for the limits and why they match the
+// row. See docs/integrations/project-sources.md § Project sources for the limits and why they match the
 // workspace-mapping write's own Zod bounds.
 export const PROVIDER_PROJECT_LIMITS = { maxProjects: 500, maxIdBytes: 200, maxLabelBytes: 200 } as const
 
 /**
  * A provider's claimed project list, bounded to what core will store and show. See
- * docs/integrations.md § Project sources for why an over-long or empty id is dropped rather than
+ * docs/integrations/project-sources.md § Project sources for why an over-long or empty id is dropped rather than
  * truncated.
  *
  * A label is display-only, so it is truncated rather than dropped, and falls back to the id when the
@@ -53,7 +53,7 @@ export function boundProviderProjects(raw: unknown): ProviderProject[] {
 
 /**
  * The projects one connection offers, or a typed failure for that connection. See
- * docs/integrations.md § Project sources for why this runs per connection rather than per provider.
+ * docs/integrations/project-sources.md § Project sources for why this runs per connection rather than per provider.
  */
 export async function listConnectionProjects(args: {
   db: AppDatabase

@@ -255,7 +255,7 @@ export async function resolveTaskCwd(
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
-    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks.md §
+    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks/worktrees.md §
     // Worktrees and setup: verify rather than assume before handing a persisted path back.
     if (!isProjectRoot) await adoptBranch(db, t, t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
@@ -354,7 +354,7 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
   return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
 }
 
-// Copy files into a fresh worktree (docs/workspaces-and-tasks.md § Worktrees and setup): read the
+// Copy files into a fresh worktree (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup): read the
 // config from the source checkout, since the entries are usually gitignored and only it has them.
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
 export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {

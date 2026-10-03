@@ -1,4 +1,4 @@
-// Branch-name normalisation for the task-create flow (docs/workspaces-and-tasks.md § Task creation and
+// Branch-name normalisation for the task-create flow (docs/workspaces-and-tasks/task-creation.md § Task creation and
 // navigation, after verne's slugify):
 // lowercase, [a-z0-9/-] only, collapse runs, trim edge separators, ≤ 60 chars. Pure and shared: the
 // renderer derives the default branch from the task title; main validates separately

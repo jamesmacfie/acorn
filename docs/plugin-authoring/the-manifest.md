@@ -125,8 +125,8 @@ host cannot draw.
 | `auditActions` | 8 | A verb you write onto the node's audit trail: `{ id, label }`. The host qualifies it as `<yourId>:<id>` and refuses a `ctx.audit.record` naming one you did not declare, so the trail stays enumerable. Record what a person reviewing this machine would want to see, not every call you make. |
 | `harnesses` | 4 | A managed agent acorn starts, drives and draws a transcript for: `{ id, label, glyph?, spawn, envPassthrough?, quirks?, probes?, terminal? }`. The only contribution that names a program acorn will run, and the only node-side one that needs no bundle at all. See [§ Harnesses](the-manifest.md#harnesses). |
 | `customAgents` | 8 | A saved start for a managed session, listed under New beside the harnesses: `{ id, name, glyph?, description?, harness, options?, instructions?, maxToolRisk? }`. Data only, and the trust prompt shows the instructions in full. See [§ Custom agents](the-manifest.md#custom-agents). |
-| `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
-| `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools.md#loaded-manifest-carriers). |
+| `agentTools` | 16 | A task-scoped agent tool projected through the ordinary registry: `{ id, description, inputSchema, risk, handler, scope?, requiresSession?, timeoutMs?, maxOutputBytes? }`. `handler` must be in your own `/v1/p/<id>/` namespace. The host qualifies the runtime name as `<pluginId>_<id>`, validates the bounded JSON Schema at install and validates every call again. See [Agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers). |
+| `contextSections` | 8 | Bounded reference data for the task prompt: `{ id, label, order, read, maxBytes, maxTokens, scope?, defaultIncluded?, timeoutMs? }`. `read` must be in your own namespace and answers the fixed host-owned response shape. See [Agent tools](../agent-tools/loaded-tools.md#loaded-manifest-carriers). |
 | `cliCommands` | 16 | Typed headless commands under `acorn plugin <id> <name>`. Each declares a name, title, summary, read/write risk, scope, required core capability, bounded object input/output schemas, and a relative `/cli/<name>` POST route. Writes also describe effects. See [CLI command authoring](./cli-commands.md). |
 
 A settings page takes three optional keys that say where it sits and what it affects:
@@ -398,7 +398,7 @@ speaks the [Agent Client Protocol](https://agentclientprotocol.com) is one manif
 acorn already owns everything downstream of the wire. That includes new-session defaults: whatever
 config options your harness advertises are remembered and re-applied to the owner's next session with
 no work on your side. For more information, see
-[New-session defaults](../managed-agents.md#new-session-defaults).
+[New-session defaults](../managed-agents/defaults.md#new-session-defaults).
 
 This is the whole plugin that adds OpenCode:
 
@@ -553,7 +553,7 @@ A custom agent is a harness with the settings, instructions, and tool access a s
 on. The owner makes their own under Settings > Custom agents, and a plugin can ship some. Each one is
 listed under **New** in the Agent pane and in the command palette, and another agent can start it by
 name through `agent_spawn`. For more information, see
-[Custom agents](../managed-agents.md#custom-agents).
+[Custom agents](../managed-agents/custom-agents.md#custom-agents).
 
 ```json
 {

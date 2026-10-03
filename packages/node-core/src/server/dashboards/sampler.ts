@@ -16,7 +16,7 @@ import { createLogger, describeError } from '../telemetry/logger'
 const log = createLogger('dashboards')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
-// than a row per panel, and docs/dashboards.md § Sampling and retention for what a pass does.
+// than a row per panel, and docs/dashboards/sampling.md § Sampling and retention for what a pass does.
 
 /** The prefs key the dashboards slice writes under (client-core/infra/persistence/prefKeys.ts § dashboards).
  *  An `app`-scoped slice is stored unqualified, so this is the whole key. It duplicates the client's
@@ -30,14 +30,14 @@ const MAX_PANELS_PER_PASS = 200
 
 export type SamplePassResult = {
   sampled: number
-  /** Panels skipped this pass, with the reason. See docs/dashboards.md § Sampling and retention for
+  /** Panels skipped this pass, with the reason. See docs/dashboards/sampling.md § Sampling and retention for
    *  why one unavailable source skips the whole panel. */
   skipped: { panelId: string; reason: string }[]
   reset: number
   overflow: number
 }
 
-/** The dashboards prefs blob as the node sees it. See docs/dashboards.md § Sampling and retention for
+/** The dashboards prefs blob as the node sees it. See docs/dashboards/sampling.md § Sampling and retention for
  *  why `null`, meaning no identity, no row yet, or an unparseable blob, must not read as "no panels
  *  exist". */
 export async function readDashboardPrefs(db: AppDatabase, env: Env): Promise<unknown | null> {
@@ -58,7 +58,7 @@ export async function readDashboardPrefs(db: AppDatabase, env: Env): Promise<unk
 }
 
 /** Which panels a pass samples: every definition asking for a history trend that is placed in at
- *  least one scope. See docs/dashboards.md § Sampling and retention for why an unplaced panel is
+ *  least one scope. See docs/dashboards/sampling.md § Sampling and retention for why an unplaced panel is
  *  skipped and what happens when it is placed again. */
 export function panelsToSample(prefs: unknown): PanelDefinition[] {
   const { panels, placements } = parsePanels(prefs)
@@ -66,7 +66,7 @@ export function panelsToSample(prefs: unknown): PanelDefinition[] {
   return Object.values(panels).filter((panel) => panel.view.trend === 'history' && placed.has(panel.id))
 }
 
-/** Every panel id the blob defines, for compaction's orphan sweep. See docs/dashboards.md § Sampling
+/** Every panel id the blob defines, for compaction's orphan sweep. See docs/dashboards/sampling.md § Sampling
  *  and retention for why placement is irrelevant here. */
 export function definedPanelIds(prefs: unknown): Set<string> {
   return new Set(Object.keys(parsePanels(prefs).panels))

@@ -15,7 +15,7 @@ import {
 } from './concurrencyClient'
 
 // Settings → Agents → Limits and cost, its first section: the two ceilings the turn dispatcher counts
-// against (docs/managed-agents.md § Operations and failure). Each field saves on its own, on blur or
+// against (docs/managed-agents/operations.md § Operations and failure). Each field saves on its own, on blur or
 // Enter, with the other ceiling as stored. The section matches the one `../index.ts` declares for
 // search; ./AgentLimitsSettings.tsx puts it on the page.
 export default function AgentConcurrencySettings() {

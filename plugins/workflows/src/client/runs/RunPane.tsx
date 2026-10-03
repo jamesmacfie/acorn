@@ -9,7 +9,7 @@ import { formatUsage, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, st
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
-// order and the same indentation the editor draws (docs/workflows.md § Routes and UI).
+// order and the same indentation the editor draws (docs/workflows/routes-and-ui.md § Routes and UI).
 //
 // Two `Rows` collections rather than one, because they answer different questions and the arrows
 // should not walk from a run into a step. Each is the kit's, so the keyboard, the type-ahead and the

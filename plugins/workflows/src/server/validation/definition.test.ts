@@ -3,7 +3,7 @@ import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '.
 import { parseWorkflowJsonPointer, renderWith, resolveWorkflowInputs, validateWorkflow, workflowEdges, type WorkflowValidationCatalog } from './definition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
-// The graph rules `after` brought with it (docs/workflows.md § Execution model). The parser is tested
+// The graph rules `after` brought with it (docs/workflows/execution.md § Execution model). The parser is tested
 // in apps/node/test/integration/plugins/workflowFiles.test.ts and the runner beside it.
 
 const catalog: WorkflowValidationCatalog = {

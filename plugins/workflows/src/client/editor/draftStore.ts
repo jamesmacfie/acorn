@@ -1,5 +1,5 @@
 // The editor's state around one open definition: the draft, its history, what the node says about it,
-// and the four writes (docs/workflows.md § Authoring).
+// and the four writes (docs/workflows/authoring.md § Authoring).
 //
 // The rules are next door and pure (./draft.ts). What is here is everything reactive: the load, the
 // catalog and provider reads the inspector draws from, the debounced validate, the dirty flag, and the

@@ -75,7 +75,7 @@ independent root child run without running the source query again.
 ## Definitions
 
 Definitions stored as rows live under `/defs`, and the whole family is device-only
-([workflows.md](../workflows.md#database-definitions)):
+([workflows.md](../workflows/definitions.md#database-definitions)):
 
 | Route | Body or query | Answer |
 | --- | --- | --- |

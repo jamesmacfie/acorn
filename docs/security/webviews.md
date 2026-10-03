@@ -45,4 +45,4 @@ Screenshots are rows in the plugin's own database, keyed to the task, and served
 the capture's task against the principal: a task token reads only its own captures, and device and
 service principals read across tasks. A foreign or unknown id gets the same empty 404. Browser context
 allocation and page diagnostics have resource budgets of their own
-([browser tools](../agent-tools.md#browser-tools)).
+([browser tools](../agent-tools/browser-and-scripts.md#browser-tools)).

@@ -106,12 +106,12 @@ export default function TabRail() {
   // A workspace switch mid-modal would repopulate the <select> while newRepo() stays on the repo
   // already selected, and the task lands in the wrong workspace.
   const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
-  // Custom branch name (docs/workspaces-and-tasks.md § Task creation and navigation). Defaults to
+  // Custom branch name (docs/workspaces-and-tasks/task-creation.md § Task creation and navigation). Defaults to
   // a slug of the title until the user edits the field, then their value wins.
   const [branchText, setBranchText] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
   const [baseChoice, setBaseChoice] = createSignal<{ projectId: string; branch: string } | null>(null)
-  // Where a git task's files come from, one tab each (docs/workspaces-and-tasks.md § Task creation and
+  // Where a git task's files come from, one tab each (docs/workspaces-and-tasks/task-creation.md § Task creation and
   // navigation). `folder` opts out of the branch entirely: the task runs in the project folder on
   // whatever is already checked out, no worktree. `worktree` adopts a linked worktree git already
   // has. Non-git projects are always `folder`, so the tabs only show for git.
@@ -419,7 +419,7 @@ export default function TabRail() {
 
   // Archive confirm and error use the same modal shell as create and rename, because the webview
   // has no window.prompt. With the bridge present the archive runs through the guarded teardown
-  // flow (docs/workspaces-and-tasks.md § Worktrees and setup); the plain HTTP flip is only for the
+  // flow (docs/workspaces-and-tasks/archive.md § Archive a task); the plain HTTP flip is only for the
   // browser dev build.
   const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')

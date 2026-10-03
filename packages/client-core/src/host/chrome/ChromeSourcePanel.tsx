@@ -417,7 +417,7 @@ export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
       </Show>
     )}
     >
-      {/* The user's own dashboard, beside this source's list (docs/dashboards.md § Placements). Only
+      {/* The user's own dashboard, beside this source's list (docs/dashboards/placements.md § Placements). Only
           one of the two can be present: the manifest refuses a source that both reserves a region and
           navigates to a project surface.
 

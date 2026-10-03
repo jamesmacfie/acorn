@@ -1,6 +1,6 @@
 // How a tool call's disclosure starts out in a transcript, and where that answer is stored. One JSON
 // pref (agent_tool_fold) read from the prefs query and written through saveJsonPref, the same shape
-// the docker plugin uses for its own (docs/managed-agents.md § Tool call display).
+// the docker plugin uses for its own (docs/managed-agents/defaults.md § Tool call display).
 import { createContext, useContext } from 'solid-js'
 import type { QueryClient } from '@tanstack/solid-query'
 import { z } from 'zod'

@@ -427,7 +427,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           return runner.retryStep(runId, stepId, prompt)
         },
-        // The chip the agent pane draws over a workflow session (docs/managed-agents.md § Sessions).
+        // The chip the agent pane draws over a workflow session (docs/managed-agents/sessions.md § Sessions).
         // Two indexed reads rather than a join, because the session row is in another plugin's
         // database and this one only holds the id.
         runForSession: async (sessionId) => {
@@ -438,7 +438,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
       })
 
-      // The second store a definition can live in (docs/workflows.md § Database definitions). Every
+      // The second store a definition can live in (docs/workflows/definitions.md § Database definitions). Every
       // route behind it is device-only, because a row is executable configuration with no committed
       // bytes for the trust snapshot to hash.
       const draftQueries = workflowDraftQueries(store, (scope, id, consumer, remove) => {
@@ -502,7 +502,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
         // A row, or a committed file the editor opens read-only. The merged list carries a summary of
         // each definition and the editor needs the whole thing, so a file id resolves here rather than
-        // fattening every list read (docs/workflows.md § Authoring).
+        // fattening every list read (docs/workflows/authoring.md § Authoring).
         get: async (id, projectId) => {
           const file = /^(repo|user):(.+)$/.exec(id)
           if (!file) {

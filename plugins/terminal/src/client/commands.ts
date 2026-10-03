@@ -15,7 +15,7 @@ import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
 import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 
 // The three things this plugin knows about the open task: what it can run, how it can be laid out, and
-// which terminals are alive in it (docs/terminal.md § From the command palette).
+// which terminals are alive in it (docs/terminal/run-targets.md § From the command palette).
 //
 // These were a `paletteRows` source until 2026-09-03 — a second contribution vocabulary with `rows` and
 // `invoke`, fetched when the palette opened whatever the reader was after, and merged into the root

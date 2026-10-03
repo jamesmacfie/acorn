@@ -144,7 +144,7 @@ async function viaModels<T>(c: Context<AppEnv>, fn: (bridge: LocalGitBridge, use
     if (error instanceof BridgeError) return respondError(c, error.status, error.code, error.message ? [error.message] : undefined)
     if (isProviderOperationError(error)) return respondError(c, error.status, error.code)
     // Anything else is flattened, as core does for its own provider calls: an upstream exception
-    // message can quote a URL or a response body (docs/integrations.md § Provider boundaries).
+    // message can quote a URL or a response body (docs/integrations/provider-boundaries.md § Provider boundaries).
     return respondError(c, 502, 'provider_unavailable')
   }
 }

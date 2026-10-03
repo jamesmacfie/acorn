@@ -46,7 +46,7 @@ export type WorkflowBridge = {
   kill(runId: string, stepId: string): Promise<{ ok: boolean }>
   retry(runId: string, stepId: string, prompt?: string): Promise<{ ok: boolean; error?: string }>
   // The run and step behind a managed agent session, for the chip the agent pane draws over one
-  // (docs/managed-agents.md § Sessions). `null` when the session was not started by a run.
+  // (docs/managed-agents/sessions.md § Sessions). `null` when the session was not started by a run.
   runForSession(sessionId: string): Promise<{ run: unknown; step: unknown } | null>
   // Every run on this node, for the merged run list (@acorn/protocol/runs.ts). Node-wide by
   // construction; core filters it for a confined caller, so this must not.

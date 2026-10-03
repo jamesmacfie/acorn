@@ -111,7 +111,7 @@ ctx.events.worktreeStatus(taskId)
 ```
 
 The order matters. The announcement is what makes every client re-read, and they must not be handed
-the answer from before your write. See [Worktree status reads](../workspaces-and-tasks.md#worktree-status-reads).
+the answer from before your write. See [Worktree status reads](../workspaces-and-tasks/worktrees.md#worktree-status-reads).
 
 **Hearing another plugin.** The same `on` takes `plugin:<id>:<verb>` when the producer declared the
 verb: a loaded plugin under a top-level `emits` key in its manifest, a built-in through

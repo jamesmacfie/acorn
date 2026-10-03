@@ -186,7 +186,7 @@ describe('TerminalDisplay', () => {
   })
 })
 
-// The emulator is a consequence of restoring a screen (docs/terminal.md § The screen, and who pays
+// The emulator is a consequence of restoring a screen (docs/terminal/sessions.md § The screen, and who pays
 // for it).
 describe('TerminalDisplay emulates only while an attach is restoring', () => {
   it('builds no emulator for a session nobody has attached to', () => {

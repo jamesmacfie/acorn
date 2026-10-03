@@ -112,9 +112,9 @@ export const launchCommandLine = (command: string, launchArgs: string[] = []): s
 export const parseTmuxSessions = (stdout: string): Set<string> =>
   new Set(stdout.split('\n').map((l) => l.trim()).filter((l) => l.startsWith(TMUX_PREFIX)))
 
-// Idle threshold (docs/terminal.md § Activity and status).
+// Idle threshold (docs/terminal/activity.md § Activity and status).
 export const IDLE_MS = 10_000
-// First-idle threshold, shorter than IDLE_MS (docs/terminal.md § Activity and status).
+// First-idle threshold, shorter than IDLE_MS (docs/terminal/activity.md § Activity and status).
 export const FIRST_IDLE_MS = 3_000
 export const computeIdle = (
   kind: 'shell' | 'agent',
@@ -150,11 +150,11 @@ export function matchBlockedPrompt(ringTail: string): boolean {
   if (!lines.length) return false
   const tail = lines.join('\n')
   if (BLOCKED_PATTERNS.some((re) => re.test(tail))) return true
-  // Trailing '?' rule (docs/terminal.md § Activity and status).
+  // Trailing '?' rule (docs/terminal/activity.md § Activity and status).
   return /\?\s*$/.test(lines[lines.length - 1])
 }
 
-// Wraps text as one bracketed-paste block (docs/terminal.md § Sending text to an agent).
+// Wraps text as one bracketed-paste block (docs/terminal/activity.md § Sending text to an agent).
 // Strips stray paste markers first, because a payload containing ESC[201~ would end the paste early,
 // and trims trailing whitespace so the caller's '\r' is the only terminator.
 export const PASTE_BEGIN = '\x1b[200~'

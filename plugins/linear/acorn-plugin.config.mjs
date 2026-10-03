@@ -149,7 +149,7 @@ export default {
       action: { verb: 'openPane', pane: 'linear' },
     }, {
       // The routed project's mapped Linear issues, searched from the palette
-      // (docs/integrations.md § From the command palette).
+      // (docs/integrations/linear.md § Palette search).
       //
       // `scope: 'project'` is the whole boundary: the host sends the project the palette session
       // captured, the route turns it into the workspace's Linear links, and a connection the routed

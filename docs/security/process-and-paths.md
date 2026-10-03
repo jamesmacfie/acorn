@@ -86,7 +86,7 @@ only. Task listing and cleanup work out association without those hints.
   root's. The resolved graph and limits are persisted, so restart recovery can't gain authority from
   an edited definition. Cancellation closes admission before it stops descendants.
 
-[workflows.md](../workflows.md#database-definitions) owns the definition model.
+[workflows.md](../workflows/definitions.md#database-definitions) owns the definition model.
 
 ## Docker, URLs, and Git
 

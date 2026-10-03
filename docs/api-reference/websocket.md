@@ -90,7 +90,7 @@ both ends. Core sends `term:`, `workflow:`, and `ws:` frames and the eleven even
 invalidations are `plugin:workflows:run-changed`, `plugin:workflows:gate-changed`, and
 `plugin:workflows:child-changed`. The child frame uses `ownerTaskId` to reach the parent's surface.
 `ws:shed` is the hub saying it dropped frames because a socket fell too far behind
-([backpressure](../terminal.md#backpressure)).
+([backpressure](../terminal/activity.md#backpressure)).
 
 The eleven Node events each say that something the Node owns has moved:
 

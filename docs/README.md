@@ -83,10 +83,9 @@ the whole plugin system in one page.
 | [features.md](./features.md) | The shipped product surfaces, one line each. |
 | [workspaces-and-tasks.md](./workspaces-and-tasks.md) | The product model: workspaces, projects, tasks, and worktrees. |
 | [managed-agents.md](./managed-agents.md) | Agent sessions acorn drives: the ledger, harnesses, managed delegation, approvals, artifacts, and usage. |
-| [managed-agents/client-surfaces.md](./managed-agents/client-surfaces.md) | Agent Center, task panes, transcript storage, and search. |
 | [terminal.md](./terminal.md) | The terminal drawer: raw PTY sessions, run targets, and provider profiles. |
 | [agent-tools.md](./agent-tools.md) | Agent tool contributions, permissions, the MCP projection, and managed-session orchestration. |
-| [dashboards.md](./dashboards.md) | User-composed panels over typed record collections. |
+| [dashboards.md](./dashboards.md) | Published dashboard panels over typed data sources, placements, and measure history. |
 | [integrations.md](./integrations.md) | Connections, providers, the external-item store, and project links. |
 | [data-sources.md](./data-sources.md) | Typed source registration, scoped invocation, completeness, and client query caching. |
 | [github-integration.md](./github-integration.md) | Pull requests, reviews, checks, the mirror, and the importer. |
@@ -94,10 +93,8 @@ the whole plugin system in one page.
 | [schedules/plugin-schedules.md](./schedules/plugin-schedules.md) | How a plugin declares a schedule, overrides, lifecycle, and trust. |
 | [schedules/user-schedules.md](./schedules/user-schedules.md) | User schedule targets, consent, workflow schedules, routes, and Settings. |
 | [workflows.md](./workflows.md) | Declarative orchestration: runs, gates, budgets, branching, joins, the two stores a definition lives in, the editor that writes one, and the pane a run is watched in. |
-| [workflows/execution.md](./workflows/execution.md) | Workflow graph execution, retries, recovery, and child tasks. |
-| [workflows/authoring.md](./workflows/authoring.md) | Workflow editor, scheduling, generation, drafts, and publication. |
 | [notes-and-memory.md](./notes-and-memory.md) | Task notes, direct memory writes, standing context, and Undo. |
-| [http-client.md](./http-client.md) | The HTTP request pane and the outbound-request gap. |
+| [http-client.md](./http-client.md) | The HTTP request pane, sending, and the workflow step. |
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |
 | [database.md](./database.md) | The database plugin: the Postgres browser and SQL editor. |
 | [mcp.md](./mcp.md) | The MCP server: a stdio child that calls the node over loopback. |
@@ -214,6 +211,75 @@ Each landing page in the tables above has topic pages in a folder of the same na
   [Terminal sources and settings](./tui/sources-and-settings.md),
   [Terminal client tests](./tui/tests.md), [Terminal dialogs and rectangles](./tui/traps.md),
   [Terminal typing](./tui/typing.md).
+
+## Feature topic pages
+
+Each feature landing page above has topic pages in a folder of the same name:
+
+- [workspaces-and-tasks.md](./workspaces-and-tasks.md): [Archive and
+  restore](./workspaces-and-tasks/archive.md), [Project
+  configuration](./workspaces-and-tasks/project-config.md), [Projects and
+  workspaces](./workspaces-and-tasks/projects.md), [Task creation and
+  navigation](./workspaces-and-tasks/task-creation.md), [Task script
+  results](./workspaces-and-tasks/task-scripts.md), [Worktrees and
+  setup](./workspaces-and-tasks/worktrees.md).
+- [managed-agents.md](./managed-agents.md): [Web activity and file
+  changes](./managed-agents/activity.md), [App-access approval](./managed-agents/app-access.md),
+  [Context, files, and attachments](./managed-agents/attachments.md), [Client
+  surfaces](./managed-agents/client-surfaces.md), [The composer](./managed-agents/composer.md),
+  [Custom agents](./managed-agents/custom-agents.md), [New-session
+  defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),
+  [Harnesses](./managed-agents/harnesses.md), [Archived agent
+  history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md),
+  [From the command palette](./managed-agents/palette.md), [Providers and plan
+  usage](./managed-agents/providers.md), [Session events and
+  waits](./managed-agents/session-events.md), [Sessions](./managed-agents/sessions.md),
+  [Subagents](./managed-agents/subagents.md), [Transcript
+  search](./managed-agents/transcript-search.md), [The transcript
+  store](./managed-agents/transcript-store.md), [The transcript](./managed-agents/transcript.md).
+- [terminal.md](./terminal.md): [Activity and delivery](./terminal/activity.md), [The terminal
+  drawer](./terminal/client.md), [Run targets](./terminal/run-targets.md), [Terminal
+  sessions](./terminal/sessions.md).
+- [agent-tools.md](./agent-tools.md): [Browser and task script
+  tools](./agent-tools/browser-and-scripts.md), [Context
+  sections](./agent-tools/context-sections.md), [Loaded tools and context
+  sections](./agent-tools/loaded-tools.md), [Managed-session
+  orchestration](./agent-tools/orchestration.md), [Plugin tools](./agent-tools/plugin-tools.md),
+  [Tracker and GitHub tools](./agent-tools/tracker-tools.md).
+- [dashboards.md](./dashboards.md): [Mapping and the editor](./dashboards/mapping-and-editor.md),
+  [Panels](./dashboards/panels.md), [Placements](./dashboards/placements.md), [Sampling and
+  retention](./dashboards/sampling.md), [Views and trends](./dashboards/views.md).
+- [integrations.md](./integrations.md): [Connection and integration
+  contributions](./integrations/contributions.md), [Linear](./integrations/linear.md), [Model
+  providers](./integrations/model-providers.md), [Project
+  sources](./integrations/project-sources.md), [Provider
+  boundaries](./integrations/provider-boundaries.md), [Rollbar](./integrations/rollbar.md),
+  [Sentry](./integrations/sentry.md), [Connection settings](./integrations/settings.md).
+- [data-sources.md](./data-sources.md): [Data source authoring
+  controls](./data-sources/authoring-controls.md), [Provider data
+  sources](./data-sources/provider-sources.md), [Workspace query
+  library](./data-sources/query-library.md).
+- [github-integration.md](./github-integration.md): [The GitHub
+  mirror](./github-integration/mirror.md), [GitHub from the command
+  palette](./github-integration/palette.md), [Reads and
+  writes](./github-integration/reads-and-writes.md), [GitHub
+  surfaces](./github-integration/surfaces.md), [Tasks and
+  references](./github-integration/tasks-and-references.md).
+- [workflows.md](./workflows.md): [Agent steps](./workflows/agent-steps.md), [AI
+  authoring](./workflows/ai-authoring.md), [Workflow authoring](./workflows/authoring.md), [Running
+  child workflows](./workflows/child-runs.md), [Workflow definitions](./workflows/definitions.md),
+  [Editor details](./workflows/editor-details.md), [Workflow execution](./workflows/execution.md),
+  [File drafts and portable export](./workflows/file-drafts.md), [Record processing
+  history](./workflows/record-history.md), [What workflows refuses](./workflows/refusals.md),
+  [Workflow routes and UI](./workflows/routes-and-ui.md), [Scheduled
+  roots](./workflows/scheduled-roots.md), [Starting runs](./workflows/starting-runs.md),
+  [Contributed step kinds](./workflows/step-kinds.md), [Typed data and
+  conditions](./workflows/typed-data.md).
+- [notes-and-memory.md](./notes-and-memory.md): [The Memory
+  page](./notes-and-memory/memory-page.md).
+- [http-client.md](./http-client.md): [HTTP client surfaces](./http-client/client.md).
+- [database.md](./database.md): [Database commands and workflow
+  steps](./database/palette-and-workflows.md), [The database pane](./database/pane.md).
 
 ## Subfolders
 

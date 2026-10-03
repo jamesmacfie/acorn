@@ -61,7 +61,7 @@ describe('the workflows plugin catalogue', () => {
     expect(run.minQueryLength).toBe(0)
   })
 
-  // "Find a run" waited for somewhere to open one (docs/workflows.md § The run pane).
+  // "Find a run" waited for somewhere to open one (docs/workflows/routes-and-ui.md § The run pane).
   it('lists this task\'s runs and opens the one that was picked', async () => {
     mocks.runs.mockResolvedValue([
       { id: 'run-2', name: 'Investigate an issue', status: 'running', createdAt: Date.now() },

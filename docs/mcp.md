@@ -59,8 +59,8 @@ which is denied by default.
 
 The task script tools use the launch token's task, so no input can name another task, and they never
 start a script. Check status and wait on setup before work that depends on it. A wait timeout leaves the
-script running ([task script tools](./agent-tools.md#task-script-tools),
-[durable results](./workspaces-and-tasks.md#durable-task-script-results)).
+script running ([task script tools](./agent-tools/browser-and-scripts.md#task-script-tools),
+[durable results](./workspaces-and-tasks/task-scripts.md#durable-task-script-results)).
 
 The server returns structured results for absent task context, unavailable optional plugins, and provider
 errors. It never returns device tokens, provider credentials, raw secret fields, or database handles.

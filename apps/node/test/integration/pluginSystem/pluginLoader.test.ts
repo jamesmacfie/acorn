@@ -149,7 +149,7 @@ describe('loading rollbar from disk', () => {
             origin: 'rollbar',
             title: 'Checkout failed',
             // The seed text a workflow started from this row reads
-            // (docs/workflows.md § Starting a run).
+            // (docs/workflows/starting-runs.md § Starting a run).
             body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',
             link: {
               connectionId: 'rollbar-production', identifier: '142',

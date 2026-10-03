@@ -97,7 +97,7 @@ export type PullFile = {
 // has is stated here rather than guessed from its length.
 export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness }
 // The diff route's answer: the pull's files as a segmented document, with no patch text in it, and
-// whether that is every file GitHub has (docs/github-integration.md § Diff documents).
+// whether that is every file GitHub has (docs/github-integration/mirror.md § Diff documents).
 export type PullDiffResponse = { document: DiffDocumentTopology; completeness: PullTopologyCompleteness }
 // A batch of segments by patch digest and ordinal, from a pull's document or a compare preview's.
 export type DiffSegmentsBody = { requests: DiffSegmentRequest[] }

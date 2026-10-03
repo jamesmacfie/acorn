@@ -122,7 +122,7 @@ describe('linear provider normalization', () => {
   })
 })
 
-// Core asks every connected workspace in turn (docs/agent-tools.md § issue_detail), so the three
+// Core asks every connected workspace in turn (docs/agent-tools/tracker-tools.md § issue_detail), so the three
 // answers this has to keep apart are "here it is", "not in this one", and "this one refused".
 describe('linear item detail', () => {
   const detailFor = (result: unknown) => linearProvider.detail!({ resource: async () => result } as never, 'ENG-42')

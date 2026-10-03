@@ -23,7 +23,7 @@ const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'm
 //
 // The PR recogniser declares `providerId: 'github'` so a click can open the reference panel
 // (./PullRefPanel.tsx). The repo recogniser declares none, because a repository is a list rather than
-// a card (docs/github-integration.md § Content links).
+// a card (docs/github-integration/tasks-and-references.md § Content links).
 export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
@@ -58,7 +58,7 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 // owner/name to the project acorn tracks it as. Null means an untracked repo, which is a normal
 // answer: `makeContentLinkHandler` below falls through to the browser for that case.
 //
-// Compared case-insensitively (docs/github-integration.md § Content links). GitHub treats owner and
+// Compared case-insensitively (docs/github-integration/tasks-and-references.md § Content links). GitHub treats owner and
 // repo names as case-insensitive, and the URL's casing does not match `projects.github_owner`.
 const eq = (a: unknown, b: unknown): boolean => str(a).toLowerCase() === str(b).toLowerCase()
 

@@ -3,7 +3,7 @@ import { parseWorkflowToml } from './files'
 import { uniqueWorkflowSlug, workflowSlug, writeWorkflowToml } from './toml'
 
 // The writer's contract is a round trip, not a shape: whatever the loader read out of a file, writing
-// it and reading it again must give the same definition back (docs/workflows.md § Database
+// it and reading it again must give the same definition back (docs/workflows/definitions.md § Database
 // definitions). Anything the writer forgets to spell shows up here as a missing field.
 
 const roundTrip = (text: string) => {

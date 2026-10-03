@@ -11,7 +11,7 @@ import { writeAgentConcurrency } from '../concurrencyStore'
 import { writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import { ManagedAgentRuntime } from './runtime'
 
-// The idle sweep (docs/managed-agents.md § Operations and failure). Each case calls the sweep with a
+// The idle sweep (docs/managed-agents/operations.md § Operations and failure). Each case calls the sweep with a
 // clock past the limit rather than waiting for its timer, except the one that checks the timer itself.
 
 const MINUTE = 60_000

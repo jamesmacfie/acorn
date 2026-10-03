@@ -29,7 +29,7 @@ export const coreSourceContributions: SourceContribution[] = [
     component: FleetHome,
   },
   // Last in the rail: somewhere to look for finished work, not somewhere to work
-  // (docs/workspaces-and-tasks.md § Restoring a task).
+  // (docs/workspaces-and-tasks/archive.md § Restoring a task).
   {
     id: 'archive',
     order: 90,

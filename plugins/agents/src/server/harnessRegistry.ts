@@ -1,5 +1,5 @@
 // The consuming half of the harness seam: what plugins/agents does with a harness another plugin's
-// manifest declared. See docs/managed-agents.md § Harnesses.
+// manifest declared. See docs/managed-agents/harnesses.md § Harnesses.
 //
 // The host already minted the runtime id, resolved the adapter entry inside the plugin's package, and
 // turned each probe route into a call (node-core/server/pluginHost/harnesses.ts). What is left is the

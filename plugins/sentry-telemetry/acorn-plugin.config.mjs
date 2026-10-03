@@ -7,7 +7,7 @@
 // reserved for the integration that reads Sentry issues into the rail, which has the Rollbar shape:
 // an organisation token, mirrored items, a pane and a source. This one has a DSN and writes. Two
 // plugins, two credentials, two reasons to install, and both carry the Sentry mark in Settings
-// (docs/integrations.md § Sentry).
+// (docs/integrations/sentry.md § Sentry).
 //
 // On the permissions:
 //

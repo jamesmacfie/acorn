@@ -116,7 +116,7 @@ export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/k
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a
-// rendering, so both hosts share it (docs/managed-agents/client-surfaces.md § Client surfaces).
+// rendering, so both hosts share it (docs/managed-agents/transcript.md § The window).
 export { createTimelineWindow } from '@acorn/client-core/kit/lib'
 export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export { Facts } from '@acorn/client-core/kit/components/content'
@@ -142,7 +142,7 @@ export { Rectangle } from '@acorn/client-core/kit/components/content'
 // and for `pty` the DOM used to keep only half of it: three plugins each built their own xterm on the
 // element it handed back. The caller now says what the channel is — open at a size, bytes in, bytes
 // out — and the host draws the emulator, which is what let the editor handoff and docker exec cross to
-// a terminal (docs/terminal.md § Client).
+// a terminal (docs/terminal/client.md § Client).
 export { attachPty } from '@acorn/client-core/features/terminal/attachPty.ts'
 export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
 

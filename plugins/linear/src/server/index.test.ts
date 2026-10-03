@@ -27,7 +27,7 @@ describe('linear server helpers', () => {
 
   // A mapped id is either a Linear project or, prefixed, a Linear team: an issue belongs to one team
   // and may belong to no project, so a team-only workspace has nothing to map otherwise
-  // (docs/integrations.md § Linear).
+  // (docs/integrations/linear.md § Linear).
   it('scopes mapped ids by project, by team, or by either', () => {
     expect(projectIssuesFilter([linearTeamScopeId('t-1'), linearTeamScopeId('t-2')])).toEqual({
       team: { id: { in: ['t-1', 't-2'] } },
@@ -45,7 +45,7 @@ describe('linear server helpers', () => {
   })
 
   // The palette's filter is the rail's filter ANDed with the typed word, so it reads "in this scope,
-  // still active, and matching one of these" (docs/integrations.md § From the command palette).
+  // still active, and matching one of these" (docs/integrations/linear.md § Palette search).
   it('narrows the mapped-scope filter by what somebody typed', () => {
     const typed = (ids: string[], query: string) =>
       (projectIssueSearchFilter(ids, query).and as Record<string, unknown>[])[1].or

@@ -1,5 +1,5 @@
 // A harness as data: everything the generic ACP driver needs to start an agent and describe it.
-// See docs/managed-agents.md § Harnesses for the two driver tiers and which one a new agent belongs in.
+// See docs/managed-agents/harnesses.md § Harnesses for the two driver tiers and which one a new agent belongs in.
 //
 // The internal shape. Its data-only twin is the `harnesses` manifest contribution
 // (@acorn/protocol/plugin/contract.ts), which the delivery seam converts into one of these. They differ
@@ -57,7 +57,7 @@ export type HarnessLaunchSpec = {
   acpSessionMeta?: (session: AgentSession) => Record<string, unknown>
   /** Built-in only. Set when `acpSessionMeta` puts a custom agent's instructions in the system prompt.
    *  Without it the generic driver sends them as a context block ahead of the first prompt of every
-   *  provider session it creates, which a compaction can later drop (docs/managed-agents.md § Custom
+   *  provider session it creates, which a compaction can later drop (docs/managed-agents/custom-agents.md § Custom
    *  agents). */
   systemPromptInstructions?: true
   quirks?: HarnessQuirks

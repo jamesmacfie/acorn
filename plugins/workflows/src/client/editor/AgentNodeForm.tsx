@@ -5,7 +5,7 @@ import type { WorkflowCatalog, WorkflowStepDef } from '../../shared/workflowCont
 
 // The fields every agent-running kind takes, whoever contributed it: the harness, whatever options
 // that harness advertises, where it runs, and what it does with its upstreams
-// (docs/workflows.md § Authoring).
+// (docs/workflows/authoring.md § Authoring).
 //
 // They are not in any kind's `describe`, on purpose. A plugin contributing a kind that runs an agent
 // should not have to restate the model list, and the model list is not the plugin's to state: each

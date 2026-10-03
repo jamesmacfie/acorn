@@ -43,7 +43,7 @@ export function registerBuiltInProfiles(): void {
   builtInProfileDisposables = [claudeCodeProfile, codexProfile, aiderProfile].map((profile) => agentProfileRegistry.register(profile))
 }
 
-// The two built-in harnesses, one per tier. See docs/managed-agents.md § Harnesses. Claude is a launch
+// The two built-in harnesses, one per tier. See docs/managed-agents/harnesses.md § Harnesses. Claude is a launch
 // spec run by the shared generic driver. Codex keeps a native driver, because its app-server carries
 // fork, compaction, archive, and delete, and ACP expresses none of them.
 //
@@ -212,7 +212,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         },
       })
       // Archiving a task stops its provider processes, because otherwise they live until the node exits
-      // (docs/managed-agents.md § Operations and failure). A handler on core's hook rather than a task
+      // (docs/managed-agents/operations.md § Operations and failure). A handler on core's hook rather than a task
       // check, because a check's cleanup runs only if the client asks for it. `transform` so core
       // waits for the stop before it removes the worktree. The payload comes back untouched.
       ctx.hooks.handle('core:task-archiving', {
@@ -256,7 +256,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         setPricing: (userId, preferences) => writeAgentPricingPreferences(core.prefs, userId, preferences),
         concurrency: (userId) => readAgentConcurrency(core.prefs, userId),
         // Drained straight after the write: raising a ceiling has to start the turns it just admitted,
-        // and the dispatcher runs on events, not on a timer (docs/managed-agents.md § Operations).
+        // and the dispatcher runs on events, not on a timer (docs/managed-agents/operations.md § Operations).
         setConcurrency: async (userId, limits) => {
           await writeAgentConcurrency(core.prefs, userId, limits)
           runtime?.drainQueue()
@@ -274,10 +274,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         deleteCustomAgent: (userId, id) => deleteCustomAgent(core.prefs, userId, id),
       })
 
-      // agents.harnessRegistry (docs/managed-agents.md § Harnesses). The plugin host resolves this per
+      // agents.harnessRegistry (docs/managed-agents/harnesses.md § Harnesses). The plugin host resolves this per
       // contributed harness, so a node with agents disabled drops them and re-enabling redelivers.
       harnessRoute = ctx.capabilities.provide(AGENTS_HARNESS_REGISTRY, createHarnessRegistry())
-      // agents.customAgentRegistry (docs/managed-agents.md § Custom agents), delivered the same way, and
+      // agents.customAgentRegistry (docs/managed-agents/custom-agents.md § Custom agents), delivered the same way, and
       // held in memory only, so a disabled plugin's agents leave New with it.
       customAgentRoute = ctx.capabilities.provide(AGENTS_CUSTOM_AGENT_REGISTRY, {
         register: (agent) => ({ dispose: customAgentRegistry.register(contributedCustomAgent(agent)) }),
@@ -368,7 +368,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // turn, because the node cannot transact with an array in the client.
       draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
     },
-    // Releases what init acquired, in the order docs/managed-agents.md § Operations and failure
+    // Releases what init acquired, in the order docs/managed-agents/operations.md § Operations and failure
     // describes.
     dispose: async () => {
       await runtime?.stop()

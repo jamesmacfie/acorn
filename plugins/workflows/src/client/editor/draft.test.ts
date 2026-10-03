@@ -20,7 +20,7 @@ import {
   type WorkflowDraft,
 } from './draft'
 
-// The rules that make the editor pleasant, as functions (docs/workflows.md § Authoring). Every one of
+// The rules that make the editor pleasant, as functions (docs/workflows/authoring.md § Authoring). Every one of
 // them is a thing a person does by accident: renaming a step three prompts reference, deleting the
 // middle of a chain, wiring an edge back into its own past.
 

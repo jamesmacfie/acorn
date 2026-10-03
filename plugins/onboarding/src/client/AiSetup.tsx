@@ -11,7 +11,7 @@ import { Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, In
 //
 // It probes nothing itself. `GET /v1/core/models/backends` runs `which` per read, so mounting this
 // step is the whole of the "detect at first load" behaviour — no boot work, and nothing to cache
-// (docs/integrations.md § Model providers).
+// (docs/integrations/model-providers.md § Model providers).
 //
 // The step never blocks. Someone with no CLI and no key reads one line about where this lives in
 // Settings and moves on, which is why there is no gate on the wizard's Next here. Generating text is

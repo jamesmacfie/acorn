@@ -293,7 +293,7 @@ const linearScopeQuery = async <T>(secret: string, query: string): Promise<T> =>
 // The projects and teams a Linear workspace offers, for the host's workspace-mapping picker. It sits
 // on the provider contribution so core can ask without knowing it is asking Linear. Core stores an
 // entry's id and never reads it, which is what lets a team ride in on the same list
-// (docs/integrations.md § Linear).
+// (docs/integrations/linear.md § Linear).
 //
 // No error handling beyond "no projects". The host runs this inside the secret scope and the request
 // budget and turns a throw into a per-connection failure the picker can retry, so swallowing a 401

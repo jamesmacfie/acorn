@@ -176,7 +176,7 @@ export const harnessGrants = (contributions: PluginContributions): PluginHarness
 
 // `Enforced`, and the only line in that group that names a program. The claim does not depend on the
 // plugin behaving: the host spawns this command with these arguments and nothing else, and the plugin
-// never gets a process of its own (docs/managed-agents.md § Harnesses).
+// never gets a process of its own (docs/managed-agents/harnesses.md § Harnesses).
 //
 // `high`, because "acorn will run this binary" is the fact an owner most needs to read.
 //
@@ -246,7 +246,7 @@ export const customAgentGrants = (contributions: PluginContributions): PluginCus
 // `Declared`, beside the context sections, because the host holds the shape but the words are the
 // plugin's own: text it puts into the system prompt of every session an owner starts from the agent.
 // The instructions are in the sentence and in the key, so the owner reads what the agent will be told
-// and a version that changes one word asks again (docs/managed-agents.md § Custom agents).
+// and a version that changes one word asks again (docs/managed-agents/custom-agents.md § Custom agents).
 export const customAgentPermissionLines = (grants: readonly PluginCustomAgentGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))

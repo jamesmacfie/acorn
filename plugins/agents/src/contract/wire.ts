@@ -29,7 +29,7 @@ export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | '
 export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
 // `delegation` is a turn an owner queued on its delegated child; `delegation_report` is the child's
-// settled result queued back on that owner (docs/managed-agents.md § Managed delegation).
+// settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
 export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import'
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
@@ -155,7 +155,7 @@ export type AgentApprovalScope = 'session' | 'always'
  * person needs to decide: which app, identified how, for how long, and any warning the provider
  * attached. The driver builds the options and the provider response; the card only reads this.
  * `scopes` is what the provider advertised, so a persistent choice exists only when `always` does.
- * The provider owns any grant it saves (docs/managed-agents.md § App-access approval).
+ * The provider owns any grant it saves (docs/managed-agents/app-access.md § App-access approval).
  */
 export type AgentAppApproval = {
   connector: string
@@ -180,7 +180,7 @@ export type AgentQuestion = {
  * The names are Acorn's: Codex spells the first two `search` and `openPage`, Claude Code spells the
  * last one `WebFetch`, and neither spelling reaches a card. A driver that cannot recognise its
  * provider's web call leaves this off and the call renders as any other tool
- * (docs/managed-agents.md § Web activity).
+ * (docs/managed-agents/activity.md § Web activity).
  *
  * Every field is optional for the same reason `AgentToolCall.status` is: a provider reports the
  * request and the results on different updates, and absent has to mean unchanged rather than empty.
@@ -243,7 +243,7 @@ export type AgentSubagentStatus = 'pending' | 'running' | 'idle' | 'completed' |
 /**
  * One subagent a session spawned, as a projection rather than a session row of its own: a subagent is
  * not something you can address, resume, or send a turn to, so making it a session would be a lie in
- * every table that reads one. docs/managed-agents.md, section Subagents, states the model.
+ * every table that reads one. docs/managed-agents/subagents.md, states the model.
  *
  * `id` is whatever the harness makes stable from the moment the subagent starts, which differs by
  * harness: Claude's spawning tool call, Codex's child thread. `providerAgentRef` is the harness's own
@@ -261,7 +261,7 @@ export type AgentSubagent = {
   /** Detached from the parent's turn: the spawning call returned the moment the child launched, so the
    *  child runs on while the parent's turn is over. Claude Code's `run_in_background` Agent call. It
    *  changes how completion is read, because that spawning call's own `completed` is a launch receipt,
-   *  not the child's finish. See docs/managed-agents.md, section Subagents. */
+   *  not the child's finish. See docs/managed-agents/subagents.md. */
   background?: boolean
   usage?: AgentUsage
   toolUseCount?: number
@@ -470,7 +470,7 @@ export type AgentDeleteResult = {
   detail?: string
 }
 
-/** What Settings > Storage and memory shows for this plugin (docs/managed-agents.md § Operations and
+/** What Settings > Storage and memory shows for this plugin (docs/managed-agents/operations.md § Operations and
  *  failure). `idle` counts the processes Stop idle agents now would stop. `memoryBytes` is the resident
  *  memory of every provider process and its descendants, and null where the node cannot list processes.
  *  The two folder sizes are measured at most every 30 seconds. */
@@ -485,7 +485,7 @@ export type AgentFootprint = {
 // `agent:turn` and `agent:request` are the node telling a client what a projected event changed.
 // Without them a client had to refetch the whole snapshot — up to 2,000 event rows, a JSON body parsed
 // per row — to learn that one turn had closed or one permission request had been answered
-// (docs/managed-agents.md § The transcript store).
+// (docs/managed-agents/transcript-store.md § The transcript store).
 export type AgentWsFrame =
   | { channel: 'agent:event'; event: AgentEventRecord }
   | { channel: 'agent:session'; session: AgentSession }

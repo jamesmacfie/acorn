@@ -619,7 +619,7 @@ describe('WorkflowRunner (docs/workflows.md)', () => {
     expect((await waitDone(runner, second)).status).toBe('done')
   })
 
-  // ── The graph (docs/workflows.md § Execution model) ─────────────────────────────────────────────
+  // ── The graph (docs/workflows/execution.md § Execution model) ─────────────────────────────────────────────
   //
   // A scripted runStep: every step reports when it starts, and finishes only when the test releases
   // it, so "these two ran at the same time" is an assertion rather than a guess about timing.

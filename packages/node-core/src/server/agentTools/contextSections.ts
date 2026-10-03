@@ -34,7 +34,7 @@ export class ContextSectionAssemblyError extends Error {
 export type ContextSectionContribution = {
   id: string
   // Where this section sits in the assembled block, declared by the section rather than ranked by
-  // core, and load-bearing for existing prompts (docs/agent-tools.md § Context sections).
+  // core, and load-bearing for existing prompts (docs/agent-tools/context-sections.md § Context sections).
   order: number
   label: string
   defaultIncluded: boolean
@@ -96,12 +96,12 @@ function applyBudget(items: ContextItem[], budget: ContextBudget): { items: Cont
 export const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted} more omitted` : '')
 
 // Invariant: a section's `compact` must be computed independently of which other sections are
-// included (docs/agent-tools.md § Context sections).
+// included (docs/agent-tools/context-sections.md § Context sections).
 
 // ─── The one section core owns ──────────────────────────────────────────────────────────────────
 //
 // Every other section is registered by the plugin that owns its rows: `pr` by github, `notes` by
-// notes, `memory` by memory (docs/agent-tools.md § Context sections).
+// notes, `memory` by memory (docs/agent-tools/context-sections.md § Context sections).
 
 // `task_links` and `issues` are core tables (docs/data-layer/core-database.md § External-item read model);
 // GitHub and Rollbar write them through the ExternalItemStore seam. This is also the only section
@@ -179,7 +179,7 @@ class ContextSectionRegistry {
     }
   }
 
-  // The wire order of the assembled block (docs/agent-tools.md § Context sections), so list() sorts
+  // The wire order of the assembled block (docs/agent-tools/context-sections.md § Context sections), so list() sorts
   // on each section's declared order rather than registration order. Ties keep registration order
   // because Array.sort is stable; two sections claiming the same slot is a contribution the author
   // should fix, not something for this list to arbitrate.

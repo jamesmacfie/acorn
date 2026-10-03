@@ -41,7 +41,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
   const connection = await getConnection(args.db, args.userId, args.connectionId)
   if (!connection || connection.provider !== args.providerId) return failure('provider_not_connected', 403)
 
-  // Built once per call, scoped to this owner and provider; see docs/integrations.md § Connection
+  // Built once per call, scoped to this owner and provider; see docs/integrations/contributions.md § Connection
   // and integration contributions for why this replaced a raw database handle here.
   const items = createExternalItemStore(args.db, args.userId, args.providerId)
   const context = (): ProviderResourceContext => ({
@@ -75,7 +75,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
     read,
     refresh: async () => {
       try {
-        // The provider call runs inside the secret scope (docs/integrations.md § Provider
+        // The provider call runs inside the secret scope (docs/integrations/provider-boundaries.md § Provider
         // boundaries), so a credential echoed back in an error body is scrubbed before this failure
         // is logged or surfaced.
         const refreshed = await args.secrets.use(connection.encryptedCredentials, `${connection.provider}: read ${resource.id}`, (secret) =>
@@ -106,7 +106,7 @@ export async function runProviderResource<TInput, TOutput>(args: {
 // The request-context form, for a provider plugin's routes: the same function, with core supplying
 // the database handle, the owner id and the secret service instead of eight call sites in linear and
 // rollbar assembling them by hand. That assembly is what put both plugins on the schema ratchet
-// described in docs/integrations.md § Connection and integration contributions.
+// described in docs/integrations/contributions.md § Connection and integration contributions.
 export const providerResource = <TInput, TOutput>(
   c: Context<AppEnv>,
   args: { providerId: string; connectionId: string; resourceId: string; input: TInput; force?: boolean },

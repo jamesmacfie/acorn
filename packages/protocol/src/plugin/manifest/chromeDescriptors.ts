@@ -86,7 +86,7 @@ export const emptyStateDescriptor = z.object({
 // there. The host draws the region; the plugin's layout only reserves it. Constraints are enforced
 // twice: the panel editor doesn't offer a disallowed option, and the host re-checks at render time
 // because a manifest-derived roster row is untrusted wire.
-// See docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension points.
+// See docs/dashboards/placements.md § Placements and docs/plugins.md § Cooperative extension points.
 export const panelRegion = z.object({
   // Which sources a panel here may be composed over. Absent means this plugin's own; present, it's
   // an explicit list of `<pluginId>:<sourceId>`. References remain stable while providers are absent.

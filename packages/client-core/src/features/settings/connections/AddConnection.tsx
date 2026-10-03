@@ -18,7 +18,7 @@ import { CredentialFields } from './CredentialFields'
 import { galleryCards, providerAsks, type GalleryCard } from './connections'
 
 // Add connection: a gallery of every provider this node can connect, built from the descriptors the
-// providers publish, then one provider's steps on the same page (docs/integrations.md § Settings).
+// providers publish, then one provider's steps on the same page (docs/integrations/settings.md § Settings).
 // Nothing here names a provider, so a plugin that registers one gets a card with no change here.
 //
 // A provider at its `maxConnections` stays in the gallery, marked as connected, and its card opens the

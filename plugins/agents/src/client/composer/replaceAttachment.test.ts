@@ -3,7 +3,7 @@ import type { AgentAttachment } from '../../contract/wire.ts'
 import { decideReplacement, MAX_DRAFT_ATTACHMENT_BYTES } from './replaceAttachment'
 
 // The compare-and-swap at the heart of "a plugin edited this attachment, put the new one in the turn"
-// (docs/managed-agents.md § Draft attachments).
+// (docs/managed-agents/attachments.md § Draft attachments).
 //
 // Worth its own suite because the failure modes are silent and expensive. Getting the order of the
 // checks wrong deletes a person's attachment; getting the index wrong reorders their turn; missing the

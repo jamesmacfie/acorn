@@ -45,7 +45,7 @@ export class ToolError extends Error {
   }
 }
 
-// Permission tiers: docs/agent-tools.md § Projections.
+// Permission tiers: docs/agent-tools.md § Permissions.
 export const TOOL_PERMS_PREF_KEY = AGENT_TOOLS_PERMS_PREF_KEY
 
 export type ToolPerms = {

@@ -1,4 +1,4 @@
-// The GitHub browse surface behind the `github` rail Source (docs/github-integration.md § Reads and
+// The GitHub browse surface behind the `github` rail Source (docs/github-integration/reads-and-writes.md § Reads and
 // writes), as two regions rather than one component.
 //
 // It used to be one `ListDetail split` here, with the pull list in one column and everything else in

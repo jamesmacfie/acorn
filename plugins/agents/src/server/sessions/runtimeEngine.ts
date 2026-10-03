@@ -165,7 +165,7 @@ export type AgentRuntimeOptions = {
   // means.
   hooks?: Pick<PluginHookRegistry, 'run'>
   /** `ctx.telemetry`, so a provider start and an agent turn are spans owned by this plugin
-   *  (docs/managed-agents.md § What a session reports). Optional so a test can build an engine with
+   *  (docs/managed-agents/session-events.md § What a session reports). Optional so a test can build an engine with
    *  no host around it. */
   telemetry?: PluginTelemetry
   /** How long a background child may go quiet before its roster row is settled to `idle`. Overridable
@@ -255,8 +255,8 @@ export class ManagedAgentEngine {
   protected queueWakeAt: number | null = null
   protected readonly subagentQuietMs: number
   // Armed with the first provider start and cleared by stop(). A timer over the live map rather than a
-  // node schedule, because what it sweeps exists only in this process (docs/managed-agents.md
-  // § Operations and failure).
+  // node schedule, because what it sweeps exists only in this process (docs/managed-agents/operations.md
+  // § Idle stop).
   protected idleSweepTimer: ReturnType<typeof setInterval> | null = null
   protected readonly idleSweepMs: number
   // Armed at construction when there is a host to report to, and cleared by stop().
@@ -441,7 +441,7 @@ export class ManagedAgentEngine {
     this.ledgerCompaction = { controller, done }
   }
 
-  // Releases what this engine holds, in the order docs/managed-agents.md § Operations and failure
+  // Releases what this engine holds, in the order docs/managed-agents/operations.md § Operations and failure
   // describes. Called from the plugin's dispose (node/index.ts) before the database closes.
   stop(): Promise<void> {
     return this.stopPromise ??= this.stopEngine()
@@ -728,7 +728,7 @@ export class ManagedAgentEngine {
 
   // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch
   // receipt and then says nothing more about it, so the only way its row can ever end is if we infer
-  // the end from silence (docs/managed-agents.md § Subagents). This is that inference, debounced:
+  // the end from silence (docs/managed-agents/subagents.md § Subagents). This is that inference, debounced:
   // every event the child produces pushes the sweep back, so it fires a full quiet window after the
   // last thing we heard. A real completion summary on a later turn still folds the row on to
   // `completed`, so nothing is lost by guessing `idle` first.

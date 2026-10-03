@@ -21,7 +21,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
   // list. `auto` approves with a classifier instead of a prompt, which is the only shape that works
   // when nobody is at the keyboard. The tools an agent may reach are still acorn's decision, taken at
   // the node: the tier and per-tool preferences the owner set, narrowed by the step's own ceiling
-  // (docs/agent-tools.md § Projections).
+  // (docs/agent-tools.md § Permissions).
   headlessArgv: (command, opts) => ({
     file: command,
     args: [
@@ -40,7 +40,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
   resumeArgv: (command, sessionRef) => ({ file: command, args: ['--resume', sessionRef] }),
   // One structured turn with both built-in and projected tools disabled. Two callers now: a workflow
   // `decide` step, and any Generate control in the app spending this CLI as a text backend
-  // (docs/integrations.md § Model providers).
+  // (docs/integrations/model-providers.md § Model providers).
   //
   // It keeps `dontAsk` where the headless turn moved to `auto`: with `--tools ''` there is nothing to
   // approve, and a deny is the right answer for anything that gets past that. Neither caller acts, so

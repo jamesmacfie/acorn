@@ -14,7 +14,7 @@ import { agentDriverRegistry } from '@acorn/plugin-agents/testkit'
 import { assembleNodeGraph } from '../../src/composition/composition'
 import type { NodePluginDeps } from '../../src/composition/plugins'
 
-// The acceptance test for harness contributions (docs/managed-agents.md § Harnesses). The opencode
+// The acceptance test for harness contributions (docs/managed-agents/harnesses.md § Harnesses). The opencode
 // plugin from docs/plugin-authoring.md § Harnesses goes on disk, through the real composition root,
 // and lands beside Claude and Codex.
 //

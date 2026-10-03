@@ -10,7 +10,7 @@
 // Built on the dedup shape server/sync/engine.ts already uses for provider mirrors: an in-flight map
 // so concurrent callers join one run, and a time-to-live so a caller just behind one gets the answer
 // that run produced. What it deliberately is not is a filesystem watcher — refused, with its exit
-// condition, in docs/workspaces-and-tasks.md § Worktree status reads.
+// condition, in docs/workspaces-and-tasks/worktrees.md § Worktree status reads.
 //
 // ── The one rule ──────────────────────────────────────────────────────────────────────────────────
 //

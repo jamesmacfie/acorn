@@ -1,5 +1,5 @@
 // Core run-target wire contracts.
-// Run targets as the renderer sees them (docs/workflows.md): the merged config list plus live
+// Run targets as the renderer sees them (docs/terminal/run-targets.md): the merged config list plus live
 // status. The terminal plugin's run-target contract and the client query layer share these shapes.
 export type RunTargetInfo = {
   id: string

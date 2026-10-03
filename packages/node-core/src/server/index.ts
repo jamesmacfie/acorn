@@ -164,8 +164,8 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)
     .route(CORE_NAMESPACE, worktree)
     .route(CORE_NAMESPACE, scripts)
-    .route(`${CORE_NAMESPACE}/tasks`, taskContext) // /:id/context: the assembled task context (docs/agent-tools.md §4)
-    .route(`${CORE_NAMESPACE}/tasks`, harness) // /:id/run: the renderer's run-target surface (docs/workflows.md §2)
+    .route(`${CORE_NAMESPACE}/tasks`, taskContext) // /:id/context: the assembled task context (docs/agent-tools/context-sections.md § The task context route)
+    .route(`${CORE_NAMESPACE}/tasks`, harness) // /:id/run: the renderer's run-target surface (docs/terminal/run-targets.md § Trust and execution)
     .route(`${CORE_NAMESPACE}/tasks`, agentTools) // /:id/tools + /:id/tools/:name: the agent-tool registry projection (docs/agent-tools.md)
     .route(`${CORE_NAMESPACE}/agent-tools`, agentToolsCatalog) // static tool catalog for the permissions settings page
     .route(`${CORE_NAMESPACE}/integrations`, integrations) // connect/disconnect/status for third-party providers

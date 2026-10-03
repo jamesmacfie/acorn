@@ -127,7 +127,7 @@ export default function PullList() {
   }
 
   // Promotes a pull into a task: origin github-pr, branch = headRef, pullNumber
-  // (docs/workspaces-and-tasks.md § Task creation and navigation).
+  // (docs/workspaces-and-tasks/task-creation.md § Task creation and navigation).
   //
   // Created inline rather than through PromoteToTaskModal, because a pull already carries its title
   // and branch. That makes this the only place a create failure can be reported, so keep the error

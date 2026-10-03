@@ -44,6 +44,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [schedules.md](./schedules.md) | Unattended backup and an `agent-run` schedule target. | Proposals moved from schedules.md, 2026-10-03. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
+| [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
 
 ## How these relate
 

@@ -46,7 +46,7 @@ export type { Disposable } from '@acorn/node-core/server/pluginHost/capabilities
 // the maps, since a loaded bundle inlines every @acorn/* import it makes.
 export { extensionPointId } from '@acorn/node-core/server/pluginHost'
 export type { Extension, ExtensionPointId } from '@acorn/node-core/server/pluginHost'
-// The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its
+// The managed agent harness seam (docs/managed-agents/harnesses.md § Harnesses). The capability id and its
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
@@ -134,7 +134,7 @@ export { confineExistingFile, resolveInRoot } from '@acorn/node-core/server/core
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
 // The coalesced `git status` for a worktree: one process per path per two seconds however many callers
 // ask, so a plugin reading local changes and core reading the rail's dirty markers share one spawn
-// (docs/workspaces-and-tasks.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
+// (docs/workspaces-and-tasks/worktrees.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
 // that has just written under a worktree itself; the ordinary announcement is
 // `ctx.events.worktreeStatus(taskId)`. `worktreeGitText` is the same window for any other read-only
 // git command against the tree, such as the changes pane's line counts.
@@ -197,7 +197,7 @@ export {
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
-// that own their rows (docs/agent-tools.md § Context sections). `pastedContent` is also how agents
+// that own their rows (docs/agent-tools/context-sections.md § Context sections). `pastedContent` is also how agents
 // marks another agent's report.
 export { formatOmitted, pastedContent, truncateBytes } from '@acorn/node-core/server/agentTools'
 export type { PluginContextSection } from '@acorn/node-core/server/agentTools'

@@ -247,7 +247,7 @@ phase 1 needs a security review before it ships.
 ### Archive and restore
 
 Archive keeps every plugin's rows and restore brings the task back
-([restoring a task](../../workspaces-and-tasks.md#restoring-a-task)). Task apps follow the task:
+([restoring a task](../../workspaces-and-tasks/archive.md#restoring-a-task)). Task apps follow the task:
 
 - The archive confirmation lists the task's apps: "2 apps belong to this task. They are archived with
   it and come back if you restore it." Each has **Publish to project** beside it.

@@ -13,7 +13,7 @@ record under another package's name any more than it can mount a route under one
 
 Two compiled plugins do this. Workflows raises `workflow.run` and `workflow.step`
 ([what a run reports](../workflows/execution.md#what-a-run-reports)), and agents raises `agent.session`, `agent.turn`, and the
-`agent.processes.*` gauges ([what a session reports](../managed-agents.md#what-a-session-reports)).
+`agent.processes.*` gauges ([what a session reports](../managed-agents/session-events.md#what-a-session-reports)).
 
 A plugin's client half has no `ctx.telemetry`, because a client context holds contribution points and
 nothing else. It calls `telemetryFor('<plugin id>')` from `@acorn/plugin-api/client`, the same six
@@ -66,7 +66,7 @@ and the host clears the sinks of a plugin whose registrations it rolls back.
 
 `plugins/sentry-telemetry` is the sink that ships. It's a loaded plugin in the bundled roster, so it's
 on every machine and does nothing until the switch is on and a Sentry DSN is connected in Settings →
-Services. [integrations.md](../integrations.md#sentry) owns the connection. Its settings page holds
+Services. [integrations.md](../integrations/sentry.md#sentry) owns the connection. Its settings page holds
 what only it can decide: a trace sample rate, which of the five kinds to send, whether to include
 stacks, and whether to send `task.id` as a tag.
 

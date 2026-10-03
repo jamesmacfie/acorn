@@ -24,7 +24,7 @@ import { authoringTurnRequestSchema, type AuthoringTurnRequest, type AuthoringTu
 import type { WorkflowPublication, WorkflowPublicationSelection } from '../../shared/workflowPublication'
 import type { WorkflowFileRequest, WorkflowFileResult } from '../../shared/workflowFileAuthoring'
 
-// Definitions stored as rows (docs/workflows.md § Database definitions). Mounted at the same
+// Definitions stored as rows (docs/workflows/definitions.md § Database definitions). Mounted at the same
 // namespace root as ./workflow.ts, which owns runs and steps.
 //
 // Every route here is device-only. Writing a definition is authoring executable configuration: a step
@@ -54,7 +54,7 @@ export type WorkflowDefsBridge = {
   validate(def: unknown, projectId?: string): Promise<{ problems: string[] }>
   saveToRepo(id: string, opts: { taskId?: string; keepRow: boolean }): Promise<{ path?: string; notFound?: boolean; error?: string }>
   // Writes a whole definition from a description or edits the current one through the picked backend
-  // (docs/workflows.md § Authoring). `error` is a reply nothing could be read out of, which is the
+  // (docs/workflows/ai-authoring.md § Generating and editing with AI). `error` is a reply nothing could be read out of, which is the
   // one failure with no definition to apply. A provider failure throws ProviderOperationError,
   // because its status is the one the caller has to see.
   generate(input: WorkflowGenerateRequest & { userId: string }): Promise<WorkflowGenerateResult | { error: string }>
@@ -211,7 +211,7 @@ export const workflowDefsRoutes = new Hono<AppEnv>()
     return withBridge(c, async (bridge) => c.json(await bridge.validate(parsed.def, parsed.projectId)))
   })
   // Writes a definition from a description. Declared before `/defs/:id` for the same reason
-  // `/defs/validate` is (docs/workflows.md § Authoring).
+  // `/defs/validate` is (docs/workflows/authoring.md § Authoring).
   //
   // No owner gate of its own: generation spends the owner's provider key, and the `/defs/*` mount
   // above is already device-only, which is stricter than the interactive-owner check the database

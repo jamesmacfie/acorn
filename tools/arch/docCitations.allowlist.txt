@@ -1,43 +1,14 @@
 apps/desktop/src/client/index.tsx: docs/plugins.md § Hearing a core event
 apps/desktop/test/client/wsChannelPrefixes.test.ts: docs/plugins.md § Hearing a core event
-apps/node/test/integration/pluginSystem/pluginLoader.test.ts: docs/workflows.md § Starting a run
-apps/node/test/integration/taskContext.test.ts: docs/agent-tools.md § 4
 apps/tui/src/extensions.test.tsx: docs/plugin-authoring.md § Keybindings
 apps/tui/src/main.tsx: docs/plugins.md § Hearing a core event
-packages/client-core/src/features/dashboards/chart.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/dashboards.css: docs/dashboards.md § The grid
-packages/client-core/src/features/dashboards/dashboards.css: docs/dashboards.md § The grid describes: one column in reading order
-packages/client-core/src/features/dashboards/dashboards.css: docs/dashboards.md § Views are derived
-packages/client-core/src/features/dashboards/format.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/history.ts: docs/dashboards.md § Trends
-packages/client-core/src/features/dashboards/homeTab.ts: docs/dashboards.md § Placements
-packages/client-core/src/features/dashboards/homeTab.ts: docs/dashboards.md § Placements: creating the first extra dashboard
-packages/client-core/src/features/dashboards/layout.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/mapping.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/model.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/PanelGrid.tsx: docs/dashboards.md § Placements
-packages/client-core/src/features/dashboards/PanelGrid.tsx: docs/dashboards.md § Placements and § The grid
-packages/client-core/src/features/dashboards/PanelGrid.tsx: docs/dashboards.md § The grid
-packages/client-core/src/features/dashboards/shaping.ts: docs/dashboards.md § The generated editor
-packages/client-core/src/features/dashboards/views/BoardView.tsx: docs/dashboards.md § Views are derived
-packages/client-core/src/features/dashboards/views/ChartView.tsx: docs/dashboards.md § Views are derived
-packages/client-core/src/features/dashboards/views/PanelBody.tsx: docs/dashboards.md § The generated editor and § Placements cover why there is exa
-packages/client-core/src/features/dashboards/views/props.ts: docs/dashboards.md § Views are derived
-packages/client-core/src/features/dashboards/views/Provenance.tsx: docs/dashboards.md § The mapping layer
-packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § The two vocabularies
-packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § Trends
 packages/client-core/src/features/fleet/FleetHome.tsx: docs/plugins.md § Node
 packages/client-core/src/features/integrations/watchConnectionChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/projects/watchProjectChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/settings/plugins/InstallPlugin.tsx: docs/plugins.md § Non-goals
 packages/client-core/src/features/settings/plugins/PluginsSettings.tsx: docs/plugins.md § Non-goals
 packages/client-core/src/features/tabs/TabRail.tsx: docs/plugins.md § Context
-packages/client-core/src/features/tasks/task-view.css: docs/workflows.md § 2
-packages/client-core/src/features/tasks/tasks.ts: docs/workflows.md § 3
 packages/client-core/src/features/tasks/watchTaskChanges.ts: docs/plugins.md § Hearing a core event
-packages/client-core/src/features/workspaces/Home.tsx: docs/dashboards.md § Placements
-packages/client-core/src/features/workspaces/Home.tsx: docs/dashboards.md § Placements for why a deleted tab falls back to the default
-packages/client-core/src/host/chrome/ChromeSourcePanel.tsx: docs/dashboards.md § Placements
 packages/client-core/src/host/frames/broker.ts: docs/plugins.md § Enforcement
 packages/client-core/src/host/frames/channels.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/host/frames/channels.ts: docs/plugins.md § Hearing another plugin
@@ -47,15 +18,11 @@ packages/client-core/src/host/frames/overlays.ts: docs/plugins.md § Frame contr
 packages/client-core/src/host/frames/PluginOverlay.tsx: docs/plugins.md § Frame contribution kind
 packages/client-core/src/host/frames/PluginRefPanel.tsx: docs/plugins.md § Frame contribution kind
 packages/client-core/src/host/frames/register.test.ts: docs/plugins.md § Frame contribution kind
-packages/client-core/src/host/frames/register.ts: docs/dashboards.md § Placements
 packages/client-core/src/host/frames/register.ts: docs/plugins.md § Frame contribution kind
 packages/client-core/src/host/plugins/pluginChannel.test.ts: docs/plugins.md § Hearing another plugin
 packages/client-core/src/host/plugins/pluginChannel.ts: docs/plugins.md § Hearing another plugin
 packages/client-core/src/host/registries/commands/clientEvents.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/host/registries/commands/clientEvents.ts: docs/plugins/forward-compatibility.md § What is not an event
-packages/client-core/src/host/registries/panes/contentLinks.test.ts: docs/dashboards.md § "Taking a route also selects the rail source that owns it"
-packages/client-core/src/host/registries/panes/contentLinks.ts: docs/dashboards.md § Provenance
-packages/client-core/src/host/registries/panes/contextMenus.ts: docs/workflows.md § Starting a run
 packages/client-core/src/host/tree/arbitration.test.ts: docs/plugins.md § Arbitration
 packages/client-core/src/host/tree/arbitration.ts: docs/plugins.md § Arbitration
 packages/client-core/src/host/tree/hostRequests.test.ts: docs/plugins.md § Asking the host
@@ -63,37 +30,11 @@ packages/client-core/src/host/tree/RemoteTree.grants.test.tsx: docs/plugins.md �
 packages/client-core/src/host/tree/Slot.tsx: docs/plugins.md § Arbitration
 packages/client-core/src/infra/node/watchNodeEvents.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/infra/node/wsClient.ts: docs/plugins.md § Hearing a core event
-packages/client-core/src/infra/styles/tokens-theme.css: docs/dashboards.md § Views are derived
-packages/client-core/src/kit/tokens/tokenAxes.ts: docs/dashboards.md § Views are derived
 packages/create-acorn-plugin/index.mjs: docs/plugin-authoring.md § Two ways to draw for when a rectangle is the right answer
-packages/dashboards-core/src/chart.ts: docs/dashboards.md § Views are derived
-packages/dashboards-core/src/format.ts: docs/dashboards.md § The generated editor gives: the component that draws this ca
-packages/dashboards-core/src/layout.ts: docs/dashboards.md § The grid
-packages/dashboards-core/src/layout.ts: docs/dashboards.md § The grid for the three things that keeps true
-packages/dashboards-core/src/layout.ts: docs/dashboards.md § The grid for why 12 columns
-packages/dashboards-core/src/mapping.test.ts: docs/dashboards.md § Provenance
-packages/dashboards-core/src/mapping.ts: docs/dashboards.md § Provenance
-packages/dashboards-core/src/mapping.ts: docs/dashboards.md § The generated editor gives
-packages/dashboards-core/src/mapping.ts: docs/dashboards.md § The mapping layer
-packages/dashboards-core/src/model.ts: docs/dashboards.md § Panels
-packages/dashboards-core/src/model.ts: docs/dashboards.md § The generated editor
-packages/dashboards-core/src/model.ts: docs/dashboards.md § The mapping layer
-packages/dashboards-core/src/model.ts: docs/dashboards.md § Trends
-packages/dashboards-core/src/model.ts: docs/dashboards.md § Views are derived
-packages/dashboards-core/src/shaping.ts: docs/dashboards.md § Panels for why shaping is client-side with server params as 
-packages/dashboards-core/src/shaping.ts: docs/dashboards.md § Views are derived
-packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends
-packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends for why
-packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends for why direction-goodness isn't guessable
-packages/node-core/src/server/dashboards/history.ts: docs/dashboards.md § Trends for why that renders as a cold state rather than an e
 packages/node-core/src/server/db/cascade.test.ts: docs/plugins.md § Uninstalling
 packages/node-core/src/server/db/cascade.ts: docs/plugins.md § Uninstalling
-packages/node-core/src/server/db/schema.ts: docs/dashboards.md § Trends
-packages/node-core/src/server/index.ts: docs/agent-tools.md § 4
-packages/node-core/src/server/index.ts: docs/workflows.md § 2
 packages/node-core/src/server/integrations/connections.test.ts: docs/plugins.md § Hearing a core event was about: four writers flipped a conne
 packages/node-core/src/server/integrations/resourceRuntime.ts: docs/plugins.md § Hearing another plugin
-packages/node-core/src/server/integrations/types.ts: docs/agent-tools.md § issue_comment
 packages/node-core/src/server/notify.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/pluginHost/context.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/pluginHost/emits.ts: docs/plugins.md § Hearing another plugin § The cross-plugin grant
@@ -101,77 +42,37 @@ packages/node-core/src/server/pluginHost/host.test.ts: docs/plugins.md § Hearin
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/plugins/bundled.ts: docs/plugins.md § Failures are contained
-packages/node-core/src/server/plugins/manifest.test.ts: docs/dashboards.md § Placements
-packages/node-core/src/server/routes/dashboards.ts: docs/dashboards.md § Trends
 packages/node-core/src/server/routes/plugins/plugins.ts: docs/plugins.md § Hearing a core event
-packages/node-core/src/server/routes/projects/taskContext.ts: docs/agent-tools.md § 4
 packages/node-core/src/server/routes/projects/tasks.ts: docs/plugins.md § Hearing a core event
-packages/node-core/src/server/runConfig.test.ts: docs/workflows.md § 2
 packages/node-core/src/server/transport/wsHub.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/worktrees/taskHeadObserver.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/worktrees/taskWorktree.test.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/worktrees/taskWorktree.ts: docs/plugins.md § Hearing a core event
-packages/node-core/src/server/worktrees/worktrees.test.ts: docs/workflows.md § 2 copy
 packages/node-core/src/server/worktrees/worktreeStatus.ts: docs/plugins.md § Hearing a core event § HEAD moved
-packages/plugin-api/src/client.ts: docs/dashboards.md § Provenance
 packages/plugin-api/src/client.ts: docs/plugin-authoring.md § Testing
-packages/plugin-types/src/contracts/attachments.ts: docs/managed-agents.md § Draft attachments
 packages/plugin-types/src/contracts/storage.ts: docs/plugins.md § What is published
 packages/protocol/src/chrome/extensionPoints.ts: docs/plugins.md § Arbitration
 packages/protocol/src/plugin/contract.ts: docs/plugins.md § Hearing another plugin
-packages/protocol/src/plugin/manifest/chromeDescriptors.ts: docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension point
-packages/protocol/src/transport/api/pluginPresentation.ts: docs/workflows.md § Starting a run
 packages/protocol/src/transport/api/pluginState.ts: docs/plugins.md § Hearing another plugin
-packages/protocol/src/transport/api/runtime.ts: docs/dashboards.md § Trends
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing a core event
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing a core event § HEAD moved
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing a core event that will grow it
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins/forward-compatibility.md § What is not an event
 packages/protocol/src/tree/messages.ts: docs/plugins.md § Asking the host
-plugins/agents/src/client/composer/AgentComposer.tsx: docs/managed-agents.md § Draft attachments
-plugins/agents/src/client/composer/QueuedAgentTurns.tsx: docs/managed-agents.md § The turn queue
-plugins/agents/src/client/composer/replaceAttachment.test.ts: docs/managed-agents.md § Draft attachments
-plugins/agents/src/client/composer/replaceAttachment.ts: docs/managed-agents.md § Draft attachments
-plugins/agents/src/client/sessions/AgentPane.test.tsx: docs/managed-agents.md § Sessions
-plugins/agents/src/client/sessions/AgentPane.tsx: docs/managed-agents.md § Sessions
-plugins/agents/src/client/sessions/AgentTaskSidebar.tsx: docs/managed-agents.md § Subagents
-plugins/agents/src/client/sessions/managedStore.ts: docs/managed-agents.md § The transcript store
-plugins/agents/src/client/sessions/toolFoldPrefs.ts: docs/managed-agents.md § Tool call display
-plugins/agents/src/client/usage/AgentUsageSection.tsx: docs/managed-agents.md § Plan usage
-plugins/agents/src/contract/draftAttachments.ts: docs/managed-agents.md § Draft attachments
-plugins/agents/src/contract/wire.ts: docs/managed-agents.md § The transcript store
-plugins/agents/src/node/index.ts: docs/managed-agents.md § Operations
-plugins/agents/src/server/sessions/runtimeEngine.ts: docs/managed-agents.md § Subagents
 plugins/agents/src/server/sessions/runtimeEngine.ts: docs/plugins.md § Hearing a core event
-plugins/agents/src/server/sessions/sessionRepository.ts: docs/managed-agents.md § Subagents
 plugins/changes/src/client/RemoteBar.tsx: docs/plugins.md § 
 plugins/editor/src/server/editor.ts: docs/plugins.md § Hearing a core event
 plugins/editor/src/server/editor.ts: docs/plugins.md § What is not an event
 plugins/github/src/client/GithubBrowse.tsx: docs/plugins.md § Frame authoring and the UI kit
 plugins/github/src/client/pullDetail/prModel.ts: docs/first-party-plugins.md § github
-plugins/github/src/client/pullTasks.ts: docs/workflows.md § Starting a run
 plugins/github/src/node/index.ts: docs/plugins.md § Hearing another plugin
 plugins/github/src/node/index.ts: docs/plugins/forward-compatibility.md § Hearing another plugin
 plugins/github/src/server/events.ts: docs/plugins.md § Hearing another plugin
-plugins/linear/src/server/index.ts: docs/workflows.md § Starting a run
-plugins/linear/src/shared/rail.ts: docs/workflows.md § Starting a run
 plugins/linear/src/tree/model.ts: docs/plugins.md § Frame authoring
-plugins/rollbar/src/shared/rail.test.ts: docs/workflows.md § Starting a run
-plugins/rollbar/src/shared/rail.ts: docs/workflows.md § Starting a run
 plugins/terminal/src/server/runtime.ts: docs/plugins.md § Hearing a core event § Run target state
 plugins/workflows/src/client/editor/startRequest.ts: docs/plugin-authoring.md § Testing
 plugins/workflows/src/client/index.ts: docs/contribution-kinds.md § Project surfaces
-plugins/workflows/src/client/layoutPrefs.test.tsx: docs/workflows.md § Where positions live
-plugins/workflows/src/client/startFromItem.test.ts: docs/workflows.md § Starting a run
 plugins/workflows/src/client/startFromItem.ts: docs/plugin-authoring.md § Testing
-plugins/workflows/src/client/startFromItem.ts: docs/workflows.md § Starting a run
-plugins/workflows/src/client/StartFromItemHost.tsx: docs/workflows.md § Starting a run
 plugins/workflows/src/client/surfacePath.ts: docs/plugin-authoring.md § Testing
-plugins/workflows/src/client/workflowsClient.ts: docs/managed-agents.md § Providers
-plugins/workflows/src/node/index.ts: docs/managed-agents.md § Sessions
 plugins/workflows/src/node/index.ts: docs/plugins.md § Hearing another plugin
-plugins/workflows/src/server/authoring/edit.ts: docs/workflows.md § Generating and editing with AI
-plugins/workflows/src/server/routes/workflow.ts: docs/managed-agents.md § Sessions
-plugins/workflows/src/server/runs/workflowTelemetry.test.ts: docs/workflows.md § What a run reports
-plugins/workflows/src/server/steps/builtins.ts: docs/workflows.md § What an agent step sees

@@ -1,11 +1,11 @@
 import { extensionPointId } from '@acorn/protocol/plugin/ids.ts'
 
 // What this plugin contributes to the workflows plugin's `workflows:step-kind` point
-// (docs/terminal.md § Workflow steps), declared here rather than imported from that package.
+// (docs/terminal/run-targets.md § Workflow steps), declared here rather than imported from that package.
 //
 // plugins/workflows already depends on this one, directly and through plugins/agents, and the
 // workspace graph has to stay acyclic (turbo.json § topo). So the point is named by the string the
-// two packages agree on — which docs/workflows.md § Contributed step kinds says is the contract —
+// two packages agree on — which docs/workflows/step-kinds.md § Contributed step kinds says is the contract —
 // and the shapes below mirror as much of `@acorn/plugin-workflows/contract/extensions.ts` as these
 // two kinds use. The mirror is held against the real types by a test in that package, which may
 // import this file because a plugin's contract/ is the one cross-plugin surface.

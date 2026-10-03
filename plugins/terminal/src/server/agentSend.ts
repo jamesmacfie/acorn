@@ -1,4 +1,4 @@
-// sendToAgent, the shared delivery primitive (docs/terminal.md § Sending text to an
+// sendToAgent, the shared delivery primitive (docs/terminal/activity.md § Sending text to an
 // agent). terminal.ts calls onIdle when a session flips idle, which flushes anything queued for
 // 'after-ready'.
 //

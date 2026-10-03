@@ -5,7 +5,7 @@ import type { AgentFootprint } from '../../contract/wire.ts'
 import { managedAgentApi } from '../sessions/managedClient'
 
 // This plugin's section of Settings > Storage and memory, drawn in core's `core:storage` point
-// (docs/managed-agents.md § Operations and failure). The page is core's; these numbers and the stop
+// (docs/managed-agents/operations.md § Operations and failure). The page is core's; these numbers and the stop
 // are this plugin's route.
 
 // The page's own rhythm, and no faster. The section lives only while the page is open.

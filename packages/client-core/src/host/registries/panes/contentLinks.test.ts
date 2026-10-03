@@ -360,8 +360,8 @@ describe('the host ladder', () => {
       routed.dispose()
     })
 
-    // Navigating is only half of arriving (docs/dashboards.md § "Taking a route also selects the rail
-    // source that owns it"). The shell draws from the rail selection, not the location, so a route
+    // Navigating is only half of arriving (docs/dashboards/panels.md § Taking a route also selects the rail
+    // source that owns it). The shell draws from the rail selection, not the location, so a route
     // taken while another source is selected moves the URL and leaves the old surface on screen.
     it('selects the rail source that owns the route before navigating', () => {
       setSelectedSource('home')

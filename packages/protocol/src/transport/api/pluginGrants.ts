@@ -52,7 +52,7 @@ export type PluginScheduleGrant = { id: string; label: string; cadence: Cadence 
 export type PluginTaskCheckGrant = { id: string; cleansUp: boolean }
 
 // The sixth grant, and the only one under `Enforced` that names a program: a managed agent harness
-// this package asks acorn to run (docs/managed-agents.md § Harnesses). The claim is exact, since the
+// this package asks acorn to run (docs/managed-agents/harnesses.md § Harnesses). The claim is exact, since the
 // host spawns the declared command with the declared args and nothing else, so the whole spawn goes
 // in the key. A version that runs a different binary, or carries more of the node's environment into
 // it, has to reach the update prompt.
@@ -93,7 +93,7 @@ export type PluginContextSectionGrant = {
 
 // A custom agent a package contributes. The instructions are the grant: they are text the package puts
 // into the system prompt of every session an owner starts from it, so the prompt shows them in full and
-// a changed text asks again (docs/managed-agents.md § Custom agents).
+// a changed text asks again (docs/managed-agents/custom-agents.md § Custom agents).
 export type PluginCustomAgentGrant = {
   id: string
   name: string

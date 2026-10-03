@@ -24,7 +24,7 @@ import { ChildRuns, RunLineage } from './RunRelationships'
 import { RunRecords } from './RunRecords'
 
 // The run pane's `detail` region: what one step is doing, and the controls that are legal for the
-// state it is in (docs/workflows.md § Routes and UI). The controls sit in the step's header bar for
+// state it is in (docs/workflows/routes-and-ui.md § Routes and UI). The controls sit in the step's header bar for
 // every kind, so Retry on a failed command is beside its name rather than under its output. A gate's
 // Approve and Reject are the exception: they answer the gate, so they sit under what they approve.
 //

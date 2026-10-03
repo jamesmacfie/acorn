@@ -84,7 +84,7 @@ export type LinkContextFormatter = {
   summarize(ref: ExternalRef, item: CachedExternalItem | null, state: CacheState): ContextItem
 }
 
-// What core lends a provider so it can answer `issue_detail` (docs/agent-tools.md § issue_detail).
+// What core lends a provider so it can answer `issue_detail` (docs/agent-tools/tracker-tools.md § issue_detail).
 // One method, and it is the same resource runtime the provider's own routes go through, so the cache,
 // the TTL, the request budget and the credential scope are the ones already in place.
 export type ProviderDetailContext = {
@@ -108,7 +108,7 @@ export type ProviderWriteContext = ProviderDetailContext & {
   idempotencyKey?: string
 }
 
-// The write behind core's `issue_comment` agent tool (docs/agent-tools.md § issue_comment). Posts
+// The write behind core's `issue_comment` agent tool (docs/agent-tools/tracker-tools.md § issue_comment and issue_image). Posts
 // `body` on the item as the connection's owner. Null means this connection has no such item.
 export type ProviderItemComment = (
   context: ProviderWriteContext,
@@ -138,7 +138,7 @@ export type ExternalIdContract = {
 
 export type ProviderResourceContext = {
   // The external-item read model, not core's database handle, scoped to this provider's own rows at
-  // construction (docs/integrations.md § Connection and integration contributions); a provider
+  // construction (docs/integrations/contributions.md § Connection and integration contributions); a provider
   // cannot read or write another provider's cache through it.
   items: ExternalItemStore
   userId: string
@@ -158,7 +158,7 @@ export type MirroredResourceContribution<TInput = unknown, TOutput = unknown> = 
   refresh(context: ProviderResourceRefreshContext, input: TInput): Promise<RefreshResult>
 }
 
-// One selectable project inside a connection, as the provider reports it; see docs/integrations.md §
+// One selectable project inside a connection, as the provider reports it; see docs/integrations/project-sources.md §
 // Project sources for how the host bounds and re-checks the list before it is offered for selection.
 export type ProviderProject = { id: string; label: string }
 
@@ -166,7 +166,7 @@ export type ProviderProjectContext = { connection: StoredConnection; secret: str
 
 /**
 /** How the host enumerates a connection's projects for its own workspace-mapping picker; see
- * docs/integrations.md § Project sources for the full contract, including why this is not a
+ * docs/integrations/project-sources.md § Project sources for the full contract, including why this is not a
  * `MirroredResourceContribution`. */
 export type ProviderProjectSource = {
   list(context: ProviderProjectContext): Promise<ProviderProject[]>
@@ -188,7 +188,7 @@ export type ConnectionProviderContribution = {
   connection: ConnectionContract
   capabilities: ProviderCapabilities
   budgets: ProviderRequestBudgets
-  // On the connection contribution rather than the integration one; see docs/integrations.md §
+  // On the connection contribution rather than the integration one; see docs/integrations/contributions.md §
   // Connection and integration contributions for why.
   projects?: ProviderProjectSource
   models?: ModelCatalogEntry[]
