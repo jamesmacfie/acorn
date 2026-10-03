@@ -6,7 +6,7 @@ const props = (): PaneSwitcherProps => ({
   panes: [{ id: 'changes', label: 'Changes', icon: 'git-diff', shown: true, pinned: false }],
   task: { id: 'task-1', title: 'Review', projectId: 'project-1' },
   maximized: null,
-  show: vi.fn(), add: vi.fn(), close: vi.fn(), pin: vi.fn(), toggleMaximize: vi.fn(), equalize: vi.fn(),
+  show: vi.fn(), add: vi.fn(), close: vi.fn(), pin: vi.fn(), toggleMaximize: vi.fn(), equalize: vi.fn(), openContextMenu: vi.fn(),
 })
 
 describe('pane switcher worker contract', () => {
@@ -19,6 +19,8 @@ describe('pane switcher worker contract', () => {
     remote.actions.equalize?.(null)
     expect(host.show).toHaveBeenCalledWith('changes')
     expect(host.equalize).toHaveBeenCalledOnce()
+    remote.actions.openContextMenu?.({ id: 'changes', at: { x: 20, y: 30 } })
+    expect(host.openContextMenu).toHaveBeenCalledWith('changes', { x: 20, y: 30 })
   })
 
   it('refuses an action for a pane the host did not offer', () => {
@@ -26,5 +28,6 @@ describe('pane switcher worker contract', () => {
     const remote = paneSwitcherRemote(host)
     expect(() => remote.actions.close?.('hidden')).toThrow('not available')
     expect(host.close).not.toHaveBeenCalled()
+    expect(() => remote.actions.openContextMenu?.({ id: 'hidden', at: { x: 20, y: 30 } })).toThrow()
   })
 })

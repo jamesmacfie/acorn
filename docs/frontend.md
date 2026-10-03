@@ -47,6 +47,15 @@ tabs, agent. A file whose folder you cannot guess belongs in `features/`.
 
 ## Registries and plugins
 
+The desktop's left source icons and right task pane icons use the shared context-menu registry and
+`ContextMenuHost`. The rail and pane hosts construct targets from their current Node, source or pane
+registration, routed project, and task; `RailTab` remains presentation only. Core rows call the
+existing source selection and task layout verbs. Optional `openContextMenu` props let replacement
+rail and pane switcher providers request that host menu for an available icon. Remote trees send a
+serializable ID and point through their existing host action bridge. The terminal client does not
+draw a right-click menu. [Plugin context menus](./plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#context-menus)
+own the declaration and dispatch contract.
+
 The client plugin host activates `apps/desktop/src/client/plugins.ts`. Plugins register panes,
 rail sources, commands and keybindings, settings pages, slots, rail markers, ref panels,
 agent contexts, extension points and their own contributions to somebody else's, schedules,

@@ -1,12 +1,20 @@
 import type { RailData, RailProps, TopbarData, TopbarProps } from '@acorn/protocol/chrome.ts'
 import type { OwnerActions } from '../tree/hostRequests'
 
-export const RAIL_ACTIONS = ['selectSource', 'openWorkspace', 'toggleCollapsed', 'reorderSources', 'createTask'] as const
+export const RAIL_ACTIONS = ['selectSource', 'openWorkspace', 'toggleCollapsed', 'reorderSources', 'createTask', 'openContextMenu'] as const
 export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'collapseRail', 'navigate', 'clearCache'] as const
 
 const known = (id: unknown, list: readonly { id: string }[]): string => {
   if (typeof id !== 'string' || !list.some((item) => item.id === id)) throw new Error('That choice is unavailable')
   return id
+}
+
+const point = (value: unknown): { x: number; y: number } => {
+  const at = value as { x?: unknown; y?: unknown } | null
+  if (!at || !Number.isFinite(at.x) || !Number.isFinite(at.y) ||
+    (at.x as number) < 0 || (at.y as number) < 0 ||
+    (at.x as number) > 100_000 || (at.y as number) > 100_000) throw new Error('Menu point is unavailable')
+  return { x: at.x as number, y: at.y as number }
 }
 
 export function railRemote(value: RailProps): { data: RailData; actions: OwnerActions } {
@@ -18,6 +26,11 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
       openWorkspace: (id) => value.openWorkspace(known(id, workspaces)),
       toggleCollapsed: () => value.toggleCollapsed(),
       createTask: () => value.createTask(),
+      openContextMenu: (payload) => {
+        if (!value.openContextMenu || !payload || typeof payload !== 'object') return
+        const request = payload as { id?: unknown; at?: unknown }
+        value.openContextMenu(known(request.id, sources), point(request.at))
+      },
       reorderSources: (ids) => {
         if (!Array.isArray(ids) || ids.length !== sources.length ||
           ids.some((id) => typeof id !== 'string') || new Set(ids).size !== sources.length ||

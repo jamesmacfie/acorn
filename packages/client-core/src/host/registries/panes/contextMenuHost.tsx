@@ -1,4 +1,4 @@
-import { For, Show } from 'solid-js'
+import { createEffect, For, onCleanup, Show } from 'solid-js'
 import Icon from '../../../kit/components/content/Icon'
 import { ContextMenu, Menu, type MenuContext } from '../../../kit/components/overlays/Menu'
 import {
@@ -48,7 +48,8 @@ export function ContextMenuItems(props: {
  *  owns the rows, one menu per list, not one per row. */
 export type ContextMenuOpening = { at: { x: number; y: number }; target: ContextMenuTarget }
 
-/**
+let activeClose: (() => void) | undefined
+
 /**
  * The right-click door. One of these per list, driven by a signal the list owns.
  *
@@ -65,6 +66,14 @@ export function ContextMenuHost(props: {
   onClose: () => void
   returnFocus?: () => HTMLElement | undefined
 }) {
+  const close = () => props.onClose()
+  createEffect(() => {
+    if (props.opening()) {
+      if (activeClose && activeClose !== close) activeClose()
+      activeClose = close
+    } else if (activeClose === close) activeClose = undefined
+  })
+  onCleanup(() => { if (activeClose === close) activeClose = undefined })
   return (
     <ContextMenu
       at={() => props.opening()?.at ?? null}

@@ -2428,7 +2428,7 @@
         },
         "contextMenus": {
           "default": [],
-          "maxItems": 8,
+          "maxItems": 32,
           "type": "array",
           "items": {
             "type": "object",
@@ -2442,8 +2442,15 @@
                 "type": "string",
                 "enum": [
                   "task.row",
-                  "item.row"
+                  "item.row",
+                  "rail.source",
+                  "rail.pane"
                 ]
+              },
+              "surface": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
               },
               "label": {
                 "type": "string",

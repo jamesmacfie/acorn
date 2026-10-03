@@ -333,6 +333,8 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
     add('context menu', descriptor.id, () => registerPluginContextMenu(pluginId, descriptor, {
       nodeId: chromeNode,
       enabled: () => pluginEnabledOnNode(chromeNode(), pluginId),
+      sources: new Set((contributions.sources ?? []).map((source) => source.id)),
+      panes: taskPanes,
     }))
   }
 

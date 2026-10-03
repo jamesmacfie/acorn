@@ -1,4 +1,5 @@
 import type { ManifestReferences } from './references'
+import { isRailMenuLocation } from '@acorn/protocol/contextMenus.ts'
 
 export function validateChrome(refs: ManifestReferences): void {
   const { manifest, issues: ctx, route, action, taskPanes } = refs
@@ -32,7 +33,18 @@ export function validateChrome(refs: ManifestReferences): void {
     if (entry.onClick) action(entry.onClick, ['contributions', 'slots', i, 'onClick'])
   })
   // Protocol checks the menu fields; this pass checks references in the action.
-  contextMenus.forEach((entry, i) => action(entry.action, ['contributions', 'contextMenus', i, 'action']))
+  contextMenus.forEach((entry, i) => {
+    const at = ['contributions', 'contextMenus', i] as (string | number)[]
+    if (isRailMenuLocation(entry.location)) {
+      const owned = entry.location === 'rail.source'
+        ? sources.some((source) => source.id === entry.surface)
+        : taskPanes.has(entry.surface ?? '')
+      if (!entry.surface || !owned) ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `${entry.location} requires a surface declared by this plugin` })
+    } else if (entry.surface !== undefined) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'surface'], message: `${entry.location} does not accept a surface` })
+    }
+    action(entry.action, [...at, 'action'])
+  })
   // Each command kind uses a different mix of actions, routes, and choices.
   const commandKind = new Map<string, string>()
   commands.forEach((entry, i) => {

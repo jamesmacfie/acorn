@@ -7,6 +7,7 @@ import { sourceRegistry, type SourceContribution } from '../sources/sources'
 import { integrationFlowRegistry } from '../sources/integrationFlows'
 import { uiSlotRegistry } from './slots'
 import { settingsRegistry } from '../shell/settings'
+import { contextMenuItems } from '../panes/contextMenus'
 
 // The client half of packages/node-core/src/server/pluginHost/host.test.ts. Registration itself is
 // verified end to end by the e2e suite (S1 asserts the rail's four Source labels in order, S3 the
@@ -38,6 +39,19 @@ const clear = (...names: string[]) =>
   initClientPlugins(names.map((name) => ({ name, init: () => {} })))
 
 describe('the client plugin host', () => {
+  it('binds compiled rail rows to its own registered source and pane', () => {
+    initClientPlugins([{ name: 'board', init: (ctx) => {
+      ctx.sources.register(source('board-feed'))
+      ctx.panes.register(pane('board-detail'))
+      ctx.contextMenus.register({ id: 'board-feed-action', location: 'rail.source', surface: 'board-feed', label: 'Refresh', order: 100, run: () => {} })
+      ctx.contextMenus.register({ id: 'board-pane-action', location: 'rail.pane', surface: 'board-detail', label: 'Refresh', order: 100, run: () => {} })
+    } }])
+    expect(contextMenuItems('rail.source', { location: 'rail.source', id: 'board-feed', title: 'Board', nodeId: 'n', projectId: 'p' }).map((item) => item.id)).toEqual(['board-feed-action'])
+    expect(contextMenuItems('rail.pane', { location: 'rail.pane', id: 'board-detail', title: 'Board', nodeId: 'n', taskId: 't', projectId: 'p', pinned: false, shown: true }).map((item) => item.id)).toEqual(['board-pane-action'])
+    clear('board')
+    expect(() => initClientPlugins([{ name: 'board', init: (ctx) => ctx.contextMenus.register({ id: 'foreign', location: 'rail.source', surface: 'board-feed', label: 'Bad', order: 1, run: () => {} }) }])).toThrow(/cannot add a menu/)
+    clear('board')
+  })
   it('runs init in declaration order, which no registry order depends on', () => {
     const order: string[] = []
     initClientPlugins([

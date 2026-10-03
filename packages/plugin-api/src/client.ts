@@ -68,6 +68,7 @@ export {
 } from '@acorn/client-core/host/registries/panes'
 export type {
   ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
+  RailSourceTarget, RailPaneTarget,
 } from '@acorn/client-core/host/registries/panes'
 // Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.

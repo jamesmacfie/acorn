@@ -117,7 +117,7 @@ host cannot draw.
 | `dataSources` | 32 | A Node-owned typed record source: `{ sourceId, name, singular, plural, identityScope, handler, icon?, providerId?, titlePointer?, urlPointer? }`. `handler` is a route on your own namespace that serves describe, options, query, and details operations. The host binds plugin identity, validates typed values and provenance, and gives dashboards and workflows the same runtime. See [Typed data sources](../data-sources.md). |
 | `dataSourceDiscoveries` | 8 | A bounded source catalogue for provider resources that are not known at install time: `{ discoveryId, handler, providerId? }`. Discovery returns source descriptors; the host binds their handler, provider, plugin, and exact discovery scope. See [Typed data sources](../data-sources.md). |
 | `themes` | 8 | A **colour** theme: `{ id, label, dark?, tokens }`, where `tokens` is the complete palette. You write no CSS — the host generates the block. See below. |
-| `contextMenus` | 8 | A row on a host-drawn right-click menu: `{ id, location, label, icon?, order?, when?, action }`. `location` is from a closed list (`task.row` today); `when` is a map of literals that must all equal the target's facts; `action` takes the narrow verb set and receives the id of what was right-clicked. |
+| `contextMenus` | 32 | A row on a host-drawn menu: `{ id, location, surface?, label, icon?, order?, when?, action }`. `rail.source` and `rail.pane` require `surface` to name this plugin's declared source or task pane. The larger bound allows menus for more than eight rail surfaces. |
 | `extensionPoints` | 4 | A place inside one of **your** surfaces that other plugins may fill: `{ id, label, kind, … }`. `kind` picks which of the five a point takes and which other fields it reads: `rows` and `annotation` take a `location` or a `key`, `remote` and `rectangle` take a `mode`, and `hook` takes a `payload` and an `allows` list. The host mints the id as `<yourId>:<pointId>`. You write no code for a `rows` or `annotation` point — the host draws it. |
 | `schedules` | 4 | Work the node runs on a timer: `{ id, name, run, cadence, timeout? }`. `run` is a POST on your own namespace, called with `{ scheduleId }`, and its response is ignored beyond ok or error. `timeout` is seconds, defaulting to 60. The host mints the key from your plugin id, which is what opts the schedule into the 300-second plugin cadence floor. See `docs/schedules.md`. |
 | `taskChecks` | 4 | What you have to say when the owner archives a task, and the cleanup you offer to do: `{ id, check, apply?, timeout? }`. `check` is a GET answering `{ concern }`; `apply` is a POST the archive runs if the owner leaves your checkbox ticked. See below. |
@@ -227,6 +227,21 @@ means both, and `{ "pinned": "true" }` matches nothing because a string is not a
 the location does not supply is refused too, for the same reason as an unknown location. Your row lands
 in the same menu core's rows come from, after them by default (order 500 against core's 10/20/30), and
 its id is namespaced to `plugin:<your-id>:<row-id>` by the host so it cannot displace one of them.
+
+Desktop icon menus use `rail.source` and `rail.pane`. Set `surface` to the exact ID of a source or
+task pane in this manifest, even when that ID differs from your plugin ID. The Node and client refuse
+foreign and undeclared surfaces. The host adds its own Open and pane layout actions; your rows follow
+them by default. A `runNodeAction` receives JSON `{ "rail": { "location": "rail.source",
+"sourceId": "...", "projectId": "..." } }` or `{ "rail": { "location": "rail.pane",
+"paneId": "...", "taskId": "...", "projectId": "..." } }`. An empty project ID means there is
+no routed project. The host chooses every field from the clicked icon. Existing `task.row` and
+`item.row` requests keep their `{ "item": "..." }` body. A source icon does not name a task, so use
+`runNodeAction`, `openUrl`, or `openOverlay` there. Rail menus are desktop only; use a command or visible
+control when an action must also work in the terminal.
+
+These location values require a Node and desktop client release that understands them. API major 3
+alone does not make an older release accept a new location; older releases retain their contained
+manifest or registration warning behavior.
 
 The two cross-plugin keys are the third vocabulary you cannot guess at, and they are two halves of one
 thing: `extensionPoints` is you opening a list to others, `extensions` is you filling somebody else's.
