@@ -1,7 +1,7 @@
 # Dashboards: panels that answer real questions
 
-Status: proposed, 2026-10-02, revised the same day after a third review. Nothing in this programme is
-built. It replaces the August 2026 backlog that lived here: the redesign verification pass,
+Status: proposed, 2026-10-02, revised the same day after a third review. Workstream 1 is complete as of
+2026-10-03, and nothing else in this programme is built. It replaces the August 2026 backlog that lived here: the redesign verification pass,
 `project-database.md`, `dynamic-collections.md`, and the old `write-back.md`. Git history keeps them,
 and their surviving decisions are carried into the files below. [Dashboards](../../dashboards.md) and
 [typed data sources](../../data-sources.md) own shipped behaviour and win over anything here until a
