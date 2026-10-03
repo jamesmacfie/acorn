@@ -32,6 +32,8 @@ export type RailProps = RailData & {
   toggleCollapsed(): void
   reorderSources(ids: readonly string[]): void
   createTask(): void
+  /** Optional desktop menu door for a replacement provider. The host validates the source. */
+  openContextMenu?(id: string, at: { x: number; y: number }): void
 }
 
 export type TopbarData = {

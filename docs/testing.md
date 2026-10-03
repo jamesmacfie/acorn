@@ -33,6 +33,32 @@ pnpm db:check
 pnpm test:coverage
 ```
 
+### Focused agent runs
+
+Use `pnpm test:focus @acorn/node-core src/server/core/git.test.ts` while editing one file, or append
+`-t 'test name'` to select a case. Give one exact workspace package name; selectors matching multiple
+packages are rejected before preparation, so each run has one report. The command prepares node-pty
+once, runs Vitest in that package with a three-worker cap (two for TUI), forwards the file and name
+filters, and fails if the explicit selection runs no tests. It checks only those selected cases; declaration-only plugins
+continue to allow an empty suite under their normal package command.
+
+Before handoff, use `pnpm test --filter=@acorn/node-core` for that package's complete runtime suite.
+Add explicit `--filter=<package>` arguments for affected consumers. For a shared protocol or client
+contract, include the consuming Node, plugin, desktop, and TUI packages that use it. For plugin
+manifest, filesystem, renderer adoption, or composition changes, also run
+`pnpm --filter @acorn/arch-tests test`. That suite owns the repository-wide adoption scanner and
+other uncached architecture rules. A narrow package run does not prove its dependents pass. Run
+`pnpm lint` and relevant suites before handoff; `pnpm test` is the complete integration gate.
+There is no automatic changed-file selection.
+
+Turbo's `topo` transit task hashes source, testkit, manifests, migrations, and configuration supplied
+to consumers, but leaves assertion files to their owning test task. The client-core runtime test task
+also hashes plugin and desktop CSS plus the `apps/desktop/scripts/stage.mjs` stylesheet list read
+by its stylesheet checks. The Node runtime test task hashes
+all loadable plugin configs and package manifests read by its config check. The uncached architecture
+suite scans repository-wide source shape, including additions and deletions. The shared browser setup
+is a root dependency, so its edits invalidate every test task, including all jsdom consumers.
+
 `pnpm test` rebuilds native modules for plain Node and runs Vitest through Turborepo with bounded
 concurrency, and reports every package rather than cancelling the rest on the first failure. Run it
 rather than `turbo run test` directly: the bound is what keeps the suite honest. Many of these tests
@@ -173,7 +199,7 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   running the plugin, registered-but-unavailable while it is disabled. Deliberately a fixture: no
   first-party loaded plugin has a two-choice preference, and inventing one to be covered would be a
   product decision made by a test;
-- the plugin invariants hold the closed kit closed at the call site. `kit/lib/adoption.test.ts` fails on a
+- the plugin invariants hold the closed kit closed at the call site. `tools/arch/primitiveAdoption.test.ts` fails on a
   raw `div` or `span` anywhere under `plugins/`, and two arch rules in `tools/arch/boundaries.test.ts`
   fail on a plugin stylesheet and on a plugin importing Solid's `render` in either spelling. These were
   a ledger of converted files until layout phase 9 finished the conversion; a ledger answers "has this
@@ -688,12 +714,26 @@ checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
     panes keep their layout, and the slow section reports itself without stalling the others
     ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
 
-Memory phase 1 also needs a real-window check. In an isolated `dev:agent` session, add a project
+<a id="memory-acceptance"></a>
+
+Memory needs a real-window check. In an isolated `dev:agent` session, add a project
 memory from the Memory page and open its body. Confirm the file and change log stay under the
 session's data root. Open a `memory_write` transcript card from a task URL; **Open** must show that
 task's project memory, and **Undo** must remove a newly created file or restore its prior version.
-The Context pane must have no memory section. Harness behavior and the two-week noise measurement
-are recorded separately in [phase 1](./future/memory/01-direct-writes.md).
+The Context pane must have no memory section.
+
+The 2026-10-02 delivery checks covered the isolated Tauri page and transcript Open/Undo. Memory
+page acceptance also covered conflicting edits with the draft preserved, delete/restore, body-only
+search, standing-context preview, and cap settings. Isolated TUI checks at 120 by 40 covered reading,
+session links, context preview, and Undo; a real PTY test covered the disposable `$EDITOR` draft.
+These checks do not establish ordinary external-model behavior.
+
+Open acceptance: use managed Claude, managed Codex, and terminal agents in ordinary work to verify
+useful memory saves, standing-context delivery, and snapshot behavior on resume. Driver and admission
+tests verify prompt delivery and stored snapshots, but cannot establish whether a model chooses
+useful memories. Over two weeks of ordinary work, record writes per project, owner Undo/deletion
+counts and reasons, examples of good and bad saves, and whether the owner wants a review queue.
+The owner requested removal of Findings before this measurement finished; it remains open.
 
 The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
 [tui.md](./tui.md) § Keys and focus. Every one of them needs a real terminal and none can be
@@ -1461,14 +1501,13 @@ The suite launches Git, PTYs, Docker probes, provider fakes, and Node children. 
 resource-sensitive; verify a failing package in isolation before changing production timeouts. Do
 not weaken runtime limits to accommodate a saturated test runner.
 
-### Known pre-existing failures
+### Historical failures
 
-Verified on a clean tree. If you see exactly these and nothing else, your change is not the cause:
-
-- One live-PTY `posix_spawnp` failure in `agentSend` tests, a native-module ABI artefact.
-  `pnpm rebuild:node` fixes the ABI class of failure; this one survives it.
-- `plugins/http/src/server/send.test.ts` fails one case comparing a temporary worktree path, a
-  macOS `/var` against `/private/var` artefact of the test's own fixture.
+Older runs reported a live-PTY `posix_spawnp` failure in `agentSend` tests and a macOS `/var`
+versus `/private/var` path mismatch in `plugins/http/src/server/send.test.ts`. The complete gate
+passed on Node 24.21.0 on 2026-10-03. Treat either failure as a new red gate if it returns: check
+the current implementation and reproduce it on an unchanged checkout before attributing it to an
+environment or dismissing it.
 
 Also worth knowing before you read a red gate as your own: the root `lint` script is
 `oxlint && turbo run lint`, so an oxlint failure means `tsc --noEmit` never ran at all. Check

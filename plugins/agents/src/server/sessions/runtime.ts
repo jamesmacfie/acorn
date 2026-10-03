@@ -30,6 +30,8 @@ import { TranscriptCommands } from './transcriptCommands'
 import { waitForSessionSnapshot } from './sessionWait'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import { mergeSearchIndex } from './ledgerCompaction'
+import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../shared/sessionDefaults'
+import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
 // synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
@@ -74,6 +76,14 @@ const assertOfferedOption = (request: AgentRequest, resolution: unknown): void =
  * durability, and scheduling. This class coordinates session lifecycle and user commands.
  */
 export class ManagedAgentRuntime extends ManagedAgentEngine {
+  /** Read once per spawn so the delegation ledger can retain the resolved choices for recovery. */
+  async spawnedAgentDefaults(): Promise<SpawnedAgentDefaults> {
+    const userId = this.currentUserId()
+    return userId
+      ? (await readAgentSessionDefaults(this.core.prefs, userId)).spawned
+      : defaultSpawnedAgentDefaults()
+  }
+
   private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
   private readonly titleGeneration = new SessionTitleGeneration({
     store: this.store,

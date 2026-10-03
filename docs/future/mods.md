@@ -2,6 +2,11 @@
 
 Proposal, 2026-09-29. Not started.
 
+Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/phases/02-permission-veto.md) delivers this
+hook and its policy consumer; [Pi phase 03](./pi/phases/03-session-messages.md) adds optional
+explanations through a separate messaging grant. Use the [phase plan](./pi/phases/README.md) for
+execution order and acceptance. This file owns the base hook design and comparison.
+
 Claude Code is adding *function hooks*, marketed as Claude Mods: a plugin ships a TypeScript module
 that wraps Claude Code's own methods like Express middleware. This file records how that model
 compares with acorn's, which parts acorn already has, and the one piece worth building: a hook on the
@@ -39,7 +44,7 @@ Most of the Mods feature list has an acorn equivalent, built on the owner-declar
 | `$` as the only door, in a worker | The permission-scoped worker and its owner-bound context | [extensibility.md](../extensibility.md#the-node-half-is-isolated) |
 | Adding a noun to `$` | Capabilities with a `contract/` folder | [plugin-map.md](../plugin-map.md#talking-to-another-plugin) |
 | `turn.complete`, `agent.spawn` | Agents lifecycle events and managed delegation | [managed-agents.md](../managed-agents.md) |
-| `sec-default`, org tiers | The managed policy layer, designed and not built | [sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md) |
+| `sec-default`, org tiers | Proposed team policy for hosted workers; no local managed policy layer | [cloud team policy](./cloud/isolation.md#team-policy) |
 
 Because these live in acorn rather than in the agent, each works the same for Claude, Codex, and
 DeepSeek.
@@ -90,7 +95,7 @@ ctx.hooks.declare({
   id: 'before-permission',
   label: 'allow a tool',
   payload: {
-    sessionId: 'string', taskId: 'string', providerId: 'string', unattended: 'boolean',
+    sessionId: 'string', taskId: 'string', requestId: 'string', providerId: 'string', unattended: 'boolean',
     kind: 'string', title: 'string', command: 'string', paths: 'string[]', root: 'string',
   },
   allows: ['observe', 'veto'],
@@ -104,6 +109,7 @@ ctx.hooks.declare({
 
 | Field | Meaning |
 | --- | --- |
+| `requestId` | The parked provider request's canonical ID, scoped to the session. A policy consumer uses it to deduplicate explanation messages without merging distinct permission requests. Added by the sequential Pi plan on 2026-10-03. |
 | `unattended` | True for `workflow` and `delegated` sessions, the set `claudeHarness.ts` already calls unattended. "No pushes from a workflow run" is the main case for this field. |
 | `kind` | One of `command`, `edit`, `read`, `fetch`, `permissions`, or `other`. ACP's `execute` maps to `command`; `edit`, `delete`, and `move` map to `edit`; `read` and `search` map to `read`. Codex maps by method. |
 | `title` | The harness's own summary, as the card shows it. |
@@ -127,9 +133,7 @@ Observe and veto only.
 - **No transform.** The harness runs its own command. Changing the payload changes nothing the
   harness does.
 - **No auto-allow.** A plugin that says no only makes a session stricter. A plugin that says yes on
-  the person's behalf is a different, much larger grant. That matches the managed policy layer's
-  rule that a local choice can only narrow
-  ([sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md)).
+  the person's behalf is a different, much larger grant.
 
 ### Timeouts fail open, and that is safe here
 
@@ -163,14 +167,17 @@ event queue. Two reasons:
    returns. `applyEventProjection` writes that row as `resolved`, with `blocked` in its resolution.
    The row is never `pending`, so it raises no notification, adds no attention badge, and doesn't
    wake a delegated child's parent.
+   A bounded blocked summary is readable through `agents.requests`, including the canonical provider
+   request ID, while raw resolution stays private. This lets the separately granted Pi explanation
+   consumer react to a confirmed refusal rather than a hook verdict that might be ignored on timeout.
 3. `AgentRequestCard.tsx` draws a blocked request as resolved and names who blocked it and why.
 
 The field is optional on the wire type in `plugins/agents/src/contract/wire.ts`. An older client
 draws the row as an ordinary resolved request, so the cached query shape needs no new key.
 
-The model sees only a plain rejection, because neither ACP's nor Codex's reply has room for a
-reason. It may try another way or ask the person. That's acceptable for a first version (see
-[Later](#later-each-with-its-trigger)).
+The permission reply gives the model a plain rejection, because neither ACP's nor Codex's reply has
+room for a reason. Optional explanation delivery is a separate grant and later queued turn in
+[Pi phase 03](./pi/phases/03-session-messages.md). The hook itself never sends that turn.
 
 ### Getting the command and paths out of each harness
 
@@ -196,12 +203,12 @@ Say these plainly in the owning docs, because a policy people trust too far is w
   policy to questions. It doesn't gate every action. acorn chooses the permission mode a session
   starts in, which is the lever for asking more often.
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
-  about. The OS sandbox in [sandbox/](./sandbox/README.md) is the containment answer.
+  about. [Security](../security.md) owns the shipped boundaries and their limits; local task
+  processes are not isolated by this hook.
 - **It can't change what the model reads.** Removing a secret from a command's output happens inside
   the harness's own loop, out of reach from outside it. acorn can do that only for its own tools.
 - **It isn't a policy engine.** Rules live in the handler plugin's code. acorn adds no rule language
-  and no settings form of patterns
-  ([sandbox/refused.md § No policy engine, and no policy language](./sandbox/refused.md#no-policy-engine-and-no-policy-language)).
+  and no settings form of patterns.
 
 ## The phases
 
@@ -233,13 +240,14 @@ Say these plainly in the owning docs, because a policy people trust too far is w
   picks none. No handler in this repository picks one. The Mods author refuses numeric priorities outright, citing Raymond Chen's observation that
   every author claims the top number. Once two third-party transforms compete on one point, replace
   the number with install order plus a reorder control in **Settings → Plugins**.
-- **Telling the model why.** Trigger: agents retry blocked commands in a loop. Add the reason as a
-  context part on the session's next turn.
+- **Telling the model why.** The Pi plan schedules an optional policy explanation consumer once
+  attributed messaging lands in [phase 03](./pi/phases/03-session-messages.md). It uses a separate
+  grant and capped queued turn; unattended delivery waits for phase 05's operation ownership.
 - **Auto-allow.** Trigger: a real request for it. It would be a separate mode with its own high grant,
   and never for unattended sessions.
-- **Handlers a person can't turn off.** This belongs to the managed layer in
-  [sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md): a managed node could require named
-  handlers. Nothing here builds that.
+- **Handlers a person can't turn off.** This would need an administrator policy and a separate
+  proposal. Nothing here builds it. [Cloud team policy](./cloud/isolation.md#team-policy) applies
+  to hosted workers and does not require named handlers.
 - **Shipping a mod into the Claude sessions acorn starts.** That would reach what acorn can't, like
   output redaction, but only for Claude. Trigger: Mods leaves early access, since its API can change
   without notice until then.

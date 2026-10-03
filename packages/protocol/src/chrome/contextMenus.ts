@@ -2,7 +2,7 @@
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */
-export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row'] as const
+export const CONTEXT_MENU_LOCATIONS = ['task.row', 'item.row', 'rail.source', 'rail.pane'] as const
 
 export type ContextMenuLocation = (typeof CONTEXT_MENU_LOCATIONS)[number]
 
@@ -26,7 +26,12 @@ export const CONTEXT_MENU_FACTS: Readonly<Record<ContextMenuLocation, readonly s
   // another. The item itself is payload, not a fact: it is the provider's own shape and nothing a
   // manifest could compare against.
   'item.row': ['providerId', 'projectId'],
+  'rail.source': ['projectId'],
+  'rail.pane': ['projectId', 'pinned', 'shown'],
 }
+
+export const isRailMenuLocation = (location: ContextMenuLocation): location is 'rail.source' | 'rail.pane' =>
+  location === 'rail.source' || location === 'rail.pane'
 
 /** A declared `when`: every named fact must equal the value given. */
 export type ContextMenuWhen = Readonly<Record<string, string | boolean>>

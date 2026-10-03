@@ -81,7 +81,8 @@
     "./tree/nodes.ts": "./src/tree/nodes.ts",
     "./tree/props.ts": "./src/tree/props.ts",
     "./webview.ts": "./src/content/webview.ts",
-    "./ws.ts": "./src/transport/ws.ts"
+    "./ws.ts": "./src/transport/ws.ts",
+    "./taskScripts.ts": "./src/projects/taskScripts.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

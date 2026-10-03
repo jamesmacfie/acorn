@@ -8,7 +8,7 @@ const sessionId = z.string().uuid().describe('The sessionId that agent_spawn ret
 const cursor = z.number().int().nonnegative().default(0)
   .describe('Only look at events after this cursor. Pass the cursor, lastSeq, or nextCursor from your last call.')
 const configOptions = z.record(z.string().min(1).max(100), z.string().max(2_000))
-  .describe("Provider settings by option id, such as { \"model\": \"opus\" }. A value the provider does not offer is skipped with a warning in the child's transcript.")
+  .describe("Overrides for this child by provider option id. For Codex, use { \"model\": \"<model id>\", \"reasoning\": \"high\" } to choose model and effort. These override saved spawn defaults and custom-agent settings. Unsupported values are skipped with a warning in the child's transcript.")
 
 export const agentSpawnInputSchema = z.object({
   title: z.string().trim().min(1).max(500)
@@ -16,7 +16,7 @@ export const agentSpawnInputSchema = z.object({
   prompt: z.string().min(1).max(1_000_000)
     .describe("The child's first message. The child sees none of your conversation, so write a complete brief."),
   profileId: z.string().min(1).max(100).optional()
-    .describe("The agent to run, such as 'claude-code' or 'codex'. Leave it out to run the same agent as you."),
+    .describe("The harness to run, such as 'claude-code' or 'codex'. Overrides the saved spawned-agent harness. When omitted, uses the saved explicit harness or inherits yours, according to Settings. Choose model and effort through configOptions."),
   agent: z.string().trim().min(1).max(200).optional()
     .describe('A custom agent the user saved, by its name or id, such as "Bug reviewer". It sets the agent to run, its settings, and its instructions, so leave profileId out. configOptions and toolCeiling still apply on top.'),
   isolation: z.enum(['shared', 'worktree']).default('shared')

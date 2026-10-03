@@ -2,6 +2,10 @@
 
 Status: proposed, 2026-10-02. Not started.
 
+Execution handoff, 2026-10-03: [phase 04](./phases/04-model-grants-and-advisor.md) ships this seam,
+atomic accounting, a replacement bounded review reader, and the interactive advisor together.
+Unattended session follow-ups are [phase 05](./phases/05-unattended-follow-ups.md).
+
 ## Why
 
 `omp` gives an extension `ctx.runEphemeralTurn`, a side question over the live conversation that does
@@ -58,8 +62,13 @@ picker path every shipped plugin uses does not change.
 
 ### The cap
 
-Count output tokens per plugin per day from the `usage` each result already returns. A harness
-backend reports no usage, so count its calls instead, at a fixed estimate the settings page states.
+Count output tokens per plugin per day from the `usage` each result returns, with atomic reservations
+as specified in phase 04. Harness generation may report usage but does not enforce `maxOutputTokens`
+in the runtime inspected on 2026-10-03. Its allowance counts calls at a fixed estimate stated in
+settings; retain any reported usage separately without claiming a strict harness token bound.
+
+The cap applies to the omitted-backend path. Calls naming a backend preserve their behavior, so
+this is not a total spending cap for every call allowed by the broad `models` permission.
 Past the cap, `generateText` fails with `provider_budget_exhausted` until midnight in the node's time
 zone, and the plugin's roster row shows why.
 
@@ -82,11 +91,11 @@ waits on [cloud phase 9](../cloud/phases/09-teams.md).
 
 ### A side turn over a session
 
-`omp`'s `runEphemeralTurn` sends the whole live conversation. Acorn should not. `agents.reviewInput.v1`
-gives a consumer each completed turn's user messages and final assistant message, bounded and
-task-authorized, and that is enough for a reviewer. A plugin builds its own prompt from it and calls
-`generateText`. No new capability. If a consumer shows it needs tool calls or diffs too, extend
-`AgentReviewInput` with bounded fields rather than handing out the event ledger.
+`omp`'s `runEphemeralTurn` sends the whole live conversation. Acorn uses a bounded completed-turn
+reader instead. The previous `agents.reviewInput.v1` was removed with Findings. Phase 04 introduces
+its replacement, returning task-checked user messages and final assistant text with truncation and
+provenance. A plugin builds its own prompt from that result and calls `generateText`. A richer read
+requires bounded contract fields rather than access to the event ledger.
 
 ## What this does not do
 
@@ -106,8 +115,8 @@ task-authorized, and that is enough for a reviewer. A plugin builds its own prom
    request.
 3. Test: a call with no grant fails without spending, a call over the cap fails, a call naming a
    backend ignores the grant, a harness call counts against the cap.
-4. Move Findings onto the grant, or leave it if [memory phase 2](../memory/02-remove-findings.md) is
-   about to delete it. Prove the grant with [05](./05-advisor.md).
+4. Prove the grant with [05](./05-advisor.md). Findings was removed by the shipped
+   [memory replacement](../../notes-and-memory.md#memory) and is no longer a grant consumer.
 5. Document the grant in [the manifest § Permissions](../../plugin-authoring/the-manifest.md#permissions)
    beside the `models` token, and the errors in [integrations.md](../../integrations.md#model-providers).
 

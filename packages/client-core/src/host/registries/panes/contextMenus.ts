@@ -6,6 +6,8 @@
 import { matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'
+import { sourceRegistry } from '../sources/sources'
+import { paneRegistry } from './panes'
 
 const log = createLogger('context-menu')
 
@@ -49,7 +51,26 @@ export type ItemRowTarget = {
   item: unknown
 }
 
-export type ContextMenuTarget = TaskRowTarget | ItemRowTarget
+export type RailSourceTarget = {
+  location: 'rail.source'
+  id: string
+  title: string
+  nodeId: string
+  projectId: string
+}
+
+export type RailPaneTarget = {
+  location: 'rail.pane'
+  id: string
+  title: string
+  nodeId: string
+  taskId: string
+  projectId: string
+  pinned: boolean
+  shown: boolean
+}
+
+export type ContextMenuTarget = TaskRowTarget | ItemRowTarget | RailSourceTarget | RailPaneTarget
 
 /** The target one location hands its rows. */
 export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget, { location: L }>
@@ -57,6 +78,8 @@ export type TargetAt<L extends ContextMenuLocation> = Extract<ContextMenuTarget,
 export type ContextMenuContribution<L extends ContextMenuLocation = ContextMenuLocation> = {
   id: string
   location: L
+  /** Required for a plugin rail row; identifies the one owned icon it can target. */
+  surface?: string
   label: string
   /** A Lucide name or a `brand:` mark, resolved by Icon. */
   icon?: string
@@ -69,6 +92,14 @@ export type ContextMenuContribution<L extends ContextMenuLocation = ContextMenuL
 
 export const contextMenuRegistry = new Registry<ContextMenuContribution>('context-menu')
 
+const ownsRailTarget = (item: ContextMenuContribution, target: ContextMenuTarget): boolean => {
+  if (target.location !== 'rail.source' && target.location !== 'rail.pane') return true
+  const owner = contextMenuRegistry.ownerOf(item.id)
+  if (!owner) return true // Host actions are registered without a plugin owner.
+  if (item.surface !== target.id) return false
+  return (target.location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === owner
+}
+
 /** The rows this location offers for this target, in declared order. Ties break on id so two
  *  contributions at the same order are stable rather than dependent on registration sequence, the
  *  same rule the slot hosts apply. */
@@ -77,7 +108,7 @@ export const contextMenuItems = <L extends ContextMenuLocation>(
   target: TargetAt<L>,
 ): ContextMenuContribution[] =>
   contextMenuRegistry.entries()
-    .filter((item) => item.location === location && (item.when?.(target) ?? true))
+    .filter((item) => item.location === location && ownsRailTarget(item, target) && (item.when?.(target) ?? true))
     .sort((a, b) => a.order - b.order || a.id.localeCompare(b.id))
 
 /** Register several at once and dispose them together, the shape `registerCommands` already has and
@@ -102,6 +133,9 @@ export function runContextMenuItem<L extends ContextMenuLocation>(
   target: TargetAt<L>,
 ): void {
   try {
+    // A menu can outlive a plugin registration for a frame. Never run a captured replacement.
+    if ((contextMenuRegistry.get(item.id) as unknown) !== item) return
+    if (!ownsRailTarget(item as unknown as ContextMenuContribution, target)) return
     item.run(target)
   } catch (error) {
     log.warn(`'${item.id}' failed on ${target.location} '${target.id}'`, error, { 'menu.item': item.id })

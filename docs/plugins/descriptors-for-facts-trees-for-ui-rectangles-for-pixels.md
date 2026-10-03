@@ -202,16 +202,18 @@ contract whose only consumer is a third party is a contract nobody has used. Bot
 (the button menu it already had, and the new right-click) draw the same list from the same registry, so
 they cannot offer different things.
 
-An entry is `{ id, location, label, icon?, order?, when?, action }`:
+An entry is `{ id, location, surface?, label, icon?, order?, when?, action }`:
 
-- **`location`** comes from a closed vocabulary (`@acorn/protocol/contextMenus.ts`). There are two:
+- **`location`** comes from a closed vocabulary (`@acorn/protocol/contextMenus.ts`). There are four:
   `task.row` is a row in the tab rail, and `item.row` is a row in an integration's list — a Rollbar
-  error, a Linear issue, a GitHub pull request. The list grows when a surface appears to draw it,
-  never ahead of one.
+  error, a Linear issue, a GitHub pull request. `rail.source` and `rail.pane` are the desktop's left
+  source and right task pane icons. The rail locations require `surface`, the exact ID of a source or
+  task pane the declaring plugin owns. Both Node parsing and client registration check that reference.
 - **`when`** is a map of literals that must *all* equal the target's own facts — not an expression. A
   manifest is data, and a predicate language would need a parser, an evaluator and a decision about
   what it may call. `task.row` supplies `origin`, `projectId` and `pinned`; `item.row` supplies
-  `providerId` and `projectId`. Naming anything else is a parse error, because a predicate that can
+  `providerId` and `projectId`. `rail.source` supplies `projectId`; `rail.pane` supplies `projectId`,
+  `shown`, and `pinned`. Naming anything else is a parse error, because a predicate that can
   never match is a contribution that installs and does nothing. Identity fields (`id`, `title`) are
   deliberately not facts: a menu row keyed to one task id is not an extension point.
 - **`action`** is the *context-free* verb set — the same one a command and a slot badge take. A menu
@@ -223,6 +225,20 @@ An entry is `{ id, location, label, icon?, order?, when?, action }`:
   receives the id of the thing that was right-clicked, never an id the descriptor chose. There is no
   `tone` — a red row is a claim that an action destroys something, and that is core's claim to make
   about core's resources.
+
+For rail `runNodeAction`, the host sends `{ rail: { location, sourceId, projectId } }` or
+`{ rail: { location, paneId, taskId, projectId } }`. A source icon supplies no task and never borrows
+the sticky active task. Existing row bodies remain `{ item: id }`. A pane action uses the task and
+pane that opened the menu. Registration disposal and target, Node, and availability checks prevent
+an open menu from invoking a replacement plugin after reload. The cap is 32 descriptors because a
+plugin may own more than eight source and pane icons; each descriptor remains bounded.
+
+Compiled plugins register rail rows through `ctx.contextMenus.register`, after their source or pane.
+The host stamps the registration owner; `surface` cannot name another plugin's icon. Replacement
+`rail` and `pane.switcher` providers may call optional `openContextMenu(id, { x, y })`; worker trees
+send the same method with `{ id, at: { x, y } }`. The host validates the ID and point. Existing
+providers need no change. Terminal providers receive no DOM menu and may ignore the optional method.
+This does not intercept a replacement provider's markup automatically.
 
   ```json
   {

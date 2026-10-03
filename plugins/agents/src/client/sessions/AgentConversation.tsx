@@ -28,9 +28,8 @@ import TerminalConversationShortcuts from './TerminalConversationShortcuts'
 // the store or a pure function of the snapshot, so the two surfaces cannot disagree about a session.
 
 export default function AgentConversation(props: AgentConversationProps & {
-  /** Take the caret when a session opens. The Agent pane's, not every caller's: the focus request is
-   *  one-shot (./managedSelection.ts), so two visible composers would race for it and win by
-   *  whichever effect happened to run first. */
+  /** Focus the composer on navigation. Only the Agent pane opts in, so other conversation surfaces
+   *  do not compete for focus. */
   autoFocus?: boolean
 }) {
   // The transcript, its effects and its local controls belong to one session. Keep that owner keyed

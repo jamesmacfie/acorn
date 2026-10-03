@@ -166,6 +166,8 @@ export const tasks = sqliteTable('tasks', {
   projectId: text('project_id').notNull(),
   branch: text('branch'), // null = run in the project root; non-null = isolated Git worktree
   worktreePath: text('worktree_path'), // null until a terminal is first opened (Flow C)
+  scriptGeneration: integer('script_generation').notNull().default(1),
+  scriptHistoryKnown: integer('script_history_known', { mode: 'boolean' }).notNull().default(true),
   skipSetup: integer('skip_setup', { mode: 'boolean' }).notNull().default(false), // task-specific opt-out of the project setup script
   pullNumber: integer('pull_number'), // null for local-first until a PR is inherited (Flow B)
   status: text('status').notNull(), // 'active' | 'archived' | 'cancelled' (workflow child task)
@@ -386,3 +388,21 @@ export const audit = sqliteTable(
   // Every read is "the most recent N", and the 90-day prune is a range delete over the same column.
   (t) => [index('audit_at_idx').on(t.at)],
 )
+
+// Durable lifecycle evidence owned by core; terminal sessions are disposable plugin records.
+export const taskScriptAttempts = sqliteTable('task_script_attempts', {
+  attemptId: text('attempt_id').primaryKey(),
+  taskId: text('task_id').notNull(),
+  phase: text('phase').notNull(),
+  generation: integer('generation').notNull(),
+  state: text('state').notNull(),
+  reason: text('reason').notNull(),
+  terminalSessionId: text('terminal_session_id'),
+  requestedAt: integer('requested_at').notNull(),
+  startedAt: integer('started_at'),
+  finishedAt: integer('finished_at'),
+  exitCode: integer('exit_code'),
+  output: text('output').notNull().default(''),
+  outputAvailable: integer('output_available', { mode: 'boolean' }).notNull().default(false),
+  outputTruncated: integer('output_truncated', { mode: 'boolean' }).notNull().default(false),
+}, (t) => [index('task_script_attempts_task_generation').on(t.taskId, t.generation, t.phase)])

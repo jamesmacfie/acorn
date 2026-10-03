@@ -11,6 +11,8 @@ vi.mock('../../infra/node/apiClient', () => ({
 }))
 
 const { contextMenuItems, contextMenuRegistry } = await import('../registries/panes/contextMenus')
+const { sourceRegistry } = await import('../registries/sources/sources')
+const { paneRegistry } = await import('../registries/panes/panes')
 const { pluginContextMenuId, pluginContextMenuItem, registerPluginContextMenu } = await import('./chromeContextMenus')
 
 // A plugin's menu row: what the host refuses, and what it binds over whatever the manifest said. The
@@ -98,7 +100,8 @@ describe('what the host binds', () => {
   })
 
   it('sends the verb the id of the thing that was right-clicked, and nothing the descriptor chose', async () => {
-    const entry = pluginContextMenuItem('board', descriptor(), binding())
+    disposables.push(registerPluginContextMenu('board', descriptor(), binding()))
+    const entry = contextMenuItems('task.row', target())[0]!
     entry.run(target({ id: 'task-42' }))
     await Promise.resolve()
     expect(sendRaw).toHaveBeenCalledWith('/v1/p/board/open', expect.objectContaining({
@@ -110,6 +113,42 @@ describe('what the host binds', () => {
 
   it('carries no tone: a red row is core’s claim about core’s resources', () => {
     expect(pluginContextMenuItem('board', descriptor(), binding()).tone).toBeUndefined()
+  })
+})
+
+describe('rail menu ownership and execution', () => {
+  const sourceTarget = { location: 'rail.source' as const, id: 'feed', title: 'Feed', nodeId: 'node-a', projectId: 'project-1' }
+  const paneTarget = { location: 'rail.pane' as const, id: 'board-pane', title: 'Board', nodeId: 'node-a', taskId: 'task-1', projectId: 'project-1', pinned: false, shown: true }
+  const railBinding = () => ({ ...binding(), sources: new Set(['feed']), panes: new Set(['board-pane']) })
+
+  it('dispatches loaded source and pane actions with only host-derived rail context', async () => {
+    disposables.push(sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'board'))
+    disposables.push(paneRegistry.register({ id: 'board-pane', label: 'Board', glyph: 'list', order: 1, component: () => null }, 'board'))
+    disposables.push(registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()))
+    disposables.push(registerPluginContextMenu('board', descriptor({ id: 'pane-action', location: 'rail.pane', surface: 'board-pane' }), railBinding()))
+    const source = contextMenuItems('rail.source', sourceTarget)[0]!
+    const pane = contextMenuItems('rail.pane', paneTarget)[0]!
+    source.run(sourceTarget)
+    pane.run(paneTarget)
+    await Promise.resolve()
+    expect(sendRaw.mock.calls.map((call) => JSON.parse((call[1] as { body: string }).body))).toEqual([
+      { rail: { location: 'rail.source', sourceId: 'feed', projectId: 'project-1' } },
+      { rail: { location: 'rail.pane', paneId: 'board-pane', taskId: 'task-1', projectId: 'project-1' } },
+    ])
+    // A captured item cannot invoke the replacement after a plugin reload.
+    disposables.pop()!.dispose()
+    pane.run(paneTarget)
+    expect(sendRaw).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses foreign or undeclared surfaces and stale target nodes', () => {
+    expect(() => pluginContextMenuItem('board', descriptor({ location: 'rail.source', surface: 'other' }), railBinding())).toThrow(/undeclared/)
+    disposables.push(sourceRegistry.register({ id: 'feed', label: 'Feed', glyph: 'list', order: 1, component: () => null }, 'foreign'))
+    disposables.push(registerPluginContextMenu('board', descriptor({ location: 'rail.source', surface: 'feed' }), railBinding()))
+    expect(contextMenuItems('rail.source', sourceTarget)).toEqual([])
+    const entry = contextMenuRegistry.get('plugin:board:open-card')!
+    entry.run({ ...sourceTarget, nodeId: 'other-node' })
+    expect(sendRaw).not.toHaveBeenCalled()
   })
 })
 

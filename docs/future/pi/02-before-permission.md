@@ -4,6 +4,10 @@ Status: proposed, 2026-10-02. Not started. The design is [mods.md](../mods.md) a
 file records why the `omp` comparison moves it up the order, and the two additions the comparison
 suggests.
 
+Execution handoffs, 2026-10-03: [phase 02](./phases/02-permission-veto.md) delivers the hook and
+policy consumer; [phase 03](./phases/03-session-messages.md) delivers explanations. The sequential
+plan also adds a canonical `requestId` payload field for explanation idempotency.
+
 ## Why it belongs in this programme
 
 `omp`'s most used extension event is `tool_call`. Its own quick-start example blocks `rm -rf` with
@@ -21,14 +25,15 @@ Build it exactly as `mods.md` describes: observe and veto only, `onTimeout: 'all
 
 ## Addition 1: tell the model why
 
-`mods.md` lists "telling the model why" under
-[Later](../mods.md#later-each-with-its-trigger), with the trigger "agents retry blocked commands in
-a loop". `omp` answers the same problem with `additionalContext` on `tool_call`: a handler adds
+The first Mods design deferred explanations until agents retried blocked commands. The sequential
+plan instead makes them an optional consumer when messaging lands.
+`omp` answers the same problem with `additionalContext` on `tool_call`: a handler adds
 trusted text that the host places after the tool results, before the next model request.
 
 Acorn cannot place text inside the harness's turn. It can queue a turn after it. Once
-[03](./03-session-messages.md) ships, a veto handler can follow its veto with a session message that
-says what was refused and why. Keep the two separate:
+[03](./03-session-messages.md) ships, the handler's plugin can follow a confirmed veto with a session
+message that says what was refused and why. Phase 03 reads committed blocked state before delivery;
+a late hook verdict ignored after timeout is not proof of refusal. Keep the two separate:
 
 - The veto stays a hook verdict with a short display reason, capped by the host.
 - The explanation is a session message from the same plugin, under the same per-session cap as any

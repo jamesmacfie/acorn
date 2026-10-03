@@ -73,6 +73,11 @@ session after it has mounted. A different id disposes the prior transcript, snap
 pending reveal, and local view controls before mounting the new one. Drafts and reading places remain
 in their session-keyed stores, so returning to a session restores those separately.
 
+Navigating to an editable session in the Agent pane focuses its message field. Returning to its task
+or pane, switching sessions, and selecting the session already on screen all hand the caret to the
+composer without scrolling the transcript. Streamed events and session metadata updates do not move
+focus. Other surfaces that show the conversation do not opt into this focus behavior.
+
 Immediately after the title, the header hosts the `agents:session-header` remote `stack` point. Its
 props are a public projection rather than the ledger itself: task and session ids, provider id,
 per-turn usage and resolved prices, and explicit token/cost accounting modes. The owner stops there.

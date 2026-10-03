@@ -119,14 +119,18 @@ Start with the plugin map, then follow the authoring guide or API reference.
   dependencies, evidence, refusals, and sustained-use acceptance.
 
 - [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
-  security gates, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
+  security gates, team memory, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
 - [Dashboards programme](./future/dashboards/README.md) — seven proposed workstreams, delivered in
   four milestones, that widen panels from 30 example requests: a typed panel plan, a source-first
   editor, identity and time, richer sources, row actions, composition, datasets, and gated write-back.
 - [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
   projections, and acceptance gates for a standalone terminal client.
+- [Pi implementation programme](./future/pi/README.md) — the oh-my-pi comparison and nine sequential
+  handoffs combining harness extensibility with the Mods permission-hook proposal.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
+- [Desktop rail context menus](./future/rail-context-menus.md) — approved PRD and dated acceptance evidence for source and pane icon menus.
+- [Faster agent test feedback](./future/test-feedback.md) — implementation evidence for focused runs, cache precision, and TUI settlement.
 - [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
   from the review code pane while preserving history and distinguishing current and historical locations.
 - `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
@@ -168,3 +172,16 @@ links; review the implementation to verify API signatures and behavior.
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)
 - [The node half](./plugin-authoring/the-node-half.md)
+
+## Pi implementation handoffs
+
+- [Execution rules and phase index](./future/pi/phases/README.md)
+- [Phase 01: contributed omp harness](./future/pi/phases/01-omp-harness.md)
+- [Phase 02: permission veto and policy plugin](./future/pi/phases/02-permission-veto.md)
+- [Phase 03: attributed session messages](./future/pi/phases/03-session-messages.md)
+- [Phase 04: model grants and interactive advisor](./future/pi/phases/04-model-grants-and-advisor.md)
+- [Phase 05: unattended follow-ups](./future/pi/phases/05-unattended-follow-ups.md)
+- [Phase 06: portable plugin skills](./future/pi/phases/06-portable-skills.md)
+- [Phase 07: native skill delivery](./future/pi/phases/07-native-skills.md)
+- [Phase 08: resource-read experiment](./future/pi/phases/08-resource-read-experiment.md)
+- [Phase 09: programme acceptance](./future/pi/phases/09-programme-acceptance.md)

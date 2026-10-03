@@ -44,7 +44,7 @@ sharing a JavaScript framework.
 No plugin in this repository has a stylesheet, and an arch rule holds that: a plugin draws kit nodes,
 which take no `class` and no `style`, and a plugin that ships CSS has written an element to hang it
 on. Two more rules go with it. No plugin draws a raw `div` or `span`, checked by
-`kit/lib/adoption.test.ts`, and no plugin mounts a Solid root of its own, because a root the host does not
+`tools/arch/primitiveAdoption.test.ts`, and no plugin mounts a Solid root of its own, because a root the host does not
 know about sits outside every focus group and no intent reaches it.
 
 Loaded-plugin commands and shortcuts are host-bound manifest data. A command id `search` becomes

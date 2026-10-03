@@ -2,6 +2,12 @@
 
 Status: proposed, 2026-10-02. Not started.
 
+Execution handoffs, 2026-10-03: [phase 03](./phases/03-session-messages.md) delivers interactive
+messaging with the policy consumer. [Phase 05](./phases/05-unattended-follow-ups.md) enables
+unattended messages after operation lifetime, accounting, and cancellation are integrated. The
+limits below describe the target behavior; Acorn-controlled input alone does not authorize work
+after a workflow or delegated operation has finished.
+
 ## Why
 
 An `omp` extension can push a message into a running session with `pi.sendMessage`, and choose when it
@@ -9,8 +15,10 @@ lands: steer the current run, follow up after it, aside at the next step boundar
 turn. That one call is what makes the advisor, the MCP-notification bridge, and most of `omp`'s
 reactive extensions possible. Something outside the conversation notices a problem and tells the agent.
 
-An acorn plugin can watch a session through lifecycle events and `agents.reviewInput.v1`, and can
-change a prompt the person is sending through `agents:before-send`. It cannot speak first. The only
+An acorn plugin can watch a session through lifecycle events and change a prompt the person is
+sending through `agents:before-send`. The bounded `agents.reviewInput.v1` reader was removed with
+Findings; [phase 04](./phases/04-model-grants-and-advisor.md) introduces a replacement. It cannot
+speak first. The only
 code that queues a turn on a session without the person is first-party: delegation reports
 (`plugins/agents/src/server/delegation/reports.ts`) and workflows through `agents.sessionExecute`.
 

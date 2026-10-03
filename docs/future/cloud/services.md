@@ -74,7 +74,7 @@ staging version of each item as they need it.
 - A billing provider, from [phase 10](./phases/10-billing.md).
 - Logs, metrics, and error reporting that never carry code or prompts. The repository already has
   a Sentry plugin (`plugins/sentry-telemetry`) and OTLP audit export is planned in
-  [enterprise policy](../sandbox/enterprise-policy.md#audit-must-leave-the-box).
+  [worker isolation](./isolation.md#audit-export).
 - CI that builds and signs the Node image, runs the account service tests, and deploys staging on
   merge and production on a tagged release.
 

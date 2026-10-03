@@ -503,3 +503,17 @@ startup. A plugin adds its own numbers to the page through the `core:storage` po
 plugin reports its processes and its attachment and artifact folders
 ([managed-agents.md § Operations and failure](./managed-agents.md#operations-and-failure)). The page
 reports and does not delete: nothing on it prunes a database or the blob cache.
+
+## Task script persistence
+
+Core's `tasks` row carries `script_generation` and `script_history_known`. The migration marks
+existing tasks as having unknown history; new tasks start with known, unrequested history.
+Core's `task_script_attempts` table holds attempt identity, task, phase, generation, lifecycle
+state/reason, nullable terminal link and exit code, timestamps, and a bounded UTF-8 output tail
+with availability/truncation flags. It does not store script bodies. The synchronous service
+commits process evidence before task invalidations and fences updates by identity and generation.
+
+Attempts survive archive and terminal deletion. Deleting a project deletes its tasks and their
+attempts; retained logs therefore follow task lifetime. Status exposes at most 50 summaries,
+while explicit attempt selection can read older retained rows. Output is bounded per attempt,
+not a general terminal event ledger. See [durable results](./workspaces-and-tasks.md#durable-task-script-results).

@@ -43,6 +43,7 @@ function toolContext(c: Context<AppEnv>): ToolContext {
   const principal = c.get('principal')
   const rawCallId = c.req.header('x-acorn-tool-call-id')?.trim()
   return {
+    signal: c.req.raw.signal,
     taskId: c.req.param('id')!,
     userLogin: ownerId(c),
     sessionId: principal?.sessionId,

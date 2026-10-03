@@ -67,7 +67,8 @@ const contributionsShape = z.looseObject({
   refResolvers: z.array(refResolverDescriptor).max(4).default([]),
   themes: z.array(themeDescriptor).max(8).default([]),
   styles: z.array(styleDescriptor).max(8).default([]),
-  contextMenus: z.array(contextMenuDescriptor).max(8).default([]),
+  // A plugin can declare more than eight rail surfaces; keep the total bounded.
+  contextMenus: z.array(contextMenuDescriptor).max(32).default([]),
   // Raised from four and eight when the one key grew from rows to five kinds: a plugin that opens a
   // pane, a slot in it, a hook before it acts and an annotation on its rows is describing one
   // integration, not four, and the old caps were sized for rows alone.

@@ -238,7 +238,9 @@ const sweep = async (surface: Surface, size: typeof SIZES[number]): Promise<void
   const where = `${surface.name} at ${size.width} by ${size.height}`
   const screen: Screen = await renderFixture({ ...size, ...(surface.pane ? { pane: surface.pane } : {}) })
   try {
-    await screen.until(surface.until, 45)
+    // At 120 cells the focused order control can draw its accessible hint over the heading.
+    // The fixture-backed count is the wide layout's readiness marker for this same loaded sidebar.
+    await screen.until(surface.name === 'agents' && size.width === 120 ? 'NEEDS YOU 1' : surface.until, 45)
     await surface.open?.(screen)
     const owed = _allStops()
     // Anti-vacuity: a screen with nothing focusable on it would pass every assertion below.

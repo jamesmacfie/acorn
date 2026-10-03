@@ -68,6 +68,9 @@ diff rendering, and relevant GitHub contracts. Future designs checked include re
 compiled-tier migration, and task sandbox/direct-mount isolation. These are proposals where their
 acceptance remains open.
 
+The local task sandbox proposal was retired on 2026-10-03. Its mention above records what this audit
+reviewed, not an implementation dependency. Cloud worker isolation remains a separate proposal.
+
 History and source confirm these optimizations, which are not proposals in this report:
 
 - `a4b13e63` shares the numstat pair and Git-directory lookup and invalidates running reads.

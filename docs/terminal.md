@@ -497,3 +497,18 @@ this group holds neither.
 
 Killing a session and bulk session management stay in the drawer, where the tab strip says what is
 running and the close control sits beside it. A palette row has neither of those in front of it.
+
+## Task script evidence
+
+Setup and teardown remain ordinary task terminal sessions for interaction. Their authoritative
+lifecycle comes from Core's durable task-script service, rather than terminal titles. The compiled
+Terminal plugin consumes admitted setup identity and reports process start, output, confirmed
+exit, spawn failure, removal, shutdown, and teardown timeout through `CoreServices.taskScripts`.
+Callbacks capture the attempt before asynchronous session admission completes, so immediate exits
+are not lost. Core fences late callbacks by attempt and generation. The plugin never writes Core's
+attempt table directly, and loaded plugins do not receive this evidence facet.
+
+Explicit removal/cancellation interrupts an active attempt before process cleanup. A teardown
+timeout is failed with reason `timeout`; an attachment exit without command evidence is
+interrupted. Archive can delete the session while Core keeps its bounded output tail. See
+[durable results](./workspaces-and-tasks.md#durable-task-script-results) for recovery and retention.

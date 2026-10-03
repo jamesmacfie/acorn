@@ -4,15 +4,15 @@ import { routeKey } from '@acorn/plugin-github/testkit/client'
 
 describe('fileStatusMeta', () => {
   it('maps common GitHub file statuses to compact letters', () => {
-    expect(fileStatusMeta('added')).toEqual({ letter: 'A', label: 'added', tone: 'ok' })
-    expect(fileStatusMeta('removed')).toEqual({ letter: 'D', label: 'deleted', tone: 'danger' })
-    expect(fileStatusMeta('renamed')).toEqual({ letter: 'R', label: 'renamed', tone: 'warn' })
-    expect(fileStatusMeta('copied')).toEqual({ letter: 'C', label: 'copied', tone: 'muted' })
+    expect(fileStatusMeta('added')).toEqual({ letter: 'A', label: 'Added', tone: 'ok' })
+    expect(fileStatusMeta('removed')).toEqual({ letter: 'D', label: 'Deleted', tone: 'danger' })
+    expect(fileStatusMeta('renamed')).toEqual({ letter: 'R', label: 'Renamed', tone: 'warn' })
+    expect(fileStatusMeta('copied')).toEqual({ letter: 'C', label: 'Copied', tone: 'muted' })
   })
 
   it('defaults unknown or missing statuses to modified', () => {
-    expect(fileStatusMeta(null)).toEqual({ letter: 'M', label: 'modified', tone: 'warn' })
-    expect(fileStatusMeta('something-new')).toEqual({ letter: 'M', label: 'modified', tone: 'warn' })
+    expect(fileStatusMeta(null)).toEqual({ letter: 'M', label: 'Modified', tone: 'warn' })
+    expect(fileStatusMeta('something-new')).toEqual({ letter: 'M', label: 'Modified', tone: 'warn' })
   })
 })
 

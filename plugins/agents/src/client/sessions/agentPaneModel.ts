@@ -15,7 +15,6 @@ import {
   agentAttentionItemId,
   clearManagedSubagent,
   clearManagedSession,
-  requestComposerFocus,
   selectManagedSession,
   selectedManagedSession,
 } from './managedSelection'
@@ -193,7 +192,6 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
       const session = await managedAgentStore.startSession(task.id, descriptor, agent?.id)
       owner.check()
       selectManagedSession(task.id, session.id)
-      requestComposerFocus(session.id)
       await managedAgentStore.loadSnapshot(session.id)
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : 'Unable to start the managed agent.')

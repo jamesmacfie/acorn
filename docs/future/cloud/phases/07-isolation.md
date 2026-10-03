@@ -18,35 +18,35 @@ team admin. The closed alpha opens: single-person teams, using their own model k
 ## Starting point
 
 - Working cloud tasks with archive and restore from [phase 6](./06-archive.md).
-- The sandbox programme's design: the execution target in [sandbox.md](../../sandbox/sandbox.md),
-  the managed layer in [enterprise policy](../../sandbox/enterprise-policy.md), and its
-  [phases](../../sandbox/phases.md). The execution target seam and the policy layer are not built.
+- The execution boundary and team policy in [isolation](../isolation.md). Neither is built.
 - The three execution chokepoints: `packages/node-core/src/server/core/proc.ts`,
   `plugins/terminal/src/server/terminal.ts`, and `plugins/agents/src/server/drivers/jsonRpcProcess.ts`.
 - The child environment allowlist in `packages/node-core/src/server/taskEnv.ts`.
 
 ## In scope
 
-- The execution target seam and its Linux backend, shared with sandbox phase 3.
+- The worker execution target seam and its Linux backend.
 - Data root permissions and credential placement in the worker.
 - The model key proxy, and the per-harness fallback.
 - A Git credential helper backed by the Node.
 - Egress enforcement for every process in the worker.
-- Team policy as the managed layer, shared with sandbox phase 4, with a resolved-policy view.
+- Team policy as the managed layer, with a resolved-policy view.
+- Functional acceptance for Git, Acorn tools, attachments, terminals, previews, and offered services.
 - The adversarial test suite, run in CI against the image.
 
 ## Out of scope
 
-The Docker Sandboxes backend for macOS and Windows, which stays in the sandbox programme. Audit
-export to a customer's telemetry sink, unless a closed-alpha team needs it.
+Local task sandboxing. Audit export to a customer's telemetry sink, unless a closed-alpha team
+needs it.
 
 ## Steps and checkpoints
 
-### 1. Agree the shared seam
+### 1. Define the worker execution seam
 
-Meet the sandbox programme's design where it is. Write down which parts of sandbox phases 3 and 4
-this phase builds, and which remain the sandbox programme's. One seam, one resolver, one policy
-vocabulary.
+Specify the execution seam from [isolation](../isolation.md#worker-execution-boundary), including
+streaming, PTYs, cancellation, and cleanup. Confirm the checkout's Git metadata is available to
+task processes while Node secrets are not. Specify task API and MCP connectivity, selected attachment
+delivery, and preview port routing before implementing the backend.
 
 ### 2. Separate the task user
 
@@ -57,9 +57,10 @@ to the Node user.
 
 **Checkpoint 1: the agent cannot read the Node.** In a local worker container, ask an agent to read
 `/data/core.sqlite`, `internal-token`, and `session.key`, and to list `/proc/<node-pid>/environ`.
-Each fails. The editor, diff, search, and git still work.
+Each fails. The editor, diff, and search still work. Inside the task terminal, Git status, diff,
+branch, and commit succeed. Acorn tools and attachments remain available to a managed agent.
 
-**Checkpoint 2: a local Node is unchanged.** On a local Node with no sandbox configured, behavior is
+**Checkpoint 2: a local Node is unchanged.** On an ordinary local Node, behavior is
 exactly as before, and the policy resolver does not run.
 
 ### 3. Credentials in memory only
@@ -96,7 +97,7 @@ and the model provider still work.
 
 ### 7. Team policy
 
-Build the managed layer resolver and the fixed vocabulary from the sandbox programme. The team Node
+Build the managed layer resolver and the fixed vocabulary from [team policy](../isolation.md#team-policy). The team Node
 delivers the team and project policy in the seed. The worker merges most-restrictive-wins. Add a
 resolved-policy view per task: what is allowed, and who decided.
 
@@ -120,14 +121,14 @@ what changed.
   writing.
 - Every harness acorn ships has a recorded model-key option.
 - A local Node with no policy runs exactly as before.
+- The functional acceptance paths in [isolation](../isolation.md#the-adversarial-test) pass alongside
+  the denial tests. A required isolation backend that cannot start refuses execution.
 
 ## Docs to update when it ships
 
-- [sandbox.md](../../sandbox/sandbox.md) and [enterprise policy](../../sandbox/enterprise-policy.md):
-  mark what shipped, and move the behavior to owning documents.
+- [Isolation](../isolation.md): mark what shipped and move behavior to owning documents.
 - [security](../../../security.md): worker isolation, credential placement, and egress.
-- The sandbox programme's [refusals](../../sandbox/refused.md), if the egress choice needs acorn to
-  own a proxy.
+- [Cloud refusals](../refused.md): record the adopted egress boundary and alternatives rejected.
 
 ## Open questions
 
@@ -147,5 +148,5 @@ Record the adversarial suite's results and the review's findings here, with date
 
 ## Verify before building
 
-Check the sandbox programme's progress, the provider's VM privileges, and which harnesses accept a
-base URL override.
+Check the provider's VM privileges, checkout and Git metadata layout, task API connectivity, and
+which harnesses accept a base URL override.

@@ -807,3 +807,21 @@ the selected project. Edits, deletes, and restores use the current file hash. Im
 previewed file to its source hash and destination hash, with a per-file overwrite choice. Caps are
 integers from 200 through 32,000 characters. Conflicts return HTTP 409; missing resources return 404.
 See [notes and memory](./notes-and-memory.md#the-memory-page-and-transcript) for the page contract.
+
+## Task script reads
+
+All routes are under Core and enforce task-token confinement:
+
+| Method | Route | Result |
+| --- | --- | --- |
+| GET | `/v1/core/tasks/:id/scripts` | Current setup/teardown snapshots, generation, archive progress, up to 50 attempts. |
+| GET | `/v1/core/tasks/:id/scripts/wait?phase=setup&timeoutMs=30000&attemptId=...` | `{ snapshot, matched, reason }`. |
+| GET | `/v1/core/tasks/:id/scripts/logs?phase=setup&tailLines=100&maxBytes=32768&attemptId=...` | Snapshot, UTF-8 output, availability, truncation and byte counts. |
+
+Both phases support optional explicit attempt selection for wait/logs. Query inputs are strictly
+validated: waits range from 0 to 30,000 ms, tails from 1 to 1,000 lines, and bytes from 1 to 32,768.
+Unknown tasks or foreign/missing attempts return 404. Reads never execute scripts or create roots.
+Waits bind once to the attempt/generation; no request returns promptly, settled states match,
+timeouts do not match, and generation changes do not satisfy the previous wait. Request abort
+releases the local wait without canceling the process. CLI transport deadlines exceed the Node's
+30-second wait bound (35 seconds). The typed contract is `@acorn/protocol/taskScripts.ts`.

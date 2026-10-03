@@ -17,7 +17,7 @@ import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { railStatusMarkers } from '../tasks/railStatus'
-import { isSettingUp } from '../tasks/agentSessions'
+import { createTaskScripts } from '../tasks/taskScripts'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
@@ -33,8 +33,11 @@ import { PrefKeys } from '../../infra/persistence/prefKeys'
 import { completeTaskArchive, isArchiving, withArchiving } from '../tasks/archiveLifecycle'
 import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
-import { registerContextMenuItems, type TaskRowTarget } from '../../host/registries/panes/contextMenus'
+import { registerContextMenuItems, type TaskRowTarget, type RailSourceTarget } from '../../host/registries/panes/contextMenus'
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
+import { menuPoint } from '../../host/registries/panes/menuPoint'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { sourceRegistry } from '../../host/registries/sources/sources'
 import IconPicker, { randomIconName } from '../../kit/components/inputs/IconPicker'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
@@ -74,6 +77,9 @@ export default function TabRail() {
   // belongs to travelling in the signal.
   const [rowMenu, setRowMenu] = createSignal<ContextMenuOpening | null>(null)
   let rowMenuReturnFocus: HTMLElement | undefined
+  const [sourceMenu, setSourceMenu] = createSignal<ContextMenuOpening | null>(null)
+  let sourceMenuReturnFocus: HTMLElement | undefined
+  let openedSource: unknown
 
   // Rail order: pin-to-top plus drag-reorder in a dedicated pref, never tasks.sort. The pure model
   // lives in railOrder.ts.
@@ -227,6 +233,28 @@ export default function TabRail() {
     const projectId = query.data?.find((task) => task.id === activeTaskId())?.projectId
     if (projectId) navigate(projectPath(projectId))
   }
+  const openSourceMenu = (id: string, at: { x: number; y: number }) => {
+    const source = sources().find((candidate) => candidate.id === id)
+    const nodeId = activeNodeId()
+    if (!source || !nodeId) return
+    setMenuId(null)
+    setRowMenu(null)
+    const projectId = params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId ?? ''
+    const target: RailSourceTarget = { location: 'rail.source', id, title: source.label, nodeId, projectId }
+    openedSource = sourceRegistry.get(id)
+    setSourceMenu({ at, target })
+  }
+  const sourceAction = registerContextMenuItems< 'rail.source'>([{
+    id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
+    run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
+  }])
+  onCleanup(() => sourceAction.dispose())
+  createEffect(() => {
+    const opened = sourceMenu()?.target
+    if (opened?.location === 'rail.source' &&
+      (opened.nodeId !== activeNodeId() || !sources().some((source) => source.id === opened.id) ||
+        sourceRegistry.get(opened.id) !== openedSource)) setSourceMenu(null)
+  })
 
   function onRowClick(w: Task) {
     if (railDrag.consumeClick(w.id)) return
@@ -441,6 +469,7 @@ export default function TabRail() {
           {(w) => {
             // CI checks are provider-owned data. The shared rail no longer reaches through a
             // repository source seam; the GitHub PR pane remains the authoritative check surface.
+            const scripts = createTaskScripts(() => w.id)
             const checks = () => []
             const st = () => taskStatus(w.id)
             // Core's own states plus whatever plugins publish for this task. RailTab orders them,
@@ -451,8 +480,8 @@ export default function TabRail() {
                 checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
                 unread: !!unreadForTask(w.id),
                 status: st(),
-                archiving: isArchiving(w.id),
-                settingUp: isSettingUp(w.id),
+                archiving: isArchiving(w.id) || scripts.freshness() === 'live' && !!scripts.query.data?.archiveInProgress,
+                settingUp: scripts.freshness() === 'live' && ['starting', 'running'].includes(scripts.query.data?.setup.state ?? ''),
                 pinned: pinnedTasks().has(w.id),
               }),
               ...markersFor({ kind: 'task', id: w.id }),
@@ -559,6 +588,7 @@ export default function TabRail() {
     formFactor: 'desktop',
     slots: { taskList: taskListRef },
     selectSource: (id) => { if (sources().some((source) => source.id === id)) selectSource(id) },
+    openContextMenu: openSourceMenu,
     openWorkspace: (id) => {
       const workspace = workspaces.data?.find((candidate) => candidate.id === id)
       const first = workspace?.projects[0]
@@ -586,12 +616,18 @@ export default function TabRail() {
             {(source) => (
               <RailTab
                 class="tabrail-source"
+                data-source-id={source.id}
                 label={source.label}
                 glyph={source.icon}
                 active={source.selected}
                 markers={[...source.markers]}
                 aria-current={source.selected ? 'page' : undefined}
                 onClick={() => value().selectSource(source.id)}
+                onContextMenu={(event) => {
+                  event.preventDefault()
+                  sourceMenuReturnFocus = event.currentTarget
+                  value().openContextMenu?.(source.id, menuPoint(event))
+                }}
               />
             )}
           </For>
@@ -618,6 +654,13 @@ export default function TabRail() {
         opening={rowMenu}
         onClose={() => setRowMenu(null)}
         returnFocus={() => rowMenuReturnFocus}
+      />
+      <ContextMenuHost
+        location="rail.source"
+        ariaLabel={sourceMenu() ? `Actions for ${sourceMenu()!.target.title}` : 'Source actions'}
+        opening={sourceMenu}
+        onClose={() => setSourceMenu(null)}
+        returnFocus={() => sourceMenuReturnFocus?.isConnected ? sourceMenuReturnFocus : undefined}
       />
       <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>

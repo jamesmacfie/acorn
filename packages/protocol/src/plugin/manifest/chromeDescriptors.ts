@@ -178,6 +178,8 @@ export const slotDescriptor = z.object({
 export const contextMenuDescriptor = z.object({
   id: z.string().min(1).max(64),
   location: z.enum(CONTEXT_MENU_LOCATIONS),
+  // Required for rail locations. The node and client verify ownership against declared surfaces.
+  surface: z.string().min(1).max(64).optional(),
   label: z.string().min(1).max(60),
   // A Lucide name or a `brand:` mark, resolved client-side, exactly as a source's `glyph` is.
   icon: z.string().min(1).max(64).optional(),

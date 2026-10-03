@@ -13,7 +13,7 @@ const valueOptions = new Set([
   'node', 'output', 'workspace', 'project', 'status', 'name', 'path', 'title', 'branch', 'base',
   'patch-file', 'file', 'task', 'session', 'provider', 'profile', 'prompt', 'prompt-file',
   'request-id', 'after-seq', 'limit', 'timeout', 'until', 'definition', 'inputs-file',
-  'input-file',
+  'input-file', 'phase', 'attempt', 'tail', 'max-bytes',
 ])
 const flagOptions = new Set(['help', 'no-header', 'background', 'force', 'skip-setup', 'include-hidden', 'follow', 'check'])
 
@@ -54,6 +54,10 @@ export function helpFor(positionals: string[]): string {
       'project remove deletes related tasks, but leaves folders and worktrees on disk',
     ]
     : section === 'task' ? [
+      'task scripts status [TASK_ID] --output json',
+      'task scripts wait [TASK_ID] --phase setup|teardown [--attempt ID] [--timeout 5m] [--check]',
+      'task scripts logs [TASK_ID] --phase setup|teardown [--attempt ID] [--tail 100] [--max-bytes 32768]',
+      'reads never start scripts; task ID omission uses task launch credentials',
       'task list [--project ID] [--status active|archived|all]|show ID',
       'task create --project ID --title TEXT [--branch NAME] [--base BRANCH] [--skip-setup] [--request-id UUID]',
       'a branch and created-trigger setup may prepare a worktree and execute project configuration',
@@ -73,6 +77,6 @@ export function helpFor(positionals: string[]): string {
     : section === 'run' ? ['run list [--workspace ID] (bounded recent summaries; use owner lists for history)']
     : section === 'plugin' ? ['plugin list|ID commands|ID COMMAND --input-file FILE|- [--request-id UUID]', 'plugin ID COMMAND --help']
     : section === 'node' ? ['node info', 'node start --background', 'node status', 'node stop [--force]']
-    : ['node info|start|status|stop', 'workspace list|show|create|rename|remove|external-projects', 'project list|show|add|rename|move|hide|unhide|detect|remove|config', 'task list|show|create', 'agent providers|list|show|start|send|events|wait', 'workflow list|start|run list|run show|run steps|run wait', 'run list', 'plugin list|ID commands|ID COMMAND']
+    : ['node info|start|status|stop', 'workspace list|show|create|rename|remove|external-projects', 'project list|show|add|rename|move|hide|unhide|detect|remove|config', 'task list|show|create|scripts status|scripts wait|scripts logs', 'agent providers|list|show|start|send|events|wait', 'workflow list|start|run list|run show|run steps|run wait', 'run list', 'plugin list|ID commands|ID COMMAND']
   return `Usage: acorn [--node ID|LABEL|https://HOST:PORT] ${lines.join('\n       acorn ')}\n\nOptions: --output text|json|jsonl  --no-header  --help\nExit codes: 0 success, 1 internal, 2 usage, 3 connection/auth/identity/protocol, 4 domain, 5 timeout, 6 failed wait, 7 ambiguous mutation or partial write.\n`
 }

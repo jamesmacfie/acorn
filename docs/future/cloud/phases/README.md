@@ -21,9 +21,8 @@ before taking a phase.
 | [10. Billing](./10-billing.md) | Metering, estimates, hard budgets, and invoices. | Paid beta. | 9. |
 | [11. Production](./11-production.md) | Three regions, backups, quotas, runbooks, security review, and the speed target met. | General availability. | 10. |
 
-Phases 1 and 2 have no dependency on each other and can run at the same time. Phase 7 shares its
-execution target work with [sandbox phase 3](../../sandbox/phases.md#phase-3--per-task-os-isolation)
-and its policy work with sandbox phase 4. Coordinate so the two programmes build one seam.
+Phases 1 and 2 have no dependency on each other and can run at the same time. Phase 7 owns the
+worker execution boundary and team policy described in [isolation](../isolation.md).
 
 ## Why this order
 

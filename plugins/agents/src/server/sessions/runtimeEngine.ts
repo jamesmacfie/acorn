@@ -71,11 +71,10 @@ const listedRow = (session: AgentSession): string => JSON.stringify({
 /**
  * acorn's own tool servers for one session, or none.
  *
- * Two doors exist and a harness gets one. Claude Code and Codex register acorn through their own CLI
- * (`claude mcp add`, `codex mcp add`), which their profile declares as `mcpRegistration`; telling them
- * again over the protocol would list every acorn tool twice. A contributed harness has no such command
- * and no manifest field for one, so the protocol is its only door. `mcpRegistration` is therefore the
- * test, rather than a new declaration: whoever already has a door keeps it.
+ * ACP harnesses with CLI registration use that registration; other ACP harnesses receive a protocol
+ * declaration. Managed Codex always receives a declaration under the registered server's name, which
+ * overrides its config-file entry. Codex filters inherited MCP environment variables, so registration
+ * alone drops the signed task context and leaves the server with no tools.
  *
  * An unregistered profile gets nothing either. The session could not have started without one, so this
  * is a broken state rather than a case, and the conservative answer is not to hand a credential to it.
@@ -89,12 +88,12 @@ const listedRow = (session: AgentSession): string => JSON.stringify({
  */
 export function acornMcpServers(
   mcp: { name: string; launcher: Launcher } | null,
-  session: Pick<AgentSession, 'profileId'>,
+  session: Pick<AgentSession, 'profileId' | 'driverKind'>,
   sessionEnv: Record<string, string>,
 ): AgentDriverMcpServer[] {
   if (!mcp) return []
   const profile = agentProfileRegistry.get(session.profileId)
-  if (!profile || profile.mcpRegistration) return []
+  if (!profile || (profile.mcpRegistration && session.driverKind !== 'codex-app-server')) return []
   return [{
     transport: 'stdio',
     name: mcp.name,

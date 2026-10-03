@@ -17,15 +17,27 @@
 
 let pending = false
 let held = 0
+// A release belongs to the surface that took its hold. Replacing the painter discards its holds,
+// but callbacks from a disposed rectangle may still arrive on a later turn.
+let surface = 0
 let draw: (() => void) | null = null
+const holdWaiters = new Set<() => void>()
+
+const notifyReleased = (): void => {
+  if (held > 0) return
+  for (const resolve of holdWaiters) resolve()
+  holdWaiters.clear()
+}
 
 /** What paint installs to be told a frame is due. One subscriber, because there is one painter.
  *
  *  The holds go with it: a surface being replaced is a new screen, and a hold left over from the last
  *  one would leave every later `frameRequested` answering yes forever. */
 export const onFrame = (fn: (() => void) | null): void => {
+  surface += 1
   draw = fn
   held = 0
+  notifyReleased()
 }
 
 /**
@@ -36,13 +48,16 @@ export const onFrame = (fn: (() => void) | null): void => {
  * one twice must not take the count below nought.
  */
 export const holdFrame = (): (() => void) => {
+  const owner = surface
   held += 1
   let gone = false
   return () => {
     if (gone) return
     gone = true
+    if (owner !== surface) return
     held -= 1
     requestFrame()
+    notifyReleased()
   }
 }
 
@@ -57,8 +72,7 @@ export const requestFrame = (): void => {
 }
 
 /** How long `framesSettled` waits for a hold nobody released. A hold that never comes back is a bug
- *  in whoever took it, and hanging the caller forever is a worse way to find out than drawing one
- *  frame early. Generous against the couple of milliseconds a real parse takes. */
+ *  in whoever took it, and rejecting names that bug instead of drawing an incomplete frame. */
 const HOLD_DEADLINE_MS = 200
 
 /**
@@ -69,12 +83,23 @@ const HOLD_DEADLINE_MS = 200
  * timer — and a loop over `frameRequested` cannot outwait one, because twenty turns of `setImmediate`
  * go by in two milliseconds and a zero-delay timer is a millisecond (../harness.tsx § flush).
  *
- * Polled rather than promised, because the release is a callback a library calls and a waiter list
- * would be a second thing that has to be got right for the same one-line answer.
+ * The release callback wakes waiters immediately. A lost hold rejects with an explicit error;
+ * returning early would let a capture assert against a frame known to be incomplete.
  */
 export async function framesSettled(): Promise<void> {
-  const until = Date.now() + HOLD_DEADLINE_MS
-  while (held > 0 && Date.now() < until) await new Promise((done) => setTimeout(done, 1))
+  if (held === 0) return
+  await new Promise<void>((resolve, reject) => {
+    const done = () => {
+      clearTimeout(timer)
+      holdWaiters.delete(done)
+      resolve()
+    }
+    const timer = setTimeout(() => {
+      holdWaiters.delete(done)
+      reject(new Error(`TUI frame hold was not released within ${HOLD_DEADLINE_MS} ms (${held} held)`))
+    }, HOLD_DEADLINE_MS)
+    holdWaiters.add(done)
+  })
 }
 
 /** Is a frame on its way, or owed? The tree operations have no return value to assert on, so this is

@@ -1,3 +1,4 @@
+import { taskScripts } from './taskScripts/service'
 import { randomUUID } from 'node:crypto'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
@@ -258,6 +259,8 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
   const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
   if (taskIds.length) {
     await db.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds))
+    for (const taskId of taskIds) taskScripts(db).interruptTask(taskId, 'cancelled')
+    await db.delete(schema.taskScriptAttempts).where(inArray(schema.taskScriptAttempts.taskId, taskIds))
     await db.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds))
     await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
     for (const taskId of taskIds) retireTaskHead(taskId)

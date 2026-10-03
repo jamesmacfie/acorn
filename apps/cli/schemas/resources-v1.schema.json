@@ -23,7 +23,10 @@
     { "$ref": "#/$defs/WorkflowRunAck" },
     { "$ref": "#/$defs/WorkflowStep" },
     { "$ref": "#/$defs/RunSummary" },
-    { "$ref": "#/$defs/RunList" }
+    { "$ref": "#/$defs/RunList" },
+    { "$ref": "#/$defs/TaskScripts" },
+    { "$ref": "#/$defs/TaskScriptWait" },
+    { "$ref": "#/$defs/TaskScriptLogs" }
   ],
   "$defs": {
     "Node": {
@@ -260,6 +263,837 @@
         "running": { "type": "boolean" }, "disabled": { "type": "boolean" }, "required": { "type": "boolean" },
         "activeVersion": { "type": ["string", "null"] }, "installedVersion": { "type": ["string", "null"] }
       }
+    },
+    "TaskScripts": {
+      "type": "object",
+      "properties": {
+        "taskId": {
+          "type": "string"
+        },
+        "generation": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "archiveInProgress": {
+          "type": "boolean"
+        },
+        "setup": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "string",
+              "enum": [
+                "setup",
+                "teardown"
+              ]
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "attemptId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_started",
+                "starting",
+                "running",
+                "succeeded",
+                "failed",
+                "skipped",
+                "interrupted",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "not_requested",
+                "legacy_history",
+                "admitted",
+                "process_started",
+                "exit_zero",
+                "nonzero_exit",
+                "spawn_failed",
+                "timeout",
+                "user_skipped",
+                "disabled",
+                "not_configured",
+                "not_applicable",
+                "cancelled",
+                "terminal_removed",
+                "shutdown",
+                "restart",
+                "process_lost",
+                "generation_changed"
+              ]
+            },
+            "terminalSessionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputAvailable": {
+              "type": "boolean"
+            },
+            "outputTruncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "taskId",
+            "phase",
+            "generation",
+            "attemptId",
+            "state",
+            "reason",
+            "terminalSessionId",
+            "requestedAt",
+            "startedAt",
+            "finishedAt",
+            "exitCode",
+            "outputAvailable",
+            "outputTruncated"
+          ],
+          "additionalProperties": false
+        },
+        "teardown": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "string",
+              "enum": [
+                "setup",
+                "teardown"
+              ]
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "attemptId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_started",
+                "starting",
+                "running",
+                "succeeded",
+                "failed",
+                "skipped",
+                "interrupted",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "not_requested",
+                "legacy_history",
+                "admitted",
+                "process_started",
+                "exit_zero",
+                "nonzero_exit",
+                "spawn_failed",
+                "timeout",
+                "user_skipped",
+                "disabled",
+                "not_configured",
+                "not_applicable",
+                "cancelled",
+                "terminal_removed",
+                "shutdown",
+                "restart",
+                "process_lost",
+                "generation_changed"
+              ]
+            },
+            "terminalSessionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputAvailable": {
+              "type": "boolean"
+            },
+            "outputTruncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "taskId",
+            "phase",
+            "generation",
+            "attemptId",
+            "state",
+            "reason",
+            "terminalSessionId",
+            "requestedAt",
+            "startedAt",
+            "finishedAt",
+            "exitCode",
+            "outputAvailable",
+            "outputTruncated"
+          ],
+          "additionalProperties": false
+        },
+        "attempts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "taskId": {
+                "type": "string"
+              },
+              "phase": {
+                "type": "string",
+                "enum": [
+                  "setup",
+                  "teardown"
+                ]
+              },
+              "generation": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "attemptId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "state": {
+                "type": "string",
+                "enum": [
+                  "not_started",
+                  "starting",
+                  "running",
+                  "succeeded",
+                  "failed",
+                  "skipped",
+                  "interrupted",
+                  "unknown"
+                ]
+              },
+              "reason": {
+                "type": "string",
+                "enum": [
+                  "not_requested",
+                  "legacy_history",
+                  "admitted",
+                  "process_started",
+                  "exit_zero",
+                  "nonzero_exit",
+                  "spawn_failed",
+                  "timeout",
+                  "user_skipped",
+                  "disabled",
+                  "not_configured",
+                  "not_applicable",
+                  "cancelled",
+                  "terminal_removed",
+                  "shutdown",
+                  "restart",
+                  "process_lost",
+                  "generation_changed"
+                ]
+              },
+              "terminalSessionId": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "requestedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "startedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "finishedAt": {
+                "anyOf": [
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "exitCode": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "outputAvailable": {
+                "type": "boolean"
+              },
+              "outputTruncated": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "taskId",
+              "phase",
+              "generation",
+              "attemptId",
+              "state",
+              "reason",
+              "terminalSessionId",
+              "requestedAt",
+              "startedAt",
+              "finishedAt",
+              "exitCode",
+              "outputAvailable",
+              "outputTruncated"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "attemptsTruncated": {
+          "type": "boolean"
+        },
+        "apiVersion": {
+          "type": "string",
+          "const": "acorn.cli/v1"
+        },
+        "kind": {
+          "type": "string",
+          "const": "TaskScripts"
+        },
+        "nodeId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "taskId",
+        "generation",
+        "archiveInProgress",
+        "setup",
+        "teardown",
+        "attempts",
+        "attemptsTruncated",
+        "apiVersion",
+        "kind",
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "TaskScriptWait": {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "string",
+              "enum": [
+                "setup",
+                "teardown"
+              ]
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "attemptId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_started",
+                "starting",
+                "running",
+                "succeeded",
+                "failed",
+                "skipped",
+                "interrupted",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "not_requested",
+                "legacy_history",
+                "admitted",
+                "process_started",
+                "exit_zero",
+                "nonzero_exit",
+                "spawn_failed",
+                "timeout",
+                "user_skipped",
+                "disabled",
+                "not_configured",
+                "not_applicable",
+                "cancelled",
+                "terminal_removed",
+                "shutdown",
+                "restart",
+                "process_lost",
+                "generation_changed"
+              ]
+            },
+            "terminalSessionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputAvailable": {
+              "type": "boolean"
+            },
+            "outputTruncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "taskId",
+            "phase",
+            "generation",
+            "attemptId",
+            "state",
+            "reason",
+            "terminalSessionId",
+            "requestedAt",
+            "startedAt",
+            "finishedAt",
+            "exitCode",
+            "outputAvailable",
+            "outputTruncated"
+          ],
+          "additionalProperties": false
+        },
+        "matched": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string",
+          "enum": [
+            "settled",
+            "not_started",
+            "unknown",
+            "timeout",
+            "generation_changed"
+          ]
+        },
+        "apiVersion": {
+          "type": "string",
+          "const": "acorn.cli/v1"
+        },
+        "kind": {
+          "type": "string",
+          "const": "TaskScriptWait"
+        },
+        "nodeId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot",
+        "matched",
+        "reason",
+        "apiVersion",
+        "kind",
+        "nodeId"
+      ],
+      "additionalProperties": false
+    },
+    "TaskScriptLogs": {
+      "type": "object",
+      "properties": {
+        "snapshot": {
+          "type": "object",
+          "properties": {
+            "taskId": {
+              "type": "string"
+            },
+            "phase": {
+              "type": "string",
+              "enum": [
+                "setup",
+                "teardown"
+              ]
+            },
+            "generation": {
+              "type": "integer",
+              "minimum": -9007199254740991,
+              "maximum": 9007199254740991
+            },
+            "attemptId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "state": {
+              "type": "string",
+              "enum": [
+                "not_started",
+                "starting",
+                "running",
+                "succeeded",
+                "failed",
+                "skipped",
+                "interrupted",
+                "unknown"
+              ]
+            },
+            "reason": {
+              "type": "string",
+              "enum": [
+                "not_requested",
+                "legacy_history",
+                "admitted",
+                "process_started",
+                "exit_zero",
+                "nonzero_exit",
+                "spawn_failed",
+                "timeout",
+                "user_skipped",
+                "disabled",
+                "not_configured",
+                "not_applicable",
+                "cancelled",
+                "terminal_removed",
+                "shutdown",
+                "restart",
+                "process_lost",
+                "generation_changed"
+              ]
+            },
+            "terminalSessionId": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "requestedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "startedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "finishedAt": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exitCode": {
+              "anyOf": [
+                {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "outputAvailable": {
+              "type": "boolean"
+            },
+            "outputTruncated": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "taskId",
+            "phase",
+            "generation",
+            "attemptId",
+            "state",
+            "reason",
+            "terminalSessionId",
+            "requestedAt",
+            "startedAt",
+            "finishedAt",
+            "exitCode",
+            "outputAvailable",
+            "outputTruncated"
+          ],
+          "additionalProperties": false
+        },
+        "output": {
+          "type": "string"
+        },
+        "available": {
+          "type": "boolean"
+        },
+        "truncated": {
+          "type": "boolean"
+        },
+        "retainedBytes": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "returnedBytes": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "apiVersion": {
+          "type": "string",
+          "const": "acorn.cli/v1"
+        },
+        "kind": {
+          "type": "string",
+          "const": "TaskScriptLogs"
+        },
+        "nodeId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot",
+        "output",
+        "available",
+        "truncated",
+        "retainedBytes",
+        "returnedBytes",
+        "apiVersion",
+        "kind",
+        "nodeId"
+      ],
+      "additionalProperties": false
     }
   }
 }

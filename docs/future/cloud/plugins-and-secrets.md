@@ -68,8 +68,8 @@ back through the API.
 ## Model keys
 
 Teams supply model provider keys. This is the sharpest part of the secret story, because the agent
-CLIs that acorn drives read their key from the environment, and the sandbox programme's
-[child environment policy](../sandbox/threat-model.md#ambient-authority-already-careful-still-wide)
+CLIs that acorn drives read their key from the environment, and Acorn's
+[child environment policy](../../security.md#process-path-and-configuration-controls)
 deliberately keeps provider credentials out of every child process.
 
 Three options, from strongest to weakest:
@@ -77,17 +77,15 @@ Three options, from strongest to weakest:
 1. **A credential-injecting loopback proxy.** The worker Node runs a small proxy on loopback. The
    agent's `ANTHROPIC_BASE_URL` or equivalent points at it, with a placeholder key. The proxy adds
    the real key from `SecretService.use` and forwards to the provider. The key never enters the
-   child. This is the pattern Docker Sandboxes uses for credentials
-   ([sandbox research](../sandbox/research.md#docker-sandboxes-sbx)). It works only for harnesses
-   that let you change the base URL.
+   child. It works only for harnesses that let you change the base URL.
 2. **A task-scoped environment variable.** The key is injected into the agent process's environment
    only, not into terminals or setup scripts, and only for the harness that needs it. An agent can
    read and send its own key. That is the trust cost, and it must be written down.
 3. **The key in the worker's environment.** Every process can read it. Refused for production.
 
 Recommended: option 1 where the harness supports it, option 2 as the named fallback, decided per
-harness in [phase 7](./phases/07-isolation.md). The proxy is a credential broker, not an egress
-filter, so it does not conflict with the sandbox programme's refusal to build an egress proxy.
+harness in [phase 7](./phases/07-isolation.md). This proxy brokers credentials. Worker-wide egress
+enforcement is a separate requirement in [isolation](./isolation.md#egress).
 
 Limit each key's scope where the provider allows it, such as a dedicated workspace key with a spend
 limit. Omit unrelated secrets from every worker. Revoke and rotate a leaked key.

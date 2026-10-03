@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web'
+import { createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AgentSession } from '../../contract/wire.ts'
 
@@ -30,6 +31,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 
 const { default: AgentComposer } = await import('./AgentComposer')
 const { clearComposerDrafts } = await import('./composerState')
+const { selectManagedSession } = await import('../sessions/managedSelection')
 
 const session = {
   id: 's1', taskId: 't1', title: 'A session', config: {}, runtimeState: 'ready', controller: 'acorn',
@@ -46,11 +48,12 @@ afterEach(() => {
   clearComposerDrafts()
 })
 
-const mount = () => {
+const mount = (options: { session?: () => AgentSession; autoFocus?: boolean; disabled?: boolean } = {}) => {
   const host = document.createElement('div')
   document.body.append(host)
   cleanups.push(render(() => (
-    <AgentComposer session={session} onSessionUpdated={() => {}} onSent={() => {}} />
+    <AgentComposer session={options.session?.() ?? session} autoFocus={options.autoFocus}
+      disabled={options.disabled} onSessionUpdated={() => {}} onSent={() => {}} />
   ), host))
   cleanups.push(() => host.remove())
   return host
@@ -58,6 +61,48 @@ const mount = () => {
 
 const attachButton = (host: HTMLElement) =>
   [...host.querySelectorAll('button')].find((button) => button.textContent?.includes('Attach'))!
+
+describe('composer navigation focus', () => {
+  it('focuses on entry and session changes without taking focus on metadata updates', async () => {
+    const [current, setCurrent] = createSignal(session)
+    const host = mount({ session: current, autoFocus: true })
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message agent"]')!
+    await vi.waitFor(() => expect(document.activeElement).toBe(field))
+
+    const attach = attachButton(host)
+    attach.focus()
+    setCurrent({ ...session, title: 'Updated title' })
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    expect(document.activeElement).toBe(attach)
+
+    setCurrent({ ...session, id: 's2' })
+    await vi.waitFor(() => expect(document.activeElement).toBe(field))
+    attach.focus()
+    selectManagedSession('t1', 's2')
+    await vi.waitFor(() => expect(document.activeElement).toBe(field))
+  })
+
+  it('focuses when returning to a session while another surface shows its composer', async () => {
+    mount()
+    const host = mount({ autoFocus: true })
+    const field = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Message agent"]')!
+    await vi.waitFor(() => expect(document.activeElement).toBe(field))
+    cleanups.splice(0).forEach((dispose) => dispose())
+
+    const returned = mount({ autoFocus: true })
+    await vi.waitFor(() => expect(document.activeElement).toBe(returned.querySelector('textarea')))
+  })
+
+  it('leaves focus alone for a disabled composer', async () => {
+    const focused = document.createElement('button')
+    document.body.append(focused)
+    cleanups.push(() => focused.remove())
+    focused.focus()
+    mount({ autoFocus: true, disabled: true })
+    await new Promise<void>((resolve) => queueMicrotask(resolve))
+    expect(document.activeElement).toBe(focused)
+  })
+})
 
 describe('attaching files', () => {
   it('keeps the message field focused after a pasted image finishes uploading', async () => {

@@ -19,6 +19,9 @@ runs in jsdom, so one subject may have both. There is no other infix. A test nam
 rather than a module is fine, and it lives in the folder of the module it exercises most; it never
 sits in a different folder from its subject.
 
+Repository-wide source-shape checks live in `tools/arch/` because their subject is the package graph
+or the whole renderer corpus; `primitiveAdoption.test.ts` scans client-core, plugins, and desktop there.
+
 Not yet everywhere: `packages/client-core/src/infra/persistence/startupRestore.integration.test.ts`
 and `apps/desktop/test/integration/persistedState.conformance.test.ts` still carry an infix. Each
 folds into the plain test beside it or takes the behaviour's name.

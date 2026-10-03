@@ -32,6 +32,7 @@ async function fixture(settleAbort = true) {
       statuses: () => [],
     },
     fleet: { list: () => [] },
+    config: { watch: () => () => {} },
   } as unknown as Helper
   const server = await startHelperServer(helper, { secret: 'r'.repeat(32), appOrigin: 'http://acorn.localhost' })
   servers.push(server)

@@ -43,7 +43,7 @@ export type AgentDriverStartOptions = {
   session: AgentSession
   cwd: string
   env: Record<string, string>
-  /** acorn's own tool server, when this harness has no CLI registration for it (docs/mcp.md
+  /** acorn's own tool server for managed Codex or a harness without CLI registration (docs/mcp.md
    *  § Configuration), followed by the user's servers this session has switched on (docs/mcp.md § Your
    *  own servers). Empty is a real answer, never a forgotten one. */
   mcpServers: readonly AgentDriverMcpServer[]

@@ -23,4 +23,6 @@ export type PaneSwitcherProps = PaneSwitcherData & {
   pin(id: string): void
   toggleMaximize(id: string): void
   equalize(): void
+  /** Optional desktop menu door for a replacement provider. The host validates the pane. */
+  openContextMenu?(id: string, at: { x: number; y: number }): void
 }

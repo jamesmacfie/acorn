@@ -383,8 +383,8 @@ Docker channels to a task-confined socket. Widening any of those seams needs a n
 **A known limit.** `resolveInRoot` is check-then-use: nothing re-validates between the containment
 check and the open, so an agent that can write in its own worktree can swap a path component for a
 symlink in the window between them. Real, hard to hit, and the honest fix is an `O_NOFOLLOW`-style
-open rather than a tighter check, so it is recorded here rather than papered over. The per-task sandbox
-(`docs/future/sandbox/sandbox.md`) is the layer that eventually subsumes it.
+open rather than a tighter check, so it is recorded here rather than papered over. Process isolation
+would not fix a path race in the Node's own filesystem service.
 
 Before the broker (`packages/node-core/src/server/core/proc.ts`) existed, about sixteen call sites
 spawned or exec'd children with their own ad hoc handling, and the inconsistency was not cosmetic.

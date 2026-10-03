@@ -19,9 +19,10 @@ The Node injects only the values the MCP process needs:
   ceiling.
 
 `ACORN_TASK_ID` is what the server addresses, so without it `tools/list` is empty. A managed session
-puts both identifiers in the provider process's own environment, not only in a protocol MCP
-declaration, because Claude Code and Codex start this server from their CLI registration and pass it
-only what they inherited (`plugins/agents/src/server/sessions/runtimeEngine.ts`).
+puts both identifiers in the provider process's environment. Managed Codex also receives an explicit
+MCP declaration with the signed token, data root, task and session identifiers, and certificate path,
+because its MCP child does not inherit arbitrary environment variables
+(`plugins/agents/src/server/sessions/runtimeEngine.ts`).
 
 The endpoint is resolved at call time because Node ports are ephemeral. The signing key is persisted
 so a tmux-reattached process still authenticates after a Node restart. Rotating the key revokes
@@ -99,14 +100,13 @@ own declaration (`plugins/agents/src/server/profiles/mcpCommands.ts`). Core owns
 exchange only — remove, then add, through a login shell, with the failure turned into a sentence — and
 knows neither CLI by name.
 
-**There is a second door, and a harness gets one of the two.** An agent that speaks ACP takes MCP
-declarations in the protocol, on `session/new` and again on the call that picks a session back up, so
-acorn names its own server there instead of writing a config file. That door is for a contributed
-harness: it has no `mcp add` command, and a manifest has no field to declare one, so the protocol is
-the only way it could ever reach these tools. Claude Code and Codex keep the config-file door, and
-`mcpRegistration` on the profile is what the runtime tests to decide — whoever already has a door keeps
-it, and nothing is offered twice
-(`acornMcpServers` in `plugins/agents/src/server/sessions/runtimeEngine.ts`).
+An ACP harness without CLI registration receives Acorn's server through the protocol, on
+`session/new` and again on session load or resume. Claude Code uses its CLI registration.
+Managed Codex receives Acorn's server through `config.mcp_servers` on `thread/start` and
+`thread/resume`, even though its profile also supports CLI registration for terminal sessions.
+The declaration uses the registered name, `acorn` or `acorn-dev`, to override that config-file entry
+with the session's explicit environment. It does not write the signed token into the user's config
+file (`acornMcpServers` in `plugins/agents/src/server/sessions/runtimeEngine.ts`).
 
 The whole launch environment is named in the declaration rather than left to inheritance. The agent
 process already holds these values, because they are the session environment acorn spawned it with,
@@ -186,3 +186,12 @@ from any variable (`env_http_headers`), but forwards a stdio server's environmen
 different secrets under one name are refused, so neither runs with the other's value. The terminal
 passes that environment the way it passes acorn's own token, which with the tmux backend means
 `tmux new-session -e` for the moment the session is created.
+
+## Reading task scripts
+
+The Node tool registry automatically projects Core's `task_scripts_status`, `task_scripts_wait`,
+and `task_scripts_logs` through the existing task MCP transport. These read-tier tools use the
+launch token's task identity; no input can substitute another task. They do not launch scripts.
+Use status and a bounded setup wait before dependency-dependent work. Wait timeouts leave the
+script running. See [task script tools](./agent-tools.md#task-script-tools) for their inputs and
+[durable task script results](./workspaces-and-tasks.md#durable-task-script-results) for state meanings.

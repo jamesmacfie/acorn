@@ -221,3 +221,12 @@ Neither deletes anything, and the Node does not run a general destructive cache 
 request. Provider mirrors, immutable blobs, plugin databases, logs, and
 application-owned records have different retention semantics and must not share a blind deletion
 policy.
+
+## Task script snapshots
+
+The shared client query key is `['task-scripts', 'v1', taskId]` within the selected Node's cache.
+Task-addressed `tasks:changed` notices invalidate that task's script query as well as task rows;
+reconnect refreshes authoritative reads. Active views also refresh every 15 seconds. Core sends
+content-free invalidations after lifecycle writes and archive-gate changes, rather than streaming
+log data into the cache. Diagnostic tails are fetched on demand. Desktop and TUI use the same
+query and freshness classification; offline/stale running snapshots do not assert process liveness.

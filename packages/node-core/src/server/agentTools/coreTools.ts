@@ -1,3 +1,5 @@
+import { taskScriptWaitInputSchema, taskScriptLogsInputSchema } from '@acorn/protocol/taskScripts.ts'
+import { taskScripts } from '../taskScripts/service'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from './contextSections.ts'
 import { pluginAuthoringTool } from './pluginAuthoring.ts'
@@ -108,6 +110,12 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   // sections); the /context route reads the same assembler.
 
   return [
+    { name: 'task_scripts_status', description: 'Read durable setup and teardown status for this task. Reads never start scripts. Setup running means installation may be incomplete.', input: z.strictObject({}), scope: 'task', risk: 'read',
+      handler: async (_input, ctx) => taskScripts(db).status(ctx.taskId) },
+    { name: 'task_scripts_wait', description: 'Wait up to 30 seconds for one setup or teardown attempt to settle. Reads never start scripts. Timeout returns matched:false and does not cancel the script; bind retries with attemptId.', input: taskScriptWaitInputSchema, scope: 'task', risk: 'read',
+      handler: async (input, ctx) => taskScripts(db).wait(ctx.taskId, input, ctx.signal) },
+    { name: 'task_scripts_logs', description: 'Read a bounded diagnostic tail for this task script phase or attempt. Reads never start scripts. Check available and truncated.', input: taskScriptLogsInputSchema, scope: 'task', risk: 'read',
+      handler: async (input, ctx) => taskScripts(db).logs(ctx.taskId, input) },
     {
       name: 'task_current',
       description: "The current acorn task: repo, branch, worktree path, PR number and linked issues.",
@@ -116,7 +124,8 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
       risk: 'read',
       handler: async (_a, ctx) => {
         const c = await assemble(deps, ctx, new Set(['issues']))
-        return { ...c.task, links: c.sections.find((section) => section.id === 'issues')?.items ?? [] }
+        const scripts = taskScripts(db).status(ctx.taskId)
+        return { ...c.task, scripts: { generation: scripts.generation, setup: scripts.setup, teardown: scripts.teardown }, scriptsHint: 'Snapshot only. Reread task_scripts_status, task_scripts_wait, or task_scripts_logs before dependency-dependent work.', links: c.sections.find((section) => section.id === 'issues')?.items ?? [] }
       },
     },
     {

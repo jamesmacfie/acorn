@@ -7,11 +7,13 @@
 // See docs/plugins.md § Context menus for what the host binds over what a manifest can state: the id
 // (`plugin:<pluginId>:<id>`), the per-node running gate, the target id the verb receives, and why there
 // is no `tone`.
-import { isContextMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
+import { isContextMenuLocation, isRailMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'
 import type { PluginContextMenuDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import { compileWhen, contextMenuRegistry, type ContextMenuContribution } from '../registries/panes/contextMenus'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { runChromeAction } from './actions'
+import { sourceRegistry } from '../registries/sources/sources'
+import { paneRegistry } from '../registries/panes/panes'
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin row can never
  *  take the place of one. */
@@ -22,6 +24,8 @@ export type PluginContextMenuBinding = {
   nodeId: () => string
   /** Is the owning plugin installed and running there? */
   enabled: () => boolean
+  sources?: ReadonlySet<string>
+  panes?: ReadonlySet<string>
 }
 
 /**
@@ -50,23 +54,50 @@ export function pluginContextMenuItem(
   if (unknown.length) {
     throw new Error(`context menu '${descriptor.id}' matches on facts '${location}' does not have: ${unknown.join(', ')}`)
   }
+  if (isRailMenuLocation(location)) {
+    const declared = location === 'rail.source' ? binding.sources : binding.panes
+    if (!descriptor.surface || !declared?.has(descriptor.surface)) {
+      throw new Error(`context menu '${descriptor.id}' names an undeclared ${location} surface`)
+    }
+  } else if (descriptor.surface !== undefined) {
+    throw new Error(`context menu '${descriptor.id}' gives a surface to ${location}`)
+  }
   const matches = compileWhen(descriptor.when)
-  return {
+  const item: ContextMenuContribution = {
     id: pluginContextMenuId(pluginId, descriptor.id),
     location,
+    ...(descriptor.surface ? { surface: descriptor.surface } : {}),
     label: descriptor.label,
     ...(descriptor.icon ? { icon: descriptor.icon } : {}),
     order: descriptor.order,
-    when: (target) => binding.enabled() && matches(target),
+    when: (target) => binding.enabled() && (!isRailMenuLocation(location) ||
+      (target.id === descriptor.surface && target.location === location &&
+        (location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)) === pluginId)) && matches(target),
     // The action was already checked against this manifest's declared surfaces by the chrome pass, the
     // same check a command's gets. What is added here is the item, minted from the target the host
     // handed the menu, never from anything the descriptor said.
-    run: (target) => void runChromeAction(descriptor.action, {
+    run: (target) => {
+      if (contextMenuRegistry.get(item.id) !== item || !binding.enabled()) return
+      if (isRailMenuLocation(location)) {
+        if (target.location !== location || target.id !== descriptor.surface || target.nodeId !== binding.nodeId()) return
+        const owner = location === 'rail.source' ? sourceRegistry.ownerOf(target.id) : paneRegistry.ownerOf(target.id)
+        if (owner !== pluginId) return
+      }
+      void runChromeAction(descriptor.action, {
       pluginId,
       nodeId: binding.nodeId(),
-      item: { id: target.id, title: target.title },
-    }),
+      ...(isRailMenuLocation(location) ? {
+        rail: target.location === 'rail.source'
+          ? { location: 'rail.source' as const, sourceId: target.id, projectId: target.projectId }
+          : target.location === 'rail.pane'
+            ? { location: 'rail.pane' as const, paneId: target.id, taskId: target.taskId, projectId: target.projectId }
+            : undefined,
+        ...(target.location === 'rail.pane' ? { taskId: target.taskId } : {}),
+      } : { item: { id: target.id, title: target.title } }),
+    })
+    },
   }
+  return item
 }
 
 /** Validate, bind and register one row. The returned disposable belongs to the chrome pass, which

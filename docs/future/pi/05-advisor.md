@@ -3,6 +3,10 @@
 Status: proposed, 2026-10-02. Not started. Depends on [03](./03-session-messages.md) and
 [04](./04-unattended-model-calls.md).
 
+Execution handoffs, 2026-10-03: [phase 04](./phases/04-model-grants-and-advisor.md) delivers model
+grants, the replacement review reader, and an interactive advisor. [Phase 05](./phases/05-unattended-follow-ups.md)
+adds owned unattended review windows and follow-ups before enabling the unattended setting.
+
 ## Why
 
 `omp`'s advisor pairs a second model with the session. It reads each turn the main agent takes and
@@ -41,7 +45,8 @@ node half and a small tree for its settings page. Nothing about it is first-part
 ### Manifest grants
 
 - `permissions.events`: `plugin:agents:turn-changed`.
-- `permissions.node.capabilities`: `agents.reviewInput.v1`, `agents.sessions`.
+- `permissions.node.capabilities`: the phase 04 replacement `agents.reviewInput.v1`, `agents.turns`,
+  and `agents.sessions`.
 - `permissions.node.core`: `models`, `tasks`, `git`.
 - A contribution to `agents:session-messenger` ([03](./03-session-messages.md)).
 - `requires.plugins`: `agents`.
@@ -54,6 +59,8 @@ agent sessions. That is honest. Each is something the plugin does.
 1. On `plugin:agents:turn-changed` with `status: 'completed'`, skip the turn when its source is
    `plugin` or `delegation_report`. A note answering a note is a loop, and a report is another agent
    talking, not the agent at work. Skip sessions the person has not opted in (see below).
+   This event flow is for interactive sessions. Unattended review uses phase 05's bounded
+   completion participation so a workflow cannot publish success before admitted corrections.
 2. Read the turn with `agents.reviewInput.v1`'s `read({ taskId, sessionId, turnId })`. If it is
    `unavailable`, stop.
 3. Read the task root with `ctx.core.tasks`, then `git diff --stat` and a bounded `git diff` with

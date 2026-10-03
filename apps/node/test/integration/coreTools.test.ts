@@ -53,6 +53,9 @@ describe('agent note contributions', () => {
 describe('the full agent-tool manifest', () => {
   const CORE_TOOLS = [
     'task_current',
+    'task_scripts_status',
+    'task_scripts_wait',
+    'task_scripts_logs',
     'task_context',
     'pr_current',
     'pr_changed_files',

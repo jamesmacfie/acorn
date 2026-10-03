@@ -6,7 +6,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
 import { applyLayoutAction, type LayoutAction, type TaskLayout } from './taskLayout'
 
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
 
 // The busiest host in the shell: it decides which panes a task shows, drops the ones this task or
 // this environment cannot offer, and contains a pane that throws. The layout reducer has its own unit
@@ -98,6 +98,20 @@ afterEach(() => {
 })
 
 describe('TaskPaneHost', () => {
+  it('opens the clicked pane menu without showing it, then dispatches its layout verb', () => {
+    pane({ id: 'pr', order: 0 })
+    pane({ id: 'changes', order: 1 })
+    mount()
+    const icon = [...host.querySelectorAll<HTMLElement>('.pane-switcher .tabrail-tab')]
+      .find((entry) => entry.getAttribute('aria-label') === 'changes')!
+    icon.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true, clientX: 30, clientY: 40 }))
+    expect(dispatched).toEqual([])
+    expect([...document.querySelectorAll('[role="menuitem"]')].map((entry) => entry.textContent?.trim()))
+      .toEqual(['Open', 'Open beside'])
+    ;[...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((entry) => entry.textContent?.trim() === 'Open beside')?.click()
+    expect(dispatched).toEqual([{ type: 'add', pane: 'changes' }])
+  })
   it('draws the layout\'s panes, in the layout\'s order', () => {
     pane({ id: 'pr', order: 0 })
     pane({ id: 'changes', order: 1 })

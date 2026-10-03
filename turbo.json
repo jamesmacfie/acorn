@@ -16,7 +16,8 @@
     "node-runtime.json",
     "plugins/tsconfig.base.json",
     "plugins/vitest.shared.ts",
-    "plugins/drizzle.shared.ts"
+    "plugins/drizzle.shared.ts",
+    "vitest.browser.setup.ts"
   ],
   // Turborepo's strict env mode hands a task only the variables named here, so the worker cap the
   // root `pnpm test` sets would never reach Vitest without this line. Passed through rather than
@@ -30,7 +31,14 @@
     // Requires an acyclic package graph, which is why the client-core <-> plugin cycles must stay
     // broken.
     "topo": {
-      "dependsOn": ["^topo"]
+      "dependsOn": ["^topo"],
+      "inputs": [
+        "$TURBO_DEFAULT$",
+        "!**/*.test.ts",
+        "!**/*.test.tsx",
+        "!**/*.spec.ts",
+        "!**/*.spec.tsx"
+      ]
     },
     "build": {
       "dependsOn": ["^build", "topo"],
@@ -69,13 +77,16 @@
         "../../{apps,packages,plugins}/*/src/**"
       ]
     },
-    // The stylesheet hygiene suite reads plugin and desktop CSS (src/infra/styles/readStyleSheets.ts).
+    // The stylesheet suites read plugin and desktop CSS (src/infra/styles/readStyleSheets.ts)
+    // and the plugin-frame stylesheet list in desktop's stage script (cssHygiene.test.ts).
+    // Cross-package TSX adoption checks live in the uncached architecture suite.
     "@acorn/client-core#test": {
       "dependsOn": ["topo"],
       "inputs": [
         "$TURBO_DEFAULT$",
-        "../../plugins/*/src/**",
-        "../../apps/desktop/src/**"
+        "../../plugins/*/src/**/*.css",
+        "../../apps/desktop/src/**/*.css",
+        "../../apps/desktop/scripts/stage.mjs"
       ]
     },
     // Fixtures, a sibling's manifest, a settings component and a published schema, all read by path.
@@ -98,10 +109,10 @@
       "inputs": ["$TURBO_DEFAULT$", "../plugin-types/acorn-plugin.schema.json"]
     },
     // The loadable-plugin config suite walks plugins/ off disk, including plugins apps/node does
-    // not depend on.
+    // not depend on. It imports only configs and reads their package versions.
     "@acorn/node#test": {
       "dependsOn": ["topo"],
-      "inputs": ["$TURBO_DEFAULT$", "../../plugins/*/src/**", "../../plugins/*/*.json"]
+      "inputs": ["$TURBO_DEFAULT$", "../../plugins/*/acorn-plugin.config.mjs", "../../plugins/*/package.json"]
     },
     // CI sets ACORN_TUI_WIDE to add the wide layout cases. Strict env mode drops any variable a
     // task does not declare, so without this the wide cases never ran and the two widths shared one

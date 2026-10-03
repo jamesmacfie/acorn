@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { declaredByBlock, readStyleSheets, referenced, workspaceRoot } from './readStyleSheets'
+import { readStyleSheets, referenced, workspaceRoot } from './readStyleSheets'
 
 const sheets = readStyleSheets()
 const corpus = sheets.map((f) => f.text).join('\n')
@@ -10,8 +10,10 @@ const withoutComments = (text: string) => text.replace(/\/\*[\s\S]*?\*\//g, '')
 describe('no phantom tokens', () => {
   it('defines every custom property that is referenced', () => {
     const declared = new Set<string>()
+    // A custom property may be scoped to a component, as --settings-measure is. This check asks
+    // whether a declaration exists anywhere, while axis rules separately inspect :root blocks.
     for (const file of sheets) {
-      for (const names of declaredByBlock(file.text).values()) for (const name of names) declared.add(name)
+      for (const match of withoutComments(file.text).matchAll(/(?:^|[;{])\s*(--[\w-]+)\s*:/g)) declared.add(match[1])
     }
 
     // Runtime-set custom properties: a component measurement or count, never a design decision

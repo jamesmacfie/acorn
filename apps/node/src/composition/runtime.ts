@@ -88,6 +88,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
   // The pin the parent hands to its connection broker. Reported by the listener rather than read from
   // disk here, so there is exactly one place that decides what identity this node is answering with.
   let identity: { fingerprint: string; certPem: string } | null = null
+  let stopScriptWaits = () => {}
   let disposePlugins: (() => Promise<void>) | null = null
   let reconcileTask: Promise<void> | null = null
   let stopped = false
@@ -144,7 +145,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // this process still holds its WAL. A drain that hits the deadline leaves the lock to dataRoot's
     // own `process.on('exit')` hook, which is why missing it here is still safe.
     const outcome = await drainNode({
-      listener: async () => { if (server) await closeListener(server) },
+      listener: async () => { stopScriptWaits(); if (server) await closeListener(server) },
       reconciliation: async () => { if (reconcileTask) await reconcileTask },
       schedules: async () => {
         schedulerCapability?.dispose()
@@ -190,6 +191,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     let apiUrl = ''
     const internalEnv: InternalEnvFactory = (claims) => ({
       ACORN_API_URL: apiUrl,
+      ACORN_NODE_ID: runtime.NODE_ID,
       ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
       ACORN_DATA_DIR: config.dataDir,
       NODE_EXTRA_CA_CERTS: join(config.dataDir, 'tls', 'cert.pem'),
@@ -202,6 +204,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // rather than by the module, so a process that starts the service more than once (the tests do)
     // gets a clean graph each time instead of "capability already provided".
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
+    stopScriptWaits = () => core.taskScripts.close()
     // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
     // `init` and see the boot it was loaded during. The preference is read on the collector's own
     // timer rather than here: `PUT /v1/core/prefs` writes the table directly and cannot notify, so a
@@ -269,6 +272,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
       try {
         await reconcileNode({ db, dataDir: config.dataDir, capabilities, mark })
       } finally {
+        core.taskScripts.reconcile()
         finishReconcile()
         if (!stopped) stateChanged('ready')
       }

@@ -676,9 +676,12 @@ app opens, with stdout as a buffer sink and no terminal behind it. So a test rea
 actually painted, as characters and as coloured runs, which is what lets a case assert that a focused
 control is lit when its six characters have not changed. `press` puts a `KeyEvent` straight onto the
 key stream rather than bytes onto stdin, so nothing is waiting to see whether a lone Escape starts a
-sequence — but the press still gives real time to what it started, because a Tab that lands the caret
-on a row whose data the fixture answers on a timer needs the timer to fire, and turning the render
-loop does not make it.
+sequence. A completed press waits for fixture requests it started, held PTY frames, and the render
+loop to settle. The fixture reports outstanding requests, including its opt-in delayed transport;
+the frame scheduler wakes hold waiters on release and rejects an unreleased hold. The harness clears
+deadline timers and reports an unsettled key or frame instead of drawing a partial tree. The slow
+transport regression keeps its 50 ms fixture delay and checks the two-pane layout at 100 cells and,
+under `ACORN_TUI_WIDE`, at 120 cells.
 
 The boot test (`apps/tui/src/node/boot.test.ts`) is what `apps/desktop/test/boot.test.ts` is for the
 shell. Against a fresh data root and a fresh config directory it starts a real standalone node, uses

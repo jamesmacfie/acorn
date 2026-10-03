@@ -85,6 +85,7 @@ reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 let apiUrl = ''
 const internalEnv: InternalEnvFactory = (claims) => ({
   ACORN_API_URL: apiUrl,
+  ACORN_NODE_ID: runtime.NODE_ID,
   ACORN_API_TOKEN: mintInternalToken(runtime.INTERNAL_TOKEN, claims),
   ACORN_DATA_DIR: root.dir,
   NODE_EXTRA_CA_CERTS: join(root.dir, 'tls', 'cert.pem'),
@@ -141,7 +142,7 @@ await scheduler.start()
 // post-listener sequence (server/composition.ts's reconcileNode; docs/node-distribution.md §
 // Runtime). The listener is already live because resumed work calls the node's own authenticated
 // routes.
-const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => finishReconcile())
+const reconcileTask = reconcileNode({ db: runtime.DB, dataDir: root.dir, capabilities }).finally(() => { core.taskScripts.reconcile(); finishReconcile() })
 await reconcileTask
 
 // Unattended enrollment, if and only if the provisioner set both environment variables

@@ -241,7 +241,7 @@ a variant selector adds an attribute, `(0,2,0)`; a style pack's override adds a
 `:root[data-style="x"]` prefix, `(0,3,0)`. A pack wins because it is more specific, never because its
 stylesheet loads last.
 
-`kit/lib/adoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
+`tools/arch/primitiveAdoption.test.ts` was a migration ledger: a list of files someone had converted, each checked for
 raw controls. Phase 9 of the layout programme finished the conversion and inverted it, so what is left
 are rules rather than a list. **No plugin draws a raw `div` or `span`.** A plugin's tree is kit nodes,
 and a raw element is how a plugin used to reach a class in the host's stylesheet. It is also the one

@@ -1,4 +1,5 @@
-import { For, Show, type JSX } from 'solid-js'
+import { TaskScriptDetails } from './TaskScriptDetails'
+import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, type JSX } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
 import { paneAvailable, paneContribution, paneContributions, paneRegistry, type PaneContribution, type PaneId } from '../../host/registries/panes/panes'
@@ -22,6 +23,8 @@ import { createSplitDrag } from '../../kit/lib/layout/split'
 import PaneSwitcher from './PaneSwitcher'
 import ExclusiveSlotHost from '../../host/plugins/ExclusiveSlotHost'
 import { registerCoreExclusiveSlot } from '../../host/registries/extensionPoints/exclusiveSlots'
+import { registerContextMenuItems, type RailPaneTarget } from '../../host/registries/panes/contextMenus'
+import { ContextMenuHost, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 
 registerCoreExclusiveSlot('pane.switcher', (props) => <PaneSwitcher {...(props.value as PaneSwitcherProps)} />)
 
@@ -33,6 +36,10 @@ export default function TaskPaneHost(props: {
   closing?: boolean // archive/teardown in flight → the close button shows a spinner
   shortcutFor?: (id: string) => string | null | undefined
 }) {
+  const menuId = createUniqueId()
+  const [paneMenu, setPaneMenu] = createSignal<ContextMenuOpening | null>(null)
+  let paneMenuReturnFocus: HTMLElement | undefined
+  let openedPane: unknown
   const stored = () => layoutForTask(props.task.id) ?? defaultLayout()
   const switcherPanes = () => paneContributions().filter((pane) => pane.showInSwitcher !== false && paneAvailable(pane, props.task))
   const chosenPanes = () => stored().panes.flatMap((id) => {
@@ -63,6 +70,47 @@ export default function TaskPaneHost(props: {
     return maximized ? panes.filter((pane) => pane.id === maximized) : panes
   }
   const isPinned = (id: PaneId) => layout().pinned?.includes(id) ?? false
+  const paneMenuTarget = (id: string): RailPaneTarget | null => {
+    const pane = switcherPanes().find((entry) => entry.id === id)
+    const nodeId = activeNodeId()
+    if (!pane || !nodeId) return null
+    return {
+      location: 'rail.pane', id, title: pane.label, nodeId,
+      taskId: props.task.id, projectId: props.task.projectId,
+      pinned: isPinned(id), shown: registeredLayoutPanes().some((entry) => entry.id === id),
+    }
+  }
+  const openPaneMenu = (id: string, at: { x: number; y: number }) => {
+    const target = paneMenuTarget(id)
+    if (!target) return
+    paneMenuReturnFocus = document.activeElement instanceof HTMLElement ? document.activeElement : undefined
+    openedPane = paneRegistry.get(id)
+    setPaneMenu({ at, target })
+  }
+  const paneAction = registerContextMenuItems<'rail.pane'>([
+    { id: `${menuId}:open`, location: 'rail.pane', label: 'Open', order: 100,
+      when: (target) => target.taskId === props.task.id,
+      run: (target) => { if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId()) dispatch({ type: 'show', pane: target.id }) } },
+    { id: `${menuId}:add`, location: 'rail.pane', label: 'Open beside', order: 110,
+      when: (target) => target.taskId === props.task.id,
+      run: (target) => { if (paneMenuTarget(target.id)?.taskId === target.taskId && target.nodeId === activeNodeId()) dispatch({ type: 'add', pane: target.id }) } },
+    { id: `${menuId}:pin`, location: 'rail.pane', label: 'Pin', order: 120,
+      when: (target) => target.taskId === props.task.id && target.shown && !target.pinned,
+      run: (target) => { if (paneMenuTarget(target.id)?.shown && target.nodeId === activeNodeId()) dispatch({ type: 'pin', pane: target.id, pinned: true }) } },
+    { id: `${menuId}:unpin`, location: 'rail.pane', label: 'Unpin', order: 120,
+      when: (target) => target.taskId === props.task.id && target.shown && target.pinned,
+      run: (target) => { if (paneMenuTarget(target.id)?.pinned && target.nodeId === activeNodeId()) dispatch({ type: 'pin', pane: target.id, pinned: false }) } },
+    { id: `${menuId}:close`, location: 'rail.pane', label: 'Close', order: 1000, tone: 'danger',
+      when: (target) => target.taskId === props.task.id && target.shown && !target.pinned && registeredLayoutPanes().length > 1,
+      run: (target) => { if (paneMenuTarget(target.id)?.shown && !isPinned(target.id) && registeredLayoutPanes().length > 1 && target.nodeId === activeNodeId()) dispatch({ type: 'close', pane: target.id }) } },
+  ])
+  onCleanup(() => paneAction.dispose())
+  createEffect(() => {
+    const target = paneMenu()?.target
+    if (target?.location === 'rail.pane' &&
+      (target.nodeId !== activeNodeId() || target.taskId !== props.task.id || !paneMenuTarget(target.id) ||
+        paneRegistry.get(target.id) !== openedPane)) setPaneMenu(null)
+  })
   const switcherProps = (): PaneSwitcherProps => ({
     panes: switcherPanes().map((pane) => ({
       id: pane.id,
@@ -83,6 +131,7 @@ export default function TaskPaneHost(props: {
     pin: (id) => dispatch({ type: 'pin', pane: id }),
     toggleMaximize: (id) => setMaximizedPane(props.task.id, maximizedPane(props.task.id) === id ? null : id),
     equalize: () => dispatch({ type: 'equalize' }),
+    openContextMenu: openPaneMenu,
   })
 
   // Hidden while everything is fine, so a healthy node adds no noise to a pane header. One value
@@ -199,6 +248,7 @@ export default function TaskPaneHost(props: {
 
       <nav class="pane-switcher" aria-label="Task panes">
         <ExclusiveSlotHost slot="pane.switcher" value={switcherProps()} />
+        <TaskScriptDetails taskId={props.task.id} />
         {props.extraButtons}
         {/* Whole-control busy rather than a marker: while the teardown runs there is no close
             action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable
@@ -217,6 +267,13 @@ export default function TaskPaneHost(props: {
           )}
         </Show>
       </nav>
+      <ContextMenuHost
+        location="rail.pane"
+        ariaLabel={paneMenu() ? `Actions for ${paneMenu()!.target.title}` : 'Pane actions'}
+        opening={paneMenu}
+        onClose={() => setPaneMenu(null)}
+        returnFocus={() => paneMenuReturnFocus?.isConnected ? paneMenuReturnFocus : undefined}
+      />
     </>
   )
 }

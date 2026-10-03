@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createComponent, ErrorBoundary, Show, Suspense } from 'solid-js'
 import type { Task } from '@acorn/client-core/infra/queries.ts'
+import { createTaskScripts, scriptLabel } from '@acorn/client-core/features/tasks'
 import { Tabs } from '../kit/grouping'
 import { Line } from '../kit/cells'
 import { EmptyState } from '../kit/showing'
@@ -19,9 +20,11 @@ import { panesFor, showPane, shownPane } from './panes'
 // for itself.
 
 export function PaneStrip(props: { task: Task; focused: boolean }) {
+  const scripts = createTaskScripts(() => props.task.id)
   const panes = () => panesFor(props.task)
   return (
-    <box flexDirection="row" gap={1}>
+    <box flexDirection="column" flexShrink={0}>
+      <box flexDirection="row" gap={1}>
       {/* The caret every collection draws, because the strip is a place the keys can be and nothing
           else on this line would say so: the current pane is already marked, and a mark that means
           two things means neither. */}
@@ -33,6 +36,8 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
         active={shownPane(props.task)?.id ?? ''}
         onChange={(id) => showPane(props.task, id)}
       />
+      </box>
+      <Show when={scripts.query.data}>{snapshot => <Line>{scriptLabel(snapshot().setup)} · {scriptLabel(snapshot().teardown)}{scripts.freshness() === 'live' ? '' : ` · ${scripts.freshness()} snapshot`}</Line>}</Show>
     </box>
   )
 }

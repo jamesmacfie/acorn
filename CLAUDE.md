@@ -21,6 +21,13 @@ load while passing in isolation. For the desktop shell alone, use
 `pnpm --filter @acorn/desktop test`, which stages the bundle inputs and then runs the boot test and
 the Rust suite.
 
+During iteration, run an explicit file or named test with
+`pnpm test:focus <package> <file-filter> [-t <test-name>]`. It prepares the native module once,
+caps Vitest workers, and fails when the selection runs no tests. Before handoff, run the affected
+package suites and the uncached architecture suite for changes to plugin or renderer source shape;
+see [docs/testing.md](./docs/testing.md#focused-agent-runs) for the exact scopes. A narrow run does
+not verify dependent consumers. Keep the `pnpm lint` and relevant-test handoff requirement above.
+
 When a change affects the desktop UI, test it in the real Tauri window on a graphical host. Run
 `pnpm dev:agent -- --session <name>`; it uses isolated data and ports and adds the current checkout as
 a local project, so neither the onboarding wizard nor GitHub login blocks the test. In another
