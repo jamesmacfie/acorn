@@ -37,7 +37,7 @@ all selected fixes and includes the two-Node and native/TUI composition checks.
 | 20 | [HTTP implementation record](../../../plans/performance/implementation-20-http.md) | Through 19 | Implemented; native verification blocked by service bundle size gate |
 | 21 | [SQL recovery implementation record](../../../plans/performance/implementation-21-sql-recovery.md) | Through 20 | Implemented; native and PTY checks blocked by service bundle size gate |
 | 22 | [Preview implementation record](../../../plans/performance/implementation-22-preview.md) | Through 21 | Implemented; native verification blocked by service bundle size gate |
-| 23 | [Memory delta indexing and fresh reconciliation](./23-memory.md) | Through 22 | Pending |
+| 23 | [Memory file reads, change feed, and UI work](./23-memory.md) | Through 22 | Revised for the direct-write store, 2026-10-03; fresh measurements and implementation pending |
 | 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
 | 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
