@@ -446,8 +446,8 @@ Every implementation must preserve:
   boundaries, pricing changes, unknown models, and bounded memory ownership if caching is later added.
 
 Future Kimi support uses the shared harness/ACP seams, so process lifecycle and discovery should live
-at those seams instead of hard-coded CLI conditionals. The future sandbox programme extends per-task
-environment and platform isolation: an owned process-group/job abstraction fits that boundary, while
+at those seams instead of hard-coded CLI conditionals. The cloud worker isolation proposal extends
+task execution isolation: an owned process-group/job abstraction fits that boundary, while
 ambient descendant killing or normal-profile caching does not. Future message/report work shares the
 durable queue and fairness policy, so F09-2/F09-3 must support additional sources without a second
 admission scheduler. Proposed isolation is not a shipped authority to weaken existing permissions.

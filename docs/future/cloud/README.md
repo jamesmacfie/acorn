@@ -34,7 +34,7 @@ Start with the first three, in order. Take the topic files as a phase needs them
 | [memory.md](./memory.md) | Shared project memory, private memory per account, worker seeds and write forwarding, attribution, roles, and optional approval. Depends on phase 9. |
 | [archive.md](./archive.md) | The whole-root archive, verify-then-destroy, encryption, and restore with fresh credentials. |
 | [plugins-and-secrets.md](./plugins-and-secrets.md) | Plugin policy and locks, cloud connections, team secrets, and how model keys reach an agent. |
-| [isolation.md](./isolation.md) | How the sandbox programme applies inside a worker, egress, team policy, and the adversarial test. |
+| [isolation.md](./isolation.md) | Worker process isolation, egress, team policy, audit export, and the adversarial test. |
 | [clients.md](./clients.md) | Every desktop and TUI change, from sign-in to routing a pane to a worker. |
 | [hosting-and-cost.md](./hosting-and-cost.md) | Provider choice, regions, scale, the speed target, pricing shape, admission, and budgets. |
 | [refused.md](./refused.md) | Alternatives rejected for the first release, and when to revisit them. |
@@ -74,8 +74,8 @@ Before changing code, read [architecture overview](../../architecture-overview.m
 [workspaces and tasks](../../workspaces-and-tasks.md), [state ownership](../../state-ownership.md),
 [Node enrollment](../../node-enrollment.md), [authentication](../../authentication.md),
 [plugin activation](../../plugins/activation.md), [node distribution](../../node-distribution.md),
-and [security](../../security.md). Also read the [sandbox programme](../sandbox/README.md), which
-phase 7 shares work with, and [remote access](../remote.md), which owns the future browser client.
+and [security](../../security.md). [Worker isolation](./isolation.md) owns phase 7's process and
+policy design. [Remote access](../remote.md) owns the future browser client.
 
 ## Verify before building
 

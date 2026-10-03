@@ -44,7 +44,7 @@ Most of the Mods feature list has an acorn equivalent, built on the owner-declar
 | `$` as the only door, in a worker | The permission-scoped worker and its owner-bound context | [extensibility.md](../extensibility.md#the-node-half-is-isolated) |
 | Adding a noun to `$` | Capabilities with a `contract/` folder | [plugin-map.md](../plugin-map.md#talking-to-another-plugin) |
 | `turn.complete`, `agent.spawn` | Agents lifecycle events and managed delegation | [managed-agents.md](../managed-agents.md) |
-| `sec-default`, org tiers | The managed policy layer, designed and not built | [sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md) |
+| `sec-default`, org tiers | Proposed team policy for hosted workers; no local managed policy layer | [cloud team policy](./cloud/isolation.md#team-policy) |
 
 Because these live in acorn rather than in the agent, each works the same for Claude, Codex, and
 DeepSeek.
@@ -133,9 +133,7 @@ Observe and veto only.
 - **No transform.** The harness runs its own command. Changing the payload changes nothing the
   harness does.
 - **No auto-allow.** A plugin that says no only makes a session stricter. A plugin that says yes on
-  the person's behalf is a different, much larger grant. That matches the managed policy layer's
-  rule that a local choice can only narrow
-  ([sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md)).
+  the person's behalf is a different, much larger grant.
 
 ### Timeouts fail open, and that is safe here
 
@@ -205,12 +203,12 @@ Say these plainly in the owning docs, because a policy people trust too far is w
   policy to questions. It doesn't gate every action. acorn chooses the permission mode a session
   starts in, which is the lever for asking more often.
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
-  about. The OS sandbox in [sandbox/](./sandbox/README.md) is the containment answer.
+  about. [Security](../security.md) owns the shipped boundaries and their limits; local task
+  processes are not isolated by this hook.
 - **It can't change what the model reads.** Removing a secret from a command's output happens inside
   the harness's own loop, out of reach from outside it. acorn can do that only for its own tools.
 - **It isn't a policy engine.** Rules live in the handler plugin's code. acorn adds no rule language
-  and no settings form of patterns
-  ([sandbox/refused.md § No policy engine, and no policy language](./sandbox/refused.md#no-policy-engine-and-no-policy-language)).
+  and no settings form of patterns.
 
 ## The phases
 
@@ -247,9 +245,9 @@ Say these plainly in the owning docs, because a policy people trust too far is w
   grant and capped queued turn; unattended delivery waits for phase 05's operation ownership.
 - **Auto-allow.** Trigger: a real request for it. It would be a separate mode with its own high grant,
   and never for unattended sessions.
-- **Handlers a person can't turn off.** This belongs to the managed layer in
-  [sandbox/enterprise-policy.md](./sandbox/enterprise-policy.md): a managed node could require named
-  handlers. Nothing here builds that.
+- **Handlers a person can't turn off.** This would need an administrator policy and a separate
+  proposal. Nothing here builds it. [Cloud team policy](./cloud/isolation.md#team-policy) applies
+  to hosted workers and does not require named handlers.
 - **Shipping a mod into the Claude sessions acorn starts.** That would reach what acorn can't, like
   output redaction, but only for Claude. Trigger: Mods leaves early access, since its API can change
   without notice until then.

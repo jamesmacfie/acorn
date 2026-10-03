@@ -24,7 +24,7 @@ Some preparation already shipped:
   provided Node only after checking the fingerprint the provider vouched for
   ([Node providers](../../plugins/node-side-extension-points.md#node-providers)).
 - The loopback-API gates and plugin containment rung 2 shipped
-  ([sandbox phases](../sandbox/phases.md)).
+  ([security](../../security.md)).
 - A task-scoped port tunnel exists at `/v1/tunnel` (`packages/node-core/src/server/transport/tunnel.ts`),
   which previews already use.
 
@@ -122,8 +122,8 @@ change cannot express the behavior, add a separately versioned contract. Put Nod
 | Attempt lifecycle | Reserve, provision, set up, route, stop, archive, restore, and reconcile, each idempotent. | Team Node orchestrator | [5](./phases/05-cloud-task.md) |
 | History transfer | Ordered, resumable transfer of core and agent events and artifacts. | Core and the agents plugin | [5](./phases/05-cloud-task.md) |
 | Whole-root archive | A versioned, encrypted format with a manifest, verification, and credential rotation on restore. | Team Node and worker | [6](./phases/06-archive.md) |
-| Execution target | The sandbox programme's per-task execution target, with a Linux backend, used inside workers. | `packages/node-core`, shared with [the sandbox programme](../sandbox/sandbox.md) | [7](./phases/07-isolation.md) |
-| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node, shared with [enterprise policy](../sandbox/enterprise-policy.md) | [7](./phases/07-isolation.md) |
+| Execution target | An isolated task execution target inside Linux workers. | `packages/node-core`; [worker isolation](./isolation.md) | [7](./phases/07-isolation.md) |
+| Team policy | Execution, egress, tool, model, and MCP policy, delivered to a worker as the managed layer. | Team Node; [team policy](./isolation.md#team-policy) | [7](./phases/07-isolation.md) |
 | Plugin policy | Team baseline, project overrides, approved hashes and grants, and a frozen lock per attempt. | Team Node and the plugin loader | [8](./phases/08-plugins.md) |
 | Route classification | A read or mutate declaration on every core and plugin route and action. | `packages/node-core` and each plugin | [9](./phases/09-teams.md) |
 | Usage | Admission reservations, provider reconciliation, and hard budgets. | Account service and team Node admission | [10](./phases/10-billing.md) |
@@ -132,15 +132,13 @@ Before any phase writes code, its design section names exact endpoints, wire sch
 idempotency keys. An agent or plugin must not reach an administrative cloud grant through an
 existing task-scoped token.
 
-## Relationship to the sandbox programme
+## Isolation inside a cloud worker
 
-The [sandbox programme](../sandbox/README.md) isolates a task's child processes on a persistent
-local Node. The Node stays on the host and only processes cross the boundary. The cloud programme
-puts each cloud task in a full Node so the Node API and plugin runtime move with it. These are two
-different answers to two different questions, and they meet inside the worker: a worker is a
-persistent-for-its-lifetime Node running agents that must not reach its own secrets, which is
-exactly the local sandbox problem on Linux. So the cloud programme reuses the sandbox's execution
-target seam and policy vocabulary rather than inventing parallel ones. See [isolation](./isolation.md).
+Each cloud task runs in a full Node so the Node API and plugin runtime move with it. The provider's
+VM separates workers, but task processes still need a boundary around the worker Node's secrets.
+[Worker isolation](./isolation.md) owns that Linux execution boundary and team policy. It must
+preserve normal Git access in the worker's own checkout. This programme does not add sandboxing to
+local tasks.
 
 ## Verify before building
 

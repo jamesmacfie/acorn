@@ -15,7 +15,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | Folder | What it is | Status |
 | --- | --- | --- |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
-| [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Panels that answer real questions: trustworthy results, a source-first editor on a typed panel plan run by the Node, identity and time, richer sources, author-chosen row actions, composition and analysis, datasets, and gated write-back. Seven workstreams delivered in four end-to-end milestones, built from 30 example panels and accepted against unseen requests. | Proposed, 2026-10-02; nothing built. Replaces the August 2026 backlog. |
 | [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
@@ -52,11 +51,16 @@ The PWA is the layouts' narrow projections,
 compiled-tier's component couplings dissolved into slots, the `core:task` annotation point carries
 loaded task status, and the marketing plugin docs should be written against the tree rather than the
 frame. Client-plugins consumes the remote root and `replace` arbitration and adds device provenance
-beside them; nothing in it waits any more. Sandbox is independent of all of that. Ecosystem's shipped
-rung-2 containment is recorded in `blockers.md` and sandbox's
-`phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
+beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containment is recorded in
+`blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`sandbox/` was deleted on 2026-10-03. The local task-isolation proposal did not establish how to
+preserve normal Git and host development workflows. The API gates, project configuration trust,
+and loaded-plugin containment it recorded remain in [Security](../security.md). Cloud worker
+isolation and team policy remain proposed in [cloud isolation](./cloud/isolation.md). The local
+design and research remain in Git history.
 
 `memory/` phases 1–3 were implemented on 2026-10-02, and the folder was deleted on 2026-10-03.
 [Notes and memory](../notes-and-memory.md) owns direct writes, standing context, history, Undo,

@@ -1,8 +1,8 @@
 # Isolation inside a worker
 
-Status: proposed, 2026-09-29. This file applies the [sandbox programme](../sandbox/README.md) to
-cloud workers. Read the sandbox [threat model](../sandbox/threat-model.md) first. Its split between
-ambient and deliberate authority is the frame for everything here.
+Status: proposed, 2026-09-29; made self-contained on 2026-10-03 after retiring the local sandbox
+proposal. This file owns cloud worker process isolation, team policy, and egress. Read the shipped
+[security model](../../security.md) first.
 
 ## The short version
 
@@ -10,11 +10,11 @@ The provider's VM keeps one worker away from other workers and from the team Nod
 to keep an agent inside a worker away from that worker's own Node. On a worker, the agent, the
 terminal, and the Node run on one machine, by default as one user. Without more isolation, an agent
 can read the worker's data root, its signing keys, its attempt token, its relay credential, and any
-secret in its environment. That is the same ambient-authority problem the sandbox programme solves
-on a laptop, on Linux, with higher stakes because the secrets belong to a team.
+secret in its environment. This is ambient authority inherited from the operating system, separate
+from the deliberate authority Acorn grants through task-scoped APIs.
 
-So a worker needs the sandbox programme's execution target, with a Linux backend, before anyone
-outside the building team uses it. [Phase 7](./phases/07-isolation.md) builds it.
+So a worker needs an isolated Linux execution target before anyone outside the building team uses
+it. [Phase 7](./phases/07-isolation.md) builds it. This does not add isolation to local tasks.
 
 ## What an agent in a worker could reach
 
@@ -32,57 +32,72 @@ outside the building team uses it. [Phase 7](./phases/07-isolation.md) builds it
 | The internet | Worker network | Yes | Egress policy, below. |
 
 Deliberate authority is unchanged: agents still get `ACORN_API_URL` and a task-scoped
-`ACORN_API_TOKEN`, and the [loopback-API gates](../sandbox/api-gates.md) apply as they do locally.
+`ACORN_API_TOKEN`, and the [loopback-API gates](../../security.md#transport-and-auth) apply as they do locally.
 An agent must not reach a grant, the attempt token, or any team-level route with that token.
 
-## Reusing the sandbox design
+## Worker execution boundary
 
-The sandbox programme's design fits a worker almost exactly:
+The worker owns one task's checkout and execution environment:
 
 - **Three chokepoints.** The process broker (`packages/node-core/src/server/core/proc.ts`), the PTY
   spawn (`plugins/terminal/src/server/terminal.ts`), and the managed-agent driver
   (`plugins/agents/src/server/drivers/jsonRpcProcess.ts`). A worker wraps the same three.
-- **Execution target on the task.** A worker's single task always has a sandboxed target. The
-  resolver maps it to a `(command, cwd, env)` transform, as [sandbox.md](../sandbox/sandbox.md#execution-target-on-the-task)
-  describes.
+- **Execution target on the task.** A worker's single task requires an isolated target. The
+  execution seam resolves the command, working directory, and environment and preserves streaming,
+  PTY interaction, cancellation, and process cleanup. If isolation cannot start, execution fails
+  closed rather than falling back to the Node user.
 - **Direct mount.** The worktree is shared between the Node user and the task user. The editor,
   diff, search, and git read it as the Node user, unchanged.
-- **The Linux backend.** Docker Sandboxes do not run on Linux, so the sandbox programme already
-  plans a second backend with Landlock and namespaces, or a container. In a worker, that is the
-  only backend needed.
+- **The Linux backend.** Task children use a separate Unix user and mount namespace, with Landlock
+  where available, or a container if the provider grants the required privileges.
+- **Git access.** The task user must be able to read and write its checkout's Git metadata and run
+  normal status, diff, branch, and commit commands. A linked worktree whose metadata is hidden in
+  the protected Node data root is insufficient. The checkout layout must provide the task's Git
+  metadata without exposing Node credentials or another task's repository.
+- **Acorn tools and attachments.** Provide the authenticated task API, certificate trust, MCP
+  launcher, and selected attachment files to task processes without granting access to the data
+  root. Preserve managed-agent protocols and terminal reattachment.
 
 Recommended minimum for a worker: task children run as a separate Unix user with no read access to
 the data root, in their own mount namespace with the worktree, a private `/tmp`, and a read-only
 view of the tools in the image. Landlock adds a second fence where the kernel supports it. A nested
 container is heavier and needs more privileges than a provider VM usually grants.
 
-The absent-means-off rule still holds: a local Node with no sandbox configured runs exactly as today.
-A worker always has its policy present, because the team Node delivers it.
+The cloud execution and policy paths do not run on an ordinary local Node. A worker always has its
+policy present, because the team Node delivers it.
 
-## Team policy is the managed layer
+## Team policy
 
-The sandbox programme's [enterprise policy](../sandbox/enterprise-policy.md) defines a managed
-configuration layer, merged most-restrictive-wins, with a fixed vocabulary: execution target, egress,
-filesystem, tool tiers, model allowlist, MCP servers, and telemetry sink. On a laptop, MDM delivers
-it. On a worker, the team Node delivers it in the seed.
+The team Node delivers a managed policy in the worker seed. Merge most-restrictive-wins: a project
+or task can narrow the team baseline but cannot widen it. Use a fixed struct, not a policy language:
 
-Use the same vocabulary and the same resolver. A team admin sets the team policy, a project can
-narrow it, and the worker cannot widen either. This makes the cloud product the first real consumer
-of the managed layer, which is a reason to build sandbox phase 4 as part of, or just before, cloud
-phase 7.
+- **Execution.** Require isolated task processes; no fallback to the Node user.
+- **Egress.** The approved destinations for worker traffic.
+- **Filesystem.** The checkout, its Git metadata, selected attachments, and explicitly approved
+  additional paths. Node secrets remain inaccessible.
+- **Tool tiers.** A ceiling applied with the owner's preferences and signed session ceiling.
+- **Models.** The allowed providers and models.
+- **MCP servers.** The approved server set, enforced across every supported harness launch path.
+- **Audit destination.** An optional endpoint for audit export.
+
+A resolved-policy view names what a task may do and which team, project, or task value decided it.
+The resolver does not run on an ordinary local Node. Loaded-plugin isolation remains mandatory under
+the shipped [plugin security contract](../../security/node-plugin-security.md); this policy adds no
+weaker plugin mode.
 
 ## Egress
 
 A worker needs to reach Git hosts, package registries, the model provider, and approved integration
-endpoints. The team policy's egress list names them. A team admin can widen it per project.
+endpoints. The team policy's egress list names them. A project can narrow that list; adding a
+destination requires a team-admin change to the approved baseline.
 
 Enforce egress at the worker's network boundary, not in the agent, and cover every path out: agent
-processes, terminals, setup scripts, plugin node halves, and the Node itself. The sandbox research
-has the lesson: a deny rule that one path bypasses is worse than none, because people trust it
-([sandbox research](../sandbox/research.md#where-controls-bite)).
+processes, terminals, setup scripts, plugin node halves, and the Node itself. Browser tools, HTTP
+requests, database connections, and provider calls must be included in that inventory. A rule on
+task children alone does not cover requests made by Node services on their behalf.
 
-The sandbox programme refused an egress proxy of acorn's own because `sbx` already enforces network
-policy. A provider VM may not. Options:
+Prefer the provider's network controls. If the provider VM cannot enforce the required policy,
+evaluate these options:
 
 1. The provider's own egress controls, if they exist per machine.
 2. `nftables` rules set at boot, before the Node starts, by a root init step that then drops to the
@@ -92,14 +107,23 @@ policy. A provider VM may not. Options:
    proxy.
 
 Which option ships is the largest open question in [phase 7](./phases/07-isolation.md#open-questions).
-If option 3 wins, update the sandbox programme's refusal with the reason.
+Record the chosen enforcement boundary and its bypass analysis in phase 7.
+
+## Audit export
+
+The core [audit table](../../security.md#audit) records security decisions but is not tamper-evident
+against someone controlling its file. If a team requires external audit, export those rows to its
+configured endpoint using OTLP, the OpenTelemetry Protocol. Add task-scoped tool-dispatch records
+at the common invocation boundary, with bounded metadata and no credentials, prompts, or tool bodies.
+Export failure needs an explicit delivery and retry policy. Customer audit export is outside the
+closed alpha unless a team requires it; phase 7 records that decision.
 
 ## What isolation does not fix
 
 An agent working legitimately in a task can read and send the repository it is working on, and it
 can write subtly wrong code. Isolation protects the worker's secrets and the team's other data. It
-does not make the working set confidential from the agent. Say so to anyone who asks whether cloud
-tasks stop exfiltration ([threat model](../sandbox/threat-model.md#what-neither-layer-fixes)).
+does not make the working set confidential from the agent. Approved network destinations may still
+provide a route for transmitting that working set, and isolation does not establish code correctness.
 
 ## The adversarial test
 
@@ -115,9 +139,14 @@ running in a worker, fail to:
 
 Record each attempt and its result in the phase's evidence.
 
+The same image must pass functional acceptance: agent Git status, diff, branch, and commit; Acorn
+MCP calls; image and file attachments; terminal interaction and reattachment; development-server
+previews; and Docker or database workflows when offered. Passing denial tests while breaking those
+task operations does not satisfy phase 7.
+
 ## Verify before building
 
 Check what privileges the chosen provider's VM grants: user namespaces, Landlock support in its
-kernel, and whether a root init step can run before the Node. Check the sandbox programme's
-[phases](../sandbox/phases.md) for progress on the execution target seam before starting, so the
-two programmes build one seam.
+kernel, and whether a root init step can run before the Node. Verify the checkout and Git metadata
+layout, task API connectivity, and the functional acceptance paths before choosing the execution
+backend. [Phase 7](./phases/07-isolation.md) owns the implementation sequence.

@@ -93,7 +93,8 @@ control plane. See [identity](./identity.md#what-the-enrollment-v2-change-is).
 ## No model key in the worker's environment
 
 A key in the worker's environment is readable by every agent, terminal, and setup script, and it
-undoes the sandbox programme's child environment policy. Workers use a credential-injecting proxy
+undoes Acorn's [child environment policy](../../security.md#process-path-and-configuration-controls).
+Workers use a credential-injecting proxy
 where the harness allows, or a key scoped to the one agent process with its cost written down. See
 [plugins and secrets](./plugins-and-secrets.md#model-keys).
 

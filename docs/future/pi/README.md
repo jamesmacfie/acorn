@@ -111,7 +111,8 @@ boundary.
 - The shipped [memory contract](../../notes-and-memory.md#memory) replaces Findings, which consumed
   `agents.reviewInput.v1` and supplied the precedent 04 generalizes. The Findings removal also
   removed that capability. Implementation phase 04 introduces its bounded replacement with the advisor.
-- [sandbox/](../sandbox/README.md) owns containment. Nothing here is containment, and 02 says so.
+- [Security](../../security.md) owns the shipped containment boundaries. Nothing here is containment,
+  and 02 says so.
 - [ecosystem/](../ecosystem/README.md) owns discovery and signing. File 06 touches the Claude Code
   marketplace format and defers to ecosystem on discovery.
 

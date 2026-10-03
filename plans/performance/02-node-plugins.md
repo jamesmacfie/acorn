@@ -16,6 +16,10 @@ The built bundled roster has eight packages: `agent-cost`, `database`, `findings
 
 Read the documentation index, architecture overview, conventions, plugin activation, the rung-2 and resource-abuse sections of the Node plugin security document, the future index, the ecosystem README and blockers, and the sandbox README and enterprise policy proposal. Read the `improve` playbook's performance section and finding format. The proposed fixes preserve per-plugin realms, permission grants, owner checks, storage ownership, and capability seams.
 
+The sandbox documents above were retired on 2026-10-03 and remain in Git history. For implementation,
+use `docs/security.md` for shipped containment and `docs/future/cloud/isolation.md` for proposed
+worker isolation and team policy.
+
 ## Priorities
 
 | ID | Finding | Impact | Effort | Fix risk | Confidence |
