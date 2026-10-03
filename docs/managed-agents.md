@@ -463,11 +463,11 @@ so a forged option, an unadvertised scope, or a changed target never reaches Com
 stays device-only (§ HTTP control authority), so an agent cannot approve its own access.
 
 Always allow trusts an app identifier, not only the windows an agent launched. The agent test app has
-an identifier of its own for this reason ([Local development](./local-development.md#native-control-of-a-session)).
+an identifier of its own for this reason ([agent drivers](./local-development/agent-drivers.md#native-control-of-a-session)).
 
 The request shape was read from the integration's source (Codex Computer Use 26.915.1001093,
 `@oai/sky` 0.7.5, codex-cli 0.159.2). A live capture and the grant lifetimes still need a real run
-([Testing](./testing.md), checks 149-154).
+([Computer Use approval checks](./testing/computer-use.md), checks 149-154).
 
 ## Provider-native subagents
 

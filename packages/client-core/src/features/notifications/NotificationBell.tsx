@@ -103,7 +103,7 @@ export default function NotificationBell(props: { onSelectTask: (taskId: string)
         <div class="notify-inbox">
           <Show when={inbox().rows.length || inbox().unavailable.length}>
             <SectionHeader level="group">Needs you</SectionHeader>
-            {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
+            {/* Partial results are a banner, never a failed list (docs/architecture/fleet.md § Fan-out and partial results). */}
             <Show when={inbox().unavailable.length}>
               <For each={inbox().unavailable}>
                 {(entry) => <Alert tone="warn" variant="banner">Couldn't reach {entry.label}</Alert>}

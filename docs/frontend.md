@@ -239,7 +239,7 @@ decided, kept as thin as the job allows.
 
 The hosts are no longer unchecked. A second vitest project, `hosts`, runs `.test.tsx` under jsdom with
 the Solid transform and renders all seven of them
-([testing.md § Test layers](./testing.md)). It answers "did the host draw it, and in what order", not
+([test layers](./testing/layers.md#client-core)). It answers "did the host draw it, and in what order", not
 "did it look right"; the pixels are still the smoke checklist's job. Keeping the rules in a JSX-free
 module is still the right shape, because a rule with a plain unit test is cheaper to reason about than
 the same rule inferred from a rendered tree.

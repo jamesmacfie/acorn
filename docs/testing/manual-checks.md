@@ -2,7 +2,7 @@
 
 Select checks by the runtime or feature that changed. The numbers preserve historical references;
 they do not form a release checklist. Record the build, host, fixture, result, and issue for each
-check you run. For the short release pass, use [the smoke checklist](../testing.md#the-smoke-checklist).
+check you run. For the short release pass, use [the smoke checklist](./smoke-checklist.md).
 
 ## Specialized checks
 
@@ -14,7 +14,9 @@ check you run. For the short release pass, use [the smoke checklist](../testing.
 | 48–57, 65–69, 73–78 | [Workflows](./workflows.md): editor, run pane, child workflows, schedules, and typed data. |
 | 58–64, 70–72 | [Agents and providers](./agents-and-providers.md): onboarding, model generation, delegation, and harnesses. |
 | 89–99, 145–148 | [Rail and annotations](./rail-and-annotations.md): appearance, task markers, keyboard inspection, and plugin source visibility. |
-| 100–144 | [Testing](../testing.md#the-smoke-checklist), after the smoke steps: custom agents, settings, and MCP servers. These have no file of their own yet. |
+| 100–144 | [Settings, custom agents, and MCP servers](./settings.md): the settings window, custom agents, and MCP servers. |
+| 149–154 | [Computer Use approval](./computer-use.md): app-access approval for managed Codex sessions. |
+| Unnumbered | [Memory](./memory.md): the Memory page, agent writes, import, and open usage acceptance. |
 
 Some checks need connected providers or native dialogs. The dated results and unverified cases
 remain beside their scenarios. A worktree run can use `pnpm dev:agent` for isolated data and ports;

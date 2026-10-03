@@ -85,7 +85,7 @@ const SURFACES: Surface[] = [
  * Eight surfaces walked at eighty presses each is about a minute on a warm worker, and doubling
  * it buys one thing: the layouts that split at a hundred cells draw both their columns. That is worth
  * running and it is not worth paying for on every save, so CI sets `ACORN_TUI_WIDE`
- * (docs/testing.md § Test layers).
+ * (docs/testing/layers.md § Test layers).
  */
 const SIZES: { width: number; height: number }[] = process.env.ACORN_TUI_WIDE
   ? [{ width: 80, height: 24 }, { width: 120, height: 40 }]

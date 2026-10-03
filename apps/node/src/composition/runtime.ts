@@ -40,7 +40,7 @@ type RuntimeOptions = {
 }
 
 // Two tags rather than one, so the lines keep the `[service:boot]` and `[service:stop]` prefixes a
-// person greps for and docs/local-development.md § Timing a cold start names.
+// person greps for and docs/local-development/profiling.md § Timing a cold start names.
 const bootLog = createLogger('service:boot')
 const stopLog = createLogger('service:stop')
 
@@ -56,7 +56,7 @@ const stopLog = createLogger('service:stop')
 // that cost the boot is the one wide number. The plugin passes are named per plugin because `install`
 // alone cannot say which plugin was the slow one. Those lines are wall-clock slices rather than
 // per-plugin costs, because the passes overlap: a plugin's line says when it finished
-// (docs/local-development.md § Timing a cold start).
+// (docs/local-development/profiling.md § Timing a cold start).
 function bootTimer(): (label: string) => void {
   const started = process.hrtime.bigint()
   let previous = started

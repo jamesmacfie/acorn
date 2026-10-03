@@ -9,7 +9,7 @@ It arrives in three layers, and the split is enforced (`tools/arch/boundaries.te
 - `packages/diff-document/` (`@acorn/diff-document`) is the document itself: the patch parser, the
   segmenter, the descriptors, search, and a parse cache. It has no DOM, node, Solid, database, or
   transport dependency, because the node builds documents and the renderer reads them
-  ([architecture-overview.md](./architecture-overview.md) § Node API and client flow).
+  ([package boundaries](./architecture/packages.md) § Shared libraries).
 - `kit/diff/` is the toolkit: the row model, the row components, the layout index and its measure
   scheduler, the find marks.
   Props in, DOM out, no application state, so a plugin can reach for a piece of it to build a simpler
@@ -647,7 +647,7 @@ numbers carry fixed labels and no path, line, body or query
 **Timing budgets from GitHub or one machine, or a stress test only in jsdom.** Refused. Hardware,
 WebKit and build mode move the milliseconds, and jsdom has no momentum, layout or paint. The tests
 assert scaling and lifecycle invariants, and absolute budgets wait for a real-window run on a
-supported host ([testing.md](./testing.md) § Large-surface fixture).
+supported host ([desktop and large-surface tests](./testing/desktop.md#the-large-surface-fixture)).
 
 **A streaming transport for the topology.** Refused as a starting point. The `canonical` topology is
 about 2.5 MB over the ordinary JSON route, and it is not paged. Add a stream only if a real-window run

@@ -4,7 +4,7 @@ import { describePluginRequest, describePluginSource, pluginRequestOutcomeMessag
 
 // The two sentences that cross the boundary in opposite directions: what the owner is shown about a
 // request an agent raised, and what the agent is told once they answer. The dialog that draws them is a
-// `.tsx` and therefore untestable here (docs/testing.md), which is exactly why they live in a plain
+// `.tsx` and therefore untestable here (docs/testing/layers.md § Client core), which is exactly why they live in a plain
 // module.
 
 const request = (over: Partial<PluginApprovalRequest> = {}): PluginApprovalRequest => ({

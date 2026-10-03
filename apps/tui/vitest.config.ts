@@ -2,7 +2,7 @@ import { fileURLToPath } from 'node:url'
 import { defineConfig, mergeConfig } from 'vitest/config'
 import base from './vite.config'
 
-// The `tui` project (docs/testing.md § Test layers). It runs the same transform the bundle does, so a
+// The `tui` project (docs/testing/layers.md § Test layers). It runs the same transform the bundle does, so a
 // test renders through our own tree module rather than through the DOM one, and it inherits the
 // `@acorn/plugin-api/ui` alias, so a pane under test imports the kit exactly as the bundle does.
 //

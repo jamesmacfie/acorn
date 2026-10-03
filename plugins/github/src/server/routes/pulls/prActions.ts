@@ -12,7 +12,7 @@ import { type GithubEmit, NO_EMIT, prChangedPayload } from '../../events'
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
 // layers optimistic updates / invalidation on top.
 
-// Every body below is parsed, never cast (docs/architecture-overview.md § Package boundaries). Two
+// Every body below is parsed, never cast (docs/architecture/node-api.md § Wire validation). Two
 // of these reach GitHub as protocol values rather than as content — the merge method becomes a
 // `merge_method` and a `PullRequestMergeMethod` enum member, and `side` becomes a review-comment
 // anchor — so an unchecked string here is a string GitHub interprets.

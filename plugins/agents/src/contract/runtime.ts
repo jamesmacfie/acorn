@@ -8,5 +8,5 @@ import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 // that ordering belongs to the composition root.
 //
 // Lives in contract/ so a composition root imports it as one of the plugin's public entrypoints
-// (docs/architecture-overview.md § Package boundaries) rather than reaching into server/sessions/runtime.ts.
+// (docs/architecture/packages.md § Package boundaries) rather than reaching into server/sessions/runtime.ts.
 export const AGENTS_RUNTIME = capabilityId<{ reconcile(): Promise<void> }>('agents.runtime')

@@ -1,27 +1,31 @@
 # Documentation
 
-Every document under `docs/` is listed here, grouped by what it is for. Nothing else indexes them, so
-a new file belongs in this list on the same commit that creates it.
+This page lists every document under `docs/`, grouped by purpose. Nothing else indexes them, so add a
+new file here in the same commit that creates it.
 
 ## Start here
 
 Read these pages in order:
 
-1. [architecture-overview.md](./architecture-overview.md) — the runtimes, who owns what, and how a
-   request crosses them.
-2. [features.md](./features.md) — what the product actually does, so the rest has something to hang on.
-3. [frontend.md](./frontend.md) or [api-reference.md](./api-reference.md) — whichever side you are
-   about to touch.
-4. [conventions.md](./conventions.md) — where a file goes and what it is called.
+1. [Architecture overview](./architecture-overview.md): the runtimes, who owns what, and which doc
+   owns each contract.
+2. [Features](./features.md): what the product does, so the rest has something to hang on.
+3. [Frontend](./frontend.md) or [API reference](./api-reference.md), whichever side you're about to
+   change.
+4. [Conventions](./conventions.md): where a file goes and what to call it.
 
-If your first task is a plugin, read [plugin-map.md](./plugin-map.md) instead of 3. It is the
-orientation map over the whole plugin system and it is much shorter than the reference.
+If your first task is a plugin, read the [plugin map](./plugin-map.md) instead of step 3. It covers
+the whole plugin system in one page.
 
 ## Architecture and contracts
 
 | Document | What it holds |
 | --- | --- |
-| [architecture-overview.md](./architecture-overview.md) | Runtime topology, process ownership, package boundaries, and the product model. The one to read first. |
+| [architecture-overview.md](./architecture-overview.md) | Runtime topology, process ownership, the product model, and which doc owns each contract. Read it first. |
+| [architecture/packages.md](./architecture/packages.md) | Package boundaries: what each package may import and publish, and how the rules are enforced. |
+| [architecture/node-api.md](./architecture/node-api.md) | Route families, the platform seam, and wire validation. |
+| [architecture/fleet.md](./architecture/fleet.md) | Client state, connection states, fan-out, deadlines, and the Fleet view. |
+| [architecture/control-plane.md](./architecture/control-plane.md) | The three parties, and what a control plane may hold. |
 | [conventions.md](./conventions.md) | The naming rules: files, folders, exports, state, contributions, packages. |
 | [api-reference.md](./api-reference.md) | Overview of `/v1` routes, authentication, errors, and transport. |
 | [data-layer.md](./data-layer.md) | The data root, the core database, plugin databases, migrations, backup, and retention. |
@@ -90,8 +94,19 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 | Document | What it holds |
 | --- | --- |
-| [local-development.md](./local-development.md) | Getting the app running, the dev loops, and the environment. |
-| [testing.md](./testing.md) | Test commands, coverage scope, test layers, and the alpha release pass. |
+| [local-development.md](./local-development.md) | Getting the app running, the dev loops, the environment, and the database commands. |
+| [local-development/agent-drivers.md](./local-development/agent-drivers.md) | Driving an isolated desktop window or terminal client, native control, and the large-surface flow. |
+| [local-development/profiling.md](./local-development/profiling.md) | Timing a cold start and a task switch. |
+| [testing.md](./testing.md) | The way into the tests: the commands, focused runs, and the topic pages. |
+| [testing/commands.md](./testing/commands.md) | Every test command, concurrency limits, caching, timeouts, and coverage measurement. |
+| [testing/layers.md](./testing/layers.md) | What each runtime's suites cover, composition-root tests, and the testkit. |
+| [testing/architecture-rules.md](./testing/architecture-rules.md) | Source-shape rules, kit invariants, loadability, the doc checks, and non-vacuity. |
+| [testing/desktop.md](./testing/desktop.md) | The desktop boot test, Rust unit tests, browser smoke test, and the large-surface fixture. |
+| [testing/ci.md](./testing/ci.md) | What CI runs, the Turborepo cache, build checks, and reading a red run. |
+| [testing/smoke-checklist.md](./testing/smoke-checklist.md) | The alpha release pass, the index of feature checks, and known gaps. |
+| [testing/settings.md](./testing/settings.md) | Settings window, custom agent, and MCP server checks. |
+| [testing/computer-use.md](./testing/computer-use.md) | Computer Use app-access approval checks. |
+| [testing/memory.md](./testing/memory.md) | Memory page, agent write, import, and open usage checks. |
 | [testing/manual-checks.md](./testing/manual-checks.md) | Index of numbered, feature-specific manual acceptance checks. |
 | [testing/preview-retention.md](./testing/preview-retention.md) | Native preview retention acceptance, process measurements, and platform recovery limits. |
 | [testing/desktop-and-plugins.md](./testing/desktop-and-plugins.md) | Packaged shell, plugin installation, host webviews, and loaded plugin lifecycle checks. |
@@ -112,34 +127,12 @@ Start with the plugin map, then follow the authoring guide or API reference.
 
 ## Subfolders
 
-- [future/](./future/README.md) — designs, analyses, sequenced plans, and delivery records retained
-  while acceptance remains open. Its README indexes every programme and single file. Shipped
-  behaviour belongs in an owning doc above.
-- [Documentation overhaul](./future/documentation/README.md). The house style for docs, and six
-  phases that check every shipped doc against the code, restyle it, and split the long pages.
-- [Remaining performance work](./future/performance/README.md) — one handoff per pending specialist,
-  dependencies, evidence, refusals, and sustained-use acceptance.
-
-- [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
-  security gates, team memory, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
-- [Dashboards programme](./future/dashboards/README.md) — seven proposed workstreams, delivered in
-  four milestones, that widen panels from 30 example requests: a typed panel plan, a source-first
-  editor, identity and time, richer sources, row actions, composition, datasets, and gated write-back.
-- [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
-  projections, and acceptance gates for a standalone terminal client.
-- [Pi implementation programme](./future/pi/README.md) — the oh-my-pi comparison and nine sequential
-  handoffs combining harness extensibility with the Mods permission-hook proposal.
-- [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
-  Rollbar, and GitHub list rows while keeping project and state scope.
-- [Desktop rail context menus](./future/rail-context-menus.md) — approved PRD and dated acceptance evidence for source and pane icon menus.
-- [Faster agent test feedback](./future/test-feedback.md) — implementation evidence for focused runs, cache precision, and TUI settlement.
-- [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
-  from the review code pane while preserving history and distinguishing current and historical locations.
-- `schemas/` — generated, versioned JSON Schemas that are pinned by a test and immutable by rule.
-  Today that is `docs/schemas/enrollment-v1.json`.
-
-The Findings plugin and docs/findings.md were retired by memory phase 2 on 2026-10-02.
-Their design and implementation remain in Git history.
+- [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
+  delivery records kept while acceptance is open. Its README indexes every programme and single file,
+  including the [documentation overhaul](./future/documentation/README.md). Shipped behavior belongs
+  in an owning doc above.
+- `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
+  published. The one schema is `docs/schemas/enrollment-v1.json`.
 
 ## Documentation ownership
 
@@ -175,16 +168,3 @@ implementation to verify API signatures and behavior.
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)
 - [The node half](./plugin-authoring/the-node-half.md)
-
-## Pi implementation handoffs
-
-- [Execution rules and phase index](./future/pi/phases/README.md)
-- [Phase 01: contributed omp harness](./future/pi/phases/01-omp-harness.md)
-- [Phase 02: permission veto and policy plugin](./future/pi/phases/02-permission-veto.md)
-- [Phase 03: attributed session messages](./future/pi/phases/03-session-messages.md)
-- [Phase 04: model grants and interactive advisor](./future/pi/phases/04-model-grants-and-advisor.md)
-- [Phase 05: unattended follow-ups](./future/pi/phases/05-unattended-follow-ups.md)
-- [Phase 06: portable plugin skills](./future/pi/phases/06-portable-skills.md)
-- [Phase 07: native skill delivery](./future/pi/phases/07-native-skills.md)
-- [Phase 08: resource-read experiment](./future/pi/phases/08-resource-read-experiment.md)
-- [Phase 09: programme acceptance](./future/pi/phases/09-programme-acceptance.md)

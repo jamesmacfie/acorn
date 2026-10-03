@@ -24,7 +24,7 @@ export function RefPanelHost() {
         <Show when={refPanelFor(target.providerId)}>
           {(panel) => (
             // `target=`, never `ref=`: Solid compiles a component's `ref` attribute into a setter
-            // method (docs/architecture-overview.md § Package boundaries, "Two renderer traps"), so
+            // method (docs/architecture/packages.md § Two renderer traps), so
             // this exact line previously handed every panel a function in place of its subject.
             // registries/refPanels.ts § RefPanelProps has the full account.
             <Dynamic

@@ -9,7 +9,7 @@ import { defineConfig } from 'vitest/config'
 //   hosts  `.test.tsx` under jsdom with vite-plugin-solid, for the contribution hosts. It renders
 //          host machinery — ordering, capability gating, arbitration, the error boundaries — not
 //          pixels. What only a person looking at the running app can check is still on
-//          docs/testing.md's smoke checklist.
+//          docs/testing/smoke-checklist.md.
 //
 // Split by extension rather than by folder so a host test sits beside the host it renders.
 export default defineConfig({

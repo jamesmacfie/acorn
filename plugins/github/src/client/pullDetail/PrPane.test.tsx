@@ -13,7 +13,7 @@ import { _resetPrTabs } from './prTabs'
 // What this holds is the shape rather than the content. The pane mounts, both columns draw, and
 // nothing throws — which is the failure a broken import, a hook called outside a root, or a region
 // name that drifted all produce. What a pull actually looks like is still the smoke checklist's
-// (docs/testing.md).
+// (docs/testing/smoke-checklist.md).
 //
 // The query layer answers nothing on purpose. A pane with no data is the state a reader sees for the
 // first few hundred milliseconds every single time, and it is the one that has to be safe.

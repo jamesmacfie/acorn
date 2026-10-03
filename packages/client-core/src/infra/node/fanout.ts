@@ -6,7 +6,7 @@ import { freshnessOf, type Freshness } from './freshness'
 
 // The one fan-out primitive. Aggregate surfaces fan out per-node requests with per-node timeouts and
 // merge results into a partial-result banner rather than a failed page
-// (docs/architecture-overview.md § Client state and fleet behavior).
+// (docs/architecture/fleet.md § Client state and fleet behavior).
 //
 // Not a TanStack `useQueries`: each node has its own QueryClient, so `fetchQuery` against a named
 // client is the only shape that reaches the right cache. It writes through, so a later single-node

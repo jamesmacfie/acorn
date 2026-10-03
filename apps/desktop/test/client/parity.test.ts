@@ -92,7 +92,7 @@ describe('docs/ui-design.md § Parity — the rail sources', () => {
 
   it('hides Fleet home until a second node is paired', () => {
     // Fleet exists only once more than one node is paired
-    // (docs/architecture-overview.md § Client state and fleet behavior). The gate is a `when` on the
+    // (docs/architecture/fleet.md § Client state and fleet behavior). The gate is a `when` on the
     // contribution, so it is checkable here without a rendered rail.
     const fleet = sourceRegistry.entries().find((source) => source.id === 'fleet')
     expect(fleet?.when).toBeTypeOf('function')

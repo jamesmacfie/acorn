@@ -23,7 +23,7 @@ jobs:
   check:
     # Linux, not macOS, for the two things the suite needs that a macOS runner does not have: Docker,
     # which the container probes look for, and a /var that is not a symlink to /private/var, which one
-    # http test compares paths against (docs/testing.md § Known pre-existing failures).
+    # http test compares paths against (docs/testing/ci.md § Historical failures).
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5

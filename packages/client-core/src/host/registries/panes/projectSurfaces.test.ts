@@ -20,7 +20,7 @@ describe('the host-minted prefix', () => {
     const prefix = pluginProjectRoutePrefix('linear')
     expect(prefix).toBe('/p/:projectId/x/linear/')
     // `x` is the reserved segment, and these are the two core patterns it has to stay clear of
-    // (docs/architecture-overview.md § Package boundaries). A plugin route confined to the prefix is
+    // (docs/architecture/packages.md § Package boundaries). A plugin route confined to the prefix is
     // longer than both and shares neither's second segment.
     expect(prefix.startsWith(`${PROJECT_ROUTE}/`)).toBe(true)
     expect(prefix.startsWith(CREATE_TASK_ROUTE)).toBe(false)

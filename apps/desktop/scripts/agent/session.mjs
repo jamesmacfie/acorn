@@ -182,7 +182,7 @@ async function main() {
       options.project = fixture.project
     } else if (options.fixture) {
       // The fixture's repository lives in the session directory, beside the data it seeds, and is
-      // generated fresh from the profile and seed (docs/testing.md § Large-surface fixture).
+      // generated fresh from the profile and seed (docs/testing/desktop.md § The large-surface fixture).
       const project = join(directory, 'fixture', 'repo')
       console.log(`[agent-dev:${name}] generating the ${options.fixture} fixture (${options.profile}, seed ${options.seed})`)
       const out = await capture(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', project,

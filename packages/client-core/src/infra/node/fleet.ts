@@ -12,7 +12,7 @@ export type { CacheStorage } from '../persistence/queryCacheLifecycle'
 import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
-// cache per node (docs/architecture-overview.md § Client state and fleet behavior,
+// cache per node (docs/architecture/fleet.md § Client state and fleet behavior,
 // docs/data-layer.md § Preferences and client persistence).
 //
 // Membership is main's, because main owns the device tokens and the pinned certificates

@@ -25,7 +25,7 @@ import { activeHints } from './bindings'
 // Whole-screen assertions rather than cell-level ones, for the reason the smoke test gives: what a
 // reader would look for on the screen. The one thing asserted cell by cell is where the caret is,
 // because on this host the caret is not decoration — it is where the keys are, and a screen with no
-// caret is a screen nobody can drive (docs/testing.md § Test layers).
+// caret is a screen nobody can drive (docs/testing/layers.md § Test layers).
 
 const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
 

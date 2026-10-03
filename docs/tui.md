@@ -57,7 +57,7 @@ a loaded client bundle or creating its worker, the terminal checks the shared po
 execution with an upgrade message, even if package installation ignored the `engines` warning.
 
 So the whole suite draws on the Node the repo already has, with no skips and no second runtime to
-bundle ([testing.md](./testing.md) § Test layers, [future/bundle.md](./future/bundle.md)).
+bundle ([test layers](./testing/layers.md#terminal-client), [future/bundle.md](./future/bundle.md)).
 
 ## The process model
 
@@ -660,7 +660,7 @@ For the full contract, see [Terminal chrome and plugins](./tui/chrome-and-plugin
 
 ## Tests
 
-[testing.md](./testing.md) § Test layers owns the tiers. In short: one case per kit node against a cell
+[Test layers](./testing/layers.md#terminal-client) owns the tiers. In short: one case per kit node against a cell
 buffer, one per layout drawn from its projection, a twin of client-core's `keys.test.tsx` against the
 terminal adapter, a pane file that opens every first-party pane at exactly 80 by 24 and asks whether
 the thing the pane is for is on the first screen, a chrome file that drives the whole shell, a
@@ -693,7 +693,7 @@ root's lock.
 For terminal UX work, the agent driver runs the compiled TUI in a real PTY and captures its visible
 cells through a headless terminal. It sends raw keyboard input through the parser that the harness
 bypasses, records snapshots and resizes, and can run a bounded navigation flow against the shared
-desktop fixture. [local-development.md](./local-development.md#agent-driven-terminal-development)
+desktop fixture. [Agent drivers](./local-development/agent-drivers.md#drive-the-terminal-client)
 has the commands and comparison procedure. The driver complements the fast cell tests; a terminal
 emulator and human inspection still cover color, focus, and host-specific behavior.
 

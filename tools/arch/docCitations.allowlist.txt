@@ -17,7 +17,6 @@ apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § The five key groups
 apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § The footer
 apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § What is drawn bespoke
 apps/tui/src/chrome/Footer.tsx: docs/ui-design.md § Connection and staleness vocabulary
-apps/tui/src/chrome/Inbox.tsx: docs/architecture-overview.md § Fleet
 apps/tui/src/chrome/Inbox.tsx: docs/tui.md § The screen
 apps/tui/src/chrome/Inbox.tsx: docs/tui.md § What is drawn bespoke
 apps/tui/src/chrome/Palette.tsx: docs/tui.md § What is drawn bespoke
@@ -110,12 +109,10 @@ packages/client-core/src/features/dashboards/views/Provenance.tsx: docs/dashboar
 packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § The two vocabularies
 packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § Trends
 packages/client-core/src/features/editor/theme.ts: docs/editor.md § The shared surface
-packages/client-core/src/features/fleet/FleetHome.tsx: docs/architecture-overview.md § Fleet
 packages/client-core/src/features/fleet/FleetHome.tsx: docs/plugins.md § Node
 packages/client-core/src/features/integrations/watchConnectionChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/notifications/invariants.test.ts: docs/notifications.md § Invariants
 packages/client-core/src/features/notifications/kindContributions.ts: docs/data-layer.md § Backup
-packages/client-core/src/features/notifications/NotificationBell.tsx: docs/architecture-overview.md § Fleet
 packages/client-core/src/features/projects/watchProjectChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/settings/appearancePrefs.ts: docs/ui-design.md § Token axes
 packages/client-core/src/features/settings/AppearanceSettings.tsx: docs/ui-design.md § Token axes
@@ -278,7 +275,6 @@ packages/node-core/src/server/audit.ts: docs/data-layer.md § Core DB
 packages/node-core/src/server/audit.ts: docs/security.md § Supply chain
 packages/node-core/src/server/auth/idempotency.ts: docs/api-reference.md § HTTP conventions
 packages/node-core/src/server/auth/pairingCodes.ts: docs/security.md § Transport: "no oracle for 'right code
-packages/node-core/src/server/bindings.ts: docs/architecture-overview.md § Fleet semantics
 packages/node-core/src/server/bridge.ts: docs/api-reference.md § error-codes
 packages/node-core/src/server/core/telemetry.ts: docs/security.md § Telemetry sinks
 packages/node-core/src/server/dashboards/history.ts: docs/dashboards.md § Trends for why that renders as a cold state rather than an e
@@ -338,13 +334,11 @@ packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin the
 packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin themes for why only these are accepted
 packages/protocol/src/chrome/extensionPoints.ts: docs/plugins.md § Arbitration
 packages/protocol/src/device/node.ts: docs/security.md § The control plane
-packages/protocol/src/device/nodeProviders.ts: docs/architecture-overview.md § The three parties for why a provider is the second door into
 packages/protocol/src/plugin/contract.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/plugin/manifest/chromeDescriptors.ts: docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension point
 packages/protocol/src/plugin/manifest/displayDescriptors.ts: docs/ui-design.md § Plugin themes for the token contract and what each group may
 packages/protocol/src/runtime/schedules.ts: docs/schedules.md § Targets
 packages/protocol/src/transport/api/nodeAdmin.ts: docs/data-layer.md § Backup
-packages/protocol/src/transport/api/pluginPresentation.ts: docs/architecture-overview.md § Who owns which contract
 packages/protocol/src/transport/api/pluginPresentation.ts: docs/workflows.md § Starting a run
 packages/protocol/src/transport/api/pluginState.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/transport/api/runtime.ts: docs/dashboards.md § Trends
@@ -354,7 +348,6 @@ packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing a core
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/transport/nodeEvents.ts: docs/plugins/forward-compatibility.md § What is not an event
 packages/protocol/src/tree/messages.ts: docs/plugins.md § Asking the host
-plugins/agents/src/client/center/AgentCenter.tsx: docs/architecture-overview.md § Fleet semantics: two nodes may hold the same UUID
 plugins/agents/src/client/composer/AgentComposer.tsx: docs/managed-agents.md § Draft attachments
 plugins/agents/src/client/composer/QueuedAgentTurns.tsx: docs/managed-agents.md § The turn queue
 plugins/agents/src/client/composer/replaceAttachment.test.ts: docs/managed-agents.md § Draft attachments
@@ -362,7 +355,6 @@ plugins/agents/src/client/composer/replaceAttachment.ts: docs/managed-agents.md 
 plugins/agents/src/client/sessions/AgentPane.test.tsx: docs/managed-agents.md § Sessions
 plugins/agents/src/client/sessions/AgentPane.tsx: docs/managed-agents.md § Sessions
 plugins/agents/src/client/sessions/AgentTaskSidebar.tsx: docs/managed-agents.md § Subagents
-plugins/agents/src/client/sessions/managedStore.ts: docs/architecture-overview.md § Fleet semantics
 plugins/agents/src/client/sessions/managedStore.ts: docs/managed-agents.md § The transcript store
 plugins/agents/src/client/sessions/readingPlaceStore.ts: docs/panes.md § there is no keepAlive
 plugins/agents/src/client/sessions/toolFoldPrefs.ts: docs/managed-agents.md § Tool call display

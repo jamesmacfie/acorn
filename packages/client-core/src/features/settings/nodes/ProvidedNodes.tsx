@@ -107,7 +107,7 @@ export default function ProvidedNodes() {
         help="Machines a plugin, such as a cloud provider, can run for you. Add one to use it here. acorn checks its identity when it connects."
       >
         {/* A provider that could not answer is a line, never a failed page: the rest of the list is
-            still true (docs/architecture-overview.md § Client state and fleet behavior). */}
+            still true (docs/architecture/fleet.md § Client state and fleet behavior). */}
         <For each={providerFailures(provided())}>
           {(failure) => <Alert tone="warn" variant="banner">{providerName(failure.providerId)} couldn't list its machines: {failure.reason}</Alert>}
         </For>

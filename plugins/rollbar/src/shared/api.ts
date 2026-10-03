@@ -1,6 +1,6 @@
 // Rollbar's wire contract (docs/integrations.md): deduped error items mirrored into `issues`. Types,
 // route builders, and query keys live here, not in `@acorn/protocol`, because a plugin owns the shape
-// of its own wire surface (docs/architecture-overview.md). Do not change a query key: it orphans a
+// of its own wire surface (docs/architecture/node-api.md). Do not change a query key: it orphans a
 // user's persisted cache (docs/caching.md).
 //
 // The list row (summary) and the detail differ: detail adds a normalized, privacy-safe view of the

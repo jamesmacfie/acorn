@@ -9,7 +9,7 @@ architecture choices, not claims that an alternative can never work. The
 The control plane holds account, Node, placement, and billing metadata. A durable team Node owns
 task content and history. Putting transcripts or repository bytes in the control plane would make
 it a second product database and weaken the replaceable-control-plane boundary in
-[architecture overview](../../architecture-overview.md#the-three-parties-and-what-a-control-plane-may-hold).
+[architecture overview](../../architecture/control-plane.md).
 The relay carries encrypted bytes but cannot interpret them.
 
 ## No browser workspace in the first release

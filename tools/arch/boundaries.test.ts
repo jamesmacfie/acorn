@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
 
 // Architecture boundary enforcement. Every rule below is stated, with the failure it prevents, in
-// docs/architecture-overview.md § Package boundaries. Read that first, then this for the mechanics.
+// docs/architecture/packages.md § Package boundaries. Read that first, then this for the mechanics.
 //
 // The scanner resolves relative and bare @acorn/* specifiers, so the package graph is checked across
 // intra-package and cross-package imports alike. Test files follow the same rules as production files
@@ -37,7 +37,7 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   })
   .map((dir) => {
     const name = (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string }).name
-    // Kind comes from where a package lives, not its name (docs/architecture-overview.md § Package
+    // Kind comes from where a package lives, not its name (docs/architecture/packages.md § Package
     // boundaries): the `@acorn/plugin-` name prefix would classify `@acorn/plugin-api`, a shared
     // library every plugin imports, as a plugin.
     const base = basename(dirname(dir))
@@ -198,7 +198,7 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  // `entries` and `composition` are apps/node's two folders (docs/architecture-overview.md).
+  // `entries` and `composition` are apps/node's two folders (docs/local-development.md).
   // `main` was a side until it merged into `server` on 2026-08-30.
   if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
@@ -274,7 +274,7 @@ describe('architecture boundaries', () => {
 
   it('spawning a child process is an enumerated exception to the broker', () => {
     // Every entry below is a considered exception to the broker, with its reason inline. See
-    // docs/architecture-overview.md § Package boundaries and docs/security.md § Process, path, and
+    // docs/architecture/packages.md § Package boundaries and docs/security.md § Process, path, and
     // configuration controls.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
@@ -543,7 +543,7 @@ describe('architecture boundaries', () => {
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
-    // before the window starts and is test scaffolding by purpose (docs/testing.md § Large-surface
+    // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
     // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
     const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
@@ -665,7 +665,7 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol declares no plugin route', () => {
-    // docs/architecture-overview.md § Package boundaries: @acorn/protocol owns no plugin's wire
+    // docs/architecture/packages.md § Package boundaries: @acorn/protocol owns no plugin's wire
     // surface.
     const proto = byName.get('@acorn/protocol')!
     const files = walk(proto.src)
@@ -700,7 +700,7 @@ describe('architecture boundaries', () => {
   })
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
-    // Two spellings that must not drift (docs/architecture-overview.md § Package boundaries).
+    // Two spellings that must not drift (docs/architecture/packages.md § Package boundaries).
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'host/registries/commands/corePaths.ts'), 'utf8')
@@ -860,7 +860,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only core reaches the machine identity store', () => {
-    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
+    // Core seams are not reachable around (docs/architecture/packages.md § Package boundaries).
     const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -874,7 +874,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only custody touches the third-party plugin cache and trust store', () => {
-    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
+    // Core seams are not reachable around (docs/architecture/packages.md § Package boundaries).
     // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
     // Two hosts, one store each. `apps/desktop` reaches it from its helper, `apps/tui` from its own
@@ -923,7 +923,7 @@ describe('architecture boundaries', () => {
 
   it('the Tauri surface stays inside the shell', () => {
     // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
-    // file that may name a Tauri binding (docs/testing.md § Test layers). `src/client` is the
+    // file that may name a Tauri binding (docs/testing/layers.md § Test layers). `src/client` is the
     // renderer and shares this package with the shell, so the rule names the shell folder rather than
     // the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
@@ -1449,7 +1449,7 @@ describe('architecture boundaries', () => {
   // core's diff rows and defined by github. Each meant a pane silently lost its styling when an
   // unrelated plugin was switched off, invisible to the compiler.
   it('a request body is parsed, not cast', () => {
-    // docs/architecture-overview.md § Package boundaries: a mutation route parses its body with a Zod
+    // docs/architecture/packages.md § Package boundaries: a mutation route parses its body with a Zod
     // schema. The rule the review found drifted was written down and nowhere enforced, so ten route
     // files had gone back to `as { field?: string }`, which type-checks and validates nothing.
     //

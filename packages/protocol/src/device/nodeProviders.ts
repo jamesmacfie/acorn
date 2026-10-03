@@ -6,7 +6,7 @@ import type { ToolRisk } from '../transport/api'
 // (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
 // stays a pure sink.
 //
-// See docs/plugins.md § Node providers for the seam and docs/architecture-overview.md § The three
+// See docs/plugins.md § Node providers for the seam and docs/architecture/control-plane.md § The three
 // parties for why a provider is the second door into the fleet.
 
 /** Where a provided node is in its life. `provisioning` is the state this exists for: a node being
@@ -58,7 +58,7 @@ export type NodeProviderDescriptor = {
 
 // `GET /v1/core/nodes`. One provider being unreachable is a line in `failures`, never a failed
 // response: the same partial-result posture the client's fan-out takes across nodes
-// (docs/architecture-overview.md § Client state and fleet behavior).
+// (docs/architecture/fleet.md § Client state and fleet behavior).
 export type NodeProvidersResponse = {
   providers: NodeProviderDescriptor[]
   nodes: Array<ProvidedNode & { providerId: string }>

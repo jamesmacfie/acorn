@@ -1,3 +1,38 @@
+> **Completed 2026-10-03** by the "Phase 2 Entry points" task.
+>
+> **What landed:** All eight entry-point docs were checked against the code, restyled, and cut to 200
+> lines or fewer. `testing.md`, `local-development.md`, and `architecture-overview.md` are short landing
+> pages, with old-heading `<a id>` anchors, over new topic pages in `docs/testing/`,
+> `docs/local-development/`, and `docs/architecture/`. About 90 source comments now cite the new pages,
+> eight allowlist lines are gone (420 to 412), and `docs/README.md` lists every new page.
+>
+> **Deviations:** (1) More pages than the plan named. `docs/testing/architecture-rules.md` takes the
+> source-shape rules, kit invariants, doc checks, and non-vacuity, because `layers.md` couldn't hold
+> them in 200 lines. `docs/architecture/node-api.md`, `fleet.md`, and `control-plane.md` take the Node
+> API, the client and fleet rules, and the three parties, because the overview was still 253 lines with
+> only `packages.md`. (2) The smoke checklist's items 10 to 99 and 145 to 148 were stale copies of
+> checks that already live in the `docs/testing/` area files, so I deleted the copies instead of moving
+> them. The release pass is `docs/testing/smoke-checklist.md`. Checks 100 to 144 went to
+> `docs/testing/settings.md`, 149 to 154 to `docs/testing/computer-use.md`, and both memory sections to
+> `docs/testing/memory.md`, because the memory programme record was deleted. (3) I edited
+> `docs/testing/manual-checks.md` beyond a link fix, to add rows for those three pages. (4) I pruned the
+> `docs/README.md` subfolder list to `future/` and `schemas/`, because the future README already
+> indexes every programme. (5) I repointed links in other phases' docs (`diff-rendering`, `frontend`,
+> `managed-agents`, `shell`, `telemetry`, `tui`, `node-enrollment`) and three broken links in
+> `docs/future/cloud/`. (6) No release tag exists, so `release-notes.md` states version 1.0.0 with no
+> tag. It also dropped "import is planned", because memory import shipped on October 2, 2026.
+>
+> **For later phases:** Moved sections keep anchors on the landing pages, so `§` citations to old
+> headings still pass, but cite the new file in new comments. Vitest hides the citation report when
+> either `CLAUDECODE` or `AI_AGENT` is set. Run `env -u CLAUDECODE -u AI_AGENT npx vitest run
+> docCitations` in `tools/arch`. Phase 1's command unset only the first and prints nothing. The length
+> report counts subfolder pages, so a new topic page must also stay under 200 lines. It skips
+> `docs/testing/`. `docPaths.test.ts` treats a retired directory name as gone only when the same line
+> says "deleted". Known gap kept in `smoke-checklist.md`: the light-theme `--is-dark` bug is still in
+> `tokens-theme.css`. Claims needing a running app were not rechecked: the manual check steps and the
+> agent-driver session behavior. `pnpm lint`, the arch suite, `pnpm db:check`, and the focused-test and
+> CLI help commands ran, but I didn't run `pnpm dev` or `pnpm dev:agent`.
+
 # Phase 2: Entry points
 
 Date: October 3, 2026. Status: proposed, not started. Part of the

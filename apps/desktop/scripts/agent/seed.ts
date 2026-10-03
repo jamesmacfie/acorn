@@ -12,11 +12,11 @@ import { makeTestNodeContext } from '@acorn/node-core/testkit'
 import { seedLargeSession } from '@acorn/plugin-agents/testkit'
 import { seedReviewNotes } from '@acorn/plugin-changes/testkit'
 
-// Seeds an agent-automation data root before the window starts (docs/local-development.md § Agent-driven
-// desktop development). Without a fixture it adds one project. Fixtures put a generated Git
+// Seeds an agent-automation data root before the window starts (docs/local-development/agent-drivers.md
+// § Drive the desktop). Without a fixture it adds one project. Fixtures put a generated Git
 // repository, task, review notes and agent session into an isolated root. `tui-navigation` also
 // adds a second task and a second workspace/project so both UI hosts can exercise navigation over
-// the same scenario (docs/testing.md § Large-surface fixture). Prints one JSON line the launcher records.
+// the same scenario (docs/testing/desktop.md § The large-surface fixture). Prints one JSON line the launcher records.
 
 const args = Object.fromEntries(process.argv.slice(2).reduce<string[][]>((pairs, value, index, all) => {
   if (index % 2 === 0) pairs.push([value, all[index + 1] ?? ''])

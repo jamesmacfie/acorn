@@ -1,7 +1,7 @@
 import type { TaskLinkSeed } from './projects.ts'
 
 // What the descriptor routes answer with. Host-defined, unlike everything else a plugin route serves,
-// because the host renders these (docs/architecture-overview.md § Who owns which contract).
+// because the host renders these (docs/architecture/node-api.md § Untrusted answers).
 // Re-exported from @acorn/plugin-api so a plugin's node half types its handlers against the same
 // declarations.
 //

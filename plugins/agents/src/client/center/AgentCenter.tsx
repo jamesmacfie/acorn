@@ -130,7 +130,7 @@ export default function AgentCenter() {
   // sort, and open below are written once.
   const rows = createMemo<AgentRow[]>(() => agentTelemetry.measure('agents.center.rows', () => {
     if (fleetScope()) {
-      // Per node, because a task id is only meaningful on its own node (docs/architecture-overview.md § Fleet semantics:
+      // Per node, because a task id is only meaningful on its own node (docs/architecture/fleet.md § Fan-out and partial results:
       // two nodes may hold the same UUID). A single flat map would resolve one node's task title against
       // another node's session.
       const tasksByNode = new Map(
@@ -176,8 +176,8 @@ export default function AgentCenter() {
     else if (!tasks.isPending && !workspaces.isPending && !workspaceSessions.loading && !providers.loading) view.ready()
   })
   const unavailable = () => (fleetScope() ? fleetSessions().unavailable : [])
-  // Two nodes may hold the same session id, so a row's key names both (docs/architecture-overview.md
-  // § Fleet semantics).
+  // Two nodes may hold the same session id, so a row's key names both (docs/architecture/fleet.md
+  // § Fan-out and partial results).
   const rowKey = (row: AgentRow) => `${row.nodeId}:${row.session.id}`
   // Key to row. `Rows` runs its body once per row, and the body below reads its own row about a dozen
   // times: as a `find` per read that is a scan of the list per field, and a session frame lands about

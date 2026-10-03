@@ -39,7 +39,7 @@ import { scrub, scrubAttrs, scrubLine } from './scrub'
 
 /** The developer switch that predates all of this. With it on, the collector runs with no sink
  *  subscribed and prints to stderr, which is what `ACORN_PERF=1` has always meant
- *  (docs/local-development.md § Timing a cold start). */
+ *  (docs/local-development/profiling.md § Timing a cold start). */
 export const PERF = process.env.ACORN_PERF === '1'
 
 /** Enough records that a burst survives a flush window, and small enough that a node nobody is

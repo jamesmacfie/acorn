@@ -29,7 +29,7 @@ import { saveTaskBranch, TaskBranchError, withBranchReservation } from '../../wo
 
 type Row = typeof schema.tasks.$inferSelect
 
-// Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). The positive-integer
+// Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). The positive-integer
 // constraint on pullNumber used to be three conjuncts of a `typeof` chain; getting it wrong here writes
 // a bad row rather than returning a 400.
 const taskPatchBody = z.object({

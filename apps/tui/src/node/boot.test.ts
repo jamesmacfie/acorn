@@ -13,7 +13,7 @@ import { custody, openNode, type OpenedNode } from './open'
 import { fileCacheStorage } from './cache'
 import { installPlatform, type Platform } from '../platform'
 
-// The boot test (docs/testing.md § Test layers): does `acorn`'s world come up.
+// The boot test (docs/testing/layers.md § Test layers): does `acorn`'s world come up.
 //
 // It runs the real thing — a real standalone node against a fresh data root, the real fleet store and
 // device-token files in a fresh config directory, the real broker over pinned TLS — and then asks the

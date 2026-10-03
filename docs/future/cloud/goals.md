@@ -63,8 +63,8 @@ Each rule has an owning document. The cloud work extends those documents; it doe
 
 | Rule | Why | Owner |
 | --- | --- | --- |
-| A local Node with no account behaves exactly as it does today. No cloud code path runs when nothing is configured. | The open-source promise. | [architecture overview](../../architecture-overview.md#the-three-parties-and-what-a-control-plane-may-hold) |
-| The control plane stores what it takes to find, vouch for, place, and bill a Node. It stores no task content: no code, prompts, transcripts, or plugin data. | Keeps the control plane replaceable and the trust story short. | [architecture overview](../../architecture-overview.md#the-three-parties-and-what-a-control-plane-may-hold) |
+| A local Node with no account behaves exactly as it does today. No cloud code path runs when nothing is configured. | The open-source promise. | [architecture overview](../../architecture/control-plane.md) |
+| The control plane stores what it takes to find, vouch for, place, and bill a Node. It stores no task content: no code, prompts, transcripts, or plugin data. | Keeps the control plane replaceable and the trust story short. | [architecture overview](../../architecture/control-plane.md) |
 | The relay moves encrypted bytes and cannot read them. Clients keep pinning the Node's certificate end to end. | A relay compromise yields routing metadata, not work. | [relay](./relay.md) |
 | Nodes stay independent. No shared database, no cross-Node transaction. The team Node reads worker history through explicit, versioned contracts. | The Node model every client and plugin is built on. | [architecture overview](../../architecture-overview.md) |
 | `/v1` routes, the `acorn-1` baseline, enrollment v1, and the meaning of a device token do not change in place. New behavior is additive or a new version. | Older clients and Nodes keep working. | [API reference](../../api-reference.md#versioning), [Node enrollment](../../node-enrollment.md#versioning) |

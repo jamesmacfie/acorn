@@ -1,4 +1,4 @@
-// The test seam for this package (docs/architecture-overview.md § Package boundaries).
+// The test seam for this package (docs/architecture/packages.md § Package boundaries).
 //
 //   apps/node/test/integration/rollbar.test.ts   everything below
 //   apps/node/test/registerProviders.ts          rollbarProvider, createRollbarFetch

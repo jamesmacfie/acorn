@@ -7,7 +7,7 @@ import { z } from 'zod'
 // a search is allowed to ask for, and the shape of a result row. It holds no execution context, no
 // outcome and no registry, because those carry host functions and Solid state and belong to the client
 // (packages/client-core/src/host/registries/commands/commands.ts). Protocol is a pure sink
-// (docs/architecture-overview.md § Package boundaries), so nothing here may reach for a client, a
+// (docs/architecture/packages.md § Package boundaries), so nothing here may reach for a client, a
 // router or a plugin implementation type.
 //
 // Nothing in `plugin/contract.ts` reads these yet. A manifest command is still an action with a

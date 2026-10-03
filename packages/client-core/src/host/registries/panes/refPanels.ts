@@ -10,7 +10,7 @@ import { onScopeEvicted } from '../shell/scopeEviction'
 export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> & Partial<Omit<ExternalRef, 'providerId' | 'displayId'>>
 
 // Named `target`, never `ref`. Solid rewrites a component's `ref` prop into a callback
-// (docs/architecture-overview.md § Package boundaries, "Two renderer traps"), so a props member named
+// (docs/architecture/packages.md § Two renderer traps), so a props member named
 // `ref` cannot carry data across a JSX call site. This shipped once as a blank panel title with every
 // guard on the way in holding. `tools/arch/boundaries.test.ts` holds the line for this directory.
 export type RefPanelProps = {

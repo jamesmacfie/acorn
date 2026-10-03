@@ -10,7 +10,7 @@ import { answerSurfaceHealthRequests, createLogger } from '@acorn/client-core/in
 // The switch is localStorage rather than `ACORN_PERF`, which is the environment variable the node and
 // the helper read: there is no environment in a webview, and the renderer is loaded by Rust's custom
 // scheme rather than spawned. `localStorage.setItem('acorn.perf', '1')` and reload
-// (docs/local-development.md § Timing a cold start).
+// (docs/local-development/profiling.md § Timing a cold start).
 //
 // `performance.now()` counts from this document's navigation, so these offsets are the renderer's own
 // and start where the helper's ready line left off.
@@ -31,7 +31,7 @@ const printing = (() => {
 })()
 
 // The same switch puts every renderer span on the performance timeline, which is how a task switch is
-// timed locally (docs/local-development.md § Timing a task switch). Spans still need telemetry on.
+// timed locally (docs/local-development/profiling.md § Timing a task switch). Spans still need telemetry on.
 setSpansOnTimeline(printing)
 
 // Large diffs and timelines count their own mounted rows, observers and queued work, and this is how

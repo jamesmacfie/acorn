@@ -47,7 +47,7 @@ export const nodeFetchResponseSchema = z.strictObject({
 })
 export type NodeFetchResponse = z.infer<typeof nodeFetchResponseSchema>
 
-// docs/architecture-overview.md § Client state and fleet behavior lists exactly these five. A
+// docs/architecture/fleet.md § Client state and fleet behavior lists exactly these five. A
 // fingerprint mismatch is not a sixth: it surfaces as `offline` carrying an `identity_mismatch`
 // error, because it is a reason a node is unreachable rather than a distinct steady state.
 export const nodeConnectionStateSchema = z.enum(['online', 'degraded', 'offline', 'incompatible', 'revoked'])
@@ -76,7 +76,7 @@ export type NodeTransportError = {
 }
 
 // A node the client knows about. Membership is client-side state
-// (docs/architecture-overview.md § Client state and fleet behavior), so this is main's record, not
+// (docs/architecture/fleet.md § Client state and fleet behavior), so this is main's record, not
 // something a node reports about itself.
 export const nodeRecordSchema = z.strictObject({
   nodeId: z.string().min(1),
@@ -142,7 +142,7 @@ export type NodeProbeResult = {
   protocolVersion: number
   baseline: string | null
   // False for a protocol major the client cannot speak: the `incompatible` state, decided before
-  // pairing rather than after (docs/architecture-overview.md § Client state and fleet behavior).
+  // pairing rather than after (docs/architecture/fleet.md § Client state and fleet behavior).
   compatible: boolean
 }
 

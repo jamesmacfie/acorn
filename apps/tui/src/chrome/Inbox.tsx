@@ -125,7 +125,7 @@ export function Inbox(props: { model: ShellModel }) {
     <Modal onDismiss={close} title="Notifications" size="md">
       <ModalBody>
         <box flexDirection="column">
-          {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
+          {/* Partial results are a banner, never a failed list (docs/architecture/fleet.md § Fan-out and partial results). */}
           <For each={inbox?.().unavailable ?? []}>
             {(entry) => <Line tone="warn">{`${entry.label} unavailable`}</Line>}
           </For>

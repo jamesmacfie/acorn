@@ -22,7 +22,7 @@ import { pluginLabel } from '../../host/plugins/pluginLabel'
 //   - With only the bundled local node the rail button does not exist at all, so "first-run never
 //     mentions nodes" is structural rather than a paragraph in a component nobody reaches.
 //   - Every number on a card comes through `createFleetQuery`, so a node that is down contributes an
-//     "unavailable" line and its neighbours still render (docs/architecture-overview.md § Client
+//     "unavailable" line and its neighbours still render (docs/architecture/fleet.md § Client
 //     state and fleet behavior).
 //
 // The card holds no per-node settings. Rename, unpair, revoke and the identity-change hard stop live
@@ -64,7 +64,7 @@ export default function FleetHome() {
         </p>
       </header>
 
-      {/* Partial results are a banner, never a failed page (docs/architecture-overview.md § Fleet). */}
+      {/* Partial results are a banner, never a failed page (docs/architecture/fleet.md § Fan-out and partial results). */}
       <Show when={unavailable().length}>
         <For each={unavailable()}>
           {(entry) => <Alert tone="warn" variant="banner">{entry.label} unavailable — {entry.reason}</Alert>}

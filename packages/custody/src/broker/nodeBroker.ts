@@ -31,7 +31,7 @@ const log = createLogger('broker')
 // so a node:https import there would fail the client/node split rule and drag Node builtins into the
 // renderer bundle.
 
-// Reconnect backoff. See docs/architecture-overview.md, "Failure behavior". Capped so a node that is
+// Reconnect backoff. See docs/architecture/fleet.md § Deadlines. Capped so a node that is
 // off for the night is retried every 30s rather than every 16.
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000]
 const JITTER = 0.2

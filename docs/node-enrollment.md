@@ -98,7 +98,7 @@ machine). `fingerprint` is the sha256 of the node's self-signed certificate, the
 client pins, and repeating it back honestly is the whole of a control plane's vouching job.
 
 A field describing tasks, repositories, runs or transcripts does not belong here and fails review by
-inspection ([architecture-overview.md](./architecture-overview.md) § The three parties).
+inspection ([the three parties](./architecture/control-plane.md)).
 
 The reply is an acknowledgement. A 2xx *is* the acknowledgement; the body may carry
 `{"controlPlaneName": "…"}`, which the node stores and shows its owner. The response is parsed

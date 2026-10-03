@@ -76,7 +76,7 @@ async function check(chain, Database) {
             console.error(
               '  This is the drizzle NOT-NULL table-rebuild quirk: the INSERT INTO __new_… SELECT\n' +
                 '  copies a column that does not exist in the source table. Hand-trim the new column\n' +
-                '  from the SELECT list (see docs/local-development.md → "Schema change workflow").',
+                '  from the SELECT list (see docs/local-development.md → "Database workflow").',
             )
           }
           break // later statements in this file depend on this one; later files on this file

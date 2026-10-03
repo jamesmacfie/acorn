@@ -187,7 +187,7 @@ bootMark('tree built')
 // this frame waits on the helper or the node (docs/frontend.md § Startup readiness).
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
 // and not the renderer's: a launch watched from behind another window prints every other mark and not
-// this one, which is why `tree built` above exists (docs/local-development.md § Timing a cold start).
+// this one, which is why `tree built` above exists (docs/local-development/profiling.md § Timing a cold start).
 // A task queued from rAF lets this paint finish before importing and registering the roster.
 // Occluded windows do not receive rAF on macOS, so they get a bounded fallback as well.
 let pluginsStarted = false

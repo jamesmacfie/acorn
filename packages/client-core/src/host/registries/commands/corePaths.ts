@@ -18,8 +18,8 @@ export const TASK_ROUTE = '/t/:taskId'
 export const PROJECT_PATH_PREFIX = '/p/'
 
 // The one segment core reserves for a loaded plugin's project-scoped URLs, and the per-plugin prefix
-// minted from it (docs/architecture-overview.md § Package boundaries, "Two spellings that must not
-// drift").
+// minted from it (docs/architecture/packages.md § Two spellings that must not
+// drift).
 //
 // Compiled plugins are not confined this way: github writes `/p/:projectId/pulls` directly through
 // `SourceContribution.routes`, because it is part of the binary and its patterns are reviewed with the

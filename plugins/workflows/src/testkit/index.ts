@@ -1,4 +1,4 @@
-// The test seam for this package (docs/architecture-overview.md § Package boundaries).
+// The test seam for this package (docs/architecture/packages.md § Package boundaries).
 //
 //   apps/node/test/integration/workflowFiles.test.ts    loadWorkflowFiles
 //   apps/node/test/integration/plugins/workflowRunner.test.ts  the runner and its schema tables

@@ -1,4 +1,4 @@
-// Declarative flows for the agent-driven window (docs/local-development.md § Large-surface flow).
+// Declarative flows for the agent-driven window (docs/local-development/agent-drivers.md § Large-surface flow).
 //
 // A flow file is data: stages of named steps, each step one action from the fixed table below, with
 // targets by role and accessible name, scroll fractions, window sizes, named wait conditions and named

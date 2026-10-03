@@ -1,6 +1,6 @@
 // The renderer end of the one authenticated stream socket. This file does not own the socket: the
 // desktop main's connection broker does, because the device token rides the upgrade request's headers
-// and a browser cannot set those (docs/architecture-overview.md § Node API and client flow).
+// and a browser cannot set those (docs/architecture/node-api.md § The platform seam).
 //
 // What stays here is node filtering, envelope dispatch and reconnect signaling. The broker owns
 // the URL, socket lifecycle, outbox and reconnect backoff. Stream owners manage their payloads.
@@ -106,7 +106,7 @@ function connect(): void {
 
   // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes every
   // frame here. Without the filter, node B's output for a colliding stream id feeds node A's reader
-  // (docs/architecture-overview.md § Client state and fleet behavior).
+  // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
   // Dropping rather than routing works because only the active node's surfaces are subscribed. A
   // fleet-wide live surface would need a nodeId in the subscription key, not a wider filter here.

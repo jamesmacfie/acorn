@@ -1,6 +1,6 @@
 // Test-only helper: a real SQLite DB (node:sqlite, server/storage/sqlite.ts) in a tmp dir with all Drizzle
 // migrations applied, no native build to match whichever runtime hosts the tests. See
-// docs/testing.md § Testkit for why this lives in its own directory.
+// docs/testing/layers.md § The testkit for why this lives in its own directory.
 import { existsSync, mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -49,13 +49,13 @@ export function makeTestCoreServices(testDb: TestDb, userId: string | null = nul
 }
 
 // The secret-bearing half of a test `Env`: the raw key and the SecretService binding every
-// credential read goes through (server/core/secrets.ts). docs/testing.md § Testkit has why these are
+// credential read goes through (server/core/secrets.ts). docs/testing/layers.md § The testkit has why these are
 // minted together.
 export function testSecretEnv(hexKey: string): { SESSION_ENC_KEY: string; SECRETS: SecretService } {
   return { SESSION_ENC_KEY: hexKey, SECRETS: new SecretService(hexKey) }
 }
 
-// The 64-hex session key every test in the repo uses (docs/testing.md § Testkit).
+// The 64-hex session key every test in the repo uses (docs/testing/layers.md § The testkit).
 export const TEST_ENCRYPTION_KEY = '0'.repeat(64)
 
 // The `c.env` bindings a route test needs, in one place.
@@ -67,7 +67,7 @@ export function testEnv(overrides: Partial<Env> = {}): Env {
   return { ...testSecretEnv(TEST_ENCRYPTION_KEY), ...overrides } as unknown as Env
 }
 
-// A workspace plugin's Drizzle chain, by id (docs/testing.md § Testkit).
+// A workspace plugin's Drizzle chain, by id (docs/testing/layers.md § The testkit).
 export function workspacePluginMigrations(plugin: string): string | null {
   let dir = dirname(fileURLToPath(import.meta.url))
   for (;;) {
@@ -81,7 +81,7 @@ export function workspacePluginMigrations(plugin: string): string | null {
 
 export type TestPluginDb = { db: PluginDatabase; dataDir: string; openConnection(): PluginDatabase; cleanup: () => void }
 
-// A real per-plugin SQLite file in a temp data root. See docs/testing.md § Testkit for how the
+// A real per-plugin SQLite file in a temp data root. See docs/testing/layers.md § The testkit for how the
 // migration chain resolves. Separate schemas mean a plugin's tests exercise the ownership boundary
 // production has.
 export function makeTestPluginDb(plugin: string, migrationsFolder: string | null = workspacePluginMigrations(plugin)): TestPluginDb {

@@ -7,7 +7,7 @@ import { renderFixture } from './harness'
 // It asserts what a reader would look for on the screen rather than a snapshot of every cell: the
 // group labels the list column drew, the note titles under them, and the body of the note the detail
 // column opened. Cell-level assertions live one node at a time in kit/kit.test.tsx, which is where a
-// broken promise names itself (docs/testing.md § Test layers). The chrome around the pane has its own
+// broken promise names itself (docs/testing/layers.md § Test layers). The chrome around the pane has its own
 // file (chrome/chrome.test.tsx); this one is about the pane.
 //
 // Since phase 4 the pane is inside a shell, so getting to it takes two presses of Tab — rail, pane

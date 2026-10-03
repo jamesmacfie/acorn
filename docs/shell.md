@@ -235,7 +235,7 @@ also the case that produces the records worth keeping.
 
 The boot marks become spans after the fact, for the same reason the terminal client's do: the answer
 arrives after the boot is over. They are held either way, because `ACORN_PERF=1` prints them
-([local-development.md](./local-development.md) § Timing a cold start).
+([profiling](./local-development/profiling.md) § Timing a cold start).
 
 ### What the shell reports
 
@@ -1036,7 +1036,7 @@ because `createUpdaterArtifacts` with no key produces nothing signed, and an uns
 is worse than none.
 
 Two release gates are owed to a person, and no script closes them: the smoke checklist
-([docs/testing.md](./testing.md) § The smoke checklist), run against the DMG on a machine that never
+([the smoke checklist](./testing/smoke-checklist.md)), run against the DMG on a machine that never
 had the Electron build, and a developer soak window. Nothing ships to a person until both pass.
 
 ### Active renderer responsiveness

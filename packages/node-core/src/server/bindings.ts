@@ -30,7 +30,7 @@ export type RuntimeBindings = {
   DATA_DIR: string
   // This Node's durable identity, minted into node.json on first start (server/storage/dataRoot.ts). Every
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
-  // collide (docs/architecture-overview.md § Fleet semantics).
+  // collide (docs/architecture/fleet.md § Fan-out and partial results).
   NODE_ID: string
   // The sha256 of this node's TLS certificate, the value a client pins (docs/api-reference.md §
   // Pairing), advertised at GET /v1/node.

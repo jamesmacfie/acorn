@@ -134,8 +134,8 @@ about 60 ms (2026-09-26, jsdom, no real-window timing). Its rules:
 The terminal client draws the same window and the same control and never trims.
 
 The window shipped because of a count, not a timing. At `canonical` the transcript mounted 3,387
-turns, eight times the 400-turn ceiling the large-surface flow asserts ([testing.md](../testing.md)
-§ Large-surface fixture), and stable keys and lazy bodies alone did not reduce card construction. The
+turns, eight times the 400-turn ceiling the large-surface flow asserts ([desktop and large-surface tests](../testing/desktop.md)
+§ The large-surface fixture), and stable keys and lazy bodies alone did not reduce card construction. The
 200-card page comes from that jsdom construction count. No WebKit sample has refined it.
 
 What the transcript refuses, and what would reopen it:

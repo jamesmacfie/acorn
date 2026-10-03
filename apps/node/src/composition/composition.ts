@@ -22,7 +22,7 @@ const reconcileLog = createLogger('node:reconcile')
 // Both Node hosts assemble the same graph here (docs/node-distribution.md § Runtime). The desktop
 // app supervises it rather than owning a second implementation. This lives in apps/node to keep the
 // dependency direction right: the graph names plugins, and node-core stays independent of them
-// (docs/architecture-overview.md § Package boundaries).
+// (docs/architecture/packages.md § Package boundaries).
 export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
 export type NodeComposition = {
@@ -84,7 +84,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
 }
 
 // The compiled-in list only, not derived from assembleNodeGraph: it is the parity fixture the
-// standalone/supervised comparison uses (docs/testing.md § Composition-root tests), and it must
+// standalone/supervised comparison uses (docs/testing/layers.md § Composition roots), and it must
 // describe what the build contains, not what happens to be installed in whichever data root the
 // process was pointed at.
 export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)

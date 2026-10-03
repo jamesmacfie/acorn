@@ -7,7 +7,7 @@ import { promisify } from 'node:util'
 const run = promisify(execFile)
 
 // The identity native tools such as Computer Use see for an agent session's window
-// (docs/local-development.md § Native control of a session). A raw `target/debug` executable has no
+// (docs/local-development/agent-drivers.md § Native control of a session). A raw `target/debug` executable has no
 // bundle identifier, so on macOS each session runs the build from inside a small app bundle instead.
 // Every session shares this identifier, which is what lets one saved approval cover later sessions
 // and rebuilds, and each gets its own bundle path, which is what tells two sessions apart. It is not

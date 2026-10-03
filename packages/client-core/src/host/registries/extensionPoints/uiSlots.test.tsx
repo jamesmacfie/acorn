@@ -6,7 +6,7 @@ import { SlotHost, TaskSlotHost, uiSlotRegistry } from './uiSlots'
 
 // The first tests in this repo that render a component. The suite next door is bare Node with no
 // Solid transform, so nothing it asserts says whether a contribution reaches the screen
-// (docs/testing.md § Test layers).
+// (docs/testing/layers.md § Test layers).
 //
 // What is checked here is host machinery: which contributions are drawn, in what order, and what
 // happens when one throws. Not appearance. A contribution renders a `<span>` with its id in it,

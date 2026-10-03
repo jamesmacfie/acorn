@@ -7,7 +7,7 @@ slow" and "whose fault is this" are one query rather than a bisect.
 This document owns the model, the switch, the collector, and what a sink sees.
 [plugin-authoring.md](./plugin-authoring.md) § Telemetry and logging owns what a plugin author
 writes. [security.md](./security.md) § Telemetry sinks owns why the read token is high.
-[local-development.md](./local-development.md) § Timing a cold start owns the `ACORN_PERF=1`
+[Profiling](./local-development/profiling.md) § Timing a cold start owns the `ACORN_PERF=1`
 developer switch that prints to a terminal instead.
 
 The node is the only collector. Every other runtime collects and posts what it collects to the
@@ -608,7 +608,7 @@ The desktop answers that request from boot, whatever the `acorn.perf` switch say
 because the automation window shares WebKit storage with a developer's own app, so turning the
 switch on for one would turn it on for both. Each answer replaces the previous
 mark, so a long automated loop leaves one entry. Nothing is put on `window`, and no HTTP route
-exposes it. The large-surface flow reads it this way ([local-development.md](./local-development.md)
+exposes it. The large-surface flow reads it this way ([agent drivers](./local-development/agent-drivers.md)
 § Large-surface flow).
 
 What the numbers say about the diff: its topology is complete before any row loads, its queue is

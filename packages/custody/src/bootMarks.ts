@@ -7,7 +7,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The desktop opens in three processes and the helper is the middle one: Rust spawns it, it sweeps its
 // caches, starts and supervises the node, binds the WebSocket the renderer talks to, and only then
 // prints the ready line Rust is blocked on. Every one of those steps is in front of the window
-// appearing, and none of them was timed (docs/local-development.md § Timing a cold start).
+// appearing, and none of them was timed (docs/local-development/profiling.md § Timing a cold start).
 //
 // stderr, not stdout: stdout is the line protocol Rust parses, and a timing line on it is a handshake
 // Rust cannot read (apps/desktop/src/helper/helperMain.ts). The *printing* is behind the switch rather

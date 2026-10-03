@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { SEAM_GROUPS, seamProblems, type SeamGroup } from '@acorn/client-core/infra/platform'
 
-// The shell's half of the platform-seam contract (docs/testing.md § Test
+// The shell's half of the platform-seam contract (docs/testing/layers.md § Test
 // layers).
 // The bridge writes the global and the seam reads it, and nothing between them is type-checked, so
 // this is the side that catches a renamed member or a dropped key.

@@ -15,7 +15,7 @@ import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
-// docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
+// docs/architecture/node-api.md § The platform seam for the seam's shape, its nullable
 // capability groups, and the arch rule that keeps `window.acorn` inside this file.
 
 // ── The capability groups ─────────────────────────────────────────────────────────────────────
@@ -290,7 +290,7 @@ declare global {
 }
 
 // Guards `window` because there is not always one. The suite runs in a node environment
-// (docs/testing.md) and apiClient consults this on every request, so a bare `window.acorn` throws
+// (docs/testing/layers.md § Client core) and apiClient consults this on every request, so a bare `window.acorn` throws
 // ReferenceError.
 //
 // Module-private, so it cannot become the contract by accident. `tools/arch/boundaries.test.ts` fails

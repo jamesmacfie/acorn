@@ -1,22 +1,19 @@
 # Architecture overview
 
-acorn has desktop and terminal clients that connect to a fleet of local or remote Node services.
-Each Node owns its data and execution environment. Clients own presentation and fleet membership.
-Nodes do not share a database or participate in cross-Node transactions.
+This page is the map of acorn's runtimes: what runs where, what each process owns, and which doc owns
+each contract. Read it first, then follow the links to the part you're about to change.
 
-The core owns runtime lifecycle, authentication, transport, storage access, and plugin registration.
-Plugins provide product functionality through declared contributions. They listen to events and call
-capabilities through the plugin API rather than importing core implementations.
+acorn has desktop and terminal clients that connect to one or more Nodes, local or remote. Each Node
+owns its data and its execution environment. Clients own presentation and fleet membership. Nodes
+don't share a database or take part in cross-Node transactions.
 
-The desktop renderer and terminal client share `@acorn/client-core`, layouts, and UI component contracts.
-Use the shared kit to support both hosts from one UI implementation. Desktop-only frames, webviews,
-and platform operations need a host requirement or a terminal fallback. Sharing the kit does not make
-those operations portable.
+Core owns runtime lifecycle, authentication, transport, storage access, and plugin registration.
+Plugins provide product features through declared contributions. They listen to events and call
+capabilities through the plugin API instead of importing core code.
 
-The desktop keeps its renderer, Rust shell, and Node helper in separate processes. The terminal client
-combines presentation and custody in one process while preserving their module boundaries.
-For the terminal runtime, see [Terminal client](./tui.md). The browser client remains a
-[design proposal](./future/remote.md).
+The desktop renderer and the terminal client share `@acorn/client-core`, the layouts, and the UI kit,
+so one UI implementation supports both. Desktop-only frames, webviews, and platform operations need a
+host requirement or a terminal fallback. The browser client is a [design proposal](./future/remote.md).
 
 ## Runtime topology
 
@@ -46,348 +43,67 @@ acorn (the Node the repo pins, no flag)
        └──────────────► the node for this machine's data root, attached or started
 ```
 
-The desktop helper starts the built `apps/node` artifact with `process.execPath`, which is the Node
-runtime the bundle ships. The Node reports its bound endpoint and certificate fingerprint through the
-service protocol. The local Node is supervised and restarted with bounded backoff; a standalone Node
+The desktop helper starts the built `apps/node` artifact with `process.execPath`, the Node runtime
+the bundle ships. The Node reports its bound endpoint and certificate fingerprint through the service
+protocol. The helper supervises the local Node and restarts it with bounded backoff. A standalone Node
 uses the same service graph.
 
-The Node binds `127.0.0.1` over HTTPS with TLS 1.3, and only loopback unless an operator has recorded
-an `advertiseHost` for it (`node.json`, or `ACORN_ADVERTISE_HOST`). For more information, see
-[node distribution](./node-distribution.md). A Host header outside that allowlist is refused with
-403 regardless. The endpoint the Node reports is always loopback, because the child processes it
-spawns validate its certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless
-`ACORN_PORT` is set or a remembered port in `node.json` is available. The Node serves no web assets. The
-shell's `app://acorn` scheme serves the renderer and falls back to its bundled `index.html` for
-client-side routes.
+The Node listens over HTTPS with TLS 1.3 on `127.0.0.1`. It binds only loopback unless an operator
+records an `advertiseHost` in `node.json` or `ACORN_ADVERTISE_HOST`, as
+[node distribution](./node-distribution.md) describes. A Host header outside that allowlist gets 403.
+The endpoint the Node reports is always loopback, because its child processes validate its
+certificate against an `IP:127.0.0.1` SAN. The port is ephemeral unless `ACORN_PORT` is set or the
+port remembered in `node.json` is free.
+
+The Node serves no web assets. The shell's `app://acorn` scheme serves the renderer and falls back
+to its bundled `index.html` for client-side routes.
 
 ## Process ownership
 
-The Node owns:
+| Process | Owns |
+| --- | --- |
+| Node | Core and plugin SQLite connections and migrations. Workspaces, projects, tasks, worktrees, Git, files, and project configuration. PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access. Provider integrations, encrypted secrets, mirrors, blobs, audit, backup, and reconciliation. The HTTPS listener, the WebSocket, stream and tunnel sockets, and the shutdown drain. |
+| Desktop shell | The window, child webviews, dialogs, menus, navigation policy, and the data key in the OS keychain. The injected renderer bridge and the helper behind it. Node endpoint records, certificate pins, device tokens, fleet membership, and service supervision. |
+| Terminal client | What the shell and helper own, in one process: the screen, endpoint records and pins, device tokens, plugin custody, and supervision of a Node it started. |
+| Headless CLI | Nothing persistent, except a local Node started with `node start --background`. |
 
-- Core and plugin SQLite connections and migrations.
-- Workspaces, projects, tasks, worktrees, Git, files, and project configuration.
-- PTYs, tmux sessions, child processes, managed agents, workflows, Docker, and Postgres access.
-- Provider integrations, encrypted secrets, mirrors, blob storage, audit, backup, and reconciliation.
-- The one scheduler, covering all periodic work whoever declared it. See
-  [the schedules doc](./schedules.md). No client owns a timer that fires work. A panel poll says "I am
-  looking at this"; a schedule says "do this whether or not anyone is".
-- The HTTPS listener, authenticated WebSocket, stream and tunnel sockets, and shutdown drain.
+The Node runs the one scheduler for all periodic work, whoever declared it. No client owns a timer
+that fires work. A panel poll says "I'm looking at this", and a schedule says "do this whether or
+not anyone is". [Schedules](./schedules.md) covers it.
 
-The desktop shell owns:
-
-- The window, child webviews, dialogs, menus, navigation policy, and the data key in the OS keychain.
-- The injected renderer bridge, and the helper process behind it. Three folders, one per process:
-  `apps/desktop/src/client/` is the renderer, `apps/desktop/src/shell/` is the Tauri side, and
-  `apps/desktop/src/helper/` is the Node process Rust supervises.
-- Node endpoint records, certificate pins, device-token custody, fleet membership, and service
-  supervision.
-
-The terminal client owns the same things the shell and the helper own between them, in one process:
-the screen, the endpoint records and pins, device-token custody, plugin custody, and supervision of a
-node it started. What the desktop holds as a process boundary it holds as a module boundary, and an
-arch rule refuses an import of custody from anything in `apps/tui` that draws a cell. It owns no
-window, no webview and no keychain, so the affordances those gate are absent through the platform seam
-rather than stubbed. See [the terminal client doc](./tui.md).
+The desktop's three processes have one folder each: `apps/desktop/src/client/` is the renderer,
+`apps/desktop/src/shell/` is the Tauri side, and `apps/desktop/src/helper/` is the Node process Rust
+supervises. The terminal client holds the same split as a module boundary. An architecture rule
+refuses a custody import from any `apps/tui` module that draws cells. It has no window, webview, or
+keychain, so those affordances are absent through the platform seam. [Terminal client](./tui.md)
+covers it.
 
 The headless CLI enters through the same `acorn` launcher when a subcommand is present. It reuses
-`@acorn/custody` for fleet membership, device tokens, certificate pins, and the broker, then reads
-one selected Node over `/v1`. Only explicit `node start --background` and `node stop` own a
-persistent local Node lifetime; ordinary resource commands attach without starting it. See
-[command-line client](./cli.md).
+`@acorn/custody` for fleet membership, tokens, pins, and the broker, then reads one Node over `/v1`.
+Ordinary commands attach without starting a Node. [CLI](./cli.md) covers it.
 
-Only serializable values cross a boundary. Product requests and streams use the broker and `/v1`.
-The service protocol is reserved for lifecycle messages.
+Only serializable values cross a process boundary. Product requests and streams use the broker and
+`/v1`. The service protocol carries lifecycle messages only.
 
-## Node-provided plugin UI
+## Contracts and their owners
 
-A loaded plugin has separate runtime, distribution, custody, and presentation facts. The Node's
-`GET /v1/core/plugins` response reports `active`, the declaration and client hash captured with the
-running node half, beside `installed`, the current disk candidate. Install, update, and uninstall can
-change `installed` without changing `active`. The Node retains the active client bytes and serves them
-by exact hash until that runtime stops. An omitted `active` field is an older protocol response and is
-adapted conservatively; `null` explicitly means no loaded runtime is active.
-
-The client reconciles one observation per paired Node. Custody fetches and hashes both active and
-installed offers, then reads its durable decision for each `(pluginId, hash)`. The client selects only
-an accepted, cached bundle matching that Node's active runtime. A disk candidate can prompt for trust
-without replacing the running version. Source-aware plugin events, arrivals, reconnects, switches,
-stale reads, and unpairing update one distribution snapshot; the active Node's disposable
-registrations follow that snapshot. A stale or unreachable Node retains its last observation for
-explanation but supplies no live loaded UI.
-
-Availability checks combine the Node runtime state with the exact accepted selection. They gate
-loaded panes, settings, importers, footer slots, commands, and other contributions before use. The
-shell still owns placement and fallback. A remote tree worker is keyed by `(pluginId, hash)`; each
-mounted tree has its own slot and bridge authority. See [activation](./plugins/activation.md),
-[descriptors](./plugins/descriptors.md), and [security](./security.md).
-
-## Package boundaries
-
-`tools/arch/boundaries.test.ts` enforces the rules below over the import graph of every package in
-`apps/`, `packages/`, `plugins/`, and `tools/`. Package kind comes from where a package lives, never
-from its name.
-
-The plugin packages are the exception to "the boundary is a test": each one declares an `exports` map
-naming at most five subpaths, so a deep import into a plugin is a `tsc` error at the import site
-rather than a boundary-test failure somewhere else in the repo.
-
-`@acorn/protocol` is closed too, and it closed differently: it has no entrypoint to funnel through, so
-its map enumerates its public modules one per line. That buys two things over the wildcard. A test file is
-not importable from another package, and a new module is public only when someone adds the line, which
-is the decision the map exists to record.
-
-The source is grouped by contract owner: agents, appearance, chrome, content, data, dashboards,
-device, integrations, projects, runtime, and transport. The public subpaths remain flat, so moving a
-source file between these folders does not change a consumer import. `plugin/` and `tree/` keep their
-own wire families. `baseline.ts` stays at the source root because the Rust shell embeds that file.
-
-The other five libraries also publish enumerated subpaths. Their boundary map is:
-
-| Library | Public paths | Keep private |
-| --- | --- | --- |
-| `client-core` | Feature, registry, kit, and infrastructure entrypoints; narrow component paths for lazy UI | Feature stores, registry implementations, and test helpers outside `testkit/` |
-| `node-core` | Server service and composition seams; `testkit` for fixtures | Runtime implementations not named by the map |
-| `custody` | Broker, plugin custody, device, and startup seams | Store and supervision internals |
-| `dashboards-core` | Contract, projection, and rendering math | Individual pipeline modules not named by the map |
-| `diff-document` | One entrypoint, `./document`: the diff document's types, parser, segmenter, search, and parse cache | Its modules behind that entrypoint |
-
-Direct paths remain where a lazy component import, a side-effect stylesheet, a mock target, a
-composition entrypoint, or two same-named exports need their own loading boundary. Public files
-re-export only the bindings used across packages. A caller cannot reach any other source path through
-package resolution. `tools/arch/boundaries.test.ts` checks the maps and refuses private imports.
-
-**The UI kit is closed as well**, and by a third mechanism again: by type. Every component a plugin
-may draw with is one row in `packages/client-core/src/kit/tokens/support.ts`, a node's props are role
-tokens rather than DOM attributes, and a type-level test refuses `class`, `className` and `style` on
-any of them ([ui design](./ui-design.md) § The closed kit). Two arch rules hold the rest — no plugin
-ships a stylesheet, and no plugin mounts a Solid root of its own.
-
-Within `client-core`, the kit depends on its own modules and the syntax highlighter, not on product
-features. It also imports public protocol and diff-document contracts. The boundary test counts
-type-only imports and re-exports: a display shape shared with a feature belongs in the kit, while
-the feature keeps its public type names for consumers.
-
-Test files follow the same rules as production files unless a rule names an exception. Remaining
-shrinking baselines are named at their own tests; plugin tests have no direct core-library imports.
-
-**Graph shape.** No cycles. `packages/*` never imports `plugins/*`. That inversion made client-core
-cyclic, and acyclicity alone does not catch it, because a plugin whose only upstream is
-`@acorn/protocol` closes no cycle. Apps never import each other.
-
-**What a plugin may import.** The facade (`@acorn/plugin-api`), the wire types, another plugin's
-`contract/`, and its own files. Nothing else in `packages/`. `contract/` is the one cross-plugin import
-surface, and it may not re-export a package's internals even transitively. `contract/x.ts ->
-shared/y.ts -> server/heavy.ts` would drag the implementation into every consumer. Types a contract needs
-live in `contract/` or `shared/`.
-
-**What an app may import.** A plugin's public subpaths, and no internal module, so a composition root
-cannot come to depend on something never meant to be load-bearing. There are five kinds, and a plugin
-declares only the ones it has:
-
-| Subpath | For |
+| Contract | Owner |
 | --- | --- |
-| `./node/index.ts` | the Node activation entrypoint |
-| `./client/index.ts` | the client activation entrypoint |
-| `./contract/*` | the cross-plugin surface, open as a directory because that is what a contract is |
-| `./testkit` | what a node-side test outside this package needs |
-| `./testkit/client` | the same for a client-side test, split so DOM types stay out of a node program |
+| What a package may import and publish | [Package boundaries](./architecture/packages.md) |
+| Route families, the platform seam, and wire validation | [Node API and client flow](./architecture/node-api.md) |
+| Every route, error, and transport detail | [API reference](./api-reference.md) |
+| File and folder names | [Conventions](./conventions.md) |
+| Which state lives on the Node and which on the device | [State ownership](./state-ownership.md) |
+| Loaded plugin activation, `active` and `installed`, and trust | [Plugin activation](./plugins/activation.md) |
+| Remote trees and mounted bridge ownership | [Descriptors](./plugins/descriptors.md) |
 
-Tests are no longer exempt, which is the change: 37 deep specifiers across 15 files under `apps/` now
-go through a `testkit` instead of reaching into a plugin's internals, and each testkit file
-names the tests it serves so an export can be traced to the reason it exists. Two plugins,
-`linear` and `rollbar`, also declare `./server/index.ts`, because a `vi.mock` has to name the module
-the code under test imports and both plugins' routes import their own `../index` relatively. The
-arch test holds that list at two.
+<a id="package-boundaries"></a>
+<a id="node-api-and-client-flow"></a>
+<a id="wire-validation"></a>
+<a id="node-provided-plugin-ui"></a>
 
-What the compiler cannot see is a map going back to `"./*": "./src/*"`, which would reopen every path
-and break no build. `tools/arch/boundaries.test.ts` checks every package map for wildcards, missing
-targets, test-file exports, and unintended private imports.
-
-**Test scaffolding stays out of production.** No production file imports any package's `testkit/`,
-which is how a temp-directory SQLite factory ends up shipped. Plugin tests reach core fixtures through
-`@acorn/plugin-api/testkit` and its client test subpaths. The architecture test rejects a plugin test
-that imports `client-core` or `node-core` directly, and rejects any production import of testkit.
-
-**Folder names are part of the boundary.** A plugin's `src/` children come from seven names — `node`,
-`server`, `client`, `tree`, `contract`, `shared`, `testkit` — and nothing else, including loose files.
-The set is fixed because every rule above that keys off the first path segment reads it as if it were
-one of these: an eighth name is not refused by any of them, it just falls through to "shared" and stops
-being governed. `node/` holds the activation entrypoint and its Drizzle schema and nothing else, since
-it is the one folder an app imports by path rather than through a barrel. No test file sits under any
-`contract/`, whose wildcard subpath would otherwise make it importable from another package. And no
-folder anywhere is named `main`, `service`, or `wiring`: `main/` meant "the Electron main process",
-and while the word survived Electron it was arbitrary which of `main/` or `server/` a module landed in
-(`agentTools.ts` sat under both, in different plugins). Every workspace package also carries a one-line
-`description`, which is the only answer `pnpm ls -r` can give to "what is this" in a repo with no
-per-package README. These four rules and the description check are in
-`tools/arch/boundaries.test.ts`; `.github/workflows/ci.yml` is what makes them run on a pull request
-rather than on whoever remembered.
-
-**The node stays bootable.** Nothing in the tree imports a shell binding it should not. Tauri's
-`invoke` and its event API are confined to `apps/desktop/src/shell/`, the bridge the window injects;
-the helper next door names none of them.
-Nothing imports `electron`, a flat ban that covers manifests too.
-The composition-root suites under `apps/node/test/integration/` are the durable check: they boot
-every plugin's `node/index.ts` in a plain Node process, which is the runtime that has to boot.
-
-**Every runtime logs through a logger.** `console.*` is a shrinking baseline under
-`packages/node-core/src`, `apps/node/src`, `packages/custody/src` and `apps/desktop/src/helper`,
-which use the node's logger, and under `packages/client-core/src`, `apps/desktop/src/client`,
-`apps/desktop/src/shell` and `apps/tui/src`, which use the client's. What survives in either
-baseline is not a log line: a handshake JSON a launcher parses off stdout, a pairing banner a person
-reads, the plugin frame's own console inside its iframe. A line written through `console.error`
-carries nothing but the prefix its author typed, where one written through `createLogger` carries an
-owner, passes a scrubber, and reaches every subscribed sink
-([telemetry.md](./telemetry.md) § Logging). A source scan rather than a graph edge, since `console`
-is a global. Tests are exempt: thirty-one of them spy on `console.warn` and `console.error`, which
-is how the logger's own output is asserted.
-
-**The custody stack stays shell-free.** `@acorn/custody` is the broker, the fleet, the device
-tokens, the plugin cache and trust store, the tunnels, and the supervised node service, composed by
-its `src/index.ts`. It names no shell binding and the encryption is injected rather than imported, so
-it is not the desktop's: the desktop runs it in a helper process under the bundled Node, and other
-hosts are free to compose it their own way. The process is the desktop's and is called the helper;
-the package is not. See the shell process in [the shell doc](./shell.md).
-
-**The client stays portable.** `window.acorn` is read only inside `packages/client-core/src/infra/platform/`.
-The global is read rather than imported, so this is a source scan rather than a graph edge. Tests are
-permanently exempt: stubbing `globalThis.window` is how the platform implementation gets exercised.
-
-**Core seams are not reachable around.** The raw identity store is confined to `packages/node-core`
-plus the two composition roots that construct it. The node's identity used to be written by
-`plugins/github`, which made "who is the user" a side effect of connecting one provider. The plugin
-trust and bundle stores are confined to `@acorn/custody`, because trust binds to a hash the
-host process computed and the renderer must stay inert. A plugin's production code never imports
-core's `db` module. Every child process goes through the process broker, with a written list of
-considered exceptions: a PTY, a long-lived agent driver, a `docker logs -f` stream, and a pg client
-are none of the things the broker models.
-
-**`@acorn/protocol` owns no plugin's wire surface.** Workflow rows and inputs live in Workflows'
-`contract/wire.ts`; managed agent sessions and events live in Agents' `contract/wire.ts`. Core tool
-ceilings live in `toolPolicy.ts`, and the small attention snapshot lives in `attention.ts`. Every plugin route lives under `/v1/p/<plugin>/`
-and core's under `/v1/core/`, so one literal catches a route builder protocol does not own. api.ts was
-701 lines of nine plugins' route builders, so no plugin could define its own wire surface without
-editing core. The plugin-named type modules that remain are an explicit list, each with a stated
-reason.
-
-**The facade stays boring.** `@acorn/plugin-api` is re-exports only: no declarations, no plain imports.
-Only the two UI barrels may re-export a `.tsx` module, so every other entrypoint stays loadable from a
-plugin's node-environment test suite. `ui/` may import only pure or presentation modules, from an
-allowlist of destinations rather than a denylist of data modules.
-
-**Two context types per side, one per tier.** `NodePluginContext` and `ClientPluginContext` are what a
-plugin loaded from disk gets; `CompiledNodePluginContext` and `CompiledClientPluginContext` add the
-seams only a plugin compiled into the binary can have — a live Hono router, the WS channel and PTY
-stream slots, agent tools, context sections, model adapters, and the client registries that take a
-component. The tier line is in the types, so crossing it is a compile error rather than a runtime "not
-a function". [plugins.md](./plugins.md) § The two contexts, one per tier owns the pair, and
-[contribution-kinds.md](./contribution-kinds.md) says why each kind sits where it does.
-
-**Two spellings that must not drift.** `PLUGIN_ROUTE_SEGMENT` is declared in client-core and re-spelled
-as a literal in `node-core/server/plugins/manifest.ts`, because the client is downstream of the node and
-cannot share the constant. The test turns that edit into a failure rather than a route the device
-refuses after the node accepted it.
-
-**Two renderer traps.** A contribution's props may not declare `ref` as data anywhere in
-`client-core/src/host/registries/`. Solid rewrites `ref={value}` on a component into a callback, so the
-panel reads `props.ref.displayId` as `undefined`, and TypeScript cannot see it because `ref` lives on
-`IntrinsicAttributes`. Second, a CSS class defined in a plugin's stylesheet may not be worn by markup
-outside that plugin, or a pane silently loses its styling when an unrelated plugin is switched off.
-
-## Node API and client flow
-
-The Node exposes one Hono application:
-
-- `/v1/node` and `/v1/pair` are the two pre-auth pairing routes.
-- `/v1/core/*` contains core-owned workspaces, projects, tasks, worktrees, integrations, settings,
-  security, backup, audit, schedule, agent-tool, and task-context routes.
-- `/v1/p/<plugin>/*` contains plugin-contributed routes. A built-in's router is mounted when the app
-  is built. A loaded plugin's fetch handler is resolved from the route registry per request, so a
-  plugin reloaded in place serves its new handler without a restart. See the dev loop in
-  [the plugins doc](./plugins.md).
-- `/v1/events` is the authenticated WebSocket for invalidation events, PTY and process streams,
-  Docker streams, workflow notices, agent events, and preview tunnels.
-
-`packages/protocol` holds what is genuinely shared: the error envelope, node identity, pairing, the
-broker and service protocols, the WebSocket envelope, and the core resource types (workspaces, tasks,
-devices, audit, backup). A plugin owns its own wire surface. Route builders, request and response
-types, and query keys live in that plugin's `shared/`, or in its `contract/` when another plugin
-reads them. Copy `plugins/docker/src/shared/model.ts`. Two boundary rules in
-`tools/arch/boundaries.test.ts` enforce it: protocol may declare no `/v1/p/` route, and the set of
-protocol modules named for a plugin is an enumerated, shrinking list. That lets a plugin define its
-wire contract without editing core, which is the precondition for third-party plugins.
-
-`packages/dashboards-core` and `packages/diff-document` are the other two packages both runtimes
-import. `dashboards-core` holds the pure
-dashboard pipeline: the panel model and its codec, shaping, cross-source mapping, layout, and chart
-and cell arithmetic, with no Solid, no registries, and no fetch. It exists because the node's measure
-sampler must compute a panel's number with the same functions the renderer draws it with. See
-[the schedules doc](./schedules.md). Two implementations of "this panel's measure" would agree until
-the day one changed, and the point of recording history is that a stored number means what the number
-on screen means. Client-core re-exports every module it moved, so the components there still say
-`./model`, and the node imports it directly. Like protocol it declares no DOM and no node types,
-which keeps the standalone node's graph clean.
-
-`diff-document` is the diff viewer's document ([diff rendering](./diff-rendering.md) § The document):
-parsing a hunks-only patch into plain rows, cutting them into bounded segments, the descriptors that
-lay a document out without its text, and search across one. It exists because the document is built
-on the node and read in the renderer. GitHub's and Changes' routes cut patches into segments and
-answer descriptors, the plugins' client sources pass those through the `DiffSource` port, and
-client-core's viewer loads the segments near the reader. No provider type enters it, and it has no
-DOM, node, Solid, database, or transport dependency. It is the one library besides protocol and the
-facade a plugin may import directly, because it holds no host state; `@acorn/plugin-api/ui/diff`
-re-exports the types the port is written in.
-
-The renderer reaches the host through one seam, `packages/client-core/src/infra/platform/`. It groups what
-a host provides, namely node transport, fleet membership, plugin custody, and the native extras, into
-separate nullable capabilities. The thin client in `packages/client-core` calls the transport group.
-Nothing else in the client may read the injected `window.acorn` global, and `boundaries.test.ts`
-fails any file outside the seam that does. The desktop bridge is the only implementation. A web
-client would implement the transport group and omit the desktop extras.
-
-The helper supplies the Node endpoint, pinned HTTPS agent, and bearer token. The renderer never
-holds a token or certificate and cannot open a direct network connection under the app CSP.
-
-Every response has an `X-Request-Id`. Errors use the single envelope
-`{ error: { code, message, requestId, retryable, details? } }`. Mutations may use
-`Idempotency-Key`; session creation, agent turns, and request resolution require one.
-
-### Wire validation
-
-**Zod at every mutation boundary.** A route that accepts a body parses it with a Zod schema and
-returns 400 on failure, using `safeParse` against a module-level schema, as
-`server/routes/projects/worktree.ts` does. Reads are not validated, because the client is TypeScript compiled
-against the same types and a response schema would restate the type.
-
-The rule exists because the alternative was drift. Roughly ten route files parsed with Zod while
-others hand-rolled `typeof` chains, and the chains were where the bugs hid: a positive-integer check
-spread over three conjuncts, a non-empty string check that only tested `typeof`. Neither is visible
-to `tsc`, because the body starts as `unknown`.
-
-Writing it here was not enough. The 2026-08-27 architecture review found ten route files back on
-casts, the worst of them passing a merge method straight to GitHub unchecked, so the rule is now an
-arch test: a file that calls `c.req.json()` and contains no `safeParse` fails
-`tools/arch/boundaries.test.ts`. The check is file-level, which is coarse on purpose. Matching each
-`safeParse` to the read it belongs to would mean parsing the file, and the failure worth catching is
-a route file with no schema in it at all. One allowlist entry survives, `plugins/agents`'s usage
-routes, whose hand-written validators live in `shared/` so the settings form can run them too and
-return per-field messages; the test names the reason and fails if that file stops reading a body.
-
-Deliberately not done: response schemas, full request and response codegen, or an OpenAPI pipeline.
-Every consumer is TypeScript in this repo, so Zod at the boundary is as far as this goes.
-
-The exceptions are all one boundary, the one that clause does not cover. A loaded plugin's answer is
-not this repo's TypeScript, and the host renders it under its own chrome. Those reads get real
-schemas in `@acorn/protocol` and are parsed on arrival: the manifest itself, agent context options
-and snapshots, batch reference resolutions, and typed data sources, whose rows are drawn as the host's own
-table beside another plugin's. See [the dashboards doc](./dashboards.md). Each parses
-all-or-nothing rather than sanitising field by field, because a half-accepted answer renders as
-complete and is not. Adding to this list means naming the same argument: untrusted wire, host-drawn.
-
-Runtime dependency security floors live in the root `package.json` overrides. The standalone packer
-carries them into npm's manifest; `tools/arch/dependencySecurity.test.ts` checks that pnpm's runtime
-overrides agree. See [dependency security policy](./node-distribution.md#dependency-security-policy)
-for direct dependency references and the standalone install's reproducibility limits.
+Package boundaries moved to [package boundaries](./architecture/packages.md). The Node API, client
+flow, and wire validation moved to [Node API and client flow](./architecture/node-api.md).
 
 ## Product model
 
@@ -398,181 +114,86 @@ Workspace: named group of projects
        └─ per-task terminal and managed-agent sessions
 ```
 
-Workspaces are machine-local groups. A project belongs to one workspace. A task is always owned
-by one Node and one project. A task's origin is the id of the source that made it, which the owning
-plugin declares, or `local` for one core made itself. Core keeps no list of them: the glyph a row is
-drawn with comes from the source's own `origins` map, and a task whose plugin is switched off falls
-back to local chrome with its origin as the tooltip.
+Workspaces are machine-local groups, and a project belongs to one. A task is always owned by one Node
+and one project. A task's origin is the id of the source that made it, which the owning plugin
+declares, or `local` when core made it. The glyph a row is drawn with comes from the source's own
+`origins` map. A task whose plugin is off falls back to local chrome with its origin as the tooltip.
+[Workspaces and tasks](./workspaces-and-tasks.md) owns the model.
 
-The renderer shell is contribution-driven. Plugins register task panes, rail sources, command-palette
-rows, settings pages, slots, context-section slots, attention sources, and node statistics. The shipped
-feature packages are GitHub, terminal, agents, editor, changes, notes, memory, context, workflows,
-Docker, preview, onboarding, and the built-in Claude, Codex, and Aider profiles registered by
-`plugins/agents`.
+The renderer shell is driven by contributions. Plugins register task panes, rail sources, palette
+rows, settings pages, slots, context sections, attention sources, and Node statistics.
 
-Several packages ship as loaded plugins instead, in neither compiled-plugin list. Rollbar was the first:
-its node provider is installed from disk, its rail rows are host-drawn descriptors, and its detail UI
-is a sandboxed frame. Model providers, the OpenAI and Anthropic connections and text adapters, is the
-minimal shape: a node bundle and a manifest, no client bundle at all, so there is nothing on the
-device to trust. Linear is the widest: a pane frame, a reference-panel frame that github's PR detail
-renders, a descriptor rail source with host-owned task promotion, and declarative `linear.app` URL
-recognisers. HTTP was the first to exercise plugin-owned tables and migrations end to end, and
-database moved onto the host-owned document surface, which proved that contract. Agent-cost is a client-only loaded example. See document
-surfaces in [the plugins doc](./plugins.md).
+Plugins come in two tiers:
 
-The desktop ships every built package as app resources, and the service reconciles them into the
-writable data root before plugin discovery. App-owned copies update with the app, while
-owner-installed overrides and uninstall tombstones win. A standalone Node has no app resources to
-reconcile from, so that step does nothing unless a developer names a directory to reconcile from. See
-the plugins section of [node distribution](./node-distribution.md).
+- **Compiled in.** They ship in the binary, run in the shell's own realm, and are trusted like the rest
+  of the app: agents, browser, changes, context, Docker, editor, GitHub, memory, notes, onboarding,
+  preview, terminal, and workflows. Agents registers the built-in Claude, Codex, and Aider profiles.
+- **Loaded.** A Node loads them from disk, installed through an owner-authenticated route and
+  distributed to each paired device. They draw as host-drawn descriptors, as a tree of host components
+  sent from a Web Worker, or in a sandboxed frame. The app bundles agent-cost, database, HTTP, Linear,
+  model providers, Rollbar, and Sentry telemetry as loaded plugins. A device can also hold a
+  client-only loaded plugin, which wins over a Node's offer of the same ID.
 
-Plugins come in two tiers. Those feature packages are **compiled in**: they ship in the binary, run
-in the shell's own realm, and are trusted like the rest of the app. A Node can also **load** a plugin
-from disk, installed through an owner-authenticated route, distributed to each paired device by the
-Node that owns it, and drawn three ways: as host-drawn descriptors, as a tree of the host's own
-components emitted from a Web Worker, or in a sandboxed frame for pixels the host cannot draw. The two
-tiers are permanent, and the line between them is what a contribution needs. Anything expressible as
-data plus async messages can be sandboxed, while PTY stream ownership and components the shell renders
-inside its own tree at a place it has not opened as an extension point need the shared realm and stay
-first-party.
-Client tree module lifetime is separate from mounted authority. Capable SDKs share a bundle worker
-while every mounted slot owns its bridge, pending requests, and document grant. A legacy SDK uses
-one immutable slot-affine worker per mounted tree and terminates with its final lease. The host captures QueryClient
-origin before lazy region construction, and structural document handle changes revoke prior grant
-generations. [Mounted bridge ownership](./plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)
-defines capability negotiation, compatibility, resource bounds, and the selected-Node event boundary.
+The desktop ships every bundled package as an app resource, and the service copies them into the data
+root before plugin discovery. Owner-installed overrides and uninstall markers win over the app's
+copies. A standalone Node has no app resources, so it skips that step unless a developer names a
+directory.
 
-A device can also hold a client-only loaded plugin. Its bundle has device provenance, wins over a Node
-offer of the same plugin ID, and uses the same client sandbox and trust gate. The device installer
-rejects any Node entry or Node-dependent contribution.
-[The plugins doc](./plugins.md) describes both tiers,
-[first-party plugins](./first-party-plugins.md) says which shipped plugins are in the first tier
-because they must be, and [extensibility](./extensibility.md) is why the split exists at all.
+Anything expressible as data plus async messages can be sandboxed. PTY stream ownership, and
+components the shell renders where it hasn't opened an extension point, need the shared realm and
+stay first-party. [Plugins](./plugins.md) describes both tiers. [First-party plugins](./first-party-plugins.md)
+says which plugins must be compiled in, and [extensibility](./extensibility.md) says why the split
+exists.
 
 ## Data ownership
 
-The Node separates disposable provider projections from application-owned state. GitHub, Linear, and
-Rollbar data is cached locally and revalidated on demand. Workspaces, tasks, notes, memories, agent
-sessions, workflow state, integrations, preferences, project configuration, saved queries, devices,
-and audit records are local source-of-truth data.
+The Node separates disposable provider projections from data it owns. GitHub, Linear, and Rollbar data
+is cached locally and revalidated on demand. Workspaces, tasks, notes, memories, agent sessions,
+workflow state, integrations, preferences, project configuration, saved queries, devices, and audit
+records are local source-of-truth data.
 
-Core owns the cross-feature workspace/task model, device and idempotency state, integrations, generic
-external-item projections, node preferences, config-trust acknowledgements, and audit records. A
-table-owning plugin owns its own SQLite file and migration chain. Plugins do not query one another's
-databases or use cross-file foreign keys; cross-plugin references are IDs resolved through typed
-CoreServices or capability contracts.
+Core owns the workspace and task model, device and idempotency state, integrations, generic
+external-item projections, Node preferences, config-trust acknowledgements, and audit records. A
+plugin with tables owns its own SQLite file and migration chain. Plugins don't query each other's
+databases or use foreign keys across files. They resolve references by ID through typed core services
+or capability contracts.
 
 The same line holds in the UI. A plugin's surface can be extended by another plugin only where its
-own manifest declares an extension point, and what crosses is a host-validated descriptor fetched
-from the contributor's own route, never a component, a callback, or DOM access into another realm.
-See cooperative extension points in [the plugins doc](./plugins.md). A plugin may also offer to draw
-one of core's designated surfaces, which the user arbitrates in settings and which falls back to
-core's own implementation on absence or failure. Neither is reachable from a plugin frame: both
-registries are populated host-side from manifests the device read, and the frame bridge gained no
-message kind.
+manifest declares an extension point. What crosses is a descriptor the host validates, fetched from
+the contributor's own route, never a component, a callback, or DOM access. A plugin may also offer to
+draw one of core's designated surfaces. The user picks in settings, and core's own version takes over
+on absence or failure. A plugin frame can reach neither. See [plugins](./plugins.md).
 
-The shared on-disk blob cache stores immutable patch bodies, file bodies, attachments, and artifacts
-by content hash. Worktrees and blobs are not included in backups. Backup snapshots core and plugin
-databases with credentials and device rows scrubbed; restore is a manual operation into a fresh data
-root.
+The blob cache stores immutable patch bodies, file bodies, attachments, and artifacts by content
+hash. Backups snapshot core and plugin databases with credentials and device rows removed, and leave
+out worktrees and blobs. Restore is a manual operation into a fresh data root.
 
 ## Client state and fleet behavior
 
-The client has one disposable query cache and IndexedDB persister per Node. It also persists fleet
-membership, endpoint pins, device tokens, device preferences, drafts, and selection state. Pane
-layouts and the other compositions belong to the Node they describe, not the device. See
-[the state doc](./state-ownership.md).
-Every Node-backed query is rendered with `live`, `refreshing`, `stale`, `offline`, `disabled`, or
-`error` status. Cached reads remain visible when a Node is offline; mutations fail fast and retain
-the user's text as a draft. There is no automatic mutation queue.
+The client keeps one disposable query cache per Node, renders every Node-backed read with its
+freshness, and fans aggregate surfaces out across Nodes. Partial results are a banner, never a failed
+page. [Client state and fleet behavior](./architecture/fleet.md) owns the rules.
 
-A paired Node's own connection has a smaller vocabulary. `NodeConnectionState`
-(`packages/protocol/src/transport/broker.ts`) is `online`, `degraded`, `offline`, `incompatible`, or `revoked`,
-and nothing else. A certificate fingerprint mismatch is not a sixth state. It surfaces as `offline`
-with an `identity_mismatch` error, because it is a reason the Node is unreachable rather than a
-steady state the UI needs its own row for. `incompatible` is decided from the protocol major the
-probe reports, before pairing completes, so a client refuses to pair with an incompatible Node rather
-than pairing and then discovering it cannot talk to it. See versioning in
-[the API reference](./api-reference.md).
+## The three parties
 
-Aggregate surfaces fan out requests per Node with bounded timeouts, merge successful results, and
-show partial availability with a Node label. A mutation always targets the Node that owns its
-resource. Node IDs are part of cache and persisted-state scope, so identical IDs on different Nodes
-cannot collide.
-
-Two deadlines sit on that path and the order between them is a contract. The client gives each Node a
-fixed window per fan-out request, and every route that waits on something outside the Node has to
-finish inside it. A provider plugin's per-request deadline is therefore always below the fan-out's,
-because a fetch that outlasts the client draws "this machine is unavailable" over a Node that is
-answering everything else, and the plugin's own "this API is unavailable" answer never reaches
-anyone. Changing the client's window means changing those deadlines with it.
-
-A route that passes its deadline is a fact about that route, not about the Node. The broker does not
-read its own request timeout as evidence that a Node is gone; liveness comes from the WebSocket
-heartbeat, and a Node that misses two pings is the one that gets terminated and reconnected. Reading
-a slow route as an unreachable Node took the whole app down over a single slow plugin panel.
-
-The Fleet source and the node switcher appear only once more than one Node is paired
-(`SourceContribution.when`). With a single bundled local Node the rail never mentions Nodes, so
-first-run stays a one-Node product. When a Node stops answering, its card in the Fleet view keeps
-rendering from that Node's own query cache rather than blanking. `createFleetQuery` falls back to
-whatever that Node's `QueryClient` last held, so a Node that answered once and then went quiet reads
-as a stale row rather than a failure. The banner that says a Node has never answered is reserved for
-a Node whose cache is empty. Conflating the two would make an offline Node look unreachable and a
-never-reachable Node look stale.
-
-That banner also has to clear itself. A Node that is still booting is listed as `online` the whole
-time, so the fan-out's source never changes and nothing re-runs it, and the surface keeps a banner
-for a Node that is fine seconds later. This is the ordinary shape of a cold launch: the desktop shell
-opens the window as soon as the helper is listening, which is a socket bind rather than a Node boot.
-So a run that reports any Node unavailable schedules another at 2, 5, and 10 seconds, and then stops.
-A ladder rather than a poll, because what it covers has an end: a Node is either up within the boot
-window or it is actually down. A Node that comes back later is picked up by a fleet change, a write,
-or a remount, each of which re-runs the fan-out anyway.
-
-## The three parties, and what a control plane may hold
-
-There are two parties today and an optional third. The **client** coordinates across the Nodes it can
-see. A **Node** owns its data and drives its own work. A **control plane** holds metadata about Nodes
-and vouches for them, and it is never in the data path.
-
-The rule that keeps the third party honest: **a control plane stores what it takes to find a Node and
-vouch for it, and nothing about what the Node is doing.** Node inventory, endpoints, fingerprints,
-enrollment records, provider handles, accounts, billing: yes. Tasks, repository contents, agent
-transcripts, run history: no. Any design that syncs task-shaped rows to a service fails this by
-inspection.
-
-Holding that line is what keeps three things true. The control plane stays replaceable, because
-nothing depends on it having seen your work. The trust story stays one sentence
-([the security doc](./security.md) § The control plane). And every `/v1` route and the WebSocket are
-untouched, so a Node with no account and no control plane is the fully usable default rather than a
-degraded mode.
-
-Two seams connect the third party, and nothing else does. A Node can enroll with a control plane at
-first boot, which is [the enrollment doc](./node-enrollment.md). A plugin can contribute a node
-provider, which puts Nodes in the fleet ([the plugins doc](./plugins.md) § Node providers). Both are
-optional, both are inert when unconfigured, and there is no `nodes` table in core: the provider
-answers, the client merges, the desktop host stores what it adopts, and `node.json` gains one optional
-record.
+A client coordinates across Nodes, a Node owns its data, and an optional control plane only finds and
+vouches for Nodes. acorn ships the two seams a control plane uses, enrollment and Node providers, but
+no control plane. [The three parties](./architecture/control-plane.md) states what a control plane may
+hold.
 
 ## Agent execution
 
-Managed agent sessions live in the agents plugin and persist normalized events in a durable per-session
+Managed agent sessions live in the agents plugin and store normalized events in a durable per-session
 sequence. Terminal sessions live in the terminal plugin and use the shared process broker, PTY and
 tmux runtime, replay tail, and WebSocket streams. The MCP server is a stdio child that calls the Node
-over loopback using a task-scoped internal token. It never opens SQLite directly.
+over loopback with a task-scoped internal token, and never opens SQLite directly.
 
-Task-scoped child processes can use only task-addressed routes and cannot read provider credentials or
-administer the Node. Service-scoped internal calls are reserved for Node-owned orchestration.
+Task-scoped child processes can use only task-addressed routes. They can't read provider credentials
+or administer the Node. Service-scoped internal calls are reserved for Node-owned orchestration.
 
-## Where the rest of it is written down
+## Read next
 
-[docs/README.md](./README.md) lists every document under `docs/`, grouped by kind, with a line each.
-It is the index; this file is the map of the runtimes.
-
-For a newcomer the reading order is short. Finish this file, then read
-[features.md](./features.md) so the machinery has something to hang on, then whichever of
-[frontend.md](./frontend.md) or [api-reference.md](./api-reference.md) sits on the side you are about
-to change, then [conventions.md](./conventions.md) for where a new file goes and what it is called.
-If your first task is a plugin, read [plugin-map.md](./plugin-map.md) in place of the third —
-it is the one-page orientation over the whole plugin system, and much shorter than the reference.
+[Documentation](./README.md) lists every doc. Read [features](./features.md) next, so the machinery
+has something to hang on. Then read [frontend](./frontend.md) or [API reference](./api-reference.md),
+whichever side you're changing, and [conventions](./conventions.md) for where a new file goes. If your
+first task is a plugin, read the [plugin map](./plugin-map.md) instead of the frontend or API page.

@@ -7,7 +7,7 @@ import { activeNodeId } from './activeNode'
 import { nodeState } from './fleet'
 
 // The renderer's only HTTP surface. Every request goes through the desktop helper's connection broker
-// (docs/architecture-overview.md § Node API and client flow), which owns the endpoint, the pinned
+// (docs/architecture/node-api.md § The platform seam), which owns the endpoint, the pinned
 // certificate, and the device token, so nothing here knows an origin and nothing here holds a
 // credential.
 //
@@ -169,7 +169,7 @@ async function deliver(
   }
 
   // Mutations fail fast and keep the user's input as a draft, with no replay queue
-  // (docs/architecture-overview.md § Client state and fleet behavior).
+  // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
   // Fail fast rather than wait for a TCP timeout, because main already knows the node is unreachable.
   // Without the check a submit spins for the broker's 30s request timeout and then reports

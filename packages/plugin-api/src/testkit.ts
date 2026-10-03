@@ -1,6 +1,6 @@
 // The test half of the plugin API: how a plugin's tests reach the host. See docs/plugins.md § The
 // plugin API for why this seam exists (every plugin used to forge `as unknown as NodePluginContext`
-// literals) and docs/architecture-overview.md § Package boundaries for the node-environment-safe
+// literals) and docs/architecture/packages.md § Package boundaries for the node-environment-safe
 // rule and the ban on importing testkit/ from production.
 //
 // Core's table schema and database type appear here: seeding core's `workspaces` to build a fixture
