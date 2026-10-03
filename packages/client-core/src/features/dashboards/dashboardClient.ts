@@ -36,8 +36,8 @@ export function dashboardClient(nodeId: string, scope: DashboardScope) {
     validate: (content: PanelPlan) => request<{ problems: string[] }>('validate', { content }),
     publish: (id: string, expectedRevision: number) => request<DashboardRevision>('publish', { id, expectedRevision }),
     published: (id: string, revision?: number, signal?: AbortSignal) => request<DashboardRevision>('published', { id, revision }, signal),
-    run: (target: { kind: 'published'; id: string; revision?: number } | { kind: 'draft'; content: DashboardContent }, mode: 'preview' | 'execution', viewerZone?: string, signal?: AbortSignal) =>
-      request<DashboardRun>('run', { target, mode, viewerZone }, signal),
+    run: (target: { kind: 'published'; id: string; revision?: number } | { kind: 'draft'; content: DashboardContent }, mode: 'preview' | 'execution', viewerZone?: string, signal?: AbortSignal, evaluationTime?: number) =>
+      request<DashboardRun>('run', { target, mode, viewerZone, ...(evaluationTime === undefined ? {} : { evaluationTime }) }, signal),
     delete: (id: string, expectedRevision: number) => request<{ ok: true }>('delete', { id, expectedRevision }),
   }
 }

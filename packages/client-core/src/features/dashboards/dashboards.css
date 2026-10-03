@@ -735,5 +735,28 @@
 .dash-stat-delta[data-tone='ok'] { color: var(--state-ok); }
 .dash-stat-delta[data-tone='bad'] { color: var(--state-bad); }
 .dash-cell-list { display: inline-flex; flex-wrap: wrap; gap: 0.25rem; }
-.dash-cell-chip { border: 1px solid var(--border, currentColor); border-radius: 999px; padding: 0.1rem 0.45rem; }
-.dash-row-group > h4 { margin: 0.75rem 0 0.25rem; font-size: 0.875rem; font-weight: 600; }
+.dash-cell-chip { border: var(--bw) solid var(--border, currentColor); border-radius: var(--radius-pill-fixed); padding: 0.1rem 0.45rem; }
+.dash-row-group > h4 { margin: 0.75rem 0 0.25rem; font-size: var(--fs-sm); font-weight: 600; }
+.dash-drill-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  background: rgb(0 0 0 / 35%);
+}
+
+.dash-drill-panel {
+  position: fixed;
+  inset: 0 0 0 auto;
+  z-index: calc(var(--z-modal) + 1);
+  width: min(48rem, 90vw);
+  overflow: auto;
+  padding: var(--space-4);
+  background: var(--bg);
+  box-shadow: var(--shadow-3);
+}
+
+.dash-row-controls {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+}

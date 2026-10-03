@@ -8,7 +8,8 @@ import { dashboardFields } from './typedProjection'
 
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
 export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; result?: DataSourceResult }
-export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; taskId?: string; action?: DataRecord['action'] }
+export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
+export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target'] }
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
 export type PlanStageCount = { path: string; input: number; output: number }
 export type DashboardRun = {
@@ -151,10 +152,18 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   if (plan.view.shape === 'bar' && columnAt(plan, plan.view.x ?? '')?.type !== 'enum') add('/view/x', 'A bar chart needs an enum axis.')
   if (plan.view.series && columnAt(plan, plan.view.series)?.type !== 'enum') add('/view/series', 'A series needs an enum column.')
   if (plan.view.trend && plan.view.kind !== 'stat') add('/view/trend', 'A trend belongs on a stat view.')
+  const checkReference = (reference: NonNullable<PanelPlan['actions']>['press'], path: string): void => {
+    if (!reference) return
+    if (reference.source && !plan.sources.some(source => source.id === reference.source)) add(path, `Source ${reference.source} is unavailable.`)
+    if (reference.kind === 'link' && (!reference.column || columnAt(plan, reference.column)?.type !== 'link')) add(path, 'Choose a link column.')
+    if (reference.kind !== 'link' && reference.column) add(path, 'Only a link reference names a column.')
+  }
+  checkReference(plan.actions?.press, '/actions/press')
+  for (const [index, button] of (plan.actions?.buttons ?? []).entries()) if (button.kind === 'open') checkReference(button.reference, `/actions/buttons/${index}/reference`)
   if (plan.view.compare && !plan.view.trend) add('/view/compare', 'A comparison needs a trend.')
   for (const [index, requirement] of (plan.requirements ?? []).entries()) {
     if (['covered', 'partial'].includes(requirement.status)) for (const path of requirement.paths ?? []) {
-      if (!/^\/(sources|columns|stages|sort|group|view)(\/|$)/.test(path)) add(`/requirements/${index}/paths`, `${path} is not a plan part.`)
+      if (!/^\/(sources|columns|stages|sort|group|view|actions)(\/|$)/.test(path)) add(`/requirements/${index}/paths`, `${path} is not a plan part.`)
     }
     if (requirement.status !== 'covered' && !requirement.reason) add(`/requirements/${index}/reason`, `${requirement.text} needs a reason.`)
   }
@@ -184,8 +193,11 @@ export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): 
     id: `${source.instanceId}:${record.ref.recordId}`,
     values: Object.fromEntries(plan.columns.map(column => [column.id, mappedValue(column, source, record)])),
     records: [record.ref],
+    recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
+    ...(record.actions ? { actions: record.actions } : {}),
+    ...(record.target ? { target: record.target } : {}),
   })))
 }
 
@@ -300,6 +312,25 @@ export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluat
   return group(rows, 0)
 }
 
+/** A drill-down begins before the summary it explains. Phase 05 can pass its summary stage and measure filter here. */
+export function deriveDrilldownPlan(plan: PanelPlan, rows: readonly Pick<PlanRow, 'values'>[], options: {
+  stageIndex?: number
+  measureFilter?: DataPredicate
+} = {}): PanelPlan {
+  const stages = plan.stages.slice(0, options.stageIndex ?? plan.stages.length)
+  const predicates: DataPredicate[] = []
+  for (const group of plan.group ?? []) {
+    const values = [...new Map(rows.map(row => [JSON.stringify(row.values[group.column] ?? null), row.values[group.column] ?? null])).values()]
+    predicates.push({ kind: 'comparison', left: { address: { from: 'item', pointer: `/${group.column}` } },
+      operator: 'in', right: { address: { from: 'literal', value: values } } })
+  }
+  if (options.measureFilter) predicates.push(options.measureFilter)
+  const where: DataPredicate = predicates.length === 1 ? predicates[0]! : { kind: 'all', predicates }
+  const filtered = !predicates.length ? stages : stages.length < 12 ? [...stages, { op: 'filter' as const, where }]
+    : [...stages.slice(0, -1), { op: 'filter' as const, where: { kind: 'all' as const, predicates: [stages.at(-1)!.where, where] } }]
+  return { ...plan, title: `${plan.title} · rows`, group: [], view: { kind: 'table' }, stages: filtered }
+}
+
 export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[] = []): string[] {
   const labels = plan.sources.map(source => {
     const resolved = sources.find(candidate => candidate.instanceId === source.id)
@@ -317,6 +348,10 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
       : predicate.operator === 'present' ? `${name} is present`
         : `${name} ${predicate.operator} ${value}`
   }
+  const selectedPress = plan.actions?.press
+  const pressedSource = sources.filter(source => !selectedPress?.source || source.instanceId === selectedPress.source)
+  const pressedKinds = [...new Set(pressedSource.flatMap(source => source.description.targets?.map(target => target.kind) ?? []))]
+  const pressedRecord = pressedKinds.length === 1 ? `the ${pressedKinds[0]!.split('.').at(-1)!.replaceAll('-', ' ')}` : 'the source record'
   return [
     `One row per record from ${labels.join(' and ')}.`,
     ...sources.map(source => `${source.label} reaches ${source.description.consistency}; scope ${JSON.stringify(source.query.scope.parameters)}.`),
@@ -326,6 +361,7 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     ...(plan.sort?.length ? [`Sort by ${plan.sort.map(item => `${columnAt(plan, item.column)?.label ?? item.column} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`).join(', ')}.`] : []),
     ...(plan.group?.length ? [`Group by ${plan.group.map(item => columnAt(plan, item.column)?.label ?? item.column).join(' then ')}.`] : []),
     ...(plan.limit ? [`Show at most ${plan.limit} rows after filtering and sorting.`] : []),
+    ...(plan.actions?.press ? [`Pressing a row opens ${plan.actions.press.kind === 'link' ? columnAt(plan, plan.actions.press.column ?? '')?.label ?? 'a link' : plan.actions.press.kind === 'task' ? 'its task' : pressedRecord} in ${plan.actions.press.prefer === 'refPanel' ? 'a side panel' : plan.actions.press.prefer === 'pane' ? 'a task pane' : plan.actions.press.prefer === 'route' ? 'a full page' : plan.actions.press.prefer === 'overlay' ? 'an overlay' : 'the browser'}.`] : []),
   ]
 }
 
@@ -360,8 +396,12 @@ export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { sch
       pluginId: row.records[0]?.pluginId ?? 'core',
       sourceId: row.records[0]?.sourceId ?? '',
       sourceRowId: row.records[0]?.recordId,
+      records: row.records,
+      ...(row.recordItems ? { recordItems: row.recordItems } : {}),
       ...(row.taskId ? { taskId: row.taskId } : {}),
       ...(row.action ? { action: row.action } : {}),
+      ...(row.actions ? { actions: row.actions } : {}),
+      ...(row.target ? { target: row.target } : {}),
     })),
   }
 }

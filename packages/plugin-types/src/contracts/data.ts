@@ -21,6 +21,8 @@ export type DataSourceDescription = {
   operations: { query: true; options: boolean; details: boolean; incremental: boolean; groups: ('all' | 'any')[] }
   detailSchema?: DataSchema; incremental?: { semantics: string }; revision: string; consistency: string
   starterPlans?: unknown[]
+  actions?: { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute' }[]
+  targets?: { kind: string }[]
 }
 export type DataSourceQuery = {
   source: DataSourceRef; scope: DataSourceScope; predicate?: DataPredicate
@@ -33,14 +35,17 @@ export type DataSourceRequest =
   | { operation: 'options'; source: DataSourceRef; scope: DataSourceScope; target: 'field' | 'parameter'; pointer: string; search: string; cursor?: string; pageSize: number }
   | { operation: 'query'; query: DataSourceQuery; mode: 'preview' | 'execution'; evaluationTime: number; cursor?: string; pageSize: number; timeoutMs?: number }
   | { operation: 'details'; ref: DataRecordRef; scope: DataSourceScope; projection: string[] }
+  | { operation: 'actions'; ref: DataRecordRef; scope: DataSourceScope }
 export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' }
 export type DataSourcePage = {
-  records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction }[]
+  records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction; actions?: NamedDataRecordAction[]; target?: { kind: string; item: string } }[]
   revision: string; readTime: number; completeness: DataSourceCompleteness; incrementalBoundary?: DataValue
 }
 export type DataRecordAction = ({ verb: 'openPane'; pane: string } | { verb: 'openTask' }
   | { verb: 'runNodeAction'; path: string } | { verb: 'openUrl'; url: string }
-  | { verb: 'openOverlay'; overlay: string } | { verb: 'surfaceAction'; surface: string }) & { risk?: 'read' | 'write' | 'execute' }
+  | { verb: 'openOverlay'; overlay: string } | { verb: 'surfaceAction'; surface: string }
+  | { verb: 'navigate'; surface: string } | { verb: 'createTask' }) & { risk?: 'read' | 'write' | 'execute' }
+export type NamedDataRecordAction = { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute'; action: DataRecordAction }
 export type DataSourceResult = Omit<DataSourcePage, 'records'> & {
   records: (Omit<DataSourcePage['records'][number], 'recordId'> & { ref: DataRecordRef })[]
   mode: 'preview' | 'execution'; evaluationTime: number
@@ -48,7 +53,8 @@ export type DataSourceResult = Omit<DataSourcePage, 'records'> & {
 export type DataSourceResponse<R extends DataSourceRequest> = R extends { operation: 'describe' } ? DataSourceDescription
   : R extends { operation: 'options' } ? { options: { id: string; label: string }[]; nextCursor?: string; exhausted: boolean }
     : R extends { operation: 'query' } ? DataSourceResult
-      : { kind: 'found'; data: DataValue; fetchedTime: number } | { kind: 'not-found' }
+      : R extends { operation: 'actions' } ? { actions: NamedDataRecordAction[] }
+        : { kind: 'found'; data: DataValue; fetchedTime: number } | { kind: 'not-found' }
 export type DataValue = DataPrimitive | DataValue[] | { [key: string]: DataValue }
 export type VersionedDataValue = { version: 1; value: DataValue }
 export type DataType = 'string' | 'number' | 'integer' | 'boolean' | 'null' | 'object' | 'array'

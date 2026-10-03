@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { dataFieldsSchema, dataPointerSchema, parseDataPredicate, type DataPredicate } from './values/dataBindings'
 import { parseDataSchema } from './values/dataSchemas'
 import { DATA_LIMITS, parseDataValue } from './values/dataValues'
-import { dataRecordActionSchema } from './dataActions'
+import { dataRecordActionSchema, dataRecordTargetSchema, namedDataRecordActionSchema } from './dataActions'
 import {
   dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
@@ -70,6 +70,9 @@ export const dataSourceDescriptionSchema = z.object({
   consistency: z.string().min(1).max(2048),
   /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
   starterPlans: z.array(z.unknown()).max(10).optional(),
+  /** Action and target metadata is structural; current eligibility is checked per record. */
+  actions: z.array(z.object({ id, label: id, icon: id.optional(), risk: z.enum(['read', 'write', 'execute']) }).strict()).max(16).optional(),
+  targets: z.array(dataRecordTargetSchema.pick({ kind: true })).max(16).optional(),
 }).strict()
 export const dataSourceQuerySchema = z.object({
   source: dataSourceRefSchema,
@@ -118,7 +121,10 @@ export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
     scope: dataSourceScopeSchema,
     projection: z.array(dataPointerSchema).max(DATA_LIMITS.fields).default([]),
   }).strict(),
+  z.object({ operation: z.literal('actions'), ref: dataRecordRefSchema, scope: dataSourceScopeSchema }).strict(),
 ])
+export const dataSourceActionsSchema = z.object({ actions: z.array(namedDataRecordActionSchema).max(16) }).strict()
+export const dataSourceActSchema = z.object({ ref: dataRecordRefSchema, actionId: id, confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict()
 export const dataSourceDiscoveryRequestSchema = z.object({
   pluginId: id,
   discoveryId: id,
@@ -159,6 +165,8 @@ export const dataSourcePageSchema = z.object({
     }).strict().optional(),
     taskId: z.string().uuid().optional(),
     action: dataRecordActionSchema.optional(),
+    actions: z.array(namedDataRecordActionSchema).max(16).optional(),
+    target: dataRecordTargetSchema.optional(),
   }).strict()).max(DATA_LIMITS.options),
   revision: id,
   readTime: z.number().finite(),
@@ -180,9 +188,10 @@ export type DataSourcePage = z.infer<typeof dataSourcePageSchema>
 export type DataSourceResult = Omit<DataSourcePage, 'records'> & { records: DataRecord[]; mode: 'preview' | 'execution'; evaluationTime: number }
 export type DataSourceOptions = z.infer<typeof dataSourceOptionsSchema>
 export type DataSourceDetails = z.infer<typeof dataSourceDetailsSchema>
+export type DataSourceActions = z.infer<typeof dataSourceActionsSchema>
 export type DataSourceDiscoveryRequest = z.infer<typeof dataSourceDiscoveryRequestSchema>
 export type DataSourceDiscoveryPage = Omit<z.infer<typeof dataSourceDiscoveryPageSchema>, 'sources'> & { sources: (DataSourceDescriptor & DataSourceRef)[] }
 export type DataSourceCatalog = z.infer<typeof dataSourceCatalogSchema>
 export type DataSourceResponse<R extends DataSourceRequest> = R extends { operation: 'describe' } ? DataSourceDescription
   : R extends { operation: 'options' } ? DataSourceOptions
-    : R extends { operation: 'query' } ? DataSourceResult : DataSourceDetails
+    : R extends { operation: 'query' } ? DataSourceResult : R extends { operation: 'actions' } ? DataSourceActions : DataSourceDetails

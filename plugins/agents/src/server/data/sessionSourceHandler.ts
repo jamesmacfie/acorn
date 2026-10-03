@@ -40,6 +40,7 @@ export function createSessionSourceHandler(runtime: ManagedAgentRuntime): Plugin
         },
         display: { title: session.title || session.providerId }, taskId: session.taskId,
         action: { verb: 'openPane' as const, pane: 'agent' },
+        target: { kind: 'agents.session', item: session.id },
       }))
       const comparisons = input.query.predicate
         ? input.query.predicate.kind === 'all' ? input.query.predicate.predicates : [input.query.predicate]

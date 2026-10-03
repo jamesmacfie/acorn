@@ -1,10 +1,11 @@
 import { For, Show } from 'solid-js'
-import { EmptyState, Row } from '../../../kit/components/primitives'
+import { Button, EmptyState, Row } from '../../../kit/components/primitives'
 import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { titleField } from '../shaping'
 import Cell from './Cell'
 import Provenance from './Provenance'
 import { rowPress, type PanelViewProps } from './props'
+import RowControls, { openRowMenu } from './RowControls'
 
 // The list view: the title-role field leads, everything else projected trails as meta.
 //
@@ -28,6 +29,9 @@ export default function ListView(props: PanelViewProps) {
         <Row
           density="compact"
           onPress={rowPress(props, row)}
+          onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined}
+          tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}
+          trailing={props.onButton ? <RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /> : undefined}
           leading={(
             <>
               <Show when={props.provenance}><Provenance pluginId={row.pluginId} /></Show>
@@ -50,6 +54,6 @@ export default function ListView(props: PanelViewProps) {
         </Row>
       )}
     </For>
-  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4>{`${group.label} · ${group.count}`}</h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
+  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown} onPress={() => props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
   return props.groups?.length ? sections(props.groups) : list(props.rows)
 }

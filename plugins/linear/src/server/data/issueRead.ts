@@ -87,7 +87,8 @@ export async function readIssues(token: string, query: DataSourceQuery, signal: 
       ids.add(issue.id)
       const record = { recordId: issue.id, data: { id: issue.id, identifier: issue.identifier, title: issue.title, url: issue.url,
         description: issue.description, projectId: issue.project.id, state: { id: issue.state.id, name: issue.state.name, category: issue.state.type },
-        createdAt: Date.parse(issue.createdAt), updatedAt: Date.parse(issue.updatedAt) }, action: { verb: 'openUrl' as const, url: issue.url } }
+        createdAt: Date.parse(issue.createdAt), updatedAt: Date.parse(issue.updatedAt) }, action: { verb: 'openUrl' as const, url: issue.url },
+        target: { kind: 'linear.issue', item: issue.identifier } }
       const size = Buffer.byteLength(JSON.stringify(record))
       if (size > DATA_LIMITS.recordBytes || !Number.isFinite(record.data.createdAt) || !Number.isFinite(record.data.updatedAt)) throw new Error('invalid_record')
       bytes += size

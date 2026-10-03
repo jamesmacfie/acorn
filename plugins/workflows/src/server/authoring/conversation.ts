@@ -58,6 +58,7 @@ export async function authorWorkflowConversation(args: {
     if (request.operation === 'validate-candidate') return validate(request.candidate)
     if (request.operation === 'list-workflows') return { workflows: (args.catalog.workflows ?? []).slice(0, 100) }
     if (request.operation === 'list-sources') return args.sources.list({ ...args.request.scope, parameters: {} }, invocation)
+    if (request.operation === 'list-accounts') return { unavailable: true, reason: 'Workflow authoring has no account catalogue.' }
     if (request.operation === 'discover-sources') {
       if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected workspace or project.')
       return args.sources.discoverAvailable(request, invocation)

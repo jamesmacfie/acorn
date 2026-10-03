@@ -1,7 +1,7 @@
 import { Hono } from 'hono'
 import type { AppEnv } from '../middleware/auth'
 import { requireProviderAccess } from '../middleware/requireUser'
-import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime'
+import { actOnDataRecord, discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime'
 import { DataSourceError } from '../dataSources/validation'
 import { respondError } from '../respond'
 import { dataSourceRequestSchema, dataSourceScopeSchema, dataSourceDiscoveryRequestSchema } from '@acorn/protocol/dataSources.ts'
@@ -13,6 +13,7 @@ export const dataSources = new Hono<AppEnv>()
     const invocation = { principal: c.get('principal')!, signal: c.req.raw.signal }
     try {
       const operation = c.req.param('operation')
+      if (operation === 'act') return c.json(await actOnDataRecord(c.env, input, c.req.header('idempotency-key'), invocation))
       const parsed = (operation === 'list' ? dataSourceScopeSchema : operation === 'discover' ? dataSourceDiscoveryRequestSchema : dataSourceRequestSchema).safeParse(input)
       if (!parsed.success) return respondError(c, 400, 'invalid-request')
       if (operation === 'list') return c.json(await listDataSources(c.env, input, invocation))

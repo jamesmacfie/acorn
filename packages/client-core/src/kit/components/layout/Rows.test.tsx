@@ -80,6 +80,18 @@ describe('Rows reconciles by key', () => {
   })
 })
 
+it('uses Enter for a standalone row press and the menu keys for its actions', () => {
+  const press = vi.fn()
+  const menu = vi.fn()
+  mount(() => <Row onPress={press} onMenu={menu}>Record</Row>)
+  const row = rows()[0]!
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'ContextMenu', bubbles: true }))
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F10', shiftKey: true, bubbles: true }))
+  expect(press).toHaveBeenCalledTimes(1)
+  expect(menu).toHaveBeenCalledTimes(2)
+})
+
 describe('Rows redraws a virtual row whose item changed', () => {
   it('follows a filter that put a different item at the same index', async () => {
     // jsdom reports every box as zero and the virtualizer draws nothing without a height, so the

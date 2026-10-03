@@ -41,6 +41,12 @@ loaded plugin can use.
 <a id="add-task-annotations"></a>
 <a id="harnesses"></a>
 <a id="the-action-verbs"></a>
+
+`contentLinks` can declare a target without `match`, with a plugin-owned kind and item ID. A loaded
+manifest may name a declared task pane or overlay and list supported presentations. Compiled plugins
+register a target resolver through `ctx.contentLinks`. Sources describe target kinds and named record
+actions separately from each record's current eligibility; the `actions` source operation must answer
+for an exact record reference before a Node action runs.
 <a id="permissions"></a>
 <a id="keybindings"></a>
 <a id="cli-commands"></a>

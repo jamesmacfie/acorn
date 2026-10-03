@@ -395,6 +395,7 @@ acorn-plugin-types: member DataSourceCatalog.sources
 acorn-plugin-types: member DataSourceCompleteness.cause
 acorn-plugin-types: member DataSourceCompleteness.cursor
 acorn-plugin-types: member DataSourceCompleteness.kind
+acorn-plugin-types: member DataSourceDescription.actions
 acorn-plugin-types: member DataSourceDescription.consistency
 acorn-plugin-types: member DataSourceDescription.detailSchema
 acorn-plugin-types: member DataSourceDescription.fields
@@ -411,6 +412,7 @@ acorn-plugin-types: member DataSourceDescription.parameters
 acorn-plugin-types: member DataSourceDescription.revision
 acorn-plugin-types: member DataSourceDescription.schema
 acorn-plugin-types: member DataSourceDescription.starterPlans
+acorn-plugin-types: member DataSourceDescription.targets
 acorn-plugin-types: member DataSourceDescriptor.icon
 acorn-plugin-types: member DataSourceDescriptor.identityScope
 acorn-plugin-types: member DataSourceDescriptor.name

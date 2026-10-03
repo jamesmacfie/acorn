@@ -1,4 +1,6 @@
-import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
+import type { DataRecordAction, NamedDataRecordAction } from '@acorn/protocol/dataActions.ts'
+import type { DataRecordRef } from '@acorn/protocol/dataSources.ts'
+import type { PlanRecordItem } from './plan'
 
 /** Dashboard-only projection types. Source plugins never register or return these shapes. */
 export type DashboardDisplayFieldType = 'text' | 'number' | 'boolean' | 'datetime' | 'enum' | 'person' | 'link'
@@ -28,4 +30,8 @@ export type DashboardDisplayRow = {
   sourceRowId?: string
   taskId?: string
   action?: DataRecordAction
+  actions?: NamedDataRecordAction[]
+  records?: DataRecordRef[]
+  recordItems?: PlanRecordItem[]
+  target?: { kind: string; item: string }
 }

@@ -2091,16 +2091,34 @@
                 "minLength": 1,
                 "maxLength": 64
               },
+              "openOverlay": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 64
+              },
               "item": {
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 32
+              },
+              "presentations": {
+                "minItems": 1,
+                "maxItems": 5,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "route",
+                    "refPanel",
+                    "pane",
+                    "overlay",
+                    "external"
+                  ]
+                }
               }
             },
             "required": [
-              "id",
-              "match",
-              "item"
+              "id"
             ]
           }
         },

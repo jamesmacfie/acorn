@@ -30,6 +30,11 @@ A placed panel caches a Node run by Node, scope, panel, revision, and viewer tim
 after a reported account or plugin changes, when the window regains focus, and at the plan's refresh
 interval. The Node shares identical authorized reads briefly across panels.
 
+The plan can choose a row press destination and up to three trailing buttons. Runs keep full source
+record references, including account and scope. A row menu offers the same actions from the keyboard.
+Group headers and stat measures open their underlying rows in a read-only side panel; **Add as panel**
+publishes the derived plan. See [panels](./dashboards/panels.md#provenance-and-what-a-row-may-not-claim).
+
 `POST /v1/core/dashboards/run` accepts a scoped published revision or a draft `PanelPlan`, `preview`
 or `execution` mode, and an optional viewer time zone. It returns the resolved plan, rows, groups,
 plain-language description, and diagnostics for sources, stages, and budgets. Dashboard authoring's

@@ -236,7 +236,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may only invoke its own sources. Cross-plugin workflow execution is a
         // compiled host consumer; raw task principals remain refused by source admission.
-        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' ? request.ref : request.source
+        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
         if (permissions && source.pluginId !== plugin) throw new Error('Source belongs to another plugin')
         return invokeDataSource(options.env, request, invocation)
       },

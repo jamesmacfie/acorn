@@ -90,6 +90,18 @@ const predicateSchema = z.unknown().transform((value, ctx): DataPredicate => {
   catch { ctx.addIssue({ code: 'custom', message: 'Invalid filter predicate' }); return z.NEVER }
 })
 const columnId = z.string().regex(/^[A-Za-z0-9_-]{1,100}$/)
+const presentation = z.enum(['route', 'refPanel', 'pane', 'overlay', 'external'])
+const openReference = z.object({
+  kind: z.enum(['record', 'task', 'link']),
+  source: columnId.optional(),
+  column: columnId.optional(),
+  prefer: presentation,
+}).strict()
+const rowButton = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('open'), label, icon: id.optional(), reference: openReference }).strict(),
+  z.object({ kind: z.literal('action'), label, icon: id.optional(), actionId: id }).strict(),
+  z.object({ kind: z.literal('createTask'), label, icon: id.optional() }).strict(),
+])
 const panelPlanViewSchema = dashboardViewSchema.omit({ field: true, x: true, series: true }).extend({
   field: columnId.optional(), x: columnId.optional(), series: columnId.optional(),
 }).strict()
@@ -120,6 +132,7 @@ export const panelPlanSchema = z.object({
   limit: z.number().int().min(1).max(5000).optional(),
   view: panelPlanViewSchema,
   refresh: z.number().int().min(30).max(86400).optional(),
+  actions: z.object({ press: openReference.optional(), buttons: z.array(rowButton).max(3).default([]) }).strict().optional(),
   requirements: z.array(z.object({ id: columnId, text: label, status: z.enum(['covered', 'partial', 'choice', 'unavailable']), reason: z.string().max(1000).optional(), paths: z.array(pointer).max(20).optional() }).strict()).max(100).optional(),
 }).strict()
 export type PanelPlan = z.infer<typeof panelPlanSchema>

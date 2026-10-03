@@ -93,6 +93,10 @@ there are two tiers and which constraints are deliberate. Read it before widenin
 <a id="rail-markers"></a>
 
 - [Descriptors](./plugins/descriptors.md): rail sources, content links, routes, and action verbs.
+
+Content-link contributions can also address a declared target by plugin-owned kind and item ID,
+including records with no URL. The contribution declares the presentations it supports; the host
+chooses the destination and keeps panel plans outside plugin frames.
 - [More descriptors](./plugins/more-descriptors.md): agent contexts, reference resolvers, typed data
   sources, schedules, node actions, and themes.
 - [Keeping a descriptor fresh](./plugins/freshness.md): refresh, status, notices, and the live channel.

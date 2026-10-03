@@ -22,7 +22,7 @@ export function createPullSourceHandler(): PluginFetchHandler {
       }
       const input = dataSourceRequestSchema.parse(await request.json())
       if (input.operation === 'describe') return Response.json(pullSourceDescription)
-      if (input.operation === 'details') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      if (input.operation === 'details' || input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
       const scope = input.operation === 'query' ? input.query.scope : input.scope
       if (!scope.connectionId) throw new Error('connection_required')
       if (!(await context.providers.connections('github')).some(connection => connection.id === scope.connectionId && connection.status === 'connected')) {

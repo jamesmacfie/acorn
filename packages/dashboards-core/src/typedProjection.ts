@@ -91,8 +91,13 @@ function sourceRows(preview: DashboardQueryProjection): DashboardDisplayRow[] {
     values: Object.fromEntries(fields.map(field => [field.id, cell(readDataPointer(record.data, field.id))])),
     pluginId: record.ref.pluginId,
     sourceId: `${record.ref.sourceId}@${preview.instanceId}`,
+    sourceRowId: record.ref.recordId,
+    records: [record.ref],
+    recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
+    ...(record.actions ? { actions: record.actions } : {}),
+    ...(record.target ? { target: record.target } : {}),
   }))
 }
 

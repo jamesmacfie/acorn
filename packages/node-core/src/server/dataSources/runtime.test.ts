@@ -12,7 +12,7 @@ import type { NodePlugin, PluginFetchHandler, PluginStorage } from '../pluginHos
 import { pluginManifestSchema } from '../plugins/manifest'
 import type { AppEnv } from '../middleware/auth'
 import { dataSources } from '../routes/dataSources'
-import { discoverDataSources, invokeDataSource, listDataSources } from './runtime'
+import { actOnDataRecord, discoverDataSources, invokeDataSource, listDataSources } from './runtime'
 
 const directory = new URL('../../../../../apps/node/test/__fixtures__/typed-source/', import.meta.url)
 const fixtureModule: { fetchSource: PluginFetchHandler } = await import(new URL('node.mjs', directory).href)
@@ -53,6 +53,29 @@ async function world(loaded = true, handler = fixtureModule.fetchSource) {
 }
 
 describe('typed source transport conformance', () => {
+  it('re-reads named actions and refuses one that stopped applying before dispatch', async () => {
+    let eligible = true
+    let calls = 0
+    const handler: PluginFetchHandler = async (request, context) => {
+      const body = await request.json() as { operation?: string; actionId?: string }
+      if (body.operation === 'describe') {
+        const base = await fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+        return Response.json({ ...await base.json() as object, actions: [{ id: 'retry', label: 'Retry', risk: 'execute' }] })
+      }
+      if (body.operation === 'actions') return Response.json({ actions: eligible ? [{ id: 'retry', label: 'Retry', risk: 'execute', action: { verb: 'runNodeAction', path: `/v1/p/${pluginId}/source` } }] : [] })
+      if (body.actionId === 'retry') { calls++; return Response.json({ ok: true }) }
+      return fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+    }
+    const { env } = await world(false, handler)
+    const ref = { ...source, recordId: 'sample-1', scope: { parameters: {} } }
+    const key = '11111111-2222-4333-8444-555555555555'
+    eligible = false
+    expect(await actOnDataRecord(env, { ref, actionId: 'retry', confirmedRisk: 'execute' }, key, invocation())).toEqual({ outcome: 'no-longer-available' })
+    expect(calls).toBe(0)
+    eligible = true
+    expect(await actOnDataRecord(env, { ref, actionId: 'retry', confirmedRisk: 'execute' }, key, invocation())).toEqual({ outcome: 'done' })
+    expect(calls).toBe(1)
+  })
   it('uses source-declared baseline and opaque continuation, not page cursors', async () => {
     const { env } = await world()
     const request = query()

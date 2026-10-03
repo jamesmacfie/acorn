@@ -30,4 +30,5 @@ export const sessionSourceDescription: DataSourceDescription = {
   parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
   consistency: 'A page reflects the managed-session ledger at read time. State may advance between pages; record identity and the explicit read time remain stable.',
+  targets: [{ kind: 'agents.session' }],
 }

@@ -10,7 +10,7 @@ export const dataSourceScopeKey = (nodeId: string, source: DataSourceRef, scope:
   [...dataSourcesKey, nodeId, source.pluginId, source.sourceId, scope.connectionId ?? null, scope.workspaceId ?? null, scope.projectId ?? null, canonicalDataEncoding(scope.parameters)] as const
 export const dataSourceRequestDigest = (request: DataSourceRequest) => canonicalDataEncoding(parseDataValue(request))
 export function dataSourceQueryKey(nodeId: string, request: DataSourceRequest, revision?: string) {
-  const source = request.operation === 'query' ? request.query.source : request.operation === 'details' ? request.ref : request.source
+  const source = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
   const scope = request.operation === 'query' ? request.query.scope : request.scope
   return [...dataSourceScopeKey(nodeId, source, scope), request.operation, dataSourceRequestDigest(request), revision ?? null] as const
 }

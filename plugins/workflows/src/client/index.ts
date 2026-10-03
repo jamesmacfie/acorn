@@ -18,6 +18,8 @@ const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
+    ctx.contentLinks.register({ id: 'workflows.run', providerId: 'workflows', parse: () => null,
+      target: item => ({ kind: 'workflows.run', item, pane: 'workflows' }), presentations: ['pane'] })
     // The reads plugins/agents' pane needs (docs/plugins/collaboration.md § Collaboration rules). Published under
     // the id agents declares (contract/workflowControl.ts). A node with workflows disabled never
     // provides it.

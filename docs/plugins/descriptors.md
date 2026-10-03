@@ -64,6 +64,11 @@ for its tooltip then, and leave out headers and toolbars.
 
 ## Content links
 
+`match` and its captured `item` are optional when the descriptor exists to open a record by kind and
+item ID. `openPane` and `openOverlay` must name surfaces declared by this plugin. `presentations`
+advertises the destinations the host can offer. The host stamps the plugin identity; a target kind
+cannot point at another plugin's panel. URL recognizers continue to work as before.
+
 A `contentLinks` entry uses a bounded `https://` host and path grammar and delivers one captured path
 segment to one of three destinations:
 

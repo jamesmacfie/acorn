@@ -40,6 +40,8 @@ export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
   required: true,
   init: (ctx) => {
+    ctx.contentLinks.register({ id: 'agents.session', providerId: 'agents', parse: () => null,
+      target: item => ({ kind: 'agents.session', item, pane: 'agent' }), presentations: ['pane'] })
     // The harnesses' own marks, so a provider reads as itself wherever it is named. The node's
     // descriptors point their `glyph` at these names (server/drivers/claudeHarness.ts, codexDriver.ts).
     //

@@ -621,7 +621,7 @@ describe('architecture boundaries', () => {
       '@acorn/client-core': 166, // PaneModelHost and QueryCacheProvider are renderer composition seams.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 10,
+      '@acorn/dashboards-core': 12, // Source-first plans added plan, capabilities, and projection seams.
       '@acorn/diff-document': 2,
     }
     const problems: string[] = []
@@ -751,6 +751,10 @@ describe('architecture boundaries', () => {
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
+      ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'preview is a dashboard run mode'],
+      ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
+      ['packages/node-core/src/server/dashboards/run.ts', 'preview is a dashboard run mode'],
+      ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],

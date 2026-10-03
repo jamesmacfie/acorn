@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dataSourceDescriptionSchema, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { dashboardPanelContentSchema, panelPlanSchema } from '@acorn/protocol/dashboards.ts'
-import { bindPanelRows, groupPlanRows, matchesPlanFilter, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type PlanRow, type PlanSource } from './plan'
+import { bindPanelRows, deriveDrilldownPlan, describePanelPlan, groupPlanRows, matchesPlanFilter, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type PlanRow, type PlanSource } from './plan'
 import { PANEL_CAPABILITIES } from './capabilities'
 
 const description = dataSourceDescriptionSchema.parse({
@@ -64,6 +64,29 @@ describe('panel plan', () => {
     expect(groupPlanRows(plan, rows, Date.UTC(2026, 9, 2))[0]).toMatchObject({ key: '2026-10-03', count: 1 })
     plan.sort = [{ column: 'amount', direction: 'desc' }]
     expect(validatePanelPlan(plan, [source('a', [])])).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/sort/0/column' })]))
+  })
+
+  it('derives the rows behind a group without carrying its grouping into the detail view', () => {
+    const plan = base()
+    plan.group = [{ column: 'currency', bucket: 'value' }]
+    const records = Array.from({ length: 9 }, (_, index) => ({ recordId: String(index), data: { title: `PR ${index}`, amount: index, currency: index < 7 ? 'NZD' : 'USD', due: '2026-10-03' } }))
+    const rows = bindPanelRows(plan, [source('a', records)])
+    const group = groupPlanRows(plan, rows, Date.UTC(2026, 9, 4)).find(item => item.key === 'NZD')!
+    const derived = panelPlanSchema.parse(deriveDrilldownPlan(plan, group.rows))
+    expect(derived.group).toEqual([])
+    expect(derived.view.kind).toBe('table')
+    expect(runPlanStages(derived, rows).rows).toHaveLength(7)
+    expect(group.rows[0]?.recordItems?.[0]?.ref.recordId).toBe('0')
+  })
+
+  it('describes the source target of a configured press and rejects a missing link destination', () => {
+    const plan = base()
+    plan.actions = { press: { kind: 'record', source: 'a', prefer: 'refPanel' }, buttons: [] }
+    const named = source('a', [])
+    named.description = { ...named.description, targets: [{ kind: 'github.pull-request' }] }
+    expect(describePanelPlan(plan, [named])).toContain('Pressing a row opens the pull request in a side panel.')
+    plan.actions.press = { kind: 'link', column: 'missing', prefer: 'refPanel' }
+    expect(validatePanelPlan(plan, [named])).toEqual(expect.arrayContaining([expect.objectContaining({ path: '/actions/press' })]))
   })
 
   it('upgrades a published version 1 definition without changing its original content', () => {

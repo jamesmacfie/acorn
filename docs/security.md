@@ -7,6 +7,11 @@ acorn is single-owner software. A paired device has full owner authority for its
 protect the transport, credential custody, process boundaries, repository data, and untrusted provider
 and preview content, rather than implementing multi-user roles.
 
+Dashboard named actions send an action ID and full source reference. The Node checks scope, account
+authority, current eligibility, and confined route ownership before dispatch. The host confirms write
+and execute risk before sending anything, and a device-scoped idempotency key replays a completed
+press. [Plugin routes](./security/plugin-secrets-and-routes.md) owns the dispatch boundary.
+
 ## Trust boundaries
 
 - **The renderer** runs UI code and third-party preview content. It holds no device token,

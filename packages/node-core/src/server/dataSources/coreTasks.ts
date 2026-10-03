@@ -35,6 +35,7 @@ export const coreTaskSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', additionalProperties: false, properties: {} },
   parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
+  targets: [{ kind: 'core.task' }],
   consistency: 'A task query is a transactionally consistent read of core task metadata. Worktree change status is optional and remains null when it has not been inspected.',
 }
 
@@ -61,7 +62,7 @@ async function coreTasks(request: DataSourceRequest, env: Env) {
         branch: task.branch, status: task.status, worktreeChanged: null,
         createdAt: task.createdAt, updatedAt: task.updatedAt,
       },
-      display: { title: task.title }, taskId: task.id, action: { verb: 'openTask' as const },
+      display: { title: task.title }, taskId: task.id, action: { verb: 'openTask' as const }, target: { kind: 'core.task', item: task.id },
     }))
     const selected = selectDataRecords(records, request.query)
     return { ...selected, revision: coreTaskSourceDescription.revision, readTime: request.evaluationTime }

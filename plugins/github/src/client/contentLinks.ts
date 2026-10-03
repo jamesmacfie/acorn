@@ -10,7 +10,7 @@ import {
   openPane,
   parseInAppTarget,
 } from '@acorn/plugin-api/client'
-import { formatPullRef } from '../shared/pullRef'
+import { formatPullRef, parsePullRef } from '../shared/pullRef'
 import { githubBrowsePath } from './clientRoutes'
 
 const GH_PR_RE = /^https?:\/\/github\.com\/([^/]+)\/([^/]+)\/pull\/(\d+)/i
@@ -28,6 +28,8 @@ export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
     providerId: 'github',
+    target: item => { const ref = parsePullRef(item); return ref ? { kind: 'github.pull-request', item, ...ref } : null },
+    presentations: ['route', 'refPanel', 'pane', 'external'],
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
       // `item` is what makes the panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit).

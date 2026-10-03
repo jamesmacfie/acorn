@@ -25,6 +25,7 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import PanelBody from './views/PanelBody'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
+import { availableContentPresentations } from '../../host/registries/panes/contentLinks'
 import { latestUnpublishedDashboard } from './dashboardEditorModel'
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from './persist'
 import './dashboards.css'
@@ -210,6 +211,16 @@ export default function DashboardEditor(props: {
   }))
   const run = createMemo(() => preview.data ? copy(preview.data) : undefined)
   const display = createMemo(() => run() ? displayPlanRun(run()!.plan, run()!.rows) : undefined)
+  const pressPresentations = createMemo(() => {
+    const selected = plan().actions?.press
+    if (!selected) return []
+    if (selected.kind === 'task') return run()?.rows.some(row => row.taskId) ? ['pane', 'route'] : []
+    const choices = (run()?.rows ?? []).flatMap(row => selected.kind === 'link'
+      ? (() => { const value = row.values[selected.column ?? '']; return typeof value === 'string' ? availableContentPresentations({ href: value, taskId: row.taskId }) : [] })()
+      : row.target ? availableContentPresentations({ kind: row.target.kind, item: row.target.item, taskId: row.taskId })
+        : row.action?.verb === 'openUrl' ? availableContentPresentations({ href: row.action.url, taskId: row.taskId }) : [])
+    return [...new Set(choices)]
+  })
   const applyAiProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
     const merged = mergeAuthoringCandidate(proposal.base as PanelPlan, proposal.candidate as PanelPlan, plan())
     if (merged.conflicts.length) return 'This panel changed while the proposal was prepared.'
@@ -321,6 +332,45 @@ export default function DashboardEditor(props: {
           </Stack></Fold>}</For>
           <Button size="sm" disabled={!plan().columns.length || plan().stages.length >= 12} onPress={addFilter}>Add stage · {PANEL_CAPABILITIES.operations[0].label}</Button>
           <Show when={!plan().columns.length}><Text emphasis="muted">Add a column before filtering rows.</Text></Show>
+        </Stack></Fold>
+        <Fold label="When a row is pressed" level="group"><Stack gap="row">
+          <Select label="Open" size="sm" value={plan().actions?.press?.kind ?? ''}
+            options={[{ value: '', label: 'Record default' },
+              ...(run()?.rows.some(row => !!row.action || !!row.target) ? [{ value: 'record', label: 'Source record' }] : []),
+              ...(run()?.rows.some(row => !!row.taskId) ? [{ value: 'task', label: 'Its task' }] : []),
+              ...(plan().columns.some(column => column.type === 'link') ? [{ value: 'link', label: 'Link column' }] : [])]}
+            onChange={kind => change(current => ({ ...current, actions: {
+              buttons: current.actions?.buttons ?? [],
+              ...(kind ? { press: { kind: kind as 'record' | 'task' | 'link', prefer: kind === 'task' ? 'pane' : 'refPanel',
+                ...(kind === 'link' ? { column: current.columns.find(column => column.type === 'link')?.id } : {}) } } : {}),
+            } }))} />
+          <Show when={plan().actions?.press} keyed>{press => <>
+            <Show when={press.kind === 'link'}><Select label="Link column" size="sm" value={press.column ?? ''}
+              options={plan().columns.filter(column => column.type === 'link').map(column => ({ value: column.id, label: column.label }))}
+              onChange={column => change(current => ({ ...current, actions: { buttons: current.actions?.buttons ?? [], press: { ...current.actions!.press!, column } } }))} /></Show>
+            <Select label="Presentation" size="sm" value={press.prefer}
+              options={([{ value: 'route', label: 'Full page' }, { value: 'refPanel', label: 'Side panel' }, { value: 'pane', label: 'Task pane' }, { value: 'overlay', label: 'Overlay' }, { value: 'external', label: 'Browser' }]).filter(option => pressPresentations().includes(option.value))}
+              onChange={prefer => change(current => ({ ...current, actions: { buttons: current.actions?.buttons ?? [], press: { ...current.actions!.press!, prefer: prefer as 'route' | 'refPanel' | 'pane' | 'overlay' | 'external' } } }))} />
+          </>}</Show>
+        </Stack></Fold>
+        <Fold label="Row buttons" level="group"><Stack gap="row">
+          <For each={plan().actions?.buttons ?? []}>{(button, index) => <Card><Stack gap="row">
+            <Input label="Button label" assist={false} value={button.label} onInput={label => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: (current.actions?.buttons ?? []).map((entry, at) => at === index() ? { ...entry, label } : entry) } }))} />
+            <Input label="Icon (optional)" assist={false} value={button.icon ?? ''} onInput={icon => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: (current.actions?.buttons ?? []).map((entry, at) => at === index() ? { ...entry, icon: icon || undefined } : entry) } }))} />
+            <Show when={button.kind === 'open'}><>
+              <Select label="Reference" size="sm" value={button.kind === 'open' ? button.reference.kind === 'link' ? `link:${button.reference.column ?? ''}` : button.reference.kind : 'record'}
+                options={[{ value: 'record', label: 'Source record' }, { value: 'task', label: 'Its task' }, ...plan().columns.filter(column => column.type === 'link').map(column => ({ value: `link:${column.id}`, label: column.label }))]}
+                onChange={value => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: (current.actions?.buttons ?? []).map((entry, at) => at === index() && entry.kind === 'open' ? { ...entry, reference: value.startsWith('link:') ? { kind: 'link', column: value.slice(5), prefer: entry.reference.prefer } : { kind: value as 'record' | 'task', prefer: entry.reference.prefer } } : entry) } }))} />
+              <Select label="Presentation" size="sm" value={button.kind === 'open' ? button.reference.prefer : 'refPanel'}
+                options={[{ value: 'route', label: 'Full page' }, { value: 'refPanel', label: 'Side panel' }, { value: 'pane', label: 'Task pane' }, { value: 'overlay', label: 'Overlay' }, { value: 'external', label: 'Browser' }]}
+                onChange={prefer => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: (current.actions?.buttons ?? []).map((entry, at) => at === index() && entry.kind === 'open' ? { ...entry, reference: { ...entry.reference, prefer: prefer as 'route' | 'refPanel' | 'pane' | 'overlay' | 'external' } } : entry) } }))} />
+            </></Show>
+            <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: (current.actions?.buttons ?? []).filter((_entry, at) => at !== index()) } }))}>Remove button</Button>
+          </Stack></Card>}</For>
+          <Button size="sm" disabled={(plan().actions?.buttons.length ?? 0) >= 3} onPress={() => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: [...(current.actions?.buttons ?? []), { kind: 'createTask', label: 'Start task' }] } }))}>Add Start task button</Button>
+          <Button size="sm" disabled={(plan().actions?.buttons.length ?? 0) >= 3} onPress={() => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: [...(current.actions?.buttons ?? []), { kind: 'open', label: 'Open', reference: { kind: 'record', prefer: 'refPanel' } }] } }))}>Add Open button</Button>
+          <Show when={run()?.rows.some(row => row.action?.verb === 'openUrl')}><Button size="sm" disabled={(plan().actions?.buttons.length ?? 0) >= 3} onPress={() => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: [...(current.actions?.buttons ?? []), { kind: 'open', label: 'Open in browser', reference: { kind: 'record', prefer: 'external' } }] } }))}>Add Open in browser button</Button></Show>
+          <For each={run()?.rows.flatMap(row => row.actions ?? []).filter((action, index, all) => all.findIndex(item => item.id === action.id) === index)}>{action => <Button size="sm" disabled={(plan().actions?.buttons.length ?? 0) >= 3} onPress={() => change(current => ({ ...current, actions: { press: current.actions?.press, buttons: [...(current.actions?.buttons ?? []), { kind: 'action', label: action.label, actionId: action.id }] } }))}>Add {action.label} button</Button>}</For>
         </Stack></Fold>
         <Fold label="View and timing" level="group" defaultOpen><Stack gap="row">
           <Field label="Panel title"><Input label="Panel title" assist={false} value={plan().title} onInput={title => change(current => ({ ...current, title }))} /></Field>

@@ -190,7 +190,7 @@ releases the wait without cancelling the process.
 
 | Method | Path | Gate | Purpose |
 | --- | --- | --- | --- |
-| `POST` | `/v1/core/data-sources/:operation` | Provider access | `list`, `discover`, `describe`, `options`, and `query` over typed sources |
+| `POST` | `/v1/core/data-sources/:operation` | Provider access | `list`, `discover`, `describe`, `options`, `query`, `details`, `actions`, and `act` over typed sources |
 | `POST` | `/v1/core/queries/:operation` | Provider access | The workspace query library |
 | `POST` | `/v1/core/dashboards/:operation` | Device, in the handler | `list`, `get`, `create`, `save`, `validate`, `publish`, `published`, `run`, and `delete` |
 | `GET` | `/v1/core/dashboards/history` | Open | The measure series a history panel draws |

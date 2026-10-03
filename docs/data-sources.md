@@ -59,6 +59,7 @@ and discovery ID. The other routes require a matching `operation` discriminator:
 | `options` | Source, scope, field or parameter pointer, search, cursor, and page size. | Stable IDs, labels, and either exhaustion or a next cursor. |
 | `query` | Typed query, mode, evaluation time, cursor, and page size. | Host-bound record references, typed data, revision, read time, and completeness. |
 | `details` | Exact record reference, scope, and projection. | Typed detail data and fetch time, or `not-found`. |
+| `actions` | Exact full record reference and matching scope. | Current named actions for that record. |
 
 Device and service principals can call these routes. Task principals cannot. Node consumers use
 `ctx.dataSources.invoke(request, { principal, signal })`; the host-created principal passes unchanged
@@ -74,6 +75,16 @@ Records carry `recordId` and `data`, with optional `display`, `taskId`, and the 
 row action. The host stamps source and connection identity. It rejects supplied provenance, foreign
 action routes, and non-HTTP action URLs. Records retain nested objects, arrays, nulls, and allowed
 additional properties. Presentation metadata cannot change record identity.
+
+A record can also declare a plugin-owned `{ kind, item }` target and named `actions` with IDs, labels,
+optional icons, verbs, and risk tiers. `describe` lists the action IDs and target kinds the source can
+offer; this is authoring metadata, not current eligibility. The source's `actions` operation answers
+for one full record reference at press time. The Node checks the reference's scope and connection,
+then checks the current action ID and risk before it dispatches a confined plugin route. Record verbs
+also include `navigate` and `createTask`; host navigation and task creation use the row's project
+context. A source that declares no named actions needs no `actions` handler.
+For `runNodeAction`, the plugin receives the press's idempotency key and must deduplicate any side
+effect by that key; a transport failure after dispatch can be retried without a stored response.
 
 ## Completeness and limits
 

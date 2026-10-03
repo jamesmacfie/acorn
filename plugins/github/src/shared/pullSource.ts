@@ -45,5 +45,6 @@ export const pullSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', properties: { repository: { type: 'string' } }, required: ['repository'], additionalProperties: false },
   parameterFields: [{ pointer: '/repository', label: 'Repository', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
+  targets: [{ kind: 'github.pull-request' }],
   consistency: 'GitHub search is eventually consistent, with no snapshot isolation during upstream pagination. Up to 1,000 matches are fully read before local exact filtering and stable sorting. Larger searches are incomplete. Continuations retain that selection for 60 seconds; expired selections must be refreshed.',
 }
