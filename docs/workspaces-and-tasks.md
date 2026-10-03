@@ -414,8 +414,9 @@ archive refusals before that point do not fabricate teardown attempts. Teardown 
 independent of later cleanup or worktree-removal failure. `archiveInProgress` covers the entire
 archive operation, rather than only script execution.
 
-The desktop's task script controls open script details, a live terminal when available, and an on-demand
-log tail. The setup rail marker uses the durable snapshot. TUI task chrome shows both phases.
+The desktop's setup rail marker uses the durable snapshot. Script sessions remain accessible in the
+terminal drawer; retained diagnostics are available through the CLI and task script tools. TUI task
+chrome shows both phases.
 Offline and stale snapshots are labeled; cached running state is not evidence of a live process.
 
 ### Retention and recovery
