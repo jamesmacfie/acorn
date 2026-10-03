@@ -1,8 +1,15 @@
 # What acorn takes from oh-my-pi
 
-Status: proposed, 2026-10-02. Nothing in this programme is built or scheduled. Where a file here
-disagrees with a shipped contract, the owning reference document wins until the implementation
+Status: proposed, 2026-10-02; sequential handoffs added 2026-10-03. Nothing in this programme is built
+or scheduled. Where a file here disagrees with a shipped contract, the owning reference document
+wins until the implementation
 changes that contract.
+
+For implementation, start with the [sequential phase plan](./phases/README.md). Give a developer one
+phase at a time and require its acceptance record before continuing. The seven numbered files below
+are design topics; their numbers are not the execution order. The phase plan incorporates the
+permission design from [mods.md](../mods.md) and resolves consumer, review-reader, and unattended
+operation prerequisites.
 
 ## What this is
 
@@ -55,7 +62,8 @@ A loaded acorn plugin runs in a permission-scoped worker and reaches the agent t
 - Agent tools, which reach every harness through acorn's MCP server.
 - `core:before-tool-call`, which guards acorn's own tools only.
 - Lifecycle events on `plugin:agents:turn-changed`, `request-changed`, and `sessions-changed`.
-- `agents.reviewInput.v1`, which reads a completed turn's user messages and final assistant message.
+- A bounded completed-turn reader is proposed in phase 04. The previous `agents.reviewInput.v1`
+  reader was removed with Findings; it is not a shipped seam.
 - `ctx.core.models.generateText` under the `models` grant, which spends a backend the caller names.
 - UI points such as `agents:tool-card`, `agents:session-header`, and `agents:composer-actions`.
 - Custom agents, MCP servers, and harness contributions.
@@ -70,41 +78,39 @@ everything inside the loop.
 | --- | --- |
 | [01-omp-harness.md](./01-omp-harness.md) | Run `omp` as a contributed ACP harness. One manifest, no acorn change, and the test of whether acorn needs its own loop. |
 | [02-before-permission.md](./02-before-permission.md) | Build the `agents:before-permission` hook already designed in [mods.md](../mods.md), and what `omp` adds to that design. |
-| [03-session-messages.md](./03-session-messages.md) | A capability that lets a plugin queue an attributed turn on a live session. |
+| [03-session-messages.md](./03-session-messages.md) | A host-bound extension point that lets a plugin queue an attributed turn on a live session. |
 | [04-unattended-model-calls.md](./04-unattended-model-calls.md) | A host-held backend choice and spending cap per plugin, so a plugin can call a model from an event without a picker. |
 | [05-advisor.md](./05-advisor.md) | A loaded advisor plugin: a second model that reviews each finished turn and sends a note back. The consumer for 03 and 04. |
-| [06-agent-content.md](./06-agent-content.md) | Skills, rules, and commands as plugin contributions that acorn writes into each harness in its own format. |
+| [06-agent-content.md](./06-agent-content.md) | Plugin skills delivered through a portable index and verified native harness interfaces; rules and importers remain outside this scope. |
 | [07-resource-reads.md](./07-resource-reads.md) | An experiment: expose acorn's read-only tools as MCP resources behind one read, the way `omp` treats `pr://` as a path. |
 | [refused.md](./refused.md) | What this programme decided not to take from `omp`, and why. |
 
 ## The order of work
 
-| Step | What the owner gets at the end | Depends on |
-| --- | --- | --- |
-| 01 | `omp` in the Agent pane beside Claude and Codex, with its own extensions, rules, and advisor running inside it. | Nothing. |
-| 02 | A plugin can refuse a harness's permission request before the person sees it. | Nothing. |
-| 03 | A plugin can queue a note on a session, drawn as the plugin's, never as the person's words. | Nothing. |
-| 04 | A plugin can generate text from a schedule or an event on a backend and cap the owner chose for it. | Nothing. |
-| 05 | An advisor that reads each finished turn and queues a note when it finds a problem. | 03, 04. |
-| 06 | A plugin can ship a skill or a rule, and every harness that supports one receives it. | Nothing. |
-| 07 | A measured answer to whether resource reads beat about 26 separate read tools. | Nothing. |
+Execute the [nine phases](./phases/README.md#the-phases) in order. Phase 01 tests whether `omp`
+provides the deep-loop features without Acorn building another agent loop. The harness-neutral
+features remain useful for Claude, Codex, and DeepSeek regardless of that outcome.
 
-Run 01 first. It costs one manifest and an afternoon, and its result changes how much the rest
-matters. If `omp` runs well as a harness, the deep-loop features (context rewriting, stream rules,
-tool shadowing) are available to anyone who wants them, through `omp`'s own extensions, and acorn
-never has to build them. Steps 02 to 06 are still worth doing, because they work the same for Claude,
-Codex, and DeepSeek, which `omp`'s extensions never will.
+Phase 02 delivers the permission hook with a real policy plugin. Phase 03 delivers interactive
+messaging with that plugin's optional explanations. Phase 04 delivers model grants, a replacement
+review reader, and the interactive advisor together. Phase 05 integrates unattended operation
+lifetime, cancellation, and accounting before enabling automatic workflow/delegation notes.
 
-Steps 03 and 04 are each built once, then proved by 05. The rule in
-[extensibility.md § Unexercised seams rot](../../extensibility.md#unexercised-seams-rot) applies: do
-not ship 03 or 04 without 05, or another real consumer, landing behind them.
+Phases 06 and 07 deliver portable and native skills in order. Phase 08 measures resource reads and
+may remove the experiment. Phase 09 accepts the combined programme on real clients and a headless
+Node. The [execution rules](./phases/README.md) define each handoff and permitted fallback.
+
+The rule in [extensibility.md § Unexercised seams rot](../../extensibility.md#unexercised-seams-rot)
+applies throughout: each public seam lands with its loaded consumer and evidence across the worker
+boundary.
 
 ## Relation to other programmes
 
-- [mods.md](../mods.md) owns the design for 02. File 02 only adds to it.
+- [mods.md](../mods.md) owns the base permission design. Topic 02 adds explanations; implementation
+  phases 02 and 03 deliver the hook and explanation consumer in order.
 - The shipped [memory contract](../../notes-and-memory.md#memory) replaces Findings, which consumed
   `agents.reviewInput.v1` and supplied the precedent 04 generalizes. The Findings removal also
-  removed that capability. Phase 05 must introduce its bounded read contract when implemented.
+  removed that capability. Implementation phase 04 introduces its bounded replacement with the advisor.
 - [sandbox/](../sandbox/README.md) owns containment. Nothing here is containment, and 02 says so.
 - [ecosystem/](../ecosystem/README.md) owns discovery and signing. File 06 touches the Claude Code
   marketplace format and defers to ecosystem on discovery.

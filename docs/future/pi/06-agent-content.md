@@ -2,6 +2,10 @@
 
 Status: proposed, 2026-10-02. Not started.
 
+Execution handoffs, 2026-10-03: [phase 06](./phases/06-portable-skills.md) delivers the portable
+catalogue, trust, and index; [phase 07](./phases/07-native-skills.md) adds verified native delivery.
+Codex's portable fallback is an accepted outcome when no supported native skill root exists.
+
 ## Why
 
 An `omp` plugin is a folder that can hold skills, slash commands, rules, prompts, subagent

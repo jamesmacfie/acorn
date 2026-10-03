@@ -2,6 +2,11 @@
 
 Proposal, 2026-09-29. Not started.
 
+Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/phases/02-permission-veto.md) delivers this
+hook and its policy consumer; [Pi phase 03](./pi/phases/03-session-messages.md) adds optional
+explanations through a separate messaging grant. Use the [phase plan](./pi/phases/README.md) for
+execution order and acceptance. This file owns the base hook design and comparison.
+
 Claude Code is adding *function hooks*, marketed as Claude Mods: a plugin ships a TypeScript module
 that wraps Claude Code's own methods like Express middleware. This file records how that model
 compares with acorn's, which parts acorn already has, and the one piece worth building: a hook on the
@@ -90,7 +95,7 @@ ctx.hooks.declare({
   id: 'before-permission',
   label: 'allow a tool',
   payload: {
-    sessionId: 'string', taskId: 'string', providerId: 'string', unattended: 'boolean',
+    sessionId: 'string', taskId: 'string', requestId: 'string', providerId: 'string', unattended: 'boolean',
     kind: 'string', title: 'string', command: 'string', paths: 'string[]', root: 'string',
   },
   allows: ['observe', 'veto'],
@@ -104,6 +109,7 @@ ctx.hooks.declare({
 
 | Field | Meaning |
 | --- | --- |
+| `requestId` | The parked provider request's canonical ID, scoped to the session. A policy consumer uses it to deduplicate explanation messages without merging distinct permission requests. Added by the sequential Pi plan on 2026-10-03. |
 | `unattended` | True for `workflow` and `delegated` sessions, the set `claudeHarness.ts` already calls unattended. "No pushes from a workflow run" is the main case for this field. |
 | `kind` | One of `command`, `edit`, `read`, `fetch`, `permissions`, or `other`. ACP's `execute` maps to `command`; `edit`, `delete`, and `move` map to `edit`; `read` and `search` map to `read`. Codex maps by method. |
 | `title` | The harness's own summary, as the card shows it. |
@@ -163,14 +169,17 @@ event queue. Two reasons:
    returns. `applyEventProjection` writes that row as `resolved`, with `blocked` in its resolution.
    The row is never `pending`, so it raises no notification, adds no attention badge, and doesn't
    wake a delegated child's parent.
+   A bounded blocked summary is readable through `agents.requests`, including the canonical provider
+   request ID, while raw resolution stays private. This lets the separately granted Pi explanation
+   consumer react to a confirmed refusal rather than a hook verdict that might be ignored on timeout.
 3. `AgentRequestCard.tsx` draws a blocked request as resolved and names who blocked it and why.
 
 The field is optional on the wire type in `plugins/agents/src/contract/wire.ts`. An older client
 draws the row as an ordinary resolved request, so the cached query shape needs no new key.
 
-The model sees only a plain rejection, because neither ACP's nor Codex's reply has room for a
-reason. It may try another way or ask the person. That's acceptable for a first version (see
-[Later](#later-each-with-its-trigger)).
+The permission reply gives the model a plain rejection, because neither ACP's nor Codex's reply has
+room for a reason. Optional explanation delivery is a separate grant and later queued turn in
+[Pi phase 03](./pi/phases/03-session-messages.md). The hook itself never sends that turn.
 
 ### Getting the command and paths out of each harness
 
@@ -233,8 +242,9 @@ Say these plainly in the owning docs, because a policy people trust too far is w
   picks none. No handler in this repository picks one. The Mods author refuses numeric priorities outright, citing Raymond Chen's observation that
   every author claims the top number. Once two third-party transforms compete on one point, replace
   the number with install order plus a reorder control in **Settings → Plugins**.
-- **Telling the model why.** Trigger: agents retry blocked commands in a loop. Add the reason as a
-  context part on the session's next turn.
+- **Telling the model why.** The Pi plan schedules an optional policy explanation consumer once
+  attributed messaging lands in [phase 03](./pi/phases/03-session-messages.md). It uses a separate
+  grant and capped queued turn; unattended delivery waits for phase 05's operation ownership.
 - **Auto-allow.** Trigger: a real request for it. It would be a separate mode with its own high grant,
   and never for unattended sessions.
 - **Handlers a person can't turn off.** This belongs to the managed layer in

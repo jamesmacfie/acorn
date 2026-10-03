@@ -3,6 +3,9 @@
 Status: proposed, 2026-10-02. Not started. This is an experiment with a stop rule, not a plan to
 replace acorn's tools.
 
+Execution handoff, 2026-10-03: [phase 08](./phases/08-resource-read-experiment.md) owns protocol
+preconditions, authorization parity, paired runs, and the retain/remove decision.
+
 ## Why
 
 `omp` gives the model one `read` tool and treats everything as a path. `read pr://1428` returns a
@@ -26,8 +29,9 @@ tools, and a resource template is less familiar.
 
 MCP has resources: a server lists URI templates, and a client reads a URI. Claude Code exposes MCP
 resources to the model through its own list and read tools, and Codex has equivalents. So acorn would
-not need a new tool or a new protocol. It would add resource templates to the server it already ships
-(`apps/node/src/entries/mcp.ts`) and route each read to the same handler the matching tool uses.
+not need a new tool or a new protocol. It would add resource templates to the library server at
+`packages/node-core/src/mcp/server.ts`, launched by the thin `apps/node/src/entries/mcp.ts`
+entrypoint, and route each read to the same handler the matching tool uses.
 
 ## The design
 
@@ -82,4 +86,4 @@ both harnesses, propose hiding the read tools behind the setting as a separate c
 - The tool list on a node with the default plugins, which decides the real count above.
 - Whether Claude Code and Codex let the model read MCP resources on its own, or only when the person
   mentions one.
-- How `apps/node/src/entries/mcp.ts` builds `tools/list`, and where resource handlers would sit beside it.
+- How `packages/node-core/src/mcp/server.ts` builds `tools/list`, and where resource handlers would sit beside it.

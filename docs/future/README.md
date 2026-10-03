@@ -21,7 +21,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
-| [pi/](./pi/README.md) | What acorn takes from oh-my-pi: run `omp` as a harness, then widen the edges acorn owns with a permission hook, plugin session messages, unattended model calls, an advisor, plugin skills, and a resource-read experiment. | Proposed, 2026-10-02; nothing built. |
+| [pi/](./pi/README.md) | What acorn takes from oh-my-pi: seven design topics with [nine sequential implementation handoffs](./pi/phases/README.md), including the Mods permission design, real loaded consumers, unattended ownership, plugin skills, and a measured resource-read experiment. | Proposed, 2026-10-02; handoffs added 2026-10-03; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 

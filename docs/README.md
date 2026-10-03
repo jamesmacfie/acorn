@@ -125,6 +125,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
   editor, identity and time, richer sources, row actions, composition, datasets, and gated write-back.
 - [Terminal UI review](./future/tui-review/README.md) — live UX evidence, feature coverage, host
   projections, and acceptance gates for a standalone terminal client.
+- [Pi implementation programme](./future/pi/README.md) — the oh-my-pi comparison and nine sequential
+  handoffs combining harness extensibility with the Mods permission-hook proposal.
 - [Plugin list search proposal](./future/pluginsearch.md) — search beyond the loaded Linear,
   Rollbar, and GitHub list rows while keeping project and state scope.
 - [Outdated review comments](./future/outdated-review-comments.md) — hide outdated GitHub threads
@@ -168,3 +170,16 @@ links; review the implementation to verify API signatures and behavior.
 - [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
 - [The manifest](./plugin-authoring/the-manifest.md)
 - [The node half](./plugin-authoring/the-node-half.md)
+
+## Pi implementation handoffs
+
+- [Execution rules and phase index](./future/pi/phases/README.md)
+- [Phase 01: contributed omp harness](./future/pi/phases/01-omp-harness.md)
+- [Phase 02: permission veto and policy plugin](./future/pi/phases/02-permission-veto.md)
+- [Phase 03: attributed session messages](./future/pi/phases/03-session-messages.md)
+- [Phase 04: model grants and interactive advisor](./future/pi/phases/04-model-grants-and-advisor.md)
+- [Phase 05: unattended follow-ups](./future/pi/phases/05-unattended-follow-ups.md)
+- [Phase 06: portable plugin skills](./future/pi/phases/06-portable-skills.md)
+- [Phase 07: native skill delivery](./future/pi/phases/07-native-skills.md)
+- [Phase 08: resource-read experiment](./future/pi/phases/08-resource-read-experiment.md)
+- [Phase 09: programme acceptance](./future/pi/phases/09-programme-acceptance.md)

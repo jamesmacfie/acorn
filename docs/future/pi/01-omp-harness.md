@@ -2,6 +2,9 @@
 
 Status: proposed, 2026-10-02. Not started, and nothing here needs a change inside acorn.
 
+Execution handoff, 2026-10-03: [phase 01](./phases/01-omp-harness.md). The manifest needs no core
+change; the handoff verifies contributed-profile workflow admission rather than assuming it works.
+
 ## Why first
 
 Every gap in this programme's [README](./README.md) comes from one fact: the agent loop belongs to
