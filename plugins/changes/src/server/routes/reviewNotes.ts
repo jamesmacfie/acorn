@@ -12,7 +12,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 // so the UI always shows sent/unsent truthfully.
 //
 // A factory over the plugin's own database, not a module-scope router reading getDb(c.env); see
-// docs/data-layer.md § Plugin databases.
+// docs/data-layer/plugin-databases.md § Plugin databases.
 
 type Row = typeof reviewNotesTable.$inferSelect
 type Emit = (frame: { channel: string } & Record<string, unknown>) => void

@@ -203,7 +203,7 @@ function transactionEnvelope(
         transaction: root.name,
         // `custom` says the name came from the code rather than from a URL. It is already a pattern:
         // `http.request` with the route as an attribute, never a hundred URLs
-        // (docs/telemetry.md § The admission rule for a span).
+        // (docs/telemetry/model.md § The admission rule for a span).
         transaction_info: { source: 'custom' },
         start_timestamp: seconds(root.start),
         timestamp: seconds(root.start + root.durationMs),
@@ -443,7 +443,7 @@ function metricEnvelope(entries: MetricEntry[], fallbackTraceId: string): Sentry
           timestamp: seconds(entry.at),
           // Required, and a metric has no trace: a histogram is one row per label set per window,
           // and putting a real trace id in one would mint a series per call
-          // (docs/telemetry.md § Ambient attribution).
+          // (docs/telemetry/runtimes.md § Ambient attribution).
           trace_id: fallbackTraceId,
           name: entry.name,
           type: entry.type,

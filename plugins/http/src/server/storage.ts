@@ -13,7 +13,7 @@ export async function protectHttpValue(value: string, secrets: SecretService): P
 }
 
 // reveal(), not a broker call: this is the API panel's own saved data going back to the owner who
-// typed it (docs/security.md § Credential handling). The router enforces the owner-invoked half by
+// typed it (docs/security/credentials.md § Credential handling). The router enforces the owner-invoked half by
 // requiring a `device` principal.
 export async function openHttpValue(value: string, encrypted: boolean, secrets: SecretService): Promise<string> {
   if (!encrypted) throw new HttpStorageError('Saved HTTP data has not been encrypted')

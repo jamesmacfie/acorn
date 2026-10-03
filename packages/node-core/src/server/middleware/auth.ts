@@ -28,7 +28,7 @@ export type Principal = {
 //
 // `trace` is set by the same middleware and only while telemetry is collecting, which is why it is
 // the one optional variable here. It carries the request's own span so an error raised inside the
-// request lands in the same trace rather than starting a second one (docs/telemetry.md § Traces).
+// request lands in the same trace rather than starting a second one (docs/telemetry/model.md § Traces).
 export type TraceRef = { traceId: string; spanId: string }
 export type AppEnv = { Bindings: Env; Variables: { principal: Principal | null; requestId: string; trace?: TraceRef } }
 

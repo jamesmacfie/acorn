@@ -1,12 +1,9 @@
-apps/desktop/src/client/App.tsx: docs/data-layer.md § Backup: "the app surfaces a one-time warning if the disk isn
-apps/desktop/src/client/index.tsx: docs/api-reference.md § Events
 apps/desktop/src/client/index.tsx: docs/plugins.md § Hearing a core event
 apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — appearance'
 apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the panes'
 apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the rail sources'
 apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the shell chords'
 apps/desktop/test/client/wsChannelPrefixes.test.ts: docs/plugins.md § Hearing a core event
-apps/node/test/integration/auth/idempotency.test.ts: docs/api-reference.md § HTTP conventions
 apps/node/test/integration/pluginSystem/pluginLoader.test.ts: docs/workflows.md § Starting a run
 apps/node/test/integration/taskContext.test.ts: docs/agent-tools.md § 4
 apps/tui/src/appearance.ts: docs/ui-design.md § Roles
@@ -72,13 +69,9 @@ apps/tui/src/main.tsx: docs/tui.md § The screen
 apps/tui/src/paint/paint.ts: docs/ui-design.md § Roles
 apps/tui/src/panel.tsx: docs/tui.md § The screen
 apps/tui/src/plugins/custody.ts: docs/tui.md § Custody
-apps/tui/src/plugins/plugins.test.tsx: docs/security.md § Rung 0 — The client sandbox
-apps/tui/src/plugins/pluginWorker.js: docs/security.md § The containment ladder is a `node:worker_threads` worker sta
 apps/tui/src/plugins/RemoteTree.tsx: docs/tui.md § Plugin surfaces
 apps/tui/src/plugins/SourcePanel.tsx: docs/tui.md § The screen
-apps/tui/src/plugins/TrustPrompt.tsx: docs/security.md § Design rules
 apps/tui/src/plugins/TrustPrompt.tsx: docs/tui.md § The trust prompt
-apps/tui/src/plugins/workerFactory.ts: docs/security.md § Rung 0
 apps/tui/src/reachability.test.tsx: docs/tui.md § Focus regions
 apps/tui/src/reachability.test.tsx: docs/tui.md § The five key groups
 apps/tui/src/reachability.test.tsx: docs/tui.md § The footer
@@ -112,17 +105,13 @@ packages/client-core/src/features/editor/theme.ts: docs/editor.md § The shared 
 packages/client-core/src/features/fleet/FleetHome.tsx: docs/plugins.md § Node
 packages/client-core/src/features/integrations/watchConnectionChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/notifications/invariants.test.ts: docs/notifications.md § Invariants
-packages/client-core/src/features/notifications/kindContributions.ts: docs/data-layer.md § Backup
 packages/client-core/src/features/projects/watchProjectChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/settings/appearancePrefs.ts: docs/ui-design.md § Token axes
 packages/client-core/src/features/settings/AppearanceSettings.tsx: docs/ui-design.md § Token axes
 packages/client-core/src/features/settings/builtInThemes.test.ts: docs/ui-design.md § Plugin themes
 packages/client-core/src/features/settings/nodes/NodesSettings.tsx: docs/ui-design.md § Node management
 packages/client-core/src/features/settings/plugins/InstallPlugin.tsx: docs/plugins.md § Non-goals
-packages/client-core/src/features/settings/plugins/PluginPage.tsx: docs/security.md § Supply chain
 packages/client-core/src/features/settings/plugins/PluginsSettings.tsx: docs/plugins.md § Non-goals
-packages/client-core/src/features/settings/SecuritySettings.tsx: docs/security.md § On-disk
-packages/client-core/src/features/settings/TelemetrySettings.tsx: docs/security.md § Telemetry sinks
 packages/client-core/src/features/settings/uiStyles.test.ts: docs/ui-design.md § Style packs
 packages/client-core/src/features/tabs/RailTab.tsx: docs/ui-design.md § Rail controls
 packages/client-core/src/features/tabs/TabRail.tsx: docs/plugins.md § Context
@@ -162,14 +151,6 @@ packages/client-core/src/host/tree/arbitration.ts: docs/plugins.md § Arbitratio
 packages/client-core/src/host/tree/hostRequests.test.ts: docs/plugins.md § Asking the host
 packages/client-core/src/host/tree/RemoteTree.grants.test.tsx: docs/plugins.md § Asking the host
 packages/client-core/src/host/tree/Slot.tsx: docs/plugins.md § Arbitration
-packages/client-core/src/host/tree/Slot.tsx: docs/security.md § Rung 0
-packages/client-core/src/host/trust/permissionLines.test.ts: docs/security.md § Rung 1
-packages/client-core/src/host/trust/permissionLines.test.ts: docs/security.md § Telemetry sinks
-packages/client-core/src/host/trust/permissions.ts: docs/security.md § Design rules
-packages/client-core/src/host/trust/permissions.ts: docs/security.md § Telemetry sinks
-packages/client-core/src/host/trust/PluginTrustDialog.tsx: docs/security.md § Design rules
-packages/client-core/src/host/trust/trustModel.test.ts: docs/security.md § Design rules
-packages/client-core/src/host/trust/trustModel.ts: docs/security.md § Design rules
 packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting covers the lazy-grammar reasoning
 packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting covers why that is what lets Shiki threa
 packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting for why it needs to be a worker (the WAS
@@ -250,7 +231,6 @@ packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axe
 packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axes for why this is neither a palette primitive nor d
 packages/client-core/src/kit/tokens/tokens.ts: docs/ui-design.md § Borders: a pack may set any of these to zero width
 packages/create-acorn-plugin/index.mjs: docs/plugin-authoring.md § Two ways to draw for when a rectangle is the right answer
-packages/custody/src/broker/nodeBroker.test.ts: docs/api-reference.md § Events: a seq gap means loss
 packages/dashboards-core/src/chart.ts: docs/dashboards.md § Views are derived
 packages/dashboards-core/src/format.ts: docs/dashboards.md § The generated editor gives: the component that draws this ca
 packages/dashboards-core/src/layout.ts: docs/dashboards.md § The grid
@@ -270,56 +250,29 @@ packages/dashboards-core/src/shaping.ts: docs/dashboards.md § Views are derived
 packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends
 packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends for why
 packages/dashboards-core/src/trend.ts: docs/dashboards.md § Trends for why direction-goodness isn't guessable
-packages/node-core/src/server/audit.test.ts: docs/security.md § The vocabulary is closed
-packages/node-core/src/server/audit.ts: docs/data-layer.md § Core DB
-packages/node-core/src/server/audit.ts: docs/security.md § Supply chain
-packages/node-core/src/server/auth/idempotency.ts: docs/api-reference.md § HTTP conventions
-packages/node-core/src/server/auth/pairingCodes.ts: docs/security.md § Transport: "no oracle for 'right code
-packages/node-core/src/server/bridge.ts: docs/api-reference.md § error-codes
-packages/node-core/src/server/core/telemetry.ts: docs/security.md § Telemetry sinks
 packages/node-core/src/server/dashboards/history.ts: docs/dashboards.md § Trends for why that renders as a cold state rather than an e
 packages/node-core/src/server/db/cascade.test.ts: docs/plugins.md § Uninstalling
 packages/node-core/src/server/db/cascade.ts: docs/plugins.md § Uninstalling
-packages/node-core/src/server/db/schema.ts: docs/api-reference.md § HTTP conventions
 packages/node-core/src/server/db/schema.ts: docs/dashboards.md § Trends
-packages/node-core/src/server/db/schema.ts: docs/schedules.md § Targets
-packages/node-core/src/server/db/schema.ts: docs/security.md § Threat model
 packages/node-core/src/server/index.ts: docs/agent-tools.md § 4
-packages/node-core/src/server/index.ts: docs/data-layer.md § Backup: core + plugin databases
 packages/node-core/src/server/index.ts: docs/workflows.md § 2
 packages/node-core/src/server/integrations/connections.test.ts: docs/plugins.md § Hearing a core event was about: four writers flipped a conne
-packages/node-core/src/server/integrations/providerRoutes.ts: docs/api-reference.md § HTTP conventions
 packages/node-core/src/server/integrations/resourceRuntime.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/integrations/types.ts: docs/agent-tools.md § issue_comment
 packages/node-core/src/server/notify.ts: docs/plugins.md § Hearing a core event
-packages/node-core/src/server/pluginFetchRoute.test.ts: docs/security.md § Design rules: a Hono instance cannot cross a process boundar
 packages/node-core/src/server/pluginHost/context.ts: docs/plugins.md § Hearing another plugin
-packages/node-core/src/server/pluginHost/context.ts: docs/security.md § Design rules
 packages/node-core/src/server/pluginHost/emits.ts: docs/plugins.md § Hearing another plugin § The cross-plugin grant
 packages/node-core/src/server/pluginHost/host.test.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/pluginHost/state.ts: docs/ui-design.md § New surfaces
-packages/node-core/src/server/pluginHost/types.ts: docs/data-layer.md § Plugin DBs
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing another plugin
-packages/node-core/src/server/pluginHost/types.ts: docs/schedules.md § Targets
 packages/node-core/src/server/plugins/bundled.ts: docs/plugins.md § Failures are contained
-packages/node-core/src/server/plugins/installer.ts: docs/security.md § Supply chain
 packages/node-core/src/server/plugins/manifest.test.ts: docs/dashboards.md § Placements
-packages/node-core/src/server/plugins/permissions.ts: docs/security.md § Rung 1
-packages/node-core/src/server/plugins/storage.ts: docs/data-layer.md § Backup
 packages/node-core/src/server/routes/dashboards.ts: docs/dashboards.md § Trends
-packages/node-core/src/server/routes/plugins/harness.ts: docs/security.md § 3
 packages/node-core/src/server/routes/plugins/plugins.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/routes/projects/taskContext.ts: docs/agent-tools.md § 4
 packages/node-core/src/server/routes/projects/tasks.ts: docs/plugins.md § Hearing a core event
-packages/node-core/src/server/routes/registry.ts: docs/security.md § Design rules
-packages/node-core/src/server/routes/security/security.ts: docs/security.md § On-disk
 packages/node-core/src/server/runConfig.test.ts: docs/workflows.md § 2
-packages/node-core/src/server/schedules/scheduler.ts: docs/schedules.md § Targets
-packages/node-core/src/server/telemetry/collector.ts: docs/security.md § Telemetry sinks
-packages/node-core/src/server/transport/tls.test.ts: docs/security.md § Transport and authentication
-packages/node-core/src/server/transport/wsHub.test.ts: docs/api-reference.md § Events: the socket is token-authenticated at upgrade
-packages/node-core/src/server/transport/wsHub.ts: docs/api-reference.md § Events
 packages/node-core/src/server/transport/wsHub.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/worktrees/taskHeadObserver.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/worktrees/taskWorktree.test.ts: docs/plugins.md § Hearing a core event
@@ -333,12 +286,9 @@ packages/plugin-types/src/contracts/storage.ts: docs/plugins.md § What is publi
 packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin themes for the three-group split and why only the pal
 packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin themes for why only these are accepted
 packages/protocol/src/chrome/extensionPoints.ts: docs/plugins.md § Arbitration
-packages/protocol/src/device/node.ts: docs/security.md § The control plane
 packages/protocol/src/plugin/contract.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/plugin/manifest/chromeDescriptors.ts: docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension point
 packages/protocol/src/plugin/manifest/displayDescriptors.ts: docs/ui-design.md § Plugin themes for the token contract and what each group may
-packages/protocol/src/runtime/schedules.ts: docs/schedules.md § Targets
-packages/protocol/src/transport/api/nodeAdmin.ts: docs/data-layer.md § Backup
 packages/protocol/src/transport/api/pluginPresentation.ts: docs/workflows.md § Starting a run
 packages/protocol/src/transport/api/pluginState.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/transport/api/runtime.ts: docs/dashboards.md § Trends
@@ -362,15 +312,12 @@ plugins/agents/src/client/usage/AgentUsageSection.tsx: docs/managed-agents.md §
 plugins/agents/src/contract/draftAttachments.ts: docs/managed-agents.md § Draft attachments
 plugins/agents/src/contract/wire.ts: docs/managed-agents.md § The transcript store
 plugins/agents/src/node/index.ts: docs/managed-agents.md § Operations
-plugins/agents/src/node/schema.ts: docs/api-reference.md § Streams describes
 plugins/agents/src/server/sessions/runtimeEngine.ts: docs/managed-agents.md § Subagents
 plugins/agents/src/server/sessions/runtimeEngine.ts: docs/plugins.md § Hearing a core event
 plugins/agents/src/server/sessions/sessionRepository.ts: docs/managed-agents.md § Subagents
-plugins/browser/src/node/schema.ts: docs/data-layer.md § Plugin DBs
 plugins/changes/src/client/RemoteBar.tsx: docs/plugins.md § 
 plugins/database/src/server/completions.ts: docs/editor.md § Language smarts
 plugins/database/src/shared/database.ts: docs/editor.md § Language smarts
-plugins/drizzle.shared.ts: docs/data-layer.md § Plugin DBs
 plugins/editor/src/client/EditorPane.tsx: docs/editor.md § Reload on focus
 plugins/editor/src/client/EditorPane.tsx: docs/editor.md § Status
 plugins/editor/src/server/editor.ts: docs/plugins.md § Hearing a core event
@@ -386,14 +333,11 @@ plugins/linear/src/shared/rail.ts: docs/workflows.md § Starting a run
 plugins/linear/src/tree/model.ts: docs/plugins.md § Frame authoring
 plugins/rollbar/src/shared/rail.test.ts: docs/workflows.md § Starting a run
 plugins/rollbar/src/shared/rail.ts: docs/workflows.md § Starting a run
-plugins/sentry-telemetry/acorn-plugin.config.mjs: docs/security.md § Telemetry sinks
 plugins/terminal/src/server/runtime.ts: docs/plugins.md § Hearing a core event § Run target state
 plugins/workflows/src/client/editor/draftStore.ts: docs/frontend.md § Reactivity
 plugins/workflows/src/client/editor/startRequest.ts: docs/plugin-authoring.md § Testing
 plugins/workflows/src/client/index.ts: docs/contribution-kinds.md § Project surfaces
 plugins/workflows/src/client/layoutPrefs.test.tsx: docs/workflows.md § Where positions live
-plugins/workflows/src/client/layoutPrefs.ts: docs/state-ownership.md § Device
-plugins/workflows/src/client/runs/RunPane.tsx: docs/state-ownership.md § Device
 plugins/workflows/src/client/startFromItem.test.ts: docs/workflows.md § Starting a run
 plugins/workflows/src/client/startFromItem.ts: docs/plugin-authoring.md § Testing
 plugins/workflows/src/client/startFromItem.ts: docs/workflows.md § Starting a run
@@ -404,9 +348,7 @@ plugins/workflows/src/node/index.ts: docs/managed-agents.md § Sessions
 plugins/workflows/src/node/index.ts: docs/plugins.md § Hearing another plugin
 plugins/workflows/src/server/authoring/edit.ts: docs/workflows.md § Generating and editing with AI
 plugins/workflows/src/server/routes/workflow.ts: docs/managed-agents.md § Sessions
-plugins/workflows/src/server/runs/runner.ts: docs/api-reference.md § Workflows
 plugins/workflows/src/server/runs/workflowTelemetry.test.ts: docs/workflows.md § What a run reports
 plugins/workflows/src/server/steps/builtins.ts: docs/workflows.md § What an agent step sees
-plugins/workflows/src/shared/workflowContracts.ts: docs/api-reference.md § Workflows
 tools/arch/boundaries.test.ts: docs/tui.md § Focus regions
 tools/arch/primitiveAdoption.test.ts: docs/ui-design.md § How the primitives are built

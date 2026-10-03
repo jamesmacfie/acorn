@@ -256,7 +256,7 @@ describe('plugin host', () => {
     expect(disposed).toEqual(['last', 'second', 'first'])
   })
 
-  // The compiled tier's half of ctx.storage. See docs/data-layer.md § Migrations. All the host needs is
+  // The compiled tier's half of ctx.storage. See docs/data-layer/migrations.md § Migrations. All the host needs is
   // the module the chain sits beside.
   it("opens, reuses and closes a built-in's database from its declared chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-builtin-storage-'))

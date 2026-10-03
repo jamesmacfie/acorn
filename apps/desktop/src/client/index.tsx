@@ -28,7 +28,7 @@ import { bootMark, emitBootSpans } from './boot'
 const noop = () => null
 
 // The renderer's telemetry, wired before anything renders so a seam that fires during boot has
-// somewhere to put its record (docs/telemetry.md § The renderer). Wiring is not collecting: the
+// somewhere to put its record (docs/telemetry/renderer.md § The emitter). Wiring is not collecting: the
 // emitter stays off until `App.tsx` reads `telemetry.enabled` off the node and says otherwise.
 startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
@@ -42,7 +42,7 @@ window.addEventListener('pagehide', stopPageFacts, { once: true })
 // error thrown outside a component's boundary was a line in a devtools console nobody had open.
 //
 // Fatal and unhandled, with the stack, which is the one place a client record carries one: an
-// uncaught error with no stack is not worth sending anywhere (docs/telemetry.md § What never leaves
+// uncaught error with no stack is not worth sending anywhere (docs/telemetry/model.md § What never leaves
 // the machine).
 window.addEventListener('error', (event) => {
   emitError('core', {
@@ -76,7 +76,7 @@ bootMark('script start')
 
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
 // the remedy is to mark everything stale and let whatever is on screen refetch
-// (docs/api-reference.md § Events). `refetchType: 'active'` is what keeps that from fanning out
+// (docs/api-reference/websocket.md § Events). `refetchType: 'active'` is what keeps that from fanning out
 // across every cached query the user cannot currently see. It is also why only the active node's
 // client needs invalidating: no other node has a mounted query to refetch.
 wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' }))

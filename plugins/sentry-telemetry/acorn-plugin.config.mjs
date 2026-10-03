@@ -14,7 +14,7 @@
 //   core: ['telemetry'] — the read-everything grant, and the reason the trust prompt draws this
 //     plugin high. A sink sees every record from every owner: core's request timings, another
 //     plugin's schedule runs, and the log lines of packages the owner installed for a different
-//     reason (docs/security.md § Telemetry sinks). It is also the entire feature.
+//     reason (docs/security/plugin-node-realm.md § Telemetry sinks). It is also the entire feature.
 //   core: ['prefs'] — the settings page below writes `plugin:sentry-telemetry:settings` through
 //     `bridge.state`, and the node half reads the same row on each flush to learn the sample rate
 //     and which kinds to send. Scoped to this plugin's own namespace by the host.

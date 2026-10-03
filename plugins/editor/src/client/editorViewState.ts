@@ -29,7 +29,7 @@ export function clearEditorViewStates(): void {
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list
-// (docs/state-ownership.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorViewStates(e.taskId)
 })

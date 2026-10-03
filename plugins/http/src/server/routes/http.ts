@@ -3,7 +3,7 @@
 // secret resolution must not be reachable through an internal token.
 //
 // A factory over the plugin's own database, not a module-scope router reading a handle off `c.env`
-// (docs/data-layer.md § Plugin databases).
+// (docs/data-layer/plugin-databases.md § Plugin databases).
 //
 // http ships as a loaded plugin, so these routes run behind `portableCarrier`. A loaded bundle sits
 // outside the host's Hono stack, so the identity comes off the request context rather than

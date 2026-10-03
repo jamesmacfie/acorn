@@ -4,7 +4,7 @@
 //
 // The device's, not the node's. Which shape a list is in is about the person reading it, not about
 // the worktree, and the other client paired with the same node draws on a screen with different room
-// on it (docs/state-ownership.md § Scope rules).
+// on it (docs/state-ownership/scope-rules.md § Scope rules).
 //
 // Which backend the commit-message wand spends used to be a second key here. It is now the one
 // "Generate with" default every Generate control in the app shares, so the pane reads and writes it

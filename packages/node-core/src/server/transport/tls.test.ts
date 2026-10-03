@@ -26,7 +26,7 @@ beforeAll(() => {
   minted = ensureCert(root())
 })
 
-describe('the node TLS identity (docs/security.md § Transport and authentication)', () => {
+describe('the node TLS identity (docs/security/transport-and-auth.md § Transport)', () => {
   it('mints a private key + certificate, and keeps both to the owner', () => {
     const dir = root()
     const cert = ensureCert(dir)

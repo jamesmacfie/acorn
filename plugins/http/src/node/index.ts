@@ -4,7 +4,7 @@ import { createHttpFetch } from '../server/routes/http'
 import { describeHttpStep, httpStepHandler, validateHttpStep } from '../server/workflowStep'
 
 // http ships as a loaded plugin, so both host seams here are the manifest-bound ones
-// (docs/data-layer.md § Plugin databases; docs/http-client.md):
+// (docs/data-layer/plugin-databases.md § Plugin databases; docs/http-client.md):
 //
 //   ctx.storage.open()  the plugin database, with the id bound from the manifest and the DDL chain
 //                       confined to the installed package. The id must never change: it is the

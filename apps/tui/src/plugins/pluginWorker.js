@@ -1,6 +1,6 @@
 // The terminal's sandbox, from the inside: what runs before a stranger's bundle does.
 //
-// A terminal has no iframe, so rung 0 of docs/security.md § The containment ladder is a
+// A terminal has no iframe, so rung 0 of docs/security/node-plugin-security.md § The containment ladder is a
 // `node:worker_threads` worker started under `--permission` with read access to two files and nothing
 // else — this one and the bundle. The permission model covers the filesystem, child processes, native
 // addons and workers. Node 22 and 24 do not cover the network, so the builtin policy and deleted

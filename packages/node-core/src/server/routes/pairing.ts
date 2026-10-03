@@ -14,7 +14,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 import { readPairingBody } from './pairingBody'
 
-// Pairing and device management (docs/api-reference.md § Pairing, docs/security.md
+// Pairing and device management (docs/api-reference/transport.md § Pairing, docs/security.md
 // § Transport and auth).
 //
 // Two routers, because they sit on opposite sides of the auth gate. `open` is how a client holding no
@@ -46,7 +46,7 @@ function attemptCeiling(now: () => number = () => Date.now()): () => boolean {
   }
 }
 
-// The single pairing failure (docs/api-reference.md § Pairing): same status, same code, same message,
+// The single pairing failure (docs/api-reference/transport.md § Pairing): same status, same code, same message,
 // no details. 401 because the request presented a credential and it was rejected.
 const pairingFailed = (c: Context<AppEnv>): Response => respondError(c, 401, 'pairing_failed', ['Pairing failed.'])
 
@@ -62,7 +62,7 @@ export function pairingRoutes(): { open: Hono<AppEnv>; core: Hono<AppEnv> } {
         baseline: ACORN_BASELINE,
         protocolVersion: NODE_PROTOCOL_VERSION,
         eventTransport: { viewers: 1 },
-        // The certificate a client pins against (docs/api-reference.md § Pairing). Reading it over the
+        // The certificate a client pins against (docs/api-reference/transport.md § Pairing). Reading it over the
         // connection being authenticated proves nothing. It is the value the owner compares against
         // the code shown on the node.
         fingerprint: c.env.NODE_FINGERPRINT,

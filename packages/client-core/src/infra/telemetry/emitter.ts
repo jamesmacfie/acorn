@@ -46,7 +46,7 @@ const FLUSH_EVERY_MS = 5_000
 const MAX_SAMPLES = 20_000
 /** How many label sets one window may hold, the node's number for the node's reason: a label whose
  *  value varies per call would otherwise mint one series per call, which is the cardinality failure
- *  the vocabulary rule exists to prevent (docs/telemetry.md § The attribute vocabulary). */
+ *  the vocabulary rule exists to prevent (docs/telemetry/model.md § The attribute vocabulary). */
 const MAX_SERIES = 200
 let slowSamples = 0
 
@@ -496,7 +496,7 @@ export function measureRenderBatch<T>(
 }
 
 /** One sample into a histogram, aggregated over the flush window. What a seam past about ten a
- *  second uses instead of a span (docs/telemetry.md § Hot seams are metrics). */
+ *  second uses instead of a span (docs/telemetry/model.md § Hot seams are metrics). */
 export const recordDuration = (owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void =>
   recordSample(owner, seam, ms, 'ms', attrs)
 

@@ -560,7 +560,7 @@ export class AgentSessionRepository {
     return { attachmentIds, artifactObjects }
   }
 
-  // Removing a session's history, for the retention pass (docs/data-layer.md § Retention). It works in
+  // Removing a session's history, for the retention pass (docs/data-layer/backup-and-retention.md § Retention). It works in
   // three steps so the caller can yield between them: find a session, delete its events a batch at a
   // time, then finish it. The session row stays, so an archived or restored task still lists the
   // session, and its transcript says what happened to it.

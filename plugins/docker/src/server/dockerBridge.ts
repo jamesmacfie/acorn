@@ -30,7 +30,7 @@ const isActive = (c: DockerContainerSummary): boolean => c.state === 'running' |
 
 // `tasks` and `projects` are core tables and this plugin owns none, so its task reads, one id and the
 // whole active set for the rail badge, and the one project read for its settings tab come through the
-// core services rather than a db handle (docs/data-layer.md § Plugin databases).
+// core services rather than a db handle (docs/data-layer/plugin-databases.md § Plugin databases).
 export type DockerCoreServices = Pick<CoreServices, 'tasks' | 'projects'>
 
 export function dockerBridge(core: DockerCoreServices, broadcast?: (frame: WsServerFrame) => void): DockerBridge {

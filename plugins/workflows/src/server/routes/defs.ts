@@ -30,7 +30,7 @@ import type { WorkflowFileRequest, WorkflowFileResult } from '../../shared/workf
 // Every route here is device-only. Writing a definition is authoring executable configuration: a step
 // can run a shell command, and a run started from a row skips the repo trust snapshot because there
 // are no committed bytes to hash. An agent's task-scoped credential must never reach that
-// (docs/security.md § Process, path, and configuration controls).
+// (docs/security/process-and-paths.md § Process, path, and configuration controls).
 
 export type WorkflowDefsBridge = {
   files?(request: WorkflowFileRequest): Promise<WorkflowFileResult>

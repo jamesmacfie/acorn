@@ -21,7 +21,7 @@ const FRESHNESS_TONE = {
 //
 //   identity_mismatch  a changed fingerprint is a security stop, not a connectivity blip
 //                      (docs/security.md).
-//   protocol_mismatch  the node speaks a major this app doesn't (docs/api-reference.md § Versioning).
+//   protocol_mismatch  the node speaks a major this app doesn't (docs/api-reference/transport.md § Versioning).
 //                      The actionable half is the sub-line: one of the two has to be upgraded.
 const HARD_ERRORS = {
   identity_mismatch: { label: 'Identity changed', detail: 'identity changed' },

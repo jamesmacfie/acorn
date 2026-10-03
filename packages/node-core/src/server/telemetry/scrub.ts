@@ -13,7 +13,7 @@
 // (`/v1/core/tasks/:id`), a channel name and a plugin namespace are all slash-shaped, and a
 // scrubber that collapsed them would make every log line and every span attribute unreadable to buy
 // nothing: the paths worth hiding are the owner's home directory and the data root, and those two
-// are named (docs/telemetry.md § What never leaves the machine).
+// are named (docs/telemetry/model.md § What never leaves the machine).
 import { homedir } from 'node:os'
 import { ATTRS_MAX, ATTR_KEY_MAX, ATTR_VALUE_MAX, LOG_BODY_MAX, type TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 

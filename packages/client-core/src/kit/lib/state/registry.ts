@@ -10,7 +10,7 @@ type Identified = { id: string }
 // make activation order observable.
 //
 // It also answers who contributed each entry. Eight of the contribution types have no plugin id on
-// them, and a telemetry record has to name an owner (docs/telemetry.md § The attribute vocabulary),
+// them, and a telemetry record has to name an owner (docs/telemetry/model.md § The attribute vocabulary),
 // so the owner is a side-map here rather than a field added to eight types and every registration
 // site. The three passes that know the owner fill it: the descriptor pass in
 // host/chrome/chromeRegister.ts, the frame pass in host/frames/register.ts, and `makeContext` in

@@ -1,372 +1,126 @@
 # State ownership
 
-The key architectural rule is simple: the Node owns product data; the desktop owns presentation.
-Client caches and persisted UI state are disposable and never prove that a mutation succeeded.
+This page covers which state the Node owns, which the device owns, and what's disposable. Read it before
+you decide where a new piece of state lives.
+
+The rule: the Node owns product data, and the client owns presentation. Client caches and persisted UI
+state are disposable and never prove that a mutation succeeded.
+
+## Pages
+
+<a id="scope-rules"></a>
+<a id="which-mechanism-holds-a-given-fact"></a>
+
+[Scope rules](./state-ownership/scope-rules.md) covers where client state is stored: the scope table,
+the three mechanisms, `DEVICE_KEYS`, eviction on a Node switch, drafts, and the device and Node
+decisions behind particular keys.
+
+[Reading places](./state-ownership/reading-places.md) covers list, timeline, and diff positions, and the
+measurements and parsed rows that go with them.
 
 ## Node-owned state
 
-The Node is authoritative for workspaces, projects, tasks, branches, worktrees, Git status,
-notes, memories, integrations, provider mirrors, terminal metadata, managed sessions, delegation
-ownership, workflow drafts, immutable revisions, publication recovery, workflow runs,
-approved workflow schedule bindings, durable schedule occurrences, processing checkpoints,
-Docker/database configuration, saved requests, secrets, devices, plugin enablement, config trust,
-and audit records.
+The Node is authoritative for workspaces, projects, tasks, branches, worktrees, Git status, notes,
+memories, integrations, provider mirrors, terminal metadata, managed sessions, delegation ownership,
+workflow drafts, immutable revisions, publication recovery, workflow runs, workflow schedule bindings
+and occurrences, processing checkpoints, Docker and database configuration, saved requests, secrets,
+devices, plugin enablement, config trust, and audit records.
 
-Workflow schedule drafts are Node-owned too. The renderer may hold unsaved form edits while the
-modal is open, but **Save draft** writes a disabled core cadence plus its workflow-owned binding.
-**Activate** is an immediate device-only mutation: a disconnected renderer reports the failure and
-does not retain an activation intent to replay later.
+It's also authoritative for what the owner composes about those resources: a task's pane layout, a
+task's open editor files, a repository's PR filters, a task's context selection, dashboard placement and
+layout, and typed dashboard definitions. These follow the resource, so any client that pairs with the
+Node renders its arrangements, and an agent can read them.
 
-Whether this node collects telemetry at all is node-owned too: one preference row,
-`telemetry.enabled`, off unless it reads `'1'` ([telemetry.md](./telemetry.md) § The switch). It
-belongs to the node rather than to a device because the collector runs whether or not a client is
-attached, and because a schedule firing at 3 AM is exactly the thing worth a record. Settings →
-Telemetry is the switch, and it writes this row like any other node preference. Turning it off in
-one window stops every client paired with that node, which is what the promise has to mean: the
-renderer reads the same row and turns its own emitter off with it.
+Workflow schedule drafts are Node-owned too. The renderer may hold unsaved form edits while the modal is
+open, but **Save draft** writes a disabled core cadence and its workflow-owned binding. **Activate** is
+an immediate device-only mutation, and a disconnected renderer reports the failure rather than keeping
+an intent to replay.
 
-What that page draws under the switch is owned by nothing and stored nowhere. The counts, the sink
-list and the drop total live in the collector's memory and start again with the process, which is
-why they are a route the page polls rather than state anything persists
-([telemetry.md](./telemetry.md) § What the page shows). A history would need a table, and the
-programme refused one.
+Whether the Node collects telemetry is one Node preference, `telemetry.enabled`
+([the switch](./telemetry/model.md#the-switch)). It belongs to the Node because the collector runs
+whether or not a client is attached, and turning it off in one window stops every client paired with
+that Node. What Settings → Telemetry draws under the switch lives in the collector's memory and starts
+again with the process.
 
-It is also authoritative for what the owner *composes* about those resources — a task's pane layout,
-a task's open editor files, a repo's PR filters, a task's context selection, dashboard placement and
-layout preferences, and core-owned typed dashboard definitions. These follow the resource, so any
-client that pairs with a Node renders that Node's arrangements and the agent can read them.
-
-Each Node has an independent data root and database set. A Node ID is part of every renderer query,
-selection scope, layout scope, and fleet aggregate input.
-
-The Node's loaded plugin runtime identity is process-owned: `active` records the declaration and
-client hash captured with the running service. The installed package is a separate disk candidate.
-Neither an install nor a cached roster response can change what the process is serving.
+Each Node has its own data root and databases. A Node ID is part of every renderer query, selection
+scope, layout scope, and fleet aggregate. The Node's loaded plugin runtime identity is process-owned:
+`active` records the declaration and client hash the running service captured, and the installed
+package is a separate disk candidate. An install or a cached roster answer can't change what the process
+serves.
 
 ## Client-owned durable state
 
 Plugin bundle bytes and exact `(pluginId, hash)` trust decisions belong to device custody, which
-verifies bytes before it writes them. The renderer's per-Node distribution snapshot is transient:
-it derives current selections from Node observations and custody decisions and is never persisted as
-a second winner record. Revoking a decision updates that snapshot and withdraws the selected code.
+verifies bytes before it writes them. The renderer's per-Node distribution snapshot is transient: it
+derives selections from Node observations and custody decisions and is never persisted. Revoking a
+decision updates the snapshot and withdraws the code.
 
-Saved query drafts are Node-owned, with compare-and-swap revisions. Their device-local recovery
-copies are keyed by Node, entity, and base revision and remain until acknowledgment or explicit
-discard. Reconnection exposes conflicts instead of overwriting Node content. These authoring drafts
-have a different lifetime from the losable comment and commit-message drafts described below.
-See [query recovery](./data-sources.md#workspace-query-library).
+Saved query drafts and typed dashboard drafts are Node-owned, with compare-and-swap revisions. Their
+device recovery copies are keyed by Node, entity, and base revision, and stay until acknowledged or
+discarded. Reconnecting shows conflicts instead of overwriting Node content
+([query recovery](./data-sources.md#workspace-query-library)). The shared query editor autosaves a saved
+query to the Node, and a stale save opens explicit conflict choices. An inline query stays inside its
+workflow or panel draft, and **Customize for this use** copies saved content into that consumer.
+Dashboard placements reference the stable published panel ID, so publishing changes a definition, not
+the geometry of every surface that places it.
 
-The shared query editor applies that contract directly: edits to a saved query autosave to the Node,
-the recovery copy remains until the matching acknowledgment, and a stale save opens explicit conflict
-choices. An inline query stays inside its owning workflow or panel draft. **Customize for this use**
-copies saved content into that consumer; it does not fork another hidden client-side entity.
-
-Typed dashboard drafts follow the same ownership rule: core stores their compare-and-swap draft and
-immutable published revisions, while a device recovery copy remains until acknowledgment. Placement
-lists, tab ownership, and layout rectangles remain in the existing Node-backed dashboard preference
-slice. A placement references the stable published panel ID; publishing changes its definition, not
-the geometry of every surface that already places it.
-
-The workflow-v2 development transition is split by owner. The Node transition exports and removes
-only old workflow/query/dashboard rows and the dashboard preference. Renderer activation removes the
-retired workflow, query, dashboard, and AI-authoring recovery-key namespaces. Neither side scans or
-deletes unrelated product state; agent-session and ordinary presentation keys survive.
-
-AI authoring conversations are device-local draft state. The recovery key includes the active Node,
-feature, and target ID, and the value contains bounded context, a pending clarification or proposal,
-the model pick, and sample opt-in. It is not a workflow run, execution transcript, or Node-owned
-definition. Applying a reviewed proposal enters the owning feature's draft and validation path; the
-conversation itself never proves that a save or publication succeeded.
+AI authoring conversations are device-local drafts. The recovery key includes the active Node, feature,
+and target ID, and the value holds bounded context, a pending clarification or proposal, the model pick,
+and the sample opt-in. Applying a proposal enters the owning feature's draft and validation path, and the
+conversation never proves that a save or publication succeeded.
 
 The desktop persists:
 
-- paired Node records, labels, endpoints, certificate fingerprints, and local-node identity;
-- which Node this window talked to last, so the next launch can pick its cache partition before
-  the fleet answers ([frontend.md](./frontend.md) § Startup readiness);
+- paired Node records, labels, endpoints, certificate fingerprints, and local-Node identity;
+- which Node this window talked to last, so the next launch picks its cache partition before the fleet
+  answers ([startup readiness](./frontend.md#startup-readiness));
 - device-scoped appearance, shortcuts, rail order, and window geometry;
 - device-held plugin enablement and `plugin:<device-plugin-id>:*` state;
 - the per-Node IndexedDB query cache;
-- selection/restore state and local drafts.
+- selection and restore state, and local drafts.
 
-Device tokens are held by the desktop helper's encrypted store, not by the renderer. Drafts are
-best-effort client memory/persistence and can be lost on restart; they are never sent automatically
-while a Node is offline.
-
-## Scope rules
-
-**State follows the resource it describes.** State about a Node's resources goes to that Node's
-per-user prefs, so every client renders it; state about this machine or the person at it — theme,
-style, keybindings, window state, notices, caches, trust, tokens — stays device-local on
-purpose. There is no "home node" to store things on: `homeNode()` picks which Node a fresh window
-opens on and nothing else, and the remembered last Node is an id this device draws a cache for,
-not a place preferences live. Drafts stay device-local by a separate recorded decision, because losable
-is acceptable for a draft and not for a composition.
-
-The preferences query reads Node-owned keys from the active Node and device-owned keys from local
-storage. It never copies either owner's values into the other store. A missing or inaccessible device
-store leaves device preferences at their defaults. Settings saved while storage was available reappear
-on the next launch; a save while it is unavailable stays only in the current query cache. Task layouts
-remain in the owning Node's preferences, so switching Nodes
-does not transfer a layout.
-
-The device plugin state rule is prefix-aware because installed plugin IDs are unknown at build time.
-Only IDs present in the device bundle roster acquire that prefix; Node-delivered plugin state keeps
-using Node preferences. Uninstall removes that device prefix and the device enablement entry while
-preserving manual trust acknowledgements.
-
-`acorn.json` is a second interface to selected device preferences: appearance, keybinding overrides,
-rail order, collapse, and plugin source visibility, and exclusive-slot picks. The desktop helper reads and watches it in its
-user data directory; the terminal uses its own config directory. Incoming values pass through the
-normal device preference setter, which writes local storage before updating the query cache. A
-Settings change to a covered value writes the file. Unknown top-level keys survive a write, and a
-parse error leaves the last valid state on screen with a line and column notice. A `plugins` entry
-is an installation request shown to the user, never a trust grant. The file contains no Node
-preferences, plugin-owned state, credentials, commands, or executable paths.
-
-Use the persistence scope that owns the state:
-
-| State | Scope |
-| --- | --- |
-| Fleet membership and token custody | desktop installation; token in main, membership in fleet store |
-| Appearance, notification settings ([notifications.md](./notifications.md) § Settings), shortcuts, rail order, notices, trust, tokens | device |
-| How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | device |
-| Where a workflow's nodes sit in the graph view | device |
-| Which workflow task roots are expanded in the rail | device |
-| Which backend and model every Generate control spends (`models.generatePick`) | device |
-| Query cache | Node |
-| Task layout, open files, PR filters, context selection | owning Node's prefs, keyed by Node + task/repo |
-| Dashboard panel definitions and their placements | owning Node's prefs, one app-scoped slice |
-| Last path, last task, last source, last Node | device |
-| Last view per workspace | owning Node's prefs, keyed by Node + workspace |
-| Last workspace and the two-workspace shortcut pair | active Node's app-scoped prefs |
-| Workspace/task selection | Node + workspace/task |
-| Draft editor/comment text, and a commit message in the Changes pane | client + current task |
-| Provider data and task mutations | owning Node |
-| Computer Use app-access grants ([managed-agents.md](./managed-agents.md) § App-access approval) | the Computer Use integration on the Node's computer; the Node keeps only the decision |
-
-Module-level signals or maps that reference a task or workspace must either include the Node ID or be
-cleared on a node switch. A state owner registers its OWN evictor beside the signal it clears, through
-`onScopeEvicted` (`client-core/host/registries/shell/scopeEviction.ts`); the shell only maps runtime lifecycle
-events onto scopes. It used to hold the list of evictors itself, which meant every new signal had to
-remember to add itself there, and forgetting was silent.
-
-Choosing between "keyed by node" and "cleared on switch" is not taste. A LIVE roster clears — the
-agent list, terminal sessions, the node's plugin list — because it refetches for the new node within a
-tick, so clearing costs nothing and keying would buy nothing. DURABLE memory is keyed — editor scroll,
-the active terminal tab, the workspace view — because switching back should restore what was there.
-
-**A draft is device-local because it is losable, and keyed by the task because it belongs to a
-worktree.** Every draft goes through one helper, which writes `localStorage` under a prefix its caller
-names (`client-core/kit/lib/state/draftState.ts`): a comment box uses `comment-draft:`, and the Changes
-pane's commit message uses `changes:commit-draft:<taskId>`. The node id is deliberately absent from
-that key. A commit message is about the files in front of the reader, and the same task on another
-node is another worktree with another set of changes in it.
-
-**A workflow's node positions are the device's, because a definition is portable.** A definition can
-be saved back into a repository as TOML and read on somebody else's screen, so x and y have no place
-in it: they would be noise in every diff and wrong on every other monitor. They live under
-`plugin:workflows:layout:<defId>` in device storage instead, as `Record<nodeName, { x, y }>`
-(`plugins/workflows/src/client/layoutPrefs.ts`). Renaming a node carries its position with it and
-deleting a definition drops its layout. A drag writes 400 ms after it stops, and a draft with no row
-yet keeps its positions in memory for the session. Which of rows and graph the run pane draws its
-nodes as is the same kind of thing and sits beside it, under `plugin:workflows:runs:nodeView`. The
-terminal client has no `localStorage`, so both writes land nowhere there — and neither is missed,
-because that host draws the graph as the list either way.
-
-**One "Generate with" default, and it is the device's.** Every Generate control in the app — the
-commit-message wand, the workflow generator, the Settings section that edits it on its own — opens on
-`models.generatePick`, a `{ backendId, modelId }` pair in one key
-(`client-core/features/settings/models/generatePick.ts`). One key rather than one per dialog because
-the list now holds agent CLIs installed on the machine beside stored API keys, so re-picking is the
-common case and a pick made in one dialog should be what the next one opens on. It is the device's for
-the reason `theme` is: the backends a node offers are the same everywhere, but which of them you want
-to spend is yours, and it should not follow you to a machine where you were working on somebody
-else's budget. A remembered pick whose backend has gone is not honoured — it falls back to the first
-backend, because a disconnected provider or an uninstalled CLI in a preference is a stale note rather
-than a decision.
-
-**The SQL dialog is the one Generate control outside that default, and it is a known limit rather
-than a choice.** It is a remote tree drawn in the database plugin's worker
-(`plugins/database/src/tree/GenerateSqlModal.tsx`), and the default is a device preference: it lives
-in the host's `localStorage`, `/v1/core/prefs` has no bridge scope on purpose, and `bridge.state` is
-that same store namespaced `plugin:<id>:*`, which is what keeps one plugin out of core's keys. So the
-dialog opens on the first backend every time and remembers nothing, and a pick made in it is not
-carried anywhere else. Closing it takes one of two things: a narrow pair of bridge verbs for that one
-key, which is a plugin-API decision rather than a preferences one, or the dialog moving to the
-compiled client tier, where reading a preference is an import.
-
-**Where you were looking is the node's, not the device's.** Which rail source or task each workspace
-was left on is `core.workspace-views`, one key per workspace
-(`client-core/features/tasks/tasks.ts`, `infra/persistence/stateSlices.ts`). A source view also
-keeps the page it was on, so a relaunch comes back to the pull request that was open and not only
-to the list. The memory sits with the pane layouts, and for the same two reasons: it is keyed by that
-node's workspace ids, so it means nothing anywhere else, and both clients paired with a node should
-return you to the same place in it. `last_workspace` says which workspace was open, and it is the
-node's too, because the terminal client has no `localStorage` and a device key there is written
-nowhere.
-
-Both clients record as you move, so the workspace open when the window closes already knows its own
-view, and both reopen the same way: `last_workspace` picks the workspace, its memory picks the view.
-The desktop differs in three ways, all in `apps/desktop/src/client/App.tsx`. An address that already
-names a place wins, which is what keeps a reload where it was. The restore pass waits for the node's
-own answer to its prefs, unless the node is known to be offline, because the first value is the
-persisted query cache and that is written at most every five seconds: a place changed just before
-quitting used to come back as the one before it. And the place opens only after the whole pass,
-because opening a task with no layout in memory gives it a default one, and the saved layouts land
-in the last phase. The desktop used to reopen from three separate
-values, `last_path`, `last_task` and `last_source`, each with its own fallback. They disagreed, and a
-task view saved an empty path that the next launch replaced with the first project, so every
-relaunch landed in the first workspace. Those keys are retired.
-
-### Which mechanism holds a given fact
-
-Three mechanisms, and the choice follows from the question "who is the source of truth, and how long
-should this outlive the tab?":
-
-| Mechanism | Use when | Example |
-| --- | --- | --- |
-| TanStack query | The Node owns it and the client is caching a read | tasks, workspaces, a PR's files |
-| Persisted state slice | It must survive a relaunch | appearance, pane layout, open editor files |
-| Module-level signal | The client owns it and it is session-only | a live roster, a scroll position, a draft |
-
-A persisted state slice is a shape, not a location. Where its value lands is decided by one set,
-`DEVICE_KEYS` in `client-core/infra/persistence/devicePrefs.ts`: listed keys go to `localStorage`, and
-everything else — including every scoped slice — goes to the owning Node through `savePref`. Unknown
-means Node, deliberately, so a new per-task or per-repo slice is portable by default. The cost is
-honest: editing a layout while its Node is offline stalls the write until reconnect, where
-`localStorage` never stalled. That is the right trade for state that is *about* that Node.
-
-The dashboard model (`core.dashboards`, one `app`-scoped slice, version 1) is the clearest case of
-that rule and worth reading as the worked example
-([dashboards.md § Persistence](./dashboards.md)). A panel is a saved question about a Node's
-resources, so it follows the Node: build a board once and every client paired with that Node draws
-it, and the agent can read it through `/v1` like anything else. Device storage would have made it a
-per-laptop artefact of the machine it happened to be composed on. It is one blob rather than a key
-per panel — the whole model is read together by every surface that draws one — holding panel
-definitions by id and placements by scope key, with placements *referencing* definitions rather than
-embedding them so a second placement is an addition rather than a migration. Unknown ids are retained
-inert on the pane-layout rule: parsing asks "is this shaped like a panel?", never "is that plugin
-installed here?", so a composition is never collateral damage of toggling a plugin off.
-
-A module-level signal is the default for anything ephemeral, and the cost of that default is exactly
-the eviction question above — so a signal keyed by task, workspace or node owes an `onScopeEvicted`
-registration in the same file.
-
-**Where a list's place lives.** Two of those signals are the host's answer for the keyboard, and both
-are session-only by choice. `client-core/kit/keys/collectionState.ts` holds `active`, `selected` and
-`offset` for every collection node, keyed by the collection's id and by each item's own key, never by
-its index: a list rebuilt from a fresh response is a new array of new objects, and an index into it
-points at whatever moved into that slot. Keying by the item's key is what makes a refetch keep your
-place, and it is why the state sits outside the rows rather than inside them.
-`client-core/host/keys/focusRegions.ts` holds which region of which pane has focus, and it is the one place
-`focusedPane` gets written and the one place the `runtime:focus-changed` event is emitted from.
-Neither is persisted. Where you are in a list is a reading posture, not a preference, and restoring
-one across a relaunch would need a scope and an eviction rule nobody has asked for. See
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) § Focus and typing.
-
-A scrolled list answers to the same rule, and for a while one list did not. A followed `Timeline` keeps
-the reader's place as the turn they were on, `ReadingPlace` in `client-core/kit/lib/timeline/readingPlace.ts`,
-and the timeline does not hold it: `plugins/agents/src/client/sessions/readingPlaceStore.ts` does,
-keyed by the view, cleared when the node drops the session and on a node switch. It used to be a pixel
-offset in a module map inside the kit node itself, which broke both halves of the rule above. The unit
-was wrong, because an offset means nothing once the content above it has changed height, which a live
-transcript does continuously. And the owner was wrong: a map inside a kit component cannot be scoped,
-cleared or seen, and its own comment said as much, bounding itself at fifty entries because `kit/` may
-not import the eviction store. Hold a reading place outside the thing that draws it, keyed by identity
-rather than by position, and clear it where you clear everything else about that entity.
-
-The diff keeps its reading place the same way. `DiffReadingPlace` in
-`client-core/features/diff/diffLayout.ts` is the item the viewport starts in (a file header, a segment
-by path and ordinal, a slice of revealed context) and a point in that item's code rows, or a thread or
-line block and an offset into it. `diff/viewState.ts` holds it per scope for the session, with the
-horizontal offset, the projection, and the file signature it was taken against, and evicts a task's
-entries when the task is archived. A place is put back only in the projection and file set it was
-taken in; a place whose item has gone lands on that file's header. A new revision of the same files
-keeps the place by its item key, so an agent saving the file under the reader leaves them at the same
-segment and depth rather than at the top of the file.
-
-The heights measured for the diff's threads and line blocks belong to the mounted pane and to nothing
-else. They are held per projection, keyed by block id, with the fingerprint of the state they were
-measured in and the width bucket they were measured at, and a height is reused only while the
-fingerprint matches. A new revision discards nothing: a thread keeps its id across revisions and its
-fingerprint says whether its height still holds, and a mounted block is measured again anyway. A new
-file signature clears every height, and so does leaving the pane. None of it is persisted: a height
-is a fact about one window's fonts and width.
-
-The diff's parsed rows are not the pane's. They are a node's, held in memory beside that node's query
-client by `client-core/features/diff/segmentCache.ts`, so a pane mounted again on the same node draws
-them without a request. The rule is the query cache's: one partition per node, cleared when the node is
-dropped, and a node switch reads the other node's. Unlike the query cache, none of it is persisted,
-and it holds no reader state. Heights, drafts, collapse, and the reading place stay where this section
-puts them, so a thread resolving changes a height and never a cached row
-([diff-rendering.md](./diff-rendering.md) § Resident segments).
-
-**A slice reads its own keys and nothing else.** Every slice used to carry a `legacy` reader as well,
-a second function that pulled the pre-scoped aggregate key the scoped keys replaced —
-`task_layouts` and `task_panes` for the layout slice, `editor_open_files`, `pr_filters`. Those went on
-2026-08-28. The migration was confirmed complete on the live data root first: none of the four
-aggregate keys was still in `prefs`, and the scoped `core:task-layouts:*`, `editor:open-files:*`,
-`github:pr-filters:*` and `context:section-selection:*` keys were all present. The `app`-scoped
-shell slices (`core.last-path`, `core.last-task`, `core.last-source`) had a
-`legacy` reader too, and for those it was always a no-op: `storageKeyFor` returns the declared key
-unchanged for an `app` slice, so the canonical read and the legacy read were the same key.
-
-The pre-scoped keys are still listed as *not* device-owned in `devicePrefs.ts`, and that is not
-leftovers. `mergePrefs` lets the device win, so a straggler in some device's `localStorage` under
-`task_layouts` must keep draining to the node rather than being classified as device state and
-shadowing the node's copy forever.
+The desktop helper holds device tokens in its encrypted store, never the renderer. Drafts are
+best-effort and can be lost on restart.
 
 ## Freshness
 
-Node-backed data is displayed with freshness derived from the query result and broker state. The
-client may render stale/offline cache, but writes target the owning Node and report errors directly.
-There is no optimistic assumption that an invalidated cache reflects a completed mutation.
+The client shows Node-backed data with freshness derived from the query result and broker state. It may
+render a stale or offline cache, but writes target the owning Node and report errors directly. An
+invalidated cache never stands in for a completed mutation.
 
 ## Restore and disablement
 
-The shell restores fleet and Node scope before task scope. Switching Nodes remounts Node-scoped
-client state so effects and query clients cannot retain the previous Node's assumptions.
+The shell restores fleet and Node scope before task scope. Switching Nodes remounts Node-scoped client
+state, so effects and query clients can't keep the previous Node's assumptions.
 
+Preference writes capture their QueryClient's Node before any asynchronous ordering or cleanup, so a
+captured missing target can't follow a later selection. Confirmation, ordering, and optimistic rollback
+are per QueryClient and key. Device keys are written to device storage before query-cache observers are
+notified.
 
-Preference writes capture their QueryClient's registered Node before asynchronous ordering or
-cleanup. Custom clients capture the active Node at the call; a captured missing target cannot follow
-a later selection. Confirmation, ordering, and optimistic rollback are per QueryClient and key.
-Device keys are read directly from the declared finite set, and device storage is written before
-query-cache observers are notified.
+Startup restore captures the same QueryClient for scoped-key generation and hydration, and hydrates
+workspace, view, and pane phases before it arms writes. Each bound slice has its own disposable effect,
+so a change in one slice doesn't serialize the others. Equivalent queued values keep their first
+deadline, and a reversion cancels stale queued work. Late plugins hydrate before writing, disablement
+keeps stored data, removed scopes write tombstones, and disposal flushes pending writes to their
+captured Node.
 
-Startup restore captures the same QueryClient identity for scoped-key generation and hydration
-filtering. It hydrates workspace, view, and pane phases before arming writes. Registry membership
-owns one independently disposable effect per bound slice. Each effect tracks codec reads, including
-deep mutable Solid stores; a change in one slice does not serialize unrelated slices. Equivalent
-queued values retain their first deadline, and a reversion cancels stale queued work. In-flight
-reversions remain queued until their exact saved value is durable. Late plugins hydrate before
-writing, disablement preserves stored data, removed scopes write tombstones, and disposal flushes
-pending writes to their captured Node.
+Disabling a plugin removes its client contributions at once and stops its Node routes and services at
+the next Node start. Its data file stays in the root until the owner deletes it.
 
-Disabling a plugin removes its client contributions at activation and stops its Node routes/services
-on the next Node initialization. Its data file remains in the Node root until the owner explicitly
-deletes it.
+Notes body and title recovery is device state keyed by Node, scope address, and slug. It stays until the
+exact local edit is acknowledged or the note is deleted, with no size cap that drops dirty text
+([notes and memory](./notes-and-memory.md)). Notes don't use the compare-and-swap contract saved queries
+do.
 
-
-### Notes recovery and compiled pane ownership
-
-Notes body/title recovery is feature-owned device state keyed by Node, complete scope address, and
-slug. It remains until the exact local edit is acknowledged or the document is explicitly deleted;
-no arbitrary size/count cap drops dirty text. The 250 ms device batch and forced flush points are
-specified in [notes-and-memory.md](./notes-and-memory.md). Notes does not implement the server
-compare-and-swap contract used by saved queries. Its selection memory is Node + task, session-only.
-
-Compiled pane models and their drawn marks carry a captured Node shell generation. One current task
-model per pane is shared across regions, survives pane removal, and retires with task replacement,
-task eviction, Node switch, or host/provider destruction. A late outgoing lease release cannot retire
-a returning equal-ID generation. This lifetime is independent of persisted query cache ownership.
+Compiled pane models carry a captured Node shell generation. One task model per pane is shared across
+regions, survives pane removal, and retires with task replacement, task eviction, a Node switch, or host
+destruction. A late lease release can't retire a returning generation with the same ID.
 
 ## Retained preview documents
 
-The Node owns preview configuration. The desktop shell owns each retained local preview's normalized
-configured home, browsing location, loading state, and navigation cursor. These facts are transient
-and stay outside the Node database and client query cache. Pane unmount hides the page and removes
-renderer observers. Refetching configuration reconciles the home without reloading an equal target.
-Node switches retire all previews so task IDs cannot cross Node ownership. Archive and shell shutdown
-also release native resources. Browser process loss and application exit can discard unsaved page
-state. For the lifecycle and recovery limits, see [Host-owned webviews](./shell.md#host-owned-webviews).
+The Node owns preview configuration. The desktop shell owns each retained local preview's configured
+home, browsing location, loading state, and navigation cursor, outside the Node database and the query
+cache. Unmounting a pane hides the page. Node switches retire every preview, so task IDs can't cross Node
+ownership, and archive and shutdown release native resources. Browser process loss and app exit can
+discard unsaved page state ([host-owned webviews](./shell.md#host-owned-webviews)).

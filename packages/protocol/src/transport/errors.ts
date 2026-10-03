@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// The one error envelope every route returns (docs/api-reference.md § Errors):
+// The one error envelope every route returns (docs/api-reference/transport.md § Errors):
 //
 //   { "error": { "code", "message", "requestId", "retryable", "details"? } }
 //
@@ -15,7 +15,7 @@ import { z } from 'zod'
 // config-trust modal, `provider_needs_auth` rewrites the message, and collapsing them all into ten
 // would delete real behaviour. A closed set buys interop discipline across an API boundary, and there
 // isn't one here: client and Node ship from the same repo and are released together
-// (docs/api-reference.md § Versioning). So a route may return its own documented code, and anything
+// (docs/api-reference/transport.md § Versioning). So a route may return its own documented code, and anything
 // without one falls back to these.
 export const ERROR_CODES = [
   'bad_request',

@@ -240,7 +240,7 @@ describe('paneAvailable', () => {
   })
 })
 
-// The two pane spans (docs/telemetry.md § The renderer). Here rather than beside the emitter because
+// The two pane spans (docs/telemetry/renderer.md § Renderer seams). Here rather than beside the emitter because
 // both are about when a region is actually on screen: a region is a `lazy()` under its own
 // `Suspense`, and only a jsdom test can hold one suspended and then let it resolve.
 describe('the pane spans', () => {

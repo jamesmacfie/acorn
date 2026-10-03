@@ -185,7 +185,7 @@ export async function startAcpSession(
     args: launch.args,
     cwd: options.cwd,
     // brokerEnv, not `{ ...process.env }`: spreading the parent environment would hand the session
-    // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security.md § Credential
+    // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security/credentials.md § Credential
     // handling. A passthrough glob is for tool configuration, never for credentials, which is why
     // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist AGENT_TOOL_PASSTHROUGH names.
     env: {

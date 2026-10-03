@@ -75,13 +75,13 @@ const xcodeLicenseBlocked = (result: ProcResult): boolean =>
 // measurement phase 5 of the performance programme argues from (../telemetry/collector.ts).
 //
 // A histogram and not a span, because this fires far more than ten times a second under normal use
-// (docs/telemetry.md § Hot seams are metrics). `measure` is a straight passthrough when nothing is
+// (docs/telemetry/model.md § Hot seams are metrics). `measure` is a straight passthrough when nothing is
 // collecting.
 //
 // `'core'` is what this file can honestly say: it is reached from every route, every schedule and
 // every plugin and knows nothing about its caller. The ambient context knows, and `measure` reads
 // it, so a spawn under `/v1/p/github` reports as github's without a signature here changing
-// (../telemetry/context.ts, docs/telemetry.md § Ambient attribution).
+// (../telemetry/context.ts, docs/telemetry/runtimes.md § Ambient attribution).
 const seam = (args: readonly string[]) => `git.${args[0] ?? 'unknown'}`
 
 // Exit code is data: `git diff --quiet` and `git merge-tree` both use it to answer a question.

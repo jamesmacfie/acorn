@@ -31,7 +31,7 @@ const REFRESH_CONCURRENCY = 3
 const isFilesMode = (value: unknown): value is PullBatchFilesMode =>
   value === 'full' || value === 'summary' || value === 'none'
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullsBatch = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().post('/:owner/:repo/pulls/batch', async (c) => {
   const uid = ownerId(c)

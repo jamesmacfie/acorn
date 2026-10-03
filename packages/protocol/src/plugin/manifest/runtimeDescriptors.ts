@@ -36,7 +36,7 @@ export const taskCheckDescriptor = z.object({
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
-// One verb this plugin will write onto the node's audit trail (docs/security.md § Audit). The host
+// One verb this plugin will write onto the node's audit trail (docs/security/audit.md § Audit). The host
 // qualifies it as `<pluginId>:<id>`, so a package cannot file a row under a core verb or another
 // plugin's, and the settings surface can still enumerate the whole vocabulary because every entry in it
 // came from a parsed manifest or from core's own closed union.

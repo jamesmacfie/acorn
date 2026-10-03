@@ -5,7 +5,7 @@ import { nodePrefsKey } from '../../infra/queries'
 import { pushBackgroundError } from '../notifications/notifications'
 import { failuresThrown, savePref, setPref } from './savePref'
 
-// The one telemetry switch, as a reader and a writer (docs/telemetry.md § The switch).
+// The one telemetry switch, as a reader and a writer (docs/telemetry/model.md § The switch).
 //
 // Two places read it, so it is a function rather than an inline `prefs?.[key] === '1'` in each: the
 // Settings page draws it, and `App.tsx` turns the client's emitter on and off with it. The same rule

@@ -59,7 +59,7 @@ export const serviceStartResultSchema = z.strictObject({
   // The bearer the client authenticates with. Never logged.
   deviceToken: z.string().min(1),
   // The node's transport identity: the self-signed certificate to pin and its sha256 fingerprint
-  // (docs/security.md § Transport and auth). Required, not optional: the listener is TLS
+  // (docs/security/transport-and-auth.md § Transport and auth). Required, not optional: the listener is TLS
   // unconditionally, and an optional pin is a pin that silently is not one.
   fingerprint: z.string().min(1),
   certPem: z.string().min(1),

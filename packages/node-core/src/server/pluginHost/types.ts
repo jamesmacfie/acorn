@@ -228,7 +228,7 @@ export type PluginRunRegistry = {
 // Work this plugin will do when something asks: a name, a route inside its own namespace, and how
 // dangerous it is (../nodeActions/registry.ts). Not a way to declare an action — it is the pointer
 // plus the risk tier — and not a schedule seam, though a user schedule is the one thing asking today
-// (docs/schedules.md § Targets). Registering nothing means nothing outside this plugin can make it
+// (docs/schedules/user-schedules.md § Targets: what a user schedule may do). Registering nothing means nothing outside this plugin can make it
 // act, which is the right default for most.
 export type PluginNodeActionRegistry = {
   register(action: NodeActionRegistration): void
@@ -258,7 +258,7 @@ export type PluginExtensionPointRegistry = {
   entries<T>(point: ExtensionPointId<T>): Extension<T>[]
 }
 
-// What this plugin puts on the node's audit trail (docs/security.md § Audit). Both tiers: a loaded
+// What this plugin puts on the node's audit trail (docs/security/audit.md § Audit). Both tiers: a loaded
 // plugin declares `auditActions` in its manifest and the host replays those declarations through
 // `declare` here, exactly as it does for schedules and task checks.
 //
@@ -381,7 +381,7 @@ export type PluginCapabilities = Pick<CapabilityRegistry, 'provide' | 'get' | 'r
 // Host-bound storage, for both tiers. The host binds the database filename to the plugin id. A loaded
 // plugin opens and migrates that exact file inside its isolated realm; a built-in does so in the host.
 // Both memoize one handle per lifecycle and close it after dispose.
-// See docs/data-layer.md § Plugin DBs.
+// See docs/data-layer/plugin-databases.md § Files.
 export type PluginStorage = {
   open(): PluginDatabase
 }

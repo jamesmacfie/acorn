@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { NODE_PROTOCOL_VERSION, nodeIdentitySchema, nodeInfoSchema, pairRequestSchema, pairResultSchema } from './node'
 
-// The compatibility contract, as assertions (docs/api-reference.md § Versioning).
+// The compatibility contract, as assertions (docs/api-reference/transport.md § Versioning).
 //
 // These schemas are the surface that decides whether two versions of acorn can talk at all, so what is
 // pinned here is their tolerance. It is a property that is invisible until the day it is missing, and

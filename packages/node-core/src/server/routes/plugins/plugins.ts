@@ -136,7 +136,7 @@ export const plugins = new Hono<AppEnv>()
   // The client bundle itself (docs/plugins.md). Not viaBridge, because that helper always JSONs and
   // this is the one response in the family that is bytes.
   //
-  // Gated by mount, not by handler (docs/security.md § Transport and auth). A task-scoped internal
+  // Gated by mount, not by handler (docs/security/transport-and-auth.md § Transport and auth). A task-scoped internal
   // token gets 403, because which code a device runs is an owner decision.
   .get('/:id/bundles/:hash', async (c) => {
     const bridge = routeCapabilityFor(c, PLUGIN_STATE)
@@ -217,7 +217,7 @@ export const plugins = new Hono<AppEnv>()
     })
   })
   // Install, update, uninstall (docs/plugins.md § Loaded plugins). Owner surface, device-gated by
-  // mount, never reachable with a task-scoped internal token (docs/security.md § Credential handling).
+  // mount, never reachable with a task-scoped internal token (docs/security/credentials.md § Credential handling).
   //
   // Nothing here starts a plugin. Each answers "the disk says this", and the roster above turns that
   // into the pending state and the restart banner.

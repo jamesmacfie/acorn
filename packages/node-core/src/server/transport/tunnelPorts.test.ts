@@ -23,7 +23,7 @@ describe('loopbackPortOf', () => {
   })
 
   it('is null for a URL that is not loopback', () => {
-    // Already reachable from the client, so there's nothing to tunnel (docs/api-reference.md §
+    // Already reachable from the client, so there's nothing to tunnel (docs/api-reference/websocket.md §
     // WebSocket).
     expect(loopbackPortOf('https://staging.example.com:8443')).toBeNull()
     expect(loopbackPortOf('http://192.168.1.20:3000')).toBeNull()

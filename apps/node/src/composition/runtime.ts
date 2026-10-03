@@ -175,7 +175,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
 
   try {
     // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
-    // (docs/data-layer.md § Retention).
+    // (docs/data-layer/backup-and-retention.md § Retention).
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
@@ -208,7 +208,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
     // `init` and see the boot it was loaded during. The preference is read on the collector's own
     // timer rather than here: `PUT /v1/core/prefs` writes the table directly and cannot notify, so a
-    // switch flipped in Settings is seen within five seconds (docs/telemetry.md § The switch).
+    // switch flipped in Settings is seen within five seconds (docs/telemetry/model.md § The switch).
     setTelemetryDataRoot(config.dataDir)
     startTelemetry({
       node: dataRoot.nodeId,

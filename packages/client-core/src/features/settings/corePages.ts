@@ -240,7 +240,7 @@ export const CORE_SETTINGS_PAGES = [
   // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
   { id: 'telemetry', ...telemetry, label: 'Telemetry', category: 'machines', scope: 'node', icon: 'activity', order: 40, followsNodeSwitcher: true },
   // Memory and disk are facts about one machine. Core's page, with a section each plugin that holds
-  // either contributes through CORE_STORAGE_POINT (docs/data-layer.md § What the node reports).
+  // either contributes through CORE_STORAGE_POINT (docs/data-layer/backup-and-retention.md § What the node reports).
   { id: 'storage', ...storage, label: 'Storage and memory', category: 'machines', scope: 'node', icon: 'hard-drive', order: 50, followsNodeSwitcher: true },
 
   // Plugins. Not `requires: 'desktop'`, for the same reason as Nodes. The node's plugins follow the

@@ -4,7 +4,7 @@ import type { TelemetrySummary } from '@acorn/protocol/api.ts'
 
 // The page is the only place a person can answer "what is this app sending", so the two things
 // worth pinning are that the switch writes the node preference and that the counters are drawn from
-// the node rather than invented (docs/telemetry.md § What the page shows).
+// the node rather than invented (docs/telemetry/diagnosis.md § What the page shows).
 //
 // The two queries are told apart by the marker each mocked options factory returns, because the
 // page asks for both and a single stub would answer the wrong one for the other.

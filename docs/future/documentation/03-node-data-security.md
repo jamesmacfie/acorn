@@ -1,3 +1,43 @@
+> **Completed 2026-10-03** by the "Phase 3 Node, data, and security" task.
+>
+> **What landed:** All 13 docs were checked against the code, restyled, and cut to 200 lines or fewer.
+> `api-reference`, `security`, `data-layer`, `state-ownership`, `telemetry`, `schedules`, and `cli` are
+> landing pages over 41 topic pages in folders of the same names, with old-heading `<a id>` anchors on
+> each landing page. `caching`, `authentication`, `node-enrollment`, `node-distribution`, and `mcp`
+> stayed single pages. About 440 source comments cite the new pages, every source section citation of
+> these docs resolves to a real heading, and the citation allowlist shrank from 412 to 354 lines.
+>
+> **Deviations:** (1) More pages than planned. The API reference has five, not four:
+> `workflow-routes.md` splits off from plugin routes to stay under 200 lines. Telemetry has seven, not
+> four: `renderer.md`, `logging.md`, and `surface-health.md` split off for the same reason. (2) The plugin
+> security owner is `docs/security/node-plugin-security.md`, rewritten as a landing page over six
+> `security/plugin-*.md` topic pages, because this phase doc links to that path and I couldn't edit its
+> body. (3) The Postgres pane section left `data-layer.md` and is linked from
+> `data-layer/plugin-databases.md` § The database plugin, which keeps the URL resolution order and the
+> generation caps. Database pane source comments now cite `docs/database.md`. (4) "Not built yet" from
+> `schedules.md` moved to `docs/future/schedules.md`, which I added to the future README. (5) Code won
+> over the docs in these places: the broker deadline has three `timeoutMs` callers, and workflow
+> generation asks for 240 seconds, not 150; core has 18 audit verbs, not 17; there are nine migration
+> chains, not 11, and `database` is a second loaded plugin with a chain; `agent-run` is not reserved
+> anywhere in code; the terminal plugin worker uses an allowlist from the shared builtin policy, not a
+> hand-written denylist; the API reference was missing about 30 routes, including plugin
+> install/update/review/uninstall, `/v1/core/runs`, `/v1/core/data-sources`, and most agents routes,
+> and listed a deleted `/v1/core/tasks/:id/mcp`. (6) `docs/README.md` is 209 lines, because it lists
+> every new page.
+>
+> **For later phases:** The scripts I used aren't committed. The approach:
+> list registered routes with `createApp().routes` in a throwaway node-core test, and read
+> `apps/node/test/integration/routeRegistry.snapshot.json` for compiled plugin routes. Loaded plugin
+> routes (database, http, linear, rollbar, preview, browser) aren't in that golden list, so grep their
+> `src/node` and `src/server`. When a heading moves, rewriting a citation from the landing page to its topic page on the
+> citation line is safe only if the topic page keeps the heading text, so keep heading text when you
+> split. `docs/security.md` anchors cover old plugin-security headings, so a comment citing them passes,
+> but cite the topic page in new comments. Phase 5 owns `database.md`, which should absorb the
+> generation caps from `data-layer/plugin-databases.md`. `integrations.md` and `testing/workflows.md` cite a
+> workflows heading that no longer exists, "Generating one from a description". Generation lives in
+> `docs/workflows/authoring.md` § Generating and editing with AI. I ran `pnpm lint` and the arch suite,
+> not the package test suites, because the source changes are comments only, plus one test title.
+
 # Phase 3: Node, data, and security
 
 Date: October 3, 2026. Status: proposed, not started. Part of the

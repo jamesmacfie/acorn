@@ -13,7 +13,7 @@ export const changesClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(changesPaneContribution)
     // How the list is drawn: one device preference, so it survives a relaunch and stays on this
-    // machine (./changesPrefs.ts, docs/state-ownership.md § Scope rules).
+    // machine (./changesPrefs.ts, docs/state-ownership/scope-rules.md § Scope rules).
     ctx.persistedStateSlices.register(changeViewSlice)
     // A row that says what this pane is for, beside core's generic `Show pane: Changes`. Somebody
     // reaching for the palette types "diff" or "staged", not "pane"

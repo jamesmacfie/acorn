@@ -7,7 +7,7 @@
 // or `c.get('principal')`, which a loaded bundle's Hono stack never sets. The bridge is a closure
 // argument, so a fake is injectable without a global registry.
 //
-// SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
+// SQL-injection posture is main/database.ts's: docs/database.md § SQL safety.
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'

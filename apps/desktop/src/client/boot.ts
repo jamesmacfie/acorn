@@ -16,7 +16,7 @@ import { answerSurfaceHealthRequests, createLogger } from '@acorn/client-core/in
 // and start where the helper's ready line left off.
 //
 // The second reader is telemetry, which turns the same marks into spans once the owner has switched
-// it on (docs/telemetry.md § The renderer). The terminal client and the helper do the same with their
+// it on (docs/telemetry/renderer.md § Renderer seams). The terminal client and the helper do the same with their
 // own marks (apps/tui/src/boot.ts, packages/custody/src/bootMarks.ts).
 
 const log = createLogger('renderer:boot')
@@ -36,7 +36,7 @@ setSpansOnTimeline(printing)
 
 // Large diffs and timelines count their own mounted rows, observers and queued work, and this is how
 // a WebDriver flow reads those counts: it dispatches the request event and reads one performance mark
-// back (docs/telemetry.md § Rendered-surface health). Always on, because the snapshot is numbers only
+// back (docs/telemetry/surface-health.md § Rendered-surface health). Always on, because the snapshot is numbers only
 // and a flow should not need a switch that the automation window shares with a developer's own app.
 // Guarded because this module is also imported by a test in bare Node, which has no `window`.
 if (typeof window !== 'undefined') answerSurfaceHealthRequests(window)

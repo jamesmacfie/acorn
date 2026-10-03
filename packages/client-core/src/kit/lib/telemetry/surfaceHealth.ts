@@ -1,5 +1,5 @@
 // What a large rendered surface says about its own health: numbers a diff or a timeline keeps about
-// itself, read on demand by whoever asks (docs/telemetry.md § Rendered-surface health).
+// itself, read on demand by whoever asks (docs/telemetry/surface-health.md § Rendered-surface health).
 //
 // A surface registers when it mounts and hands over a reader. The reader is only called when someone
 // asks for a snapshot, so a surface pays for its counts at read time rather than on every scroll or

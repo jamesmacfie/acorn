@@ -47,7 +47,7 @@ const route = (frame: WsServerFrame): void => {
   if (!parsed) return
   // Owned by the plugin whose channel it is, and a histogram rather than a span: a plugin sampling
   // twice a second is the polite case and nothing stops a chattier one
-  // (docs/telemetry.md § Hot seams are metrics).
+  // (docs/telemetry/model.md § Hot seams are metrics).
   measure(parsed.pluginId, 'plugin.frame', () => {
     const listeners = frameListeners.get(frame.channel)
     if (listeners?.size) {

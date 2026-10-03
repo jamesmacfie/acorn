@@ -246,7 +246,7 @@ export default function App() {
     if (nodeId && nodeState(nodeId) !== 'offline') void applyNodePlugins(nodeId)
   })
 
-  // The one-time disk-encryption warning (docs/data-layer.md § Backup: "the app surfaces a one-time
+  // The one-time disk-encryption warning (docs/security/audit.md § Filesystem and backup: "the app surfaces a one-time
   // warning if the disk isn't encrypted"). Once per (device, node), which is why it sits here beside the
   // plugin apply rather than at boot: a node the owner pairs later has never been checked, and the same
   // remount that makes the effect above correct makes this one fire for it.
@@ -330,7 +330,7 @@ export default function App() {
     workspaceForProject(workspaces.data, contextProjectId()) ?? previous ?? null)
   const sourceScope = createSourceScope(() => activeWorkspace()?.id, nodeReady)
 
-  // The one switch, read off the node and handed to the client's emitter (docs/telemetry.md § The
+  // The one switch, read off the node and handed to the client's emitter (docs/telemetry/model.md § The
   // switch). An effect rather than a call at boot, because the preference arrives after the first
   // paint and can change while the app is open: the node's collector re-reads its own copy every
   // five seconds, and this is the renderer's half of the same promise. The boot account waits for the

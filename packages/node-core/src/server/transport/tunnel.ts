@@ -7,7 +7,7 @@ import { authorizeWsUpgrade, type WsAuthDeps } from './wsHub'
 import { MAX_TUNNEL_MESSAGE_BYTES } from '@acorn/protocol/ws.ts'
 
 export type TunnelDeps = WsAuthDeps & {
-  // Ports this task legitimately serves on (docs/api-reference.md § WebSocket). Empty, or a throw,
+  // Ports this task legitimately serves on (docs/api-reference/websocket.md § WebSocket). Empty, or a throw,
   // means nothing is tunnellable for that task.
   declaredPorts(taskId: string): Promise<readonly number[]>
   maxTunnelMessageBytes?: number
@@ -15,7 +15,7 @@ export type TunnelDeps = WsAuthDeps & {
 
 export const TUNNEL_PATH = '/v1/tunnel'
 
-// 127.0.0.1 only, never the hostname (docs/api-reference.md § WebSocket, on why there is no general
+// 127.0.0.1 only, never the hostname (docs/api-reference/websocket.md § WebSocket, on why there is no general
 // SOCKS proxy here).
 const LOOPBACK = '127.0.0.1'
 

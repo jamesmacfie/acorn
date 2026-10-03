@@ -128,7 +128,7 @@ async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: 
 
 export const tasks = new Hono<AppEnv>()
   // Filtered for a task-confined caller rather than gated, the same answer /task-statuses and
-  // terminal's session roster give (docs/security.md § Transport and auth). A row carries the task's
+  // terminal's session roster give (docs/security/transport-and-auth.md § Transport and auth). A row carries the task's
   // title, branch and absolute worktree path, so the unfiltered list hands an agent the shape of every
   // other piece of work on the machine. Its own row still comes back, because the renderer surfaces a
   // frame draws are entitled to it.

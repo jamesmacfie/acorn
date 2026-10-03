@@ -131,7 +131,7 @@ export const nodeProbeRequestSchema = z.strictObject({ endpoint: z.string().url(
 export type NodeProbeRequest = z.infer<typeof nodeProbeRequestSchema>
 
 // What the owner is asked to compare against the fingerprint the node itself displays. That
-// out-of-band comparison is the security of pairing (docs/api-reference.md § Pairing): reading a
+// out-of-band comparison is the security of pairing (docs/api-reference/transport.md § Pairing): reading a
 // fingerprint over the very connection being authenticated proves nothing on its own.
 //
 // The certificate stays in main and is never part of this reply: main remembers the probe, so `pair`
@@ -170,7 +170,7 @@ export const nodeForgetRequestSchema = z.strictObject({
 })
 export type NodeForgetRequest = z.infer<typeof nodeForgetRequestSchema>
 
-// Opening a preview tunnel (docs/api-reference.md § WebSocket). The renderer names a task and a port
+// Opening a preview tunnel (docs/api-reference/websocket.md § WebSocket). The renderer names a task and a port
 // on the node and gets back a loopback port on this machine, never an endpoint and never a token. The
 // pipe itself is main's, like every other byte to or from a node.
 export const nodeTunnelRequestSchema = z.strictObject({

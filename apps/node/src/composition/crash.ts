@@ -35,7 +35,7 @@ let installed = false
  *
  * The stack goes on the record here and nowhere else in the node. A log line with a stack in it
  * buries the next fifty lines, but a fatal error with no stack is not worth sending anywhere
- * (docs/telemetry.md § What never leaves the machine).
+ * (docs/telemetry/model.md § What never leaves the machine).
  */
 export function installCrashHandlers(options: CrashHandlerOptions = {}): void {
   if (installed) return

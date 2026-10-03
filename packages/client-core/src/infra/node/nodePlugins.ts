@@ -68,7 +68,7 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
 //
 // `writeJson` rather than `postJson`, which carries an idempotency key but not a node id. The key is
 // minted here because only the call site knows a retry is the same logical install
-// (docs/api-reference.md § Request processing).
+// (docs/api-reference/transport.md § Request processing).
 //
 // None of them touch the `nodePlugins` signal. Nothing has changed in the running process, and the
 // caller re-reads the roster to pick up the pending row.

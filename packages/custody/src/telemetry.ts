@@ -16,7 +16,7 @@ import { helperBootSpans } from './bootMarks'
 import { helperTelemetryRequests, type HelperTelemetryRequests } from './telemetryRequests'
 
 // How the desktop helper reports, and how the Rust shell's last words get out
-// (docs/telemetry.md § Other runtimes, docs/shell.md § What the helper reports).
+// (docs/telemetry/runtimes.md § Other runtimes, docs/shell.md § What the helper reports).
 //
 // **The emitter is the node's collector, not the renderer's.** The helper is a Node process that
 // already depends on `@acorn/node-core`, so `createLogger`, `startSpan` and `recordDuration` are

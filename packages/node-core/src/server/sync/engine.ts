@@ -71,7 +71,7 @@ export async function serveThenRevalidate<T>(opts: {
   const decision = opts.force ? 'cold' : decideSync({ cached: cached != null, fetchedAt: cached?.fetchedAt ?? null, ttlMs: opts.ttlMs, now: Date.now() })
   // One count per decision, with the resource as a label and the owner off the ambient context, so
   // "this provider is serving cold every time" is a query rather than a hunch
-  // (docs/telemetry.md § Ambient attribution). A count and not a span: the decision itself takes no
+  // (docs/telemetry/runtimes.md § Ambient attribution). A count and not a span: the decision itself takes no
   // time, and the refresh behind it is already timed by whatever it spawns or requests.
   emitMetric('core', { name: `sync.${decision}`, type: 'count', value: 1, attrs: { seam: 'sync', resource: opts.resource } })
 

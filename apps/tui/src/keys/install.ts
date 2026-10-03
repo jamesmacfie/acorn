@@ -72,7 +72,7 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
 // nobody can act on and this turns it into a log (docs/tui.md § Keys and focus). And one histogram
 // sample per key, always, because a key press is far past ten a second under a held arrow and the
 // question a reader asks about it is a distribution rather than a list
-// (docs/telemetry.md § Hot seams are metrics).
+// (docs/telemetry/model.md § Hot seams are metrics).
 //
 // A `key:after` intercept rather than a layer: it runs once per key after dispatch has finished, so
 // it can say what answered and why without claiming the key. The hyphenated `key-after` is not a

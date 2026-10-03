@@ -1,11 +1,11 @@
-// Prompt construction and response cleanup for AI SQL generation (docs/data-layer.md § Database
-// plugin: the Postgres pane). Pure functions, so the contract with the model, "the reply is the
+// Prompt construction and response cleanup for AI SQL generation (docs/data-layer/plugin-databases.md §
+// The database plugin). Pure functions, so the contract with the model, "the reply is the
 // query," is unit-testable without a provider.
 
 import type { DbSavedQuery } from '../shared/database'
 
 export const GENERATE_MAX_OUTPUT_TOKENS = 2048
-// Budget for the notes and examples block: docs/data-layer.md § Database plugin: the Postgres pane.
+// Budget for the notes and examples block: docs/data-layer/plugin-databases.md § The database plugin.
 export const GENERATE_MAX_CONTEXT_CHARS = 16_000
 
 export const SQL_SYSTEM_PREAMBLE = [

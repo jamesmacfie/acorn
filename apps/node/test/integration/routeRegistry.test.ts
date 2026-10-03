@@ -46,7 +46,7 @@ describe('plugin route registry', () => {
 // /v1/p/<plugin>.
 const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]> = [
   // The two pre-auth pairing routes, outside /v1/core because that namespace is the gated one. They
-  // are how an unpaired client gets a credential at all (docs/api-reference.md § Request processing).
+  // are how an unpaired client gets a credential at all (docs/api-reference/transport.md § Request processing).
   ['GET', '/v1/node'],
   ['POST', '/v1/pair'],
   ['POST', '/v1/core/pair/start'],
@@ -85,7 +85,7 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
 // docs/plugins.md § The golden lists covers the mechanism and why it's exact equality now instead of
 // a representative `some()` check per contribution. The segment doubling is visible here too
-// (docs/api-reference.md § Plugin routes): a router that names its own top-level segment repeats it
+// (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
 // under its plugin namespace, e.g. `/v1/p/memory/memory`.
 //
 // Duplicates are kept rather than deduped. Several github routers register under one path with

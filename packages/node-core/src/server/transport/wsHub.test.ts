@@ -224,7 +224,7 @@ describe('wsHub auth', () => {
     await expect(open({ ...authHeaders(), host: 'evil.example.com' })).rejects.toThrow()
   })
 
-  // docs/api-reference.md § Events: the socket is token-authenticated at upgrade. No cookie, no
+  // docs/api-reference/websocket.md § Events: the socket is token-authenticated at upgrade. No cookie, no
   // Origin: a broker socket from the desktop helper is not a browser socket, and there is no ambient
   // credential left for an Origin check to defend.
   it('accepts a device bearer, and does not care what Origin says', async () => {
@@ -543,7 +543,7 @@ describe('wsHub streaming', () => {
 })
 
 // A task-scoped internal credential is confined to its own task's streams
-// (docs/security.md § Transport and auth, on the finding this test guards against).
+// (docs/security/transport-and-auth.md § Transport and auth, on the finding this test guards against).
 describe('wsHub task scope', () => {
   const streamHandlers = (seen: string[]) => ({
     input: (id: string, data: string) => void seen.push(`input:${id}:${data}`),
@@ -599,7 +599,7 @@ describe('wsHub task scope', () => {
 })
 
 // The second half of the same finding: the scope check used to live inside the `term:` branch, so
-// every other channel, and every broadcast, was unchecked (docs/security.md § Transport and auth).
+// every other channel, and every broadcast, was unchecked (docs/security/transport-and-auth.md § Transport and auth).
 describe('wsHub non-term channels and broadcast, under task scope', () => {
   const taskToken = () => mintInternalToken(INTERNAL, { scope: 'task', taskId: 'task-1' })
 
@@ -653,7 +653,7 @@ describe('wsHub non-term channels and broadcast, under task scope', () => {
   })
 
   // No broadcast frame is task-addressed, so a confined socket gets none of them
-  // (docs/security.md § Transport and auth).
+  // (docs/security/transport-and-auth.md § Transport and auth).
   it('does not fan any broadcast to a task-scoped socket, while an unconfined socket still gets them', async () => {
     const confined = await open({ host, 'x-acorn-internal': taskToken() })
     const service = await open({ host, 'x-acorn-internal': mintInternalToken(INTERNAL, { scope: 'service' }) })

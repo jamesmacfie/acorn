@@ -14,7 +14,7 @@ import { homeNode, nodeIsStarting, nodes, ORIGIN_NODE_ID, refreshFleet } from '.
 // which is a flash and a thrown-away first paint.
 //
 // Device state, and a hint rather than a fact: it says which machine's window this is, not anything
-// about a node's data (docs/state-ownership.md § Scope rules). `selectActiveNode` below corrects it
+// about a node's data (docs/state-ownership/scope-rules.md § Scope rules). `selectActiveNode` below corrects it
 // against the fleet, and a node that has gone reaches the `node-replaced` reload.
 const LAST_NODE_KEY = 'acorn.last-node'
 

@@ -275,7 +275,7 @@ test('a plugin worker draws its tree and cannot read a file it was not granted',
   const text = insert.op === 'insert' ? String(insert.node.children[0]?.props.value ?? '') : ''
   // The permission model refused the read, and the module hook refused the import. Between them the
   // bridge's port is the only way out of the worker, which is the containment claim
-  // (docs/security.md § Rung 0 — The client sandbox).
+  // (docs/security/plugin-client-sandbox.md § Three containers).
   expect(text).toContain('ERR_ACCESS_DENIED')
   expect(text).toContain('no net')
 }, 30_000)

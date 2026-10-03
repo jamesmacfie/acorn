@@ -254,12 +254,12 @@ export const issueResources = sqliteTable(
   (t) => [primaryKey({ columns: [t.userId, t.integrationId, t.issueIdentifier, t.resource, t.identifier] })],
 )
 
-// HTTP request and variable tables are owned by plugins/http (docs/data-layer.md § Plugin databases).
+// HTTP request and variable tables are owned by plugins/http (docs/data-layer/plugin-databases.md § Plugin databases).
 
-// ── Device identity: the node authentication root (docs/api-reference.md § Pairing) ───────────────
+// ── Device identity: the node authentication root (docs/api-reference/transport.md § Pairing) ───────────────
 //
 // One row per paired client. Every paired device has full owner authority, a disclosed product decision
-// (docs/security.md § Threat model), so there are no scopes and no per-device authorization. The row
+// (docs/security/node-plugin-security.md § Threat model), so there are no scopes and no per-device authorization. The row
 // exists to name a device and to be revocable.
 //
 // Only sha256(secret) is stored. A 256-bit random secret makes offline hash guessing infeasible, so
@@ -281,7 +281,7 @@ export const devices = sqliteTable(
   (t) => [index('devices_revoked_idx').on(t.revokedAt)],
 )
 
-// Idempotency replay (docs/api-reference.md § HTTP conventions). Stores (deviceId, key) to request hash
+// Idempotency replay (docs/api-reference/transport.md § Request processing). Stores (deviceId, key) to request hash
 // plus response for 24 hours: the same request replays the stored response, a different request under
 // the same key is a 409, and 5xx is never stored so a genuine retry re-executes.
 export const idempotency = sqliteTable(
@@ -301,7 +301,7 @@ export const idempotency = sqliteTable(
 // ── Schedules: periodic work owned by the node ────────────────────────────────────────────────────
 //
 // Machine-scoped like every newer app-state table. State and definition split by owner
-// (docs/data-layer.md § Core database): a state row whose schedule is no longer registered is
+// (docs/schedules.md § The three declarers, one registry): a state row whose schedule is no longer registered is
 // retained unread, since disabling a plugin must not delete the owner's pause or its run history.
 // See docs/schedules.md for the reserved `'*'` global pause key.
 export const scheduleState = sqliteTable('schedule_state', {
@@ -321,7 +321,7 @@ export const scheduleState = sqliteTable('schedule_state', {
 export const userSchedules = sqliteTable('user_schedules', {
   id: text('id').primaryKey(), // uuid; the registry key is `user:<id>`
   name: text('name').notNull(),
-  kind: text('kind').notNull(), // a registered target kind (docs/schedules.md § Targets)
+  kind: text('kind').notNull(), // a registered target kind (docs/schedules/user-schedules.md § Targets: what a user schedule may do)
   target: text('target').notNull(), // JSON, kind-shaped
   cadence: text('cadence').notNull(), // JSON, clamped on read
   risk: text('risk'), // ToolRisk, stamped at creation from the target's declared tier: the consent record
@@ -345,7 +345,7 @@ export const scheduleRuns = sqliteTable(
 // ── Measure history: what a panel's number was (docs/dashboards.md § Trends) ─────────────────────
 //
 // Why the host samples on a schedule rather than growing the plugin contract, and why this is its own
-// table rather than the `core.dashboards` prefs slice, are in docs/data-layer.md § Core database.
+// table rather than the `core.dashboards` prefs slice, are in docs/data-layer/core-database.md § Tables.
 export const dashboardMeasureSamples = sqliteTable(
   'dashboard_measure_samples',
   {

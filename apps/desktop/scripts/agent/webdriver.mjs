@@ -136,7 +136,7 @@ function scrollToFraction(selector, fraction) {
 }
 
 /** Ask the renderer for a fresh rendered-surface health snapshot and read it back off the
- *  performance timeline (docs/telemetry.md § Rendered-surface health). Numbers only. */
+ *  performance timeline (docs/telemetry/surface-health.md § Rendered-surface health). Numbers only. */
 function readSurfaceHealth() {
   dispatchEvent(new Event('acorn:surface-health'))
   const mark = performance.getEntriesByName('acorn:surface.health').at(-1)

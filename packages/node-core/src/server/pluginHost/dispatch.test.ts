@@ -10,7 +10,7 @@ import { dispatchPluginRoute } from './dispatch'
 // HTTP request in front of it: a manifest-declared schedule firing, or the dashboard sampler
 // reading a collection. What matters here is that it enters the same ambient context the request
 // middleware does, so the SQL a plugin runs on a schedule is that plugin's SQL
-// (docs/telemetry.md § Ambient attribution).
+// (docs/telemetry/runtimes.md § Ambient attribution).
 
 const ENV = { ACTIVE_IDENTITY: { get: () => 'james' } } as unknown as Env
 

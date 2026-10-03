@@ -13,7 +13,7 @@ import { isUpgradeClaimed } from './upgradeClaim'
 const INTERNAL_KEY = 'k'.repeat(64)
 const DEVICE_TOKEN = 'acorn_dt_test'
 
-// A revocable stub. The tunnel has to honour both halves of docs/api-reference.md § Pairing: the
+// A revocable stub. The tunnel has to honour both halves of docs/api-reference/transport.md § Pairing: the
 // immediate `onRevoked` callback and the periodic `isActive` sweep, so both are drivable here.
 let active = new Set(['d1'])
 let fireRevoked: ((deviceId: string) => void) | null = null
@@ -198,7 +198,7 @@ describe('attachTunnel', () => {
   })
 
   it('refuses an undeclared port', async () => {
-    // Only a declared port is tunnellable (docs/api-reference.md § WebSocket). Without this the pipe
+    // Only a declared port is tunnellable (docs/api-reference/websocket.md § WebSocket). Without this the pipe
     // is a proxy to anything listening on the node's loopback, every database, every other app's dev
     // server.
     declared = [echoPort + 1]

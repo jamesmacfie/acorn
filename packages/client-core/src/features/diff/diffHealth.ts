@@ -6,7 +6,7 @@ import type { DiffItem } from './documentView'
 import { residentKey } from './segmentCache'
 import type { SegmentLoader } from './segmentLoader'
 
-// The diff's health reading (docs/telemetry.md § Rendered-surface health). Everything here is read
+// The diff's health reading (docs/telemetry/surface-health.md § Rendered-surface health). Everything here is read
 // when a snapshot is asked for, from state the pane already holds, so an open diff pays nothing for
 // it between requests.
 //

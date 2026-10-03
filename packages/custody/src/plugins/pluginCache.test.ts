@@ -288,7 +288,7 @@ describe('eviction', () => {
 })
 
 // Five bundled plugins used to mean five bundle writes and five fsynced index rewrites per launch, for
-// bytes that last changed at an app update. See docs/security.md § Third-party plugin bundles.
+// bytes that last changed at an app update. See docs/security/plugin-bundles.md § Third-party plugin bundles.
 describe('caching the application own bundles', () => {
   // Nanoseconds, not milliseconds: two writes inside one millisecond would compare equal and the test
   // would pass for the wrong reason.

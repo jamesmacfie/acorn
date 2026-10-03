@@ -11,7 +11,7 @@ import { consentStillCovers, registerNodeActionTarget } from './nodeAction'
 import { type Clock, Scheduler } from './scheduler'
 
 // The `node-action` target: what a user schedule may do, and where consent lives
-// (docs/schedules.md § `node-action`, § Consent, and the two ways it fails closed).
+// (docs/schedules/user-schedules.md § `node-action`, § Consent, and the two ways it fails closed).
 //
 // The two cases worth testing are the ones where the stamp stops being true: the action's tier
 // rising, and the action disappearing. Both fail closed and read as `skipped`, not as a broken

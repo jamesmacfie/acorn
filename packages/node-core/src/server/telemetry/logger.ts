@@ -5,7 +5,7 @@
 // `console`: a line written through here carries the tag that wrote it, reaches every subscribed
 // sink, and is scrubbed on the way. None of that is true of a bare `console.error`, and the
 // attribution is the whole point — "which plugin logged this" is the question a person asks first
-// and could not previously answer (docs/telemetry.md § Logging).
+// and could not previously answer (docs/telemetry/logging.md § Logging).
 //
 // Everything goes to stderr, including `info` and `debug`. Stdout is a wire: the standalone entry
 // prints its handshake JSON there and the desktop helper speaks a line protocol on it, so a log line

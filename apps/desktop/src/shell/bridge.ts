@@ -158,7 +158,7 @@ const receiveBytes = (frame: Uint8Array): void => {
 
 // A histogram and not a span. Every node read the renderer makes crosses this socket, so it is far
 // past ten a second while a person is scrolling, and the span that describes the same round trip is
-// already `api.request` one layer up (docs/telemetry.md § Renderer seams). What this adds is the
+// already `api.request` one layer up (docs/telemetry/renderer.md § Renderer seams). What this adds is the
 // helper's own leg of it: a slow `bridge.call` with a fast node says the broker is the problem.
 //
 // `method` is the label, which is a fixed vocabulary of about thirty names rather than a per-call

@@ -6,7 +6,7 @@ import { loadTask } from '../worktrees/taskWorktree'
 import { getProjectConfig } from '../projectConfig'
 
 // Which loopback ports a task legitimately serves on, for the preview tunnel's allowlist
-// (server/transport/tunnel.ts, docs/api-reference.md § WebSocket). Derived, never configured: a port is
+// (server/transport/tunnel.ts, docs/api-reference/websocket.md § WebSocket). Derived, never configured: a port is
 // tunnellable exactly when the owner has told the node something serves on it.
 const LOOPBACK_HOSTS = new Set(['localhost', '127.0.0.1', '[::1]', '::1', '0.0.0.0'])
 
@@ -61,7 +61,7 @@ export function declaredTunnelPorts(db: AppDatabase, capabilities?: Pick<Capabil
         const port = Number(value)
         if (Number.isInteger(port) && port >= 1 && port <= 65535) ports.add(port)
       }
-      // `previewMode: 'url'` is also a source (docs/api-reference.md § WebSocket).
+      // `previewMode: 'url'` is also a source (docs/api-reference/websocket.md § WebSocket).
       if (config?.previewMode === 'url') add(value)
     }
 

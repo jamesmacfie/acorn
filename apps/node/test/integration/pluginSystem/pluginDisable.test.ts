@@ -224,7 +224,7 @@ describe('disabling a node plugin', () => {
     // Floors first, the anti-vacuity half. The equality below is against a file, so a boot that
     // registered nothing would match an empty golden. Six databases, not eight: http.sqlite and
     // database.sqlite belong to loaded packages that open them through ctx.storage
-    // (docs/data-layer.md § Plugin databases), so this boot never sees either. The provider
+    // (docs/data-layer/plugin-databases.md § Plugin databases), so this boot never sees either. The provider
     // registries need real content too, or the ledger's expectations pass against an empty registry.
     expect(snapshot.databases.length).toBeGreaterThanOrEqual(6)
     expect(snapshot.routes.length).toBeGreaterThanOrEqual(15)

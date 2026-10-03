@@ -54,7 +54,7 @@ describe('terminal control routes', () => {
     }))
     const app = authed()
     // De-doubled paths: /sessions, not /terminal/sessions. Under the plugin namespace this is
-    // /v1/p/terminal/sessions (docs/api-reference.md § Plugin routes).
+    // /v1/p/terminal/sessions (docs/api-reference/plugin-routes.md § Plugin routes).
     expect((await app.fetch(req('/api/sessions'), {} as Env)).status).toBe(200)
     await app.fetch(req('/api/sessions', 'POST', { taskId: 'task1', profileId: 'shell' }), {} as Env)
     await app.fetch(req('/api/sessions/s1/resize', 'POST', { cols: 100, rows: 40 }), {} as Env)

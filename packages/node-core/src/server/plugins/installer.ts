@@ -58,7 +58,7 @@ export type PluginProvenance = Record<string, string>
 // What was installed, pinned. `archiveSha256` answers "are these the bytes that were reviewed"; the
 // entrypoint hashes answer the same question for the two files that actually execute; `provenance`
 // records what the source resolved to (a release tag, an npm integrity value) so "what exactly is
-// running" survives the source moving underneath it (docs/security.md § Supply chain).
+// running" survives the source moving underneath it (docs/security/plugin-storage-and-supply-chain.md § Supply chain).
 export type PluginLockfile = {
   source: PluginInstallSource
   resolvedVersion: string
@@ -371,7 +371,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
   }
 }
 
-// A folder install (docs/security.md § Installing from a folder). The directory is symlinked rather
+// A folder install (docs/security/plugin-install.md § Installing from a folder). The directory is symlinked rather
 // than copied, so whatever is in that tree at the node's next start is what runs, and the lockfile
 // below records no archive hash and no entrypoint digests because there is nothing to pin.
 function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
@@ -397,7 +397,7 @@ function linkLocal(dataRoot: string, source: { path: string }, expectId: string 
   return { id: manifest.id, version: manifest.version, state: 'installed-restart-required' }
 }
 
-// Refuse to go backwards. An update is the attack window (docs/security.md § Supply chain), and a
+// Refuse to go backwards. An update is the attack window (docs/security/plugin-storage-and-supply-chain.md § Supply chain), and a
 // source that suddenly resolves to an older version is either a mistake or someone re-pointing a tag
 // at a version whose vulnerability is already public.
 function guardDowngrade(existing: PluginLockfile | null, next: string, options: InstallOptions): void {

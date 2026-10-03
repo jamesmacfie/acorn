@@ -1,4 +1,4 @@
-// The workflows plugin's own tables (docs/data-layer.md § Plugin databases). They live in
+// The workflows plugin's own tables (docs/data-layer/plugin-databases.md § Plugin databases). They live in
 // <data-root>/plugins/workflows.sqlite with their own Drizzle chain, migrated at plugin init.
 //
 // The two ids that point elsewhere, `task_id` into core's `tasks` and `agent_session_id` into

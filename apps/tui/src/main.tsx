@@ -77,7 +77,7 @@ const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/
 
 // This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
 // off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
-// arrangement the desktop's composition root has (docs/telemetry.md § The switch).
+// arrangement the desktop's composition root has (docs/telemetry/model.md § The switch).
 //
 // The poster is client-core's, unchanged. A batch leaves over the ordinary API client, which on this
 // host is the platform seam installed above, so the terminal client needed no transport of its own —
@@ -161,7 +161,7 @@ const renderer: Renderer = openTerminalRenderer()
 // The logger is held by this too, and that is the arrangement rather than an accident. A line written
 // through `createLogger` still reaches the emitter and still becomes a record; what the hold catches
 // is the `console.error` the logger writes underneath, which is the half that would draw on the
-// screen (docs/telemetry.md § Logging, docs/tui.md § What the terminal client reports).
+// screen (docs/telemetry/logging.md § Logging, docs/tui.md § What the terminal client reports).
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
 const realConsole = new Map(CONSOLE_METHODS.map((name) => [name, console[name].bind(console)]))
 const releaseConsole = (): void => {

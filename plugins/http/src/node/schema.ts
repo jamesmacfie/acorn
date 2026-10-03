@@ -1,4 +1,4 @@
-// The http plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
+// The http plugin's own tables (docs/data-layer/plugin-databases.md § Plugin databases). Lives in
 // <data-root>/plugins/http.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // `task_id` is a plain ID into core's `tasks`, dereferenced through CoreServices.tasks, never joined.

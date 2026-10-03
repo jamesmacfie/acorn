@@ -7,7 +7,7 @@ import { PLUGIN_DB_DIR } from '../plugins/storage'
 import { resolveDatabasePath } from './paths'
 import { openSqlite } from './sqlite'
 
-// POST /v1/core/backup. docs/data-layer.md § Backup and import covers what is excluded and why.
+// POST /v1/core/backup. docs/data-layer/backup-and-retention.md § Backup and import covers what is excluded and why.
 // This is SQLite's online-backup API into a staging directory, a scrub, a manifest, and `tar`.
 //
 // Each database opens through a fresh readonly handle rather than the live one, because AppDatabase
@@ -50,9 +50,9 @@ async function backupDatabase(source: string, destination: string): Promise<void
 function scrubCore(copy: string): void {
   const handle = openSqlite(copy)
   try {
-    // Blanked rather than deleted (docs/data-layer.md § Backup and import).
+    // Blanked rather than deleted (docs/data-layer/backup-and-retention.md § Backup and import).
     handle.exec("UPDATE integrations SET encrypted_credentials = ''")
-    // Deleted outright, not blanked (docs/data-layer.md § Backup and import).
+    // Deleted outright, not blanked (docs/data-layer/backup-and-retention.md § Backup and import).
     handle.exec('DELETE FROM devices')
     // 24 hours of replay records for requests that can never be replayed against a new node.
     handle.exec('DELETE FROM idempotency')

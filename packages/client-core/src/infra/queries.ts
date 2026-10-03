@@ -116,7 +116,7 @@ export const prefsOptions = (enabled: boolean) => ({
 })
 
 // What Settings → Telemetry draws under the switch: counters from the node's collector, per owner
-// and kind, plus who is subscribed (docs/telemetry.md § What the page shows).
+// and kind, plus who is subscribed (docs/telemetry/diagnosis.md § What the page shows).
 //
 // It refetches every five seconds while the page is open, which is the collector's own flush
 // window. Counts that move while you watch are the evidence the switch is doing something, and a

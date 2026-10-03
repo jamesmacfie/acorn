@@ -52,7 +52,7 @@ type GitHubCompare = {
   commits?: { sha: string; commit: { message: string } }[]
 }
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const prCreate = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   .get('/:owner/:repo/branches', async (c) => {

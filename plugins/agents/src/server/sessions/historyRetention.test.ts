@@ -1,4 +1,4 @@
-// The retention pass (docs/data-layer.md § Retention) against a real migrated database: core's tasks
+// The retention pass (docs/data-layer/backup-and-retention.md § Retention) against a real migrated database: core's tasks
 // in one file and this plugin's sessions in the other, the way a node has them.
 import { randomUUID } from 'node:crypto'
 import { existsSync } from 'node:fs'

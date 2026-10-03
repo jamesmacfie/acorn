@@ -1,6 +1,6 @@
 import { randomBytes, timingSafeEqual } from 'node:crypto'
 
-// One-time pairing codes (docs/api-reference.md § Pairing). Exported because the route that opens a
+// One-time pairing codes (docs/api-reference/transport.md § Pairing). Exported because the route that opens a
 // window has to tell the client how long the code it is about to display stays valid, and two
 // constants would drift.
 export const PAIRING_WINDOW_MS = 10 * 60_000
@@ -31,7 +31,7 @@ export function pairingCodes(now: () => number = () => Date.now()): PairingCodes
     },
 
     // Failures are uniform: no window, expired, attempts exhausted, and wrong code are
-    // indistinguishable to the caller (docs/security.md § Transport: "no oracle for 'right
+    // indistinguishable to the caller (docs/api-reference/transport.md § Pairing: "no oracle for 'right
     // code, wrong something'"). The caller turns this into one generic error.
     consume(candidate) {
       if (!open) return false

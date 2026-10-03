@@ -103,7 +103,7 @@ export const formatOmitted = (omitted: number) => (omitted ? `\n- … ${omitted}
 // Every other section is registered by the plugin that owns its rows: `pr` by github, `notes` by
 // notes, `memory` by memory (docs/agent-tools.md § Context sections).
 
-// `task_links` and `issues` are core tables (docs/data-layer.md § External-item read model);
+// `task_links` and `issues` are core tables (docs/data-layer/core-database.md § External-item read model);
 // GitHub and Rollbar write them through the ExternalItemStore seam. This is also the only section
 // that reads `db`, which is why PluginContextSection can withhold the handle at no cost.
 export const linkedIssuesSection: ContextSectionContribution = {

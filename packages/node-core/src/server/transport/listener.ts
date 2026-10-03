@@ -123,7 +123,7 @@ export function startListener(
   const server = createAdaptorServer({
     fetch,
     createServer: createHttpsServer,
-    // TLS 1.3 only (docs/security.md § Transport and auth). Every client is one we ship, the
+    // TLS 1.3 only (docs/security/transport-and-auth.md § Transport and auth). Every client is one we ship, the
     // broker's https.Agent, `ws`, and Node children, so there is no legacy peer to accommodate, and
     // pinning the floor here means the transport cannot be downgraded.
     serverOptions: { key: keyPem, cert: certPem, minVersion: 'TLSv1.3' },

@@ -183,7 +183,7 @@ export type PickedBackend = Pick<ModelBackend, 'kind' | 'label'>
  *
  *  Matched on the error envelope's `code` rather than on an `ApiError` instance: the class is not on
  *  the plugin surface, and the code is the part of the envelope that is a contract
- *  (docs/api-reference.md § Errors). Shared provider codes get a next step; everything else keeps
+ *  (docs/api-reference/transport.md § Errors). Shared provider codes get a next step; everything else keeps
  *  the node's own prose, which for a refusal is the sentence the bridge wrote. */
 export function generateReason(error: unknown, backend?: PickedBackend): string {
   return modelProviderFailure(error, backend)

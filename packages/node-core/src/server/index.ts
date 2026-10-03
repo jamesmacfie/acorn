@@ -53,9 +53,9 @@ export function createApp() {
     .route('/v1', pairing.open) // GET /v1/node + POST /v1/pair, pre-auth by construction
     .use('/v1/*', requireUser) // single 401 gate over the protected router table
     // Below the gate: replay is keyed on the caller's deviceId, which only exists once the
-    // principal is resolved (docs/api-reference.md § Request processing).
+    // principal is resolved (docs/api-reference/transport.md § Request processing).
     .use('/v1/*', idempotency)
-    // Device-only: mints credentials and administers devices (docs/security.md § Transport and auth).
+    // Device-only: mints credentials and administers devices (docs/security/transport-and-auth.md § Transport and auth).
     // Must sit here, before the router, or a route added under this prefix is reachable ungated.
     .use(`${CORE_NAMESPACE}/pair`, requireDevice)
     .use(`${CORE_NAMESPACE}/pair/*`, requireDevice)
@@ -65,7 +65,7 @@ export function createApp() {
     // exist and which SQLite files open. A task-scoped agent must not read the list, which enumerates
     // the surface, or write it, which lets it disable the plugin whose gate it stands behind.
     .use(`${CORE_NAMESPACE}/plugins`, requireDevice)
-    // Both forms, like `pair` and `devices` above (docs/security.md § Transport and auth), and the
+    // Both forms, like `pair` and `devices` above (docs/security/transport-and-auth.md § Transport and auth), and the
     // pattern every gate below repeats. Under the Hono this repo pins, a trailing `/*` does also match
     // the bare path, so the second line is the load-bearing one and the first is belt. Whether that
     // holds has moved between Hono versions; writing both makes the gate independent of it, and
@@ -116,13 +116,13 @@ export function createApp() {
     // task-addressed, so nothing narrows a delete to the caller's own work.
     .use(`${CORE_NAMESPACE}/workspaces`, requireDevice)
     .use(`${CORE_NAMESPACE}/workspaces/*`, requireDevice)
-    // Task scope, enforced by mount rather than per handler (docs/security.md § Transport and auth).
+    // Task scope, enforced by mount rather than per handler (docs/security/transport-and-auth.md § Transport and auth).
     .use(`${CORE_NAMESPACE}/tasks/:id`, requireTaskScope)
     .use(`${CORE_NAMESPACE}/tasks/:id/*`, requireTaskScope)
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id`, requireTaskScope)
     .use(`${PLUGIN_NAMESPACE}/:plugin/tasks/:id/*`, requireTaskScope)
     // Administering or spending the owner's provider connections: device principals plus the node's own
-    // service-scope calls (docs/security.md § Credential handling), never a task-scoped child.
+    // service-scope calls (docs/security/credentials.md § Credential handling), never a task-scoped child.
     .use(`${CORE_NAMESPACE}/integrations`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/integrations/*`, requireProviderAccess)
     .use(`${CORE_NAMESPACE}/data-sources`, requireProviderAccess)
@@ -140,7 +140,7 @@ export function createApp() {
     // Telemetry another runtime collected. Device-only for a different reason from the rest of this
     // group: it is a write, not a read. Everything admitted here reaches every subscribed sink, and a
     // sink can post it off the machine, so a task-scoped agent must not be able to put words in one
-    // (docs/telemetry.md § Other runtimes).
+    // (docs/telemetry/runtimes.md § Other runtimes).
     .use(`${CORE_NAMESPACE}/telemetry`, requireDevice)
     .use(`${CORE_NAMESPACE}/telemetry/*`, requireDevice)
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
@@ -157,7 +157,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/queries`, queries)
     .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Run history: every plugin's runs, merged (@acorn/protocol/runs.ts)
     .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins.md § Search providers)
-    .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer.md § Backup: core + plugin databases, minus credentials
+    .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer/backup-and-retention.md § Backup and import: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/projects`, projects)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
@@ -201,5 +201,5 @@ export function createApp() {
   app.all(`${PLUGIN_NAMESPACE}/:plugin`, dispatchPluginFetch)
   app.all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
 
-  return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/api-reference.md § Errors)
+  return app.onError(onServerError) // uncaught throws still speak the ApiError envelope (docs/api-reference/transport.md § Errors)
 }

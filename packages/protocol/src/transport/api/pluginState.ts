@@ -71,7 +71,7 @@ export type InstalledPluginRow = {
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed, and it's a cache-key hint only: the device hashes the bytes it
   // received and refuses a mismatch, because a compromised node can lie here
-  // (docs/security.md § Third-party plugin bundles).
+  // (docs/security/plugin-bundles.md § Third-party plugin bundles).
   client: { hash: string; bytes: number } | null
   // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
   // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
@@ -105,7 +105,7 @@ export type PluginApprovalRequest = {
   // Present for an update or an uninstall.
   pluginId?: string
   // The agent asked for dev mode: on approval the device records a per-(plugin, node) grant that
-  // auto-trusts future bundles until the owner ends it (docs/security.md § The dev grant).
+  // auto-trusts future bundles until the owner ends it (docs/security/plugin-install.md § The dev grant).
   dev: boolean
   purgeData?: boolean
   // Untrusted display text written by an agent that may be reading hostile content. Capped by the
@@ -121,7 +121,7 @@ export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boole
 
 // Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory
 // on the node's filesystem, allowed on every build and symlinked rather than copied, so it's the one
-// source whose bytes aren't pinned (docs/security.md § Installing from a folder).
+// source whose bytes aren't pinned (docs/security/plugin-install.md § Installing from a folder).
 export type PluginInstallSource =
   | { github: string; tag?: string }
   | { npm: string; version?: string }

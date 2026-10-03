@@ -52,7 +52,7 @@ export type AcornBridgeApi = {
 
 /** What a telemetry attribute may be: a scalar, and nothing else. An object here would be a place
  *  for a request body to hide, and no sink's column model can index one
- *  (docs/telemetry.md § The attribute vocabulary). */
+ *  (docs/telemetry/model.md § The attribute vocabulary). */
 export type PluginTelemetryAttrs = PluginBridgeTelemetryAttrs
 
 /** What `getBytes` resolves to. `filename` is whatever the route's `Content-Disposition` named, or null
