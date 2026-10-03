@@ -14,7 +14,7 @@ import { readDevicePrefs } from '../persistence/devicePrefs'
 import { PrefKeys } from '../persistence/prefKeys'
 import { savePref } from '../../features/settings/savePref'
 
-// The reads behind Settings → Security and backup and Settings → Audit log, addressed at a named node (docs/security.md § Audit, § Filesystem and
+// The reads behind Settings → Security and backup and Settings → Audit log, addressed at a named node (docs/security/audit.md § Audit, § Filesystem and
 // backup). The audit trail and the disk-encryption answer are facts about one machine, so a fleet-wide
 // roll-up would mislead.
 //
@@ -34,7 +34,7 @@ export function nodeAuditPage(options: { nodeId?: string; before?: number; limit
   return readJson<AuditPage>(`${coreAuditRoute}${query ? `?${query}` : ''}`, options.nodeId ? { nodeId: options.nodeId } : {})
 }
 
-// --- Backup (docs/data-layer.md § Backup and import) ---
+// --- Backup (docs/data-layer/backup-and-retention.md § Backup and import) ---
 
 // Where the node suggests writing the archive. Asked rather than composed here, because the path is on
 // the node's filesystem and a client cannot know its home directory. A native save dialog would pick a
@@ -58,7 +58,7 @@ export function createNodeBackup(destPath: string, nodeId?: string): Promise<Bac
   )
 }
 
-// --- The one-time disk-encryption warning (docs/data-layer.md § Backup and import) ---
+// --- The one-time disk-encryption warning (docs/data-layer/backup-and-retention.md § Backup and import) ---
 
 const ackedNodes = (): string[] => {
   try {
@@ -79,7 +79,7 @@ export function shouldWarnAboutDisk(posture: NodeSecurityPosture, nodeId: string
 }
 
 // Warn once per device and node. A notice rather than a modal, because nothing is blocked by an
-// unencrypted disk and docs/ui-design.md § Interaction rules reserves modal chrome for destructive
+// unencrypted disk and docs/ui-design/interaction.md § Interaction rules reserves modal chrome for destructive
 // confirmations, secret entry and agent approvals.
 //
 // Best-effort throughout. A node that cannot answer, or a device with no localStorage, does not warn.

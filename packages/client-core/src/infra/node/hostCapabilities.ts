@@ -36,7 +36,7 @@ import { nodePlugins } from './nodePlugins'
 // Reach for `'desktop'` sparingly. It is right for a surface that is about the shell itself, and
 // wrong both for anything whose implementation is an HTTP route and for anything a shell can ship
 // without — the desktop's own preview views are optional, so the preview pane asks `{ seam: 'preview' }`
-// rather than "am I the desktop" (docs/frontend.md § The desktop gate audit).
+// rather than "am I the desktop" (docs/frontend/registries.md § Gates).
 export type HostRequirement =
   | 'desktop'
   | { plugin: string }

@@ -7,13 +7,13 @@ import { _resetPrModels } from './prModel'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
-// (docs/panes.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
+// (docs/panes/layout.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
 // deferred it and the pane has been unexercised since.
 //
 // What this holds is the shape rather than the content. The pane mounts, both columns draw, and
 // nothing throws — which is the failure a broken import, a hook called outside a root, or a region
 // name that drifted all produce. What a pull actually looks like is still the smoke checklist's
-// (docs/testing.md).
+// (docs/testing/smoke-checklist.md).
 //
 // The query layer answers nothing on purpose. A pane with no data is the state a reader sees for the
 // first few hundred milliseconds every single time, and it is the one that has to be safe.
@@ -122,7 +122,7 @@ describe('the PR pane', () => {
   it('draws the navigator beside the diff', () => {
     const node = draw()
     // The kit's split, which is what makes this look like the browse surface rather than like a
-    // second design (docs/panes.md § Layout model).
+    // second design (docs/panes/layout.md § Layout model).
     const split = node.querySelector<HTMLElement>('.ui-listdetail')!
     expect(split).not.toBeNull()
     expect(node.querySelector('[aria-label="Pull request"]')).not.toBeNull()

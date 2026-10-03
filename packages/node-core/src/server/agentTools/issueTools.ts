@@ -1,5 +1,5 @@
 // `issue_comment` and `issue_image`: a write on, and a file read from, an item this task links
-// (docs/agent-tools.md § issue_comment and issue_image).
+// (docs/agent-tools/tracker-tools.md § issue_comment and issue_image).
 //
 // The same split as `issue_detail`: core owns the tools, and each provider owns the call through the
 // `comment` and `image` hooks on its contribution. A tracker opts in by declaring the hook.

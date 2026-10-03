@@ -1,5 +1,5 @@
 // When the diff reads the heights of its dynamic blocks, and when it commits them
-// (docs/diff-rendering.md § Row geometry).
+// (docs/diff-rendering/geometry.md § Row geometry).
 //
 // One `ResizeObserver` per diff surface watches every mounted dynamic block and the scroller. Its
 // callback only marks blocks dirty: it reads nothing and writes nothing, because an observer that

@@ -1,5 +1,5 @@
 import { taskScriptsKey } from '@acorn/protocol/taskScripts.ts'
-// The client half of `tasks:changed` (docs/plugins.md § Hearing a core event).
+// The client half of `tasks:changed` (docs/plugins/events.md § Hearing a core event).
 //
 // Every task write on the node announces itself (node-core/server/notify.ts § broadcastTasksChanged)
 // and this turns that into one cache invalidation. The frame names one task, or null for a batch, but

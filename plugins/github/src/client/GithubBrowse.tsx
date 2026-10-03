@@ -1,4 +1,4 @@
-// The GitHub browse surface behind the `github` rail Source (docs/github-integration.md § Reads and
+// The GitHub browse surface behind the `github` rail Source (docs/github-integration/reads-and-writes.md § Reads and
 // writes), as two regions rather than one component.
 //
 // It used to be one `ListDetail split` here, with the pull list in one column and everything else in
@@ -11,8 +11,7 @@
 // exist only to populate params. That is why neither export takes props.
 //
 // The routed project is all this surface needs to render, the same gate every other Source applies
-// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins.md § Frame
-// authoring and the UI kit): the routes address a pull, they do not decide whether the surface
+// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins/descriptors.md § Routes): the routes address a pull, they do not decide whether the surface
 // renders.
 import { createSignal, lazy, Show, Suspense, type JSX } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'
@@ -113,7 +112,7 @@ export function GithubBrowseDetail() {
           what decides what the region shows while a chunk is loading, on either host. They arrived as
           a workaround for a cell host refusing the empty string a pending `lazy()` resolves to, and
           they are no longer that — the terminal paints a loose string as a one-line run
-          (docs/tui.md § Rendering). They stay because a boundary at a lazy mount is correct
+          (docs/tui/rendering.md § Rendering). They stay because a boundary at a lazy mount is correct
           either way. */}
       <Show
         when={isNew()}

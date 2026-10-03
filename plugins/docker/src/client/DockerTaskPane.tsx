@@ -2,7 +2,7 @@
 // per container switching the shared ContainerDetail, the same shape as RollbarPane.
 //
 // A `header-body` pane: the chips are the header and do not scroll, the detail is the body and does
-// (docs/panes.md § Layout model). The two regions share a selection, so it lives in ./dockerViewState
+// (docs/panes/layout.md § Layout model). The two regions share a selection, so it lives in ./dockerViewState
 // rather than in either of them.
 import { useQueryClient } from '@tanstack/solid-query'
 import { captureDockerScope, dockerScopeKey, onDockerRetired } from './dockerScope'

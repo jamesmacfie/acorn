@@ -30,7 +30,7 @@ const item = (over: Partial<ContextMenuContribution<'task.row'>> = {}): ContextM
 })
 
 // A row in a tracker's list: the second location, added when three lists needed one menu
-// (docs/plugins.md § Context menus).
+// (docs/plugins/menus-and-markers.md § Context menus).
 const rowTarget = (over: Partial<ItemRowTarget> = {}): ItemRowTarget => ({
   location: 'item.row',
   id: 'RB-4412',

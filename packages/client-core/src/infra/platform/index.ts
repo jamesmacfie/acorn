@@ -15,7 +15,7 @@ import type { WsClientFrame, WsSendOptions } from '@acorn/protocol/ws.ts'
 import type { DeviceConfig } from '@acorn/protocol/deviceConfig.ts'
 
 // The platform seam: the renderer's one door to whatever is hosting it. See
-// docs/architecture-overview.md § Node API and client flow for the seam's shape, its nullable
+// docs/architecture/node-api.md § The platform seam for the seam's shape, its nullable
 // capability groups, and the arch rule that keeps `window.acorn` inside this file.
 
 // ── The capability groups ─────────────────────────────────────────────────────────────────────
@@ -62,7 +62,7 @@ export type FleetBridge = {
   tunnelClose(match: { nodeId?: string; taskId?: string }): void
 }
 
-// Custody of third-party plugin bundles. See docs/security.md § Third-party plugin bundles for
+// Custody of third-party plugin bundles. See docs/security/plugin-bundles.md § Third-party plugin bundles for
 // why the bytes and cache paths stay with the host and the renderer only ever names a bundle by
 // hash.
 export type PluginCustody = {
@@ -72,7 +72,7 @@ export type PluginCustody = {
   remove(request: { pluginId: string }): Promise<void>
   trustRecord(request: PluginTrustDecision): Promise<void>
   trustForget(request: { pluginId: string; hash: string }): Promise<void>
-  // Enter or leave development mode for one plugin on one node. See docs/security.md § The dev
+  // Enter or leave development mode for one plugin on one node. See docs/security/plugin-install.md § The dev
   // grant.
   devGrant(request: PluginDevGrantRequest): Promise<void>
 }
@@ -211,7 +211,7 @@ export type PluginTrustDecision = {
   schedules: PluginScheduleGrant[]
   // What this package will say, and possibly do, when a task is archived.
   taskChecks: PluginTaskCheckGrant[]
-  // What this package asks acorn to run as a managed agent (docs/managed-agents.md § Harnesses).
+  // What this package asks acorn to run as a managed agent (docs/managed-agents/harnesses.md § Harnesses).
   harnesses: PluginHarnessGrant[]
   // Task-scoped tools and bounded context carried by the installed manifest.
   agentTools: PluginAgentToolGrant[]
@@ -224,12 +224,12 @@ export type PluginAckRecord = Omit<PluginTrustDecision, 'declaration'> & {
   // Old on-disk approvals have no declaration. They cannot authorize a loaded UI until reviewed.
   declaration?: string
   decidedAt: number
-  // The decision was recorded but its disclosure snapshot could not be. See docs/security.md §
+  // The decision was recorded but its disclosure snapshot could not be. See docs/security/plugin-install.md §
   // The dev grant for why such a row never becomes the baseline of a later "what changed" diff.
   partial?: true
   dev?: true
 }
-// Which plugins this device is developing, and against which node. See docs/security.md § The dev
+// Which plugins this device is developing, and against which node. See docs/security/plugin-install.md § The dev
 // grant for why the key is the pair rather than the plugin id alone.
 export type PluginDevGrant = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grantedAt: number }
 export type PluginDevGrantRequest = { pluginId: string; nodeId: string; source?: import('@acorn/protocol/plugin/bundles.ts').BundleSource; path?: string; grant: boolean }
@@ -290,7 +290,7 @@ declare global {
 }
 
 // Guards `window` because there is not always one. The suite runs in a node environment
-// (docs/testing.md) and apiClient consults this on every request, so a bare `window.acorn` throws
+// (docs/testing/layers.md § Client core) and apiClient consults this on every request, so a bare `window.acorn` throws
 // ReferenceError.
 //
 // Module-private, so it cannot become the contract by accident. `tools/arch/boundaries.test.ts` fails
@@ -312,7 +312,7 @@ export const hostPlatform = (): string | undefined => acornGlobal()?.platform
 // covers it.
 //
 // `nodeFetch` alone discriminates "there is a broker". The rest degrade individually rather than
-// nulling the whole group, the same tolerance docs/api-reference.md § Versioning describes.
+// nulling the whole group, the same tolerance docs/api-reference/transport.md § Versioning describes.
 export const nodeTransport = (): NodeTransport | null => {
   const acorn = acornGlobal()
   if (!acorn?.nodeFetch) return null

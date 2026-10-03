@@ -1,7 +1,7 @@
 // Everything the API panel knows, held once per subject and read by both of its regions.
 //
 // The pane is a `list-detail` layout, so the request tree and the request being edited are two
-// entries in this bundle that the host mounts side by side (docs/panes.md § Layout model). They share
+// entries in this bundle that the host mounts side by side (docs/panes/layout.md § Layout model). They share
 // the selection, the draft, the send result and the saved lists, and the shared thing has to outlive
 // either of them.
 //

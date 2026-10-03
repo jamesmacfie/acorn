@@ -1,6 +1,0 @@
-{
-  "fixture": "actual Notes model and API, captured synthetic transport, QueryClient, jsdom; body/title edits then Node switch and model cleanup",
-  "beforeRetirement": 0,
-  "immediately": [],
-  "afterTitleDeadline": []
-}

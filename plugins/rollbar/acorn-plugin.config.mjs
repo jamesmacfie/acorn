@@ -35,7 +35,7 @@ export default {
       providerId: 'rollbar',
       // One tree fills the whole pane, so the layout is the trivial one. Naming it is still what says
       // "draw this from my tree" rather than "give me a rectangle", and it is what the pane inherits
-      // its focus group and padding from (docs/panes.md § Layout model).
+      // its focus group and padding from (docs/panes/layout.md § Layout model).
       layout: 'single',
       regions: { body: { kind: 'remote', entry: 'pane' } },
     }, {
@@ -86,7 +86,7 @@ export default {
       action: { verb: 'openPane', pane: 'rollbar' },
     }, {
       // The routed project's active Rollbar items, searched from the palette
-      // (docs/integrations.md § From the command palette).
+      // (docs/integrations/rollbar.md § Palette search).
       //
       // `scope: 'project'` is what makes this safe and what makes it useful: the host sends the
       // project the palette session captured and nothing else, the route resolves only the

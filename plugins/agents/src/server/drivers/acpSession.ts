@@ -185,7 +185,7 @@ export async function startAcpSession(
     args: launch.args,
     cwd: options.cwd,
     // brokerEnv, not `{ ...process.env }`: spreading the parent environment would hand the session
-    // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security.md § Credential
+    // SESSION_ENC_KEY, INTERNAL_TOKEN, and GITHUB_CLIENT_*. See docs/security/credentials.md § Credential
     // handling. A passthrough glob is for tool configuration, never for credentials, which is why
     // `ANTHROPIC_*` and `OPENAI_*` are absent from the base allowlist AGENT_TOOL_PASSTHROUGH names.
     env: {
@@ -243,7 +243,7 @@ export async function startAcpSession(
   const initialized = await agent.initialize({
     protocolVersion: 1,
     clientInfo: { name: 'acorn', version: '1.0.0' },
-    // acorn declines every client capability but one. See docs/managed-agents.md § Harnesses for
+    // acorn declines every client capability but one. See docs/managed-agents/harnesses.md § Harnesses for
     // what each buys and why it is parked.
     //
     // Form elicitation is the exception, and declaring it is what lets an agent ask a question at

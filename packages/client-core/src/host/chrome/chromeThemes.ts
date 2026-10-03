@@ -1,5 +1,5 @@
 // A plugin-contributed colour theme, turned into a stylesheet block by the host
-// (docs/ui-design.md § Plugin themes owns the token contract, the validation rule, and the fallback
+// (docs/ui-design/appearance.md § Plugin themes owns the token contract, the validation rule, and the fallback
 // behaviour; this module is the code it describes). The checks run again here, immediately before the
 // write, because a roster row is bytes a node sent and this is the one place in the client where a
 // string from a manifest is concatenated into CSS. Refusing is stronger than escaping: an escaper is a
@@ -9,7 +9,7 @@ import type { PluginThemeDescriptor } from '@acorn/protocol/plugin/contract.ts'
 import { themeRegistry } from '../registries/shell/themes'
 import type { Disposable } from '../../kit/lib/state/registry'
 
-/** `plugin:<pluginId>:<themeId>`, the shape bb uses (docs/ui-design.md § Plugin themes). No built-in
+/** `plugin:<pluginId>:<themeId>`, the shape bb uses (docs/ui-design/appearance.md § Plugin themes). No built-in
  * id contains a colon, so a plugin theme can never collide with one. */
 export const pluginThemeId = (pluginId: string, themeId: string): string => `plugin:${pluginId}:${themeId}`
 
@@ -30,7 +30,7 @@ export function pluginThemeBlock(id: string, descriptor: PluginThemeDescriptor):
   if (!SAFE_ID.test(id)) throw new Error(`theme id '${id}' is not a safe selector value`)
   const tokens = descriptor.tokens ?? {}
   const unknown = Object.keys(tokens).filter((name) => !(THEME_PALETTE_TOKENS as readonly string[]).includes(name))
-  // Both directions, and the unknown-key half is the one that matters most (docs/ui-design.md §
+  // Both directions, and the unknown-key half is the one that matters most (docs/ui-design/appearance.md §
   // Plugin themes: derived tokens follow the palette by reference and a theme restating one would
   // break that).
   if (unknown.length) throw new Error(`theme '${id}' sets tokens it may not set: ${unknown.join(', ')}`)
@@ -41,7 +41,7 @@ export function pluginThemeBlock(id: string, descriptor: PluginThemeDescriptor):
     }
     return `  ${name}: ${value};`
   })
-  // Self-description, written by the host from one boolean (docs/ui-design.md § Plugin themes).
+  // Self-description, written by the host from one boolean (docs/ui-design/appearance.md § Plugin themes).
   // --color-scheme is what makes a plugin theme colour syntax correctly with no further declaration:
   // the diff and fence rules read Shiki's dual output through light-dark(), which follows it.
   declarations.push(descriptor.dark

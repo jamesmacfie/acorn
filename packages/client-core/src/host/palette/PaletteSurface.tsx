@@ -60,7 +60,7 @@ export function PaletteSurface<T>(props: {
   // The three combobox attributes, written onto the element rather than passed to `Input`.
   //
   // `aria-activedescendant` has to sit on the element that holds focus, which is the field, and the
-  // kit's Input takes a fixed set of props on purpose (docs/ui-design.md § The closed kit). Adding
+  // kit's Input takes a fixed set of props on purpose (docs/ui-design/closed-kit.md § The closed kit). Adding
   // three ARIA props to a node every pane in the app draws, for one surface, is the wrong trade; the
   // surface owns its own dialog and list markup already, so it owns these too.
   //

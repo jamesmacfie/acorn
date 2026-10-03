@@ -7,7 +7,7 @@ import { focusedRegion, focusedRenderable, isField } from './keys/regions'
 //
 // A source is chosen in the Menu panel, its `list` region draws in the Browse panel, moving the caret
 // onto a row navigates, and the `detail` region in the main panel follows — with no Enter pressed
-// anywhere (docs/tui.md § The screen, § Collections).
+// anywhere (docs/tui/chrome.md § The screen, § Collections).
 //
 // It is slow and it is worth it. Four separate things have to hold for the last line to pass: the
 // router shim resolving `:number` off a path (./kit/router.ts), the source contract carrying two

@@ -25,7 +25,7 @@ import { activeHints } from './bindings'
 // Whole-screen assertions rather than cell-level ones, for the reason the smoke test gives: what a
 // reader would look for on the screen. The one thing asserted cell by cell is where the caret is,
 // because on this host the caret is not decoration — it is where the keys are, and a screen with no
-// caret is a screen nobody can drive (docs/testing.md § Test layers).
+// caret is a screen nobody can drive (docs/testing/layers.md § Test layers).
 
 const caretRow = (frame: string): number => frame.split('\n').findIndex((line) => line.includes('›'))
 
@@ -404,7 +404,7 @@ describe('the shell', () => {
     // does not: a row the engine never reported is the sheet lying about a key that does nothing, and
     // a hint with no row is the footer offering something the sheet cannot explain. Adding a binding
     // adds a row here and removing one removes it, with nothing to keep in step by hand
-    // (./bindings.ts, docs/tui.md § The footer).
+    // (./bindings.ts, docs/tui/footer.md § The footer).
     expect(drawn).toEqual(offered)
   }, 30_000)
 
@@ -417,7 +417,7 @@ describe('the shell', () => {
     }
     // vim's first and last, and they are `first` and `last` in the shared intent table rather than a
     // mode of this host's own — so the desktop's lists answer them too, and there is one table
-    // (client-core/kit/keys/keymap.ts § intentKeys, docs/tui.md § The five key groups).
+    // (client-core/kit/keys/keymap.ts § intentKeys, docs/tui/keys.md § The five key groups).
     expect(await on()).toContain('GitHub')
     await screen.press('g', { shift: true })
     expect(await on()).toContain('Memory')
@@ -454,7 +454,7 @@ describe('the shell', () => {
     expect(cleared).not.toContain('Saved.')
   }, 30_000)
 
-  // The count and what is behind it (docs/tui.md § What is drawn bespoke). The number is the desktop
+  // The count and what is behind it (docs/tui/chrome.md § What is drawn bespoke). The number is the desktop
   // bell's, written here through the platform seam's `setBadge`, and `n` opens the same two sections
   // the bell's popover holds.
   it('counts what is waiting in the topbar, and opens the inbox on n', async () => {
@@ -482,7 +482,7 @@ describe('the shell', () => {
     expect(frame.split('\n')[0]).not.toContain('\u25d4')
   }, 30_000)
 
-  // Drawing in front of the node (docs/tui.md § Attach or start). `acorn` creates its renderer before
+  // Drawing in front of the node (docs/tui/process.md § Attach or start). `acorn` creates its renderer before
   // a node it spawned has printed its boot line, so the whole shell has to be drawable from the
   // persisted cache with nothing on the wire.
   it('draws the whole shell from the persisted cache while the node it started is booting', async () => {

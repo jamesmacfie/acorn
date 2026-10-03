@@ -1,4 +1,4 @@
-// Rollbar occurrence normalization. See docs/security.md § Untrusted provider data for why this
+// Rollbar occurrence normalization. See docs/security/renderer.md § Untrusted provider data for why this
 // file keeps its own allowlist rather than trusting the SDK's scrub. Every string here is
 // control-char-stripped and length-capped, and CAPS.maxDetailBytes (192 KiB) keeps the whole detail
 // well below the 256 KB generic cache ceiling. Fields outside the allowlist, including raw request
@@ -18,7 +18,7 @@ import type {
 import { levelName, type RollbarApiInstance, type RollbarApiItem } from './'
 import { isRecord } from '@acorn/plugin-api/node'
 
-// Caps: docs/integrations.md § Rollbar. Exported so tests assert against the same numbers.
+// Caps: docs/integrations/rollbar.md § Rollbar. Exported so tests assert against the same numbers.
 export const CAPS = {
   traceChains: 10,
   framesTotal: 200,

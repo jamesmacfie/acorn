@@ -2,7 +2,7 @@ import { Portal } from 'solid-js/web'
 import type { JSX } from 'solid-js'
 
 // The app's one drawer: a bottom dock between the two icon rails, above the task footer
-// (docs/ui-design.md § Chrome and overlays).
+// (docs/ui-design/overlays.md § Chrome and overlays).
 //
 // It exists because a drawer is a `drawer` slot rather than a pane, so no host layout owns its outer
 // box — and until phase 9 of the layout programme that box was the terminal plugin's own stylesheet.
@@ -11,7 +11,7 @@ import type { JSX } from 'solid-js'
 //
 // Not a modal. Nothing behind it goes inert, there is no backdrop and Escape does not dismiss it: the
 // drawer is a second place to work, not an interruption. What is inside it is the caller's, and the
-// terminal's is entirely kit nodes (docs/terminal-and-agents.md § Client).
+// terminal's is entirely kit nodes (docs/terminal/client.md § Client).
 export function Drawer(props: {
   /** Height in pixels while not maximized. The caller owns it because the caller owns the grip that
    *  drags it (`createSplitDrag`); ignored when `maximized`, where a top and a bottom decide it. */

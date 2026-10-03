@@ -10,7 +10,7 @@ export type DraftAttachment = {
 }
 
 /** Read one unsent image attachment of a task, and store an altered copy of it
- *  (docs/managed-agents.md § Draft attachments).
+ *  (docs/managed-agents/attachments.md § Draft attachments).
  *
  * Two methods, and what is absent is the design. Neither replaces the draft nor deletes the source: the
  * unsent draft is an array in the agent composer's client state, the node cannot transact with it, and

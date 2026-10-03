@@ -4,7 +4,7 @@ import type { PanelView } from './model'
 import { aggregateRows } from './shaping'
 
 // The stat's trend: the sparkline beside the number and the delta under it. The two tiers, the
-// zero-versus-gap rule and the baseline argument are all in docs/dashboards.md § Trends.
+// zero-versus-gap rule and the baseline argument are all in docs/dashboards/views.md § Trends.
 //
 // Pure and tested for the same reason `chart.ts` is: vitest here runs in node with no Solid plugin, so
 // `StatView.tsx` cannot be checked by anything and therefore decides nothing. Every number on screen,
@@ -163,7 +163,7 @@ export const COMPARE_LABELS: Record<NonNullable<PanelView['compare']>, string> =
   week: 'last week',
 }
 
-/** The baseline is a point looked up, never a window aggregated. See docs/dashboards.md § Trends for
+/** The baseline is a point looked up, never a window aggregated. See docs/dashboards/views.md § Trends for
  *  why, and searched no further back than twice the window, so a series with a three-week hole says
  *  nothing rather than comparing today against a number from a different month. */
 export function baselineValue(
@@ -185,7 +185,7 @@ export function baselineValue(
 export type TrendDelta = {
   /** Current live measure minus the baseline. Signed; zero is a real answer and says "unchanged". */
   change: number
-  /** `muted` unless the panel declared which direction is good. See docs/dashboards.md § Trends for
+  /** `muted` unless the panel declared which direction is good. See docs/dashboards/views.md § Trends for
    *  why direction-goodness isn't guessable. */
   tone: 'ok' | 'bad' | 'muted'
 }

@@ -12,7 +12,7 @@ import { type GithubEmit, NO_EMIT, prChangedPayload } from '../../events'
 // a read within the TTL window reflects the change, and returns the canonical bit. The client
 // layers optimistic updates / invalidation on top.
 
-// Every body below is parsed, never cast (docs/architecture-overview.md § Package boundaries). Two
+// Every body below is parsed, never cast (docs/architecture/node-api.md § Wire validation). Two
 // of these reach GitHub as protocol values rather than as content — the merge method becomes a
 // `merge_method` and a `PullRequestMergeMethod` enum member, and `side` becomes a review-comment
 // anchor — so an unchecked string here is a string GitHub interprets.
@@ -45,7 +45,7 @@ async function readBody<S extends z.ZodType>(c: Context<AppEnv>, schema: S, miss
   return parsed.success ? parsed.data : null
 }
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const prActions = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>()
   // Merge: PUT /pulls/{n}/merge. 405 = not mergeable, 409 = head moved.

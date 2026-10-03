@@ -3,13 +3,13 @@ import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 import { previewConfigured } from './configuredStore'
 
 // The pane's registration, apart from what it draws: the plugin registers this before the first draw,
-// and the pane itself only loads once a task opens it (docs/frontend.md § Startup budget).
+// and the pane itself only loads once a task opens it (docs/frontend/startup-budget.md § Startup budget).
 const PreviewTaskPane = lazy(async () => ({ default: (await import('./PreviewTaskPane')).PreviewTaskPane }))
 
 export const previewPaneContribution: PaneLayoutContribution = {
   id: 'preview', label: 'Preview', glyph: 'globe', description: 'The app running in this task', order: 80,
-  // The gate is the seam that actually backs the pane, not "am I the desktop" (docs/frontend.md §
-  // The desktop gate audit). The pane is a WebContentsView the shell positions over the client, and
+  // The gate is the seam that actually backs the pane, not "am I the desktop"
+  // (docs/frontend/registries.md § Gates). The pane is a child webview the shell positions over the client, and
   // a desktop shell may ship without preview views — so a host that has not installed the group
   // never lists the pane at all, rather than listing it and then saying it cannot draw it.
   defaultChord: 'meta+shift+b', requires: { seam: 'preview' },

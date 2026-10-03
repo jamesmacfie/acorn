@@ -1,4 +1,4 @@
-// Node-side capability registry (docs/plugins.md § Collaboration rules): a plugin exports a named
+// Node-side capability registry (docs/plugins/collaboration.md § Collaboration rules): a plugin exports a named
 // typed function, and another plugin consumes it without importing it.
 //
 // Not a DI container. It is a Map with a phantom-typed key, because the whole problem is two packages

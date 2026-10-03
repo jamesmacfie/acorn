@@ -54,7 +54,7 @@ export default defineConfig({
   // grep away.
   define: { __ACORN_HOST__: '"dom"' },
   // Why format and entryFileNames matter for the highlighter worker's Content-Security-Policy:
-  // docs/shell.md § The syntax-highlighter worker's separate policy. The `worker-` prefix is what
+  // docs/shell/origins.md § The syntax-highlighter worker's separate policy. The `worker-` prefix is what
   // the CSP's filename match keys on.
   worker: {
     format: 'es',
@@ -72,7 +72,7 @@ export default defineConfig({
       // one drop out, while one whose exports are used keeps its own `delegateEvents` call. That took
       // about 67 KB off startup on 2026-09-25. Only the kit's `.tsx` files are named, because much of
       // the rest of client-core creates its stores at import time. tools/arch boundaries.test.ts holds
-      // the kit to it (docs/frontend.md § Startup budget).
+      // the kit to it (docs/frontend/startup-budget.md § Startup budget).
       treeshake: { moduleSideEffects: [{ test: /\/packages\/client-core\/src\/kit\/components\/.*\.tsx$/, sideEffects: false }] },
     },
   },

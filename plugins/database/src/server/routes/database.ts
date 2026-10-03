@@ -2,12 +2,12 @@
 // per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
 // table/column completions.
 //
-// database ships as a loaded plugin (docs/plugins.md § Loaded plugins). The host gets `router.fetch`
+// database ships as a loaded plugin (docs/plugins/loaded-plugins.md § Loaded plugins). The host gets `router.fetch`
 // (createDatabaseFetch at the bottom), and identity rides in through `c.env` rather than `ownerId(c)`
 // or `c.get('principal')`, which a loaded bundle's Hono stack never sets. The bridge is a closure
 // argument, so a fake is injectable without a global registry.
 //
-// SQL-injection posture is main/database.ts's: docs/data-layer.md § Database plugin: the Postgres pane.
+// SQL-injection posture is main/database.ts's: docs/database.md § SQL safety.
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
@@ -132,7 +132,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
   // The task's scratch document, written. One helper because two routes write it and they must agree
   // on the row: the host's editor autosave below, and the palette's `Generate SQL`, whose whole
   // contract is that this has committed before the reader is told it worked
-  // (docs/database.md § From the command palette, step 5).
+  // (docs/database/palette-and-workflows.md § From the command palette, step 5).
   const writeScratch = async (taskId: string, sql: string): Promise<void> => {
     documentText.parse(sql)
     const at = Date.now()
@@ -291,7 +291,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ options: rows.map((row) => ({ value: row.id, label: row.name, ...(row.notes ? { description: row.notes } : {}) })) })
     })
 
-    // --- the command palette's two rows (docs/plugins.md § Command kinds) ---
+    // --- the command palette's two rows (docs/plugins/commands.md § Command kinds) ---
     //
     // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
     // project-owned, but every route in this file addresses them through a task, because the task is
@@ -317,7 +317,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
     })
 
     // The `Generate SQL` fast path: the modal's six steps with every choice already made
-    // (docs/database.md § From the command palette).
+    // (docs/database/palette-and-workflows.md § From the command palette).
     //
     // The choices it does not offer are the point. One text field cannot carry a backend, a model and
     // a set of worked examples, so this takes the first available backend and that backend's own
@@ -379,7 +379,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       const backends = await core.models.available(owner(c))
       // `options` beside `backends`, not instead of it: the pane's dropdown reads the rows and the
       // workflow editor reads the field-option shape every `optionsRoute` answers
-      // (docs/workflows.md § Contributed step kinds).
+      // (docs/workflows/step-kinds.md § Contributed step kinds).
       return c.json({ backends, options: backends.map((backend) => ({ value: backend.id, label: backend.label })) })
     })
 

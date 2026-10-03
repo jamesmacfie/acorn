@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { BrowserPool } from './driver'
 
-// The snapshot-act-verify loop against a real browser. See docs/testing.md § The browser smoke test.
+// The snapshot-act-verify loop against a real browser. See docs/testing/desktop.md § The browser smoke test.
 //
 // Opt-in, because it launches a real browser: `pnpm --filter @acorn/plugin-browser test:smoke`. The
 // default suite covers the pure layer (./axTree.test.ts) and the store (./captures.test.ts), and this

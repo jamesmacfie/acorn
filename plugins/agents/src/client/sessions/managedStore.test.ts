@@ -269,7 +269,7 @@ describe('what a projected event costs', () => {
 })
 
 // The rail warms a task's session list on hover, and the pane model asks for the same list a moment
-// later when the reader clicks (docs/panes.md § Contributions). Without a window between them that is
+// later when the reader clicks (docs/panes/contributions.md § Contributions). Without a window between them that is
 // two reads of the same rows for one click.
 describe('a task’s session list', () => {
   beforeEach(() => {

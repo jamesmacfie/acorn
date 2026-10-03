@@ -9,7 +9,7 @@ import { pairingCodes } from '@acorn/node-core/server/auth'
 import { makeTestDb, type TestDb } from '@acorn/node-core/testkit'
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
-// The pairing surface end to end over the assembled app (docs/api-reference.md § Pairing): what the
+// The pairing surface end to end over the assembled app (docs/api-reference/transport.md § Pairing): what the
 // two pre-auth routes may leak, that every pairing failure is byte-identical, and that a paired token
 // then works everywhere a session does, and stops working the instant the device is revoked.
 
@@ -90,7 +90,7 @@ describe('GET /v1/node', () => {
     const { deviceToken } = await pairDevice()
     const info = (await (await send('/v1/node', { token: deviceToken })).json()) as NodeInfo
     // `toEqual`, not `toMatchObject`, and that is the assertion: this response must stay readable by
-    // every client forever (docs/api-reference.md § Versioning), so the bar for a field on it is a
+    // every client forever (docs/api-reference/transport.md § Versioning), so the bar for a field on it is a
     // consumer. `appVersion` used to ride along here with no reader anywhere and was dropped.
     expect(info).toEqual({ baseline: ACORN_BASELINE, protocolVersion: NODE_PROTOCOL_VERSION, fingerprint: FINGERPRINT, nodeId: NODE_ID, eventTransport: { viewers: 1 } })
   })

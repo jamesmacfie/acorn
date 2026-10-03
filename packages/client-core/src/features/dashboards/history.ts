@@ -5,7 +5,7 @@ import { TREND_DAYS, type MeasureSample } from '@acorn/dashboards-core/render'
 import { readJson } from '../../infra/node/apiClient'
 import { activeNodeId } from '../../infra/node/activeNode'
 
-// A panel's recorded measure series, read from the node that stores it (docs/dashboards.md § Trends).
+// A panel's recorded measure series, read from the node that stores it (docs/dashboards/views.md § Trends).
 //
 // Not through the panel's own fan-out, unlike its rows. The fan-out gives a source read a deadline, a
 // cache fallback and the live/stale/offline vocabulary, because those rows are what the panel is. A

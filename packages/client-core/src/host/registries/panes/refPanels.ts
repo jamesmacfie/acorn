@@ -10,7 +10,7 @@ import { onScopeEvicted } from '../shell/scopeEviction'
 export type RefPanelTarget = Pick<ExternalRef, 'providerId' | 'displayId'> & Partial<Omit<ExternalRef, 'providerId' | 'displayId'>>
 
 // Named `target`, never `ref`. Solid rewrites a component's `ref` prop into a callback
-// (docs/architecture-overview.md § Package boundaries, "Two renderer traps"), so a props member named
+// (docs/architecture/packages.md § Two renderer traps), so a props member named
 // `ref` cannot carry data across a JSX call site. This shipped once as a blank panel title with every
 // guard on the way in holding. `tools/arch/boundaries.test.ts` holds the line for this directory.
 export type RefPanelProps = {
@@ -70,7 +70,7 @@ export function openRefPanel(ref: RefPanelTarget): boolean {
 export const closeRefPanel = (): void => void setOpenRef(null)
 
 // A panel is not keyed by node, so without this a node switch leaves the outgoing node's plugin frame
-// over the incoming one's shell (docs/state.md § Scope rules). Not cleared on task archival, because
+// over the incoming one's shell (docs/state-ownership/scope-rules.md § Scope rules). Not cleared on task archival, because
 // the panel is not task-scoped and one opened from a rail source has no task to lose.
 onScopeEvicted((eviction) => {
   if (eviction.scope === 'node-switched') setOpenRef(null)

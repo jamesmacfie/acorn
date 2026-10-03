@@ -5,7 +5,7 @@ import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import { mergeToolCall } from '../../shared/toolFold'
 
 // A tool call or a file change is stored as two rows: the one that opened its card, and one that
-// holds its whole latest state. docs/managed-agents/client-surfaces.md § The transcript store says why.
+// holds its whole latest state. docs/managed-agents/transcript-store.md § How the ledger stores a tool call says why.
 //
 // A harness reports a tool call as a run of updates on one id, and each used to stay in the ledger as
 // its own row. On this developer's database that was 196,000 tool rows for 39,000 calls, 300 MB of

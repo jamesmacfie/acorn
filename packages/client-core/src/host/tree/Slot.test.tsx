@@ -4,7 +4,7 @@ import { Slot } from './Slot'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
-// A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins.md §
+// A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md §
 // Cooperative extension points, the `remote` kind).
 //
 // The arbitration rule itself is unit-tested next door in `arbitration.test.ts`; what a render adds is

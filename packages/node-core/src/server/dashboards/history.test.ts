@@ -94,7 +94,7 @@ describe('compaction', () => {
     const result = await compactHistory(test.db, NOW, null)
     expect(result.collapsed).toBe(2)
     const samples = (await readSeries(test.db, 'p1')).samples
-    // The day's last value, not an average (docs/dashboards.md § Sampling and retention).
+    // The day's last value, not an average (docs/dashboards/sampling.md § Sampling and retention).
     expect(samples).toEqual([{ bucket: day + 23 * HOUR_MS, value: 30 }, { bucket: recent, value: 99 }])
   })
 
@@ -109,7 +109,7 @@ describe('compaction', () => {
   it('removes a series whose panel is gone, and keeps one that is merely unplaced', async () => {
     await write('deleted-panel', hourBucket(NOW), 1)
     await write('unplaced-but-defined', hourBucket(NOW), 2)
-    // The live set is what the prefs blob defines, not what is placed (docs/dashboards.md § Sampling
+    // The live set is what the prefs blob defines, not what is placed (docs/dashboards/sampling.md § Sampling
     // and retention).
     const result = await compactHistory(test.db, NOW, new Set(['unplaced-but-defined']))
     expect(result.orphaned).toBe(1)
@@ -119,7 +119,7 @@ describe('compaction', () => {
 
   it('skips the orphan sweep entirely when the blob could not be read', async () => {
     await write('p1', hourBucket(NOW), 1)
-    // `null` means "unknown", not "none" (docs/dashboards.md § Sampling and retention).
+    // `null` means "unknown", not "none" (docs/dashboards/sampling.md § Sampling and retention).
     const result = await compactHistory(test.db, NOW, null)
     expect(result.orphaned).toBe(0)
     expect((await readSeries(test.db, 'p1')).samples).toHaveLength(1)

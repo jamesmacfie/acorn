@@ -14,7 +14,7 @@ import { saveJsonPref } from '../savePref'
 //
 // The device's, not the node's. The backends a node offers are the same everywhere, but which of them
 // you want to spend is yours, and it should not follow you to a machine where you were working on
-// somebody else's budget (docs/state-ownership.md § Scope rules). Written through `saveJsonPref`, so
+// somebody else's budget (docs/state-ownership/scope-rules.md § Scope rules). Written through `saveJsonPref`, so
 // `localStorage` is written before the query cache — the other way round, `mergePrefs` recomputes
 // against the old device value and drops the new one, silently (../savePref.ts).
 

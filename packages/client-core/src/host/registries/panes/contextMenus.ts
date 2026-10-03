@@ -1,7 +1,7 @@
 // The context-menu registry: what a right-click offers, contributed rather than written inline
-// (docs/plugins.md § Context menus).
+// (docs/plugins/menus-and-markers.md § Context menus).
 //
-// This module holds no JSX import (docs/frontend.md § Registries and plugins): the host that draws
+// This module holds no JSX import (docs/frontend/registries.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.
 import { matchesWhen, type ContextMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { Registry } from '../../../kit/lib/state/registry'
@@ -38,7 +38,7 @@ export type TaskRowTarget = {
  * `item` is the provider's own row, handed back untouched to whoever contributed the action, which is
  * how one registry serves three lists that agree on nothing else. It is not a fact, so no `when` can
  * name it. `title`, `body` and `link` are the three things every tracker has and the three the
- * workflow prefill reads (docs/workflows.md § Starting a run).
+ * workflow prefill reads (docs/workflows/starting-runs.md § Starting a run).
  */
 export type ItemRowTarget = {
   location: 'item.row'

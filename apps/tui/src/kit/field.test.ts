@@ -147,7 +147,7 @@ describe('a field', () => {
     expect(down.cursor).toBe(13)
     expect(press(create(text, 7), key('up')).cursor).toBe(1)
     // And nothing at all where there is no such row, which is what makes a one-row field inert on the
-    // vertical pair without a table of its own (docs/tui.md § The five key groups).
+    // vertical pair without a table of its own (docs/tui/keys.md § The five key groups).
     expect(took(create('ab', 1), key('up'), Infinity, false)).toBe(false)
     expect(took(create('ab', 1), key('down'), Infinity, false)).toBe(false)
   })
@@ -179,7 +179,7 @@ describe('a field', () => {
 
   it('refuses a chord carrying the platform\'s own modifier rather than matching its Ctrl twin', () => {
     // A terminal emulator on macOS keeps that key and never delivers it; where the kitty protocol
-    // does, this table binds none of it (docs/tui.md § The adapter).
+    // does, this table binds none of it (docs/tui/keys.md § The adapter).
     expect(took(create('one two'), { name: 'left', super: true })).toBe(false)
   })
 })

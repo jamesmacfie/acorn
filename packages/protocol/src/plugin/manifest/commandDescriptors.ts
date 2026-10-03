@@ -55,7 +55,7 @@ export const groupCommandDescriptor = z.object({
  * The host GETs `route` with `q` and the identifiers the declared scope owns, and it renders what
  * comes back as display facts (@acorn/protocol/commands.ts § CommandSearchItem). A result cannot
  * choose what picking it does: `onSelect` is one static verb from a closed set, declared here and
- * reviewed with the rest of the manifest (docs/command-palette-and-shortcuts.md § What the palette
+ * reviewed with the rest of the manifest (docs/command-palette-and-shortcuts/palette-data.md § What the palette
  * refuses). The set is a command's own plus `navigate`, because a picked row is a selected row and a
  * project-scoped search already has its project.
  */
@@ -98,7 +98,7 @@ export const inputCommandDescriptor = z.object({
  *
  * Deliberately not free text. A secret, a URL or a number needs validation, a reveal policy and a
  * recovery story that a list of labelled choices does not
- * (docs/command-palette-and-shortcuts.md § What the palette refuses).
+ * (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
  */
 export const settingCommandDescriptor = z.object({
   ...commandCommon,

@@ -8,7 +8,7 @@ const asObject = (value: unknown): JsonObject | null =>
 
 // Computer Use's app-access request, as the installed integration sends it through Codex's
 // `mcpServer/elicitation/request`. The shape is that integration's, read from its own source and
-// checked against a captured request (docs/managed-agents.md § App-access approval), so every field
+// checked against a captured request (docs/managed-agents/app-access.md § App-access approval), so every field
 // is optional here and anything unexpected falls back to the plain consent form.
 //
 //   _meta: {

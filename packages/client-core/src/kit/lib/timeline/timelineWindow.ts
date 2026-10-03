@@ -1,5 +1,5 @@
 // Which part of a long timeline is drawn: the newest turns, and as many older ones as the reader asked
-// for (docs/managed-agents/client-surfaces.md § Client surfaces).
+// for (docs/managed-agents/transcript.md § The window).
 //
 // A fixed logical window, not a virtualizer. It counts turns and never measures one, so nothing here
 // can feed back into layout the way the transcript's old virtualizer did

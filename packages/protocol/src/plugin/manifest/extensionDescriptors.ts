@@ -11,7 +11,7 @@ import { pluginRoute } from './manifestFields.ts'
 // A declares the point it hosts, B declares the contribution, and the host fetches B's items from B's
 // own node route and draws them inside the strip A's layout reserved. What crosses is a descriptor plus
 // a verb from the closed set: never a component, never a callback, never code.
-// See docs/plugins.md § Cooperative extension points and @acorn/protocol/extensionPoints.ts.
+// See docs/plugins/cooperative-extension-points.md § Cooperative extension points and @acorn/protocol/extensionPoints.ts.
 
 // What a hook's payload is declared to hold: field name to type, in the tree's prop vocabulary. Bounded
 // because a payload is a decision's subject, not a document.
@@ -56,13 +56,13 @@ export const extensionPointDescriptor = z.object({
   accepts: z.array(z.string().min(1).max(128)).max(32).optional(),
   // `remote` only: what a contributor's tree may ask this point's owner to do. A closed vocabulary,
   // declared by the owner, because a contributor's props are data and it therefore has no other way to
-  // reach back (docs/plugins.md § Cooperative extension points, "asking the owner").
+  // reach back (docs/plugins/cooperative-extension-points.md § Cooperative extension points, "asking the owner").
   //
   // Names, not handlers. The owner binds a handler of the same name per `Slot` it draws, and the host
   // refuses a request that is not in both lists. An empty declaration is the default and means a
   // contributor may draw and nothing else, which is what every point shipped before this field meant.
   actions: z.array(z.string().min(1).max(64).regex(/^[a-z][a-zA-Z0-9]*$/, 'an action name is lower camel case')).max(8).optional(),
-  // ── The hook fields (docs/plugins.md § Hooks) ──
+  // ── The hook fields (docs/plugins/hooks.md § Hooks) ──
   // Required for `kind: 'hook'` and refused elsewhere.
   payload: hookPayloadShape.optional(),
   // The subset of observe | transform | veto this owner permits. A handler asking for anything else
@@ -106,7 +106,7 @@ export const extensionDescriptor = z.object({
   // Absent means "every key", which is the ordinary answer in a `stack` slot.
   matches: z.array(z.string().min(1).max(128)).min(1).max(64).optional(),
   // `remote` only: one of this manifest's own `overlay` frames, which this tree may ask the host to
-  // present (docs/plugins.md § Companion overlays). A qualifier on the `remote` carrier rather than a
+  // present (docs/plugins/remote-points.md § Companion overlays). A qualifier on the `remote` carrier rather than a
   // carrier of its own, so it must stay out of the exactly-one-carrier count below; adding it there
   // would reject every descriptor that uses it.
   //

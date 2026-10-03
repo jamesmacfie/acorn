@@ -1,4 +1,4 @@
-// Guards for URLs the app hands to the OS. Scheme allowlisting policy is in docs/security.md §
+// Guards for URLs the app hands to the OS. Scheme allowlisting policy is in docs/security/process-and-paths.md §
 // Process, path, and configuration controls.
 //
 // An anchor's href is untrusted input: renderer content includes GitHub, Linear, and Rollbar text

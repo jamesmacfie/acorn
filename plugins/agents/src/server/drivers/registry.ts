@@ -2,7 +2,7 @@ import { AcpDriver } from './acpDriver'
 import type { HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverFactory } from './types'
 
-// The harness registry. Two doors (docs/managed-agents.md § Harnesses):
+// The harness registry. Two doors (docs/managed-agents/harnesses.md § Harnesses):
 //
 //   register        a launch spec, run by the shared generic driver. The default for a new harness and
 //                   the only door a loaded plugin's manifest can reach.

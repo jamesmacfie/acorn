@@ -1,11 +1,11 @@
-// The database plugin's own tables (docs/data-layer.md § Plugin databases). Lives in
+// The database plugin's own tables (docs/data-layer/plugin-databases.md § Plugin databases). Lives in
 // <data-root>/plugins/database.sqlite with its own Drizzle chain, migrated at plugin init.
 //
 // The row is scoped by projectId, an opaque core ID resolved through CoreServices rather than joined
 // against core's `tasks`, since a query never spans database files.
 import { sqliteTable, integer, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
-// Named SQL snippets for the Database pane (docs/data-layer.md § Database plugin: the Postgres pane).
+// Named SQL snippets for the Database pane (docs/database/pane.md § Database pane).
 // Project-scoped, not task-scoped: a query written against a project's schema outlives any one task
 // worktree. Machine-scoped (no user_id). Saving under an existing project/name overwrites it.
 export const dbSavedQueries = sqliteTable(
@@ -22,7 +22,7 @@ export const dbSavedQueries = sqliteTable(
   (t) => [uniqueIndex('db_saved_queries_project_name_idx').on(t.projectId, t.name)],
 )
 
-// The task's query editor, as a document (docs/editor.md § Composed panes: decided). A
+// The task's query editor, as a document (docs/editor/composed-panes.md § Composed panes: decided). A
 // document surface is a route that reads text and a route that writes it, so the text has to live
 // somewhere the plugin can serve it from.
 //

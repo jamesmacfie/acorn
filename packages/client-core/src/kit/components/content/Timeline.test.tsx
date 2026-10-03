@@ -11,7 +11,7 @@ import { createTimelineWindow, TIMELINE_PAGE } from '../../lib/timeline/timeline
 // The transcript's guardrails, at the node that owns them: appending a turn must not replace the ones
 // already drawn, following the newest turn must stop when the reader scrolls away from it, and a
 // reader who comes back to a list must come back to the turn they left
-// (docs/ui-design.md § The closed kit).
+// (docs/ui-design/closed-kit.md § The closed kit).
 //
 // jsdom has no layout, so the geometry is a model: turn heights, a viewport, and a `scrollTop` that
 // CLAMPS the way a browser does. That clamp is the whole point of the harness. Without it a test can

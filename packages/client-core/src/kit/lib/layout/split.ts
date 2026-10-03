@@ -1,7 +1,7 @@
 import { onCleanup } from 'solid-js'
 
 // Drag-to-resize, plus the keyboard contract the three hand-rolled splitters didn't have. See
-// docs/ui-design.md § Drag-to-resize for why it reports a delta and what it owns versus the caller.
+// docs/ui-design/overlays.md § Drag-to-resize for why it reports a delta and what it owns versus the caller.
 
 export type SplitDrag = {
   /** Spread onto the handle element. */
@@ -39,7 +39,7 @@ export type SplitDragOptions = {
 export function createSplitDrag(opts: SplitDragOptions): SplitDrag {
   const step = () => opts.step ?? 16
 
-  // See docs/ui-design.md § Drag-to-resize: a drag that outlives its component would keep moving
+  // See docs/ui-design/overlays.md § Drag-to-resize: a drag that outlives its component would keep moving
   // panes that no longer exist.
   let release: (() => void) | undefined
   onCleanup(() => release?.())
@@ -61,7 +61,7 @@ export function createSplitDrag(opts: SplitDragOptions): SplitDrag {
       cancelAnimationFrame(frame)
       frame = requestAnimationFrame(() => opts.onDelta(current - start))
     }
-    // Idempotent: reachable from four places. See docs/ui-design.md § Drag-to-resize for why this
+    // Idempotent: reachable from four places. See docs/ui-design/overlays.md § Drag-to-resize for why this
     // removes the property rather than restoring a snapshot.
     const up = () => {
       if (ended) return
@@ -78,7 +78,7 @@ export function createSplitDrag(opts: SplitDragOptions): SplitDrag {
     release = up
     window.addEventListener('pointermove', move)
     window.addEventListener('pointerup', up)
-    // See docs/ui-design.md § Drag-to-resize for why both `pointerup` and `pointercancel` are
+    // See docs/ui-design/overlays.md § Drag-to-resize for why both `pointerup` and `pointercancel` are
     // handled here. PanelGrid's own drag already handles cancel for the same reason.
     window.addEventListener('pointercancel', up)
     handle?.addEventListener('lostpointercapture', up)

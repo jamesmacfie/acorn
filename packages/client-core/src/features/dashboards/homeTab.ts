@@ -7,8 +7,8 @@ import { MAX_TABS, type DashboardTab } from './persist'
 // `home/<tabId>/<workspaceId>` and a name in the `tabs` list. Nothing here knows about the
 // workspace. These are list operations on the tabs of the one workspace the bar is showing.
 //
-// Which tab is active is device view state and never enters the node blob (docs/dashboards.md
-// § Placements). Create, rename, and reorder are all one write (`setHomeTabs`), so each verb only
+// Which tab is active is device view state and never enters the node blob (docs/dashboards/placements.md
+// § Home tabs). Create, rename, and reorder are all one write (`setHomeTabs`), so each verb only
 // decides what list to hand over.
 
 const [activeHomeTab, setActiveHomeTab] = createSignal('')
@@ -30,7 +30,7 @@ const uniqueName = (tabs: readonly DashboardTab[], base: string): string => {
   return candidates.find((name) => !taken.has(name)) ?? base
 }
 
-/** The list that creating a dashboard writes, plus the new tab's id (docs/dashboards.md §
+/** The list that creating a dashboard writes, plus the new tab's id (docs/dashboards/placements.md §
  *  Placements: creating the first extra dashboard). One workspace's list in, the same list out —
  *  `setHomeTabs` is what puts the workspace back on it. */
 export function addTab(tabs: readonly DashboardTab[], name = ''): { tabs: DashboardTab[]; id: string } {
@@ -61,7 +61,7 @@ export const homeTabSlice: PersistedStateSlice<string> = {
   codec: { parse: (raw) => (typeof raw === 'string' ? raw : ''), serialize: (value) => value },
   empty: () => '',
   // A remembered tab that has since been deleted falls back to the default tab rather than drawing
-  // an empty grid (docs/dashboards.md § Placements).
+  // an empty grid (docs/dashboards/placements.md § Placements).
   unknownIds: 'retain-inert',
   maxBytes: 128,
   binding: appStateBinding(activeHomeTab, setActiveHomeTab),

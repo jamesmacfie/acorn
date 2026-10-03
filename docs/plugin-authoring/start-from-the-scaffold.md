@@ -1,69 +1,90 @@
 # Start from the scaffold
 
-[Plugin authoring](../plugin-authoring.md)
+This page walks you through creating a plugin package with the scaffold and checking that it works.
+It's part of [plugin authoring](../plugin-authoring.md).
 
-Create a package with a remote tree:
+## Create a package
 
-```sh
-npm create acorn-plugin my-widget
-```
+1. Create a package with a remote tree:
 
-The scaffold writes a manifest, a node entrypoint, a route module, and one client file. It
-inlines the bridge handshake and tree protocol, so no build step is required. Open a task and run
-**Open My widget** from the command palette to show its pane. The button calls the Node route at
-`/v1/p/my-widget/greeting` through the bridge and updates the host-rendered tree with its answer.
-The route lives in `server/routes.js`, leaving the entrypoint focused on registration. Reload starts
-a fresh Node worker and re-evaluates its imported modules too.
+   ```sh
+   npm create acorn-plugin my-widget
+   ```
 
-To extend another plugin's UI, declare an `extensions` entry for one of its published extension points.
-For example, `agents:tool-card` accepts a tree, while `changes:diff-line` accepts route-backed
-annotations. Add those after the plugin's own pane works. See [The manifest](./the-manifest.md) for
-the contribution shapes and host checks.
+   The scaffold writes `acorn-plugin.json`, `node/index.js`, `server/routes.js`, `client.js`, and a
+   `README.md` with the install steps. The client file inlines the bridge handshake and the tree
+   protocol, so there's no build step.
 
-For browser-specific UI, generate a frame instead:
+2. To check the node half in your editor, install the declaration package as a development
+   dependency:
+
+   ```sh
+   npm install --save-dev acorn-plugin-types @types/node
+   ```
+
+   An installed node entrypoint must resolve its runtime imports without your development
+   `node_modules`, so keep these out of runtime code.
+
+3. Install the folder on a Node with the local-path source
+   ([install a hand-written package](./installing-a-hand-written-package.md)), restart the Node, and
+   accept the bundle when the device asks.
+
+4. Open a task and run **Open My widget** from the command palette. The pane's button calls the Node
+   route at `/v1/p/my-widget/greeting` through the bridge and updates the host-drawn tree with the
+   answer.
+
+The route lives in `server/routes.js`, so the entrypoint only registers. A reload starts a fresh Node
+worker and evaluates imported modules again, so editing either file takes effect together.
+
+For a browser-specific surface, such as a canvas, generate a frame instead:
 
 ```sh
 npm create acorn-plugin my-widget -- --rectangle
 ```
 
-Trees name shared components that the host renders on desktop or terminal. Frames render their own
-DOM in a desktop iframe. Use a frame for a canvas or other browser-specific surface.
+A tree names shared components the host renders on the desktop and in the terminal. A frame renders
+its own DOM in a desktop iframe ([two ways to draw](./the-client-half.md#two-ways-to-draw)).
 
-To check the node half in your editor, install the declaration package:
-
-```sh
-npm install --save-dev acorn-plugin-types @types/node
-```
-
-These are development dependencies. An installed node entrypoint must resolve its runtime imports
-without the author's development `node_modules` directory.
+To extend another plugin's UI after your own pane works, add an `extensions` entry for one of its
+published points. For example, `agents:tool-card` accepts a tree, and `changes:diff-line` accepts
+route-backed annotations ([extensions](./extensions.md)).
 
 ## The package
 
 ```text
 my-widget/
   acorn-plugin.json
+  README.md
   node/
     index.js
   server/
     routes.js
   client.js
-  migrations/
+  migrations/          only if the plugin owns tables
     meta/_journal.json
     0000_init.sql
 ```
 
-Include `migrations/` only if the plugin owns tables. The manifest filename is fixed; it declares
-the paths to the node entrypoint, client bundle, and migrations. Keep the plugin's manifest `id`
-equal to the node export's `name`.
+The manifest filename is fixed, and the manifest declares the paths to the node entrypoint, the
+client bundle, and any migrations ([the manifest](./the-manifest.md)). Keep the manifest `id` equal to
+the node export's `name`. The id binds the route namespace, preferences, and the SQLite filename, so
+keep it stable across updates ([storage and migrations](./storage.md)).
 
-The ID binds the route namespace, preferences, and SQLite filename. Keep it stable across updates.
-For the manifest fields, see [The manifest](./the-manifest.md). To install and run the package,
-follow [Install a package](./installing-a-hand-written-package.md).
+## Limits
+
+The Node runs loaded plugins only on a patched Node release:
+`>=22.23.2 <23 || >=24.18.1 <25 || >=26.5.1 <27` (`packages/protocol/src/runtime/nodeRuntime.ts`). On
+an older release, the plugin's roster row reads `failed` with a reason that names both versions.
 
 ## Scaffold verification
 
-The scaffold tests check the API major, schema URL, manifest, Node route reload, and both client
-handshakes. They also run the packed scaffold and type-check its Node files outside the repository
-against the packed declaration package. This catches dependencies that resolve only inside the
-workspace.
+`packages/create-acorn-plugin/index.test.ts` checks the API major, the schema URL, the manifest, a
+route reload in a fresh worker, and both client handshakes. It runs the packed scaffold and
+type-checks its node files outside the repository against the packed declaration package, which
+catches dependencies that resolve only inside the workspace. It also type-checks the
+[complete example](./complete-example.md) and checks that the manifest examples on these pages speak
+the current API major.
+
+On October 4, 2026, running the scaffold with `node packages/create-acorn-plugin/index.mjs my-widget`
+produced the five files above with `"apiVersion": "3"`, and its manifest passed the Node's manifest
+parser with no unrecognized keys.

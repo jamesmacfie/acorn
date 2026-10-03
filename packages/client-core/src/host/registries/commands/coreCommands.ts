@@ -38,7 +38,7 @@ import type { ContributedCommand } from './commands'
 //
 // **A setting is not a toggle.** Every Boolean here is an explicit On and Off with the current value
 // marked, so the command shows what is set, means the same thing pressed twice, and reads the same as
-// a theme picker. (docs/command-palette-and-shortcuts.md § What the palette refuses draws the other
+// a theme picker. (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses draws the other
 // edge of the same line.) Nothing here is free text, a secret, or a field that depends on another;
 // those stay pages.
 //
@@ -89,7 +89,7 @@ export const goToGroup = (): ContributedCommand => ({
  * hand-written list would go stale the moment one loads. It is not a reflection of the pages'
  * *contents*: a page is an arbitrary component, and scraping one would couple the palette to rendering
  * and create the second persistence path this whole file exists to avoid
- * (docs/command-palette-and-shortcuts.md § What the palette refuses). What is
+ * (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses). What is
  * generated is one action that opens settings on the page the reader asked for.
  *
  * Every page the rail lists, in the rail's order, with its group as the hint so two groups' pages can

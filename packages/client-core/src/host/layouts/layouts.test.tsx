@@ -5,7 +5,7 @@ import { _resetLayoutState } from './state'
 import { _resetSidebarCollapse } from '../../kit/lib/layout/collapseState'
 import type { LayoutProps, Region } from './regions'
 
-// The seven layouts, rendered with placeholder regions (docs/panes.md § Layout model).
+// The seven layouts, rendered with placeholder regions (docs/panes/layout.md § Layout model).
 //
 // What a render adds over the region table in @acorn/protocol/paneLayouts.ts is the part the table
 // cannot see: that each region ends up in the document, in the order the layout promises, and that a

@@ -1,4 +1,4 @@
-// Published declaration, hand-written and copied verbatim to dist/sdk.d.ts. See docs/plugins.md §
+// Published declaration, hand-written and copied verbatim to dist/sdk.d.ts. See docs/plugins/publishing.md §
 // What is published, and what acorn promises about it.
 
 /** What this frame was opened to look at. A snapshot, not reactive: the host recreates a frame when

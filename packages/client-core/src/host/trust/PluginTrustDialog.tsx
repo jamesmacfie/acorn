@@ -18,7 +18,7 @@ import { HelpMark } from '../../kit/components/content/HelpMark'
 // acknowledgement lives beside the device token rather than in the node's database and why pairing a
 // new laptop asks again.
 //
-// Three groups, and the split between them is the whole point (docs/security.md § Design rules,
+// Three groups, and the split between them is the whole point (docs/security/plugin-storage-and-supply-chain.md § Design rules,
 // rule 6). `Enforced` is a fence held by the UI bridge and isolated node realm. `Declared`
 // describes plugin-authored unattended behavior whose intent cannot be verified. `Web pages` is
 // enforced by the shell but reaches the live internet, so it is neither of
@@ -215,7 +215,7 @@ export default function PluginTrustDialog() {
   )
 }
 
-// What each tier's word means, matching docs/security.md § Node-half plugin security.
+// What each tier's word means, matching docs/security/plugin-storage-and-supply-chain.md § Design rules.
 const TIER_HELP: Record<TierKey, string> = {
   enforced: 'acorn blocks anything not listed.',
   declared: 'Jobs and checks the plugin runs. acorn controls when they run, not what they do.',

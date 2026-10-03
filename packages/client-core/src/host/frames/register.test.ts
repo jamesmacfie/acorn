@@ -26,7 +26,7 @@ const { openPluginOverlay, closePluginOverlay } = await import('./overlays')
 const { exclusiveSlotOffers, exclusiveSlotRegistry, registerCoreExclusiveSlot, resolveExclusiveSlot, noteExclusiveSlotFailure, exclusiveSlotFailed } = await import('../registries/extensionPoints/exclusiveSlots')
 const { _resetFrameContributions, frameBindingFor, syncFrameContributions } = await import('./register')
 
-// The frame host pass (docs/plugins.md § Frame contribution kind).
+// The frame host pass (docs/plugins/frames.md § Frame contribution kind).
 //
 // The sibling of chrome/register.test.ts, and it exists because this module stopped being a `.tsx`
 // file. What is pinned is the pass's contract rather than the rectangles: which registry each target

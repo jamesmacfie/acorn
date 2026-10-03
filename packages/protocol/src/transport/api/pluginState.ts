@@ -1,11 +1,11 @@
-// Settings → Plugins (docs/plugins.md § Activation). Per node, since which plugins a node runs
+// Settings → Plugins (docs/plugins/activation.md § Activation). Per node, since which plugins a node runs
 // decides which routes exist and which SQLite files open. `running` and `disabled` answer different
 // questions: a toggle takes effect at the node's next start, so the page shows the gap between saving
 // and restarting.
 //
 // `state` is the third answer, the only one a restart cannot change: a plugin loaded from disk whose
 // init threw is `'failed'`. It stays out of `running` because `restartRequired` is computed from
-// `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
+// `running` alone, and a restart cannot fix a broken plugin (docs/plugins/loaded-plugins.md § Loaded plugins).
 export type NodePluginRow = {
   /** The plugin's id. Routes, files, settings keys and the command line all use it. */
   name: string
@@ -53,25 +53,25 @@ export type InstalledPluginRow = {
   // contribution kind, an unknown `permissions.node.core` facet. Absent when there is nothing to report.
   //
   // The forward-compatibility rule is that unknown is retained and reported, never dropped silently
-  // (docs/plugins.md § Forward compatibility). This is the reporting half: the device raises one
+  // (docs/plugins/forward-compatibility.md § Forward compatibility). This is the reporting half: the device raises one
   // attention row per entry, on the same path a surface that failed to register takes.
   unknown?: readonly string[]
   permissions: import('../../plugin/contract.ts').NodePluginPermissions
   contributions: import('../../plugin/contract.ts').PluginContributions
-  // What the plugin declared other plugins may hear (docs/plugins.md § Hearing another plugin). Optional
+  // What the plugin declared other plugins may hear (docs/plugins/events.md § Hearing another plugin). Optional
   // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
   // and a required field would need a bumped key.
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
   // Brand marks the manifest declared: one SVG path's `d` in a 24 box, never an SVG document, plus the
   // brand's own colour as a six-digit hex. The device registers `icon` as `brand:<pluginId>` and each
   // `icons` key as `brand:<pluginId>/<key>`, stamping the prefix from the roster row so a package can't
-  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design.md § Icons.
+  // claim another's mark. See client-core/kit/tokens/brandMarks.ts and docs/ui-design/icons.md § Icons.
   icon?: { d: string; color?: string }
   icons?: Record<string, { d: string; color?: string }>
   // The client bundle this node is offering, or null when the package has no client half. `hash` is
   // the sha256 the node computed, and it's a cache-key hint only: the device hashes the bytes it
   // received and refuses a mismatch, because a compromised node can lie here
-  // (docs/security.md § Third-party plugin bundles).
+  // (docs/security/plugin-bundles.md § Third-party plugin bundles).
   client: { hash: string; bytes: number } | null
   // Where the package came from, as one line for the settings row ("github:owner/repo@v1.2.0",
   // "npm:acorn-board", a URL). Absent for a package that predates the installer or was copied in by
@@ -89,7 +89,7 @@ export type InstalledPluginRow = {
 export type PluginRuntimeIdentity = Omit<InstalledPluginRow, 'source' | 'bundled' | 'installedAt'> & {
   activation: 'node' | 'client-only'
 }
-// An install the agent asked for and the owner hasn't answered yet (docs/plugins.md §
+// An install the agent asked for and the owner hasn't answered yet (docs/plugins/agent-install.md §
 // Approval-mediated install). Raised by the `plugin_request` agent tool, which can't install anything:
 // the record is inert until a device reads it and installs over the device-gated route with its own
 // principal. A prompt-injected agent can produce this row and nothing else.
@@ -100,12 +100,12 @@ export type PluginApprovalRequest = {
   taskId: string
   action: 'install' | 'update' | 'uninstall'
   // Present for an install, exactly as the agent gave it. Nothing has been fetched yet. See
-  // docs/plugins.md § What the owner can know before the download.
+  // docs/plugins/agent-install.md § What the owner can know before the download.
   source?: PluginInstallSource
   // Present for an update or an uninstall.
   pluginId?: string
   // The agent asked for dev mode: on approval the device records a per-(plugin, node) grant that
-  // auto-trusts future bundles until the owner ends it (docs/security.md § The dev grant).
+  // auto-trusts future bundles until the owner ends it (docs/security/plugin-install.md § The dev grant).
   dev: boolean
   purgeData?: boolean
   // Untrusted display text written by an agent that may be reading hostile content. Capped by the
@@ -121,7 +121,7 @@ export type NodePluginState = { plugins: NodePluginRow[]; restartRequired: boole
 
 // Where a plugin package is fetched from (docs/plugins.md installer). `path` is an absolute directory
 // on the node's filesystem, allowed on every build and symlinked rather than copied, so it's the one
-// source whose bytes aren't pinned (docs/security.md § Installing from a folder).
+// source whose bytes aren't pinned (docs/security/plugin-install.md § Installing from a folder).
 export type PluginInstallSource =
   | { github: string; tag?: string }
   | { npm: string; version?: string }
@@ -135,7 +135,7 @@ export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: s
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
 // The one exception, and only for a plugin the node loaded from disk: a reload swaps its node half in
-// the running process (docs/plugins.md § The dev loop). `failed` is a 200, not an error, because
+// the running process (docs/plugins/dev-loop.md § The dev loop). `failed` is a 200, not an error, because
 // candidate-then-commit means a failed reload changed nothing and the previous instance still serves.
 export type PluginReloadResult = { id: string; version: string; state: 'reloaded' | 'failed'; reason?: string }
 

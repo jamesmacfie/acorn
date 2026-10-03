@@ -6,15 +6,14 @@ import { fleetBridge } from '../platform'
 import { createFleetQuery, type FleetResult } from './fanout'
 import { refreshFleet } from './fleet'
 
-// Nodes this client's nodes know about, and the four lifecycle verbs (docs/plugins.md § Node
+// Nodes this client's nodes know about, and the four lifecycle verbs (docs/plugins/node-providers.md § Node
 // providers). The client half of the fleet's second door.
 //
 // Read by fanning out over every reachable node and unioning the answers, not by asking the local
 // node. Today one node usually holds the cloud connection, so the two are indistinguishable — which
 // is exactly why the shortcut is worth refusing. The day the account credential moves off the local
 // node, or a second machine signs into the same account, the fan-out is already what the surface
-// does, and `providerNodeId` is stable across whoever answered, so nothing renumbers
-// (docs/future/phased-review-steps/cloud-guardrails.md rules 3 and 5).
+// does, and `providerNodeId` is stable across whoever answered, so nothing renumbers.
 
 const PROVIDED_KEY = ['provided-nodes'] as const
 

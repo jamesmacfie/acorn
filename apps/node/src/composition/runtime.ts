@@ -40,7 +40,7 @@ type RuntimeOptions = {
 }
 
 // Two tags rather than one, so the lines keep the `[service:boot]` and `[service:stop]` prefixes a
-// person greps for and docs/local-development.md § Timing a cold start names.
+// person greps for and docs/local-development/profiling.md § Timing a cold start names.
 const bootLog = createLogger('service:boot')
 const stopLog = createLogger('service:stop')
 
@@ -56,7 +56,7 @@ const stopLog = createLogger('service:stop')
 // that cost the boot is the one wide number. The plugin passes are named per plugin because `install`
 // alone cannot say which plugin was the slow one. Those lines are wall-clock slices rather than
 // per-plugin costs, because the passes overlap: a plugin's line says when it finished
-// (docs/local-development.md § Timing a cold start).
+// (docs/local-development/profiling.md § Timing a cold start).
 function bootTimer(): (label: string) => void {
   const started = process.hrtime.bigint()
   let previous = started
@@ -175,7 +175,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
 
   try {
     // Audit retention and the idempotency sweep run as node-owned schedules, not boot-time calls
-    // (docs/data-layer.md § Retention).
+    // (docs/data-layer/backup-and-retention.md § Retention).
     mark('migrate')
 
     const worktreesDir = join(config.dataDir, 'worktrees')
@@ -200,7 +200,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 
-    // The plugin composition seam (docs/plugins.md § Collaboration rules). Owned by this runtime
+    // The plugin composition seam (docs/plugins/collaboration.md § Collaboration rules). Owned by this runtime
     // rather than by the module, so a process that starts the service more than once (the tests do)
     // gets a clean graph each time instead of "capability already provided".
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })
@@ -208,7 +208,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     // Before the plugins, so one that declares the `telemetry` token can subscribe from its own
     // `init` and see the boot it was loaded during. The preference is read on the collector's own
     // timer rather than here: `PUT /v1/core/prefs` writes the table directly and cannot notify, so a
-    // switch flipped in Settings is seen within five seconds (docs/telemetry.md § The switch).
+    // switch flipped in Settings is seen within five seconds (docs/telemetry/model.md § The switch).
     setTelemetryDataRoot(config.dataDir)
     startTelemetry({
       node: dataRoot.nodeId,

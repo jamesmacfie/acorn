@@ -36,7 +36,7 @@ import './dashboards.css'
 
 // One placement: the grid of panels a person put somewhere and the gestures that arrange it.
 // `PanelGridItem` owns each panel's render/chrome boundary; this owns only the shared arrangement.
-// See docs/dashboards.md § Placements and § The grid.
+// See docs/dashboards/placements.md § Placements and § The grid.
 //
 // It takes a scope rather than assuming home, because `panelsAt` and `layoutAt` already do. A task
 // pane or a plugin-reserved region is this component with a different scope.
@@ -71,7 +71,7 @@ export default function PanelGrid(props: {
   scope: PlacementScope
   /** Replaces the "Panels" heading in the same seat; Home's tab bar takes it when there is more than
    *  one dashboard. Its presence also keeps the header row on an empty placement, so a freshly
-   *  created tab still has a bar. See docs/dashboards.md § Placements. */
+   *  created tab still has a bar. See docs/dashboards/placements.md § Placements. */
   heading?: JSX.Element
   /** `role="tabpanel"` wiring for the grid, when something above it is a tablist. */
   panelAria?: { id: string; labelledBy: string }
@@ -111,7 +111,7 @@ export default function PanelGrid(props: {
 
   // ── Measurement ─────────────────────────────────────────────────────────────────────────────
   //
-  // The one pixel measurement in the whole feature (docs/dashboards.md § The grid): square cells,
+  // The one pixel measurement in the whole feature (docs/dashboards/placements.md § The grid): square cells,
   // measured by a `ResizeObserver`, at the cost of panel heights breathing with window width.
   //
   // The gap is read off the resolved `column-gap` rather than by token name, so the grid and the
@@ -303,7 +303,7 @@ export default function PanelGrid(props: {
   // ── Menu reorder, reinterpreted onto geometry ───────────────────────────────────────────────
   //
   // Move up and move down are reinterpreted onto geometry as a swap toward the neighbour in reading
-  // order (docs/dashboards.md § The grid). On a one-column window they behave as they did before
+  // order (docs/dashboards/placements.md § The grid). On a one-column window they behave as they did before
   // geometry existed.
 
   const moveTo = (id: PanelId, delta: -1 | 1) => {
@@ -324,7 +324,7 @@ export default function PanelGrid(props: {
 
   // ── Moving between placements ───────────────────────────────────────────────────────────────
   //
-  // The Home tabs other than this one (docs/dashboards.md § Placements). A flat labelled group
+  // The Home tabs other than this one (docs/dashboards/placements.md § Placements). A flat labelled group
   // rather than a submenu, because `Menu` has no submenu and a list of at most seven names is
   // already keyboard-operable as rows.
   //

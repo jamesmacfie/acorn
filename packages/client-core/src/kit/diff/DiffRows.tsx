@@ -38,7 +38,7 @@ export function NonCodeRow(props: {
   retryDiff?: (file: LoadDiffRow['file']) => void
   /** The file's hydration state now, rather than when the row model was built. A row model over 200
    *  files is rebuilt per parse, so baking a per-file status into it made every file's error rebuild
-   *  every other file's rows (docs/diff-rendering.md § Parsing and highlighting). */
+   *  every other file's rows (docs/diff-rendering/loading.md § Parsing and highlighting). */
   loadStatus?: (path: string) => LoadDiffStatus
   mentions?: string[]
   threadCollapse?: (thread: DiffThread) => ThreadCollapseController

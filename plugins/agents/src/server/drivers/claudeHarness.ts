@@ -3,7 +3,7 @@
 //
 // `id` is `claude` and `profileId` is `claude-code`. Both names predate this seam and both are
 // persisted, the first on every session row, the second on session rows and workflow steps
-// (docs/managed-agents.md § Harnesses).
+// (docs/managed-agents/harnesses.md § Harnesses).
 import { createRequire } from 'node:module'
 import { probeClaudeAuthentication } from './authProbe'
 import type { AgentSession } from '../../contract/wire.ts'

@@ -1,5 +1,5 @@
 // Delivers a manifest-declared managed agent harness to the plugin that owns agent sessions.
-// See docs/managed-agents.md § Harnesses for the seam and the two driver tiers.
+// See docs/managed-agents/harnesses.md § Harnesses for the seam and the two driver tiers.
 //
 // This is a capability contract rather than a node-core registry, because the consumer is one
 // specific plugin and neither package may import the other.
@@ -53,7 +53,7 @@ export type HarnessRegistry = {
  *  the harness's own local id, and the host mints the qualified one. */
 export type PluginHarnessRegistration = Omit<ManifestHarness, 'id' | 'pluginId'> & { id: string }
 
-/** Where this plugin's managed agent harnesses go (docs/managed-agents.md § Harnesses). Registering
+/** Where this plugin's managed agent harnesses go (docs/managed-agents/harnesses.md § Harnesses). Registering
  *  when the agents plugin is absent is the same silent nothing every unmatched contribution gets. */
 export type PluginHarnessRegistry = {
   register(harness: PluginHarnessRegistration): void

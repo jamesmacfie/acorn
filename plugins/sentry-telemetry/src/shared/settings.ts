@@ -6,7 +6,7 @@
 // lives here, in `shared/`, rather than being written twice and drifting.
 //
 // Everything here is the sink's own decision to make. Core has one switch and never samples, because
-// only a sink knows which signals its vendor bills for (docs/telemetry.md § The collector).
+// only a sink knows which signals its vendor bills for (docs/telemetry/runtimes.md § The collector).
 
 /** Which of the five record kinds this exporter sends. Each maps to a Sentry item that costs money. */
 export type SentryKindSwitches = {

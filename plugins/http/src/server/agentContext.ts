@@ -1,5 +1,5 @@
 // "Saved HTTP requests" in the agent composer, as the two routes the manifest's `agentContexts`
-// descriptor names (docs/http-client.md § Client).
+// descriptor names (docs/http-client/client.md § Client).
 //
 // These rows arrive with the ciphertext already opened: real bearer tokens, real bodies, real
 // variable values. The shape below is an allowlist, so adding a field is an explicit act. The host
@@ -32,7 +32,8 @@ const TEMPLATE_ONLY = /^\{\{[A-Za-z0-9_.-]+\}\}$/
  * literal is a secret. Keys survive, so an agent still learns the endpoint takes `token`.
  *
  * Stricter than the client contribution it replaced, which sent the whole URL and leaked exactly
- * this way (docs/third-party/README.md § "http has moved").
+ * this way (docs/plugins/more-descriptors.md
+ * § Agent contexts).
  *
  * String surgery rather than `new URL()`: the stored URL is frequently a template
  * (`{{BASE_URL}}/users`) and would not parse.
@@ -59,7 +60,7 @@ export function redactUrl(url: string): string {
 
 /**
 /**
- * One saved request as markdown an agent can learn the API's shape from (docs/http-client.md §
+ * One saved request as markdown an agent can learn the API's shape from (docs/http-client/client.md §
  * Client). Method, URL, folder, auth mode, body mode, and header names survive; everything
  * credential-bearing does not.
  */

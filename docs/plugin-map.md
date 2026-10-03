@@ -1,6 +1,6 @@
 # How a plugin fits together
 
-A plugin adds functionality through declared APIs. Keep its data and implementation private; use
+A plugin adds functionality through declared APIs. Keep its data and implementation private. Use
 capabilities for calls, events for notifications, and extension points for contributions to another
 plugin's UI or behavior.
 
@@ -20,16 +20,16 @@ A loaded plugin can have a node half, a client half, both, or only manifest desc
 | Remote tree | Desktop worker or terminal worker | Sandbox bridge and shared component tree |
 
 Use a tree for UI that must work on desktop and terminal. Use a frame for browser-specific rendering.
-The default scaffold emits a tree without a build step; `--rectangle` emits a frame.
+The default scaffold emits a tree without a build step, and `--rectangle` emits a frame.
 
 Node plugins run on one Node. Client connections form a fleet, but a plugin's database and capability
-registry do not span that fleet. Keep client reads, caches, and subscriptions scoped to the selected Node.
+registry don't span that fleet. Keep client reads, caches, and subscriptions scoped to the selected Node.
 
 ## Startup
 
 The Node awaits each plugin's `init(ctx)`, then each optional `ready(ctx)`, before opening the listener.
 Loaded packages initialize after their declared `requires.plugins` dependencies. Resolve optional
-capabilities at call time so a reload or disabled provider does not leave a cached implementation.
+capabilities at call time so a reload or disabled provider doesn't leave a cached implementation.
 
 Compiled client plugins register contributions synchronously in `init(ctx)` and start side effects
 in `activate(ctx)`. Handle rejections from asynchronous work started there.
@@ -54,12 +54,13 @@ Use `acorn-plugin-types` for the loaded `NodePluginContext` declaration. Its mai
 | `extensionPoints`, `hooks` | Accept contributions and run declared hooks |
 | `audit`, `telemetry`, `log` | Record actions and operational diagnostics |
 
-Loaded plugins do not receive `routes.register`, `tools`, `contextSections`, `search`, `providers.model`,
-`events.channel`, or `events.streams`. Those members belong to the compiled context. `search`
-registers a search provider for the archive page ([plugins.md § Search providers](./plugins.md)).
-Loaded packages declare task-scoped tools and bounded context through `contributions.agentTools` and
-`contributions.contextSections` instead. The host adapts those descriptors into the same registries;
-they are not a second MCP server or context assembler.
+Loaded plugins don't receive `routes.register`, `tools`, `contextSections`, `search`,
+`events.channel`, or `events.streams`. Those members belong to the compiled context
+([the two contexts](./plugins/plugin-api.md#the-two-contexts-one-per-tier)). `search` registers a
+[search provider](./plugins/search-providers.md) for the archive page. Loaded packages declare
+task-scoped tools and bounded context through `contributions.agentTools` and
+`contributions.contextSections` instead. The host adapts those descriptors into the same registries,
+not a second MCP server or context assembler.
 
 A loaded Node plugin can also declare `contributions.cliCommands` for structured headless calls.
 The CLI reads descriptors from the selected Node's running roster and the Node dispatches through
@@ -67,7 +68,7 @@ the plugin's own route with the paired device principal. [CLI command authoring]
 defines the schema, scope, and retry contract.
 
 Core returns projections such as `TaskRef`, not database rows. A manifest grants each core facet
-explicitly. The host sends that owner-bound projection over RPC to a permission-scoped worker; direct
+explicitly. The host sends that owner-bound projection over RPC to a permission-scoped worker. Direct
 database and unrestricted Node builtin access are unavailable. For the trust boundary, see
 [Security](./security.md).
 
@@ -82,7 +83,7 @@ behavior. A frame owns its DOM and requests host operations through the bridge.
 
 Contribution `requires` fields express host requirements. A contribution's `when` predicate controls
 its own contextual availability. Gate desktop operations and provide a terminal alternative where
-appropriate; a shared component does not make an iframe or webview available in a terminal.
+appropriate. A shared component doesn't make an iframe or webview available in a terminal.
 
 For each contribution's availability, see [Contribution kinds](./contribution-kinds.md).
 
@@ -104,7 +105,7 @@ For each contribution's availability, see [Contribution kinds](./contribution-ki
 | `@acorn/plugin-api/testkit`, `testkit/client` | Repository test helpers |
 
 `@acorn/plugin-api` is private to the workspace. Do not use it as an npm runtime dependency in a
-third-party package. Bundle runtime dependencies into the output; an unbundled client file cannot
+third-party package. Bundle runtime dependencies into the output, because an unbundled client file can't
 resolve package imports. A remote tree must not import the DOM component barrel.
 
 ## Events
@@ -134,26 +135,25 @@ requests and session rosters, GitHub repositories and pull-request mirrors, brow
 typed sources, local review-note counts, memory-library scopes, and resolved preview homes. The
 provider's `contract/` directory holds the matching read capability whenever a listener needs more
 than the event's safe state payload. Exact payloads and deliberate omissions are in
-[Forward compatibility](./plugins/forward-compatibility.md#shipped-first-party-lifecycle-events).
+[Events](./plugins/events.md#shipped-first-party-events).
 
 Events have no replay or delivery guarantee. Re-read stored state after startup or reconnect.
 Use `ctx.events.status()` to invalidate your descriptors and `worktreeStatus(taskId)` after a
 worktree change. Store durable work in your own database.
 
 The client-local `clientEvents` emitter carries presentation and lifecycle events within one client.
-It does not notify other devices. Compiled clients can also register WebSocket handlers through
+It doesn't notify other devices. Compiled clients can also register WebSocket handlers through
 `registerWsChannel`. Loaded clients subscribe through the bridge.
 
 ## Talking to another plugin
 
 Resolve a capability through `ctx.capabilities.get(id)` when you need a result. `get` returns
-`undefined` when the provider is absent or the capability is ungranted; `require` throws.
+`undefined` when the provider is absent or the capability is ungranted, and `require` throws.
 Declare required plugin dependencies and capability permissions in the manifest.
 
 Share identifiers and types through public contracts. Do not import a provider's implementation,
 read its database, or use core internals to bypass a missing API. For working fragments, see
 [Events and capabilities](./plugin-authoring/events-and-capabilities.md).
-
 
 ## Notifications
 
@@ -170,9 +170,9 @@ Declare a source and the contributions it needs, such as routes, project surface
 resolution. Keep IDs in the plugin's namespace. Use status invalidation when source data changes.
 For the complete source descriptor, see [Descriptors](./plugins/descriptors.md).
 On desktop, a plugin can add actions to its own source and task pane icons with `rail.source` and
-`rail.pane` context menu descriptors. A compiled client registers through `ctx.contextMenus`; a loaded
+`rail.pane` context menu descriptors. A compiled client registers through `ctx.contextMenus`, and a loaded
 plugin declares the rows in its manifest. The host supplies the target and validates ownership.
-See [Context menus](./plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#context-menus).
+See [Context menus](./plugins/menus-and-markers.md#context-menus).
 
 ## Example: a compiled plugin, both halves
 

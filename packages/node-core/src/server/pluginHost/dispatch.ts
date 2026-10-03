@@ -10,7 +10,7 @@
 // plugin-route contract and not two.
 //
 // The principal is the node's own: 'internal' with the 'service' scope, which is what every other
-// loopback caller presents and what `requireProviderAccess` already admits (docs/security.md §
+// loopback caller presents and what `requireProviderAccess` already admits (docs/security/credentials.md §
 // Credential handling). It is not task-scoped, since a schedule and a sampling pass belong to no
 // task, and not a device, because nobody is here.
 import type { Env } from '../bindings'
@@ -81,7 +81,7 @@ export async function dispatchPluginRoute(
   forwarded.pathname = url.pathname.slice(routeMountPath(match).length) || '/'
   // The one seam where the host calls a plugin's route with no HTTP request behind it, so the
   // request middleware's span cannot cover it. `path` is the declared route, which is a pattern the
-  // manifest wrote down rather than a URL a caller composed (docs/telemetry.md § Node seams).
+  // manifest wrote down rather than a URL a caller composed (docs/telemetry/runtimes.md § Node seams).
   const span = startSpan(pluginId, { name: 'plugin.dispatch', attrs: { seam: 'plugin.dispatch', method: init.method, path } })
   try {
     // Entered for the same reason the request middleware enters it: the handler is about to run

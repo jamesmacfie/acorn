@@ -148,7 +148,7 @@ Each team Node should start in its region. Sign in from the desktop and use each
 - [Node enrollment](../../../node-enrollment.md): v2 beside v1.
 - [authentication](../../../authentication.md): the `member` principal and grants.
 - [security](../../../security.md): the grant issuer's trust cost.
-- [Node providers](../../../plugins/node-side-extension-points.md#node-providers): grant-backed
+- [Node providers](../../../plugins/node-providers.md#node-providers): grant-backed
   adoption.
 
 ## Open questions

@@ -47,7 +47,7 @@ export const publicConnectionProvider = <TValidated>(
         ...(connection.maxConnections === undefined ? {} : { maxConnections: connection.maxConnections }),
       },
       capabilities: provider.capabilities,
-      // Projected from the presence of the contribution; see docs/integrations.md § Project sources
+      // Projected from the presence of the contribution; see docs/integrations/project-sources.md § Project sources
       // for why a provider can neither over-claim nor under-claim `supportsProjects`.
       ...(provider.projects === undefined ? {} : { supportsProjects: true }),
       ...(provider.models === undefined ? {} : { models: provider.models }),

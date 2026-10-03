@@ -52,7 +52,7 @@ export function loadIconNodes(): Promise<IconNodeMap> {
 
 // A name worth fetching 706 KB for. `Icon` renders an unmatched name as text on purpose — Lucide has no
 // brand icons, so provider marks and about 120 inline glyph literals across plugins/ rely on that
-// fallback (docs/ui-design.md § Icons). Those are emoji, single characters and words with capitals or
+// fallback (docs/ui-design/icons.md § Icons). Those are emoji, single characters and words with capitals or
 // colons in them; asking Lucide about one would fetch the whole set to learn it was never there.
 const LUCIDE_SHAPED = /^[a-z0-9][a-z0-9-]*$/
 

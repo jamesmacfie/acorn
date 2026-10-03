@@ -1,4 +1,4 @@
-// The two calls behind Generate in the workflow editor (docs/workflows.md § Authoring): ask, read
+// The two calls behind Generate in the workflow editor (docs/workflows/ai-authoring.md § Generating and editing with AI): ask, read
 // the answer, and give the model one chance to fix what the checker found.
 //
 // The only impure thing here is the injected `generateText`, which is `core.models.generateText`

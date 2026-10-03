@@ -23,7 +23,7 @@ const { markersFor } = await import('../registries/rail/railMarkerFeed')
 const { _resetFrameContributions, syncFrameContributions } = await import('../frames/register')
 
 // The cooperative cross-plugin seam, end to end through the pass that builds it. Pins the four
-// promises and the one refusal docs/plugins.md § Cooperative extension points describes: the host
+// promises and the one refusal docs/plugins/cooperative-extension-points.md § Cooperative extension points describes: the host
 // mints both names, the host stamps provenance, an unmatched contribution is quiet, both ends must be
 // live, and B cannot reach past its own routes.
 

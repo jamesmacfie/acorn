@@ -3,7 +3,7 @@
 // `@opentui/keymap` is built from a `KeymapHost`: thirteen members that tell it how to read one
 // host's keyboard, tree and focus. The package ships an HTML one the desktop uses through
 // `client-core/kit/keys/keymapHost.ts`, and this file is the terminal's. Both hosts on one engine is
-// how the two adapters cannot drift, and it is why the engine stays (docs/tui.md § The adapter).
+// how the two adapters cannot drift, and it is why the engine stays (docs/tui/keys.md § The adapter).
 //
 // This host used to build its adapter from the OpenTUI one the package ships, overriding two of the
 // thirteen. What was wrong was never the engine but one of its questions: `getFocusedTarget`

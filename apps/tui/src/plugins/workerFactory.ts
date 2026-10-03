@@ -21,7 +21,7 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
 // The measurement 06-isolation.md asked for, made on Node 24 and 26: a worker thread's `execArgv`
 // **does** take `--permission`, and the grants are the worker's own rather than the parent's. So the
 // design's fallback — a child process per plugin with the two ports over IPC — is not needed, and the
-// TUI process itself runs with no permission flags at all. Recorded in docs/security.md § Rung 0.
+// TUI process itself runs with no permission flags at all. Recorded in docs/security/plugin-client-sandbox.md § Three containers.
 
 /**
  * The bootstrap, as a path rather than a specifier: a worker is pointed at a file, and the worker this
@@ -53,7 +53,7 @@ const log = createLogger('plugins')
 
 function spawn(url: string): WorkerLike {
   assertSupportedNodeRuntime(process.versions.node)
-  // The host addresses a bundle by hash and never by path, on every host (docs/security.md §
+  // The host addresses a bundle by hash and never by path, on every host (docs/security/plugin-bundles.md §
   // Third-party plugin bundles). Here the path is looked up from the hash rather than passed in.
   const hash = url.slice(url.lastIndexOf('/') + 1).replace(/\.js$/, '')
   const claimed = bundlePath(hash)

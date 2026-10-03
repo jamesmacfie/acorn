@@ -7,7 +7,7 @@ import type { PtyIo } from '../../kit/lib/pty'
 // bound to the channel the caller described (../../kit/lib/pty.ts).
 //
 // Here rather than in `kit/` because it carries xterm and a stylesheet, and the kit may import neither
-// (docs/frontend.md § Registries and plugins). Reached by a plugin through `@acorn/plugin-api/ui`,
+// (docs/frontend/registries.md § Registries and plugins). Reached by a plugin through `@acorn/plugin-api/ui`,
 // which is where every other host-owned rule on the compiled surface already is.
 //
 // It exists because three plugins were each doing this — the editor's `$EDITOR` window and docker's
@@ -15,7 +15,7 @@ import type { PtyIo } from '../../kit/lib/pty'
 // its own copy for the options it needs. The two throwaway ones are now one function, and the same
 // function has a sibling in the terminal client that draws in cells instead
 // (apps/tui/src/kit/pty.ts). That is what let the editor handoff and docker exec cross to a host with
-// no browser in it (docs/terminal.md § Client).
+// no browser in it (docs/terminal/client.md § Client).
 //
 // xterm arrives through a dynamic import, which is what the two callers used to get from `lazy()`
 // around their own components: it reads `self` at module scope, so a static import here would put it

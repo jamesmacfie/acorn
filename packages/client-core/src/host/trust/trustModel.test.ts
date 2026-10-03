@@ -26,7 +26,7 @@ const { recordTrustDecision, trustTiers } = await import('./trustModel')
 //
 // The tier split is a security claim rather than a layout: `Enforced` is a fence the UI bridge holds,
 // `Declared` is a disclosure the plugin can ignore entirely, and merging them would let the strong
-// half lend credibility to the weak one (docs/security.md § Design rules, rule 6).
+// half lend credibility to the weak one (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6).
 
 const HASH = 'a'.repeat(64)
 

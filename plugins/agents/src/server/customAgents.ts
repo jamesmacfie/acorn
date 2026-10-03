@@ -1,4 +1,4 @@
-// Where custom agents live on the node (docs/managed-agents.md § Custom agents).
+// Where custom agents live on the node (docs/managed-agents/custom-agents.md § Custom agents).
 //
 // Two feeders, one list. The owner's own agents are one `prefs` row per user, beside every other agent
 // setting. A plugin's are held in memory for as long as the plugin is enabled, the way a contributed

@@ -2,7 +2,7 @@ import { createUniqueId } from 'solid-js'
 import Icon from './Icon'
 
 /* The "?" a titled node draws after its title when given `help`. Internal to the kit: a node takes
-   `help`, and nothing places this directly (docs/ui-design.md § Tooltips).
+   `help`, and nothing places this directly (docs/ui-design/tooltips.md § Tooltips).
 
    A real button, so it is a tab stop and the tip opens on focus. Its name is "About" plus the title,
    so a page of marks reads "About Stop idle agents after" rather than "Help, help, help". Its

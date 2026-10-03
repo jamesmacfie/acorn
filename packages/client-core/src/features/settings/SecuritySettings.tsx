@@ -9,7 +9,7 @@ import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import './settings.css'
 
-// Settings → Security and backup (docs/security.md § On-disk): whether the node's disk is encrypted,
+// Settings → Security and backup (docs/security/audit.md § Filesystem and backup): whether the node's disk is encrypted,
 // and an archive of its databases. The audit trail that used to share this page is Settings → Audit log
 // (./AuditLogSettings.tsx).
 //

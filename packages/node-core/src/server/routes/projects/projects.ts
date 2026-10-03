@@ -119,7 +119,7 @@ export const projects = new Hono<AppEnv>()
     return c.json(result.response)
   })
   // Absolute paths of every free worktree are a layout disclosure, so a task-confined caller gets
-  // none, as with the task list (docs/security.md § Transport and auth).
+  // none, as with the task list (docs/security/transport-and-auth.md § Transport and auth).
   .get('/:id/worktrees', async (c) => {
     if (isTaskConfined(c)) return respondError(c, 403, 'forbidden')
     const row = await getProject(getDb(c.env), c.req.param('id'))

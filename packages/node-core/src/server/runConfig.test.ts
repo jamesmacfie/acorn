@@ -21,7 +21,7 @@ describe('captured repo configuration', () => {
   })
 })
 
-describe('loadRepoConfig (docs/workflows.md §2)', () => {
+describe('loadRepoConfig (docs/workspaces-and-tasks/project-config.md § The layers)', () => {
   let dir: string
   let repoDir: string
   let userDir: string
@@ -108,7 +108,7 @@ browser = "run:dev"
     const cfg = loadRepoConfig(repoDir, null, {})
     expect(cfg.errors).toEqual([])
     expect(cfg.copy).toEqual(['.env.local', '.env.development'])
-    // `ratio` in the file is tolerated but not parsed: panes split equally (docs/workflows.md).
+    // `ratio` in the file is tolerated but not parsed: panes split equally (docs/workspaces-and-tasks/project-config.md).
     expect(cfg.layouts).toEqual([{ id: 'review', panes: ['pr', 'changes'], terminal: 'dev', browser: 'run:dev' }])
   })
 

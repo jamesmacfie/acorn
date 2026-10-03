@@ -1,4 +1,4 @@
-// The appearance token contract, as data. See docs/ui-design.md § Token axes for the two axes and
+// The appearance token contract, as data. See docs/ui-design/tokens.md § Token axes for the two axes and
 // why they are disjoint.
 //
 // This module is the single declaration of which token belongs to which axis. `tokenAxes.test.ts`
@@ -24,8 +24,8 @@ export const DERIVED_THEME_TOKENS = [
 ] as const
 
 /** Series identity, for a chart mark asking "which one" rather than "how is this doing." See
- * docs/ui-design.md § Token axes for why this is neither a palette primitive nor derived, and
- * docs/dashboards.md § Views are derived, not chosen from a menu for how a chart uses it.
+ * docs/ui-design/tokens.md § Token axes for why this is neither a palette primitive nor derived, and
+ * docs/dashboards/views.md § Views are derived, not chosen from a menu for how a chart uses it.
  *
  * Three, hard cap. Series four onwards folds into `other`. */
 export const SERIES_TOKENS = ['--viz-series-1', '--viz-series-2', '--viz-series-3'] as const
@@ -93,7 +93,7 @@ export const INVARIANT_TOKENS = [
 ] as const
 
 // Tokens read from JavaScript via getComputedStyle, because canvas surfaces cannot use CSS. See
-// docs/ui-design.md § Token axes for the full list and why renaming one breaks the terminal or
+// docs/ui-design/tokens.md § Token axes for the full list and why renaming one breaks the terminal or
 // editor silently. Add to this list when a bridge starts reading a new token.
 export const BRIDGE_TOKENS = [
   '--bg', '--bg-subtle', '--bg-hover', '--bg-selected',
@@ -110,7 +110,7 @@ export const FRAME_TOKENS = [
 ] as const
 
 /** Ordering constraints that are behavioural, not cosmetic, asserted by the test. See
- * docs/ui-design.md § Token axes for why each pair is ordered this way. */
+ * docs/ui-design/tokens.md § Token axes for why each pair is ordered this way. */
 export const Z_ORDER_INVARIANTS: readonly (readonly [above: string, below: string])[] = [
   ['--z-picker', '--z-modal'],
   ['--z-modal', '--z-overlay'],

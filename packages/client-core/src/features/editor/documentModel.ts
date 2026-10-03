@@ -1,7 +1,7 @@
 // The parts of a host-owned document surface that are not a component (docs/editor.md).
 //
 // Everything here is pure or a plain module-level map, because vitest runs in node with no Solid
-// plugin (docs/testing.md), so the logic worth pinning has to live outside the .tsx.
+// plugin (docs/testing/layers.md § Client core), so the logic worth pinning has to live outside the .tsx.
 import { MAX_DOCUMENT_BYTES } from '@acorn/protocol/plugin/bridge.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
@@ -28,7 +28,7 @@ export { MAX_DOCUMENT_BYTES }
 export type DocumentScope = { taskId?: string; projectId?: string }
 
 /** What a composed pane's frame may do to the document it shares the rectangle with. See
- * docs/editor.md § Communication between regions. */
+ * docs/editor/composed-panes.md § Communication between regions. */
 export type DocumentHandle = {
   read(): string
   write(text: string): void
@@ -70,7 +70,7 @@ export const documentUri = (pluginId: string, surfaceId: string): string => `plu
 // ── View state ────────────────────────────────────────────────────────────────────────────────────
 //
 // Scroll and cursor, held as host state keyed by (node, scope, uri) rather than the plugin's own
-// editor's own type. See docs/editor.md § View state.
+// editor's own type. See docs/editor/document-surface.md § View state.
 //
 // `unknown` rather than `EditorViewState`, because this module is storage, not the editor. The one
 // caller that knows what the value is casts at the boundary.

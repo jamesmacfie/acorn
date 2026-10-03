@@ -35,7 +35,7 @@ const CSI = '\x1b['
  * 1 is the one that matters and it is why the app asks at all: a legacy terminal sends the single
  * byte `\r` for Return with Ctrl held and for Return without it, so `ctrl+return` — `commit`, the key
  * that sends what is in the composer — does not exist to be bound. It settles a lone Escape the same
- * way (docs/tui.md § The adapter).
+ * way (docs/tui/keys.md § The adapter).
  *
  * 2 is an addition to what `../main.tsx` asks for today, and it is deliberate. OpenTUI's
  * `useKittyKeyboard: { disambiguate: true }` builds the flags 1 and 4 and never 2 (its
@@ -91,7 +91,7 @@ const LEAVE = [
 ].join('')
 
 /** The 80 by 24 every terminal has been since the VT100, for a stdout that will not say. Also the
- *  size the whole kit is designed against (docs/ui-design.md § Every node at 80 by 24). */
+ *  size the whole kit is designed against (docs/ui-design/every-node.md § Every node at 80 by 24). */
 const FALLBACK = { cols: 80, rows: 24 }
 
 /** What this module needs of stdin, which is little enough that a test can pass an `EventEmitter`. */
@@ -167,7 +167,7 @@ export function openTerminal(options: TerminalOptions = {}): Terminal {
   // Raw mode is what makes the bytes above ours: no line buffering, no echo, and no terminal driver
   // turning Ctrl+C into a signal before we see it. Ctrl+C at the shell is the TUI's and inside an
   // entered rectangle it is the child's, which is the whole reason a rectangle owns its keys
-  // (docs/tui.md § Signals and exit).
+  // (docs/tui/process.md § Signals and exit).
   stdin.setRawMode?.(true)
   stdin.resume?.()
   stdin.on('data', onData)

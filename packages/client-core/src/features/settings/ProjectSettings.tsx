@@ -22,7 +22,7 @@ import { BranchPrefixRow, createProjectConfig, DatabaseTab, PreviewTab, SetupTab
 import { ProjectConnections } from './ProjectConnections'
 import { createSettingSave, createTextSetting } from './settingSave'
 
-// Settings → a project's own page (docs/frontend.md § Settings). One folder project's identity and its
+// Settings → a project's own page (docs/frontend/settings.md § Settings). One folder project's identity and its
 // project-level config, split over tabs because together they are two dozen rows. A settings page a
 // plugin registers with `scope: 'project'` is one more tab, drawn with this project in its context.
 //

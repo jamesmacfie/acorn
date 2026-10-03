@@ -256,7 +256,7 @@ describe('plugin host', () => {
     expect(disposed).toEqual(['last', 'second', 'first'])
   })
 
-  // The compiled tier's half of ctx.storage. See docs/data-layer.md § Migrations. All the host needs is
+  // The compiled tier's half of ctx.storage. See docs/data-layer/migrations.md § Migrations. All the host needs is
   // the module the chain sits beside.
   it("opens, reuses and closes a built-in's database from its declared chain", async () => {
     const dir = mkdtempSync(join(tmpdir(), 'acorn-builtin-storage-'))
@@ -513,7 +513,7 @@ describe('loaded plugins', () => {
   })
 
   it('delivers a granted core event to a loaded plugin, and stops on unload', async () => {
-    // The receive side of ctx.events (docs/plugins.md § Hearing another plugin). It fires whether or
+    // The receive side of ctx.events (docs/plugins/events.md § Hearing another plugin). It fires whether or
     // not a client is attached, which is the property that makes it useful on a node nobody is sitting
     // at.
     const heard: string[] = []
@@ -551,7 +551,7 @@ describe('loaded plugins', () => {
   })
 
   it('lets one plugin hear another\'s declared verb, and only a declared one', async () => {
-    // The cross-plugin grant (docs/plugins.md § Hearing another plugin). The producer is a built-in with an
+    // The cross-plugin grant (docs/plugins/events.md § Hearing another plugin). The producer is a built-in with an
     // `emits` field; the consumer is loaded, so the manifest grant applies too.
     const heard: string[] = []
     const gh = plugin('gh', { emits: [{ verb: 'checks-changed', description: 'checks flipped' }] })

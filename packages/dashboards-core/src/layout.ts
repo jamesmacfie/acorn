@@ -1,10 +1,10 @@
 import type { PanelId } from './model'
 
 // Grid geometry: where a panel sits in a placement, and what happens to its neighbours when it is
-// moved or resized. See docs/dashboards.md § The grid, and § The generated editor for why this
+// moved or resized. See docs/dashboards/placements.md § The grid, and § The generated editor for why this
 // logic is pure functions outside the grid component.
 
-/** Fixed, not responsive. See docs/dashboards.md § The grid for why 12 columns. A constant rather
+/** Fixed, not responsive. See docs/dashboards/placements.md § The grid for why 12 columns. A constant rather
  *  than config, since there is one placement kind's worth of grid. */
 export const COLS = 12
 
@@ -22,7 +22,7 @@ export type PanelLayout = {
 
 /** How small a panel of a given view kind may be, and how big it arrives. The view already gates what
  *  the editor offers; it also knows how small a panel can be before it is furniture. A tuning table,
- *  not a contract. See docs/dashboards.md § The grid. */
+ *  not a contract. See docs/dashboards/placements.md § The grid. */
 export type PanelSize = { minW: number; minH: number; w: number; h: number }
 
 const SIZES: Record<string, PanelSize> = {
@@ -82,7 +82,7 @@ type Placed = { id: PanelId; rect: Rect }
 /** Reading order, `(y, x)` with the id as the tiebreak so every client paired with the node agrees.
  *
  *  This is the order everything else here iterates in, and it is what `placements` is rewritten to on
- *  every commit. See docs/dashboards.md § The grid for the three things that keeps true. */
+ *  every commit. See docs/dashboards/placements.md § The grid for the three things that keeps true. */
 export function readingOrder(layout: PanelLayout): PanelId[] {
   return layout.order
     .filter((id) => layout.rects[id])

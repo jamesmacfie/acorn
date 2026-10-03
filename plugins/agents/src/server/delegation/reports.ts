@@ -77,7 +77,7 @@ export function delegatedTurn(
   }
 }
 
-/** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents.md § Managed delegation). */
+/** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents/delegation.md § Managed delegation). */
 export class DelegationReports {
   constructor(
     private readonly runtime: ManagedAgentRuntime,

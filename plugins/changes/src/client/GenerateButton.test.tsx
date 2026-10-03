@@ -106,7 +106,7 @@ describe('what a press does', () => {
   })
 
   // The text it would overwrite is the reader's, so the button asks before it replaces it. Two
-  // presses, and the label between them is the whole prompt (docs/ui-design.md § The closed kit).
+  // presses, and the label between them is the whole prompt (docs/ui-design/closed-kit.md § The closed kit).
   it('arms first over a message somebody wrote', () => {
     draw({ backends: [backend('c1', 'Work', ['fast'])], draft: 'feat: I wrote this' })
     wand()!.click()

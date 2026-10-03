@@ -183,7 +183,7 @@ describe('the panel-local schema', () => {
 
 describe('`source` as a panel-local field', () => {
   // A row's source is provenance, not a field, so it becomes a field where fields already grow and
-  // every downstream feature works without a chart special case. See docs/dashboards.md § Provenance,
+  // every downstream feature works without a chart special case. See docs/dashboards/panels.md § Provenance,
   // and what a row may not claim.
 
   it('appears on a multi-source panel as an ordinary enum over the panel’s own source keys', () => {

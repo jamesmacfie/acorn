@@ -101,7 +101,7 @@ and node-scoped caches already assume N.
 Decided 2026-08-28 while planning the layout programme: mobile is a PWA, not a native app, and
 host-owned layouts are what make the subset shell cheap. Every pane declares one of eight host-owned
 layouts, each with a narrow projection written before it lands
-([docs/panes.md § Layout model](../panes.md#layout-model)), so responsiveness is paid once per layout
+([docs/panes.md § Layout model](../panes/layout.md#layout-model)), so responsiveness is paid once per layout
 rather than once per pane. The rest of what the kit owes a mobile host — breakpoints as style tokens,
 `formFactor` on surfaces so a desktop-shaped rectangle is hidden rather than mangled, no node reading
 the window width, and hover that is never load-bearing — is

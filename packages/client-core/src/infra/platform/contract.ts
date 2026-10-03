@@ -34,7 +34,7 @@ import {
 // Returning strings instead of calling `expect` keeps a test framework out of src/.
 //
 // Every group is nullable, so a host that renames a member returns null and the affordance vanishes
-// with no compile error. This turns that into a failing test. See docs/testing.md § Test layers.
+// with no compile error. This turns that into a failing test. See docs/testing/layers.md § Test layers.
 
 // A member added to a seam type and left out of the lists below fails `tsc` here rather than
 // silently dropping out of the contract.
@@ -44,7 +44,7 @@ const members =
     keys as readonly string[]
 
 // Groups a host either implements or does not. Absent is a supported product state for all but the
-// first two: docs/shell.md § The renderer bridge.
+// first two: docs/shell/bridge-and-broker.md § The renderer bridge.
 const GROUPS = {
   desktop: {
     // Not an object, so it is checked rather than enumerated: the marker plus the platform string.

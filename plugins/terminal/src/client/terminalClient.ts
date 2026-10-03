@@ -29,7 +29,7 @@ export type TerminalApi = {
 
 // Always available: every verb here is an HTTP route or a WebSocket frame against the node. It used to
 // return null unless the shell exposed a native folder picker, which is neither a PTY nor
-// anything this file has an opinion about (git history: docs/future/node-first/platform-seam.md). Whether the node
+// anything this file has an opinion about (the node-first platform seam design, in Git history). Whether the node
 // runs terminals at all is `hasHostCapability({ plugin: 'terminal' })`, read from the node's plugin roster.
 export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi => {
   const post = <T>(url: string, body?: unknown) => writeJson<T>(url, { nodeId, method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })

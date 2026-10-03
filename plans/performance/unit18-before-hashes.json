@@ -1,9 +1,0 @@
-{
-  "capturedBeforeEditing": true,
-  "baselineHead": "4b8a611a",
-  "sha256": {
-    "packages/node-core/src/server/core/data.ts": "bb0f449e48f8e7d0d4c8a90e446d9240e382c948fc0b0554a80e32ecd5fcd39a",
-    "plugins/database/src/server/database.ts": "0064db2a37bb731b213597f93eb9e4a5b9a13d60c3a043095282b085d3b2c76f",
-    "plans/performance/13-data-probe.test.ts": "dbc08f3f3c142dbe90c07c8dd10215c716488e7ae28f695cd33df7e039104397"
-  }
-}

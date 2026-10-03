@@ -1,4 +1,4 @@
-// Where a right-click lands, and what a menu item may ask about it. See docs/plugins.md § Context
+// Where a right-click lands, and what a menu item may ask about it. See docs/plugins/menus-and-markers.md § Context
 // menus.
 
 /** Every place a right-click opens a host-drawn menu. */

@@ -28,13 +28,13 @@ import { bootMark, emitBootSpans } from './boot'
 const noop = () => null
 
 // The renderer's telemetry, wired before anything renders so a seam that fires during boot has
-// somewhere to put its record (docs/telemetry.md § The renderer). Wiring is not collecting: the
+// somewhere to put its record (docs/telemetry/renderer.md § The emitter). Wiring is not collecting: the
 // emitter stays off until `App.tsx` reads `telemetry.enabled` off the node and says otherwise.
 startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer') })
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
 // Counts about the page every thirty seconds while collecting, read against the memory the shell
-// measures from outside (docs/shell.md § What the shell reports).
+// measures from outside (docs/shell/node-child.md § What the shell reports).
 const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
 window.addEventListener('pagehide', stopPageFacts, { once: true })
 
@@ -42,7 +42,7 @@ window.addEventListener('pagehide', stopPageFacts, { once: true })
 // error thrown outside a component's boundary was a line in a devtools console nobody had open.
 //
 // Fatal and unhandled, with the stack, which is the one place a client record carries one: an
-// uncaught error with no stack is not worth sending anywhere (docs/telemetry.md § What never leaves
+// uncaught error with no stack is not worth sending anywhere (docs/telemetry/model.md § What never leaves
 // the machine).
 window.addEventListener('error', (event) => {
   emitError('core', {
@@ -76,7 +76,7 @@ bootMark('script start')
 
 // A WS drop means the client missed events, and there is no cursor into history to replay from, so
 // the remedy is to mark everything stale and let whatever is on screen refetch
-// (docs/api-reference.md § Events). `refetchType: 'active'` is what keeps that from fanning out
+// (docs/api-reference/websocket.md § Events). `refetchType: 'active'` is what keeps that from fanning out
 // across every cached query the user cannot currently see. It is also why only the active node's
 // client needs invalidating: no other node has a mounted query to refetch.
 wsOnReconnect(() => void clientFor(activeCacheId()).client.invalidateQueries({ refetchType: 'active' }))
@@ -126,20 +126,20 @@ createRoot(() => {
 // than here. A pass fired from this line ran before the fleet list had been read and while the node the
 // helper just started was still `offline`, so it asked nobody and found nothing, and no loaded plugin
 // appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
-// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins.md § The dev loop).
+// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins/dev-loop.md § The dev loop).
 watchPluginChanges()
 void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
 // window invalidates its cached list whether or not it was the one that wrote
-// (docs/plugins.md § Hearing a core event).
+// (docs/plugins/events.md § Hearing a core event).
 watchTaskChanges()
 
 // …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
 // so Settings → Services and the Sources rail hear about it here rather than at the next 401
-// (docs/plugins.md § Hearing a core event).
+// (docs/plugins/events.md § Hearing a core event).
 watchConnectionChanges()
-// The rest of the core catalogue (docs/plugins.md § Hearing a core event): projects invalidate their query;
+// The rest of the core catalogue (docs/plugins/events.md § Hearing a core event): projects invalidate their query;
 // HEAD, run targets and agent sessions are re-emitted on the client bus for whoever listens.
 watchProjectChanges()
 watchWorkspaceChanges()
@@ -184,10 +184,10 @@ bootMark('tree built')
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
 // moment the node could answer. The two are far apart on purpose: nothing between `script start` and
-// this frame waits on the helper or the node (docs/frontend.md § Startup readiness).
+// this frame waits on the helper or the node (docs/frontend/data-and-startup.md § Startup readiness).
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
 // and not the renderer's: a launch watched from behind another window prints every other mark and not
-// this one, which is why `tree built` above exists (docs/local-development.md § Timing a cold start).
+// this one, which is why `tree built` above exists (docs/local-development/profiling.md § Timing a cold start).
 // A task queued from rAF lets this paint finish before importing and registering the roster.
 // Occluded windows do not receive rAF on macOS, so they get a bounded fallback as well.
 let pluginsStarted = false

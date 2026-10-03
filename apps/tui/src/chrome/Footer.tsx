@@ -16,7 +16,7 @@ import { nodeSentence, nodeStarting } from './nodeState'
 //
 // The node's state takes the right-hand end, and only when it is worth a sentence. A healthy node
 // says nothing, which is the same rule every other surface in the app keeps
-// (docs/ui-design.md § Connection and staleness vocabulary).
+// (docs/ui-design/states.md § Connection and staleness vocabulary).
 
 /** What an entered rectangle says instead of the hints, because while it is entered they are all
  *  false: it has taken every key, and the only two that mean anything are these

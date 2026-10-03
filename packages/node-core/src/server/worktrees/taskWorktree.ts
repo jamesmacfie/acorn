@@ -54,7 +54,7 @@ export const rendererBaseCheckout = (cwd: string | undefined): string | undefine
 
 export type TaskRow = typeof schema.tasks.$inferSelect
 
-// The plugin-facing projection of a task: docs/plugins.md § Activation covers why CoreServices
+// The plugin-facing projection of a task: docs/plugins/activation.md § Activation covers why CoreServices
 // hands back TaskRef rather than the database row, and why it carries only the fields plugins need.
 export type TaskRef = {
   id: string
@@ -193,7 +193,7 @@ export async function projectForTask(db: AppDatabase, t: Pick<TaskRef, 'projectI
 // Fired once per task, right after its worktree is first created and configured files are copied.
 //
 // A hook rather than a capability since phase 4 of the layout programme (server/pluginHost/hooks.ts,
-// docs/plugins.md § Hooks). It used to be one typed slot the terminal plugin filled, which meant one
+// docs/plugins/hooks.md § Hooks). It used to be one typed slot the terminal plugin filled, which meant one
 // plugin could run setup and a second had nowhere to say so. The choke point is still core's; what
 // changed is that any number of packages may take a turn here, in the owner's order, each bounded and
 // each recorded on its own roster row when it fails.
@@ -222,7 +222,7 @@ async function adoptBranch(db: AppDatabase, t: TaskRef, path: string, branch: st
   if (on === branch) return
   await db.update(schema.tasks).set({ branch: on, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
   log.info(`task ${t.id} adopted branch '${on}' from ${path}, was '${branch}'`)
-  // Same event worktree creation uses: consumers re-read the task row (docs/plugins.md § Hearing a
+  // Same event worktree creation uses: consumers re-read the task row (docs/plugins/events.md § Hearing a
   // core event).
   broadcastTasksChanged({ taskId: t.id })
 }
@@ -255,7 +255,7 @@ export async function resolveTaskCwd(
   if (!t.branch || project?.vcs !== 'git') return { cwd: checkout, isWorktree: false, created: false }
   if (t.worktreePath && isDir(t.worktreePath)) {
     const isProjectRoot = !!projectRoot && resolve(t.worktreePath) === resolve(projectRoot)
-    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks.md §
+    // A path persisted once used to be trusted forever, until docs/workspaces-and-tasks/worktrees.md §
     // Worktrees and setup: verify rather than assume before handing a persisted path back.
     if (!isProjectRoot) await adoptBranch(db, t, t.worktreePath, t.branch)
     return { cwd: t.worktreePath, isWorktree: !isProjectRoot, created: false }
@@ -282,7 +282,7 @@ export async function resolveTaskCwd(
     await db.update(schema.tasks).set({ worktreePath: wt.path, updatedAt: Date.now() }).where(eq(schema.tasks.id, t.id))
     // The task row just gained a worktree, and archive already announces losing one, so "worktree
     // created / removed" folds into `tasks:changed`: a consumer re-reads `worktreePath`
-    // (docs/plugins.md § Hearing a core event).
+    // (docs/plugins/events.md § Hearing a core event).
     broadcastTasksChanged({ taskId: t.id })
     if (wt.created) {
       const scripts = taskScripts(db)
@@ -354,7 +354,7 @@ export async function projectSetup(db: AppDatabase, projectId: string): Promise<
   return { script: config?.config.setupScript ?? null, trigger: config?.config.setupScriptTrigger ?? 'terminal' }
 }
 
-// Copy files into a fresh worktree (docs/workspaces-and-tasks.md § Worktrees and setup): read the
+// Copy files into a fresh worktree (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup): read the
 // config from the source checkout, since the entries are usually gitignored and only it has them.
 // Warnings are logged, never thrown, so a failed copy never blocks worktree creation.
 export async function copyConfiguredFiles(db: AppDatabase, t: Pick<TaskRef, 'projectId'>, checkout: string, worktreePath: string): Promise<void> {

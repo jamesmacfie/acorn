@@ -6,7 +6,7 @@ import { describe, expect, it } from 'vitest'
 import ts from 'typescript'
 
 // Architecture boundary enforcement. Every rule below is stated, with the failure it prevents, in
-// docs/architecture-overview.md § Package boundaries. Read that first, then this for the mechanics.
+// docs/architecture/packages.md § Package boundaries. Read that first, then this for the mechanics.
 //
 // The scanner resolves relative and bare @acorn/* specifiers, so the package graph is checked across
 // intra-package and cross-package imports alike. Test files follow the same rules as production files
@@ -37,7 +37,7 @@ const PACKAGES: Pkg[] = ['apps', 'packages', 'plugins', 'tools']
   })
   .map((dir) => {
     const name = (JSON.parse(readFileSync(join(dir, 'package.json'), 'utf8')) as { name: string }).name
-    // Kind comes from where a package lives, not its name (docs/architecture-overview.md § Package
+    // Kind comes from where a package lives, not its name (docs/architecture/packages.md § Package
     // boundaries): the `@acorn/plugin-` name prefix would classify `@acorn/plugin-api`, a shared
     // library every plugin imports, as a plugin.
     const base = basename(dirname(dir))
@@ -145,7 +145,7 @@ const crossPackage = firstParty.filter((e) => e.target.pkg!.name !== e.fromPkg.n
 // 'shared', and so on.
 const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).split('/')[0]
 
-// contract/ is the one cross-plugin import surface (docs/plugins.md § Package shape). A plugin may
+// contract/ is the one cross-plugin import surface (docs/plugins/package-shape.md § Package shape). A plugin may
 // import another plugin's contract/; anything else is a coupling edge.
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
@@ -198,7 +198,7 @@ function side(pkg: Pkg, file: string): 'client' | 'node' | 'shared' {
   }
   const seg = relative(pkg.src, file).split('/')[0]
   if (seg === 'client') return 'client'
-  // `entries` and `composition` are apps/node's two folders (docs/architecture-overview.md).
+  // `entries` and `composition` are apps/node's two folders (docs/local-development.md).
   // `main` was a side until it merged into `server` on 2026-08-30.
   if (['server', 'mcp', 'entries', 'composition'].includes(seg)) return 'node'
   return 'shared'
@@ -274,7 +274,7 @@ describe('architecture boundaries', () => {
 
   it('spawning a child process is an enumerated exception to the broker', () => {
     // Every entry below is a considered exception to the broker, with its reason inline. See
-    // docs/architecture-overview.md § Package boundaries and docs/security.md § Process, path, and
+    // docs/architecture/packages.md § Package boundaries and docs/security/process-and-paths.md § Process, path, and
     // configuration controls.
     const CHILD_PROCESS_OK = new Set([
       // Core, and the broker itself.
@@ -313,7 +313,7 @@ describe('architecture boundaries', () => {
   it('the renderer and the other client runtimes log through the logger, not console (shrinking baseline)', () => {
     // The renderer's half of the same rule. Its 66 call sites moved on 2026-09-11, and a line
     // written through `createLogger` reaches every sink and says who wrote it
-    // (docs/telemetry.md § The renderer).
+    // (docs/telemetry/logging.md § The rule).
     //
     // The terminal client is scanned with it, because it runs client-core in process and writes
     // through the same logger. The desktop helper and `packages/custody` are the other rule's,
@@ -334,7 +334,7 @@ describe('architecture boundaries', () => {
       'packages/client-core/src/host/frames/sdk/frameMount.ts',
       'packages/client-core/src/host/frames/sdk/treeChannel.ts',
       // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
-      // a log line (docs/tui.md § What the terminal client reports).
+      // a log line (docs/tui/reporting.md § What the terminal client reports).
       //
       // A person answering a pairing prompt, before the renderer exists.
       'apps/tui/src/node/pair.ts',
@@ -356,7 +356,7 @@ describe('architecture boundaries', () => {
   it('the node logs through the logger, not console (shrinking baseline)', () => {
     // A log line written through `console.error` carries nothing but the prefix the author typed:
     // no owner, no scrubbing, and no way for a sink to see it. `createLogger` gives all three
-    // (docs/telemetry.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
+    // (docs/telemetry/logging.md § Logging). The node's 81 call sites moved on 2026-09-10 and this is what
     // keeps them moved; the renderer and the other runtimes follow in phases 1 and 3.
     //
     // A source scan and not a graph edge: `console` is a global, so there is no import to trace.
@@ -379,12 +379,12 @@ describe('architecture boundaries', () => {
       'apps/node/src/entries/standalone.ts',
       // The desktop helper's stdout is the line protocol Rust parses. Those two writes are the
       // handshake, not log lines; everything else in the file goes through the logger
-      // (docs/shell.md § The shell process).
+      // (docs/shell/process.md § The shell process).
       'apps/desktop/src/helper/helperMain.ts',
     ]
     // The helper and the custody stack are here rather than with the renderer's rule: they are Node
     // processes, they already depend on node-core, and their lines belong on stderr
-    // (docs/shell.md § What the helper reports).
+    // (docs/shell/node-child.md § What the helper reports).
     const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
     const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
       .filter((file) => !isTestCode(file))
@@ -404,7 +404,7 @@ describe('architecture boundaries', () => {
     // The third console rule, and the strictest, because a plugin has no reason to be an exception.
     // A plugin's line goes through `ctx.log` where a context is in reach, and through
     // `createLogger(tag, '<plugin id>')` from `@acorn/plugin-api` where one is not: a module-level
-    // engine, a route factory, a driver (docs/plugin-authoring.md § Telemetry and logging).
+    // engine, a route factory, a driver (docs/plugin-authoring/telemetry.md § Telemetry and logging).
     //
     // The baseline is empty and stays empty. Thirteen sites moved on 2026-09-11, and the arguments
     // the other two rules make for their entries, that stdout is a wire, that the file is the
@@ -426,7 +426,7 @@ describe('architecture boundaries', () => {
 
   it('a loaded plugin that draws a tree writes no DOM and ships no stylesheet', () => {
     // The tree path's whole premise: the plugin names acorn's components and the host draws them
-    // (docs/plugins.md § The tree contract). A raw element or a class in one of these directories is
+    // (docs/plugins/tree-contract.md § The tree contract). A raw element or a class in one of these directories is
     // markup the host cannot draw, cannot style with the reader's pack, and cannot give focus or ARIA
     // to — it would render as the labelled placeholder and nothing would say why.
     //
@@ -517,7 +517,7 @@ describe('architecture boundaries', () => {
     ])
     // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
     // which a provider's node builds diff documents with and its client hands the viewer
-    // (docs/diff-rendering.md § The document).
+    // (docs/diff-rendering/document.md § The document).
     const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document'])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
@@ -543,7 +543,7 @@ describe('architecture boundaries', () => {
     // ends up shipped. Any package's testkit/, not just node-core's: the rule immediately found the
     // same shape in plugins/github.
     // One exception: the agent-automation seeder, which writes fixtures into a throwaway data root
-    // before the window starts and is test scaffolding by purpose (docs/testing.md § Large-surface
+    // before the window starts and is test scaffolding by purpose (docs/testing/desktop.md § The large-surface
     // fixture). It never ships: apps/desktop/scripts/ is build and dev tooling.
     const offenders = EDGES.filter((e) => !isTestCode(e.fromFile) && rel(e.fromFile) !== 'apps/desktop/scripts/agent/seed.ts')
       .filter((e) => e.target.file?.includes('/src/testkit/') || e.target.file?.endsWith('/src/testkit.ts'))
@@ -665,7 +665,7 @@ describe('architecture boundaries', () => {
   })
 
   it('protocol declares no plugin route', () => {
-    // docs/architecture-overview.md § Package boundaries: @acorn/protocol owns no plugin's wire
+    // docs/architecture/packages.md § Package boundaries: @acorn/protocol owns no plugin's wire
     // surface.
     const proto = byName.get('@acorn/protocol')!
     const files = walk(proto.src)
@@ -700,7 +700,7 @@ describe('architecture boundaries', () => {
   })
 
   it('the reserved plugin route segment is spelled the same on both sides of the client/node boundary', () => {
-    // Two spellings that must not drift (docs/architecture-overview.md § Package boundaries).
+    // Two spellings that must not drift (docs/architecture/packages.md § Package boundaries).
     const client = byName.get('@acorn/client-core')!
     const node = byName.get('@acorn/node-core')!
     const corePaths = readFileSync(join(client.src, 'host/registries/commands/corePaths.ts'), 'utf8')
@@ -735,7 +735,7 @@ describe('architecture boundaries', () => {
   })
 
   it('core never names a plugin', () => {
-    // The claim docs/plugins.md § Adding a plugin contribution makes: a fourth tracker, harness or
+    // The claim docs/plugins/adding-a-contribution.md § Adding a plugin contribution makes: a fourth tracker, harness or
     // terminal-shaped plugin is one roster line and no core edit. A plugin id spelled inside
     // `packages/*` is how that claim stops being true, so each surviving one is named here with its
     // reason and the list may only shrink.
@@ -860,7 +860,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only core reaches the machine identity store', () => {
-    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
+    // Core seams are not reachable around (docs/architecture/packages.md § Package boundaries).
     const IDENTITY_STORE_OK = new Set(['packages/node-core', 'apps/node'])
     const offenders = PACKAGES.flatMap((p) =>
       walk(p.src)
@@ -874,7 +874,7 @@ describe('architecture boundaries', () => {
   })
 
   it('only custody touches the third-party plugin cache and trust store', () => {
-    // Core seams are not reachable around (docs/architecture-overview.md § Package boundaries).
+    // Core seams are not reachable around (docs/architecture/packages.md § Package boundaries).
     // client-core/host/plugins/host.ts is the one door on the renderer side, speaking hashes and
     // decisions only.
     // Two hosts, one store each. `apps/desktop` reaches it from its helper, `apps/tui` from its own
@@ -923,7 +923,7 @@ describe('architecture boundaries', () => {
 
   it('the Tauri surface stays inside the shell', () => {
     // The renderer's one door to a host is the platform seam, and the bridge that fills it is the only
-    // file that may name a Tauri binding (docs/testing.md § Test layers). `src/client` is the
+    // file that may name a Tauri binding (docs/testing/layers.md § Test layers). `src/client` is the
     // renderer and shares this package with the shell, so the rule names the shell folder rather than
     // the package.
     const SHELL = join(ROOT, 'apps', 'desktop', 'src', 'shell') + '/'
@@ -965,7 +965,7 @@ describe('architecture boundaries', () => {
   it('the terminal client keeps custody out of everything that draws', () => {
     // The desktop runs the renderer and the broker in two processes, so "the renderer never holds a
     // token" is structural. The TUI is one process, so the same promise is a module boundary instead,
-    // and this is it (docs/tui.md § Shell and broker in one process). Custody — the token
+    // and this is it (docs/tui/process.md § Shell and broker in one process). Custody — the token
     // store, the fleet store, the broker, pairing — is reachable from the process model and from the
     // seam that installs it, and from nothing that draws a cell.
     //
@@ -987,7 +987,7 @@ describe('architecture boundaries', () => {
 
   it('the terminal focus store knows the keyboard and not the screen', () => {
     // `apps/tui/src/keys/` is the keyboard's: five levels, one settle pass, and no idea which region
-    // is the rail (docs/tui.md § Focus regions). Everything the shell knows about its own
+    // is the rail (docs/tui/focus.md § Focus regions). Everything the shell knows about its own
     // arrangement arrives through `setTopology` and `setPaneCycler`, installed from `chrome/Shell.tsx`.
     // An import the other way is how `moveBack` came to find Browse by spelling its id.
     const reaching = EDGES
@@ -1017,7 +1017,7 @@ describe('architecture boundaries', () => {
   it('plugin-api is a facade: re-exports only, and only of the core packages', () => {
     // The moment the facade grows behaviour of its own it becomes another core package with its own
     // bugs. `@acorn/diff-document` is on the list because `ui/diff` publishes the document types the
-    // viewer's port is written in (docs/diff-rendering.md § The document).
+    // viewer's port is written in (docs/diff-rendering/document.md § The document).
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
     const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api', '@acorn/diff-document'])
     const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
@@ -1230,7 +1230,7 @@ describe('architecture boundaries', () => {
   })
 
   it('gives a plugin no way to draw inside the palette', () => {
-    // docs/plugins.md § Command kinds. A plugin returns facts and declares a closed verb; the host
+    // docs/plugins/commands.md § Command kinds. A plugin returns facts and declares a closed verb; the host
     // draws them. A frame or a remote tree targeting the palette would put one palette per plugin
     // inside the one surface that owns global focus, the reserved keys and every loading and error
     // state — and it would have no terminal half at all.
@@ -1246,7 +1246,7 @@ describe('architecture boundaries', () => {
   })
 
   it('gives a search response no way to choose what selecting it does', () => {
-    // docs/command-palette-and-shortcuts.md § Palette data. A route answer is untrusted wire input. A
+    // docs/command-palette-and-shortcuts/palette-data.md § Palette data. A route answer is untrusted wire input. A
     // result that could name a verb, a route or a URL would make a changing server response more
     // powerful than the manifest somebody reviewed, so the row carries display facts and identity and
     // the manifest's search command owns the one static action.
@@ -1449,7 +1449,7 @@ describe('architecture boundaries', () => {
   // core's diff rows and defined by github. Each meant a pane silently lost its styling when an
   // unrelated plugin was switched off, invisible to the compiler.
   it('a request body is parsed, not cast', () => {
-    // docs/architecture-overview.md § Package boundaries: a mutation route parses its body with a Zod
+    // docs/architecture/packages.md § Package boundaries: a mutation route parses its body with a Zod
     // schema. The rule the review found drifted was written down and nowhere enforced, so ten route
     // files had gone back to `as { field?: string }`, which type-checks and validates nothing.
     //

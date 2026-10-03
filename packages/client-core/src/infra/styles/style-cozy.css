@@ -72,8 +72,8 @@
   --dur-med: 280ms;
 }
 
-/* Escape hatch, budget 25 selectors (docs/ui-design.md § Style packs). Currently 2. */
+/* Escape hatch, budget 25 selectors (docs/ui-design/tokens.md § Style packs). Currently 2. */
 
 
-/* docs/ui-design.md § Style packs covers why this reaches past the token block for .markdown. */
+/* docs/ui-design/tokens.md § Style packs covers why this reaches past the token block for .markdown. */
 :root[data-style='cozy'] .markdown { line-height: var(--lh); }

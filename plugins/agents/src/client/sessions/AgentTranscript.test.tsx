@@ -217,7 +217,7 @@ describe('a streamed event reaching the transcript', () => {
   })
 })
 
-// A long session is drawn through a window (docs/managed-agents/client-surfaces.md § Client surfaces):
+// A long session is drawn through a window (docs/managed-agents/transcript.md § The window):
 // the projection covers every event, and the DOM holds the newest page and whatever the reader asked
 // for on top of it.
 describe('a long transcript', () => {

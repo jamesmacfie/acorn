@@ -6,7 +6,7 @@ import type { ToolRisk } from '../transport/api'
 // (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
 // stays a pure sink.
 //
-// See docs/plugins.md § Node providers for the seam and docs/architecture-overview.md § The three
+// See docs/plugins/node-providers.md § Node providers for the seam and docs/architecture/control-plane.md § The three
 // parties for why a provider is the second door into the fleet.
 
 /** Where a provided node is in its life. `provisioning` is the state this exists for: a node being
@@ -22,8 +22,7 @@ export type ProvidedNodeState = z.infer<typeof providedNodeStateSchema>
 export const providedNodeSchema = z.strictObject({
   // The control plane's own id for this node, stable no matter which node asked. That stability is
   // what lets two nodes signed into one account list the same cloud nodes, and what makes moving
-  // credential custody later renumber nothing (docs/future/phased-review-steps/cloud-guardrails.md
-  // rule 5).
+  // credential custody later renumber nothing.
   providerNodeId: z.string().min(1),
   // acorn's own id, once the node has booted far enough to have one. Null before that.
   nodeId: z.string().nullable(),
@@ -59,7 +58,7 @@ export type NodeProviderDescriptor = {
 
 // `GET /v1/core/nodes`. One provider being unreachable is a line in `failures`, never a failed
 // response: the same partial-result posture the client's fan-out takes across nodes
-// (docs/architecture-overview.md § Client state and fleet behavior).
+// (docs/architecture/fleet.md § Client state and fleet behavior).
 export type NodeProvidersResponse = {
   providers: NodeProviderDescriptor[]
   nodes: Array<ProvidedNode & { providerId: string }>
@@ -67,7 +66,7 @@ export type NodeProvidersResponse = {
 }
 
 // `POST /v1/core/nodes/adopt`. The renderer names a provider and a node; the answer carries the
-// credential, so the desktop host is the only caller (docs/shell.md § Fleet membership).
+// credential, so the desktop host is the only caller (docs/shell/bridge-and-broker.md § Fleet membership).
 export const nodeAdoptBodySchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),

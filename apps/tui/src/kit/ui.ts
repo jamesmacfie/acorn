@@ -1,6 +1,6 @@
 // What `@acorn/plugin-api/ui` is on this host.
 //
-// A compiled pane reaches the kit through that one facade (docs/plugins.md § The plugin API), so
+// A compiled pane reaches the kit through that one facade (docs/plugins/plugin-api.md § The plugin API), so
 // pointing the facade here is the whole host switch for it: the pane's source is unchanged, its
 // imports are unchanged, and a different component answers each name. `vite.config.ts` makes the swap
 // for the bundle and `tsconfig.json`'s `paths` makes it for tsc.
@@ -98,6 +98,6 @@ export function createSplitDrag(options: SplitDragOptions): SplitDrag {
 // Two of the barrel's exports have no answer here and are absent rather than stubbed.
 //
 // `tip` is the delegated tooltip protocol, and hover is never load-bearing anywhere
-// (docs/tui.md § What the TUI never does). `rowHeightSm` is a pixel count for
+// (docs/tui/rectangles.md § What the TUI never does). `rowHeightSm` is a pixel count for
 // a DOM virtualiser; `Rows` here counts lines instead. A pane that reaches for one fails to build,
 // which is the answer we want: the affordance is gone, not silently broken.

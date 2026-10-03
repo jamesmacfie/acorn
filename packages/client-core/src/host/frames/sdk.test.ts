@@ -6,7 +6,7 @@ import { AcornBridgeError, connect, mountFrame, mountTree, openLinkOnClick, _res
 // (packages/client-core/vitest.config.ts). What it needs is exactly what a frame gives it: something
 // to hear one `message` event on, and a port. Both are stubbed; the port is a real MessageChannel.
 //
-// docs/plugins.md § Loaded plugins: the client half owns the behaviour this suite pins: the handshake
+// docs/plugins/client-half.md § Loaded plugins: the client half owns the behaviour this suite pins: the handshake
 // deadline and its placeholder, the content-link ladder and rung preference, the two browser affordances
 // a frame does not have, and the once-a-second/focus-gated `openUrl` throttle.
 
@@ -633,7 +633,7 @@ describe('telemetry and log', () => {
   it('posts one message per verb, with no id and nothing to await', async () => {
     // Fire and forget by design: telemetry never fails the thing it describes, so there is no
     // reply for the host to send and nothing a frame could do with one
-    // (docs/plugin-authoring.md § Telemetry from a frame).
+    // (docs/plugin-authoring/the-bridge.md § Telemetry from a frame).
     host(() => undefined)
     const acorn = await handshake()
     acorn.telemetry.event('cache-miss', { resource: 'issues' })

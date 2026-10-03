@@ -35,7 +35,7 @@ export const localStatusRoute = (taskId: string) => `/v1/p/changes/tasks/${taskI
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
 export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
-// The stacked diff as a document (docs/diff-rendering.md § The document). One staging area at a time:
+// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at a time:
 // the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
 // for the file, which is how the node knows a file has not moved and need not be diffed again.
 export const localDocumentRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document`
@@ -60,7 +60,7 @@ export const localActionRoute = (
  *  `all` is the client's answer to "nothing is staged": `git commit -a` stages every tracked
  *  modification and deletion and leaves untracked files alone, which is what the button that sets it
  *  says. `noVerify` skips git's own pre-commit and commit-msg hooks; acorn's `before-commit` chain
- *  runs either way (docs/plugins.md § Hooks). */
+ *  runs either way (docs/plugins/hooks.md § Hooks). */
 export type CommitOptions = { all?: boolean; amend?: boolean; signoff?: boolean; noVerify?: boolean }
 
 /** HEAD's hash and full message, which is what an amend puts in an empty field. */
@@ -114,7 +114,7 @@ export const localCommitMessageRoute = (taskId: string) => `/v1/p/changes/tasks/
  *
  *  This plugin's own route rather than a read of core's roster: `/v1/core/integrations` has no bridge
  *  scope, and minting one would hand every installed plugin every connection to serve one dropdown
- *  (docs/integrations.md § Model providers). The path still says `model-connections` after the rename:
+ *  (docs/integrations/model-providers.md § Model providers). The path still says `model-connections` after the rename:
  *  only this plugin's own client reads it, so changing it would be churn with nothing on the other
  *  side of it. */
 export const localModelBackendsRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/model-connections`

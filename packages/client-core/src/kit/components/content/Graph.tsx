@@ -13,7 +13,7 @@ import {
  * The kit's canvas. It is here rather than in the plugin that wanted it because plugin client code
  * may not emit raw DOM or SVG: a picture drawn in a plugin is a picture the terminal host cannot
  * draw, and the premise of the kit is that both hosts draw the same tree
- * (docs/ui-design.md § The closed kit). Two surfaces asked for it, the workflows editor and the
+ * (docs/ui-design/closed-kit.md § The closed kit). Two surfaces asked for it, the workflows editor and the
  * workflows run pane, and both projections were written before it landed, which is the admission
  * rule.
  *

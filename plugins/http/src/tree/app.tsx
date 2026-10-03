@@ -8,7 +8,7 @@ import HttpList from './HttpList'
 import HttpVariables from './HttpVariables'
 import { httpPanelModel } from './panelModel'
 
-// Two regions and a settings renderer, over three manifest surfaces (docs/http-client.md § Client).
+// Two regions and a settings renderer, over three manifest surfaces (docs/http-client/client.md § Client).
 // What a pane draws is decided by the props the host mounted this region with, which is the tree
 // contract's version of what the frame contract called `context`: the host says what this region was
 // opened to look at.
@@ -20,7 +20,7 @@ import { httpPanelModel } from './panelModel'
 //                   project first, and it is a renderer of its own rather than a fourth branch here.
 //
 // The two panes are `list-detail`, so the host draws the split, the divider and the drag handle and
-// mounts each region separately (docs/panes.md § Layout model). Both regions run in one worker and
+// mounts each region separately (docs/panes/layout.md § Layout model). Both regions run in one worker and
 // share ./panelModel.ts, which is what makes two renderers possible at all: the selection, the draft
 // and the send result are in module scope rather than in either component.
 //

@@ -28,7 +28,7 @@ async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): 
   })
 }
 
-// Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins.md §
+// Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins/activation.md §
 // Activation): a plugin may resolve scope and filesystem ownership, but never receives core's
 // executable config, hidden/sort state, or a database handle.
 export type ProjectRef = {
@@ -252,8 +252,8 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
 }
 
 /**
- * Delete a project and the tasks that belong to it (docs/workspaces-and-tasks.md § Workspace and
- * project). Row-only: the project's folder and any task worktrees are never touched from here.
+ * Delete a project and the tasks that belong to it (docs/workspaces-and-tasks/projects.md
+ * § Delete a project). Row-only: the project's folder and any task worktrees are never touched from here.
  */
 export async function deleteProject(db: AppDatabase, id: string): Promise<void> {
   const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)

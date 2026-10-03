@@ -1,4 +1,4 @@
-// Reloading one loaded plugin's node half in a running process (docs/plugins.md § The dev loop).
+// Reloading one loaded plugin's node half in a running process (docs/plugins/dev-loop.md § The dev loop).
 //
 // The split with server/pluginHost/host.ts matches the boot path. This half does the disk work: re-scan,
 // start a fresh worker realm with a fresh module graph, re-resolve the manifest's migrations chain. The host owns the

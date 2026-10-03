@@ -4,7 +4,7 @@ import { createRunPaneModel, WORKFLOWS_PANE_ID, type RunPaneModel } from './runP
 import { taskHasWorkflowRuns } from './runStore'
 
 // Workflow runs as a `list-detail` pane: the host draws the split and these four regions fill it
-// (docs/panes.md § Layout model).
+// (docs/panes/layout.md § Layout model).
 //
 // `when` hides it on a task that has never run a workflow, which is most of them, so the pane strip
 // does not grow a button per task (./runStore.ts holds the answer in memory).

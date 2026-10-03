@@ -9,7 +9,7 @@ import { setSelectedSource } from '../../../features/tasks/tasks'
 // Resolving an external URL in rendered content to somewhere inside the app, so a link to
 // github.com/o/r/pull/9 or linear.app/acme/issue/ENG-1 opens the pane instead of the browser. The
 // manifest declaration, the three destinations and who picks between them are in
-// docs/plugins.md § Loaded plugins: the client half.
+// docs/plugins/client-half.md § Loaded plugins: the client half.
 //
 // The registry and this type used to live in plugins/github/src/client/contentLinks.ts, together with
 // the recogniser for linear's URLs, so a third provider could not participate in link resolution
@@ -157,7 +157,7 @@ export function scanContentRefs(texts: (string | null | undefined)[]): ContentRe
 // prefix already confirmed in the same surface by a URL the owning plugin's own recogniser claimed. The
 // prefix was witnessed, so there is no ambiguity to resolve, and the shape is host-owned, so there is no
 // pattern language to review. Cold-start bare refs with no witness are a different and later design,
-// recorded in docs/third-party/README.md.
+// recorded in docs/future/compiled-tier.md § Open items from the loaded-plugin migrations.
 const BARE_REF_SHAPE = /^([A-Z][A-Z0-9]*)-\d+$/
 
 /** Prefix to the provider whose confirmed ref licensed it. First witness wins, so a second provider
@@ -289,7 +289,7 @@ export type ContentLinkPresentation = {
   // browse and a rail source have no task, and the panel rung covers them.
   taskId?: string | null
   // Which presentation the clicking surface would rather have. The surface knows where the reader is and
-  // the target does not, which is the whole argument. See docs/dashboards.md § Provenance, and what a row
+  // the target does not, which is the whole argument. See docs/dashboards/panels.md § Provenance, and what a row
   // may not claim for the ranking and the bug that produced it.
   prefer?: 'route' | 'pane' | 'refPanel'
   // The shell's navigator, for the `route` rung. Absent is normal: a surface with no navigator in scope

@@ -52,7 +52,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
 
-// Turning accepted manifests into shell contributions (docs/plugins.md § Frame contribution kind).
+// Turning accepted manifests into shell contributions (docs/plugins/frames.md § Frame contribution kind).
 //
 // This file registers ordinary contributions, pre-bound to the plugin, surface and bundle. What draws
 // inside one is the surface's own declaration: a `remote` region is a tree of the host's own components
@@ -93,7 +93,7 @@ const PluginOverlay = lazy(() => import('./PluginOverlay'))
 const DomExtendedPane = lazy(() => import('../chrome/ChromeExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
-// (docs/plugins.md § The tree contract).
+// (docs/plugins/tree-contract.md § The tree contract).
 //
 // Host-supplied, with the DOM's as the fallback, for the reason `paneLayouts` below is: this pass runs
 // on every host and a terminal draws a tree in cells (../tree/table.ts).
@@ -197,7 +197,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
   // The two extension carriers that run the plugin's own bytes: a remote tree in a worker, and an
   // `inline` rectangle in an iframe. Both ride this pass rather than the chrome one, and both are gated
   // on trust for the same reason a pane is and with no second question asked — the prompt the owner
-  // answered was about these bytes (docs/shell.md § The plugin worker). The other two
+  // answered was about these bytes (docs/shell/origins.md § The plugin worker). The other two
   // carriers, `items` and `route`, are descriptors and register in the chrome pass.
   for (const entry of row.installed?.contributions.extensions ?? []) {
     if (entry.remote === undefined && entry.frame === undefined) continue
@@ -269,7 +269,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // Every pane declares one of the host's layouts. The host draws the arrangement and fills each
       // region: a document region is the host's editor and runs no plugin code at all, a `frame` region
       // is the plugin's own bundle in an iframe, and a `remote` region is that same bundle in a worker
-      // emitting a tree the host draws (docs/panes.md § Layout model). This comes before everything else
+      // emitting a tree the host draws (docs/panes/layout.md § Layout model). This comes before everything else
       // the `pane` case does, because a pane whose regions are all documents has no bundle to mount and
       // no bridge to open.
       //
@@ -329,7 +329,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 // own bytes in the other half of a composed pane, and the grant is structural either
                 // way: what makes the `document` verb answerable is standing beside a host editor, not
                 // which of the two runtimes the bundle happens to be in
-                // (docs/editor.md § Communication between regions).
+                // (docs/editor/composed-panes.md § Communication between regions).
                 regions[name] = () => createComponent(RemoteTree, { contribution, props: regionScope, scope: regionScope, document: documentGrant, openingItem })
                 continue
               }
@@ -388,7 +388,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       }
       // Did this manifest reserve part of this pane for somebody else? Two locations, two contributors:
       // a `pane.footer` strip filled by other plugins' rows, and a `pane.aside` column filled by the
-      // user's own panels (docs/dashboards.md § Placements). Both are read off the manifest rather
+      // user's own panels (docs/dashboards/placements.md § Placements). Both are read off the manifest rather
       // than the registry, because the chrome pass registers points on its own schedule and asking the
       // registry here would make the wrapper depend on which pass ran first.
       //
@@ -401,7 +401,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         const point = points.find((entry) => entry.location === 'pane.footer')
         const pointId = point ? qualifiedExtensionPointId(pluginId, point.id) : null
         // The two rectangle locations, each holding another plugin's iframe beside this one's
-        // (docs/plugins.md § Cooperative extension points, the `rectangle` kind).
+        // (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `rectangle` kind).
         const inlineId = (location: string): string | null => {
           const entry = points.find((candidate) => candidate.location === location)
           return entry ? qualifiedExtensionPointId(pluginId, entry.id) : null
@@ -729,7 +729,7 @@ export function syncFrameContributions(): void {
   }
 }
 
-// The other half of the forward-compatibility rule (docs/plugins.md § Forward compatibility): the node
+// The other half of the forward-compatibility rule (docs/plugins/forward-compatibility.md § Forward compatibility): the node
 // retained what it could not understand, and this is where it gets reported. One row per declaration, on
 // the same path a surface that failed to register takes, because the owner's question is the same either
 // way — "why is this part of the plugin not doing anything?"

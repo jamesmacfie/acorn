@@ -8,7 +8,7 @@ import StatView from './StatView'
 import TableView from './TableView'
 
 // The one place a panel's body is drawn, for both the placed panel (Panel.tsx) and the wizard's live
-// preview (PanelPreview.tsx). docs/dashboards.md § The generated editor and § Placements cover why
+// preview (PanelPreview.tsx). docs/dashboards/mapping-and-editor.md § The generated editor and § Placements cover why
 // there is exactly one view switch and what an unresolved view kind falls back to.
 
 export default function PanelBody(props: PanelViewProps) {

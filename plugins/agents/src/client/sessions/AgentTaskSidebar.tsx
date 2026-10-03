@@ -31,7 +31,7 @@ import {
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
-// (docs/command-palette-and-shortcuts.md § Focus and typing). Subagents are rows of the sessions collection at depth
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). Subagents are rows of the sessions collection at depth
 // one, rather than a nested list, because stepping into a child run is a selection and not an
 // expansion.
 //
@@ -39,7 +39,7 @@ import {
 // sessions with its workflow steps, and opening a step spawned a terminal on the harness's resume
 // command. The run pane owns a run's steps now
 // (plugins/workflows runs/paneContribution.ts), and the terminal drawer owns PTY sessions, so the
-// rows had two better homes and one confusing one (docs/workflows.md § What workflows refuses).
+// rows had two better homes and one confusing one (docs/workflows/refusals.md § What workflows refuses).
 
 /** The order button in a group's header. The choice is this task's and this group's alone
  *  (./sessionOrder.ts). */
@@ -68,7 +68,7 @@ function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }
 }
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
- *  the list under it scrolls (docs/panes.md § Layout model). */
+ *  the list under it scrolls (docs/panes/layout.md § Layout model). */
 export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>
@@ -265,7 +265,7 @@ export default function AgentTaskSidebar(props: { task: Task; model: AgentPaneMo
                   // off the session row, which the WebSocket pushes whenever an event this node
                   // records changes it, so these rows appear and settle live for every session in the task and
                   // not only the one that happens to be open. Nothing extra is fetched
-                  // (docs/managed-agents.md § Subagents).
+                  // (docs/managed-agents/subagents.md § Subagents).
                   <Row
                     item={itemProps}
                     variant="stacked"

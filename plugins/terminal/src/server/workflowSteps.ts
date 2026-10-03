@@ -1,4 +1,4 @@
-// This plugin's two workflow step kinds (docs/terminal.md § Workflow steps).
+// This plugin's two workflow step kinds (docs/terminal/run-targets.md § Workflow steps).
 //
 // They live here rather than in the workflows plugin for the reason the http step gives: everything a
 // command needs to run safely is already in this package — the process broker's environment

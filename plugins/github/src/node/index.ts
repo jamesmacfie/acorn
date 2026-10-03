@@ -38,7 +38,7 @@ export const githubPlugin = (): NodePlugin => {
     label: 'GitHub',
     required: false,
     // What other plugins may hear from this one
-    // (docs/plugins/forward-compatibility.md § Hearing another plugin). workflows hears
+    // (docs/plugins/events.md § Hearing another plugin). workflows hears
     // `checks-changed`.
     emits: [
       { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
@@ -51,13 +51,13 @@ export const githubPlugin = (): NodePlugin => {
     migrationsModule: import.meta.url,
     init: async (ctx) => {
       // Opens and migrates before init returns; every router below closes over this handle rather
-      // than reading one off the request environment (docs/data-layer.md § Plugin databases).
+      // than reading one off the request environment (docs/data-layer/plugin-databases.md § Plugin databases).
       const store = ctx.storage.open()
       ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
         id: 'pull-request',
         value: pullRequestEditorLineMarkers(store, ctx.core),
       })
-      // github's own `plugin:github:<verb>` channel (docs/plugins.md § Hearing another plugin).
+      // github's own `plugin:github:<verb>` channel (docs/plugins/events.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
       const emit = githubEmitter(ctx.events.send)
 
@@ -128,7 +128,7 @@ export const githubPlugin = (): NodePlugin => {
       // github.sqlite), so github registers it directly rather than through GITHUB_MIRROR: resolving
       // its own capability out of the registry would be a plugin asking the graph about itself.
       // Contribution semantics, including what an absent section renders as, are core's
-      // (docs/agent-tools.md § Context sections).
+      // (docs/agent-tools/context-sections.md § Context sections).
       ctx.contextSections.register(pullRequestSection((userId, repoOwner, repoName, pullNumber) =>
         mirroredPullRequest(store, userId, repoOwner, repoName, pullNumber),
       ))

@@ -1,7 +1,7 @@
 // Drivable browser, pure layer: CDP accessibility payloads become a compact AxNode tree with stable
 // per-snapshot refs (e1, e2, ...), plus the ref bookkeeping clicks and fills resolve against. Agents
 // reference refs, never CSS selectors, which is the Playwright ARIA-snapshot model.
-// See docs/agent-tools.md § Browser tools. The glue that opens a session and dispatches input lives
+// See docs/agent-tools/browser-and-scripts.md § Browser tools. The glue that opens a session and dispatches input lives
 // in ./driver.ts.
 export type AxNode = {
   ref?: string // present when the node is actionable (has a backend DOM node)

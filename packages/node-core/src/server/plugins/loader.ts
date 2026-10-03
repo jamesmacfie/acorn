@@ -1,7 +1,7 @@
-// Loading a plugin's node half from disk (docs/plugins.md § Loaded plugins).
+// Loading a plugin's node half from disk (docs/plugins/loaded-plugins.md § Loaded plugins).
 //
 // Everything here is best-effort: a bad manifest, an unimportable bundle or an id that collides with
-// a built-in is a skip plus a report, never a throw (docs/plugins.md § Loaded plugins, "Failures are
+// a built-in is a skip plus a report, never a throw (docs/plugins/loaded-plugins.md § Loaded plugins, "Failures are
 // contained").
 //
 // The loader used to be inert unless ACORN_UNSAFE_PLUGINS=1, because there was no consent surface and
@@ -101,7 +101,7 @@ export type InstalledPluginInfo = {
   bundled?: true
 }
 
-// Why one directory did not produce a plugin (docs/plugins.md § Loaded plugins, "Failures are
+// Why one directory did not produce a plugin (docs/plugins/loaded-plugins.md § Loaded plugins, "Failures are
 // contained"). `id` is the directory name when the manifest could not be read at all, since it is the
 // only handle we have on the thing that failed. `at` used to be missing, and every load failure
 // rendered as a 56-year-old event that sorted last within its severity band; the roster needs it so
@@ -250,7 +250,7 @@ export function scanInstalled(dataRoot: string): { installed: InstalledPlugin[];
 
   for (const name of subdirectories(root).sort()) {
     const dir = join(root, name)
-    // The reason carries the Zod issue paths (docs/plugins.md § Loaded plugins, "Failures are
+    // The reason carries the Zod issue paths (docs/plugins/loaded-plugins.md § Loaded plugins, "Failures are
     // contained").
     const read = readPluginManifestResult(dir)
     if (!read.ok) {
@@ -385,7 +385,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   if (!manifest.node) {
     // But it may still contribute to the node, as data. A managed agent harness and a custom agent are
     // the two kinds that need no route of their own and therefore no bundle at all
-    // (docs/managed-agents.md § Harnesses), and the point of that tier is that adding an agent costs one
+    // (docs/managed-agents/harnesses.md § Harnesses), and the point of that tier is that adding an agent costs one
     // manifest.
     //
     // It goes through the host as a real plugin with an empty `init`, rather than being delivered
@@ -503,7 +503,7 @@ export async function loadExternalPlugins(
   for (const outcome of outcomes) {
     if (outcome.failure) failures.push(outcome.failure)
     if (outcome.loaded) {
-      // Shadowing a built-in during a staged migration (docs/plugins.md § The dev loop). Loud rather
+      // Shadowing a built-in during a staged migration (docs/plugins/dev-loop.md § The dev loop). Loud rather
       // than silent, because "the version running is not the one in this binary" is the single most
       // confusing thing a support thread can fail to mention.
       if (outcome.loaded.shadowsBuiltin) log.warn(`${outcome.loaded.manifest.id}: loading from ${outcome.loaded.dir} INSTEAD of the built-in`)

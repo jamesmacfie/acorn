@@ -17,12 +17,12 @@ import { closeOverlay } from './state'
 import type { ShellModel } from './model'
 
 // What is waiting, as the bell's two sections in a terminal
-// (docs/tui.md § What is drawn bespoke).
+// (docs/tui/chrome.md § What is drawn bespoke).
 //
 // The desktop draws this in a popover under the topbar bell. There is no popover here and no bell to
 // hang one under, so it is an overlay opened on `n` — and an overlay rather than a fourth panel
 // because the column has three framed panels and twenty-two rows to spend at 80 by 24. An inbox that
-// is open only when asked costs nothing when it is closed (docs/tui.md § The screen).
+// is open only when asked costs nothing when it is closed (docs/tui/chrome.md § The screen).
 //
 // The data is the bell's, not its component: `createAttentionInbox` is the same fleet-wide fan-out
 // and `noticesForActiveNode` the same ring. What differs is the pixels, and one shape — the two
@@ -125,7 +125,7 @@ export function Inbox(props: { model: ShellModel }) {
     <Modal onDismiss={close} title="Notifications" size="md">
       <ModalBody>
         <box flexDirection="column">
-          {/* Partial results are a banner, never a failed list (docs/architecture-overview.md § Fleet). */}
+          {/* Partial results are a banner, never a failed list (docs/architecture/fleet.md § Fan-out and partial results). */}
           <For each={inbox?.().unavailable ?? []}>
             {(entry) => <Line tone="warn">{`${entry.label} unavailable`}</Line>}
           </For>

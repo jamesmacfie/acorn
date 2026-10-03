@@ -1,8 +1,0 @@
-{
-  "plugins/agents/src/server/sessions/sessionRepository.ts": "c8dad0850989e50c79e0d30f5ceb58e3fa175bbbb9b6011e4c7ac83cfb0cb0ca",
-  "plugins/agents/src/server/sessions/store.ts": "ec181637c07557d435919d01f2a28589c90ead5c7a64dc42989876abc0790128",
-  "plugins/agents/src/server/routes/managedBridge.ts": "c791d72d04c083bc31b086b19482577e2525dd077a068ccb614881ba394b54ba",
-  "plugins/agents/src/server/sessions/runtimeEngine.ts": "7c90711caab3e32ccc41eb9dffb60d987bc7b7b071ac9bed0671b05f28f7a590",
-  "plugins/agents/migrations/meta/_journal.json": "e3132bc50017fa515ce53ef2f70ff5fee896aff2ad5840e8f9ceb58b3dd382d2",
-  "plans/performance/unit12-search-probe.test.ts": "87e73c439823b2a29a37489883f13a20c471df787533d50bb66637cfa11d61c7"
-}

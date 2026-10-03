@@ -21,8 +21,8 @@ const REPO = join(PACKAGES, '..')
 const CLI = join(HERE, 'index.mjs')
 
 const documentedExample = (heading: string, language: string): string => {
-  const source = readFileSync(join(REPO, 'docs/plugin-authoring/installing-a-hand-written-package.md'), 'utf8')
-  const marker = `### \`${heading}\``
+  const source = readFileSync(join(REPO, 'docs/plugin-authoring/complete-example.md'), 'utf8')
+  const marker = `## \`${heading}\``
   const section = source.indexOf(marker)
   const open = source.indexOf(`\`\`\`${language}\n`, section)
   const start = open + language.length + 4
@@ -90,8 +90,8 @@ it('points $schema at the schema this repository actually publishes', () => {
 
 it('keeps copyable manifest examples compatible with the host major', () => {
   for (const [path, section] of [
-    ['docs/plugin-authoring/the-manifest.md', '#### Add task annotations'],
-    ['docs/plugin-authoring/installing-a-hand-written-package.md', '### `acorn-plugin.json`'],
+    ['docs/plugin-authoring/extensions.md', '## Add task annotations'],
+    ['docs/plugin-authoring/complete-example.md', '## `acorn-plugin.json`'],
   ]) {
     const example = JSON.parse(fencedExample(path!, section!, 'json'))
     expect(speaksApiVersion(example.apiVersion), path).toBe(true)

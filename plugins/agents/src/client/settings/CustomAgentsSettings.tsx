@@ -12,7 +12,7 @@ import ProviderGlyph from '../sessions/ProviderGlyph'
 import { advertisedOptionsByProvider } from './agentConfigOptions'
 import { customAgentsOptions, deleteCustomAgent, saveCustomAgent } from './customAgentsClient'
 
-// Settings -> Agents -> Custom agents: saved starts for a managed session (docs/managed-agents.md §
+// Settings -> Agents -> Custom agents: saved starts for a managed session (docs/managed-agents/custom-agents.md §
 // Custom agents). A list, then one agent's editor in the same pane, which the settings header names
 // and offers the way back from (useSettingsDetail). The editor is a form with Save and Cancel rather
 // than saving on each change, unlike the rest of Settings, because an agent is a record that needs a

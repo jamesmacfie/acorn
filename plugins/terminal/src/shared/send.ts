@@ -1,4 +1,4 @@
-// Submit mode for sendToAgent's bracketed-paste delivery (docs/terminal-and-agents.md § Sending
+// Submit mode for sendToAgent's bracketed-paste delivery (docs/terminal/activity.md § Sending
 // text to an agent).
 //
 // Lives in shared/ because four sides of this plugin need the same union and contract/ is one of them.

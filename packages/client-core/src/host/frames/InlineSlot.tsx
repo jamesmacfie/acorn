@@ -7,7 +7,7 @@ import { createSlotChoice } from '../tree/slotChoice'
 import PluginFrame from './PluginFrame'
 import { frameBindingFor } from './register'
 
-// Another plugin's rectangle, drawn as a sibling region of this one's pane (docs/plugins.md §
+// Another plugin's rectangle, drawn as a sibling region of this one's pane (docs/plugins/cooperative-extension-points.md §
 // Cooperative extension points, the `rectangle` kind).
 //
 // The counterpart to `tree/Slot.tsx`, and the same arbitration module decides both: what differs is
@@ -18,7 +18,7 @@ import { frameBindingFor } from './register'
 // The two rectangles are siblings and the host sits between them. Neither can reach into the other:
 // the occupant's bridge is bound from the occupant's own manifest, so standing inside somebody else's
 // pane grants it nothing of theirs, and talking across the box is a hook with one handler
-// (docs/plugins.md § Hooks).
+// (docs/plugins/hooks.md § Hooks).
 
 export function InlineSlot(props: {
   /** `<owner>:<point>`, the id the host minted from the owner's manifest. */

@@ -5,7 +5,7 @@
 // contributions for every host, and it named `chrome/ChromeExtendedPane.tsx` directly. That component is DOM
 // all the way down — `<div class="extended-pane">`, `<aside>`, a `PanelGrid` sized in pixels — so a
 // loaded plugin's pane that reserved a footer or an aside handed the cell reconciler a `div` and it
-// refused (docs/tui.md § The host switch).
+// refused (docs/tui/host-switch.md § The host switch).
 //
 // Types only, so a bare-Node suite can import the frame registration pass without a Solid transform.
 // The components themselves stay behind the caller's `lazy`.
@@ -14,7 +14,7 @@ import type { Component, JSX } from 'solid-js'
 import type { PanelRegion } from '../../features/dashboards/region'
 
 /** What both hosts' `ExtendedPane` takes: the owner's own frame, and the point ids of the rectangles
- *  it reserved for somebody else (docs/plugins.md § Cooperative extension points). */
+ *  it reserved for somebody else (docs/plugins/cooperative-extension-points.md § Cooperative extension points). */
 export type ExtendedPaneProps = {
   /** The qualified point id of a `pane.footer`, when this pane reserved one. */
   footerPointId?: string

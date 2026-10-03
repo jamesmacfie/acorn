@@ -5,7 +5,7 @@ import type { Env } from './bindings'
 // Work a plugin will do when something asks, with no client attached and no request in sight, and the
 // registry that makes it askable.
 //
-// A schedule is the one thing asking today (docs/schedules.md § `node-action`) and it is not the
+// A schedule is the one thing asking today (docs/schedules/user-schedules.md § `node-action`) and it is not the
 // definition. An event, a monitor crossing a threshold, a webhook, a run finishing: each of those is a
 // different caller of the same actions, and the tier on the record below is what lets them ask for
 // different confirmations. Nothing here may grow a schedule-shaped assumption.

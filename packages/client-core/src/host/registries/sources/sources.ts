@@ -21,7 +21,7 @@ export type SourcePromotion<Item> = {
 }
 
 // A URL pattern a source wants registered on the Router. `order` decides registration order, so a
-// static path can be declared ahead of a parameter path that would swallow it (docs/frontend.md §
+// static path can be declared ahead of a parameter path that would swallow it (docs/frontend/registries.md §
 // Registries and plugins).
 export type SourceRouteContribution = {
   id: string
@@ -32,7 +32,7 @@ export type SourceRouteContribution = {
 export type SourceContribution<Item = unknown> = {
   id: string
   // The rail's position. Required rather than derived from plugin activation order. See
-  // docs/frontend.md § Registries and plugins.
+  // docs/frontend/registries.md § Registries and plugins.
   order: number
   // Absent for local sources with no integration row behind them (docker); always shown.
   providerId?: string
@@ -42,7 +42,7 @@ export type SourceContribution<Item = unknown> = {
   // have a desktop shell, does this node run terminals (../hostCapabilities.ts).
   requires?: HostCapabilityRequirement
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
-  // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
+  // Core's Fleet home is the one user of it (docs/frontend/registries.md § Registries and plugins).
   when?: () => boolean
   // Draw only while the active workspace has a git project. A workspace question rather than a `when`,
   // because the active workspace is the rail's to know and `SourceScope` already carries its facts.
@@ -80,7 +80,7 @@ export type SourceContribution<Item = unknown> = {
   defaultPane?: string
   // A third question again: given the integration behind `providerId` is connected, does it grant this
   // capability? Not `requires`, which asks about the platform, and not a plugin-to-plugin capability
-  // either — the three used to share a word (docs/plugins.md § Collaboration rules).
+  // either — the three used to share a word (docs/plugins/collaboration.md § Collaboration rules).
   requiresProvider?: ProviderCapabilityName
   // Does this surface read the routed project? Opt in, because most sources don't, and a source that
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
@@ -90,19 +90,19 @@ export type SourceContribution<Item = unknown> = {
   // Presentation only: the source still registers, still opens from a command, and the user's switch
   // wins over it (features/tabs/railVisibility.ts). Core's own sources ignore it.
   showInRailByDefault?: boolean
-  // The owning plugin may declare the initial browse surface (docs/frontend.md § Registries and
+  // The owning plugin may declare the initial browse surface (docs/frontend/registries.md § Registries and
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean
   routes?: readonly SourceRouteContribution[]
-  // Where a task belongs in the router, when this source owns it. See docs/plugins.md § Loaded
+  // Where a task belongs in the router, when this source owns it. See docs/plugins/client-half.md § Loaded
   // plugins: the client half.
   taskPath?: (task: Task) => string | undefined
   // The inverse of `taskPath`: does this task already track the thing a reference panel is showing?
-  // docs/plugins.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
+  // docs/plugins/client-half.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
   tracksRef?: (task: Task, ref: { providerId?: string; displayId: string }) => boolean
   promotion?: SourcePromotion<Item>
   // No `emptyState` here, unlike the descriptor twin, because a first-party source is a component and
-  // renders its own empty case (docs/plugins.md § Loaded plugins: the client half).
+  // renders its own empty case (docs/plugins/client-half.md § Loaded plugins: the client half).
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
@@ -115,7 +115,7 @@ const sourceOrder = (a: SourceContribution, b: SourceContribution): number => a.
 export const sourceIsProjectScoped = (sourceId: string | null | undefined): boolean =>
   !!sourceRegistry.get(sourceId ?? '')?.projectScoped
 
-// Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend.md §
+// Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend/registries.md §
 // Registries and plugins covers the default/order fallback.
 export const defaultSource = (): SourceContribution | undefined => {
   const sources = sourceRegistry.entries()
@@ -143,7 +143,7 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
  *
  * Exported because the terminal has no router and matches with this instead: `apps/tui/src/kit/router.ts`
  * resolves `useParams` against the same patterns the desktop's Router is built from, so the two hosts
- * cannot disagree about what a path means (docs/tui.md § The router).
+ * cannot disagree about what a path means (docs/tui/host-switch.md § The router).
  */
 export function matchRoute(pattern: string, path: string): Record<string, string> | null {
   const expected = pattern.split('/').filter(Boolean)
@@ -194,7 +194,7 @@ export function defaultPaneForTask(task: Task): string | undefined {
 }
 
 /** Does this task already track this external reference? Host link matching first, then each
- *  source's own second spelling (docs/plugins.md § Loaded plugins: the client half). */
+ *  source's own second spelling (docs/plugins/client-half.md § Loaded plugins: the client half). */
 export function taskTracksRef(task: Task, ref: { providerId?: string; displayId: string; connectionId?: string }): boolean {
   // A link names a connection and a panel target usually does not. A PR body says `ENG-42`, not which
   // connected Linear owns it, so the connection is compared only when both sides have one.

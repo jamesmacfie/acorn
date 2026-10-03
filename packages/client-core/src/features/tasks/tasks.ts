@@ -115,7 +115,7 @@ export function hydrateTaskLayout(taskId: string, layout: TaskLayout): void {
   setTaskLayouts((current) => (current[taskId] ? current : { ...current, [taskId]: layout }))
 }
 
-// Recipe-resolved browser home URLs (docs/workflows.md §3): a layout recipe points the browser pane at
+// Recipe-resolved browser home URLs (docs/workspaces-and-tasks/project-config.md § Layout recipes): a layout recipe points the browser pane at
 // a run target's resolved URL. Session-only view state, per task.
 const [recipeBrowserUrls, setRecipeBrowserUrls] = createSignal<Record<string, string>>({})
 export const recipeBrowserUrl = (taskId: string): string | undefined => recipeBrowserUrls()[taskId]

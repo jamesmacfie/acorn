@@ -55,7 +55,7 @@ export const contentLinkDescriptor = z.object({
   // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
   // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
   // the two a click gets is the clicking surface's call, not the manifest's.
-  // See docs/plugins.md § Loaded plugins: the client half.
+  // See docs/plugins/client-half.md § Loaded plugins: the client half.
   openPane: z.string().min(1).max(64).optional(),
   item: z.string().min(1).max(32),
 })
@@ -80,7 +80,7 @@ export const agentContextDescriptor = z.object({
 // One batch-enrichment route, so a surface holding identifiers of this plugin's items can display them
 // without importing this plugin. The host POSTs `{ identifiers }` and parses the answer against
 // @acorn/protocol/refResolvers.ts. There's no single-identifier form: ask for an array of one.
-// See docs/third-party/README.md § cross-plugin references.
+// See docs/plugins/descriptors.md § Descriptors.
 export const refResolverDescriptor = z.object({
   id: z.string().min(1).max(64),
   kind: z.string().min(1).max(64),
@@ -91,7 +91,7 @@ export const refResolverDescriptor = z.object({
 // A colour theme: a map of theme-token values the host validates, then generates a
 // `:root[data-theme="plugin:<pluginId>:<id>"]` block from. No plugin-authored CSS reaches the shell.
 // `z.strictObject` rather than `z.record` so every check happens at parse time.
-// See docs/ui-design.md § Plugin themes for the token contract and what each group may declare.
+// See docs/ui-design/appearance.md § Plugin themes for the token contract and what each group may declare.
 export const themeDescriptor = z.object({
   // Namespaced by the host into `plugin:<pluginId>:<id>`. The alphabet is bounded because the result
   // is written into a CSS attribute selector.

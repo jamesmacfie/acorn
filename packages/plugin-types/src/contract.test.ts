@@ -18,7 +18,7 @@ import type { DataBinding, DataField, DataPredicate } from '@acorn/protocol/data
 import type { DataSourceRequest, DataSourceResult, DataSourceDescription } from '@acorn/protocol/dataSources.ts'
 
 // The drift lock for the hand-written published declarations, copying the pattern
-// packages/plugin-sdk/src/contract.test.ts established. See docs/plugins.md § What is published, and
+// packages/plugin-sdk/src/contract.test.ts established. See docs/plugins/publishing.md § What is published, and
 // what acorn promises about it for why the contract modules are hand-written.
 //
 // Assignability is asserted in both directions per type: one direction alone passes happily when the

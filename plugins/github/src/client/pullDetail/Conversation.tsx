@@ -250,7 +250,7 @@ export function PrConversation(props: {
     }
   })
   // The diff's document says which segment holds each thread's line, so a thread's snippet reads one
-  // segment rather than a parsed patch (docs/github-integration.md § Conversation). Only asked for
+  // segment rather than a parsed patch (docs/github-integration/surfaces.md § Conversation). Only asked for
   // when some thread has a line to quote.
   const anchored = createMemo(() => entries().some((entry) => entry.kind === 'thread' && entry.thread.line != null))
   const diff = createQuery(() => pullDiffOptions(owner, repo, number, anchored()))

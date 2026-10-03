@@ -14,7 +14,7 @@ const attachments = (turn: AgentTurn) =>
   turn.input.filter((part) => part.type === 'attachment' || part.type === 'image')
 
 // Follow-ups typed while the session was busy, in the order they will be sent. Editable and
-// reorderable until the dispatcher takes one (docs/managed-agents.md § The turn queue).
+// reorderable until the dispatcher takes one (docs/managed-agents/operations.md § The turn queue).
 export default function QueuedAgentTurns(props: {
   sessionId: string
   runtimeState: AgentRuntimeState

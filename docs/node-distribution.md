@@ -1,159 +1,116 @@
 # Standalone Node distribution
 
-`pnpm pack:node` builds a self-contained tarball for running an acorn Node without the desktop app.
-The artifact contains the Node service, a headless CLI and terminal client under one `acorn`
-launcher, shared chunks with the pure-JavaScript dependencies bundled in, migrations, and a
-`package.json` naming packages installed beside them: native modules and packages loaded at run
-time (`apps/node/externals.ts`). Run `node bin/acorn.mjs --help` from the extracted folder after
-`npm install --omit=dev`; `node bin/acorn.mjs` opens the terminal client and needs a terminal.
-The CLI read commands attach to a running Node and use the same device custody as the terminal
-client. `node start --background` runs the standalone entry as a persistent local service from the
-extracted archive, with a private token handoff and rotated restricted log; `node status` and
-`node stop` inspect or drain only that CLI-owned process. See [command-line client](./cli.md).
+This page covers running an acorn Node without the desktop app: the tarball, how the Node boots, how
+clients reach it, and how to operate it. Read it before you change the standalone entry, the packer, or
+the boot order.
+
+`pnpm pack:node` builds a self-contained tarball. It holds the Node service, the headless CLI and the
+terminal client under one `acorn` launcher, shared chunks with the pure-JavaScript dependencies bundled
+in, migrations, and a `package.json` naming the packages installed beside them: native modules and
+packages loaded at run time (`apps/node/externals.ts`). The tarball isn't an npm package, because native
+dependencies make a platform-specific artifact the safer unit.
 
 ## Runtime
 
-`apps/node/src/entries/` holds all three build entries — `standalone.ts`, `service.ts`, and the MCP
-server — and `apps/node/src/composition/` holds what any two of them share. The standalone entry uses
-`ACORN_DATA_DIR` or a local `.acorn` root, binds HTTPS/TLS 1.3, and prints one JSON handshake line. The line contains `nodeId`, endpoint, certificate fingerprint and PEM, and a
-device token for the launcher/first client. It also runs plugin initialization, reconciliation,
-WebSocket/tunnel listeners, and bounded shutdown.
+`apps/node/src/entries/` holds the three build entries, `standalone.ts`, `service.ts`, and `mcp.ts`, and
+`apps/node/src/composition/` holds what they share. The standalone entry uses `ACORN_DATA_DIR` or a local
+`.acorn` root, binds HTTPS with TLS 1.3, and prints one JSON handshake line with the `nodeId`, endpoint,
+certificate fingerprint and PEM, and a device token for the launcher or first client. It runs plugin
+initialization, reconciliation, the WebSocket and tunnel listeners, and a bounded shutdown. Standalone
+and desktop-supervised Nodes use the same `apps/node/src/composition/composition.ts` graph,
+reconciliation sequence, and drain order. They differ in supervision and native capability injection.
 
-After the handshake it prints a human pairing banner: the address to connect to, the certificate
-fingerprint as six words, and a live pairing code. Compare those words against the ones acorn shows
-on its pairing screen. That comparison is what makes pairing safe. A code opens automatically only
-while no device is paired. `kill -USR1 <pid>` opens another without restarting the node and killing
-its live agent and terminal sessions. `SIGUSR1` does not exist on Windows, so pairing a second device
+After the handshake it prints a pairing banner: the address, the certificate fingerprint as six words,
+and a live pairing code. Compare those words with the ones acorn shows on its pairing screen, because
+that comparison is what makes pairing safe. A code opens automatically only while no device is paired.
+`kill -USR1 <pid>` opens another without a restart. Windows has no `SIGUSR1`, so pairing a second device
 there means a restart.
+
+A standalone Node supports pure-Node features: workspaces, tasks, providers, Git, files, the database
+plugin, Docker, HTTP, and core routes. Shell-only operations such as native dialogs, child webviews, and
+window management are unavailable. It wires the terminal, managed-agent, and workflow engines when their
+dependencies are present, and an unsupported native adapter reports an explicit unavailable state.
 
 ## Boot order
 
-The node binds its listener at the end of one chain: open the data root and take its lock, reconcile
-bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run
-every plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, listen.
-Three things that used to be in that chain for history rather than dependency are not any more.
+The Node binds its listener at the end of one chain: open the data root and take its lock, reconcile
+bundled packages, open and migrate `core.sqlite`, load the packages installed in the data root, run every
+plugin's `init` and then every plugin's `ready`, mint or read the TLS certificate, and listen. Plugin
+`init` runs for every plugin at once, and so does `ready` ([activation](./plugins.md#activation)).
+`startServiceRuntime` returns once the Node is listening, and the tmux, worktree, workflow, and agent
+reconcile steps run after that.
 
-The login-shell `PATH` probe starts at the first mark and nothing waits on it. On a packaged macOS
-build a window-launched process inherits a minimal `PATH`, so the node asks the owner's login shell
-what theirs is with `$SHELL -lic 'printf %s "$PATH"'`. That costs 520 ms on this developer's machine
-and up to 2 seconds on a profile with a version manager in it, and the answer is needed to spawn
-agents and build commands, not to migrate a database or bind a listener. The probe keeps its
-five-second ceiling, and the first process the node spawns waits for it: `runProcess` and
-`runHeadless` both await the gate in `packages/node-core/src/server/core/loginShellPath.ts` before
-they call `spawn`. A spawn that arrives after the probe has settled waits for nothing.
+The login-shell `PATH` probe starts at the first step and nothing waits on it. A window-launched process
+on packaged macOS inherits a minimal `PATH`, so the Node asks the owner's login shell with
+`$SHELL -lic 'printf %s "$PATH"'`. That took 520 ms on one developer machine and up to two seconds with a
+version manager in the profile. The probe has a five-second ceiling, and `runProcess` and `runHeadless`
+wait for it before they `spawn` (`packages/node-core/src/server/core/loginShellPath.ts`).
 
-Two spawn paths do not go through that gate, and both are deliberate. A terminal session runs
-`$SHELL -lc`, which reads the profile itself, so the probe would tell it nothing it does not already
-know. The managed-agent drivers under `plugins/agents/src/server/` call `spawn` directly, so an agent
+Two spawn paths skip that gate on purpose. A terminal session runs `$SHELL -lc`, which reads the profile
+itself. The managed-agent drivers in `plugins/agents/src/server/` call `spawn` directly, so an agent
 started in the first two seconds of a packaged launch can see the inherited `PATH`. Move them onto
-`spawnsReady()` if that ever shows up as a missing-binary report.
+`spawnsReady()` if that shows up as a missing-binary report.
 
-Plugin `init` runs for every plugin at once, and so does `ready`. See
-[docs/plugins.md](./plugins.md) § Activation for what that means for a plugin author.
-
-Opening the blob cache no longer chmods every file in it. The sweep is a permission migration for
-files an older build wrote, it is synchronous, and it sat inside the `migrate` step
-([caching.md](./caching.md) § Immutable blob cache).
-
-Reconciliation runs behind the listener, not in front of it. `startServiceRuntime` returns as soon as
-the node is listening, and the tmux, worktree, workflow, and agent reconcile steps continue after
-that.
-
-`[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, unconditionally, so a node
-that took 11 seconds to bind says so without anyone having asked. Per-request timing is the opposite
-and sits behind `ACORN_PERF=1`. Read the labels as wall-clock slices rather than per-plugin costs
-once the passes overlap: with 16 plugins initialising together, a plugin's line says when it
-finished, not how long it worked.
+`[service:boot] <label> +<offset>ms (<step>ms)` prints one line per step, always, so a slow bind says so
+without anyone asking. Read the labels as wall-clock slices: with plugins initializing together, a
+plugin's line says when it finished, not how long it worked. Per-request timing sits behind
+`ACORN_PERF=1`.
 
 ## Reaching a node with `acorn`
 
-`acorn` with no command is the terminal client (`apps/tui/`, [docs/tui.md](./tui.md)). Run it and it opens the
-workspace for the node this machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root
-if the app is installed here, else the dev checkout's. It reads the root's lock to decide what to do.
-A node already holds it, so `acorn` attaches, reading the endpoint from `node.json` and the
-certificate to pin from `tls/cert.pem`; nothing holds it, so `acorn` starts one and owns its
-lifetime, draining it on the way out. A second `acorn` in a second terminal finds the lock and
-attaches, and leaves the node running when it quits. The one that started it owns it, which is the
-desktop's rule too.
+`acorn` with no command is the [terminal client](./tui.md). It opens the workspace for the Node this
+machine's data root holds: `ACORN_DATA_DIR`, else the desktop app's root if the app is installed, else
+the development root. It reads the root's lock. If a Node holds it, `acorn` attaches, reading the
+endpoint from `node.json` and the certificate to pin from `tls/cert.pem`. If nothing holds it, `acorn`
+starts a Node, owns its lifetime, and drains it on the way out. A second `acorn` attaches and leaves the
+Node running when it quits.
 
-Attaching needs a device token, and `acorn` keeps its own — in its config directory, at mode 0600,
-never in the node's data root. A node the desktop started is a node whose token belongs to the
-desktop, so the first `acorn` against one asks for a pairing code the same way any other client
-does: `kill -USR1 <pid>` opens one.
-
-`acorn --node https://host:4317` pairs with a node elsewhere: the fingerprint as six words to compare
-against what that node printed, then the code. It remembers what it pairs with, so the second time is
-`acorn --node <name>`.
+`acorn` keeps its own device token in its config directory, at mode `0600`, never in the Node's root. A
+Node the desktop started has a token that belongs to the desktop, so the first `acorn` against it asks
+for a pairing code: `kill -USR1 <pid>` opens one. `acorn --node https://host:4317` pairs with a Node
+elsewhere, and remembers it so the next time is `acorn --node <name>`. The [CLI](./cli.md) uses the same
+custody.
 
 ## Reaching a node from another machine
 
-A node answers on loopback only until someone says otherwise. Binding beyond `127.0.0.1` puts a
-service that runs PTYs, spawns agents, and executes repo-configured commands onto a network, so
-nothing infers the answer: a node advertises an address only because someone said so, either by
-answering the first-boot question below or by setting `ACORN_ADVERTISE_HOST`. A machine with three
-interfaces and a VPN has no obvious answer to guess at, and guessing wrong would fail as a bare 403
-from the Host guard with nothing to debug against.
+A Node answers on loopback until someone says otherwise. Binding beyond `127.0.0.1` puts a service that
+runs PTYs, spawns agents, and executes repository commands on a network, so the Node never guesses. It
+advertises an address only when the operator answers the first-boot question or sets
+`ACORN_ADVERTISE_HOST`.
 
-On first boot at a terminal it lists this machine's IPv4 addresses and asks which to advertise;
-pressing Enter keeps it private, one keystroke away from exposure rather than something that happens
-because an installer's return key was held down. Only IPv4 addresses are offered: the answer ends up
-in a URL the operator types and in a Host header comparison, and a bracketed IPv6 literal is a worse
-first experience than the v4 address every one of these machines also has. The answer is recorded as
-`advertiseHost` in the data root's `node.json`, so it is asked once; recording "none" (an empty
-string) is what stops it reappearing every boot.
+On first boot at a terminal it lists this machine's IPv4 addresses and asks which to advertise, and
+pressing Enter keeps it private. The answer is recorded as `advertiseHost` in `node.json`, and "none" is
+recorded as an empty string so the question doesn't come back. Only IPv4 is offered, because the answer
+ends up in a URL the operator types and in a `Host` comparison. The prompt is skipped without recording
+anything when there's no TTY (launchd, systemd, Docker, CI) or no network address to offer.
 
-The prompt is skipped, without recording anything, when there is no TTY to ask at (launchd, systemd,
-Docker, CI) or when the machine has no network address to offer. A laptop booted off the network gets
-asked once it is plugged in, because that case alone is not treated as an answer.
+Set `ACORN_ADVERTISE_HOST` for an install with no terminal. It wins over the recorded answer, so a
+service manager can set it without touching the data root, and it takes a comma-separated list for a
+machine reached by both an IP and a hostname. With it set the listener binds `0.0.0.0` and accepts that
+`Host` as well as loopback. Every other `Host` gets a 403, which keeps a DNS-rebinding page out.
 
-Set `ACORN_ADVERTISE_HOST` for an install with no terminal to answer: launchd, systemd, Docker, CI.
-It takes priority over the recorded answer, so a service manager or container can set it without
-touching the data root, and an operator who already answered "none" can still override it for one run
-without editing `node.json`. It accepts a comma-separated list when a machine is reached by both an IP
-and a hostname, since that is a real case and the alternative would be two settings that have to agree.
-With it set the listener binds `0.0.0.0` and accepts that Host as well as loopback; every other Host
-still gets a 403, which is what keeps a DNS-rebinding page out.
-
-Understand what this exposes before setting it. A node runs PTYs, spawns agents and executes
-repo-configured commands, and what stands between the network and all of that is a device bearer
-token plus a rate-limited pairing code. Advertise on a network you trust. An SSH tunnel
-(`ssh -N -L <port>:127.0.0.1:<port>`) reaches a loopback-only node with no exposure at all, as long
-as the local and remote ports match, because the Host guard compares the port too.
-
-It supports pure-Node features such as workspaces, tasks, providers, Git, files, database, Docker,
-HTTP, and core routes. Shell-only operations such as native dialogs, child webviews, and window
-management are unavailable. The standalone composition wires the terminal, managed-agent, and
-workflow engines when their dependencies are present. Unsupported native adapters report an explicit
-unavailable state.
-
-Standalone and desktop-supervised Node hosts use the same `apps/node/src/composition/composition.ts` graph,
-post-listener reconciliation sequence, and bounded drain order. The host difference is supervision and
-native capability injection, not a second plugin assembly.
+What stands between the network and the Node is a device bearer token and a rate-limited pairing code,
+so advertise only on a network you trust. An SSH tunnel, `ssh -N -L <port>:127.0.0.1:<port>`, reaches a
+loopback-only Node with no exposure, as long as the local and remote ports match, because the `Host`
+guard compares the port too.
 
 ## Plugins
 
-Both hosts build the `PLUGIN_STATE` bridge, meaning the roster, the installer, and the owner's
-disabled list, through one builder: `apps/node/src/composition/pluginState.ts`. One thing differs on
-purpose. Bundled packages have nothing to be reconciled from. The desktop ships every built plugin as
-app resources and copies them into the writable data root before discovery. A standalone node has no
-`resourcesPath`, so the step does nothing and plugins arrive only through the owner-authenticated
-install route. Nothing goes stale as a result; there is no app-owned copy. A developer running
-against a repo checkout can name one with `ACORN_BUNDLED_PLUGINS_DIR`, and then this root reconciles
-as the desktop's does. Both call one `reconcileBundledPackages`, so the outcome and the boot summary
-cannot differ. A service-managed node sets no such variable.
+Both hosts build the `PLUGIN_STATE` bridge, the roster, installer, and disabled list, through
+`apps/node/src/composition/pluginState.ts`. The desktop ships every built plugin as app resources and
+copies them into the data root before discovery. A standalone Node has no `resourcesPath`, so plugins
+arrive only through the owner's install route. A developer running from a checkout can name a source with
+`ACORN_BUNDLED_PLUGINS_DIR`, and the root then reconciles as the desktop's does. Both call one
+`reconcileBundledPackages`.
 
-Reconciliation hashes the source and installed package on each pass. It leaves the ownership file
-untouched when the stored status, version, fingerprint, and installation time all match. A missing
-ownership row is still repaired after exact package placement. Owner overrides, uninstall tombstones,
-and development markers retain their reconciliation rules.
+Reconciliation hashes the source and installed package on each pass and leaves the ownership file alone
+when the status, version, fingerprint, and installation time match. A missing ownership row is repaired
+after exact package placement. Owner overrides, uninstall tombstones, and development markers keep their
+own rules. Both roots report every ownership row at boot, because a package frozen by an owner-installed
+row looks like a missing feature.
 
-Both roots report every ownership row at boot, whether or not they had a bundled copy to offer,
-because a package frozen by an owner-installed row is the failure that looks like a feature nobody
-built.
-
-The disabled list is the data root's file, unioned with any start-config override. Only the
-supervised host passes an override, so tests and `pnpm dev:node` pin a list without writing into a
-data root. A standalone node's list is the file alone.
+The disabled list is the data root's file, unioned with any start-config override. Only the supervised
+host passes an override, so tests and `pnpm dev:node` can pin a list without writing into a data root.
 
 ## Install and start
 
@@ -166,64 +123,47 @@ ACORN_DATA_DIR=/var/lib/acorn-node npm start
 node bin/acorn.mjs --help
 ```
 
-The target machine needs Node 22.23.2 or later in the 22 branch, 24.18.1 or later in the 24 branch,
-or 26.5.1 or later in the 26 branch. Other branches are unsupported. These floors include the
+The machine needs Node 22.23.2 or later in branch 22, 24.18.1 or later in branch 24, or 26.5.1 or later
+in branch 26. These floors include the
 [July 29, 2026 permission model security fixes](https://nodejs.org/en/blog/vulnerability/july-2026-security-releases)
-and the `node:sqlite` APIs the shim needs. The packed `package.json` copies the root manifest's
-`engines` range. Because package managers can treat this range as a warning, the loaded Node and
-terminal plugin worker factories also enforce the shared runtime policy before creating a realm
-or preparing its storage. The desktop bundles Node 24.21.0 from `node-runtime.json`, using its
-HTTPS download and archive checksum verification path.
+and the `node:sqlite` APIs the shim needs. The packed `package.json` copies the root `engines` range, and
+because a package manager may treat that as a warning, the loaded plugin worker factories also enforce
+the policy. The desktop bundles Node 24.21.0, pinned in `node-runtime.json` and checked against its
+archive checksum.
 
-The Node generates its RSA-2048 key with Node's native crypto implementation and encodes and signs
-its self-signed certificate with the packaged `node-forge` library, loaded only when minting an
-identity. Certificate creation does not require an OpenSSL executable on any platform.
-The key and certificate persist under `tls/` in the
-data root, and subsequent boots reuse them, including certificates generated by OpenSSL.
+The Node generates its RSA-2048 key with Node's native crypto and signs its self-signed certificate with
+the packaged `node-forge`, loaded only when minting, so no OpenSSL executable is needed. The key and
+certificate persist under `tls/` and are reused, including ones OpenSSL made.
 
-`node-pty` is the only native module. It ships prebuilt binaries for macOS and Windows and compiles
-from source on Linux, so a Linux target also needs the usual build prerequisites. If package
-installation ignores lifecycle scripts, native bindings may remain unbuilt. Run the package's rebuild
-step before diagnosing a missing-bindings failure.
+`node-pty` is the only native module. It ships prebuilt binaries for macOS and Windows and compiles from
+source on Linux, which needs the usual build tools. If installation skipped lifecycle scripts, run
+`npm rebuild` before diagnosing a missing-bindings failure.
 
-`SESSION_ENC_KEY` is optional. Supply it and it is used; leave it unset and the node generates one
-into `session.key` in the data root at mode 0600, beside the TLS private key that has the same blast
-radius. It is never re-minted. A damaged key file is an error, because silently generating a
-replacement would turn "this file is wrong" into "every stored credential is gone".
-
-If GitHub is enabled, its plugin uses acorn's public client ID by default. `GITHUB_CLIENT_ID` is an
-optional override. Connection uses device flow without a client secret or callback URL. For app
-setup, see [GitHub integration](./github-integration.md#connecting).
+`SESSION_ENC_KEY` is optional. Unset, the Node generates one into `session.key` in the data root at mode
+`0600` and never mints it again. A damaged key file is an error, because a silent replacement would turn
+"this file is wrong" into "every stored credential is gone". GitHub uses acorn's public client ID unless
+`GITHUB_CLIENT_ID` overrides it ([connecting](./github-integration.md#connecting)).
 
 ## Operations
 
-Use a dedicated mode-`0700` data root. Only one process may hold it. The `0700`/`0600` modes on the
-data root and key files are POSIX permissions. On Windows they are advisory, and restricting the
-data root is the operator's job, with an NTFS ACL on the directory. Send SIGTERM for a graceful
-drain: the listener closes first, plugins dispose next, SQLite closes, and the root lock releases.
-The drain has a 30-second deadline.
+Use a dedicated mode-`0700` data root, and only one process may hold it. The `0700` and `0600` modes are
+POSIX permissions. On Windows they're advisory, so restrict the data root with an NTFS ACL. Send SIGTERM
+for a graceful drain: the listener closes, plugins dispose, SQLite closes, and the lock releases, within
+a 30-second deadline.
 
 ## Dependency security policy
 
-The root `package.json` owns runtime dependency security overrides. The workspace repeats those
-entries in `pnpm-workspace.yaml`, and `tools/arch/dependencySecurity.test.ts` rejects disagreement.
-The packer copies the policy into the generated npm manifest because npm does not read pnpm's
-workspace settings. For a direct dependency, npm's `$name` reference uses that dependency's declared
-patched range for all copies and avoids incompatible override specifiers. Hono's catalog floor and
-other direct runtime floors must be updated with the policy.
+The root `package.json` owns runtime dependency security overrides. `pnpm-workspace.yaml` repeats them,
+and `tools/arch/dependencySecurity.test.ts` rejects disagreement. The packer copies the policy into the
+generated npm manifest, because npm doesn't read pnpm's settings. For a direct dependency, npm's `$name`
+reference uses that dependency's declared patched range. Hono's catalog floor and other direct runtime
+floors move with the policy.
 
-The root manifest's `acornStandalone` policy also pins the keymap provider to the release tested in
-the workspace. A newer provider can raise its Node requirement within its compatible version range.
-Keymap's optional Solid adapter peer follows the standalone direct Solid dependency through a
-package-specific override. Acorn imports its generic engine, add-ons, and HTML adapter, not that
-optional Solid adapter. This alignment keeps the declared Solid floor and requires no global peer
-bypass. `tools/arch/dependencySecurity.test.ts` checks the pin against the source declaration and
-workspace lockfile, and checks that peer references name standalone direct dependencies.
+The root manifest's `acornStandalone` policy pins the keymap provider to the release tested in the
+workspace, and its optional Solid adapter peer follows the standalone Solid dependency through a
+package-specific override. The test checks the pin against the source declaration and the lockfile.
 
-The workspace lockfile pins exact versions and integrity hashes. The standalone manifest carries
-ranges and overrides, but no npm lockfile, so a future install can resolve different compatible
-versions. These floors cover reviewed advisories; they do not make the standalone install
-reproducible or cover advisories published after the review.
-
-The tarball is not an npm package: native dependencies and workspace package boundaries make a
-platform/architecture-specific artifact the safer distribution unit.
+The workspace lockfile pins exact versions and integrity hashes. The standalone manifest carries ranges
+and overrides but no npm lockfile, so a later install can resolve different compatible versions. The
+floors cover reviewed advisories. They don't make the install reproducible or cover advisories published
+after the review.

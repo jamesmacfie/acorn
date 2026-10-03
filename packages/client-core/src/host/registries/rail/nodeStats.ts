@@ -1,6 +1,6 @@
 import { Registry } from '../../../kit/lib/state/registry'
 
-// A number a plugin can put on a Fleet home node card (docs/frontend.md § Registries and plugins).
+// A number a plugin can put on a Fleet home node card (docs/frontend/registries.md § Registries and plugins).
 //
 // Core supplies the task count, since `tasks` is core's table. Everything else on the card belongs to
 // a plugin: "agents running" is the agents plugin's, "workflow runs" is workflows'. Fleet home lives

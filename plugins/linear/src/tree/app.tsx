@@ -15,7 +15,7 @@ import { canonicalIdentifier, failureReason, linearIdentifierFromHref, targetKey
 import { LinearIssueView } from './LinearIssueView'
 
 // One renderer, three manifest surfaces, told apart by what the host mounted this slot with
-// (docs/integrations.md § Linear).
+// (docs/integrations/linear.md § Linear).
 //
 //   refPanel   `item`, unscoped: resolved across every connected workspace.
 //   pane       `item` from a rail row, or `taskId` for whatever the task links.
@@ -103,7 +103,7 @@ export function LinearIssuePane(props: LinearPaneProps & { bridge: AcornBridge }
     void fetchIssue(canonicalIdentifier(identifier), target()?.connectionId)
   }
 
-  // A linear.app ticket link stays local rather than going through the host (docs/integrations.md §
+  // A linear.app ticket link stays local rather than going through the host (docs/integrations/linear.md §
   // Linear). Re-pointing in place is what makes the back affordance work. Everything else goes over
   // the bridge to the host's in-app-or-browser resolution.
   //

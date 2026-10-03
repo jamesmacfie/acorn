@@ -5,7 +5,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { SEARCH_HITS_MAX, searchProviders } from '../pluginHost/search'
 
-// Search across core and every plugin's provider (docs/plugins.md § Search providers).
+// Search across core and every plugin's provider (docs/plugins/search-providers.md § Search providers).
 //
 // `?q=` is the text, `?archived=1` searches archived tasks instead of active ones, and `?workspaceId=`
 // narrows to one workspace. Core resolves that into task ids once, so every provider gets the same

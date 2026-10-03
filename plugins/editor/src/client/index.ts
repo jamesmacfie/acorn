@@ -1,7 +1,7 @@
-// The editor plugin's client part (docs/plugins.md § The plugin API).
+// The editor plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 //
 // One pane: find-in-files is a panel in its sidebar rather than a pane of its own
-// (docs/panes.md § Contributions).
+// (docs/panes/contributions.md § Contributions).
 import { activeTaskId, type ClientPlugin } from '@acorn/plugin-api/client'
 import { editorOpenFilesSlice } from './openFilesSlice'
 // Imported for the side effect: claiming the `editor` WS prefix at boot rather than when the first

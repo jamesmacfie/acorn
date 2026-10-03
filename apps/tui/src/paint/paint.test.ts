@@ -35,7 +35,7 @@ function drawn(root: Node, cols: number, rows: number): string[] {
 }
 
 /** A screen with its writes collected instead of sent, which is the whole of what a test terminal is
- *  (docs/tui.md § Tests). */
+ *  (docs/tui/tests.md § Tests). */
 function screenOf(cols: number, rows: number): { screen: Screen; writes: string[] } {
   const writes: string[] = []
   const screen = openScreen({ cols, rows, write: (text) => writes.push(text) })

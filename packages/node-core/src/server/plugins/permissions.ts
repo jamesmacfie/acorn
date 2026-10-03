@@ -12,7 +12,7 @@ import { connectionProviderRegistry } from '../integrations/connectionProviders/
 import { SIMPLE_FACETS } from './coreFacets'
 export { NODE_CORE_FACETS } from './coreFacets'
 
-// What `projects:read` grants (docs/security.md § Rung 1, on why `checkouts()` needs its own
+// What `projects:read` grants (docs/security/plugin-node-realm.md § Rung 1: permission-shaped context, on why `checkouts()` needs its own
 // disclosure line in the trust prompt). `byWorkspace` is the scope-validation half used by a loaded
 // owner of workspace-scoped records; it returns the same bounded ProjectRef projection as `byId`.
 const PROJECT_READS = ['byId', 'byGithub', 'byWorkspace', 'checkouts', 'externalProjects'] as const
@@ -28,7 +28,7 @@ const pick = <T extends object, K extends keyof T>(source: T, keys: readonly K[]
 const utf8Bytes = (text: string): number => new TextEncoder().encode(text).byteLength
 
 // Loaded plugins share the `plugin:<id>:*` preference namespace with their sandboxed frames
-// (docs/security.md § Rung 1). Built-ins never pass through scopeCore and keep the raw service,
+// (docs/security/plugin-node-realm.md § Rung 1: permission-shaped context). Built-ins never pass through scopeCore and keep the raw service,
 // because several core-owned preference keys are shared with client surfaces on purpose.
 const prefsFor = (prefs: PrefService, pluginId: string): PrefService => ({
   read: (userId, key) => prefs.read(userId, pluginStateKey(pluginId, key)),
@@ -114,10 +114,9 @@ export function scopeCore(
   return granted as CoreServices
 }
 
-// The two ids the host declares itself, which are invitations rather than any plugin's property:
-// `core.taskWorktreeCreated` (server/worktrees/taskWorktree.ts) and `agents.harnessRegistry`
-// (server/pluginHost/harnesses.ts). Whoever owns worktree side-effects or agent sessions on a given node
-// fills them, so they are exempt from the namespace rule below. Held to the real constants by
+// The one id the host declares itself, which is an invitation rather than any plugin's property:
+// `agents.harnessRegistry` (server/pluginHost/harnesses.ts). Whoever owns agent sessions on a given node
+// fills it, so it is exempt from the namespace rule below. Held to the real constants by
 // pluginPermissions.test.ts, because a literal list is only safe if something checks it.
 export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegistry']
 

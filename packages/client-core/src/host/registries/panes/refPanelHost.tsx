@@ -11,7 +11,7 @@ import { activeTaskId } from '../../../features/tasks/tasks'
 //
 // It draws no chrome of its own, no backdrop, no header, no dismiss button, because a panel already
 // brings all three: a manifest-declared panel is wrapped in the host's overlay classes and owns the
-// close affordance, a first-party panel component draws its own (docs/plugins.md § "Loaded plugins:
+// close affordance, a first-party panel component draws its own (docs/plugins/client-half.md § "Loaded plugins:
 // the client half"). Adding a second wrapper here would letterbox one and double-frame the other.
 export function RefPanelHost() {
   return (
@@ -24,7 +24,7 @@ export function RefPanelHost() {
         <Show when={refPanelFor(target.providerId)}>
           {(panel) => (
             // `target=`, never `ref=`: Solid compiles a component's `ref` attribute into a setter
-            // method (docs/architecture-overview.md § Package boundaries, "Two renderer traps"), so
+            // method (docs/architecture/packages.md § Two renderer traps), so
             // this exact line previously handed every panel a function in place of its subject.
             // registries/refPanels.ts § RefPanelProps has the full account.
             <Dynamic

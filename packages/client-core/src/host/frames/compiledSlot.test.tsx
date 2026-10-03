@@ -5,7 +5,7 @@ import { extensionPointRegistry, extensionRegistry } from '../registries/extensi
 import type { Disposable } from '../../kit/lib/state/registry'
 
 // The direct render path into a slot: a compiled plugin's component, mounted where a loaded plugin's
-// worker tree would go (docs/plugins.md § Cooperative extension points, "two render paths").
+// worker tree would go (docs/plugins/cooperative-extension-points.md § Cooperative extension points, "two render paths").
 //
 // The shape under test is context and memory, which is the pair phase 6 of the layout programme moved
 // onto this seam: context opens `context:section` and draws its own rows as the default children;

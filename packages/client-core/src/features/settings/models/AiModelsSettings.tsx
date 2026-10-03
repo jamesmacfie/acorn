@@ -15,7 +15,7 @@ import ModelBackendPicker from './ModelBackendPicker'
 import { effectiveModelPick, readGeneratePick, saveGeneratePick } from './generatePick'
 
 // Settings > Connections > AI models: what this owner can generate text with, and which of it a
-// Generate control reaches for by default (docs/integrations.md § Model providers).
+// Generate control reaches for by default (docs/integrations/model-providers.md § Model providers).
 //
 // The keys are connections, so each one opens the same connection page Services draws. The agent CLIs
 // come from the backends route rather than being counted off the connections, because whether a CLI is

@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it } from 'vitest'
 import { Rectangle } from './Rectangle'
 
-// The box the kit owns and something else fills with pixels (docs/ui-design.md § The closed kit).
+// The box the kit owns and something else fills with pixels (docs/ui-design/closed-kit.md § The closed kit).
 //
 // What is worth a test is not the box, it is the way out of it. A PTY and a webview both swallow Tab,
 // so without a contract a reader who lands in one is stuck there — which is what the two hand-rolled

@@ -12,7 +12,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
 // The nodes this node's plugins know about, and the four lifecycle verbs
-// (docs/plugins.md § Node providers).
+// (docs/plugins/node-providers.md § Node providers).
 //
 // Gated with requireDevice by mount in server/index.ts. Every route here either enumerates
 // infrastructure, hands over a credential, or spends money, and none of it is a fair question for a
@@ -22,7 +22,7 @@ import { respondError } from '../respond'
 // providerId plus providerNodeId. So the route answers for this node only and never tries to be the
 // fleet's view of itself: whichever node holds the cloud connection is the one whose providers reply,
 // and today that is usually the local one, which is exactly the assumption the fan-out avoids baking
-// in (docs/future/phased-review-steps/cloud-guardrails.md rule 3).
+// in.
 
 // Long enough for a cloud API round trip, short enough that one wedged provider does not hold the
 // response open past the client's own per-node deadline (5s in client-core/infra/node/fanout.ts).

@@ -5,7 +5,7 @@ import { rollbarProvider } from './provider'
 
 const ref: ExternalRef = { providerId: 'rollbar', connectionId: 'conn-1', displayId: '142' }
 
-// See docs/integrations.md § Rollbar: why the project source is declared rather than omitted.
+// See docs/integrations/rollbar.md § Rollbar: why the project source is declared rather than omitted.
 describe('rollbar project source', () => {
   const connection = (config: string) => ({ id: 'conn-1', label: 'Rollbar · acme', config } as StoredConnection)
 
@@ -56,7 +56,7 @@ describe('rollbar provider cache contract', () => {
 })
 
 // Three resource calls, and the two occurrence ones stay soft: an item whose occurrences cannot be
-// listed is still worth handing an agent (docs/agent-tools.md § issue_detail).
+// listed is still worth handing an agent (docs/agent-tools/tracker-tools.md § issue_detail).
 describe('rollbar item detail', () => {
   const metadata = { identifier: '142', itemId: '999', title: 'TypeError', level: 'error', environment: 'prod', status: 'active' }
 

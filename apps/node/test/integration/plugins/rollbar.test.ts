@@ -68,7 +68,7 @@ const mockDetailFetch = () => {
     .mockResolvedValueOnce(rollbarJson(INSTANCE))
 }
 
-describe('Rollbar source (docs/integrations.md, docs/integrations.md § Rollbar)', () => {
+describe('Rollbar source (docs/integrations.md, docs/integrations/rollbar.md § Rollbar)', () => {
   let t: TestDb
   let app: Hono<AppEnv>
 

@@ -12,7 +12,7 @@ import { resolveTerminalFontSize, TERMINAL_FONT_SIZE_OPTIONS } from './preferenc
 // with itself, so the defaulting, the option lists and the writes live here and every caller uses
 // them. There is no `setting` command over these two yet, and that is the point of extracting the
 // accessor before there is: one registered later cannot become a second writer
-// (docs/terminal.md § From the command palette).
+// (docs/terminal/run-targets.md § From the command palette).
 //
 // Beside `./preferences.ts` rather than inside it, because that file is the pure half — the font-size
 // bounds and the line height xterm measures with — and it is imported by a bare-Node test. This half

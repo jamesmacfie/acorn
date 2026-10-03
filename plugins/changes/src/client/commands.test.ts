@@ -4,7 +4,7 @@ import { AMEND_COMMAND, CHANGES_PANE, COMMIT_COMMAND, changesBindings, changesCo
 // The panel's commands as contributions: the two commit chords and the three remote palette rows. A
 // binding id is a persistence key: it is what a reader's override in Settings → Shortcuts is stored
 // under, so a rename here silently drops whatever they rebound
-// (docs/command-palette-and-shortcuts.md § Plugin shortcuts).
+// (docs/command-palette-and-shortcuts/shortcuts.md § Plugin shortcuts).
 
 const run = { commit: vi.fn(), amend: vi.fn(), remote: vi.fn(), inPane: vi.fn(() => true) }
 

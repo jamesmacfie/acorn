@@ -3,7 +3,7 @@ import { pluginStateKey } from '@acorn/protocol/plugin/state.ts'
 import * as schema from './schema'
 import type { AppDatabase } from './index'
 
-// Application-level cascade for disconnecting an integration (docs/data-layer.md § External-item
+// Application-level cascade for disconnecting an integration (docs/data-layer/core-database.md § External-item
 // read model: the schema declares no foreign keys). If you add a table keyed by integrationId,
 // delete its rows below before the integrations row.
 export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, id: string) => {
@@ -18,7 +18,7 @@ export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, 
 }
 
 // The same shape one entity over: everything in the core database that belongs to one plugin id, for
-// an uninstall the owner asked to purge (docs/plugins.md § Uninstalling).
+// an uninstall the owner asked to purge (docs/plugins/data-ownership.md § Uninstalling).
 //
 // Uninstall used to delete the package directory, the lockfile and the plugin's own SQLite files, then
 // audit `dataPurged: true` while leaving these behind. The prefs rows are the sharp edge: every

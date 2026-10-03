@@ -146,12 +146,12 @@ const RULES: readonly RouteRule[] = [
   { path: shape('/v1/core/storage'), scopes: {}, note: 'Node memory and disk sizes; owner surface.' },
   { path: shape('/v1/core/audit'), scopes: {}, note: 'The audit trail must not be readable by the code it audits.' },
   { path: shape('/v1/core/backup'), scopes: {}, note: 'Writes an archive to a path on the Node.' },
-  // The batch route the renderer and the other runtimes post to (docs/telemetry.md § Other
+  // The batch route the renderer and the other runtimes post to (docs/telemetry/runtimes.md § Other
   // runtimes). Unmappable, and it is a write rather than a read: everything admitted there reaches
   // every subscribed sink and a sink can post it off the machine. A frame measuring its own work
   // has `ctx.telemetry` on the bridge, which files under the plugin the host bound.
   { path: shape('/v1/core/telemetry'), scopes: {}, note: 'Anything posted here reaches every sink; a frame cannot be allowed to write into that stream.' },
-  // The counters Settings draws (docs/telemetry.md § What the page shows). Unmappable because the
+  // The counters Settings draws (docs/telemetry/diagnosis.md § What the page shows). Unmappable because the
   // answer names every other plugin on this machine and how much each of them is producing, which
   // is a plugin roster with a load profile attached. A plugin's own numbers are its own to keep.
   { path: shape('/v1/core/telemetry/summary'), scopes: {}, note: 'Names every other owner on this node and what each produces.' },
@@ -171,7 +171,7 @@ const RULES: readonly RouteRule[] = [
   // directions: reading it names a control plane and the device row that vouches for it, and the DELETE
   // would let a plugin frame cut a node off from whoever provisioned it.
   { path: shape('/v1/core/attachment'), scopes: {}, note: 'Attachment is owner administration; the DELETE revokes a credential.' },
-  // Node providers (docs/plugins.md § Node providers). The sharpest entry added since the plugin-install
+  // Node providers (docs/plugins/node-providers.md § Node providers). The sharpest entry added since the plugin-install
   // routes below, and for the same reason: `adopt` hands over a durable credential for another machine,
   // `create` spends the owner's money, and `destroy` is irreversible. The list is no better — it
   // enumerates the owner's infrastructure. A plugin that wants to contribute nodes does it from its node
@@ -236,7 +236,7 @@ const RULES: readonly RouteRule[] = [
   // mappable to a scope: it is the whole roster, and minting a scope for it would hand every installed
   // plugin every connection the owner holds to serve one dropdown. A plugin that needs the list serves
   // it from its own `/v1/p/<id>` route over `ctx.core.models.available`, which is what the three
-  // Generate dialogs already do (docs/integrations.md § Model providers).
+  // Generate dialogs already do (docs/integrations/model-providers.md § Model providers).
   { path: shape('/v1/core/models/backends'), scopes: {}, note: 'The whole model roster. A plugin proxies its own through ctx.core.models.' },
 ]
 

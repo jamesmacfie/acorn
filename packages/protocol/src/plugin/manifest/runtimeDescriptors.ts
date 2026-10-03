@@ -21,7 +21,7 @@ export const scheduleDescriptor = z.object({
 
 // A check the host runs before it archives a task, and the cleanup the owner may opt into. The pair to
 // `ctx.taskChecks.register`. Node-side, because the question is about a worktree and the processes
-// around it. See docs/plugins.md § Task checks.
+// around it. See docs/plugins/task-checks.md § Task checks.
 export const taskCheckDescriptor = z.object({
   id: z.string().min(1).max(64),
   // GET ?taskId=… → { concern } | { concern: null }. Confined to this plugin's own namespace at parse
@@ -36,7 +36,7 @@ export const taskCheckDescriptor = z.object({
   timeout: z.number().int().min(1).max(10).optional(),
 })
 
-// One verb this plugin will write onto the node's audit trail (docs/security.md § Audit). The host
+// One verb this plugin will write onto the node's audit trail (docs/security/audit.md § Audit). The host
 // qualifies it as `<pluginId>:<id>`, so a package cannot file a row under a core verb or another
 // plugin's, and the settings surface can still enumerate the whole vocabulary because every entry in it
 // came from a parsed manifest or from core's own closed union.
@@ -51,11 +51,11 @@ export const auditActionDescriptor = z.object({
   label: z.string().min(1).max(80),
 })
 
-// ── Managed agent harnesses (docs/managed-agents.md § Harnesses) ──────────────────────────────────
+// ── Managed agent harnesses (docs/managed-agents/harnesses.md § Harnesses) ──────────────────────────────────
 //
 // A harness is data. The contributing plugin describes the spawn, and plugins/agents owns the child
 // process, the session, and the transcript, so a data-only harness plugin needs no `exec` grant.
-// docs/plugin-authoring.md § Harnesses is the authoring contract.
+// docs/plugin-authoring/harnesses.md § Harnesses is the authoring contract.
 
 // A variable name, or a `PREFIX_*` glob. A bare `*` is refused here and in `brokerEnv`: it would copy
 // the node's whole environment into the agent and defeat the allowlist.
@@ -91,7 +91,7 @@ const harnessQuirks = z.object({
 })
 
 // One prompt in, one answer out, with no session and no tools. Declaring it is what puts the harness
-// in every Generate list beside a connected API key (docs/integrations.md § Model providers), and it
+// in every Generate list beside a connected API key (docs/integrations/model-providers.md § Model providers), and it
 // is the only argv a manifest may assemble.
 //
 // It sits beside `terminal` rather than inside it, because answering one question and holding a

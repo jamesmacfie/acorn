@@ -1,7 +1,7 @@
 // The editor plugin's wire contract: find-in-files plus the worktree read/write/list routes.
 //
 // Lives in contract/, not shared/, because plugins/agents' @-mention textarea reads
-// `editorFilesRoute` from here (docs/plugins.md § Package shape).
+// `editorFilesRoute` from here (docs/plugins/package-shape.md § Package shape).
 
 // Find-in-files: POST because it spawns ripgrep and the query is an arbitrary body, not a path
 // segment.

@@ -19,7 +19,7 @@ export type InputProps = ControlOwn & {
    *  callback, because every keystroke would be a message hop. */
   onInput?: (value: string) => void
   /** The committed value: blur, or Enter. `onChange` rather than `onCommit` because commit IS what
-   *  the kit means by a change (docs/ui-design.md § The closed kit), and only a name in that list can carry
+   *  the kit means by a change (docs/ui-design/closed-kit.md § The closed kit), and only a name in that list can carry
    *  a handler across the remote root. */
   onChange?: (value: string) => void
   /** Enter, with the value. The kit's own name for "the reader is done and wants this to happen",
@@ -27,7 +27,7 @@ export type InputProps = ControlOwn & {
    *  `onKeyDown`, and a remote tree cannot: a DOM event does not cross. */
   onSubmit?: (value: string) => void
   /** An input owns its keys while focused, which is why this is here and nowhere else in the kit.
-   *  See docs/ui-design.md § The closed kit. */
+   *  See docs/ui-design/closed-kit.md § The closed kit. */
   onKeyDown?: (event: KeyboardEvent) => void
   onPaste?: (event: ClipboardEvent) => void
   onFocus?: () => void

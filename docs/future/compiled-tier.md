@@ -125,6 +125,34 @@ true. Coupling 4, the projects row, is untouched by the layout programme.
   anti-vacuity floors in `boundaries.test.ts` (package/edge minimums) will need lowering as
   plugins leave the workspace graph.
 
+## Open items from the loaded-plugin migrations
+
+`docs/loaded-plugin-migration.md` recorded the moves of rollbar, model-providers, linear, http, and
+database out of the binary. It was deleted on October 4, 2026, and its history is in Git. These items
+were still open when it went:
+
+- **The editor's move.** What's left is the open-document verb its ⌘P needs (`docs/editor.md`).
+- **The first loaded consumer of the `overlay` frame target.** The carrier is tested at the manifest
+  and broker boundaries, but no loaded package declares an `overlay` frame, so the path is unexercised
+  end to end.
+- **Release validation:** a real-token soak and an installer-driven update.
+- **Cold-start bare references,** such as a `JIRA-42` with no confirming URL nearby, are deliberately
+  unbuilt. They'd need a bounded host-compiled token grammar, gated on a live connection and on
+  confirmation through the provider's `refResolvers` route. Plugin-supplied regular expressions were
+  rejected: a ReDoS risk, no answer when two providers' patterns collide, and a second pattern language.
+- **Confined URLs stay as they are.** The loaded tier's `/p/:projectId/x/<plugin-id>/` URLs are ugly on
+  purpose. The long-term answer to the asymmetry is to confine compiled plugins too.
+- **Known issues nobody owns yet:** `broker.fetch` throwing `Unknown node` is the only connection
+  failure not modeled as a connection state. The local Node's label resets to "This computer" after
+  an identity change. GitHub's pulls batch keeps previously mirrored rows when part of a pass fails,
+  with no visible signal. `onSelectTarget` on the reference panel props has no caller.
+- **Verification that needs the running app,** across the database, linear, and http moves: the
+  composed database pane (the splitter, ⌘Enter running the just-typed text, completions against a real
+  database, the modals in the bottom region, the scratch document surviving a reopen, and the result
+  grid with a `SELECT` that has no `LIMIT`), linear's panel inside a pull request and its
+  project-scoped view, and http's surfaces, two-click deletes, `bridge.ui.copy`, and agent-context
+  options.
+
 ## Verify before building
 
 Re-run the census: which plugins have `acorn-plugin.config.mjs`; current consumers of each

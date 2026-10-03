@@ -18,6 +18,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Panels that answer real questions: trustworthy results, a source-first editor on a typed panel plan run by the Node, identity and time, richer sources, author-chosen row actions, composition and analysis, datasets, and gated write-back. Seven workstreams delivered in four end-to-end milestones, built from 30 example panels and accepted against unseen requests. | Proposed, 2026-10-02; nothing built. Replaces the August 2026 backlog. |
 | [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
+| [documentation/](./documentation/README.md) | Bring every shipped doc in line with the code, restyle it to one house style, and split pages past 200 lines into topic folders. A citation check first, then five phases by area. | Proposed, 2026-10-03; nothing started. |
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [pi/](./pi/README.md) | What acorn takes from oh-my-pi: seven design topics with [nine sequential implementation handoffs](./pi/phases/README.md), including the Mods permission design, real loaded consumers, unattended ownership, plugin skills, and a measured resource-read experiment. | Proposed, 2026-10-02; handoffs added 2026-10-03; nothing built. |
@@ -40,8 +41,10 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [rail-context-menus.md](./rail-context-menus.md) | Desktop source and pane icon menus, plugin ownership, replacement providers, and verification gates. | Implementation on isolated branch, 2026-10-03; integration acceptance open. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
+| [schedules.md](./schedules.md) | Unattended backup and an `agent-run` schedule target. | Proposals moved from schedules.md, 2026-10-03. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
+| [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
 
 ## How these relate
 
@@ -73,7 +76,7 @@ The design, research, refused alternatives, and delivery records remain in Git h
 `client-plugins/` shipped its five phases in 2026-09 and was deleted on 2026-09-27.
 [Plugins](../plugins.md), [security](../security.md), [frontend composition](../frontend.md),
 [pane layout](../panes.md), [appearance](../ui-design/appearance.md), and
-[terminal chrome and plugins](../tui/chrome-and-plugins.md) own the behavior. [remote.md](./remote.md)
+[terminal chrome](../tui/chrome.md) own the behavior. [remote.md](./remote.md)
 owns browser custody. The parked icon-pack proposal and the refused alternatives remain in git history.
 
 `cli/` shipped on 2026-09-27 and was deleted after final review. [CLI](../cli.md) owns command
@@ -82,7 +85,7 @@ owns packaging; [API reference](../api-reference.md) owns the invocation route; 
 [CLI command authoring](../plugin-authoring/cli-commands.md) owns the loaded-plugin descriptor.
 The five-phase proposal and its refused alternatives remain in git history.
 
-`rail-source-visibility.md` shipped on 2026-09-30 and was deleted. [Frontend](../frontend.md#rail-source-visibility)
+`rail-source-visibility.md` shipped on 2026-09-30 and was deleted. [Frontend](../frontend/rail-and-routing.md#rail-source-visibility)
 owns the preference, the rail projection, and the palette opener; [the manifest](../plugin-authoring/the-manifest.md)
 owns `showInRailByDefault` and `railSourceVisibility`; [activation](../plugins/activation.md#the-plugin-strip)
 owns the plugin strip; and [testing](../testing.md) holds the manual checks.
@@ -107,7 +110,7 @@ house patterns, the deferred findings, and the open product decisions remain in 
 the single files `live-qa.md`, `dx.md`, `web_search_run.md`, and `rail-tab.md` are in git history. The
 rail component and compiled marker contract live in [ui-design.md](../ui-design.md), and loaded task
 annotations live in
-[Cooperative extension points](../plugins/cooperative-extension-points.md#task-annotations). Each ended by saying
+[Cooperative extension points](../plugins/rows-and-annotations.md#task-annotations). Each ended by saying
 where its behaviour moved.
 
 `node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the
@@ -136,7 +139,7 @@ shipped, its three refusals including `content-visibility`, and its known limits
 [api-reference.md](../api-reference.md) and [data-layer.md](../data-layer.md) have the routes and the
 mirror columns; [package-shape.md](../plugins/package-shape.md) § The plugin API and
 [plugin-authoring.md](../plugin-authoring.md) § Drawing a diff have plugin API major 2; and
-[tui/interaction.md](../tui/interaction.md) has the terminal's diff pane. The fixture and the flow are
+[tui/scrolling.md](../tui/scrolling.md#the-diff-window) has the terminal's diff pane. The fixture and the flow are
 [testing.md](../testing.md) § Large-surface fixture and
 [local-development.md](../local-development.md) § Large-surface flow. Smoke items 81 to 85 in
 [changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) are the real-window acceptance it still owes: none has run on a visible
@@ -171,7 +174,7 @@ trust line. [security.md](../security.md) § Credential handling has the rule th
 CLI's own login and never a key acorn holds. [state-ownership.md](../state-ownership.md) § Scope rules
 has the one `models.generatePick` default and the SQL dialog's known limit, which is the programme's
 one unclosed deviation: that dialog is a remote tree in a worker and cannot read a device preference,
-so it opens on the first backend and remembers nothing. [ui-design.md](../ui-design.md) § The closed
+so it opens on the first backend and remembers nothing. [ui-design.md](../ui-design/closed-kit.md) § The closed
 kit has the renamed picker, [features.md](../features.md) and
 [first-party-plugins.md](../first-party-plugins.md) have the Settings section and the wizard step,
 [api-reference.md](../api-reference.md) has the route, and
@@ -212,8 +215,8 @@ owner-typed row and the save that re-enters the snapshot, and
 [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) and
 [first-party-plugins.md](../first-party-plugins.md) have the three palette rows and the plugin's
 grown row, [integrations.md](../integrations.md) has **Start workflow…** as a registry contribution
-rather than three menus, and [ui-design.md](../ui-design.md) § The closed kit and
-[tui.md](../tui.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
+rather than three menus, and [ui-design.md](../ui-design/closed-kit.md) § The closed kit and
+[tui.md](../tui/plugin-losses.md) § What a plugin loses here have the kit's `Graph` node and its two projections.
 [workflows.md](../testing/workflows.md) holds what the programme owes: nine manual checks, items 48 to 56, six
 for the editor and the run pane, two for the start-from-an-item flow and one for the graph view. None
 of them has been run.
@@ -222,20 +225,20 @@ of them has been run.
 staging over three groups, a list-or-tree view, a multi-line commit editor with amend and sign-off, a
 branch bar with fetch, pull and push, a model-written commit message, and a point another plugin fills
 once a branch is pushed. Shipped and deleted 2026-09-08.
-[diff-rendering.md](../diff-rendering.md) owns the panel: § The source port has the one `LocalStatus`
+[diff-rendering.md](../diff-rendering/changes-pane.md) owns the panel: § One status read has the one `LocalStatus`
 read behind every region and why the two signatures are separate, § Data flow has the navigator, the
 checkbox, the three groups, the footer's order, the primary button's verb and the three refresh signals,
 and § What the Changes panel refuses has the ten decisions — a branch picker, hunk staging, other
 remotes, chords on the remote verbs, a split button, a separate pane, a rail surface, git write tools
 for agents, a commit history, and a warning on archive about unpushed commits.
-[panes.md](../panes.md) § Layout model has the commit draft outliving its region, and
+[panes.md](../panes/models.md) § Pane models has the commit draft outliving its region, and
 [state-ownership.md](../state-ownership.md) § Scope rules has where the draft, the view preference and
 the model pick live. [plugins.md](../plugins.md) § Hooks has `amend` and `force` on the two payloads,
 and § Cooperative extension points has `changes:push-actions` with its props beside the other
 first-party remote points. [security.md](../security.md) § Process, path, and configuration controls has
 the lease and the abort verb; [integrations.md](../integrations.md) § Model providers has the commit
 message beside the database plugin's SQL as the two `generateText` consumers;
-[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Plugin shortcuts has the two
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts/shortcuts.md) § Plugin shortcuts has the two
 commit chords and the palette rows; [first-party-plugins.md](../first-party-plugins.md) and
 [api-reference.md](../api-reference.md) have the plugin's row and its route surface; and
 [changes-and-large-surfaces.md](../testing/changes-and-large-surfaces.md) has smoke items 43 to 47.
@@ -280,7 +283,7 @@ one owner and one representation, removed compatibility adoption, and reset ever
 initial migration. Tickets 01 to 12 shipped and ticket 13 recorded acceptance on 2026-09-23; the
 folder was deleted on 2026-09-26. The owning docs hold the contracts. What ticket 13 could not prove
 on a real host is recorded where it applies: the terminal client has no Terminal drawer receiver
-([tui.md](../tui.md) § What a plugin loses here), agent automation stages the built renderer because
+([tui.md](../tui/plugin-losses.md) § What a plugin loses here), agent automation stages the built renderer because
 Vite's development proxy drops a cold module ([local-development.md](../local-development.md)), and
 the real-window checks the driver cannot reach (a Memory proposal approval, plugin trust, workflow
 promotion, native menus, dialogs and keychain prompts) stay manual.
@@ -305,9 +308,9 @@ adapters, the three edges, the one-second hold and the seen rule, acknowledge on
 channels and the `notify` seam group, the settings schema, the two chimes, and the terminal's OSC
 recipe. Its eight invariants are properties in
 `packages/client-core/src/features/notifications/invariants.test.ts`. Where a phase's behaviour
-belongs to somebody else's contract, that owner took it: [shell.md](../shell.md) § The renderer
+belongs to somebody else's contract, that owner took it: [shell.md](../shell/bridge-and-broker.md) § The renderer
 bridge has the desktop's two Tauri commands and the focus approximation that stands in for a click
-callback, [tui.md](../tui.md) § What is drawn bespoke has the topbar count, the inbox overlay and the
+callback, [tui.md](../tui/chrome.md) § What is drawn bespoke has the topbar count, the inbox overlay and the
 DEC 1004 focus rule, [plugin-map.md](../plugin-map.md) § Notifications still answers which call a
 plugin makes, and [contribution-kinds.md](../contribution-kinds.md) has what an attention
 row's severity decides.
@@ -341,7 +344,7 @@ client-core is TypeScript whatever paints the cells, and a constraint layout ins
 rather than rejected. Both are in the folder's `refused.md`.
 
 `terminal-updates/` was seven phases that finished the terminal's keyboard, shipped and deleted
-2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of it. Phase 0 wired every asking node so it
+2026-09-02. [tui.md](../tui/keys.md) § Keys and focus owns all of it. Phase 0 wired every asking node so it
 focuses, shows focus and acts, which is § The adapter and the pressable contract under it. Phase 1
 rewrote the region store into five levels with one settle pass and a shell-installed topology, and
 phase 4 moved the shell's own arrangement into `chrome/topology.ts`; both are § Focus regions and
@@ -357,7 +360,7 @@ there.
 
 `terminal-keyboard/` was seven phases that re-founded the terminal client's focus and keys after the
 model under them had been rewritten ten times in three days, each time correctly, for a bug somebody
-saw. Shipped 2026-09-02. [tui.md](../tui.md) § Keys and focus owns all of
+saw. Shipped 2026-09-02. [tui.md](../tui/keys.md) § Keys and focus owns all of
 it, and the review's finding was that five reports came from four structural faults and one scrolling
 fault, so
 each of its five rules went to the subsection that owns the mechanism. Rule 1, the renderer is the
@@ -394,13 +397,13 @@ booted under Node, drawing the same panes in cells. Phases 0 to 6 shipped on 202
 was deleted the same day. [tui.md](../tui.md) owns the client — the process model, the config
 directory, the host switch, the chrome, the keys, the sandbox and the doors it left open — and the
 behaviour that belongs to a shared contract went to that contract's owner instead:
-[ui-design.md](../ui-design.md) §§ The closed kit, What a terminal renderer needs from this and Every
-node at 80 by 24 for the kit and the role tokens, [panes.md](../panes.md) § Layout model for the
-projections, [command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and
+[ui-design.md](../ui-design/closed-kit.md) §§ The closed kit, What a terminal renderer needs from this and Every
+node at 80 by 24 for the kit and the role tokens, [panes.md](../panes/layout.md) § Layout model for the
+projections, [command-palette-and-shortcuts.md](../command-palette-and-shortcuts/focus-and-typing.md) § Focus and
 typing for the intents and the layers, [security.md](../security.md) §§ Trust boundaries, Transport
 and auth, Third-party plugin bundles and The containment ladder for the worker-thread sandbox,
 [plugins.md](../plugins.md) § The tree contract for the shared batch rules,
-[first-party-plugins.md](../first-party-plugins.md) § What each of these loses in a terminal for the
+[first-party plugins in the terminal](../first-party-plugins/terminal.md) for the
 plugin-by-plugin table, [terminal.md](../terminal.md) § Client and [editor.md](../editor.md) for
 `attachPty` and the `$EDITOR` handoff, [node-distribution.md](../node-distribution.md) § Reaching a
 node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7's tarball
@@ -410,7 +413,7 @@ remain in [bundle.md](./bundle.md) § Shipping `acorn`.
 
 `before-terminal-ui/` was eight phases that emptied the plugin client tier of the raw DOM a second
 host cannot draw, shipped and deleted 2026-08-31. The kit grew four nodes and
-[ui-design.md](../ui-design.md) §§ The closed kit and Every node at 80 by 24 owns them; the file
+[ui-design.md](../ui-design/closed-kit.md) §§ The closed kit and Every node at 80 by 24 owns them; the file
 dialogs are two verbs on the platform seam in [frontend.md](../frontend.md), which also owns the
 `{ seam: … }` host requirement that replaced the preview pane's desktop gate; the editor is
 CodeMirror with an `$EDITOR`-in-a-PTY mode and [editor.md](../editor.md) owns both, with
@@ -441,11 +444,11 @@ schema.
 
 `layout/` was the largest of them: eleven phases that made every pane a host-owned layout filled with
 a tree of closed-kit components, shipped and deleted 2026-08-30. Its behaviour lives in
-[ui-design.md](../ui-design.md) § The closed kit and § Every node at 80 by 24,
-[panes.md](../panes.md) § Layout model, [plugins.md](../plugins.md) §§ The tree contract and
+[ui-design.md](../ui-design/closed-kit.md) § The closed kit and § Every node at 80 by 24,
+[panes.md](../panes/layout.md) § Layout model, [plugins.md](../plugins.md) §§ The tree contract and
 Cooperative extension points and Hooks,
-[command-palette-and-shortcuts.md](../command-palette-and-shortcuts.md) § Focus and typing,
-[shell.md](../shell.md) § The plugin worker, and [security.md](../security.md) § Rung 0.
+[command-palette-and-shortcuts.md](../command-palette-and-shortcuts/focus-and-typing.md) § Focus and typing,
+[shell.md](../shell/origins.md) § The plugin worker, and [security.md](../security.md) § Rung 0.
 
 
 `telemetry/` shipped all six phases and was reviewed and deleted on 2026-09-11.

@@ -1,7 +1,7 @@
 import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescriptor, type ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
 
 // Node providers: a plugin that knows about nodes, and optionally can make and remove them
-// (docs/plugins.md § Node providers). The second door into the fleet, beside probe-then-pair.
+// (docs/plugins/node-providers.md § Node providers). The second door into the fleet, beside probe-then-pair.
 //
 // **A provider runs on some node, not necessarily the one the person is sitting at, and with no
 // client necessarily attached.** Write nothing into a provider that assumes otherwise. That sentence
@@ -11,8 +11,7 @@ import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescript
 // looking is broken in the case this seam exists for.
 //
 // Node-side, and staying that way. A renderer-side provider would put the cloud account credential in
-// the renderer, the one place the architecture has always kept credentials out of
-// (docs/future/phased-review-steps/cloud-guardrails.md rule 6). The credential is the thing that may
+// the renderer, the one place the architecture has always kept credentials out of. The credential is the thing that may
 // move later; the provider is not.
 
 /** What `list` answers with. The wire projection (`providedNodeSchema`) is strict and has no

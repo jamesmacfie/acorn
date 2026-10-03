@@ -11,7 +11,7 @@
 //   the mark    `focused()`, which the node draws with `litControl` (../kit/roles.ts)
 //
 // Nothing here decides which node is a stop and nothing here draws. The node asks for a press and is
-// told whether it has the keys (docs/tui.md § Rendering).
+// told whether it has the keys (docs/tui/rendering.md § Rendering).
 
 import { createEffect, createSignal, onCleanup, untrack } from 'solid-js'
 import type { Renderable } from '../tree/compat'
@@ -99,7 +99,7 @@ export function pressable(box: Renderable, options: StopOptions): void {
     return runs[intent]?.() ?? false
   }, { priority: STOP, mode: 'focus' }))
   // Click to focus and then press, which is the whole of this host's pointer model
-  // (docs/tui.md § What the TUI never does). Only the press is here: the store hit-tests the same
+  // (docs/tui/rectangles.md § What the TUI never does). Only the press is here: the store hit-tests the same
   // mouse-down on its way up to the root and focuses the nearest stop above it, which is this box
   // (./regions.ts § Clicks are hit tests).
   box.onMouseDown = () => {

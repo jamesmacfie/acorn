@@ -8,6 +8,6 @@
 // There is no runtime half and there must not be one. The build reads `moduleName` in
 // `../../vite.config.ts` and emits calls to `./renderer.ts` whatever the pragma says, so a `jsx` or
 // `jsxs` function exported here would be a second answer nothing calls
-// (docs/tui.md § The host switch).
+// (docs/tui/host-switch.md § The host switch).
 
 export type { JSX } from './jsx'

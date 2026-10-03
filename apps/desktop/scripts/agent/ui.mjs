@@ -91,7 +91,7 @@ async function main() {
     return
   }
   // A declarative flow from ./flows, run against this session's window, with a dated report written
-  // beside the session's screenshots (docs/local-development.md § Large-surface flow). A failed
+  // beside the session's screenshots (docs/local-development/agent-drivers.md § Large-surface flow). A failed
   // invariant fails the command after the whole flow has run and the report is on disk.
   if (command === 'flow') {
     if (args.length !== 1 || !/^[a-z0-9-]+$/.test(args[0])) throw new Error('Usage: flow NAME (a file in scripts/agent/flows)')

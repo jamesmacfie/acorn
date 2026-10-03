@@ -1,4 +1,4 @@
-// The `pr` context section (docs/agent-tools.md § Context sections). Its rows are this plugin's
+// The `pr` context section (docs/agent-tools/context-sections.md § Context sections). Its rows are this plugin's
 // (`repos ⋈ pull_requests ⋈ pr_files` in github.sqlite), so its shape lives here rather than in core.
 // Core keeps the assembly, the order and the byte ceiling.
 import { pastedContent, truncateBytes, type PluginContextSection } from '@acorn/plugin-api/node'

@@ -28,7 +28,7 @@ export type ConnectIntegrationRequest = { providerId: IntegrationProvider; crede
 export type RotateIntegrationRequest = { credentials: Record<string, string> }
 
 // The same links read and written from the connection's side rather than a workspace's, which is how
-// Settings shows one integration's whole map at once (docs/integrations.md § Project sources).
+// Settings shows one integration's whole map at once (docs/integrations/project-sources.md § Project sources).
 export type IntegrationMapping = { workspaceId: string; externalId: string; projectId?: string }
 export type IntegrationMappingsResponse = { mappings: IntegrationMapping[] }
 // The projects one connection offers, for core's workspace picker. `id` is what a chosen row's
@@ -45,7 +45,7 @@ export const integrationMappingsRoute = (id: string) => `/v1/core/integrations/$
 // The read half of the model seam: every backend a Generate control can spend, which is every
 // connected key plus every agent CLI installed on this machine (@acorn/protocol/modelProviders.ts § ModelBackend).
 // Device-only. A plugin frame reads its own plugin's proxy route instead, because `/v1/core/*` has no
-// bridge scope (docs/integrations.md § Model providers).
+// bridge scope (docs/integrations/model-providers.md § Model providers).
 export const modelBackendsRoute = '/v1/core/models/backends'
 
 // v3 adds descriptor metadata and normalized connection summaries. A distinct key stops a persisted v2

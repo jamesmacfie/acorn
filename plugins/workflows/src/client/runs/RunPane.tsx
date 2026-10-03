@@ -9,7 +9,7 @@ import { formatUsage, runGlyph, runTone, statusLabel, stepElapsed, stepGlyph, st
 import { isLiveRun, type RunPaneModel } from './runPaneModel'
 
 // The run pane's list column: this task's runs, then the selected run's steps in the same reading
-// order and the same indentation the editor draws (docs/workflows.md § Routes and UI).
+// order and the same indentation the editor draws (docs/workflows/routes-and-ui.md § Routes and UI).
 //
 // Two `Rows` collections rather than one, because they answer different questions and the arrows
 // should not walk from a run into a step. Each is the kit's, so the keyboard, the type-ahead and the
@@ -17,7 +17,7 @@ import { isLiveRun, type RunPaneModel } from './runPaneModel'
 //
 // The steps half draws either way: a list, or the kit's `Graph` over the same model. Which one is a
 // per-device preference, because it is a reading habit rather than anything about the run
-// (docs/state-ownership.md § Device). A module signal, because the switch sits in the header region
+// (docs/state-ownership/scope-rules.md § Particular decisions). A module signal, because the switch sits in the header region
 // and the list region draws what it chose.
 
 type NodeView = 'rows' | 'graph'

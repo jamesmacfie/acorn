@@ -14,7 +14,7 @@ import {
 
 // The two agent defaults the catalogue admits as palette settings: whether a session carries the last
 // one's model forward, and how a tool card starts out
-// (docs/managed-agents.md § From the command palette).
+// (docs/managed-agents/palette.md § From the command palette).
 //
 // **Why a mounted component rather than `ctx.commands` at boot.** Both write through the accessors
 // their Settings pages already use, and both of those accessors take a `QueryClient` — the cache is
@@ -25,7 +25,7 @@ import {
 // (plugins/github/src/client/Shortcuts.tsx).
 //
 // **Desktop only, and that is the honest answer rather than a gap.** The `overlay` slot is not drawn in
-// a terminal (docs/tui.md § What a plugin loses here), and the tool-fold value is a device preference
+// a terminal (docs/tui/plugin-losses.md § What a plugin loses here), and the tool-fold value is a device preference
 // with nowhere to be stored there — which is the same reason core registers Appearance on the desktop
 // and not in the terminal. A choice that would quietly fail to persist is worse than an absent row.
 //

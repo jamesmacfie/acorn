@@ -1,4 +1,4 @@
-// The process broker. See docs/security.md § Process, path, and configuration controls for the
+// The process broker. See docs/security/process-and-paths.md § Process, path, and configuration controls for the
 // guarantee this gives every caller and the incidents that led to it.
 import { spawn } from 'node:child_process'
 import { basename } from 'node:path'
@@ -85,7 +85,7 @@ export function brokerEnv(spec: Pick<ProcSpec, 'env' | 'passthrough'>, parent: N
 //
 // The label is the binary's base name, never the path a caller composed: a metric name and its
 // labels have to be patterns, and `/opt/homebrew/bin/docker` and `/usr/local/bin/docker` are the
-// same fact about the same tool (docs/telemetry.md § The attribute vocabulary). The owner comes off
+// same fact about the same tool (docs/telemetry/model.md § The attribute vocabulary). The owner comes off
 // the ambient context, so a spawn under a plugin's route is that plugin's.
 const procLabel = (file: string): string => basename(file)
 

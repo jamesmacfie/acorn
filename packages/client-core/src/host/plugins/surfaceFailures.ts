@@ -1,4 +1,4 @@
-// Surfaces a plugin declared that this device couldn't register (docs/plugins.md § Loaded plugins: the
+// Surfaces a plugin declared that this device couldn't register (docs/plugins/client-half.md § Loaded plugins: the
 // client half).
 //
 // The third failure class, after the roster's load, init and ready reasons. A manifest can declare a

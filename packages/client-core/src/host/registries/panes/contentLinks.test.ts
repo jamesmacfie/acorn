@@ -256,7 +256,7 @@ describe('the host ladder', () => {
     stopped.dispose()
   })
 
-  // The third destination (docs/plugins.md § "Loaded plugins: the client half"): a target whose plugin
+  // The third destination (docs/plugins/client-half.md § "Loaded plugins: the client half"): a target whose plugin
   // has a project-scoped route rather than a pane or a panel. The null case has to keep working, so an
   // untracked repo still leaves for the browser.
   it('resolves a route for a target whose plugin declares one, and null for one it cannot place', () => {
@@ -360,8 +360,8 @@ describe('the host ladder', () => {
       routed.dispose()
     })
 
-    // Navigating is only half of arriving (docs/dashboards.md § "Taking a route also selects the rail
-    // source that owns it"). The shell draws from the rail selection, not the location, so a route
+    // Navigating is only half of arriving (docs/dashboards/panels.md § Taking a route also selects the rail
+    // source that owns it). The shell draws from the rail selection, not the location, so a route
     // taken while another source is selected moves the URL and leaves the old surface on screen.
     it('selects the rail source that owns the route before navigating', () => {
       setSelectedSource('home')

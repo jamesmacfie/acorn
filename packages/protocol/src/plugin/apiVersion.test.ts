@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR, speaksApiVersion } from './apiVersion.ts'
 
 // The compatibility gate four call sites share: two loader paths, the installer, and the client's
-// bundle resolution (docs/plugins.md § Activation). A plugin that loads when it should not is a
+// bundle resolution (docs/plugins/activation.md § Activation). A plugin that loads when it should not is a
 // `ctx` member that is not a function; one that refuses when it should not is a plugin nobody can
 // install.
 describe('speaksApiVersion', () => {

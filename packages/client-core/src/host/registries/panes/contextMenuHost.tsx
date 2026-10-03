@@ -9,12 +9,12 @@ import {
 } from './contextMenus'
 
 // The two hosts for the context-menu registry. The registry, the location vocabulary and the `when`
-// evaluation live in ./contextMenus.ts, JSX-free (docs/frontend.md § Registries and plugins). What is
+// evaluation live in ./contextMenus.ts, JSX-free (docs/frontend/registries.md § Registries and plugins). What is
 // here is a `<For>` and an anchor, kept as little as the job allows, because it is the half
 // only a person looking at the running app can check.
 
 /** The registry's rows for one target, as menu items. Rendered inside whatever menu is open, the
- *  button-triggered one the tab rail already had, and the right-click one below (docs/plugins.md §
+ *  button-triggered one the tab rail already had, and the right-click one below (docs/plugins/menus-and-markers.md §
  *  Context menus, "two doors, one list"). */
 export function ContextMenuItems(props: {
   context: MenuContext
@@ -22,7 +22,7 @@ export function ContextMenuItems(props: {
   target: ContextMenuTarget
 }) {
   const items = () => contextMenuItems(props.location, props.target)
-  // A destructive item sits below a rule, apart from the safe ones (docs/ui-design.md § Menus and
+  // A destructive item sits below a rule, apart from the safe ones (docs/ui-design/interaction.md § Menus and
   // right-click). Registered rows have no groups, so the rule goes before the first danger row.
   const firstDanger = () => items().findIndex((item) => item.tone === 'danger')
   return (

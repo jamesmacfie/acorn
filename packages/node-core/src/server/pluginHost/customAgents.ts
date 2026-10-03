@@ -1,5 +1,5 @@
 // Delivers a manifest-declared custom agent to the plugin that owns agent sessions, the same handover
-// a harness takes (./harnesses.ts). See docs/managed-agents.md § Custom agents.
+// a harness takes (./harnesses.ts). See docs/managed-agents/custom-agents.md § Custom agents.
 //
 // Data only: a name, a harness, provider options, instructions and a tool ceiling. Nothing here is a
 // program or a path, so the host's whole job is to mint the id and qualify the harness it names.

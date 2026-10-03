@@ -26,7 +26,7 @@ import { Graph } from './graph'
 // the whole test: a pane written against the kit imports `@acorn/plugin-api/ui`, and on this host that
 // facade resolves to `./ui.ts`, which re-exports these. The pane does not change and does not know.
 //
-// What each one draws is the sentence in docs/ui-design.md § Every node at 80 by 24, and what a
+// What each one draws is the sentence in docs/ui-design/every-node.md § Every node at 80 by 24, and what a
 // `reduced` one loses is written beside its level in client-core's kit/tokens/support.ts.
 // `tools/arch/kitTable.test.ts` fails if this table, that matrix and that appendix disagree.
 

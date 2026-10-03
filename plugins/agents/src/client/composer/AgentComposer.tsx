@@ -46,7 +46,7 @@ type InsertChoice = {
 // The `footer` of the Agent pane's detail: what is going to be sent, and everything that can be
 // added to it.
 //
-// The field is the kit's `MentionTextarea` (docs/ui-design.md § The closed kit): `@file`,
+// The field is the kit's `MentionTextarea` (docs/ui-design/closed-kit.md § The closed kit): `@file`,
 // `/command` and `$skill` are three `sources`, and the colour behind the text is `segments`. What
 // this file still owns is what those three mean here — the worktree walk, the commands the session
 // advertised, and which spans of the draft the turn will actually send as file parts.
@@ -373,7 +373,7 @@ export default function AgentComposer(props: {
 
   /**
    * A contributor asking this composer to put a different attachment in one slot
-   * (docs/plugins.md § Asking the owner; docs/managed-agents.md § Draft attachments).
+   * (docs/plugins/remote-points.md § Asking the owner; docs/managed-agents/attachments.md § Draft attachments).
    *
    * A compare-and-swap, because there is no transaction to be had. The draft is an array in this
    * component and the replacement is a row on the node, so "atomic" here can only mean: either the id
@@ -691,7 +691,7 @@ export default function AgentComposer(props: {
             //
             // Bare, not `window.setTimeout`: the terminal host defines `window` as an object holding
             // `acorn` and nothing else, on the grounds that a `window` answering every question is
-            // worse than none (docs/tui.md § Booting client-core under Node). Reaching through it
+            // worse than none (docs/tui/host-switch.md § Booting client-core under Node). Reaching through it
             // threw a TypeError out of a keymap handler and this row did nothing there. The global is
             // the same function on both hosts, and only the DOM has the delegation this defers past.
             setTimeout(() => setContextPickerId(contribution.id), 0)

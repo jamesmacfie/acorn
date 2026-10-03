@@ -4,7 +4,7 @@
 // again immediately before registration; a failure throws and costs the plugin this one row, not its
 // whole manifest (the caller runs inside the chrome pass's per-contribution try/catch).
 //
-// See docs/plugins.md § Context menus for what the host binds over what a manifest can state: the id
+// See docs/plugins/menus-and-markers.md § Context menus for what the host binds over what a manifest can state: the id
 // (`plugin:<pluginId>:<id>`), the per-node running gate, the target id the verb receives, and why there
 // is no `tone`.
 import { isContextMenuLocation, isRailMenuLocation, unknownWhenFacts } from '@acorn/protocol/contextMenus.ts'

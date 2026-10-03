@@ -1,7 +1,7 @@
 // ── Hooks ─────────────────────────────────────────────────────────────────────────────────────────
 
 /**
- * A turn in one of your decisions, offered to other plugins (docs/plugins.md § Hooks).
+ * A turn in one of your decisions, offered to other plugins (docs/plugins/hooks.md § Hooks).
  *
  * The difference between a hook and an event: an event has already happened and nobody can stop it; a
  * hook runs *before*, in a chain, with a return value. "Task archived" is an event. "Before I push,

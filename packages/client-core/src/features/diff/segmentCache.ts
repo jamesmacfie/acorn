@@ -4,7 +4,7 @@ import { isCodeRow, type DiffRow } from '../../kit/diff/diffModel'
 import { segmentCaches } from './segmentCaches'
 
 // The node's recently read diff segments, held in memory so returning to a diff paints its rows at
-// once (docs/diff-rendering.md § Resident segments).
+// once (docs/diff-rendering/loading.md § Resident segments).
 //
 // One cache per query client, which is one per node: the same partition, and the same lifetime, as
 // everything else the renderer holds for a node. A pane mounts, reads from it and writes to it, and

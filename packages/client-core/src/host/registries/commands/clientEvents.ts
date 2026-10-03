@@ -10,19 +10,19 @@ const log = createLogger('client-event')
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
-  // Show the editor pane's find-in-files panel and focus its box (docs/panes.md § Contributions
+  // Show the editor pane's find-in-files panel and focus its box (docs/panes/contributions.md § Contributions
   // covers the fold into the editor pane). It has to be an intent for the same reason `editor:reveal`
   // is: the pane may not be mounted yet, and the request has to survive until it is.
   | { kind: 'editor:search' }
   | { kind: 'integration:show-ref'; ref: ExternalRef }
   | { kind: 'context:reveal'; sectionId: string; itemId?: string } // → pane 'context'
   // A row a plugin's declarative rail source was selected on, carried to that plugin's own pane
-  // (docs/plugins.md § "Loaded plugins: the client half"). It reuses this mechanism rather than
+  // (docs/plugins/client-half.md § "Loaded plugins: the client half"). It reuses this mechanism rather than
   // inventing one because the problem is identical: the pane may not be mounted yet, and the intent
   // has to survive until it is.
   | { kind: 'plugin:select'; item: string }
   // Open a workflow run in the workflows pane, at one node when the sender knows which
-  // (docs/workflows.md § Routes and UI). Sent by a bell row, an attention row, the rail's recent
+  // (docs/workflows/routes-and-ui.md § Routes and UI). Sent by a bell row, an attention row, the rail's recent
   // runs and the agent pane's chip, all of which name a run and none of which can be sure the pane
   // is mounted.
   | { kind: 'workflows:show-run'; runId: string; stepId?: string }
@@ -37,7 +37,7 @@ export type ClientEventMap = {
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
-  // (docs/editor.md § Communication between regions). Not retained like a pane intent:
+  // (docs/editor/composed-panes.md § Communication between regions). Not retained like a pane intent:
   // an intent describes a destination the reader is being taken to, so it waits for the pane to
   // exist, whereas this is a verb fired at a frame that is already on screen. Replaying "run the
   // query" into a pane that opens ten minutes later would be a surprise, not a fix.
@@ -61,10 +61,10 @@ export type ClientEventMap = {
   // for a stronger reason than the others: focus is a fact about one window, so the node has nothing
   // to say about it and never broadcasts one. Coarse on purpose — the region, not the node inside it
   // — because a per-keystroke feed is on the refused list
-  // (docs/plugins/forward-compatibility.md § What is not an event).
+  // (docs/plugins/events.md § What is not an event).
   //
   // The one emit point is the region focus store (keys/regions.ts); the full contract lives in
-  // docs/command-palette-and-shortcuts.md § Focus and typing.
+  // docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
   'runtime:focus-changed': { taskId: string | null; paneId: string; regionId: string }
   // ── Node-emitted facts ──────────────────────────────────────────────────────────────────────────
   //
@@ -81,7 +81,7 @@ export type ClientEventMap = {
   // listener drop the frame without a round trip. Still state rather than a delta: `status` is what the
   // connection now is (node-core/server/notify.ts § broadcastConnectionChanged).
   'connection:changed': ConnectionChangedEvent
-  // The rest of the core catalogue (docs/plugins.md § Hearing a core event), each carrying the state it is
+  // The rest of the core catalogue (docs/plugins/events.md § Hearing a core event), each carrying the state it is
   // about rather than a delta, for the same reason `connection:changed` does.
   'head:changed': HeadChangedEvent
   'run:changed': RunTargetChangedEvent

@@ -21,7 +21,7 @@ export type TextareaProps = ControlOwn & {
   onChange?: (value: string) => void
   /** A textarea owns its keys and its own surface while focused: the composer completes mentions,
    *  the editor takes a dropped file. One of the three nodes the kit lets keys through. See
-   *  docs/ui-design.md § The closed kit. */
+   *  docs/ui-design/closed-kit.md § The closed kit. */
   onKeyDown?: (event: KeyboardEvent) => void
   onKeyUp?: (event: KeyboardEvent) => void
   onPaste?: (event: ClipboardEvent) => void

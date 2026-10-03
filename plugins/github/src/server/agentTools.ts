@@ -81,7 +81,7 @@ export function githubAgentTools(
   }, {
     // Two reads over the mirror this plugin already keeps fresh, so neither spends a credential or
     // touches the network. Between them they answer the two questions an agent on a reviewed PR has:
-    // what did people say, and what is red (docs/agent-tools.md § GitHub).
+    // what did people say, and what is red (docs/agent-tools/tracker-tools.md § GitHub).
     name: 'pr_review_comments',
     description: "What reviewers said about the current task's pull request: submitted reviews, inline comment threads, and conversation comments, from acorn's local mirror. Open threads only unless you ask for resolved ones.",
     input: z.object({

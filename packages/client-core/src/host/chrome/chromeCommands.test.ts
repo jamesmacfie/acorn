@@ -23,7 +23,7 @@ type SettingCommand = import('../registries/commands/commands').SettingCommand
 // Two boundaries are worth the length. The host decides what a route is asked — the reader's text and
 // the identifiers the declared scope owns, and nothing a descriptor or a previous answer wrote. And the
 // answer decides nothing: it carries display facts and identity, and the verb that runs when a row is
-// picked is the static one the manifest declared (docs/command-palette-and-shortcuts.md § What the palette refuses).
+// picked is the static one the manifest declared (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
 const CONTEXT: CommandExecutionContext = {
   host: 'desktop', nodeId: 'node-b', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',
@@ -155,7 +155,7 @@ describe('a search command', () => {
 
   // `navigate` is the verb Rollbar and Linear pick a row with: their detail belongs to the project, so
   // a pick changes the URL and the surface beside the list follows
-  // (docs/plugins.md § Command kinds).
+  // (docs/plugins/commands.md § Command kinds).
   describe('picking a row that navigates', () => {
     const navigating = searchDescriptor({ onSelect: { verb: 'navigate', surface: 'rollbar-item' } })
 

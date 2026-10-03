@@ -188,7 +188,7 @@ describe('the operation banner', () => {
   })
 })
 
-// The room another plugin has under the bar (docs/plugins.md § Cooperative extension points). What
+// The room another plugin has under the bar (docs/plugins/cooperative-extension-points.md § Cooperative extension points). What
 // belongs here is this owner's half: the point draws nothing on its own, and a contributor is handed
 // the five facts the bar reads and no markup. Who wins a contested slot is `Slot`'s business and
 // client-core tests it.

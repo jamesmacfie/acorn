@@ -16,7 +16,7 @@ import { overlayKeys } from '../keys/trap'
 // going to have to agree — a group that pushed here and not there would be two products.
 //
 // What stays is the rectangle. There is no backdrop and no dialog: the surface is a `Modal` holding a
-// filter field and a list, which is what a terminal overlay is (docs/tui.md § What is drawn bespoke).
+// filter field and a list, which is what a terminal overlay is (docs/tui/chrome.md § What is drawn bespoke).
 //
 // Nor does the cursor come from the kit's collection, and that is the same decision the desktop made
 // for the same reason: a palette is a text box you steer with the arrows, and a collection's keys are

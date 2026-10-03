@@ -27,7 +27,7 @@ const ARCHIVE_SIDEBAR_KEY = 'archive'
 const archivedOn = (at: number): string => new Date(at).toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' })
 
 // The archive: archived tasks newest first, a search over every provider, and a read-only preview of
-// the selected task with a way to restore it (docs/workspaces-and-tasks.md § Restoring a task).
+// the selected task with a way to restore it (docs/workspaces-and-tasks/archive.md § Restoring a task).
 //
 // The page uses the search seam; it does not own it. The same providers can back a search across
 // active tasks, which is `archived=0` on the same route.

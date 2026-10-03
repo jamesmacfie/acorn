@@ -81,7 +81,7 @@ export const PrefKeys = {
   editorOpenFilesScoped: 'editor:open-files',
   prFiltersScoped: 'github:pr-filters',
   contextSelectionScoped: 'context:section-selection',
-  // Which nodes' disk-encryption warnings this device has been shown (docs/security.md § Filesystem
+  // Which nodes' disk-encryption warnings this device has been shown (docs/security/audit.md § Filesystem
   // and backup). A JSON array of nodeIds in one key, because a key per node would need a scoped slice
   // and an eviction rule for a value that is three booleans.
   //
@@ -100,7 +100,7 @@ export const PrefKeys = {
   // the same reason, and the device's for the same reason too: the plugin behind a pick may not be
   // installed on the other machine paired with this node.
   remoteSlots: 'remote_slots',
-  // User-composed panel definitions and where they are placed (docs/state.md § Scope rules,
+  // User-composed panel definitions and where they are placed (docs/state-ownership/scope-rules.md § Scope rules,
   // dashboards/persist.ts). The node's, because a panel describes that node's resources, so every
   // client paired with the node renders the board its owner built.
   dashboards: 'dashboards',
@@ -114,7 +114,7 @@ export const PrefKeys = {
   // The device's, like `theme`: a sound on this machine is not a fact about the node, and the other
   // client paired with the same node may not even be able to make one.
   notifications: 'notifications',
-  // Whether this node collects telemetry at all (docs/telemetry.md § The switch). The node's, and
+  // Whether this node collects telemetry at all (docs/telemetry/model.md § The switch). The node's, and
   // emphatically not the device's: the collector lives on the node, it re-reads this row on its own
   // five-second tick, and every runtime paired with that node stops collecting when it goes off.
   telemetry: TELEMETRY_PREF_KEY,

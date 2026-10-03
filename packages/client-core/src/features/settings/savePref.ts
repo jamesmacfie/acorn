@@ -15,7 +15,7 @@ const log = createLogger('prefs')
 // The active node, which is apiClient's default target, not a home node. What survives in this store
 // after the device migration all describes one node's resources: a task's pane layout, its open files,
 // a repo's PR filters, what the agent running there may do. State follows the resource it describes
-// (docs/state.md § Scope rules), so there's no home node to pick.
+// (docs/state-ownership/scope-rules.md § Scope rules), so there's no home node to pick.
 export const setPref = async (key: string, value: string, nodeId: string | null = activeNodeId()) =>
   writeJson<{ key: string; value: string }>(prefsRoute, {
     method: 'PUT',

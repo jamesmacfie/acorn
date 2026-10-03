@@ -25,7 +25,7 @@ import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, taskCheck
 import { documentCompletions, documentRegion, frameSurface, navigationDestination } from './manifest/surfaces.ts'
 
 // A saved start for a managed session: a harness, the provider options it starts on, text for its
-// system prompt, and a ceiling on acorn's own tools (docs/managed-agents.md § Custom agents). Data
+// system prompt, and a ceiling on acorn's own tools (docs/managed-agents/custom-agents.md § Custom agents). Data
 // only. It names no program, so it needs no grant beyond the owner reading its instructions, and it
 // cannot bring a tool server: a server is a program to run, which is what `agentTools` is for.
 const customAgentDescriptor = z.object({
@@ -81,10 +81,10 @@ const contributionsShape = z.looseObject({
   // Audit verbs. The ctx twin is `ctx.audit`, and both feeders land in the same registry.
   auditActions: z.array(auditActionDescriptor).max(8).default([]),
   // Managed agent harnesses. The ctx twin is the `agents.harnessRegistry` capability. See
-  // docs/managed-agents.md § Harnesses.
+  // docs/managed-agents/harnesses.md § Harnesses.
   harnesses: z.array(harnessDescriptor).max(4).default([]),
   // Custom agents. The ctx twin is the `agents.customAgentRegistry` capability. See
-  // docs/managed-agents.md § Custom agents.
+  // docs/managed-agents/custom-agents.md § Custom agents.
   customAgents: z.array(customAgentDescriptor).max(8).default([]),
   // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
   agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
@@ -112,7 +112,7 @@ const manifestPermissions = z.object({
 })
 
 // What a plugin announces on its own `plugin:<id>:<verb>` channel that *other* plugins may subscribe
-// to (docs/plugins.md § Hearing another plugin). A verb works undeclared for the
+// to (docs/plugins/events.md § Hearing another plugin). A verb works undeclared for the
 // plugin's own frames; declaring it is what lets another manifest name it in `permissions.events`, and
 // what gives the settings page a line to render. The description is the author's own words and is
 // shown as text, never as trust-prompt copy.

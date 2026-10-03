@@ -8,7 +8,7 @@ import { runtimeIdentityForRow } from './runtimeIdentity'
 import { decisionKey } from './distributionModel'
 
 // Who may contribute, and what they declared: the shared identity-and-trust check both registration
-// passes need before either can draw anything (docs/plugins.md § One shared eligibility and trust
+// passes need before either can draw anything (docs/plugins/distribution.md § One shared eligibility and trust
 // check for why this used to be duplicated between frames/register.ts and chrome/register.ts, and what
 // broke when the two copies drifted).
 
@@ -19,13 +19,13 @@ export type EligiblePlugin = {
   inactive: boolean
   // The bundle selected for the active node's running identity, or '' when none is usable.
   hash: string
-  // May this device execute this plugin's code? See docs/plugins.md § One shared eligibility and trust
+  // May this device execute this plugin's code? See docs/plugins/distribution.md § One shared eligibility and trust
   // check for the frames-versus-chrome distinction this backs.
   trusted: boolean
 }
 
 /** Every plugin whose contributions this device may draw, one row per plugin id, already labelled with
- *  its trust state (docs/plugins.md § One shared eligibility and trust check). */
+ *  its trust state (docs/plugins/distribution.md § One shared eligibility and trust check). */
 export function eligiblePlugins(options: { includeInactive?: boolean } = {}): EligiblePlugin[] {
   const snapshot = distribution()
   const nodeId = activeNodeId() ?? snapshot.byNode.keys().next().value
@@ -73,7 +73,7 @@ export function eligiblePlugins(options: { includeInactive?: boolean } = {}): El
   return eligible
 }
 
-/** Does this package carry code this device has not been cleared to run? See docs/plugins.md § One
+/** Does this package carry code this device has not been cleared to run? See docs/plugins/distribution.md § One
  *  shared eligibility and trust check for how this differs from `trusted`. */
 export const hasWithheldCode = (entry: EligiblePlugin): boolean => entry.installed.client !== null && !entry.trusted
 
@@ -87,12 +87,12 @@ export const hasWithheldCode = (entry: EligiblePlugin): boolean => entry.install
 export { isTaskPaneSurface as isTaskPane } from '@acorn/protocol/plugin/contract.ts'
 
 export type DeclaredSurfaces = {
-  // Task-scoped panes: the `openPane` allowlist (docs/plugins.md § One shared eligibility and trust check).
+  // Task-scoped panes: the `openPane` allowlist (docs/plugins/distribution.md § One shared eligibility and trust check).
   panes: ReadonlySet<string>
-  // The detail half of a rail source's browse, kept out of `panes` (docs/plugins.md § One shared
+  // The detail half of a rail source's browse, kept out of `panes` (docs/plugins/distribution.md § One shared
   // eligibility and trust check).
   projectPanes: ReadonlySet<string>
-  // Full-screen pickers the host places. Not panes (docs/plugins.md § One shared eligibility and trust
+  // Full-screen pickers the host places. Not panes (docs/plugins/distribution.md § One shared eligibility and trust
   // check).
   overlays: ReadonlySet<string>
   // Panes of either scope that draw at least one region with this plugin's own bytes: the

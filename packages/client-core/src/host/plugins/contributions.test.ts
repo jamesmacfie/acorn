@@ -181,7 +181,7 @@ describe('eligiblePlugins', () => {
   })
 
   it('is the same answer for a dev grant: an acceptance is an acceptance, and losing it withholds code', () => {
-    // The dev grant does not change eligibility, and that is the design (docs/security.md § The dev
+    // The dev grant does not change eligibility, and that is the design (docs/security/plugin-install.md § The dev
     // grant). It writes an ordinary accepted acknowledgement in main as the bytes land, so the new hash
     // arrives here already trusted and no prompt is queued for it, and ending dev mode deletes those
     // acknowledgements, which is what makes "revoke" mean something on this side of the seam.

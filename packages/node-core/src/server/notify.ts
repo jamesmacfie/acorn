@@ -70,7 +70,7 @@ export function broadcastRepoConfigTrustNotice(taskId: string): void {
 }
 
 // An agent asked for a plugin install, update, or removal and the owner has not answered
-// (docs/plugins.md § Approval-mediated install). Content-free apart from the verb: the request, and
+// (docs/plugins/agent-install.md § Approval-mediated install). Content-free apart from the verb: the request, and
 // the agent's own sentence about why, come from the device-only roster route, so nothing an agent
 // wrote reaches the bell over the wire.
 export function broadcastPluginApprovalNotice(taskId: string, action: 'install' | 'update' | 'uninstall'): void {
@@ -86,7 +86,7 @@ export function broadcastWorkflowStepEvent(runId: string, stepId: string, event:
 }
 
 // This node's plugin set moved under a running client. A reload swapped a plugin's node half, so its
-// roster row, its routes, and the bundle hash behind its UI may all differ (docs/plugins.md § The
+// roster row, its routes, and the bundle hash behind its UI may all differ (docs/plugins/dev-loop.md § The
 // dev loop). Content-free, like `term:status`: the roster is a fetchable route, and putting it on
 // the wire too would mean two projections of the same state to keep in step.
 export function broadcastPluginsChanged(): void {
@@ -102,7 +102,7 @@ export function broadcastPluginsChanged(): void {
 // "the task list moved" from "a terminal's status moved" — the first invalidates a query, the second
 // re-pulls a session list — and because a plugin's node half can subscribe to this one by name
 // (@acorn/protocol/nodeEvents.ts). Without it a second client kept a stale task list until it
-// reconnected (docs/plugins.md § Hearing a core event).
+// reconnected (docs/plugins/events.md § Hearing a core event).
 export function broadcastTasksChanged(event: TaskChangedEvent): void {
   wsBroadcast({ channel: 'tasks:changed', ...event })
 }
@@ -121,7 +121,7 @@ export function broadcastWorkspaceProjectsChanged(event: WorkspaceProjectsChange
 // A connection was made, rotated, tested, disabled, re-enabled, or demoted to `needs-auth` because its
 // credential could not be read. Nine writers spread over four files change that status, and until this
 // existed none of them said so: a client refetched on suspicion and an integration plugin found out
-// from the next 401 (docs/plugins.md § Hearing a core event).
+// from the next 401 (docs/plugins/events.md § Hearing a core event).
 //
 // This one carries a payload where the other three are content-free, and the difference is who the
 // audience is. The built-in `tasks:changed` consumer always re-reads the whole list. A revoked
@@ -136,7 +136,7 @@ export function broadcastConnectionChanged(connection: ConnectionChangedEvent): 
   wsBroadcast({ channel: 'connection:changed', ...connection })
 }
 
-// A task worktree's HEAD moved (docs/plugins.md § Hearing a core event). Detected by
+// A task worktree's HEAD moved (docs/plugins/events.md § Hearing a core event). Detected by
 // computeTaskStatuses (server/worktrees/taskWorktree.ts), which already runs `git status` for every active worktree
 // and now reads the branch tip too, so a commit made from a terminal, an agent, or an outside editor is
 // noticed the same way one made from the changes pane is. Carries a payload because the audience is CI,
@@ -145,21 +145,21 @@ export function broadcastHeadChanged(event: HeadChangedEvent): void {
   wsBroadcast({ channel: 'head:changed', ...event })
 }
 
-// A declared run target started or stopped (docs/api-reference.md § WebSocket). Emitted by the
+// A declared run target started or stopped (docs/api-reference/websocket.md § WebSocket). Emitted by the
 // terminal plugin, which holds the process, through `ctx.events.send`; this helper is the core-side
 // twin so the two never spell the frame differently.
 export function broadcastRunTargetChanged(event: RunTargetChangedEvent): void {
   wsBroadcast({ channel: 'run:changed', ...event })
 }
 
-// A managed agent session finished a turn or asked for attention (docs/api-reference.md §
+// A managed agent session finished a turn or asked for attention (docs/api-reference/websocket.md §
 // WebSocket). Same two kinds as the agents webhook service, on purpose: there is one reduction of
 // the session stream to human-scale edges, and it is deployed.
 export function broadcastAgentSessionChanged(event: AgentSessionChangedEvent): void {
   wsBroadcast({ channel: 'agent-session:changed', ...event })
 }
 
-// A project row or its config moved (docs/api-reference.md § WebSocket). Preview reads browser
+// A project row or its config moved (docs/api-reference/websocket.md § WebSocket). Preview reads browser
 // rules and the preview mode, terminal reads run targets, changes reads the branch prefix, and until
 // this existed none of them heard a write; onboarding hand-invalidated its own cache after creating one.
 export function broadcastProjectChanged(event: ProjectChangedEvent): void {

@@ -4,7 +4,7 @@ import { Spinner } from '../content/Spinner'
 import { isExternal } from '../content/isExternal'
 import type { Size, Tone } from '../../tokens/tokens'
 
-/** The delegated tooltip, as props rather than attributes. See docs/ui-design.md § Tooltips: the
+/** The delegated tooltip, as props rather than attributes. See docs/ui-design/tooltips.md § Tooltips: the
  *  contract is still data attributes on the element, but only the kit writes them now. */
 type Tipped = {
   tip?: string

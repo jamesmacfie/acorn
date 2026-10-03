@@ -1,4 +1,4 @@
-// The `http:request` workflow step (docs/workflows.md § Contributed step kinds), and this plugin's
+// The `http:request` workflow step (docs/workflows/step-kinds.md § Contributed step kinds), and this plugin's
 // only node-side contribution to another plugin.
 //
 // It exists here rather than in workflows for the reason the extensibility review gave: everything an
@@ -53,7 +53,7 @@ export const validateHttpStep: StepValidator = (step, { label }) => {
  * `[steps.with]` and the handler finds it there.
  *
  * `auth` is deliberately absent. It is an object with a different shape per mode, and a field that
- * needs a component is not a field (docs/workflows.md § Contributed step kinds). A step that
+ * needs a component is not a field (docs/workflows/step-kinds.md § Contributed step kinds). A step that
  * authenticates writes `auth` in the definition's JSON, or puts the header in `headers`.
  */
 export const describeHttpStep: StepKindDescription = {

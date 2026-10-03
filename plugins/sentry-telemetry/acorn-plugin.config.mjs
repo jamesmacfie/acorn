@@ -7,14 +7,14 @@
 // reserved for the integration that reads Sentry issues into the rail, which has the Rollbar shape:
 // an organisation token, mirrored items, a pane and a source. This one has a DSN and writes. Two
 // plugins, two credentials, two reasons to install, and both carry the Sentry mark in Settings
-// (docs/integrations.md § Sentry).
+// (docs/integrations/sentry.md § Sentry).
 //
 // On the permissions:
 //
 //   core: ['telemetry'] — the read-everything grant, and the reason the trust prompt draws this
 //     plugin high. A sink sees every record from every owner: core's request timings, another
 //     plugin's schedule runs, and the log lines of packages the owner installed for a different
-//     reason (docs/security.md § Telemetry sinks). It is also the entire feature.
+//     reason (docs/security/plugin-node-realm.md § Telemetry sinks). It is also the entire feature.
 //   core: ['prefs'] — the settings page below writes `plugin:sentry-telemetry:settings` through
 //     `bridge.state`, and the node half reads the same row on each flush to learn the sample rate
 //     and which kinds to send. Scoped to this plugin's own namespace by the host.
@@ -66,7 +66,7 @@ export default {
       ],
       // One tree fills the page, so the layout is the trivial one. Naming it is still what says
       // "draw this from my tree" rather than "give me a rectangle", and it is what the surface
-      // inherits its focus group and padding from (docs/panes.md § Layout model).
+      // inherits its focus group and padding from (docs/panes/layout.md § Layout model).
       layout: 'single',
       regions: { body: { kind: 'remote', entry: 'settings' } },
     }],

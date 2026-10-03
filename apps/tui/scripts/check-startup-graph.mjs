@@ -3,7 +3,7 @@ import { basename, resolve } from 'node:path'
 
 // main.js plus every top-level dynamic import awaited before render, followed through static edges.
 // Vite's acorn:tui-startup-graph plugin records the real chunk edges and source modules, including
-// modules merged into chunks named after something else. docs/frontend.md § Startup budget owns it.
+// modules merged into chunks named after something else. docs/frontend/startup-budget.md § Startup budget owns it.
 const args = process.argv.slice(2)
 const distFlag = args.indexOf('--dist')
 const dist = resolve(distFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[distFlag + 1])

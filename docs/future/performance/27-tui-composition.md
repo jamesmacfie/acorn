@@ -14,13 +14,13 @@ crosses them. Review Git changes since the audit before capturing a fresh cumula
 The preserved investigations contain the reproducible probes, measured workloads, source paths,
 proposed improvements, rejected alternatives, and limits:
 
-- [Investigation 06](../../../plans/performance/06-cache.md).
-- [Investigation 07](../../../plans/performance/07-navigation.md).
-- [Investigation 15](../../../plans/performance/15-tui.md).
-- [Investigation 16](../../../plans/performance/16-ownership.md).
+- Investigation 06.
+- Investigation 07.
+- Investigation 15.
+- Investigation 16.
 
-The original [unit brief](../../../plans/performance/implementation-27-review-brief.md) and
-[implementation sequence](../../../plans/performance/implementation-plan.md) retain provenance.
+The original unit brief and
+implementation sequence retain provenance.
 The sections below reproduce the detailed assignment so this handoff carries its review concerns.
 No application fix for this unit is included in the units 01–08 commit.
 

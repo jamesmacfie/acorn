@@ -11,7 +11,7 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { REPO_CONFIG_FILE, RunTargetsTable } from './RunTargetsTable'
 import { createSettingSave, createTextSetting } from './settingSave'
 
-// The project-level config of one folder project (docs/workspaces-and-tasks.md § Worktrees and setup),
+// The project-level config of one folder project (docs/workspaces-and-tasks/project-config.md § The project row),
 // split over the project page's tabs. Reads and writes the project row through the project bridge, on
 // the settings save model (./settingSave.ts): selects save when they change, text saves on blur or Enter.
 //

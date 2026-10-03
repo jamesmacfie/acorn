@@ -1,7 +1,7 @@
 // Trust gate for the executable configuration a task can run: the repo's own `.acorn` files, and the
 // project row's script columns. A checkout is untrusted input even on a trusted machine — cloning it
 // must not be sufficient to execute committed commands — and the row is in the snapshot as the belt
-// behind the device-only gate on the write path (docs/security.md § Process, path, and configuration
+// behind the device-only gate on the write path (docs/security/process-and-paths.md § Process, path, and configuration
 // controls).
 import { and, desc, eq, isNotNull } from 'drizzle-orm'
 import type { AppDatabase } from './db'

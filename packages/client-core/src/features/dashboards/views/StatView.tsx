@@ -14,9 +14,9 @@ import type { PanelViewProps } from './props'
 
 // The stat view: one number over the shaped rows. Count by default, because "how many of these are
 // there" is what a filter has already been written to answer. Unit comes from the aggregated field,
-// not the view (docs/dashboards.md § The two vocabularies, and the budget).
+// not the view (docs/dashboards/panels.md § The two vocabularies, and the budget).
 //
-// Trend tiers and their rules are docs/dashboards.md § Trends. This file turns `trend.ts`'s pure
+// Trend tiers and their rules are docs/dashboards/views.md § Trends. This file turns `trend.ts`'s pure
 // output into SVG, as ChartView does.
 
 const AGGREGATE_LABELS: Record<string, string> = { sum: 'Total', avg: 'Average', min: 'Lowest', max: 'Highest' }
@@ -48,7 +48,7 @@ export default function StatView(props: PanelViewProps) {
   }
 
   // Only the history tier costs a read; activity is bucketed from rows already on screen
-  // (docs/dashboards.md § Trends).
+  // (docs/dashboards/views.md § Trends).
   const samples = createMeasureHistory(() => props.panelId, () => props.view.trend === 'history')
 
   const points = createMemo(() => {

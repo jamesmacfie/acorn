@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { CoreProcService } from '@acorn/plugin-api/node'
 
-// What Settings > Storage and memory measures for this plugin (docs/managed-agents.md § Operations and
+// What Settings > Storage and memory measures for this plugin (docs/managed-agents/operations.md § Operations and
 // failure): the memory of each provider process tree, and the size of the two folders this plugin
 // writes under the data root.
 

@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { ACORN_BASELINE } from '../baseline.ts'
 
 // The current wire protocol version, and the whole of the client to node compatibility contract. See
-// docs/api-reference.md § Versioning.
+// docs/api-reference/transport.md § Versioning.
 export const NODE_PROTOCOL_VERSION = 1
 
 // The attachment record: who this node enrolled with, when, and under which enrollment token. One
@@ -28,7 +28,7 @@ export const nodeAttachmentSchema = z.strictObject({
 export type NodeAttachment = z.infer<typeof nodeAttachmentSchema>
 
 // `node.json` in the data root: a Node's durable identity, written once on first start. See
-// docs/data-layer.md § Data root for why its schema tolerates unknown keys and no longer carries a
+// docs/data-layer/data-root.md § `node.json` for why its schema tolerates unknown keys and no longer carries a
 // protocol version.
 export const nodeIdentitySchema = z.object({
   baseline: z.literal(ACORN_BASELINE),
@@ -42,7 +42,7 @@ export const nodeIdentitySchema = z.object({
   // string is a real answer meaning "loopback only, stop asking".
   advertiseHost: z.string().optional(),
   // Who this node is attached to, if anyone. Absent on every install that never enrolled, which is
-  // all of them by default (docs/security.md § The control plane).
+  // all of them by default (docs/security/control-plane.md § The control plane).
   attachment: nodeAttachmentSchema.optional(),
   // Why the last enrollment attempt failed. Kept apart from `attachment` because the two are
   // different facts: an attached node with a stale error is normal, and a node that tried and failed
@@ -53,7 +53,7 @@ export const nodeIdentitySchema = z.object({
 
 export type NodeIdentity = z.infer<typeof nodeIdentitySchema>
 
-// GET /v1/node. See docs/api-reference.md § Versioning for why this is the most tolerant surface in
+// GET /v1/node. See docs/api-reference/transport.md § Versioning for why this is the most tolerant surface in
 // the system and stays additive-forever.
 //
 // `fingerprint` is the sha256 of the node's self-signed certificate (lowercase hex) and is always
@@ -84,7 +84,7 @@ export const pairRequestSchema = z.strictObject({
 export type PairRequest = z.infer<typeof pairRequestSchema>
 
 // A paired device as the owner sees it. Never carries the token or its hash: the raw token is
-// returned exactly once, in `PairResult`. See docs/api-reference.md § Pairing.
+// returned exactly once, in `PairResult`. See docs/api-reference/transport.md § Pairing.
 //
 // Not strict for the same reason `pairResultSchema` is not: it is nested inside that response, so a
 // strict device object would break the handshake just as surely as a strict envelope around it.
@@ -97,7 +97,7 @@ export const pairedDeviceSchema = z.object({
 })
 export type PairedDevice = z.infer<typeof pairedDeviceSchema>
 
-// The other half of the handshake. See docs/api-reference.md § Versioning for why it is tolerant: a
+// The other half of the handshake. See docs/api-reference/transport.md § Versioning for why it is tolerant: a
 // client that pairs successfully and then refuses the answer because it grew a field is a client that
 // cannot be upgraded past.
 export const pairResultSchema = z.object({

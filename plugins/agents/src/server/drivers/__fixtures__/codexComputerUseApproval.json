@@ -6,7 +6,7 @@
     "os": "macOS 27.0"
   },
   "notes": [
-    "Synthetic: built field for field from the integration's own request construction, not captured off the wire. A live capture is owed (docs/testing.md, check 149).",
+    "Synthetic: built field for field from the integration's own request construction, not captured off the wire. A live capture is owed (docs/testing/computer-use.md, check 149).",
     "The app is the bundle identifier; the name a person reads is only in tool_params_display.",
     "persist is ['session', 'always'] when the integration's policy allows persistent approval, else ['session'].",
     "The integration reads the answer's _meta.persist, and its own telemetry counts an accept without it as a session grant. node_repl keeps session grants per thread under CODEX_HOME/computer-use/sessions and always grants in its ComputerUseAppApprovals.json.",

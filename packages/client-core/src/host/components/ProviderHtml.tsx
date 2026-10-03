@@ -8,7 +8,7 @@ import { sanitizedHtmlFragment } from '../../kit/lib/rendering/sanitizedHtml'
 // `Markdown` node has nothing to do with this content: it takes source and sanitises it. What these
 // call sites need instead is the same skin, the same bare-reference pass, and the same click
 // handling. That pass is host machinery — `linkifyRefs` lives in a registry and `ui/` may not import
-// one (docs/frontend.md § Registries and plugins) — which is why this is here and not in the kit.
+// one (docs/frontend/registries.md § Registries and plugins) — which is why this is here and not in the kit.
 //
 // Provider-rendered HTML is still untrusted. The kit copies only safe formatting and HTTPS links
 // into fresh nodes before this host-owned reference pass sees the DOM.

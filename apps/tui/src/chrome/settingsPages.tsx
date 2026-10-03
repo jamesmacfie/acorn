@@ -7,7 +7,7 @@ import {
 } from '@acorn/client-core/host/registries/shell'
 import { configDir } from '../node/paths'
 
-// Which settings pages this host draws, and what it says about the rest (docs/tui.md § Settings).
+// Which settings pages this host draws, and what it says about the rest (docs/tui/sources-and-settings.md § Settings).
 //
 // The list is the desktop's: core's pages come from the one declaration table in client-core, and the
 // roster's plugins register theirs through `ctx.settingsPages` exactly as they do on the desktop. So
@@ -40,7 +40,7 @@ const WHY_NOT_HERE: Partial<Record<CoreSettingsPageId, string>> = {
 }
 
 /** Device pages whose values this client reads from its own acorn.json, so a person can set them here
- *  by editing that file (docs/tui.md § Where the TUI keeps things). */
+ *  by editing that file (docs/tui/process.md § Where the TUI keeps things). */
 const IN_DEVICE_CONFIG = new Set<string>(['appearance', 'shortcuts', 'rail-surfaces', 'device-config'])
 
 const CORE_PAGE_IDS = new Set<string>(CORE_SETTINGS_PAGES.map((page) => page.id))

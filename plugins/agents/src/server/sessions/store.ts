@@ -195,11 +195,11 @@ export class AgentStore extends AgentSessionRepository {
     // The fourth workspace-scoped read (sessionRepository.ts holds the other three). Resolved to task
     // ids through core rather than joined, because `tasks` lives in core's database and this table
     // lives in the plugin's. An empty result narrows to nothing, not to unfiltered.
-    // See docs/managed-agents.md § Session model.
+    // See docs/managed-agents/sessions.md § Session model.
     const taskIds = await this.workspaceTaskIds(filter.workspaceId)
     if (taskIds?.length === 0) return { sessions: [], delegations: [], nextCursor: null }
     // A session outlives its task's worktree but not its task. A caller already pinned to a task id is
-    // exempt (docs/managed-agents.md § Client surfaces).
+    // exempt (docs/managed-agents/client-surfaces.md § Retired and archived sessions).
     //
     // One extra core read per list call, fine while `active()` is a small table scan. If it stops being
     // one, core grows an `activeIds()` and this asks for that instead.

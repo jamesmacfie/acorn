@@ -46,7 +46,7 @@ export function GenerateButton(props: { model: ChangesModel }) {
           {/* One control for both states rather than two that swap: `skipConfirm` is off the moment
               there is text to lose, so a press over an empty field generates and a press over a
               message somebody wrote arms first and reads Replace?. `ConfirmButton` is the prompt on
-              every host (docs/ui-design.md § The closed kit). A ghost square, so the glyph has a 26 by
+              every host (docs/ui-design/closed-kit.md § The closed kit). A ghost square, so the glyph has a 26 by
               26 box to press. Armed, the kit lets an icon-only button grow to fit its prompt. */}
           <ConfirmButton
             variant="ghost"

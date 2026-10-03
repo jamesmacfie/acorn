@@ -14,7 +14,7 @@ import {
 
 describe('shared API contract helpers', () => {
   // A net under the route literals in the subject modules: every one must land in a
-  // current /v1 namespace (docs/api-reference.md § Transport), because a path outside /v1/*
+  // current /v1 namespace (docs/api-reference/transport.md § Transport), because a path outside /v1/*
   // escapes the server's single auth and requireUser glob. Enumerated
   // from the module rather than listed, so a new builder is covered the day it lands.
   it('namespaces every exported route builder under /v1/core or /v1/p', () => {

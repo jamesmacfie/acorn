@@ -23,7 +23,7 @@ const ImagePreview = lazy(() => import('./ImagePreview'))
 const log = createLogger('editor', 'editor')
 const telemetry = telemetryFor('editor')
 
-// The extension-to-language map and the editor theme live in the host (docs/editor.md § Status).
+// The extension-to-language map and the editor theme live in the host (docs/editor.md § The shared surface).
 
 // The editor pane: a lazy file tree on the left, a file tab bar and one reused CodeMirror instance
 // on the right. Single-click opens an ephemeral (italic) preview tab; editing or double-click
@@ -31,7 +31,7 @@ const telemetry = telemetryFor('editor')
 // agent and the human share the worktree.
 //
 // A reader who lives in vim can have the same box hold `$EDITOR` in a throwaway PTY instead
-// (docs/editor.md § Editing in your own editor). One device preference switches it, graphical is the
+// (docs/editor/editor-pane.md § Editing in your own editor). One device preference switches it, graphical is the
 // default, and everything to the left of the box is untouched either way.
 export default function EditorPane(props: { task: Task }) {
   let engine: typeof import('./editorEngine') | undefined
@@ -290,7 +290,7 @@ export default function EditorPane(props: { task: Task }) {
       // Opening this pane used to be three steps in a row — read the root, mount the rectangle the
       // root gated, read the file — of which two are requests. The file the reader left open does not
       // depend on the root, so it is read now, beside it, and `show()` finds it already in the pool
-      // (docs/editor.md § One round trip to text).
+      // (docs/editor/editor-pane.md § One round trip to text).
       // Warm text under the host capability; imports and document state wait for surface admission.
       const remembered = active()
       if (graphical && mode() === 'graphical' && remembered && !imageTypeForPath(remembered)) {
@@ -572,7 +572,7 @@ export default function EditorPane(props: { task: Task }) {
   //
   // A raw window listener, and it stays one: this is a desktop-host fact about the app regaining
   // focus, the platform seam carries no signal for it, and it is the same rectangle-adjacent
-  // territory as the editor's own DOM (docs/editor.md § Reload on focus).
+  // territory as the editor's own DOM (docs/editor/editor-pane.md § Reload on focus).
   async function onFocus() {
     const p = currentPath
     const entry = p ? pool.files.get(p) : undefined

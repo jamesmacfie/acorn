@@ -19,7 +19,7 @@ The agent sends JSON naming blocks, and the host has a renderer per block. The d
 refuses this as "a widget toolkit in the wire format": it is always one field short, and logic ends
 up reinvented inside the JSON. A tree keeps logic in the app's own code.
 
-Revisit never, for the reasons in [descriptors, trees, rectangles](../../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md).
+Revisit never, for the reasons in [descriptors, trees, rectangles](../../plugins/ui-tiers.md).
 
 ## One left-rail icon per app
 

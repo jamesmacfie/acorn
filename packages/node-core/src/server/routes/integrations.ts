@@ -25,7 +25,7 @@ import { respondError } from '../respond'
 import { projectInWorkspace } from './projects/workspaces'
 import { broadcastWorkspaceProjectsChanged } from '../notify'
 
-// Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
+// Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation).
 // One PATCH, two independent edits: turn a connection off, or rename it. Both fields are optional so
 // a caller sends only the one it means, and `name: null` is how the owner clears a name and goes back
 // to the provider's label. `.refine` is what stops an empty body from being a silent success.
@@ -119,7 +119,7 @@ export const integrations = new Hono<AppEnv>()
   // One connection's whole map: which workspace, and optionally which project inside it, follows each
   // of its external projects. Settings edits an integration from its own side rather than a workspace
   // at a time, so it needs to read and replace every row this connection owns in one go
-  // (docs/integrations.md § Project sources).
+  // (docs/integrations/project-sources.md § Project sources).
   //
   // Scoped to the connection, so a write here can never disturb a sibling integration's rows the way
   // the workspace-side replace has to be careful to avoid.
@@ -196,7 +196,7 @@ export const integrations = new Hono<AppEnv>()
     }
   })
   .patch('/:id', async (c) => {
-    // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation).
+    // Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation).
     const parsed = patchBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'provider_bad_config')
     const body = parsed.data

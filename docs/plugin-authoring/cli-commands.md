@@ -1,9 +1,14 @@
 # CLI command authoring
 
-`cliCommands` is a loaded Node plugin contribution for headless, structured calls. It is separate
-from the client command palette and agent tools. Only a running plugin's descriptors appear under
-`acorn plugin ID commands`. The CLI and Node validate one bounded JSON object in and out; the Node
-also checks device authority and resource scope at execution time.
+This page covers `cliCommands`, a loaded plugin contribution for headless, structured calls from the
+`acorn` CLI. It's part of [plugin authoring](../plugin-authoring.md), and running the commands is in
+[plugin commands](../cli/plugin-commands.md).
+
+## Declare a command
+
+A CLI command is separate from the palette and from agent tools. Only a running plugin's descriptors
+appear under `acorn plugin ID commands`. The CLI and the Node each validate one bounded JSON object in
+and out, and the Node also checks device authority and resource scope when the command runs.
 
 Put this descriptor inside `contributions.cliCommands` in `acorn-plugin.json` (or in
 `acorn-plugin.config.mjs` for a built package). The surrounding manifest also needs a Node entry,
@@ -61,7 +66,9 @@ exists. A missing handler fails at invocation. Use `validatePluginConfig` from
 real Node route. `testCliCommandDescriptor` from that testkit supplies a fixture descriptor for
 host tests; it does not validate an authored manifest.
 
-Command names are stable lower-case kebab-case. Two commands in one manifest cannot share a name;
+## Names, schemas, and writes
+
+Command names are stable lowercase kebab-case. Two commands in one manifest cannot share a name;
 two plugins may both declare `inspect`. Input and output schemas use the bounded JSON Schema
 subset accepted for plugin agent tools: object, array, scalar types, properties, required,
 additionalProperties, enum, and basic length or numeric bounds. References and arbitrary
@@ -75,6 +82,8 @@ A write command has `risk: "write"`, a nonempty `effects` sentence displayed by 
 required idempotency key at the Node endpoint. The CLI sends one from `--request-id` or generates
 one; a retry uses the same key and input. The ordinary device replay store provides the same
 retry behavior as core writes. Do not expose destructive behavior through this generic seam.
+
+## Run it
 
 For a complete read example, see the Database plugin's `query` descriptor and `/cli/query` handler.
 It calls the existing `database.query` read-only service, not the pane's arbitrary SQL route, and

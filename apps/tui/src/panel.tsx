@@ -60,7 +60,7 @@ export function Panel(props: {
       // room its contents want. Left at `auto` a growing panel is at least as tall as everything in
       // it, and `flexShrink={0}` above means nothing can take that back — so one long list pushed the
       // Tasks panel off the bottom of the screen and drew over the footer. A panel is a place on the
-      // screen; what is in it clips or scrolls (docs/tui.md § The screen).
+      // screen; what is in it clips or scrolls (docs/tui/chrome.md § The screen).
       {...(props.grow ? { flexBasis: 0 } : {})}
       {...(props.rows === undefined ? {} : { height: props.rows })}
       {...boxBorder('surface', { tone: lit() ? 'accent' : 'neutral' })}

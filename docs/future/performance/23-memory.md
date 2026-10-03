@@ -18,9 +18,9 @@ The October 1 assignment optimized database reconciliation: delta writes to SQLi
 search, recall statistics, joined source reconciliation, and Findings approval receipts. Those
 owners were removed on October 2. None of that database work remains an implementation requirement.
 
-[Investigation 14](../../../plans/performance/14-background.md),
-[the original review brief](../../../plans/performance/implementation-23-review-brief.md), and
-[the implementation sequence](../../../plans/performance/implementation-plan.md) retain historical
+Investigation 14,
+the original review brief, and
+the implementation sequence retain historical
 provenance. Their Memory measurements describe the retired implementation. Do not compare those
 timings with a file-scan implementation and claim an improvement from this unit.
 
@@ -228,7 +228,7 @@ bounded full suite and sustained-use acceptance after the selected fixes.
 ## Completion and handoff
 
 Implement only reproduced costs. Record before/after counts and timings, resource costs, selected
-and deferred candidates, and remaining limits under `plans/performance/`. Update the owning shipped
+and deferred candidates, and remaining limits in this file. Update the owning shipped
 docs for any route, capability, import, or freshness contract change. A small-library result may
 justify leaving conditional cache, virtualization, or batch-import work deferred.
 

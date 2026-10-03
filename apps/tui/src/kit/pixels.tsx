@@ -23,7 +23,7 @@ export function Rectangle(props: {
   kind: 'pty' | 'webview' | 'frame' | 'editor'
   label: string
   /** Drawn but off the screen. Honoured for `pty`, which is the kind that costs something to rebuild
-   *  and the reason the prop exists (docs/terminal.md § Client); the other three are cheap enough
+   *  and the reason the prop exists (docs/terminal/client.md § Client); the other three are cheap enough
    *  that a caller hiding one would unmount it. */
   hidden?: boolean
   mount?: (handle: HTMLElement) => void

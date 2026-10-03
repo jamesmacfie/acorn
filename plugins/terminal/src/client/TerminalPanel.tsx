@@ -333,7 +333,7 @@ export default function TerminalPanel(props: { onClose: () => void; task: Task |
                       trailing={
                         <>
                           <Show when={!p.available}>Not installed</Show>
-                          {/* tmux degrade hint (docs/terminal-and-agents.md): the profile still
+                          {/* tmux degrade hint: the profile still
                               works, but the durable backend silently fell back to node-pty. */}
                           <Show when={p.available && p.tmuxMissing}>Closes when acorn quits</Show>
                         </>

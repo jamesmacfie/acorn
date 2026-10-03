@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { PluginDocumentRegion, PluginFrameSurface } from '@acorn/protocol/api.ts'
 import { isHostOwnedSurface, paneLayoutFor, remoteRegionEntry } from './layouts'
 
-// The line between a pane that runs plugin code and one the host draws (docs/panes.md § Layout model).
+// The line between a pane that runs plugin code and one the host draws (docs/panes/layout.md § Layout model).
 // It is the trust gate for a whole class of surface, so it is worth pinning in both directions: a
 // frame stays behind the bytes-hash prompt, a host-drawn pane does not need one, and neither gets to
 // name a route outside its own plugin.

@@ -30,7 +30,7 @@ import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderCon
 // Header, body and footer without a nested layout. The transcript inside the conversation is a
 // `Timeline follow`, which owns the scroll and takes what height is left, so the bar above it and the
 // composer below it are pinned by being its siblings rather than by a second set of regions
-// (docs/panes.md § Layout model). That is why everything here is a fragment down to the timeline.
+// (docs/panes/layout.md § Layout model). That is why everything here is a fragment down to the timeline.
 
 /** The header bar: which session is open, what it is doing, and how to start another.
  *
@@ -41,7 +41,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
   const pricing = createQuery(() => agentPricingOptions())
   // A session a workflow started says so, and the chip opens the run that started it. The session row
   // has carried `kind` and `workflowRunId` since the runtime wrote them; nothing read either until
-  // the run pane existed to open (docs/managed-agents.md § Sessions).
+  // the run pane existed to open (docs/managed-agents/sessions.md § Sessions).
   //
   // Resolved per call, never captured: a node with workflows disabled answers `undefined` here, and
   // the chip is simply absent.
@@ -141,7 +141,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
                 <For each={model.sessionActions().filter((item) => props.task.status === 'active' || READS_STORED_SESSION.has(item.id))}>
                   {(item) => (
                     <>
-                      {/* The one destructive action is last, below a rule (docs/ui-design.md § Menus and right-click). */}
+                      {/* The one destructive action is last, below a rule (docs/ui-design/interaction.md § Menus and right-click). */}
                       <Show when={item.tone === 'danger'}><Menu.Separator /></Show>
                       <Menu.Item
                         context={menu}
@@ -162,7 +162,7 @@ export function AgentDetailHeader(props: { task: Task; model: AgentPaneModel }) 
         )}}
       </Show>
       <AgentUsageIndicator />
-      {/* An archived task has no worktree to start a session in (docs/panes.md § Contributions). */}
+      {/* An archived task has no worktree to start a session in (docs/panes/contributions.md § Contributions). */}
       <Show when={props.task.status === 'active'}>
       <Picker<NewSessionChoice>
         label="New"

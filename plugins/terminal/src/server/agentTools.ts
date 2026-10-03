@@ -1,5 +1,5 @@
 // The terminal plugin's agent tools: the five run_* tools, as the `tools` contribution point
-// (docs/plugins.md § Tool projection).
+// (docs/plugins/data-ownership.md § Tool projection).
 //
 // They live here, beside the RuntimeService this plugin's init builds, because that service closes
 // over the live session map and this plugin's database.
@@ -14,7 +14,7 @@ export function runAgentTools(runTargets: TerminalRunTargets, repoConfigTrustNot
   const empty = z.object({})
 
   // Starting a run target executes the repo's committed `.acorn/config.toml`, so it sits behind the
-  // hash-gated trust acknowledgement (docs/workflows.md § Configuration trust). The notice broadcasts
+  // hash-gated trust acknowledgement (docs/terminal/run-targets.md § Trust and execution). The notice broadcasts
   // so the human sees the review prompt, and the agent gets a 'needs-trust' kind rather than an opaque
   // failure it might retry.
   const executeRun = async <T>(taskId: string, execute: () => Promise<T>): Promise<T> => {

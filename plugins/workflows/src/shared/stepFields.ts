@@ -1,5 +1,5 @@
 // How the nine built-in kinds describe themselves, and where each of their fields lands
-// (docs/workflows.md § Contributed step kinds).
+// (docs/workflows/step-kinds.md § Contributed step kinds).
 //
 // Here rather than beside the handlers in ../server/steps/builtins.ts for two reasons. The editor
 // runs on the client and needs the same table, and ../server/validation/definition.ts reads `runsAgent`

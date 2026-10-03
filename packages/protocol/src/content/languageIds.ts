@@ -1,4 +1,4 @@
-// The language-id vocabulary, published once (docs/editor.md § Naming).
+// The language-id vocabulary, published once (docs/editor/document-surface.md § Naming).
 //
 // Three parties need the same words and no two share a package: the node parses a manifest that names
 // one, the renderer maps it onto a CodeMirror language, and the diff highlighter maps it onto a shiki

@@ -14,10 +14,10 @@ crosses them. Review Git changes since the audit before capturing a fresh cumula
 The preserved investigations contain the reproducible probes, measured workloads, source paths,
 proposed improvements, rejected alternatives, and limits:
 
-- [Investigation 15](../../../plans/performance/15-tui.md).
+- Investigation 15.
 
-The original [unit brief](../../../plans/performance/implementation-26-review-brief.md) and
-[implementation sequence](../../../plans/performance/implementation-plan.md) retain provenance.
+The original unit brief and
+implementation sequence retain provenance.
 The sections below reproduce the detailed assignment so this handoff carries its review concerns.
 No application fix for this unit is included in the units 01–08 commit.
 

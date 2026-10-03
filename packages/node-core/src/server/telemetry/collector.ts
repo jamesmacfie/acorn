@@ -39,7 +39,7 @@ import { scrub, scrubAttrs, scrubLine } from './scrub'
 
 /** The developer switch that predates all of this. With it on, the collector runs with no sink
  *  subscribed and prints to stderr, which is what `ACORN_PERF=1` has always meant
- *  (docs/local-development.md § Timing a cold start). */
+ *  (docs/local-development/profiling.md § Timing a cold start). */
 export const PERF = process.env.ACORN_PERF === '1'
 
 /** Enough records that a burst survives a flush window, and small enough that a node nobody is
@@ -52,7 +52,7 @@ const FLUSH_EVERY_MS = 5_000
 const MAX_SAMPLES = 20_000
 /** How many distinct histograms one flush window may hold. A seam that puts an id in an attribute
  *  would otherwise mint one series per call, which is the cardinality failure the vocabulary rule
- *  exists to prevent (docs/telemetry.md § The attribute vocabulary). */
+ *  exists to prevent (docs/telemetry/model.md § The attribute vocabulary). */
 const MAX_SERIES = 200
 /** The separator inside a summary counter key. A control
  *  character because an owner, a seam and an attribute value are all free-ish text and none of them
@@ -132,7 +132,7 @@ export const telemetryEnabled = (): boolean => PERF || (state.sinks.size > 0 && 
 // ── Attribute hygiene ─────────────────────────────────────────────────────────────────────────────
 //
 // Truncate rather than drop, and count what was truncated, so a chatty seam shows up as a metric
-// instead of quietly losing its tail (docs/telemetry.md § The attribute vocabulary).
+// instead of quietly losing its tail (docs/telemetry/model.md § The attribute vocabulary).
 
 function cleanAttrs(attrs: TelemetryAttrs | undefined, owner: string, runtime: TelemetryRuntime = 'node'): TelemetryAttrs {
   const { attrs: out, truncated } = scrubAttrs(attrs)
@@ -200,7 +200,7 @@ export const newSpanId = (): string => hex(8)
 // Every verb takes the owner as its first argument. Where the caller has nothing better to say than
 // `'core'`, the store answers instead: a request under `/v1/p/rollbar` entered it with
 // `owner: 'rollbar'`, so the git spawn eleven frames down reports as rollbar's without git.ts ever
-// learning who called it (./context.ts, docs/telemetry.md § Ambient attribution).
+// learning who called it (./context.ts, docs/telemetry/runtimes.md § Ambient attribution).
 //
 // The precedence is explicit, then ambient, then core. A plugin's `ctx.telemetry` closes over its
 // own id and so always passes one, which is what stops a plugin inheriting core's name, or another
@@ -324,7 +324,7 @@ export function startSpan(owner: string, input: SpanInput): SpanHandle {
  * One sample into a histogram, aggregated over the flush window.
  *
  * This is the seam `perf.ts` used to be. A seam firing thousands of times a second is a metric and
- * never a span (docs/telemetry.md § Hot seams are metrics), and pre-aggregating here is what makes
+ * never a span (docs/telemetry/model.md § Hot seams are metrics), and pre-aggregating here is what makes
  * the difference between one record per window and a thousand records a sink has to throw away.
  */
 export function recordDuration(owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void {
@@ -360,7 +360,7 @@ export function recordDuration(owner: string, seam: string, ms: number, attrs?: 
  *
  * The replacement for `perf.ts`'s `timed`. A caller with nothing better to say than `'core'` gets
  * the ambient owner, so `git.ts` and `sqlite.ts` name the plugin whose request they are serving
- * without either file learning anything about its callers (docs/telemetry.md § Ambient attribution).
+ * without either file learning anything about its callers (docs/telemetry/runtimes.md § Ambient attribution).
  */
 export function measure<T>(owner: string, seam: string, run: () => T, attrs?: TelemetryAttrs): T {
   if (!telemetryEnabled()) return run()
@@ -388,7 +388,7 @@ export function measure<T>(owner: string, seam: string, run: () => T, attrs?: Te
  * Take a batch another runtime built and hold it with the node's own records.
  *
  * The node is the only collector, so the renderer, the helper, the terminal client and the shell all
- * post here (docs/telemetry.md § Other runtimes). Three things are re-done rather than trusted:
+ * post here (docs/telemetry/runtimes.md § Other runtimes). Three things are re-done rather than trusted:
  *
  *   - `runtime` comes from the route, which takes it from a set that does not contain `node`. A
  *     record that could claim to be the node's own would be indistinguishable from one at a sink.
@@ -422,7 +422,7 @@ export function ingestTelemetry(runtime: PostedTelemetryRuntime, records: readon
 
 /**
  * Subscribe to the stream. Behind the `telemetry` core token, because a sink sees every record from
- * every owner (docs/security.md § Telemetry sinks).
+ * every owner (docs/security/plugin-node-realm.md § Telemetry sinks).
  *
  * A sink must return quickly. The collector calls sinks in order on a timer, awaits none of them and
  * contains a throw or a rejection; buffering and retry are the sink's job.
@@ -452,7 +452,7 @@ export function clearTelemetrySinks(owner: string): void {
 
 /**
  * What Settings → Telemetry draws: is it on, what is it seeing, and who is reading it
- * (docs/telemetry.md § What the page shows).
+ * (docs/telemetry/diagnosis.md § What the page shows).
  *
  * Counters, not records. The ring is 5,000 deep and a sink may have drained it a second ago, so a
  * page built on the ring would answer "what is this collecting" with whatever the last five seconds
@@ -704,7 +704,7 @@ export function resetTelemetryForTest(): void {
 
 // ── The owner-bound projection ────────────────────────────────────────────────────────────────────
 
-/** What `ctx.telemetry` is (docs/plugin-authoring.md § Telemetry and logging). The owner is closed
+/** What `ctx.telemetry` is (docs/plugin-authoring/telemetry.md § Telemetry and logging). The owner is closed
  *  over by the host, so every verb on it files under the plugin the context belongs to. */
 export type PluginTelemetry = {
   /** Whether anything is collecting. For a sample that costs something to take, such as listing

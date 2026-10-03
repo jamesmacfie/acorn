@@ -56,7 +56,7 @@ export type AgentProfileContribution = {
   resumeArgv?: (command: string, sessionRef: string) => HeadlessArgv
   // Declaring this is the opt-in for text generation, not just for a workflow `decide` step: a profile
   // that can decide can also generate, so `models.available()` lists it beside every connected API key
-  // (docs/integrations.md § Model providers). One field, no second registry.
+  // (docs/integrations/model-providers.md § Model providers). One field, no second registry.
   aiArgv?: (command: string, opts: HeadlessOpts) => HeadlessArgv
   streamJson?: StreamJsonAdapter
   // The same two fields a connection provider declares, for the same reason: a picker needs a model

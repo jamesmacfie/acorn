@@ -1359,7 +1359,7 @@ describe('managed agent runtime conformance', () => {
     await expect(runtime.store.requireSession(session.id)).rejects.toThrow('Managed agent session not found')
   })
 
-  // Archiving a task retires its agents (docs/managed-agents.md § Client surfaces).
+  // Archiving a task retires its agents (docs/managed-agents/client-surfaces.md § Retired and archived sessions).
   it('retires the sessions of an archived task from the live list', async () => {
     const seed = await seedTask(testDb, dataDir)
     runtime = new ManagedAgentRuntime({
@@ -1388,8 +1388,8 @@ describe('managed agent runtime conformance', () => {
     const archived = await runtime.store.listSessions({ archived: true })
     expect(live.sessions).toEqual([])
     expect(archived.sessions.map((row) => row.id)).toEqual([session.id])
-    // Exempt: a pinned task id is the task pane looking at its own task (docs/managed-agents.md § Client
-    // surfaces).
+    // Exempt: a pinned task id is the task pane looking at its own task (docs/managed-agents/client-surfaces.md
+    // § Retired and archived sessions).
     const pinned = await runtime.store.listSessions({ taskId: seed.taskId, archived: false })
     expect(pinned.sessions.map((row) => row.id)).toEqual([session.id])
   })

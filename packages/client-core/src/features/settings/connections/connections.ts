@@ -3,7 +3,7 @@ import { connectionName, type PublicIntegrationProvider } from '@acorn/protocol/
 import type { SettingsNavigate } from '../../../host/registries/shell/settings'
 import { createDetailRequest } from '../settingsDetail'
 
-// The Connections group's two pages and what they share (docs/integrations.md § Settings). Services
+// The Connections group's two pages and what they share (docs/integrations/settings.md § Settings). Services
 // lists the connections that feed the rail and the agents: issue trackers, error trackers, GitHub,
 // telemetry export. AI models lists the keys a Generate control spends, beside the agent CLIs this
 // machine has. Both draw the same connection page and the same Add connection gallery, and each

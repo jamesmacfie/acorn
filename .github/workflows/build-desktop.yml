@@ -83,7 +83,7 @@ jobs:
         run: pnpm --filter @acorn/node-core test src/server/plugins/pluginDbFiles.test.ts
 
       # The shell's own boot test plus the Rust unit tests. This is the gate that catches "the shell
-      # cannot load its world" (docs/testing.md § The desktop boot test), and it runs before the
+      # cannot load its world" (docs/testing/desktop.md § The desktop boot test), and it runs before the
       # slow bundler pass so a broken boot path fails in seconds rather than minutes.
       - name: Test the shell and the helper
         run: pnpm --filter @acorn/desktop run test:built

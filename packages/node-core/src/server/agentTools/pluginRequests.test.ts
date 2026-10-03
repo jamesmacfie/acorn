@@ -11,7 +11,7 @@ import {
 
 // The one agent tool that can put third-party code on a node, and the thing worth asserting is what
 // it cannot do: every test below is a variation on "the tool raises a question, and only a device
-// answering it makes anything happen" (docs/agent-tools.md § plugin_request).
+// answering it makes anything happen" (docs/agent-tools/plugin-tools.md § plugin_request).
 
 const ctx = { taskId: 'task-1', userLogin: 'owner' }
 
@@ -84,7 +84,7 @@ describe('the owner’s answer', () => {
     decidePluginRequest(pending.requestId, { decision: 'approved', message: 'board 1.0.0 is installed.' })
 
     expect(await call(tool, args)).toEqual({ state: 'approved', message: 'board 1.0.0 is installed.' })
-    // Spent (docs/plugins.md § Approval-mediated install): a second identical call is a new question,
+    // Spent (docs/plugins/agent-install.md § Approval-mediated install): a second identical call is a new question,
     // not a second use of the yes already given.
     await expect(call(tool, args)).rejects.toMatchObject({ kind: 'needs-trust' })
     expect(pendingPluginRequests()).toHaveLength(1)

@@ -39,7 +39,7 @@ import {
   type CodexThreadSettings,
 } from './codexConfiguration'
 
-// The node's log, tagged as the provider's side of this plugin (docs/plugin-authoring.md §
+// The node's log, tagged as the provider's side of this plugin (docs/plugin-authoring/telemetry.md §
 // Telemetry and logging). A module with no `ctx` in reach, so the owner is stated here.
 const log = createLogger('agents:provider', 'agents')
 

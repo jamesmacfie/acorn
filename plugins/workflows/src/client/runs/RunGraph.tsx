@@ -3,7 +3,7 @@ import { Graph, type GraphCard } from '@acorn/plugin-api/ui'
 import { statusLabel, stepGlyph, stepTone } from './runDisplay'
 import type { RunPaneModel } from './runPaneModel'
 
-// The run's steps as a picture, in place of the list (docs/workflows.md § The run pane).
+// The run's steps as a picture, in place of the list (docs/workflows/routes-and-ui.md § The run pane).
 //
 // The same model, the same reading order and the same selection as the list: the toggle in the Runs
 // header swaps which one is drawn and nothing else. No ports and no dragging, because a

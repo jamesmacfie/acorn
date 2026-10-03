@@ -8,7 +8,7 @@ import { type GithubEmit, NO_EMIT } from '../../events'
 const decodeBase64 = (content: string) =>
   new TextDecoder().decode(Uint8Array.from(atob(content.replace(/\n/g, '')), (c) => c.charCodeAt(0)))
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pullBlob = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/blobs/:sha', async (c) => {
   const uid = ownerId(c)

@@ -12,8 +12,8 @@ export type { CacheStorage } from '../persistence/queryCacheLifecycle'
 import { dropSegmentCache } from '../../features/diff/segmentCaches'
 
 // The fleet store: which nodes this client knows, what state each connection is in, and one query
-// cache per node (docs/architecture-overview.md § Client state and fleet behavior,
-// docs/data-layer.md § Preferences and client persistence).
+// cache per node (docs/architecture/fleet.md § Client state and fleet behavior,
+// docs/state-ownership.md § Client-owned durable state).
 //
 // Membership is main's, because main owns the device tokens and the pinned certificates
 // (docs/architecture-overview.md § Process ownership). This is a projection of `fleetList()` plus the
@@ -56,7 +56,7 @@ const keyPrefix = (key: readonly unknown[]): string =>
  *
  * Handled, always. The UI has already dealt with these: a failed read leaves the last-known data on
  * screen with a stale badge, and a failed write surfaces a notice and keeps the draft
- * (docs/ui-design.md § Connection and staleness vocabulary). What the record adds is a count.
+ * (docs/ui-design/states.md § Connection and staleness vocabulary). What the record adds is a count.
  */
 const failureCaches = () => ({
   queryCache: new QueryCache({
@@ -110,7 +110,7 @@ export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nod
 
 // The node this window opens on when nothing else is selected, and the one a notification with no node
 // of its own is attributed to. Not a prefs home: preferences follow the resource they describe
-// (docs/state.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 
@@ -130,7 +130,7 @@ function subscribeStatuses(): void {
     // A status for a node this list has never heard of. It used to be impossible: membership was read
     // after the local node had been adopted. The window now opens first, so on a first-ever launch the
     // list is empty and the local node's first status is the only news that it exists
-    // (docs/frontend.md § Startup readiness). Re-reading costs the helper one
+    // (docs/frontend/data-and-startup.md § Startup readiness). Re-reading costs the helper one
     // file read.
     if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
     chased.add(status.nodeId)

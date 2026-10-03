@@ -41,7 +41,7 @@ const HELD_STDERR_LINES = 200
 
 export type SupervisedNode = {
   /** The child's boot line, still in flight. Not awaited by `startNode`, so the shell can draw while
-   *  the node boots (docs/tui.md § Attach or start). */
+   *  the node boots (docs/tui/process.md § Attach or start). */
   handshake: Promise<Handshake>
   /** Whatever the child wrote to stderr, in order, for printing once the renderer has handed the
    *  terminal back. Piped rather than inherited: stderr is the file the renderer draws on, so a line
@@ -76,7 +76,7 @@ function nodeEntry(): { command: string; args: string[]; cwd?: string } {
  *
  *  Not awaited here, and that is the point: the renderer is created and the shell drawn while the
  *  child boots, which in a checkout with no build is a full tsx boot of the node
- *  (docs/tui.md § Attach or start).
+ *  (docs/tui/process.md § Attach or start).
  *
  *  `deviceToken` is whatever this TUI already holds for this data root. The node reuses a token that
  *  still authenticates and mints one otherwise, so passing it is what stops every launch adding a

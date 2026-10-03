@@ -85,7 +85,7 @@ type Entry = { action: string; actor: string; actorId: string | null; subject: s
 
 // recordAudit is fire-and-forget so a logging failure cannot fail the action it describes; the row
 // therefore lands a microtask after the response. Poll rather than sleep a fixed interval: this file
-// runs beside 25 other packages (CLAUDE.md § the suite is load-sensitive).
+// runs beside 25 other packages (AGENTS.md § Test and lint quickly).
 async function entries(predicate: (rows: Entry[]) => boolean = (rows) => rows.length > 0): Promise<Entry[]> {
   const deadline = Date.now() + 5_000
   for (;;) {

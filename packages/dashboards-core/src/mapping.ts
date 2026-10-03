@@ -13,8 +13,8 @@ import {
 } from './model'
 
 // The mapping layer: field mapping, value mapping, derived enum, in that order. See
-// docs/dashboards.md § The mapping layer, and cross-source panels for what each layer does and why.
-// Pure over `(sources, mapping)`, tested outside the component for the reason docs/dashboards.md §
+// docs/dashboards/mapping-and-editor.md § The mapping layer, and cross-source panels for what each layer does and why.
+// Pure over `(sources, mapping)`, tested outside the component for the reason docs/dashboards/mapping-and-editor.md §
 // The generated editor gives.
 
 /** One source's answer, as the mapping layer sees it. */
@@ -27,12 +27,12 @@ export type PanelSourcePage = {
 // ── The panel-local field vocabulary ──────────────────────────────────────────────────────────
 //
 // Five role fields, fixed, plus however many the user invented (`mapping.extraFields`). See
-// docs/dashboards.md § The mapping layer, and cross-source panels for why the vocabulary is capped
+// docs/dashboards/mapping-and-editor.md § The mapping layer, and cross-source panels for why the vocabulary is capped
 // at roles.
 
 const ROLE_FIELDS = [
   { id: 'title', name: 'Title', type: 'text', role: 'title' },
-  // Also the derived enum. See docs/dashboards.md § The mapping layer, and cross-source panels.
+  // Also the derived enum. See docs/dashboards/mapping-and-editor.md § The mapping layer, and cross-source panels.
   { id: 'status', name: 'Status', type: 'enum', role: 'status' },
   { id: 'assignee', name: 'Assignee', type: 'person', role: 'assignee' },
   { id: 'updated', name: 'Updated', type: 'datetime', role: 'updated' },
@@ -45,7 +45,7 @@ export const PANEL_FIELDS: readonly DashboardDisplayField[] = ROLE_FIELDS
 export const PANEL_STATUS_FIELD_ID = 'status'
 
 /** Where a row came from, as an ordinary panel-local field, fed by the host's stamp described in
- *  docs/dashboards.md § Provenance, and what a row may not claim. See docs/dashboards.md § The
+ *  docs/dashboards/panels.md § Provenance, and what a row may not claim. See docs/dashboards/mapping-and-editor.md § The
  *  mapping layer, and cross-source panels for why source is a field rather than a special case, and
  *  why it carries no tone.
  *
@@ -102,7 +102,7 @@ export const isMapped = (sources: readonly PanelProjectionSource[], mapping: Pan
 
 // ── Field mapping ─────────────────────────────────────────────────────────────────────────────
 
-/** Which of a source's fields feeds a panel-local field. See docs/dashboards.md § The mapping layer,
+/** Which of a source's fields feeds a panel-local field. See docs/dashboards/mapping-and-editor.md § The mapping layer,
  *  and cross-source panels for why the role is the runtime default rather than a copy, and what an
  *  explicit `''` means. */
 export function sourceFieldFor(
@@ -284,7 +284,7 @@ export function panelSchema(
 
 /** Every source's rows as one list of panel-local rows.
  *
- *  Provenance is the host's stamp (docs/dashboards.md § Provenance, and what a row may not claim):
+ *  Provenance is the host's stamp (docs/dashboards/panels.md § Provenance, and what a row may not claim):
  *  `pluginId` and the query-instance `sourceId` are copied from the typed record reference, never
  *  accepted from a plugin-controlled display row.
  *

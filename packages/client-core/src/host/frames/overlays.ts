@@ -1,6 +1,6 @@
 import { createSignal } from 'solid-js'
 
-// Which plugin overlay is on screen, and for whom (docs/plugins.md § Frame contribution kind).
+// Which plugin overlay is on screen, and for whom (docs/plugins/frames.md § Frame contribution kind).
 //
 // One at a time, and a plain signal rather than a registry: an overlay covers the window, so "two open"
 // is not a state the surface has. The second would hide the first and the reader would have no way to
@@ -15,7 +15,7 @@ import { createSignal } from 'solid-js'
 // An invocation rather than a pair of ids, because an overlay is now two things at once. A manifest
 // command opens one with nothing to say and nothing to hear back, which is what the ⌘P file palette has
 // always been. A remote tree opens its own companion overlay with an input and waits for a result
-// (docs/plugins.md § Companion overlays). Both are the same record; the second simply fills the two
+// (docs/plugins/remote-points.md § Companion overlays). Both are the same record; the second simply fills the two
 // fields the first leaves empty.
 
 /** One opening of one overlay. `id` is what keys the iframe, so reopening the same surface builds a

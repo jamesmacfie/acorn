@@ -35,7 +35,7 @@ const harnessState = (provider: AgentProviderDescriptor): string | undefined => 
 }
 
 // Settings -> Agents -> Harnesses and defaults: the harnesses this node can run, and what a new session
-// of each one starts on (docs/managed-agents.md § New-session defaults). Every control saves when it
+// of each one starts on (docs/managed-agents/defaults.md § New-session defaults). Every control saves when it
 // changes, and a failure is said on the row that failed. A default seeds new sessions only; each row
 // that is one says which control changes a session already open. The fixed sections match the ones
 // `../index.ts` declares for search; the one per harness depends on what is installed, so search does

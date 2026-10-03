@@ -44,7 +44,7 @@ export type PluginFrameProps = {
   // `context`, and every change after that is a `select` message rather than a remount.
   item?: string
   // Overlay surfaces only: what the remote tree that opened this overlay handed over
-  // (docs/plugins.md § Companion overlays). Reaches the frame as `bridge.context.input` and nothing
+  // (docs/plugins/remote-points.md § Companion overlays). Reaches the frame as `bridge.context.input` and nothing
   // else; the frame is never told which slot or which plugin asked.
   input?: unknown
   // Importer surfaces only. The host owns the modal chrome and the post-import refresh; the frame only
@@ -104,7 +104,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       })
       return result
     },
-    // The byte path (docs/plugins.md § Binary bridge calls). Almost nothing new: the transport under
+    // The byte path (docs/plugins/frames.md § Binary bridge calls). Almost nothing new: the transport under
     // `sendRawBytes` has carried a `Uint8Array` body all the way from the broker since it was written,
     // and the only reason a frame could not reach it was that the line above hard-codes JSON in both
     // directions. So this is a second door onto existing transport, not new transport.
@@ -135,7 +135,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // verifies the shell has one. Subscribing never creates a channel.
       //
       // A plugin channel first and separately: its own, or another plugin's when the manifest named it in
-      // `permissions.events`, which the broker has already checked (docs/plugins.md § Hearing another plugin).
+      // `permissions.events`, which the broker has already checked (docs/plugins/events.md § Hearing another plugin).
       if (parsePluginChannel(channel)) return onPluginFrame(props.binding.pluginId, channel, listener)
       if (!isSubscribable(channel)) throw new Error(`${channel} is not a channel a plugin frame can subscribe to`)
       return clientEvents.on(channel, (payload) => listener(payload))
@@ -182,7 +182,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
     },
     // A link clicked inside a frame's rendered content, resolved on the host's side of the port through
     // the same content-link ladder and rung-preference rule every shell surface follows
-    // (docs/plugins.md § Loaded plugins: the client half).
+    // (docs/plugins/client-half.md § Loaded plugins: the client half).
     openUrl: (url) => {
       // The bound task, never `activeTaskId()`, even though the shell's own content handlers use the
       // ambient one. A frame the host did not give a task is not looking at one: a project-scoped surface
@@ -202,7 +202,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
       // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
       // browser and never in-app, with no second policy to keep in step
-      // (docs/shell.md § Navigation policy).
+      // (docs/shell/origins.md § Navigation policy).
       if (host.openExternal) return host.openExternal(url)
       window.open(url, '_blank', 'noopener,noreferrer')
     },

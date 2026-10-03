@@ -1,5 +1,5 @@
 // The two phantom-typed ids a plugin's contract/ exports so another package can address a capability
-// or an extension point without importing its implementation (docs/plugins.md § Collaboration rules).
+// or an extension point without importing its implementation (docs/plugins/collaboration.md § Collaboration rules).
 // Here rather than in node-core so a contract module imports wire types only.
 
 // A capability id that remembers its own signature. `__signature` is never read at runtime and is

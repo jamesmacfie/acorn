@@ -1,12 +1,16 @@
 # Events and capabilities
 
+This page has short working examples of a node half hearing core, talking to another plugin, and
+choosing a portable UI. It's part of [plugin authoring](../plugin-authoring.md).
+
 Use events to announce a completed change. Use a capability when a caller needs a result from another
 plugin. Both belong to one Node. A client connected to several Nodes must keep each Node's data and
 subscriptions separate.
 
-These examples use plugin API major `2`. The node context is declared in
-`packages/plugin-types/src/public.ts`; the event vocabulary is in
-`packages/protocol/src/transport/nodeEvents.ts`.
+These examples use plugin API major `3`. The node context is declared in
+`packages/plugin-types/src/public.ts`, and the event list is in
+`packages/protocol/src/transport/nodeEvents.ts`. [Events](../plugins/events.md) and
+[collaboration rules](../plugins/collaboration.md) hold the full rules.
 
 ## Listen to a core event
 
@@ -36,7 +40,7 @@ export default {
 ```
 
 The host disposes the subscription when the plugin unloads. Keep the listener short. If it starts
-asynchronous work, catch failures in that work. Events have no replay or delivery guarantee; read
+asynchronous work, catch failures in that work. Events have no replay and no promise of delivery, so read
 stored state when starting or reconnecting.
 
 ## Publish an event for another plugin

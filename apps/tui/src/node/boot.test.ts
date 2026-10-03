@@ -13,7 +13,7 @@ import { custody, openNode, type OpenedNode } from './open'
 import { fileCacheStorage } from './cache'
 import { installPlatform, type Platform } from '../platform'
 
-// The boot test (docs/testing.md § Test layers): does `acorn`'s world come up.
+// The boot test (docs/testing/layers.md § Test layers): does `acorn`'s world come up.
 //
 // It runs the real thing — a real standalone node against a fresh data root, the real fleet store and
 // device-token files in a fresh config directory, the real broker over pinned TLS — and then asks the
@@ -169,7 +169,7 @@ describe('acorn against a node it started', () => {
   }, 60_000)
 })
 
-// The start path, once the root has been opened before (docs/tui.md § Attach or start). The first-ever
+// The start path, once the root has been opened before (docs/tui/process.md § Attach or start). The first-ever
 // start has no id on disk and nothing cached, so it waits for the handshake; every start after that
 // returns as soon as the child is spawned, which is what lets the renderer draw in front of a booting
 // node.

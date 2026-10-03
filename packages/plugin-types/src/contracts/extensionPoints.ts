@@ -14,7 +14,7 @@ export type Extension<T> = {
   value: T
 }
 
-/** The node's many-to-many seam, beside the single-provider one above (docs/plugins.md § Cooperative
+/** The node's many-to-many seam, beside the single-provider one above (docs/plugins/cooperative-extension-points.md § Cooperative
  *  extension points). Reach for a capability when there is one right answer, and for a point when
  *  there are many: several plugins each adding a workflow step kind, an event sink, a run backend.
  *

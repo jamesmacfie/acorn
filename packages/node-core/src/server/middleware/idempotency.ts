@@ -9,7 +9,7 @@ const KEY_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 // rather than producing an empty 204.
 const BODILESS = new Set([204, 205, 304])
 
-// In-flight executions, keyed exactly as the store is. docs/api-reference.md § Request processing: "a
+// In-flight executions, keyed exactly as the store is. docs/api-reference/transport.md § Request processing: "a
 // duplicate arriving while the first is still executing waits for it and gets its response".
 // Process-local by design: this is the window between "first request started" and "its response was
 // stored", which only exists inside one process.

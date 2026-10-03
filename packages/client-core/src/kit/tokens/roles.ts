@@ -3,7 +3,7 @@
 //
 // Two columns, from the day the kit exists. `dom` resolves to a custom property; `tui` says what the
 // role means to a terminal and, since the terminal host started drawing the kit, carries the same
-// answer as something a cell renderer can act on. See docs/ui-design.md § The closed kit for the
+// answer as something a cell renderer can act on. See docs/ui-design/closed-kit.md § The closed kit for the
 // table this mirrors.
 import type { Border, Radius, RoleName, Size, Space, TextRole, Tone } from './tokens'
 

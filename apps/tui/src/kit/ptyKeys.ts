@@ -184,7 +184,7 @@ export function encodeKeyText(key: PtyKey, modes: PtyModes): string {
     // Ctrl on one of these is the byte below it rather than a parameter: Ctrl+Backspace is BS, and
     // Ctrl+Space is NUL, which is how a reader sets a mark in emacs. Ctrl+Return is `\r` — a legacy
     // terminal has never had another byte for it, which is the whole reason this app asks for the
-    // kitty protocol on its *own* keyboard (docs/tui.md § The adapter).
+    // kitty protocol on its *own* keyboard (docs/tui/keys.md § The adapter).
     const byte = key.ctrl && key.name === 'backspace' ? '\b'
       : key.ctrl && key.name === 'space' ? '\x00'
         : single

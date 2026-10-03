@@ -54,7 +54,7 @@ const log = createLogger('helper')
 //
 // Nothing else is served. There is no HTTP surface at all — the listener exists to be upgraded, and a
 // plain request gets 426. That keeps the widened `connect-src` in the renderer CSP down to a
-// WebSocket origin (docs/shell.md § Renderer origin and protocol handler).
+// WebSocket origin (docs/shell/origins.md § Renderer origin and protocol handler).
 
 export type HelperServer = {
   port: number

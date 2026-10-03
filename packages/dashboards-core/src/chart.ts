@@ -9,7 +9,7 @@ import { aggregateRows, boardColumns, groupField } from './shaping'
 
 // The chart view's arithmetic: buckets, aggregates, scales, ticks and path data. Which shapes exist,
 // which schemas can draw them and where a mark's colour comes from are all in
-// docs/dashboards.md § Views are derived, not chosen from a menu.
+// docs/dashboards/views.md § Views are derived, not chosen from a menu.
 //
 // Pure and tested because `ChartView.tsx` cannot be. Vitest here runs in node with no Solid plugin,
 // so the component is a thin `<svg>` over what this file answers.
@@ -19,7 +19,7 @@ import { aggregateRows, boardColumns, groupField } from './shaping'
 // A mark's colour comes from one of two attributes, never a literal: `tone` when the plugin declared
 // what a value means, `series` when the mark is identity with no declared tone. Three identity slots,
 // then a muted `other` fold. `dashboards.css` maps both attributes to colours.
-// See docs/dashboards.md § Views are derived, not chosen from a menu.
+// See docs/dashboards/views.md § Views are derived, not chosen from a menu.
 
 /** `1 | 2 | 3` are the identity slots; `other` is the fold. */
 export type ChartSeriesSlot = 1 | 2 | 3 | 'other'

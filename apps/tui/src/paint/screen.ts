@@ -22,7 +22,7 @@ import { paint } from './paint'
 // **The sink is injectable and that is not only for tests.** Paint writes to one function that takes
 // a string, so the test harness reads frames without a terminal and the real boot hands it
 // `process.stdout.write`. Which is also the promise `../kit/render.tsx` already makes to every kit
-// test (docs/tui.md § Tests).
+// test (docs/tui/tests.md § Tests).
 //
 // The terminal's own setup — the alternate screen, raw mode, the protocol requests — is not here. It
 // belongs with the parser that reads their replies, and this module writes nothing but cells.
@@ -32,7 +32,7 @@ export type Sink = (text: string) => void
 
 /** How long the three halves of one frame took, in milliseconds. Reported rather than recorded here,
  *  because this module writes cells and knows nothing about telemetry: the renderer turns these into
- *  the `tui.frame` histogram (../renderer.ts, docs/tui.md § What the terminal client reports). */
+ *  the `tui.frame` histogram (../renderer.ts, docs/tui/reporting.md § What the terminal client reports). */
 export type FramePhases = { layoutMs: number; paintMs: number; flushMs: number }
 
 export type Screen = {

@@ -154,7 +154,7 @@ function validateBudget(label: string, budget: WorkflowBudget | undefined): stri
 
 /**
  * The checks a description states, applied by the host before the kind's own validator runs
- * (docs/workflows.md § Contributed step kinds). A validator can then assume the shape and check the
+ * (docs/workflows/step-kinds.md § Contributed step kinds). A validator can then assume the shape and check the
  * meaning. A select with an `optionsRoute` is skipped: the node reading the file may not be able to
  * reach the project whose route lists the choices.
  */

@@ -1,4 +1,4 @@
-// The diff's geometry as two domains (docs/diff-rendering.md § Row geometry).
+// The diff's geometry as two domains (docs/diff-rendering/geometry.md § Row geometry).
 //
 // An item is a file header, a segment of code rows, or a slice of revealed context. Its fixed height
 // comes from the topology and is exact: code never wraps, so a row is always one line. Those heights

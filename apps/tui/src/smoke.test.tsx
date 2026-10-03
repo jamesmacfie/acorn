@@ -7,7 +7,7 @@ import { renderFixture } from './harness'
 // It asserts what a reader would look for on the screen rather than a snapshot of every cell: the
 // group labels the list column drew, the note titles under them, and the body of the note the detail
 // column opened. Cell-level assertions live one node at a time in kit/kit.test.tsx, which is where a
-// broken promise names itself (docs/testing.md § Test layers). The chrome around the pane has its own
+// broken promise names itself (docs/testing/layers.md § Test layers). The chrome around the pane has its own
 // file (chrome/chrome.test.tsx); this one is about the pane.
 //
 // Since phase 4 the pane is inside a shell, so getting to it takes two presses of Tab — rail, pane
@@ -30,7 +30,7 @@ test('the notes pane draws its list at 80 by 24', async () => {
   expect(frame).toContain('What the agent found')
   expect(frame).toContain('Conventions')
   // 80 cells is the contract, not an accident of this fixture: a wider line is a node that read a
-  // width it does not have (docs/ui-design.md § What the kit and layouts must never do).
+  // width it does not have (docs/ui-design/closed-kit.md § What the kit and layouts must never do).
   for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(80)
 }, 30_000)
 

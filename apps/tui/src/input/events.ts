@@ -1,7 +1,7 @@
 // What the terminal tells us, as five plain objects.
 //
 // One shape, ours, read by the keymap host, the footer, the rectangle's encoder and the test harness
-// (docs/tui.md § How a frame is drawn). The engine in `@opentui/keymap` is generic over
+// (docs/tui/rendering.md § How a frame is drawn). The engine in `@opentui/keymap` is generic over
 // the event type and never constructs one, so this is the only definition of a keystroke in the
 // client — which is what makes `../kit/render.tsx`'s `RAW_KEYS` table unnecessary. That table exists
 // because the only way to press a key at OpenTUI's test input is to hand it bytes, and a name it does
@@ -18,7 +18,7 @@ export type Modifiers = {
   alt: boolean
   /** The platform command key. A terminal emulator keeps Cmd for itself and never delivers it, so
    *  this is only ever true on Linux and Windows, under the kitty protocol
-   *  (docs/tui.md § The adapter, on why every chord here is spelled with `ctrl`). */
+   *  (docs/tui/keys.md § The adapter, on why every chord here is spelled with `ctrl`). */
   super: boolean
 }
 

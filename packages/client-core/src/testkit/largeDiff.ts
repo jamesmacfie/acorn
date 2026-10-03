@@ -1,4 +1,4 @@
-// The generated large diff behind the large-surface fixture (docs/testing.md § Large-surface fixture).
+// The generated large diff behind the large-surface fixture (docs/testing/desktop.md § The large-surface fixture).
 //
 // Deterministic from a seed and built at run time, so nothing checked in is a million lines long.
 // Files come out of a generator one at a time with both sides of the file, the unified patch between

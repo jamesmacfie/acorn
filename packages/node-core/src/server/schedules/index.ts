@@ -81,7 +81,7 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       },
     })
 
-    // The one user-schedule target this build can run (docs/schedules.md § `node-action`). Registered
+    // The one user-schedule target this build can run (docs/schedules/user-schedules.md § `node-action`). Registered
     // here rather than through the bridge because the target is core's: it dispatches a plugin's own
     // route the way a click does, and no plugin should register that dispatch on its own behalf.
     registerNodeActionTarget(scheduler, env)

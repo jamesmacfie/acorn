@@ -4,7 +4,7 @@ import type { ExtensionPointId } from '@acorn/plugin-api/node'
 import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runs/runner'
 import type { WorkflowDef, WorkflowStepDef } from '../shared/workflowContracts'
 
-// The human gate over a real runner and a real plugin database (docs/workflows.md § Execution model).
+// The human gate over a real runner and a real plugin database (docs/workflows/execution.md § Execution model).
 // No step here runs an agent, so no profile or process is involved.
 
 const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }

@@ -8,7 +8,7 @@ import { findInFiles, type SearchHit } from './searchClient'
 // Find-in-files panel: substring search by default, with case, whole-word, and regex toggles.
 // Double-clicking a hit opens the file in the editor beside it, centered on the match. For why this
 // is a sidebar panel rather than its own pane, and why it stays mounted when hidden, see
-// docs/panes.md § Contributions.
+// docs/panes/contributions.md § Contributions.
 //
 // Entirely kit nodes since phase 9 of the layout programme, and its stylesheet went with them. Two
 // things came back for free in the trade: the results are a `Rows` collection, so arrow keys, Home,
@@ -74,13 +74,13 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   const files = () => results()?.files ?? []
   const totalHits = createMemo(() => files().reduce((n, f) => n + f.hits.length, 0))
 
-  // The retained pane intent rather than a callback prop. See docs/panes.md § Contributions.
+  // The retained pane intent rather than a callback prop. See docs/panes/contributions.md § Contributions.
   function openHit(path: string, hit: SearchHit) {
     requestEditorReveal(props.taskId, path, hit.line, hit.col)
   }
 
   // Focus the box whenever the sidebar flips to Search, including when the retained `editor:search`
-  // intent does the flipping (docs/panes.md § Contributions). Deferred to a microtask because
+  // intent does the flipping (docs/panes/contributions.md § Contributions). Deferred to a microtask because
   // `TabPanel` keeps the panel hidden until the same render that sets `active`, and a hidden input
   // cannot take focus.
   let input: HTMLInputElement | undefined

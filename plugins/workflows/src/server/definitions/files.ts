@@ -1,6 +1,6 @@
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 // Workflow files: declarative, committed `.acorn/workflows/*.toml`. Layering and sub-workflow
-// expansion are covered in docs/workflows.md § Execution model.
+// expansion are covered in docs/workflows/execution.md § Execution model.
 import { existsSync, readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { parse as parseToml } from 'smol-toml'
@@ -270,7 +270,7 @@ export function parseWorkflowToml(text: string, id: string, source: 'repo' | 'us
   }
 }
 
-// Inline sub-workflow expansion with cycle rejection: see docs/workflows.md § Execution model.
+// Inline sub-workflow expansion with cycle rejection: see docs/workflows/execution.md § Execution model.
 export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[], catalog: WorkflowValidationCatalog = defaultCatalog()): LoadedWorkflow[] {
   const byId = new Map(raw.map((w) => [w.id, w]))
   const out: LoadedWorkflow[] = []
@@ -357,7 +357,7 @@ export function expandWorkflows(raw: RawWorkflow[], errors: WorkflowFileError[],
 }
 
 // Scans `.acorn/workflows/*.toml` in the repo checkout/worktree plus `~/.acorn/workflows`; see
-// docs/workflows.md § Execution model for the layering rule.
+// docs/workflows/execution.md § Execution model for the layering rule.
 export function loadWorkflowFiles(
   repoDir: string | null,
   userDir: string | null,

@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { createWorkflowApi } from '../workflowsClient'
 
 // One field of a step kind's `describe`, as the matching kit control
-// (docs/workflows.md § Contributed step kinds).
+// (docs/workflows/step-kinds.md § Contributed step kinds).
 //
 // The host draws it, which is the whole point of describing a form as data: a plugin contributes a
 // step kind and its inputs appear on both hosts with no component of its own. `prompt` is not here —

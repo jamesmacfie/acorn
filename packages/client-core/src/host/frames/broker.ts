@@ -1,4 +1,4 @@
-// The host side of one sandboxed plugin frame's bridge. See docs/plugins.md § Enforcement.
+// The host side of one sandboxed plugin frame's bridge. See docs/plugins/frames.md § Enforcement.
 //
 // One of these per frame. It holds the binding, the plugin id, node, task, project and declared scopes,
 // and the frame cannot influence any of it: every message is checked against values the host read off the
@@ -303,7 +303,7 @@ export function createFrameBridge(input: {
     }
   }
 
-  // The same call as `handleApi`, for a route whose body is bytes (docs/plugins.md § Binary bridge
+  // The same call as `handleApi`, for a route whose body is bytes (docs/plugins/frames.md § Binary bridge
   // calls). The two share one thing and it is the important one: `allowApi` decides before either looks
   // at a body, so the byte path cannot be used to reach a path the JSON path would refuse.
   const handleApiBytes = async (id: number, data: Record<string, unknown>, controller: AbortController, reply: typeof post): Promise<void> => {
@@ -536,7 +536,7 @@ export function createFrameBridge(input: {
         }
         if (op === 'importer.done') services.importerDone()
         else {
-          // A result is an overlay answering the tree that opened it (docs/plugins.md § Companion
+          // A result is an overlay answering the tree that opened it (docs/plugins/remote-points.md § Companion
           // overlays). An importer has nobody awaiting a value, so supplying one there is a frame
           // built against the wrong surface and is refused rather than dropped.
           const result = (data as { result?: unknown }).result
@@ -555,7 +555,7 @@ export function createFrameBridge(input: {
     }
   }
 
-  // The composed pane's shared document (docs/editor.md § Communication between regions).
+  // The composed pane's shared document (docs/editor/composed-panes.md § Communication between regions).
   // Three operations, and the interesting thing about them is what is not here: no cursor, no selection,
   // no decorations, no "open this other document". Each of those is either the host's state or an
   // LSP-shaped route, and the growth rule sends new asks to the second rather than to this list.
@@ -667,7 +667,7 @@ export function createFrameBridge(input: {
       return
     }
     // A histogram and never a span: a frame doing real work sends a handful of messages per
-    // interaction, and one drawing a chart sends thousands (docs/telemetry.md § Hot seams are
+    // interaction, and one drawing a chart sends thousands (docs/telemetry/model.md § Hot seams are
     // metrics). The kind is in the seam name rather than an attribute, because a histogram is
     // keyed by seam and `api` and `state.set` are different questions.
     const kind = MEASURED_KINDS.has(data.kind) ? data.kind : 'other'

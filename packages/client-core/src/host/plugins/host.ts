@@ -63,7 +63,7 @@ export const forgetPluginTrust = async (request: { pluginId: string; hash: strin
   await bridge()?.trustForget(request)
 }
 
-// Enter or leave development mode for a plugin on a node (docs/security.md § The dev grant). A build with
+// Enter or leave development mode for a plugin on a node (docs/security/plugin-install.md § The dev grant). A build with
 // no plugin host has no bundles to auto-trust, so this is a no-op there rather than an error.
 export const setPluginDevGrant = async (request: PluginDevGrantRequest): Promise<void> => {
   await bridge()?.devGrant(request)

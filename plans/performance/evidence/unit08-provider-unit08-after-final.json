@@ -1,6 +1,0 @@
-{
-  "fixture": "Normal QueryClientProvider and useQueryClient with one reactive Solid component",
-  "sameClient": true,
-  "constructions": 1,
-  "updatedText": "after"
-}

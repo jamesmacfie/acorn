@@ -1,9 +1,0 @@
-{
-  "fixture": "100 actual textarea input events with two composer surfaces, one synthetic 128 KiB context; jsdom and localStorage, synchronous bracket includes input rendering and persistence",
-  "edits": 100,
-  "contextBytes": 131072,
-  "storageWrites": 100,
-  "storedCharactersWritten": 13120390,
-  "synchronousWallMs": 88.11945900000137,
-  "processCPUms": 72.222
-}

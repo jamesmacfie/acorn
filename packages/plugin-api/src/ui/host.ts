@@ -1,4 +1,4 @@
-// Compiled-host UI only. See docs/plugins.md § The plugin API for the boundary between this and
+// Compiled-host UI only. See docs/plugins/plugin-api.md § The plugin API for the boundary between this and
 // @acorn/plugin-api/ui: nothing here is safe to bundle into an isolated plugin frame.
 export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
@@ -14,7 +14,7 @@ export { IconPicker } from '@acorn/client-core/kit/components/inputs'
 export type { IconPickerProps } from '@acorn/client-core/kit/components/inputs'
 // The app's one bottom dock. Host-only, and not a kit node: where the rails are and how tall the top
 // bar is are the shell's own geography, and its height is a pixel the drag handle produced, which is
-// exactly what a kit node's props may not be (docs/ui-design.md § The closed kit).
+// exactly what a kit node's props may not be (docs/ui-design/closed-kit.md § The closed kit).
 export { Drawer } from '@acorn/client-core/kit/components/overlays'
 // The palette chrome, deduped ×4. Host-only: palettes use the shell's focus machinery, and a
 // sandboxed frame cannot open one.
@@ -36,7 +36,7 @@ export type { PromoteTaskAction } from '@acorn/client-core/features/integrations
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.
 export { default as RefPanelTaskLink } from '@acorn/client-core/host/components/RefPanelTaskLink.tsx'
-// A place in this surface where another plugin's tree may be grafted (docs/plugins.md § Cooperative
+// A place in this surface where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `remote` kind). Host-only for the same reason the palette is: it acquires a
 // worker, wires a bridge and mounts the shell's own components. A plugin that owns a surface places
 // this where it wants a contributor's UI; it never sees the contributor's nodes.
@@ -58,11 +58,11 @@ export { requestAnnotations, annotationsFor } from '@acorn/client-core/host/anno
 
 // The `wizard` layout, for a surface that is a wizard but is not a pane. Host-only: a layout is the
 // host's arrangement, and a pane gets one by naming it on its contribution rather than by importing
-// it (docs/panes.md § Layout model). Onboarding is the one surface that needs the arrangement without
+// it (docs/panes/layout.md § Layout model). Onboarding is the one surface that needs the arrangement without
 // a pane to hang it on, because it lives in the `overlay` slot.
 export { Wizard } from '@acorn/client-core/host/layouts'
 // Show one tab of a `tabs` pane. The selection is the host's, held under the pane id, so a pane whose
-// panels point at each other asks rather than keeping a second copy (docs/panes.md § Layout model).
+// panels point at each other asks rather than keeping a second copy (docs/panes/layout.md § Layout model).
 export { selectPaneTab } from '@acorn/client-core/host/layouts/state.ts'
 
 // Another plugin's rectangle, beside or below this one's pane (the `rectangle` kind). The iframe twin

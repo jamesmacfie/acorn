@@ -9,7 +9,7 @@ import { rowHeightSm } from '../../lib/layout/metrics'
 
    Two components rather than one flag, because the geometry is different in kind: Table lets the
    browser size its columns, and a virtualised list cannot — the row height and the column track
-   both have to be numbers before a row is drawn. See docs/ui-design.md § The closed kit.
+   both have to be numbers before a row is drawn. See docs/ui-design/closed-kit.md § The closed kit.
 
    Cells are strings. A cell that wants a Badge wants a Table.
 

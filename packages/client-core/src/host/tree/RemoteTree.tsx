@@ -39,7 +39,7 @@ export type RemoteTreeProps = {
    *  a tool card redraws on every transcript snapshot without its worker restarting. */
   props: () => unknown
   /**
-   * What the owner of this slot will do if the tree asks (docs/plugins.md § Asking the owner).
+   * What the owner of this slot will do if the tree asks (docs/plugins/remote-points.md § Asking the owner).
    *
    * Host-only. These never reach the worker in any form: a function cannot cross the boundary, and the
    * name is not sent either, so a tree learns which actions exist only from the point's own published

@@ -1,7 +1,7 @@
 import type { WorkflowFileTarget } from '../../shared/workflowFileAuthoring'
 
 /** Which store a definition came from, and its id there. The URL carries the pair as one string so a
- *  link is a link (docs/workflows.md § Authoring). */
+ *  link is a link (docs/workflows/authoring.md § Authoring). */
 export type DefRef = { source: 'database' | 'repo' | 'user'; id: string }
 
 export const defRefKey = (ref: DefRef): string => `${ref.source === 'database' ? 'db' : ref.source}:${ref.id}`

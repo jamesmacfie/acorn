@@ -8,7 +8,7 @@ import type { Node } from '../tree/node'
 // prototype because a node that joins the tree after a frame's layout pass has no computed size, and
 // the fault is Yoga's rather than OpenTUI's: `getComputedWidth` and `getComputedHeight` on an
 // unmeasured node both return `NaN`, and so does `getComputedLayout()` for the same two fields
-// (docs/tui.md § Rendering). It survives the move to wasm unchanged. What changes is that there is
+// (docs/tui/rendering.md § Rendering). It survives the move to wasm unchanged. What changes is that there is
 // one place a rectangle is read, so there is one place to answer it.
 //
 // Three things the clamp has to know, each measured rather than assumed.
@@ -25,7 +25,7 @@ import type { Node } from '../tree/node'
 //   negative             reported left -15 at width 40 inside a 10-cell parent. Clamping that to 0
 //                        would move the run; paint's job is to clip it. So the invariant is four
 //                        finite integers, of which only the width and the height are non-negative
-//                        (docs/tui.md § Rendering).
+//                        (docs/tui/rendering.md § Rendering).
 //
 // Yoga rounds sizes to whole cells by itself at the default point scale factor of 1 — 101 split three
 // ways comes back 34, 33, 34 with edges that meet — so the rounding below is a belt, not the braces.

@@ -20,7 +20,7 @@ import type { PrModel } from './prModel'
 // The Solid-rendered twin of the host's `linkifyRefs`: same split, different mechanism, because a
 // pull's title is text this component owns and its body is opaque provider HTML. The twin used to
 // mint the same raw anchor with the same private class; the kit has a word for a clickable run of
-// text now, so it writes a node (docs/ui-design.md § The closed kit).
+// text now, so it writes a node (docs/ui-design/closed-kit.md § The closed kit).
 function RefText(props: { text: string; prefixes: ReadonlyMap<string, string>; onOpen: (id: string) => void }) {
   const parts = createMemo(() => splitRefTokens(props.text, props.prefixes))
   return (

@@ -1,4 +1,4 @@
-// The exact local reader for rendered-surface health (docs/telemetry.md § Rendered-surface health).
+// The exact local reader for rendered-surface health (docs/telemetry/surface-health.md § Rendered-surface health).
 //
 // Telemetry gets a handful of samples at each checkpoint (emitter.ts installs that handler). A
 // developer or a WebDriver flow wants the whole snapshot at the moment it asks, so this answers a

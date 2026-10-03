@@ -3,7 +3,7 @@ import { createNotesModel, type NotesModel } from './notesModel'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
 // Notes as a `list-detail` pane: the host draws the split, the divider and the drag handle, and these
-// three components fill the regions (docs/panes.md § Layout model).
+// three components fill the regions (docs/panes/layout.md § Layout model).
 const NotesHeader = lazy(async () => ({ default: (await import('./NotesPane')).NotesHeader }))
 const NotesList = lazy(async () => ({ default: (await import('./NotesPane')).NotesList }))
 const NoteBody = lazy(async () => ({ default: (await import('./NotesPane')).NoteBody }))

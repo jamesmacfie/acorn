@@ -21,7 +21,7 @@ import {
 import type { CoreServices } from '../core/index.ts'
 
 // This file is about drift: every test below re-derives an answer from the source of truth and
-// compares, rather than pinning a hand-written list (docs/agent-tools.md § plugin_authoring).
+// compares, rather than pinning a hand-written list (docs/agent-tools/plugin-tools.md § plugin_authoring).
 
 describe('the derived vocabulary tracks the manifest schema', () => {
   it('derives something at all', () => {
@@ -168,10 +168,10 @@ describe('the two doors', () => {
   it('registers an opt-in context section that costs a normal task nothing', () => {
     const section = getContextSections().find((candidate) => candidate.id === PLUGIN_AUTHORING_SECTION)
     expect(section).toBeDefined()
-    // The affordability argument (docs/agent-tools.md § plugin_authoring). If this flips, every task
+    // The affordability argument (docs/agent-tools/plugin-tools.md § plugin_authoring). If this flips, every task
     // starts paying for a guide it is not using.
     expect(section?.defaultIncluded).toBe(false)
-    // Keeps wire order after memory (docs/agent-tools.md § Context sections).
+    // Keeps wire order after memory (docs/agent-tools/context-sections.md § Context sections).
     expect(section?.order).toBeGreaterThan(40)
   })
 
@@ -199,7 +199,7 @@ describe('the two doors', () => {
 
   it('names the telemetry token, the two ctx members, and the frame verb', () => {
     // What a plugin author asks first about telemetry: can I write one, what does reading cost, and
-    // what does a frame do instead (docs/plugin-authoring.md § Telemetry and logging). The token
+    // what does a frame do instead (docs/plugin-authoring/telemetry.md § Telemetry and logging). The token
     // itself is derived from NODE_CORE_FACETS, so this is about the guide saying what it grants.
     const guide = renderPluginAuthoring()
     expect(guide).toContain('`ctx.log`')

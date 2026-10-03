@@ -7,7 +7,7 @@ import { z } from 'zod'
 // a search is allowed to ask for, and the shape of a result row. It holds no execution context, no
 // outcome and no registry, because those carry host functions and Solid state and belong to the client
 // (packages/client-core/src/host/registries/commands/commands.ts). Protocol is a pure sink
-// (docs/architecture-overview.md § Package boundaries), so nothing here may reach for a client, a
+// (docs/architecture/packages.md § Package boundaries), so nothing here may reach for a client, a
 // router or a plugin implementation type.
 //
 // Nothing in `plugin/contract.ts` reads these yet. A manifest command is still an action with a
@@ -22,7 +22,7 @@ export type CommandKind = (typeof COMMAND_KINDS)[number]
  * Which identity a command needs before it can run, and how wide it reaches.
  *
  * `node` is the default and means "the node this session captured". `fleet` is the only one that fans
- * out, and it is opt-in for the reason docs/command-palette-and-shortcuts.md § What the palette refuses
+ * out, and it is opt-in for the reason docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses
  * gives: fanning out by default multiplies provider traffic, rate-limit pressure and partial errors.
  */
 export const COMMAND_SCOPES = ['none', 'task', 'project', 'workspace', 'node', 'fleet'] as const
@@ -52,7 +52,7 @@ export const MAX_COMMAND_SEARCH_QUERY = 200
 export const MAX_COMMAND_SEARCH_ITEMS = 50
 
 /** A setting is a visible choice, so it needs at least two of them, and a list long enough to need
- *  scrolling is a page rather than a command (docs/command-palette-and-shortcuts.md § What the palette refuses). */
+ *  scrolling is a page rather than a command (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses). */
 export const MIN_COMMAND_SETTING_OPTIONS = 2
 export const MAX_COMMAND_SETTING_OPTIONS = 32
 
@@ -63,7 +63,7 @@ export const MAX_COMMAND_SETTING_OPTIONS = 32
  *
  * There is deliberately no action field, no route and no verb. A response is untrusted wire input, and
  * letting a row choose what happens when it is picked would make a changing server answer more
- * powerful than the manifest somebody reviewed (docs/command-palette-and-shortcuts.md § What the
+ * powerful than the manifest somebody reviewed (docs/command-palette-and-shortcuts/palette-data.md § What the
  * palette refuses). The search command owns one static action; this is the fact it is handed.
  *
  * Unknown keys are stripped rather than kept, which is what makes that true in practice: a row that
@@ -75,7 +75,7 @@ export const commandSearchItemSchema = z.object({
   id: z.string().min(1).max(200),
   title: z.string().min(1).max(300),
   subtitle: z.string().min(1).max(300).optional(),
-  // A Lucide name or a `brand:` id, resolved client-side (docs/ui-design.md § Icons), so it is
+  // A Lucide name or a `brand:` id, resolved client-side (docs/ui-design/icons.md § Icons), so it is
   // length-bounded rather than parsed against a vocabulary this package does not own.
   icon: z.string().min(1).max(80).optional(),
   badge: z.string().min(1).max(80).optional(),

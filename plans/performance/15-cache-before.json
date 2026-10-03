@@ -1,8 +1,0 @@
-{
-  "fixture": "Actual dropNode with real TUI fileCacheStorage in /tmp; no browser IndexedDB",
-  "fileRemains": true,
-  "freshClientQueries": 0,
-  "browserIndexedDBPresent": false,
-  "warningCount": 0,
-  "synchronousError": "indexedDB is not defined"
-}

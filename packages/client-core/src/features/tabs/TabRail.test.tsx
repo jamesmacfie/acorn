@@ -20,7 +20,7 @@ vi.mock('../tasks/taskBridge', () => ({
 }))
 
 // The rail's hover prefetch. A task switch disposes the whole task scope, so what makes coming back
-// cheap is the cache being warm before the click (docs/panes.md § Contributions).
+// cheap is the cache being warm before the click (docs/panes/contributions.md § Contributions).
 //
 // The rail is a router surface; nothing here navigates, so the router is answered rather than mounted.
 vi.mock('@solidjs/router', () => ({

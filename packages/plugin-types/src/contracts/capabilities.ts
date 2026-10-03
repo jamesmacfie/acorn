@@ -11,7 +11,7 @@ export type Disposable = { dispose(): void }
 export type CapabilityId<T> = string & { readonly __signature?: (value: T) => void }
 
 /** One plugin exports a named typed function and another consumes it without importing it
- *  (docs/plugins.md § Collaboration rules). Not a DI container: a map with a phantom-typed key.
+ *  (docs/plugins/collaboration.md § Collaboration rules). Not a DI container: a map with a phantom-typed key.
  *
  * Resolve at call time, never at init: plugin init order is undefined, so a consumer that caches at
  * init may cache `undefined` for a plugin that was simply declared later.

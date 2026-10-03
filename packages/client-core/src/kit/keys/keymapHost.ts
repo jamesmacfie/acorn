@@ -35,7 +35,7 @@ let typing: () => boolean = () => false
 // modifier, which on macOS is `super`, and that is right in a browser and wrong in a terminal: a
 // terminal emulator keeps Cmd for itself and never delivers it, so `super+return` is a chord nobody
 // can press. So a host may say. Nothing supplies it but the terminal
-// (docs/tui.md § The adapter).
+// (docs/tui/keys.md § The adapter).
 let primary: 'super' | 'ctrl' | null = null
 // Whether this host shadows the bare keys with a layer of its own while somebody is typing, instead
 // of putting a matcher on every bare-key binding below.

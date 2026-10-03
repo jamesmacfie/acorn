@@ -13,7 +13,7 @@ import './tabrail.css'
 
    It is presentation only. It takes a glyph, a state, and already-resolved status markers; it never
    reads task state, asks a registry anything, or knows which rail it is in. See
-   docs/ui-design.md § Rail controls. */
+   docs/ui-design/shell-hierarchy.md § Rail controls. */
 
 export type RailTabProps = Omit<ComponentProps<'button'>, 'children' | 'color'> & {
   /** The control's name, in words. Becomes both the tooltip title and the accessible name. */

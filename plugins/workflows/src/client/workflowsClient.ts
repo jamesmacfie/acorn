@@ -4,7 +4,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 //
 // Lives in contract/ rather than client/ because plugins/agents' task sidebar calls it as well as
 // this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin surface
-// (docs/plugins.md § Package shape). It reads only client-core and protocol's workflow row types,
+// (docs/plugins/package-shape.md § Package shape). It reads only client-core and protocol's workflow row types,
 // never this plugin's own client/, so transitive contract purity holds.
 //
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.
@@ -52,13 +52,13 @@ export const workflowSessionRunRoute = (sessionId: string) => `/v1/p/workflows/s
 // Every run on this node, the same route core's merged run list reads.
 export const workflowAllRunsRoute = '/v1/p/workflows/runs'
 export const workflowTaskNavigationRoute = '/v1/p/workflows/workflows/task-navigation'
-// Definitions stored as rows (docs/workflows.md § Database definitions). Device-only on the node, so
+// Definitions stored as rows (docs/workflows/definitions.md § Database definitions). Device-only on the node, so
 // these answer 403 to anything but the app.
 export const workflowDefsRoute = '/v1/p/workflows/defs'
 export const workflowDefRoute = (id: string) => `${workflowDefsRoute}/${id}`
 export const workflowDefValidateRoute = `${workflowDefsRoute}/validate`
 // A whole definition written from a description or edited from the current graph
-// (docs/workflows.md § Authoring).
+// (docs/workflows/authoring.md § Authoring).
 export const workflowDefGenerateRoute = `${workflowDefsRoute}/generate`
 // What the owner can generate with — a stored key, or an agent CLI installed on this machine — for
 // the Generate modal's picker. Device-only like the rest of `/defs`, and ids and labels only: no key
@@ -72,7 +72,7 @@ export const workflowSchedulesRoute = '/v1/p/workflows/workflows/schedules'
 export const workflowScheduleRoute = (id: string) => `${workflowSchedulesRoute}/${encodeURIComponent(id)}`
 // The harnesses, with the config options each one advertises. Read from the agents plugin's own route
 // rather than copied into the catalog, so the editor's model and reasoning lists are the same lists the
-// agent pane offers (docs/managed-agents.md § Providers).
+// agent pane offers (docs/managed-agents/providers.md § Providers).
 export const agentProvidersRoute = '/v1/p/agents/providers'
 
 type Defs = { workflows: WorkflowDefSummary[]; errors: { source: string; message: string }[] }
@@ -170,7 +170,7 @@ function workflowApiAt(nodeId?: string | null) {
     allRuns: (at: At = {}) => readJson<{ runs: RunRowInput[] }>(workflowAllRunsRoute, at),
     taskNavigation: () => readJson<{ groups: WorkflowTaskGroup[] }>(workflowTaskNavigationRoute),
     // A select field's own options, from the route its `describe` named. The host substitutes the two
-    // placeholders and the contributing plugin answers `{ options }` (docs/workflows.md § Contributed
+    // placeholders and the contributing plugin answers `{ options }` (docs/workflows/step-kinds.md § Contributed
     // step kinds).
     fieldOptions: (route: string) => readJson<{ options: { value: string; label: string; description?: string }[] }>(route),
     createDef: (input: { workspaceId: string; projectId?: string; def: unknown }) => post<WorkflowDefRow>(workflowDefsRoute, input),

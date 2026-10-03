@@ -10,12 +10,12 @@ import { emitSpan, newSpanId, newTraceId } from '@acorn/client-core/infra/teleme
 // Unconditional, unlike the desktop helper's: these lines only appear once the shell has already
 // exited, where there is nothing left to interrupt, and a person who ran `acorn` and waited two
 // seconds for a rail has earned the account of where they went
-// (docs/local-development.md § Timing a cold start).
+// (docs/local-development/profiling.md § Timing a cold start).
 //
 // Its own module rather than a block at the top of `./main.tsx`, because the second reader is the
 // telemetry pass and that runs from `./App.tsx`. The marks are recorded either way and cost one
 // `hrtime` read each; what the switch decides is whether they also become spans
-// (docs/tui.md § What the terminal client reports).
+// (docs/tui/reporting.md § What the terminal client reports).
 
 const bootStarted = process.hrtime.bigint()
 const marks: { label: string; at: number }[] = []

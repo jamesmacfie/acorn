@@ -2,7 +2,7 @@
 //
 // Textual renders the focused widget's bindings as a footer strip; the cheat sheet is the same data
 // with nothing left out. Both read this function, so nothing is declared twice
-// (docs/tui.md § The footer).
+// (docs/tui/footer.md § The footer).
 //
 // The source is the engine's own `getActiveKeys`, which answers for the layers that are active
 // against whatever has focus right now — so a hint disappears when the thing that offered it does,
@@ -54,7 +54,7 @@ type Spec = Hint & { probe: string; when?: () => boolean }
  *
  * Six kinds and no seventh: the same key means a different thing on each, and a reader on a Merge
  * button should not be told Enter opens something. The order is a priority — a field that is also a
- * stop is a field, and a viewport is only ever a stop when it holds none (docs/tui.md § The footer).
+ * stop is a field, and a viewport is only ever a stop when it holds none (docs/tui/footer.md § The footer).
  */
 export type FocusedKind = 'item' | 'parent' | 'field' | 'opens' | 'viewport' | 'stop'
 
@@ -123,7 +123,7 @@ export const WORDS: Record<FocusedKind, Words> = {
  *                                  panel and changes its tab; the rail is never where it lands
  *
  * Everything else bubbles to the region tier, which has one meaning for it: one column left or right
- * (../keys/regions.ts § crossParent, § moveColumn, docs/tui.md § The five key groups).
+ * (../keys/regions.ts § crossParent, § moveColumn, docs/tui/keys.md § The five key groups).
  */
 export const words = (): Words => {
   const kind = focusedKind()
@@ -144,7 +144,7 @@ const specs = (): Spec[] => {
     // Third, and never further down. Escape is the way out and the one key a reader who is lost has
     // to be able to find, and the footer cuts rather than wraps — so while this sat last in reading
     // order the line ran out before it on every screen we draw, the cheat sheet included. Nothing was
-    // wrong with the list; the reader never saw the row (./Footer.tsx, docs/tui.md § The footer).
+    // wrong with the list; the reader never saw the row (./Footer.tsx, docs/tui/footer.md § The footer).
     { probe: bare('dismiss'), keys: 'esc', label: 'back' },
     {
       probe: bare('expand', 1),

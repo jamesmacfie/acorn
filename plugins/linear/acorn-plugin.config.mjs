@@ -53,7 +53,7 @@ export default {
       // linear link (client-core plugins/frames/register.ts).
       // All three draw the same ticket from the same renderer, so all three name the same entry; what
       // differs is the subject the host mounts each slot with. `single` is the layout, because one tree
-      // fills each of them (docs/panes.md § Layout model).
+      // fills each of them (docs/panes/layout.md § Layout model).
       {
         target: 'pane',
         id: 'linear',
@@ -149,7 +149,7 @@ export default {
       action: { verb: 'openPane', pane: 'linear' },
     }, {
       // The routed project's mapped Linear issues, searched from the palette
-      // (docs/integrations.md § From the command palette).
+      // (docs/integrations/linear.md § Palette search).
       //
       // `scope: 'project'` is the whole boundary: the host sends the project the palette session
       // captured, the route turns it into the workspace's Linear links, and a connection the routed

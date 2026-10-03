@@ -1,4 +1,4 @@
-// The reload path's acceptance list (docs/plugins.md § The dev loop § Reloading one plugin without a
+// The reload path's acceptance list (docs/plugins/dev-loop.md § The dev loop § Reloading one plugin without a
 // restart): candidate-then-commit, contained failure, a stale handle that throws, plus the fix that
 // made all three pointless until it landed, which is that a reloaded plugin's routes have to serve
 // the new handler.

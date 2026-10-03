@@ -1,18 +1,26 @@
 # Typed data sources
 
-Query content can carry a structured `timeWindow` with a field pointer and an `absolute`,
-`last-duration`, or `since-local-midnight` window. Calendar windows require a valid IANA timezone.
-Resolution creates ordinary half-open timestamp comparisons at one evaluation instant. Workflow
-execution freezes that instant and the resolved query across retries. Incremental queries use a
-source-declared continuation contract and the workflow processing ledger described below.
+A data source is a typed, queryable set of records that a plugin serves through the Node, such as
+GitHub pull requests, Linear issues, or agent sessions. Workflows and dashboards read every record
+through this one contract. Read this page for registration, the routes, and the limits. The contract
+is `packages/protocol/src/data/dataSources.ts`, with schemas, values, and field bindings in the
+companion typed-data modules. Connections and credentials belong to [integrations](./integrations.md).
+
+The Node owns source registration and bounded reads. Providers return typed nested records through
+their own plugin routes. Core tasks, managed agent sessions, GitHub pull requests, Linear issues, and
+Rollbar error groups are all sources. A core task's `worktreeChanged` stays `null` until the Node
+has inspected its worktree. The agent sessions source reads every unarchived session through the
+store's cursor, up to the host's 5,000-record budget, and reports `incomplete` with `host-budget`
+when more remain. No client registers a source or discovers a schema on its own.
 
 The host stamps each returned record reference with its retrieval `scope`, including dynamic source
-parameters. Scope is context, not record identity. Details preserve that scope and connection and
-return the runtime-validated detail schema beside data and fetched time.
+parameters. Scope is context, not record identity. Details keep that scope and connection, and return
+the validated detail schema beside the data and fetch time.
 
-The Node owns source registration and bounded reads. Providers supply typed nested records through
-their own plugin routes. The shared contract is `packages/protocol/src/data/dataSources.ts`; schemas,
-values, and field bindings use the companion typed-data modules.
+A query can carry a structured `timeWindow` with a field pointer and an `absolute`, `last-duration`,
+or `since-local-midnight` window. Calendar windows need a valid IANA timezone. Resolution produces
+half-open timestamp comparisons at one evaluation instant. Workflow execution freezes that instant and
+the resolved query across retries.
 
 ## Register a source
 
@@ -33,6 +41,12 @@ For dynamic sources, register `ctx.dataSources.discover` or `contributions.dataS
 Discovery returns at most 100 descriptors per page. The host binds their plugin, handler, and provider;
 each discovered ID is available only in the exact workspace, project, connection, and parameter scope
 that discovered it. Refreshing discovery cannot replace a static descriptor.
+
+A source description may include `starterPlans` for dashboard authoring. The host parses and
+validates each version 2 plan before offering it. Static field choices may declare a `tone` and
+numeric `rank`; panel columns inherit these until the author overrides them. The source query
+contract does not yet offer projection lists; source-side projection belongs to the later report
+volume milestone.
 
 ## Operations and transport
 
@@ -92,162 +106,21 @@ continuation, zero-match continuation, and explicit expired-token failure; GitHu
 Rollbar do not declare incremental support.
 
 The workflow ledger commits that boundary with the selected record decisions and reserved child
-intents. For the transaction and recovery contract, see [Record processing history](./workflows.md#record-processing-history).
+intents. [Record processing history](./workflows/record-history.md) has the transaction and recovery contract.
 
-## Client cache and conformance
+## Pages
 
-`packages/client-core/src/features/dataSources/queries.ts` builds keys from Node, plugin, source,
-connection, workspace, project, resolved parameters, operation digest, and revision. Connection and
-plugin change watchers invalidate matching keys while retaining cached values. Each response belongs
-to its full request key, so a response from an obsolete request cannot replace another query's cache.
+<a id="client-cache-and-conformance"></a>
+<a id="shared-authoring-controls"></a>
 
-The portable example is `apps/node/test/__fixtures__/typed-source/node.mjs`. Its manifest registers a
-connectionless nested source and dynamic discovery. Modes cover malformed, oversized, incomplete,
-duplicate, looping, failing, and nonresponsive reads. The Node conformance tests load its manifest
-through the actual schema, synthesize registrations through `initPlugins`, and exercise core POST
-routes. They separately register the handler as compiled code and compare records. These tests cover
-the registration and route boundary; package installation and worker-process isolation belong to the
-programme's final acceptance checks.
+- [Authoring controls](./data-sources/authoring-controls.md) covers the client cache, the conformance
+  fixture, and the shared source and query editor.
 
-Core tasks and managed agent sessions use this same Node-owned contract. A core task's
-`worktreeChanged` value is nullable and remains `null` until the Node has actually inspected that
-worktree. The agent sessions source reads every unarchived session through the session
-store's cursor, up to the host's 5,000-record selection budget, and reports `incomplete` with
-`host-budget` when more remain. GitHub pull requests, Linear issues, and Rollbar error groups are provider-backed sources.
-No client registration or cold-cache schema discovery path exists: every consumer describes and
-queries through this runtime.
+<a id="workspace-query-library"></a>
 
-A source description may include `starterPlans` for dashboard authoring. The host parses and
-validates each version 2 plan before offering it. Static field choices may declare a `tone` and
-numeric `rank`; panel columns inherit these until the author overrides them. The source query
-contract does not yet offer projection lists; source-side projection belongs to the later report
-volume milestone.
+- [Workspace query library](./data-sources/query-library.md) covers saved queries.
 
-## Shared authoring controls
+<a id="linear-issues-and-rollbar-error-groups"></a>
 
-`packages/client-core/src/features/dataSources/SourceQueryEditor.tsx` is the host-owned source/query
-editor used by workflow and dashboard authoring. It reads the source catalog,
-connections, descriptions, dependent options, and saved-query library through core routes. Provider
-plugins contribute descriptors and handlers only; they do not ship forms.
-
-The editor keeps connection scope visible, clears dependent choices and filters when an upstream
-parameter changes, and renders only declared operators and typed operands. Dynamic option search is
-a metadata read. Record reads happen only when the user chooses **Refresh preview**. The previous
-preview remains visible after query edits or a failed refresh and is labelled out of date by its
-query digest. A request generation prevents an older response from replacing a newer preview.
-Preview rows preserve nested data and identify observed fields without assigning them query support.
-
-Saved queries use the same surface. **Edit saved query** writes the core-owned draft with the existing
-750 ms compare-and-swap autosave and device recovery copy. A conflict retains both versions and
-offers reload or **Customize for this use**; customization detaches an inline copy and does not alter
-the saved query. Unpublished and unavailable saved queries remain visible for repair.
-
-`TypedBindingPicker.tsx` is the corresponding typed field-picker API. Consumers pass admitted
-workflow inputs, a current item, and predecessor results with structural schemas and optional
-examples. The picker searches labels and JSON Pointers, includes whole objects and arrays, orders
-compatible fields before explicit conversions and incompatible fields, labels observed and optional
-paths, and says **No preview value** when no example exists. It never invents array indices or parses
-arbitrary strings into another type. Required destinations can retain a typed fallback.
-
-The compiled UI surface is `@acorn/plugin-api/ui/data-sources`. It is a lazy entrypoint so consumers
-that do not author typed data do not load the editor. A feature-owned kit seam maps that same control
-tree to DOM or terminal primitives; neither host reimplements editor rules.
-
-`AuthoringConversation` is the shared AI conversation control for query, workflow, and dashboard
-drafts. It sends only the selected scope, draft, bounded conversation, and model choice. The Node
-executes model-requested source listing, dynamic discovery, description, and option operations through
-the same source runtime as the visual editor. Preview records require an explicit checkbox and use
-the ordinary preview route with a limit of three records and 16 KiB. Query proposals return through
-`SourceQueryEditor`, which resolves the candidate with the normal query validator before applying one
-undoable edit.
-
-## Workspace query library
-
-Core stores query drafts, immutable published revisions, and consumer references in its normal
-SQLite migration chain. The contract is `packages/protocol/src/data/queries/dataQueries.ts`. Each query belongs
-to a workspace and can be restricted to one project. Project reads include workspace-wide queries;
-workspace-wide reads do not expose project-restricted queries. Scope cannot change through a save.
-
-Query content contains a name, a closed object schema for declared parameters, a source query,
-explicit `sourceParameters` bindings, and an optional connection binding. Literal source parameters
-remain ordinary data. Explicit bindings overlay named source parameters. Saved content can address
-only its own declared inputs; a consumer's outer bindings can address its admitted inputs, predecessor
-outputs, or current item. `packages/protocol/src/data/queries/dataQueryResolution.ts` resolves bindings without
-string coercion. The consumer controls which predecessor outputs enter that context.
-
-POST JSON to `/v1/core/queries/:operation`, with the matching `operation` and `scope` in the body.
-Operations are `list`, `get`, `create`, `save`, `publish`, `published`, `delete`, `consumers`,
-`consumer`, and `resolve`. Saves, deletes, and publication require `expectedRevision`. Conflicts
-return 409 and preserve the stored draft. Drafts can retain unavailable sources and broken references
-for repair. Publication validates declared types, source capabilities, and selected dynamic options
-without reading records. Dynamic validation is bounded to 100 option pages per selection and
-60 seconds for the publication validation. `validationParameters` supplies discovery values and does
-not persist defaults. Missing or unresolved metadata prevents publication.
-
-Consumers store either inline content or a saved query ID with typed bindings. Omitting `revision`
-resolves the published pointer. Runs retain the returned `ResolvedQuery`, including the exact
-`QueryRevision`, digest, source revision, and resolved parameter values. Draft edits do not move the
-published pointer. Published content remains readable after an unreferenced draft is deleted.
-Resolution revalidates source availability and choices; a retained snapshot itself needs no source
-connection to inspect. Failed publication does not change the published pointer.
-
-Node plugins use `ctx.dataSources.resolveQuery` and `ctx.dataSources.setQueryConsumer`. The host
-stamps the registering plugin on consumer references; loaded plugins can resolve only their own
-sources. The `consumer` HTTP operation requires a device principal. Other operations accept device
-and service principals and refuse task principals. Consumer records support panel, workflow, and
-schedule impact links, including references to unpublished drafts. Deletion refuses any referenced
-query. Publication returns affected consumers for the publishing feature to notify; schedule graph
-review and cross-database publication coordination belong to their later workflow-v2 phases.
-
-Published dashboard panels register one `panel` consumer for every saved query they reference.
-Dashboard rendering intentionally resolves an unpinned saved reference to its latest publication, so
-publishing that query changes the next panel refresh and the query publication response names the
-affected panel. **Customize for this use** replaces the consumer reference with an inline copy;
-display mappings never alter either query form.
-
-`packages/client-core/src/features/queries/queriesClient.ts` supplies the client service.
-`packages/client-core/src/features/queries/recoveryStore.ts` retains device copies by Node, entity,
-and base revision, including discovery after reopening against a newer Node revision. It clears a
-copy only after a matching acknowledgment or explicit discard. A late acknowledgment cannot erase
-subsequent edits. Storage failure reports `not-saved`; a local write reports `saved-on-device`.
-The 750 ms autosave constant and recovery states support the editor phase; this slice adds no editor.
-
-## Linear issues and Rollbar error groups
-
-`linear/issues` requires an explicit connection and `/project` parameter. Project choices are
-paginated. `/state/id` choices come from the selected project's teams, with provider state IDs and
-labels preserved. The record keeps state name and category separately. Two states in the same
-category remain distinct choices. A state from another project's teams fails validation.
-Project, exact state, and created/updated date predicates narrow the Linear GraphQL query.
-The records include issue descriptions and archived issues. Dates use epoch milliseconds.
-
-`rollbar/error-groups` selects deduplicated items in one project connection. Its record identity
-combines the system item ID and immutable project counter. Status, level, and environment predicates
-narrow the REST request. First-seen and last-seen predicates run after candidate exhaustion because
-the REST items endpoint does not declare those date filters. First-seen selection excludes a group
-created before the boundary even when it receives another occurrence afterward.
-
-Both adapters read at most 5,000 candidates and report incomplete selections when that limit prevents
-exhaustion. Numeric date sorts use record identity to break ties. Sorted `take` applies after
-exhaustion, so a candidate cap cannot become a dispatchable first-N selection. Pages retain the
-selected records for 60 seconds and bind continuations to owner, source, scope, query, and evaluation
-time. Each read checks the principal and connection, including retained pages. Neither source
-claims snapshot isolation or incremental checkpoint support.
-
-Rollbar details use the provider's metadata and occurrence resources. The response contains the
-group and a safe projection of its newest occurrence's message, exception, and stack frames.
-Occurrences are not an independent queryable source. Missing items return `not-found`; resource
-failures and truncated projections fail the read. Projected strings are limited to 8 KiB, and the
-shared detail byte limit applies. Raw request headers, bodies, and person data are excluded.
-Detail calls check cancellation between resource reads; an in-flight provider resource refresh
-uses the resource layer's own lifecycle. Query HTTP calls receive the request abort signal.
-
-The plugin API's `createDataSelectionPager` handles ephemeral retained pages. Its caller must
-reauthorize every invocation and validate the candidate selection before retaining it.
-`dataComparisons` and `selectDataRecords` support literal comparisons in `all` groups and numeric
-sorting. They do not implement a host query fallback or advertise provider capabilities.
-
-Provider API references checked on September 13, 2026:
-
-- [Linear filtering](https://linear.app/developers/filtering), [pagination](https://linear.app/developers/pagination), and [official GraphQL schema](https://github.com/linear/linear/blob/master/packages/sdk/src/schema.graphql).
-- [Rollbar item listing](https://docs.rollbar.com/reference/list-all-items), [item identity](https://docs.rollbar.com/reference/get-an-item-by-id), and [occurrence listing](https://docs.rollbar.com/reference/get_api-1-item-item-id-instances).
+- [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
+  groups.

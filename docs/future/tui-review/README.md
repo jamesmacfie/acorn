@@ -18,6 +18,7 @@ contract belong with that feature. Terminal layout and text alternatives belong 
 3. [Navigation and affordances](./navigation.md) gives the keyboard and comprehension findings.
 4. [Host projections](./host-projections.md) decides what to hide, retain, or replace per host.
 5. [Delivery and acceptance](./delivery.md) orders the work and defines release gates.
+6. [Open doors](./open-doors.md) lists proposals moved out of the terminal client's reference page.
 6. [Decisions not taken](./refused.md) records alternatives that would weaken the terminal app.
 
 ## Current assessment
@@ -57,7 +58,7 @@ shipped behavior in the owning docs.
 The host now retries reads and pane boundaries after reconnect, with a visible Retry control for a
 persistent error. A first-run route creates workspaces, projects, and tasks and exposes provider
 connections; Set up acorn and New task remain in the palette. On 2026-09-30 **Open settings** gained
-its own route, built from the desktop's settings registry ([tui.md](../../tui.md#settings)). Password fields mask their terminal cells.
+its own route, built from the desktop's settings registry ([tui.md](../../tui/sources-and-settings.md#settings)). Password fields mask their terminal cells.
 The file seam opens an absolute local path prompt for attachments and downloads, with errors and
 overwrite confirmation. Source rows can invoke their promotion contract through a terminal task
 picker. A task and the palette can open a native terminal session list and PTY, including an existing

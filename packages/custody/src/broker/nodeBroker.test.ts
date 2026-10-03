@@ -456,7 +456,7 @@ describe('broker WebSocket', () => {
     expect(JSON.parse(inbound[0])).toEqual({ channel: 'term:attach', id: 's1' })
   })
 
-  // docs/api-reference.md § Events: a seq gap means loss, and the remedy is to reconnect, because
+  // docs/api-reference/websocket.md § Events: a seq gap means loss, and the remedy is to reconnect, because
   // there is no cursor into history to replay from.
   it('treats a seq gap as loss and reconnects', async () => {
     const { origin, server } = await listen(false)
@@ -483,7 +483,7 @@ describe('broker WebSocket', () => {
   // A `ws:shed` marker is the node saying "you were behind, so I dropped some invalidation frames".
   // Shed load, not lost data. Closing the socket here would re-attach every terminal and refetch every
   // active query at the moment the node is busiest, which is the amplification phase 5 removed
-  // (node-core/server/transport/wsHub.ts, docs/terminal.md § Backpressure).
+  // (node-core/server/transport/wsHub.ts, docs/terminal/activity.md § Backpressure).
   it('does not reset the socket on a shed marker, even one that skipped a number', async () => {
     const { origin, server } = await listen(false)
     let connections = 0
@@ -534,7 +534,7 @@ describe('broker WebSocket', () => {
   })
 
   it('reports a peer that stopped answering as an event a sink can read', async () => {
-    // The broker's half of the helper's health reporting (docs/shell.md § What the helper reports).
+    // The broker's half of the helper's health reporting (docs/shell/node-child.md § What the helper reports).
     // The collector is driven directly here rather than through `startHelperTelemetry`, because
     // what is under test is that the seam fires, not how the batch leaves.
     const batches: TelemetryRecord[] = []
@@ -604,7 +604,7 @@ describe('broker WebSocket', () => {
   })
 })
 
-// The version gate (docs/api-reference.md § Versioning). Before this, `incompatible` and
+// The version gate (docs/api-reference/transport.md § Versioning). Before this, `incompatible` and
 // `protocol_mismatch` were declared in the protocol and produced by nothing: a node that upgraded past
 // the client kept connecting, and the mismatch surfaced as an undefined deep inside a component.
 describe('broker protocol version', () => {

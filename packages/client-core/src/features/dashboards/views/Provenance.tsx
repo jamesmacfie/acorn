@@ -4,8 +4,8 @@ import { brandMarkRegistry } from '../../../kit/tokens/brandMarks'
 import Icon from '../../../kit/components/content/Icon'
 
 // Which source a row came from, on a panel that unions more than one typed query
-// (docs/dashboards.md § The mapping layer, and cross-source panels). The brand mark and its text
-// fallback for an unmatched name are docs/ui-design.md § Icons.
+// (docs/dashboards/mapping-and-editor.md § The mapping layer, and cross-source panels). The brand mark and its text
+// fallback for an unmatched name are docs/ui-design/icons.md § Icons.
 
 export default function Provenance(props: { pluginId: string }) {
   const mark = () => brandMarkRegistry.get(props.pluginId)

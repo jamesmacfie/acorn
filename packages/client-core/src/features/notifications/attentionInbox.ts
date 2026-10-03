@@ -52,7 +52,7 @@ export function markAttentionSeen(nodeId: string, itemId: string): void {
 export const attentionIsAcknowledged = (nodeId: string, item: AttentionItem): boolean =>
   item.severity === 'info' && seen().has(seenKey(nodeId, item.id))
 
-// Node-scoped like every other node-minted id (docs/state-ownership.md § Scope rules).
+// Node-scoped like every other node-minted id (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'node-switched') setSeen(new Set<string>())
 })

@@ -11,7 +11,7 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('plugins')
 
-// Custody of third-party plugin bundles, from a terminal (docs/tui.md § Custody).
+// Custody of third-party plugin bundles, from a terminal (docs/tui/plugins.md § Custody).
 //
 // The desktop's helper holds these in a process the renderer cannot reach. There is no second process
 // here, so the boundary is this module: the cache and the trust store are built once, in the composition
@@ -77,7 +77,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       if (disclosure.success) return store.record({ ...decision, ...disclosure.data, decidedAt: Date.now() })
       // A node running a newer manifest schema than this build. The decision is exact and the snapshot
       // is not, so it is recorded `partial` and never becomes the baseline of a later "what changed"
-      // diff (docs/security.md § The dev grant).
+      // diff (docs/security/plugin-install.md § The dev grant).
       log.warn(`the disclosure recorded with ${decision.decision} for ${decision.pluginId} could not be parsed; storing a partial record`, undefined, { 'plugin.id': decision.pluginId })
       store.record({ ...decision, ...NO_DISCLOSURE, partial: true, decidedAt: Date.now() })
     },
@@ -92,7 +92,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
       if (!grant) return store.revokeDev(pluginId, source ?? nodeId)
       // `{ path }` is a device-provenance install: a person at a terminal installing a plugin is
-      // installing it here (docs/tui/chrome-and-plugins.md § Loaded plugins).
+      // installing it here (docs/tui/plugins.md § Custody).
       store.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
       if (source?.kind === 'device') {
         for (const [hash, entry] of Object.entries(bundles.list())) {

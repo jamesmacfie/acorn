@@ -27,7 +27,7 @@ const descriptorFor = (provider: ConnectionProviderContribution): PublicIntegrat
       : { maxConnections: provider.connection.maxConnections }),
   },
   capabilities: provider.capabilities,
-  // Derived from the contribution; see docs/integrations.md § Project sources for why a provider
+  // Derived from the contribution; see docs/integrations/project-sources.md § Project sources for why a provider
   // cannot claim `supportsProjects` without a source behind it.
   ...(provider.projects === undefined ? {} : { supportsProjects: true }),
   ...(provider.models === undefined ? {} : { models: provider.models }),

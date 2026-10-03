@@ -25,7 +25,7 @@ describe('node extension points', () => {
 
   it('still answers to the names it carried before 2026-08-31', () => {
     // `open`, `contribute` and `entries` are deprecated aliases for one major, so a plugin outside this
-    // repository moves on its own schedule (docs/plugins.md § The plugin API). One test rather than a
+    // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). One test rather than a
     // second copy of the suite: the aliases share their implementations with the new names, so what is
     // worth proving is that all three are wired and reach the same registry.
     const owner = context('owner')

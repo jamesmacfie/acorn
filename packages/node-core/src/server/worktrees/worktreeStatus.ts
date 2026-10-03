@@ -10,7 +10,7 @@
 // Built on the dedup shape server/sync/engine.ts already uses for provider mirrors: an in-flight map
 // so concurrent callers join one run, and a time-to-live so a caller just behind one gets the answer
 // that run produced. What it deliberately is not is a filesystem watcher — refused, with its exit
-// condition, in docs/workspaces-and-tasks.md § Worktree status reads.
+// condition, in docs/workspaces-and-tasks/worktrees.md § Worktree status reads.
 //
 // ── The one rule ──────────────────────────────────────────────────────────────────────────────────
 //
@@ -126,7 +126,7 @@ export async function worktreeGitText(path: string, args: readonly string[], opt
 
 // `--porcelain=v2 --branch` adds `# branch.oid` and `# branch.head` header lines ahead of the entries,
 // so one process answers "is it dirty", "how many files" and "where is HEAD"
-// (docs/plugins.md § Hearing a core event § HEAD moved). The changes plugin's own parser skips any
+// (docs/plugins/events.md § Hearing a core event § HEAD moved). The changes plugin's own parser skips any
 // line that does not start with `?`, `1`, `2` or `u`, so the headers cost it nothing and the two
 // callers share one process rather than spawning one each.
 //

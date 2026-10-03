@@ -9,7 +9,7 @@ import { readDevicePrefs } from '../../infra/persistence/devicePrefs'
 import { saveJsonPref, type SavePrefOptions } from '../settings/savePref'
 import { selectedSource, setSelectedSource } from '../tasks/tasks'
 
-// Whether the desktop rail draws a plugin source's icon (docs/frontend.md § Registries and plugins).
+// Whether the desktop rail draws a plugin source's icon (docs/frontend/registries.md § Registries and plugins).
 //
 // Presentation, never availability. `availableSources()` still answers "can this source open?", and
 // the rail, the palette opener and Settings each apply this on top of it. Filtering availability

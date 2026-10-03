@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Does the facade load in a plugin's own test environment? See docs/plugins.md § The plugin API for
+// Does the facade load in a plugin's own test environment? See docs/plugins/plugin-api.md § The plugin API for
 // the barrel/tier boundary this protects: a `.tsx` module anywhere behind an entrypoint dies on
 // `window is not defined` in someone else's package the moment that plugin's suite imports it.
 //

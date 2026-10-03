@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { DIFF_LINE_KEY, DIFF_LINE_POINT, SUMMARY_BADGES_MAX, SUMMARY_BADGES_POINT } from './extensionPoints'
 
-// The two points this plugin opens (docs/plugins.md § Cooperative extension points). Both are held
+// The two points this plugin opens (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Both are held
 // here rather than where they are drawn, because an unmatched contribution is silent by design: a
 // point whose name or key drifted produces an empty surface and no error.
 //

@@ -5,7 +5,7 @@ import { isProviderOperationError, type ProviderOperationError } from './types'
 const log = createLogger('integrations:provider')
 
 // One mapping from a provider failure to a wire error, shared by core's connection lifecycle routes
-// and by plugin-owned connect flows; see docs/integrations.md § Provider boundaries for why it must
+// and by plugin-owned connect flows; see docs/integrations/provider-boundaries.md § Provider boundaries for why it must
 // stay the only one.
 /** A refusal somebody threw on purpose, with its reason when it carried one. The message is the
  *  reason only when the thrower passed one; otherwise it is the code, and repeating that as the

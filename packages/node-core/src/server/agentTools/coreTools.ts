@@ -106,7 +106,7 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
   const { db } = deps
   const empty = z.object({})
 
-  // The context-read tools compose from the shared section registry (docs/agent-tools.md § Context
+  // The context-read tools compose from the shared section registry (docs/agent-tools/context-sections.md § Context
   // sections); the /context route reads the same assembler.
 
   return [
@@ -180,10 +180,10 @@ export function buildAgentTools(deps: AgentToolsDeps): AgentToolContribution[] {
     },
 
     // Extending acorn itself: writing one (read tier). Importing the module also registers the
-    // matching context section (docs/agent-tools.md § plugin_authoring).
+    // matching context section (docs/agent-tools/plugin-tools.md § plugin_authoring).
     pluginAuthoringTool(),
     // The only tool that can put third-party code on this node, by asking rather than installing
-    // (docs/agent-tools.md § plugin_request).
+    // (docs/agent-tools/plugin-tools.md § plugin_request).
     pluginRequestTool(broadcastPluginApprovalNotice),
     // A ticket or an error, from the tracker that owns it. The comment and image tools act only on an
     // item this task links (./issueTools.ts).

@@ -1,6 +1,6 @@
 import { recordSetupDecision } from '../taskScripts/setup'
 import { taskScripts } from '../taskScripts/service'
-// Task archive orchestration. docs/workspaces-and-tasks.md § Worktrees and setup covers the
+// Task archive orchestration. docs/workspaces-and-tasks/archive.md § Archive a task covers the
 // lifecycle order.
 //
 // Split out from the route handler so it runs under plain Node against a temp git repo, with the
@@ -159,7 +159,7 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   }
 }
 
-// Put an archived task back (docs/workspaces-and-tasks.md § Restoring a task). Archive kept the row,
+// Put an archived task back (docs/workspaces-and-tasks/archive.md § Restoring a task). Archive kept the row,
 // the branch, and every plugin's data, so this is a status flip plus rebuilding the worktree.
 //
 // The worktree is rebuilt now rather than by the first pane that asks for it, because the two ways it

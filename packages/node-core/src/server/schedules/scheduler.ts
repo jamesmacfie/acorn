@@ -53,7 +53,7 @@ export type DeclaredSchedule = {
 
 /** What a user schedule may do. The vocabulary is closed; an unknown kind renders inert rather than
  *  failing, since the row may have been created by a later version of this node and read by an
- *  earlier one (docs/schedules.md § Targets). */
+ *  earlier one (docs/schedules/user-schedules.md § Targets: what a user schedule may do). */
 export type ScheduleTarget = {
   kind: string
   options?(): ScheduleTargetOption[]
@@ -190,7 +190,7 @@ export class Scheduler {
   }
 
   /** Register what a user schedule of `kind` actually does: one `parse`/`risk`/`run` set per kind
-   *  name. A kind with nothing registered for it renders inert (docs/schedules.md § Targets). */
+   *  name. A kind with nothing registered for it renders inert (docs/schedules/user-schedules.md § Targets: what a user schedule may do). */
   registerTarget(target: ScheduleTarget): { dispose(): void } {
     if (this.#targets.has(target.kind)) throw new Error(`Schedule target already registered: ${target.kind}`)
     this.#targets.set(target.kind, target)
@@ -252,7 +252,7 @@ export class Scheduler {
     }))
   }
 
-  /** Create a user schedule (docs/schedules.md § Routes): the one non-tolerant edge in this module. */
+  /** Create a user schedule (docs/schedules/user-schedules.md § Routes): the one non-tolerant edge in this module. */
   async create(input: CreateScheduleInput): Promise<ScheduleRow> {
     const target = this.#targets.get(input.kind)
     if (!target) throw new BridgeError(400, 'bad_request', `This node has nothing that can run a '${input.kind}' schedule.`)
@@ -400,7 +400,7 @@ export class Scheduler {
   async #runOnce(entry: Entry, reason: ScheduleRunReason, requestKey?: string): Promise<void> {
     const startedAt = this.#clock.now()
     // Unattended work starts its own trace: nobody asked for this, so there is no caller's trace to
-    // join (docs/telemetry.md § Traces). The owner comes off the key prefix, which is the same thing
+    // join (docs/telemetry/model.md § Traces). The owner comes off the key prefix, which is the same thing
     // the cadence floor and the settings badge read.
     const owner = keyOwner(entry.key)
     const ownerId = owner.owner === 'plugin' ? owner.pluginId : 'core'
@@ -411,7 +411,7 @@ export class Scheduler {
         'schedule.key': entry.key,
         'schedule.reason': reason,
         // How often this is meant to run, and how long it may take. A sink turning runs into a cron
-        // monitor needs both to say "this one is late" (docs/telemetry.md § Node seams), and the
+        // monitor needs both to say "this one is late" (docs/telemetry/runtimes.md § Node seams), and the
         // run is the only place either is known: a sink sees records and nothing else. Neither adds
         // cardinality, because both are constant per `schedule.key`, which is already an attribute.
         'schedule.period.ms': cadencePeriodMs(entry.cadence),

@@ -22,7 +22,7 @@ const reconcileLog = createLogger('node:reconcile')
 // Both Node hosts assemble the same graph here (docs/node-distribution.md § Runtime). The desktop
 // app supervises it rather than owning a second implementation. This lives in apps/node to keep the
 // dependency direction right: the graph names plugins, and node-core stays independent of them
-// (docs/architecture-overview.md § Package boundaries).
+// (docs/architecture/packages.md § Package boundaries).
 export const NODE_DRAIN_ORDER = ['listener', 'reconciliation', 'schedules', 'plugin state', 'plugins', 'sqlite', 'data root'] as const
 
 export type NodeComposition = {
@@ -33,7 +33,7 @@ export type NodeComposition = {
   // Every package on disk, including the client-only ones that produced no NodePlugin. This is what
   // the roster route distributes from; `loaded` above is only what this process runs.
   installed: readonly InstalledPlugin[]
-  // Why the rest of the install directory produced nothing (docs/plugins.md § Loaded plugins,
+  // Why the rest of the install directory produced nothing (docs/plugins/loaded-plugins.md § Loaded plugins,
   // "Failures are contained, and every failure names itself"). Both roots hand this to the
   // PLUGIN_STATE bridge, which is how it reaches the roster row and the attention inbox.
   failures: readonly PluginLoadFailure[]
@@ -44,7 +44,7 @@ export type NodeComposition = {
 // awaited initPlugins around this call, so the graph assembles at the same point it always did.
 //
 // A fresh install's empty directory gets exactly the static list. Anything extra arrived through the
-// installer, an owner-authenticated route (docs/plugins.md § Loaded plugins).
+// installer, an owner-authenticated route (docs/plugins/loaded-plugins.md § Loaded plugins).
 export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): Promise<NodeComposition> {
   const builtins = nodePlugins(dataDir, deps)
   const { loaded, installed, failures } = await loadExternalPlugins(dataDir, { builtins: builtins.map((plugin) => plugin.name) })
@@ -84,7 +84,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
 }
 
 // The compiled-in list only, not derived from assembleNodeGraph: it is the parity fixture the
-// standalone/supervised comparison uses (docs/testing.md § Composition-root tests), and it must
+// standalone/supervised comparison uses (docs/testing/layers.md § Composition roots), and it must
 // describe what the build contains, not what happens to be installed in whichever data root the
 // process was pointed at.
 export const nodePluginNames = (): string[] => nodePlugins('', {} as NodePluginDeps).map((plugin) => plugin.name)
@@ -112,7 +112,7 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
       pluginLog.info(`bundled packages: installed ${bundled.installed.join(', ') || 'none'}; updated ${bundled.updated.join(', ') || 'none'}`)
     }
     // Tombstoned outside the package directory so a later app update cannot restore it
-    // (docs/plugins.md § Loaded plugins).
+    // (docs/plugins/loaded-plugins.md § Loaded plugins).
     if (bundled.removed.length) {
       pluginLog.info(`bundled packages NOT restored (uninstalled on this node; install again to get them back): ${bundled.removed.join(', ')}`)
     }
@@ -122,13 +122,13 @@ export function reconcileBundledPackages({ dataDir, bundledRoot, development }: 
   }
 
   // `preserved` alone cannot name a package frozen on a node with no newer copy to decline
-  // (docs/plugins.md § Loaded plugins), so the ownership rows are read directly and unioned in: the
+  // (docs/plugins/loaded-plugins.md § Loaded plugins), so the ownership rows are read directly and unioned in: the
   // row is what freezes the package.
   const frozen = [...new Set([...preserved, ...userManagedPluginIds(dataDir)])].sort()
   if (frozen.length === 0) return
   pluginLog.info(`NOT taking app updates (installed by the owner on this node): ${frozen.join(', ')}`)
   if (development) {
-    // Development only (docs/plugins.md § Loaded plugins): for a user this row is correct and
+    // Development only (docs/plugins/loaded-plugins.md § Loaded plugins): for a user this row is correct and
     // permanent, an owner install must never be replaced by a bundled copy.
     pluginLog.info(`an ownership row is never replaced by an app build. To hand one back, delete its entry from ${bundledPluginStatePath(dataDir)} — \`build:plugin <id>\` already does that for a package it writes into this data root.`)
   }

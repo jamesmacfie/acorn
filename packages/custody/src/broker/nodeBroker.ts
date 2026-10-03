@@ -17,7 +17,7 @@ import { BrokerFetch } from './brokerFetch'
 import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
-// What the broker reports, and it is health rather than traffic (docs/shell.md § What the helper
+// What the broker reports, and it is health rather than traffic (docs/shell/node-child.md § What the helper
 // reports). `broker.request` is a histogram because a renderer's reads run far past ten a second;
 // the four events are the moments a person would want a timestamp for, and each carries the node id
 // so a fleet view of slow or flapping nodes is a query rather than a bisect.
@@ -31,7 +31,7 @@ const log = createLogger('broker')
 // so a node:https import there would fail the client/node split rule and drag Node builtins into the
 // renderer bundle.
 
-// Reconnect backoff. See docs/architecture-overview.md, "Failure behavior". Capped so a node that is
+// Reconnect backoff. See docs/architecture/fleet.md § Deadlines. Capped so a node that is
 // off for the night is retried every 30s rather than every 16.
 const BACKOFF_MS = [1_000, 2_000, 4_000, 8_000, 16_000, 30_000]
 const JITTER = 0.2
@@ -388,7 +388,7 @@ export class NodeBroker {
     // load, not lost data: the node's hub takes a sequence number for the marker so there is normally
     // no gap at all, and where there is one, closing would be the wrong answer twice over — a reconnect
     // re-attaches every terminal and refetches every active query at the moment the node is busiest
-    // (docs/terminal.md § Backpressure). The frame is forwarded either way, and the renderer answers it
+    // (docs/terminal/activity.md § Backpressure). The frame is forwarded either way, and the renderer answers it
     // by marking what it is showing stale.
     const shed = (frame as { channel?: unknown }).channel === 'ws:shed'
     if (typeof seq === 'number') {

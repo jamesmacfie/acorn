@@ -1,5 +1,5 @@
 // A waiting gate is a row in the attention inbox, kept until somebody resolves it
-// (docs/notifications.md § What a row points at).
+// (docs/notifications/rows-and-targets.md § What a row points at).
 //
 // Addressed at the node it is passed, never the active one: the inbox fans out over the fleet, and a
 // source that read the ambient node would report one node's gates under every card

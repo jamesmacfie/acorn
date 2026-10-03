@@ -75,7 +75,7 @@ export default {
       // `list-detail`: the host draws the split, the divider and the drag handle, and the two regions
       // are two entries in one bundle. They share the selection, the draft and the send result through
       // module scope in that bundle (src/tree/panelModel.ts), which is what a loaded plugin has instead
-      // of the host's `model` seam (docs/panes.md § Layout model).
+      // of the host's `model` seam (docs/panes/layout.md § Layout model).
       {
         target: 'pane',
         id: 'http',
@@ -178,7 +178,7 @@ export default {
       },
       {
         // This project's saved requests, searched from the palette
-        // (docs/http-client.md § From the command palette).
+        // (docs/http-client/client.md § From the command palette).
         //
         // `scope: 'project'` is the whole boundary: the host sends the project the palette session
         // captured, the route filters on owner and project in SQL, and the command is not offered at

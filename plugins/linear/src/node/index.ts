@@ -11,7 +11,7 @@ export const linearPlugin = (): NodePlugin => ({
   // `requireProviderAccess` in the projection: a task-scoped internal token may not spend the owner's
   // Linear credential.
   //
-  // Always the portable fetch carrier (docs/plugins.md § Loaded plugins): linear ships loaded, and a
+  // Always the portable fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins): linear ships loaded, and a
   // bundled Hono instance cannot cross the contract.
   init: (ctx) => {
     ctx.routes.fetch(createIssueSourceHandler(), { prefix: '/data/issues' })

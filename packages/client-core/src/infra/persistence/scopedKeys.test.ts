@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { setActiveNode } from '../node/activeNode'
 import { scopeIdFromStorageKey, storageKeyFor } from './persistedState'
 
-// docs/state.md § Scope rules: task and workspace ids are node-minted UUIDs, and two nodes may
+// docs/state-ownership/scope-rules.md § Scope rules: task and workspace ids are node-minted UUIDs, and two nodes may
 // hold the same one, so a bare task id in a storage key was the collision that rule forbids.
 // `storageKeyFor` and `scopeIdFromStorageKey` are the only places a nodeId enters or leaves a key,
 // so these are the only cases needed.

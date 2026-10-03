@@ -16,7 +16,7 @@ import { buildConversationEntries, reviewDecision } from './model'
 import { actionFailure, type ActionFailure } from '../actionErrors'
 
 // Everything one pull request knows, held once per pull and read by every surface that draws it
-// (docs/github-integration.md, docs/panes.md § Layout model).
+// (docs/github-integration.md, docs/panes/layout.md § Layout model).
 //
 // Overview, the file list and the conversation are three components rather than one long closure, and
 // browse and the PR pane draw them in different arrangements. They share fifteen queries, six
@@ -124,7 +124,7 @@ function build(scope: PrScope) {
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () =>
     (integrations.data?.integrations ?? []).some((entry) => entry.providerId === 'linear' && entry.status === 'connected')
-  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § github). The
+  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § First-party for one specific reason). The
   // connection check stays because a 403 with no connection wastes a round trip when the "connect
   // Linear" fallback is what should render.
   const linearIssues = createQuery(() =>

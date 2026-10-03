@@ -1,4 +1,4 @@
-// Rollbar REST client, structured like server/linear/ (docs/integrations.md § Rollbar covers the
+// Rollbar REST client, structured like server/linear/ (docs/integrations/rollbar.md § Rollbar covers the
 // connection model). Items are Rollbar's deduped errors, identified in acorn by their visible
 // `counter` (#142) rather than their internal id. Exported fetch is mocked in route tests, never
 // called live there.

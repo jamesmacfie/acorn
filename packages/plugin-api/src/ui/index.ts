@@ -1,4 +1,4 @@
-// Frame-safe components: props in and DOM out. See docs/plugins.md § The plugin API for the
+// Frame-safe components: props in and DOM out. See docs/plugins/plugin-api.md § The plugin API for the
 // barrel and tier boundary this is held to.
 //
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather
@@ -98,7 +98,7 @@ export { DiffPane } from '@acorn/client-core/features/diff/DiffPane.tsx'
 
 // ── The nodes the kit gained when it closed ───────────────────────────────────────────────────
 // Each one replaces a shape two or more panes were drawing with raw tags and a private class. See
-// docs/ui-design.md § The closed kit for the admission rule they had to pass, and
+// docs/ui-design/closed-kit.md § The closed kit for the admission rule they had to pass, and
 // @acorn/plugin-api/ui/tokens for the role enums their props take.
 export { Stack } from '@acorn/client-core/kit/components/layout'
 export { Inline } from '@acorn/client-core/kit/components/layout'
@@ -110,13 +110,13 @@ export { Heading } from '@acorn/client-core/kit/components/content'
 export { Section } from '@acorn/client-core/kit/components/layout'
 // A settings page's titled group and its one setting: the label left, the control right, and the
 // Saved signal, the error, Reset and a value set elsewhere drawn the same way on every page. The save
-// helpers that drive them are on ./client (docs/frontend.md § Settings).
+// helpers that drive them are on ./client (docs/frontend/settings.md § Settings).
 export { SettingRow, SettingsSection } from '@acorn/client-core/kit/components/layout'
 export type { SettingRowProps, SettingsSectionProps } from '@acorn/client-core/kit/components/layout'
 export { Timeline, type TimelineControls } from '@acorn/client-core/kit/components/content'
 export type { ReadingPlace } from '@acorn/client-core/kit/lib'
 // Which of a long timeline's turns to draw: the newest page, and more on "Show earlier". A rule, not a
-// rendering, so both hosts share it (docs/managed-agents/client-surfaces.md § Client surfaces).
+// rendering, so both hosts share it (docs/managed-agents/transcript.md § The window).
 export { createTimelineWindow } from '@acorn/client-core/kit/lib'
 export type { TimelineWindow } from '@acorn/client-core/kit/lib'
 export { Facts } from '@acorn/client-core/kit/components/content'
@@ -125,7 +125,7 @@ export { Log } from '@acorn/client-core/kit/components/content'
 export { Grid } from '@acorn/client-core/kit/components/layout'
 // The canvas: cards on a grid, edges as curves, one card selected. A picture is exactly what a
 // plugin may not draw for itself — no raw DOM, no SVG — so the kit draws it and the terminal host
-// draws the same cards as an indented list. See docs/ui-design.md § The closed kit.
+// draws the same cards as an indented list. See docs/ui-design/closed-kit.md § The closed kit.
 export { Graph } from '@acorn/client-core/kit/components/content'
 export type { GraphCard } from '@acorn/client-core/kit/components/content'
 export type { GraphEdgeRef, GraphPoint } from '@acorn/client-core/kit/lib'
@@ -142,7 +142,7 @@ export { Rectangle } from '@acorn/client-core/kit/components/content'
 // and for `pty` the DOM used to keep only half of it: three plugins each built their own xterm on the
 // element it handed back. The caller now says what the channel is — open at a size, bytes in, bytes
 // out — and the host draws the emulator, which is what let the editor handoff and docker exec cross to
-// a terminal (docs/terminal.md § Client).
+// a terminal (docs/terminal/client.md § Client).
 export { attachPty } from '@acorn/client-core/features/terminal/attachPty.ts'
 export type { PtyEvent, PtyIo } from '@acorn/client-core/kit/lib'
 

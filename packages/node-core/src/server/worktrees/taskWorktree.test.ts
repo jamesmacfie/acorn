@@ -156,7 +156,7 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     ])
   })
 
-  // The status poll is the HEAD observer (docs/plugins.md § Hearing a core event): the first
+  // The status poll is the HEAD observer (docs/plugins/events.md § Hearing a core event): the first
   // sighting seeds silently, a moved tip on the next pass broadcasts, an unmoved one does not.
   it('broadcasts head:changed when a worktree tip moves between polls', async () => {
     const res = await resolveTaskCwd(t.db, await loadTask(t.db, TASK), checkout)

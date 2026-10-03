@@ -86,7 +86,7 @@ export type ProjectConfigPatch = Partial<{
   branchPrefix: string
 }>
 // What the project checkout's committed `.acorn/config.toml` sets, which wins over the matching
-// machine-local value in `config` (docs/workspaces-and-tasks.md § Worktrees and setup). A key is
+// machine-local value in `config` (docs/workspaces-and-tasks/project-config.md § The project row). A key is
 // present only when the file sets it. Run targets merge by id, so each one here replaces the machine
 // target with the same id and leaves the others in place, and a `dev` target replaces the dev script
 // and its restart command too. Whether the file is trusted yet decides whether a task may run it, not

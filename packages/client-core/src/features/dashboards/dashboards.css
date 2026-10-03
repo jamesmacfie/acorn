@@ -103,7 +103,7 @@
 /* ── The grid ────────────────────────────────────────────────────────────────────────────── */
 
 /* Twelve columns of square cells, positioned absolutely off one ResizeObserver measurement rather
-   than by `grid-area` (docs/dashboards.md § The grid). The template stays here because a style pack
+   than by `grid-area` (docs/dashboards/placements.md § The grid). The template stays here because a style pack
    owns it and PanelGrid reads the resolved `column-gap` off it; the container's height is stated
    inline from the live layout.
 
@@ -121,7 +121,7 @@
   min-width: 0;
 }
 
-/* The collapse docs/dashboards.md § The grid describes: one column in reading order, heights
+/* The collapse docs/dashboards/placements.md § The grid describes: one column in reading order, heights
    content-driven as they were before geometry existed. Purely presentational, so widening the
    window restores the arrangement exactly. */
 .dash-grid[data-collapsed] {
@@ -486,7 +486,7 @@
    which is the right way round because stretching distorts the type with it.
 
    Every colour is a token, never a literal, and a mark carries one of two attributes, never both. See
-   docs/dashboards.md § Views are derived, not chosen from a menu:
+   docs/dashboards/views.md § Views are derived, not chosen from a menu:
 
      data-tone    the plugin declared what this value means. The same five StatusDot uses
                   (primitives.css), so a `Ready` bar is the ok colour.

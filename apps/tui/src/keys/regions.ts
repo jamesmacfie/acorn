@@ -54,7 +54,7 @@ type RegionOptions = {
    *  An integer rather than the pair `'rail' | 'main'` it replaced, because two frames drawn side by
    *  side inside one pane are two columns and the pair could not say so: every region a layout
    *  registered was `'main'`, so Right in a `list-detail` had nothing to cross to and did nothing at
-   *  all (docs/tui.md § Focus regions). The rail's three panels pass 0, a layout's
+   *  all (docs/tui/focus.md § Focus regions). The rail's three panels pass 0, a layout's
    *  regions default to 1, and a layout with side-by-side regions declares the second one 2. Nothing
    *  reads the number except `moveColumn`, which walks to the nearest one in the direction asked, so
    *  the values only have to be ordered and not contiguous. */
@@ -200,7 +200,7 @@ const inScope = (node: Renderable): boolean => {
  *
  *  Read by the trace flag, which reports it per key so that "the dialog is up and nothing answers"
  *  is a line in a log rather than a guess, and by the command layer, whose bare keys belong to the
- *  screen (./install.ts, ./commandLayer.ts, docs/tui.md § Keys and focus). */
+ *  screen (./install.ts, ./commandLayer.ts, docs/tui/keys.md § Keys and focus). */
 export const scopeDepth = (): number => scopes().length
 
 /** Read the mount signal so footer hints update when regions appear or disappear without a focus move. */
@@ -234,7 +234,7 @@ export function pushScope(box: Renderable): () => void {
     // The keys leave the box that is going, said here rather than read off the tree. The tree is
     // still telling the truth of the last render: nothing is destroyed, so the pass below would find
     // the closing dialog attached, visible, and — its own scope gone — inside the screen's, and would
-    // leave the keys on it (docs/tui.md § Traps).
+    // leave the keys on it (docs/tui/traps.md § Traps).
     const at = focusedNode()
     if (at && within(box, at)) setFocus(null)
     scheduleSettle()
@@ -357,7 +357,7 @@ const regionOf = (node: Renderable): Group | undefined => {
  *  A landing on a frame is never remembered. The frame is the last resort, taken when the thing had
  *  nothing in it yet, and remembering it pins the keys to a border for the rest of the run: a reader
  *  who looked into Browse before choosing a source came back to a lit border with dead arrows
- *  (§ enter, docs/tui.md § Focus regions). */
+ *  (§ enter, docs/tui/focus.md § Focus regions). */
 const remember = (of: Memory, node: Renderable, frame: Renderable | null): void => {
   if (node === frame) return
   of.last = node
@@ -403,7 +403,7 @@ const setFocus = (node: Renderable | null): void => {
   // an open `Menu` is drawn inside whatever region had them, so a region that also remembered a
   // dialog's rows would give the keys back to a destroyed row when the dialog closed rather than to
   // the trigger that opened it, and its claim would say the reader had changed region while they were
-  // answering a dialog (docs/tui.md § Focus regions).
+  // answering a dialog (docs/tui/focus.md § Focus regions).
   const scope = top()
   if (scope.box) {
     remember(scope, node, scope.box)
@@ -610,7 +610,7 @@ export function moveStop(delta: 1 | -1): boolean {
   if (walkStops(node, delta, { within: box, stops })) return true
   // Up from the first stop of a panel is the strip that owns it, because Down from the strip is how
   // the reader got in: the two are one door, and a wall at the top of a panel left Escape as the only
-  // way back to the tabs. The bottom edge stays a wall (docs/tui.md § The five key groups).
+  // way back to the tabs. The bottom edge stays a wall (docs/tui/keys.md § The five key groups).
   if (delta < 0 && isPanel(box)) focusRenderable(ownerOf(box)?.node)
   return true
 }

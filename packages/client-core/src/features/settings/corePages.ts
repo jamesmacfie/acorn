@@ -12,7 +12,7 @@ import type { SettingsContribution } from '../../host/registries/shell/settings'
 export type CoreSettingsPage = Omit<SettingsContribution, 'component'>
 
 // What each page offers search, here rather than in the page, because a page is a lazy chunk and
-// search must find it before it has ever loaded (docs/frontend.md § Search and deep links). A
+// search must find it before it has ever loaded (docs/frontend/settings.md § Search and deep links). A
 // section's `id` is the `SettingsSection` the page draws and `rows` are its row labels, so a change to
 // a page's sections is a change here too.
 type SearchDeclaration = Pick<SettingsContribution, 'keywords' | 'sections'>
@@ -192,7 +192,7 @@ const extensionPoints: SearchDeclaration = {
   ],
 }
 
-// Core's settings pages, placed in the rail's nine groups (docs/frontend.md § Settings). Ids are
+// Core's settings pages, placed in the rail's nine groups (docs/frontend/settings.md § Settings). Ids are
 // stable because callers deep-link by them: `openSettings('shortcuts')`, a notice target's page id,
 // the palette's rows. `order` counts within a group.
 //
@@ -240,7 +240,7 @@ export const CORE_SETTINGS_PAGES = [
   // `telemetry.enabled` is a preference on the node rather than on this screen (docs/telemetry.md).
   { id: 'telemetry', ...telemetry, label: 'Telemetry', category: 'machines', scope: 'node', icon: 'activity', order: 40, followsNodeSwitcher: true },
   // Memory and disk are facts about one machine. Core's page, with a section each plugin that holds
-  // either contributes through CORE_STORAGE_POINT (docs/data-layer.md § What the node reports).
+  // either contributes through CORE_STORAGE_POINT (docs/data-layer/backup-and-retention.md § What the node reports).
   { id: 'storage', ...storage, label: 'Storage and memory', category: 'machines', scope: 'node', icon: 'hard-drive', order: 50, followsNodeSwitcher: true },
 
   // Plugins. Not `requires: 'desktop'`, for the same reason as Nodes. The node's plugins follow the

@@ -7,7 +7,7 @@ import { pluginRoute } from './manifestFields.ts'
 //
 // These descriptors contain static data or paths into the plugin's route namespace. The host draws
 // them from the plugin's node responses. The node's manifest refinement confines routes using `id`.
-// See docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels.
+// See docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels.
 
 // The closed verb set the host executes for a descriptor. `invoke`, an RPC into the plugin's frame,
 // isn't here: it needs a headless frame lifecycle the shell doesn't have.
@@ -27,7 +27,7 @@ export const chromeAction = z.discriminatedUnion('verb', [
   // Host-owned promotion. The selected rail row carries the seed; the verb carries no plugin
   // callbacks, so it survives the descriptor boundary.
   z.object({ verb: z.literal('createTask') }),
-  // https only, opened in the real browser rather than in-app (docs/shell.md § Navigation policy).
+  // https only, opened in the real browser rather than in-app (docs/shell/origins.md § Navigation policy).
   z.object({ verb: z.literal('openUrl'), url: z.string().url() }),
   // An `overlay` surface the same manifest declares, checked by the node. It's in both unions because an
   // overlay covers the window and belongs to no task's layout, so it needs nothing from its click
@@ -62,7 +62,7 @@ export const contextFreeAction = z.discriminatedUnion('verb', [
 //
 // A search row is a selected row, and a project-scoped search ran because the session had a routed
 // project, so both halves of the address exist here where they do not on a plain command
-// (docs/plugins.md § Command kinds). `createTask` is still absent: a
+// (docs/plugins/commands.md § Command kinds). `createTask` is still absent: a
 // search result is a thing to go and look at, and promoting one is a second verb on the row rather
 // than what picking it means (docs/integrations.md § From the command palette).
 export const selectedRowAction = z.discriminatedUnion('verb', [
@@ -86,7 +86,7 @@ export const emptyStateDescriptor = z.object({
 // there. The host draws the region; the plugin's layout only reserves it. Constraints are enforced
 // twice: the panel editor doesn't offer a disallowed option, and the host re-checks at render time
 // because a manifest-derived roster row is untrusted wire.
-// See docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension points.
+// See docs/dashboards/placements.md § Placements and docs/plugins/cooperative-extension-points.md § Cooperative extension points.
 export const panelRegion = z.object({
   // Which sources a panel here may be composed over. Absent means this plugin's own; present, it's
   // an explicit list of `<pluginId>:<sourceId>`. References remain stable while providers are absent.
@@ -161,7 +161,7 @@ export const sourceDescriptor = z.object({
 export const slotDescriptor = z.object({
   id: z.string().min(1).max(64),
   // Enumerated host slots, so an unknown one is a parse error rather than a contribution that never
-  // appears. Short, because a slot opened is hard to close. docs/plugins.md § Descriptors for chrome,
+  // appears. Short, because a slot opened is hard to close. docs/plugins/descriptors.md § Descriptors for chrome,
   // frames for rectangles has the table, including every slot that was refused and why.
   slot: z.enum(['footer', 'topbar']),
   icon: z.string().min(1).max(64).optional(),
@@ -174,7 +174,7 @@ export const slotDescriptor = z.object({
 // A row on a host-drawn context menu (@acorn/protocol/contextMenus.ts holds the location vocabulary and
 // the facts a `when` may name). Takes the narrow `contextFreeAction` union: the thing under the cursor
 // is a core resource, and the two missing verbs both need something only a rail source has.
-// See docs/plugins.md § Context menus.
+// See docs/plugins/menus-and-markers.md § Context menus.
 export const contextMenuDescriptor = z.object({
   id: z.string().min(1).max(64),
   location: z.enum(CONTEXT_MENU_LOCATIONS),

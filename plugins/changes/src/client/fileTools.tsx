@@ -13,7 +13,7 @@ import type { FileRow } from './model'
 // left is the two verbs you reach for once.
 //
 // Discard is a `Menu.Item` with `confirm`: it cannot be undone, and the armed label is the prompt on
-// every host, terminal included (docs/ui-design.md § The closed kit).
+// every host, terminal included (docs/ui-design/closed-kit.md § The closed kit).
 export function FileTools(props: { row: FileRow; model: ChangesModel }) {
   const row = () => props.row
   return (

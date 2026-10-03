@@ -31,7 +31,7 @@ export default function RefPanelTaskLink(props: { target: RefPanelTarget }) {
   })
   const projectId = (): string => chosen() || (choices().length === 1 ? choices()[0]!.id : '')
 
-  // `taskTracksRef`, not a link check written here (docs/plugins.md § "Loaded plugins: the client
+  // `taskTracksRef`, not a link check written here (docs/plugins/client-half.md § "Loaded plugins: the client
   // half"): a github-pr task records its pull request as `pullNumber` on the task row rather than as
   // a link, so matching only `task.links` found nothing for a PR and offered to create a task that
   // already existed.

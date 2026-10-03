@@ -50,7 +50,7 @@ async function respond<B>(c: Context<AppEnv>, bridge: B | null | undefined, fn: 
   }
 }
 
-// Auth is enforced globally by requireUser in createApp() (docs/security.md §3).
+// Auth is enforced globally by requireUser in createApp() (docs/security/transport-and-auth.md § The gates).
 export const harness = new Hono<AppEnv>()
   .get('/:id/run', (c) => respond(c, routeCapabilityFor(c, RUN_TARGETS), (b) => b.targets(c.req.param('id'))))
   // Static 'default-url' before the ':target' routes so it can't be shadowed by a target id.

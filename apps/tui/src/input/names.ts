@@ -9,7 +9,7 @@
 //
 // The spellings are OpenTUI's, taken from its `keyName`, `tildeKeyMap` and kitty tables at 0.5.9,
 // because the bindings were written against them and a rename would be a rewrite of the app's
-// keyboard rather than of its parser (docs/tui.md § Keys and focus).
+// keyboard rather than of its parser (docs/tui/keys.md § Keys and focus).
 
 /** `CSI <number> ~`. Two numbers mean `home` and two mean `end`, which is not a mistake: the VT and
  *  the PC layouts disagreed and terminals still send both. */

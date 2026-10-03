@@ -1,9 +1,9 @@
 // "Start workflow…" on a Rollbar error, a Linear issue or a GitHub pull request: what the row menu
-// asks for, and what the item fills in (docs/workflows.md § Starting a run).
+// asks for, and what the item fills in (docs/workflows/starting-runs.md § Starting a run).
 //
 // A `.ts` module of its own, beside ./editor/startRequest.ts and for its reason: the prefill rule is
 // the half worth testing and a Solid component on the path makes it unloadable in a node-environment
-// test (docs/plugin-authoring.md § Testing). The box it opens is ./StartFromItemHost.tsx.
+// test (docs/plugin-authoring/testing.md § Testing). The box it opens is ./StartFromItemHost.tsx.
 import { createSignal } from 'solid-js'
 import type { ItemRowTarget } from '@acorn/plugin-api/client'
 import type { DataRecord } from '@acorn/protocol/dataSources.ts'

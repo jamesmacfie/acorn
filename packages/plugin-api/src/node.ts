@@ -13,7 +13,7 @@
 // ── The plugin contract itself ────────────────────────────────────────────────────────────────
 // `PluginHook*` are named here for the same reason `TaskConcern` below is: a plugin that opens a hook
 // passes `ctx.hooks` into the module that runs it, and a parameter needs a type to name
-// (server/pluginHost/hooks.ts, docs/plugins.md § Hooks).
+// (server/pluginHost/hooks.ts, docs/plugins/hooks.md § Hooks).
 export type {
   NodePlugin,
   CompiledPluginBroadcast,
@@ -40,13 +40,13 @@ export type { SearchHit } from '@acorn/protocol/search.ts'
 export { PLUGIN_API_MAJOR } from '@acorn/node-core/server/plugins'
 export { capabilityId } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 export type { Disposable } from '@acorn/node-core/server/pluginHost/capabilities.ts'
-// The many-provider seam beside capabilities (docs/plugins.md § Cooperative extension points). Only
+// The many-provider seam beside capabilities (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Only
 // the id minter and the entry type: `open`, `contribute` and `entries` arrive on
 // `ctx.extensionPoints`, and a plugin that imported the registry directly would get its own copy of
 // the maps, since a loaded bundle inlines every @acorn/* import it makes.
 export { extensionPointId } from '@acorn/node-core/server/pluginHost'
 export type { Extension, ExtensionPointId } from '@acorn/node-core/server/pluginHost'
-// The managed agent harness seam (docs/managed-agents.md § Harnesses). The capability id and its
+// The managed agent harness seam (docs/managed-agents/harnesses.md § Harnesses). The capability id and its
 // shape live in node-core rather than in the agents plugin, because the host delivers a
 // manifest-declared harness and neither package may import the other.
 export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
@@ -59,7 +59,7 @@ export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.
 export { isTaskConfined, mayActOnTask, ownerId, principalMayActOnTask, requireDevice, requireUser } from '@acorn/node-core/server/middleware/requireUser.ts'
 export { onServerError, respondError } from '@acorn/node-core/server/respond.ts'
 // The portable carrier a loaded plugin uses to run its own Hono router through
-// `ctx.routes.fetch` (docs/plugins.md § Loaded plugins).
+// `ctx.routes.fetch` (docs/plugins/loaded-plugins.md § Loaded plugins).
 export { portableCarrier } from '@acorn/node-core/server/pluginHost'
 export { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/node-core/server/bridge.ts'
 export { ScheduleSkipped } from '@acorn/node-core/server/schedules/scheduler.ts'
@@ -71,7 +71,7 @@ export { chunkRowsByColumnBudget } from '@acorn/node-core/server/rows.ts'
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The objects arrive on `ctx.telemetry`, `ctx.log` and `ctx.core.telemetry`; the types are here
 // because a plugin that passes one into a module of its own needs a parameter type to name
-// (docs/telemetry.md, docs/plugin-authoring.md § Telemetry and logging). `TelemetrySink` is what a
+// (docs/telemetry.md, docs/plugin-authoring/telemetry.md § Telemetry and logging). `TelemetrySink` is what a
 // plugin holding the `telemetry` token writes.
 export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-core/server/telemetry'
 // The one value in this block, for a compiled plugin's module-level code with no `ctx` in reach: a
@@ -83,7 +83,7 @@ export type { PluginTelemetry, SpanHandle, TelemetrySink } from '@acorn/node-cor
 // and a scrubbed one-line message, which is what goes in the line.
 export { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 export type { Logger } from '@acorn/node-core/server/telemetry'
-// The rule from docs/telemetry.md § What never leaves the machine, as a function, for the one
+// The rule from docs/telemetry/model.md § What never leaves the machine, as a function, for the one
 // plugin shape that needs it: a sink, which is the last thing a record passes through before the
 // network. Core scrubs at the ingest door, so a sink is re-checking rather than cleaning, and a
 // span name or a metric name is the part core takes on trust as a pattern.
@@ -100,13 +100,13 @@ export type {
 } from '@acorn/protocol/telemetry.ts'
 
 // ── Storage ───────────────────────────────────────────────────────────────────────────────────
-// The handle type only. See docs/data-layer.md and docs/plugins.md § Data ownership for
+// The handle type only. See docs/data-layer.md and docs/plugins/data-ownership.md § Data ownership for
 // `ctx.storage.open()` and how a plugin declares its migrations.
 export type { PluginDatabase } from '@acorn/node-core/server/plugins'
 
 // ── Core services ─────────────────────────────────────────────────────────────────────────────
 // The type only; the object arrives on `ctx.core`, and a plugin never constructs one or deep-imports
-// the implementation. See docs/plugins.md § The plugin API for why `ProjectRef` and `TaskRef` are
+// the implementation. See docs/plugins/plugin-api.md § The plugin API for why `ProjectRef` and `TaskRef` are
 // projections rather than the drizzle row.
 export type {
   CompiledCoreServices,
@@ -134,7 +134,7 @@ export { confineExistingFile, resolveInRoot } from '@acorn/node-core/server/core
 export { git, gitOrThrow, gitText } from '@acorn/node-core/server/core'
 // The coalesced `git status` for a worktree: one process per path per two seconds however many callers
 // ask, so a plugin reading local changes and core reading the rail's dirty markers share one spawn
-// (docs/workspaces-and-tasks.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
+// (docs/workspaces-and-tasks/worktrees.md § Worktree status reads). `invalidateWorktreeStatus` is for a plugin
 // that has just written under a worktree itself; the ordinary announcement is
 // `ctx.events.worktreeStatus(taskId)`. `worktreeGitText` is the same window for any other read-only
 // git command against the tree, such as the changes pane's line counts.
@@ -144,7 +144,7 @@ export { brokerEnv } from '@acorn/node-core/server/core'
 // ── Task, worktree and run configuration ──────────────────────────────────────────────────────
 export { buildSessionEnv, childEnv } from '@acorn/node-core/server/taskEnv.ts'
 export type { SessionTaskInfo } from '@acorn/node-core/server/taskEnv.ts'
-// Takes a `TaskRef` (above), not the `tasks` row; see docs/plugins.md § The plugin API for why a
+// Takes a `TaskRef` (above), not the `tasks` row; see docs/plugins/plugin-api.md § The plugin API for why a
 // column rename in core would otherwise be a silent plugin break.
 export { isDir, rendererBaseCheckout, taskContext } from '@acorn/node-core/server/worktrees'
 export { loadRepoConfig } from '@acorn/node-core/server/runConfig.ts'
@@ -197,7 +197,7 @@ export {
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from '@acorn/protocol/plugin/runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 // The context-section helpers, not the sections: `pr`, `notes` and `memory` are shaped by the plugins
-// that own their rows (docs/agent-tools.md § Context sections). `pastedContent` is also how agents
+// that own their rows (docs/agent-tools/context-sections.md § Context sections). `pastedContent` is also how agents
 // marks another agent's report.
 export { formatOmitted, pastedContent, truncateBytes } from '@acorn/node-core/server/agentTools'
 export type { PluginContextSection } from '@acorn/node-core/server/agentTools'
@@ -234,7 +234,7 @@ export { providerError } from '@acorn/node-core/server/integrations'
 export { providerRequestScheduler } from '@acorn/node-core/server/integrations'
 export { defaultBudgets, externalIdsFor, publicConnectionProvider, publicProvider } from '@acorn/node-core/server/integrations'
 export type { ModelProviderAdapter } from '@acorn/node-core/server/modelProviders'
-// The node-provider contract (docs/plugins.md § Node providers). Types only: the provider arrives on
+// The node-provider contract (docs/plugins/node-providers.md § Node providers). Types only: the provider arrives on
 // `ctx.providers.nodes`, and a plugin that imported the registry directly would get its own copy of
 // the map, since a loaded bundle inlines every @acorn/* import it makes. `ProvidedNode` and its state
 // enum live in @acorn/protocol, which a plugin already depends on.

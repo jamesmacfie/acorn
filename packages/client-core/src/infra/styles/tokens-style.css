@@ -31,12 +31,12 @@
   --control-bw: var(--bw);
   --surface-bw: var(--bw);         /* cards, popovers, modals */
   --marker-w: var(--bw-marker);    /* active-row left rule, Modern/Cute zero this */
-  /* docs/ui-design.md § Border roles covers why --stripe-w is a semantic sibling of --marker-w
+  /* docs/ui-design/tokens.md § Border roles covers why --stripe-w is a semantic sibling of --marker-w
      that no pack may zero. */
   --stripe-w: var(--bw-marker);
   --tab-active-w: var(--bw-strong);
 
-  /* docs/ui-design.md § Border roles covers why these four recipes split by role. */
+  /* docs/ui-design/tokens.md § Border roles covers why these four recipes split by role. */
   --divider: var(--divider-w) solid var(--border);              /* row / list separators */
   --chrome-divider: var(--chrome-divider-w) solid var(--border); /* topbar, section headers */
   --control-border: var(--control-bw) solid var(--border-strong); /* inputs, buttons */
@@ -112,11 +112,11 @@
   --avatar-sm: 18px;
   --avatar-md: 24px;
   --diff-line-h: 20px;
-  /* docs/ui-design.md § Token axes covers why --term-fs is a bridge token. */
+  /* docs/ui-design/tokens.md § Token axes covers why --term-fs is a bridge token. */
   --term-fs: 15px;
 
   /* ── Typography ────────────────────────────────────────────────────────────────────────────
-     docs/ui-design.md § Token axes covers why --font-mono cannot be repointed by a style pack.
+     docs/ui-design/tokens.md § Token axes covers why --font-mono cannot be repointed by a style pack.
      --font-glyph keeps the remaining Unicode glyphs (◆ ◇ ⊘ ◉ ▦ ⎇) on the same mono stack even when
      the chrome goes sans, since those box-drawing characters only align there. The brand marks
      that used to be on this list are path data now (ui/brandMarks.ts), but the token still earns
@@ -190,7 +190,7 @@
 
   /* ── Motion ────────────────────────────────────────────────────────────────────────────────
      --hover-lift / --press-scale are applied by the null-default declarations in base.css. See
-     docs/ui-design.md § Style packs for the null-default pattern this follows. */
+     docs/ui-design/tokens.md § Style packs for the null-default pattern this follows. */
   --dur-instant: 0ms;  --dur-short: 150ms;  --dur-med: 220ms;  --dur-long: 320ms;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);

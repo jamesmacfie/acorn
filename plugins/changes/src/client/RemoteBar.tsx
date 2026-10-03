@@ -13,7 +13,7 @@ import { primaryRemote, remoteCounts, type RemoteAction, type RemoteVerb } from 
 //
 // The counts are text and the verb is a button. Zed makes the counts part of the button; keeping them
 // apart means the label is only the verb, which is what the terminal projection needs when the row is
-// 40 cells wide (docs/ui-design.md § Every node at 80 by 24).
+// 40 cells wide (docs/ui-design/every-node.md § Every node at 80 by 24).
 
 /** What the primary button says. Publish and Push run the same git command; the label is the
  *  difference, because "publish" is what a branch with no upstream needs to hear. */
@@ -89,7 +89,7 @@ function OperationBanner(props: { model: ChangesModel }) {
  *
  *  No heading above the run. Each label says the whole verb instead.
  *
- *  Force push sits last, below a rule, as every destructive item does (docs/ui-design.md § Menus and
+ *  Force push sits last, below a rule, as every destructive item does (docs/ui-design/interaction.md § Menus and
  *  right-click). It is a `Menu.Item` with `confirm`, on the pattern the row's Discard set (./fileTools.tsx):
  *  the armed label is the prompt on every host, and a dialog was refused by the programme's
  *  decisions table. */
@@ -139,7 +139,7 @@ function RemoteMenu(props: { model: ChangesModel }) {
 /** The banner, the bar, and the `changes:push-actions` slot under it.
  *
  *  Mounted at the top of the footer, above the commit editor, because the order top to bottom is what
- *  happens in order: see where you are, land the commit, then send it (docs/panes.md § Layout model).
+ *  happens in order: see where you are, land the commit, then send it (docs/panes/layout.md § Layout model).
  */
 export function RemoteBar(props: { model: ChangesModel }) {
   const model = () => props.model
@@ -173,8 +173,8 @@ export function RemoteBar(props: { model: ChangesModel }) {
         <RemoteMenu model={model()} />
       </Toolbar>
       {/* What another plugin does once the branch is on its remote, between the bar and the editor:
-          the GitHub plugin's "Open pull request" is the one filler today (docs/plugins.md §
-          Cooperative extension points).
+          the GitHub plugin's "Open pull request" is the one filler today (docs/plugins/remote-points.md
+          § Remote points).
 
           No children, so an unfilled point draws nothing and takes no space. With no contributor
           installed the footer is exactly the height it was before this slot existed, which is the

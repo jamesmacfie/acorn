@@ -107,7 +107,7 @@ case. Prove a disabled or unconfigured advisor makes no paid call.
 ## Documentation and handoff
 
 Update [integrations](../../../integrations.md), [state ownership](../../../state-ownership.md),
-[data layer](../../../data-layer.md), [model grant authoring](../../../plugin-authoring/the-manifest.md#permissions),
+[data layer](../../../data-layer.md), [model grant authoring](../../../plugin-authoring/permissions.md#permissions),
 [managed agents](../../../managed-agents.md), [plugin map](../../../plugin-map.md), and provider checks.
 Document the review-reader limits, conservative accounting, broad grant limitation, and interactive
 scope. Supply the advisor package and grant schema revisions to phase 05.

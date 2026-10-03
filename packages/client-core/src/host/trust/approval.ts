@@ -7,7 +7,7 @@ import type { PluginApprovalRequest, PluginInstallSource } from '@acorn/protocol
 //
 // It carries a task id and nothing else. The requests themselves are read from the node's device-only
 // roster route when the dialog opens, never from the notification frame. A notice is a ping, and what the
-// owner is being asked to approve has to come from the gated surface (docs/plugins.md § Approval-mediated
+// owner is being asked to approve has to come from the gated surface (docs/plugins/agent-install.md § Approval-mediated
 // install).
 
 const [pluginApprovalTask, setPluginApprovalTask] = createSignal<string | null>(null)

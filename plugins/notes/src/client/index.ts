@@ -1,4 +1,4 @@
-// The notes plugin's client part (docs/plugins.md § The plugin API). One pane: the note files
+// The notes plugin's client part (docs/plugins/plugin-api.md § The plugin API). One pane: the note files
 // live on the node under <data-root>/notes/, and the context pane's notes section is context's
 // own contribution.
 import type { ClientPlugin } from '@acorn/plugin-api/client'

@@ -9,7 +9,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
 // The half of the remote tree host that is arithmetic rather than drawing: the store, the pre-flight
-// check, the mutation apply, and the coalescer that feeds them (docs/plugins.md § The tree contract).
+// check, the mutation apply, and the coalescer that feeds them (docs/plugins/tree-contract.md § The tree contract).
 //
 // Split out of TreeHost.tsx when the terminal grew a tree host of its own
 // (docs/tui.md). There are two hosts and one set of rules: a batch
@@ -295,7 +295,7 @@ export function createTreeState(input: TreeStateInput) {
     if (!ops.length) return
     // A histogram, owned by the plugin whose tree this is. One coalesced batch per frame while a
     // remote pane is animating is well past the ten-a-second line a span has to stay under
-    // (docs/telemetry.md § Hot seams are metrics), and what the number answers is "whose tree is
+    // (docs/telemetry/model.md § Hot seams are metrics), and what the number answers is "whose tree is
     // making the shell drop frames".
     if (queuedAt) recordDuration(input.pluginId, 'tree.queue.wait', performance.now() - queuedAt)
     recordSample(input.pluginId, 'tree.batch.operations', ops.length)

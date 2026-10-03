@@ -15,7 +15,7 @@ import { evictScope } from '../shell/scopeEviction'
 import { _resetLayoutState } from '../../layouts/state'
 
 // The one thing the pane registry does beyond holding entries: it turns a declared layout into the
-// component every consumer already expects (docs/panes.md § Contributions).
+// component every consumer already expects (docs/panes/contributions.md § Contributions).
 
 const task = { id: 't1', projectId: 'p1' } as unknown as Task
 
@@ -89,7 +89,7 @@ describe('a pane that declares a layout', () => {
 })
 
 // Two regions are two components the host mounts side by side, so whatever they share has to outlive
-// both of them (./paneModels.ts, docs/panes.md § Layout model). Four compiled panes each kept their
+// both of them (./paneModels.ts, docs/panes/models.md § Pane models). Four compiled panes each kept their
 // own root map before this seam existed.
 describe('the model a pane’s regions share', () => {
   it('builds once per task and hands the same object to every region', async () => {
@@ -204,7 +204,7 @@ describe('a region that has already drawn', () => {
 })
 
 // `keepAlive` was a field on this contract that promised the host would hold a pane's DOM across a
-// task switch. One pane set it, nothing read it, and it is gone (docs/panes.md § Contributions). This
+// task switch. One pane set it, nothing read it, and it is gone (docs/panes/contributions.md § Contributions). This
 // is a compile-time test: `@ts-expect-error` fails `tsc --noEmit`, and therefore `pnpm lint`, on the
 // day somebody puts the field back without wiring it up.
 describe('the pane contract', () => {
@@ -240,7 +240,7 @@ describe('paneAvailable', () => {
   })
 })
 
-// The two pane spans (docs/telemetry.md § The renderer). Here rather than beside the emitter because
+// The two pane spans (docs/telemetry/renderer.md § Renderer seams). Here rather than beside the emitter because
 // both are about when a region is actually on screen: a region is a `lazy()` under its own
 // `Suspense`, and only a jsdom test can hold one suspended and then let it resolve.
 describe('the pane spans', () => {

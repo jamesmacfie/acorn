@@ -440,7 +440,7 @@ describe('saved queries', () => {
   })
 })
 
-// The command palette's two routes (docs/plugins.md § Command kinds
+// The command palette's two routes (docs/plugins/commands.md § Command kinds
 // § Database). Both are task-scoped, and the reason is the boundary: saved queries are project-owned,
 // but every route in this plugin reaches them through the task, because the task is what core resolves
 // a project from. What is worth pinning here is that scoping, the ordering, and the one ordering that

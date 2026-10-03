@@ -17,7 +17,7 @@ import { WORKFLOWS_PANE_ID } from './runs/runPaneModel'
 
 // "Run a workflow", as one search over the definitions this task can run: the files its repository
 // commits, the user layer, and the rows the owner saved for this workspace
-// (docs/workflows.md § From the command palette).
+// (docs/workflows/starting-runs.md § From the command palette).
 //
 // A `paletteRows` source until 2026-09-03, which put one row per definition into the palette root and
 // fetched them on every ⌘K. It is a `search` command now: one named row at the root, one fetch when the

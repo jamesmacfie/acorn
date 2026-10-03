@@ -3,7 +3,7 @@ import type { FrameServices } from './broker'
 import type { AcornBridge } from './sdk/bridgeTypes'
 
 // The frame bridge's vocabulary, declared once so the five places that spell it cannot drift apart
-// (docs/plugins.md § Loaded plugins: the client half, the paragraph on the bridge's `api` surface).
+// (docs/plugins/client-half.md § Loaded plugins: the client half, the paragraph on the bridge's `api` surface).
 //
 // A sandboxed frame's whole ability to affect the world is a small set of verbs, and until now each
 // one had to be written into five modules by hand: the wire union (@acorn/protocol/plugin/bridge.ts),
@@ -61,7 +61,7 @@ type AuthorSurface = {
   'api:PATCH': AcornBridge['api']['patch']
   'api:DELETE': AcornBridge['api']['del']
   // The byte path is its own wire kind, so it is its own pair of verbs here: a JSON call and a byte
-  // call are not the same request wearing a flag (docs/plugins.md § Binary bridge calls).
+  // call are not the same request wearing a flag (docs/plugins/frames.md § Binary bridge calls).
   'api.bytes:GET': AcornBridge['api']['getBytes']
   'api.bytes:POST': AcornBridge['api']['postBytes']
   subscribe: AcornBridge['events']['on']

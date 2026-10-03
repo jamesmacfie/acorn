@@ -9,13 +9,13 @@ import { Line } from '../kit/cells'
 
 // "Do you want to run this?", in a terminal.
 //
-// Nothing in the prompt is terminal-specific (docs/tui.md § The trust prompt).
+// Nothing in the prompt is terminal-specific (docs/tui/plugins.md § The trust prompt).
 // The three tiers, the sentence per grant and the "what this version gained" diff are
 // `client-core/host/trust/trustModel.ts`, which is a plain module with a test, and answering is its
 // `recordTrustDecision`. What is here is the arrangement: a `Modal` where the pane would go, drawn
 // with the kit.
 //
-// The tier split is a security claim and the three lists may never be merged (docs/security.md §
+// The tier split is a security claim and the three lists may never be merged (docs/security/plugin-storage-and-supply-chain.md §
 // Design rules, rule 6): `Enforced` is a fence the bridge holds, `Declared` is a disclosure the
 // plugin can ignore entirely, and a strong claim must not lend credibility to a weaker one beside it.
 //

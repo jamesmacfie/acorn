@@ -3,8 +3,8 @@ import type { Env } from '../bindings'
 import { nodeAction, nodeActions, riskOf, runNodeAction } from '../nodeActions'
 import { ScheduleSkipped, type Scheduler } from './scheduler'
 
-// The `node-action` schedule target: what it may do (docs/schedules.md § `node-action`) and where
-// its consent lives (docs/schedules.md § Consent, and the two ways it fails closed).
+// The `node-action` schedule target: what it may do (docs/schedules/user-schedules.md § `node-action`) and where
+// its consent lives (docs/schedules/user-schedules.md § Consent, and the two ways it fails closed).
 
 export type NodeActionTarget = {
   pluginId: string

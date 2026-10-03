@@ -2,7 +2,7 @@ import { activeNodeId, onScopeEvicted } from '@acorn/plugin-api/client'
 import type { EditorViewState } from '@acorn/plugin-api/ui/editor'
 
 // Where the reader was in each open file. Selection and scroll, as data this plugin owns, rather
-// than an editor library's opaque blob (docs/editor.md § View state).
+// than an editor library's opaque blob (docs/editor/document-surface.md § View state).
 const viewStates = new Map<string, EditorViewState>()
 const viewKey = (taskId: string, path: string, nodeId: string | null): string => `${nodeId ?? ''}/${taskId}:${path}`
 
@@ -29,7 +29,7 @@ export function clearEditorViewStates(): void {
 }
 
 // Registered beside the signal it clears rather than in the shell's evictor list
-// (docs/state.md § Scope rules).
+// (docs/state-ownership/scope-rules.md § Scope rules).
 onScopeEvicted((e) => {
   if (e.scope === 'task') evictEditorViewStates(e.taskId)
 })

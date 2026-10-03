@@ -5,14 +5,14 @@ import type { HttpRequest } from '../shared/model'
 
 // The API pane is `list-detail`, so its two regions are two entries in this bundle that the host
 // mounts side by side. What makes that possible is here: one model per subject, in module scope, so
-// the list and the detail are looking at the same selection and the same draft (docs/panes.md §
+// the list and the detail are looking at the same selection and the same draft (docs/panes/layout.md §
 // Layout model). A compiled pane gets the equivalent from the host's `model` seam.
 
 const selects: ((item: string) => void)[] = []
 const actions: ((command: string) => void)[] = []
 // `context` is the host's snapshot at connect, and `item` in it is the row that OPENED the pane: a task
 // pane has no URL to hold a selection, so a click or the palette's curl import arrives this way
-// (docs/plugins.md § The tree contract).
+// (docs/plugins/tree-contract.md § The tree contract).
 const bridge = (item?: string) => ({
   context: { surface: 'http', target: 'remote', nodeId: 'node-a', authority: 'node-a/http', ...(item ? { item } : {}) },
   onSelect: (handler: (item: string) => void) => {

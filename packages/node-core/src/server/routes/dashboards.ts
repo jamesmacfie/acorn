@@ -10,7 +10,7 @@ import { dashboardContentProblems, deleteDashboard, publishDashboard } from '../
 import { runDashboard } from '../dashboards/run'
 import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 
-// The measure-history read route (docs/dashboards.md § Trends).
+// The measure-history read route (docs/dashboards/views.md § Trends).
 //
 // One route, GET only. There is no write route: the sampler and the store share a process, so the
 // only writer is `core:sample-measures`. An earlier design had clients PUT samples while panels

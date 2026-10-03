@@ -1,5 +1,5 @@
 // A loaded pane's `availability` route, held in memory for the pane's `when` gate
-// (docs/panes.md § Contributions).
+// (docs/panes/contributions.md § Contributions).
 //
 // `when` is synchronous and is asked while the pane strip is drawn, so the answer has to be here
 // already. One node-wide read fills it, and the events below refresh it. Nothing reports a hand edit to

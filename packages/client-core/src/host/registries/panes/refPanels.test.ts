@@ -11,7 +11,7 @@ import { activeRefPanel, closeRefPanel, openRefPanel, refPanelRegistry } from '.
 //
 // What this suite cannot reach is the other half of the same failure: the props the host hands the
 // panel component. That is JSX, this package's vitest config has no Solid transform
-// (docs/frontend.md § Registries and plugins), and the defect that produced a blank panel in the app
+// (docs/frontend/registries.md § Registries and plugins), and the defect that produced a blank panel in the app
 // lived precisely there, a props member named `ref`, which Solid compiles into a setter.
 // `tools/arch/boundaries.test.ts` holds that line instead, and the two together are the whole
 // invariant.

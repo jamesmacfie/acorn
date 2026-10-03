@@ -40,7 +40,7 @@ export const documentRegion = z.object({
 //
 // `'frame'` is this plugin's own bundle in a sandboxed iframe: the plugin draws, and the host sees a
 // rectangle. A `remote` region is the same bundle running in a worker with no DOM, emitting a tree of
-// the host's own component names, which the host draws (docs/plugins.md § The tree contract); `entry`
+// the host's own component names, which the host draws (docs/plugins/tree-contract.md § The tree contract); `entry`
 // is a key of the object the bundle passed to `mountTree`. A document region is host-drawn outright:
 // the plugin contributes routes and a language id, no code.
 //
@@ -73,7 +73,7 @@ export const frameSurface = z.object({
   // `overlay` is the full-screen picker slot: the host places the rectangle and the frame draws its
   // contents. It has no click site, so `openOverlay` is the only way to open one. `coreSlot` is drawn
   // where one of core's own surfaces normally is; registering one seizes nothing, because the user
-  // picks the provider in settings. See docs/plugins.md § Replacing a core surface.
+  // picks the provider in settings. See docs/plugins/replacing-core-surfaces.md § Replacing a core surface.
   // `inline` is the rectangle a *different* plugin's point holds: the surface is never registered as
   // one of this plugin's own panes, and it appears only where an `extensions` entry places it. Nothing
   // draws it until an owner's point takes it, which is what makes "the owner consents" true of the
@@ -98,7 +98,7 @@ export const frameSurface = z.object({
   readsArchived: z.boolean().optional(),
   // Task `pane` only. A GET route that answers `{ [taskId]: boolean }` for the node's active tasks, so
   // the host can hide the pane on a task it has nothing to draw for. A task the answer leaves out is
-  // hidden too. See docs/panes.md § Contributions.
+  // hidden too. See docs/panes/contributions.md § Contributions.
   availability: pluginRoute.optional(),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
@@ -131,7 +131,7 @@ export const frameSurface = z.object({
     .refine((list) => new Set(list.map((section) => section.id)).size === list.length)
     .optional().catch(undefined),
   // `settings` only. This plugin's own sources whose **Show in left rail** switch the host draws above
-  // the page, in the plugin's source order (docs/frontend.md § Rail source visibility). Caught like
+  // the page, in the plugin's source order (docs/frontend/rail-and-routing.md § Rail source visibility). Caught like
   // the lists above. An id that names no source of this plugin is reported by the manifest reader and
   // dropped on the device, because the host draws a switch only for a plugin's own source.
   railSourceVisibility: z.array(z.string().min(1).max(64)).max(RAIL_SOURCE_VISIBILITY_MAX).optional().catch(undefined),

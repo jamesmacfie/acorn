@@ -6,7 +6,7 @@ import {
 } from '@acorn/protocol/extensionPoints.ts'
 import { agentPaneContribution, AGENT_PANE_ID } from './paneContribution'
 
-// The three places another plugin may come into this pane (docs/plugins.md § Cooperative extension
+// The three places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative extension
 // points). Held in a test rather than only where they are drawn, because an unmatched contribution is
 // silent by design: a point whose name drifted produces an empty surface and no error, and the two
 // sides of the name are read from different manifests.

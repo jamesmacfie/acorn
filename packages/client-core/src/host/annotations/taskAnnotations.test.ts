@@ -12,7 +12,7 @@ vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 // `core:task` is core's own annotation point, and the thing worth pinning is the translation: a mark
 // is a line of text on a diff and a corner icon on a 52-pixel rail row, and the words survive either
 // way — in the legend here, beside the icon there. See docs/plugins/cooperative-extension-points.md
-// § Task annotations and docs/ui-design.md § Rail controls and status markers.
+// § Task annotations and docs/ui-design/shell-hierarchy.md § Rail controls and status markers.
 
 const registered: Disposable[] = []
 

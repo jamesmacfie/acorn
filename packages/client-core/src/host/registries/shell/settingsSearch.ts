@@ -3,7 +3,7 @@ import {
   type SettingsContribution, type SettingsNavigate, type SettingsScopeKind, type SettingsSectionDeclaration,
 } from './settings'
 
-// Settings search (docs/frontend.md § Settings). Built from declarations only: each page's label,
+// Settings search (docs/frontend/settings.md § Settings). Built from declarations only: each page's label,
 // keywords and sections, each section's row labels and keywords, and the names of the things settings
 // holds pages for, handed in by the caller. Nothing reads a rendered control, so a page is findable
 // before it has ever been opened, and a page that renders slowly ranks the same as one that does not.

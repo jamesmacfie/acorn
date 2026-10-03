@@ -46,7 +46,7 @@ describe('langFor', () => {
 })
 
 // The engine, not the mapping. Nothing here can see the renderer's CSP: node runs WebAssembly
-// happily, which is why the Oniguruma failure (docs/diff-rendering.md § Syntax highlighting) was
+// happily, which is why the Oniguruma failure (docs/diff-rendering/loading.md § Syntax highlighting) was
 // invisible until it reached a window. So what this pins is the half a test can see: every
 // grammar this build bundles loads under the engine this build chose, and colour comes out the
 // far end. This is the main-thread highlighter, now the fallback rather than the path, since no

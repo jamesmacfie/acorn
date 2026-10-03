@@ -4,7 +4,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { activeNodeId, queryOwner } from '@acorn/plugin-api/client'
 import { liveXterm, type LiveXterm } from './liveXterm'
 
-// One session's box in the drawer (docs/terminal.md § Client). The xterm inside is not this
+// One session's box in the drawer (docs/terminal/client.md § Client). The xterm inside is not this
 // component's: it lives from the first frame the tab is shown until the tab closes (./liveXterm.ts,
 // ./heldTerminals.ts), and this surface lends it an element while it is drawn. Inside the drawer the
 // parent draws every session's surface and hides all but one, so switching tabs is a repaint; across
@@ -50,7 +50,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
   })
 
   // A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way in and
-  // out of it with the keyboard, and xterm owns everything inside (docs/terminal-and-agents.md §
+  // out of it with the keyboard, and xterm owns everything inside (docs/terminal/client.md §
   // Client). `mount` is the element xterm attaches to, drawn by the host, which is why this file spells
   // no element and carries no stylesheet.
   return <Rectangle kind="pty" label="Terminal" hidden={props.hidden} mount={(element) => { host = element }} />

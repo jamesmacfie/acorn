@@ -25,7 +25,7 @@ const log = createLogger('plugin-chrome')
 // Same posture as ./chromeContextMenus.ts beside it: the node refused a bad descriptor when it parsed
 // the manifest, and this checks the same things again because a roster row is bytes a node sent.
 //
-// The line this file holds is the one docs/command-palette-and-shortcuts.md § What the palette refuses draws: a plugin declares
+// The line this file holds is the one docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses draws: a plugin declares
 // what it wants asked and what picking a row does, and the host does both. A route's answer is display
 // facts and identity — it cannot name a verb, a URL, a route or another command, because the fields
 // that would carry one are stripped before the answer reaches here (@acorn/protocol/commands.ts), and
@@ -149,7 +149,7 @@ export function usablePluginCommands(
  *
  * The id, the parent id and the owner are the host's: `plugin.<pluginId>.<localId>` and the plugin id
  * itself, so a manifest can neither claim another plugin's id nor hang its rows inside another
- * plugin's group (docs/command-palette-and-shortcuts.md § What the palette refuses).
+ * plugin's group (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
  */
 export function pluginCommand(
   pluginId: string,

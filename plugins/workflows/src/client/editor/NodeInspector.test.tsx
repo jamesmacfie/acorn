@@ -8,7 +8,7 @@ import { RevealFieldErrors } from './FieldControl'
 
 // The inspector in jsdom, because the whole point of `describe` is that a plugin's step kind gets a
 // form nobody wrote by hand — and "the right control for the right field type" is a claim only a
-// render can check (docs/workflows.md § Contributed step kinds).
+// render can check (docs/workflows/step-kinds.md § Contributed step kinds).
 
 const fieldOptions = vi.fn<(route: string) => Promise<{ options: { value: string; label: string }[] }>>()
 vi.mock('../workflowsClient', () => ({ createWorkflowApi: () => ({ fieldOptions: (route: string) => fieldOptions(route) }) }))

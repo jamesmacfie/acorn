@@ -14,7 +14,7 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// The SQL editor lives in the host, in the region above this frame (docs/editor.md §
+// The SQL editor lives in the host, in the region above this frame (docs/editor/composed-panes.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Run, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which Run also calls before reading the current SQL.
@@ -208,7 +208,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       if (command === 'execute') void execute()
     }))
     // The selection that opened this pane rides in `context`; every later one is a message
-    // (docs/plugins.md § The tree contract). Both land in the same signal.
+    // (docs/plugins/tree-contract.md § The tree contract). Both land in the same signal.
     setRequested(props.bridge.context.item)
     onCleanup(props.bridge.onSelect((item) => { selectionGeneration++; setRequested(item) }))
     void connect()

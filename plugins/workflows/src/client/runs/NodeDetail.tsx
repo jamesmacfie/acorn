@@ -24,7 +24,7 @@ import { ChildRuns, RunLineage } from './RunRelationships'
 import { RunRecords } from './RunRecords'
 
 // The run pane's `detail` region: what one step is doing, and the controls that are legal for the
-// state it is in (docs/workflows.md § Routes and UI). The controls sit in the step's header bar for
+// state it is in (docs/workflows/routes-and-ui.md § Routes and UI). The controls sit in the step's header bar for
 // every kind, so Retry on a failed command is beside its name rather than under its output. A gate's
 // Approve and Reject are the exception: they answer the gate, so they sit under what they approve.
 //
@@ -36,7 +36,7 @@ import { RunRecords } from './RunRecords'
 // Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
 // sizes against the region, so that branch is a fragment; a `Stack` around it, or a row of buttons
 // after it, and the composer ends up below the fold with the pane's own scroll broken (client-core
-// infra/styles/shell.css, docs/panes.md § Layout model).
+// infra/styles/shell.css, docs/panes/layout.md § Layout model).
 
 const readJson = <T,>(raw: string | null | undefined): T | null => {
   if (!raw) return null
@@ -164,7 +164,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   }
 
   // Resolved per call, never captured: a node with the agents plugin disabled answers `undefined` and
-  // this pane keeps the summary it always drew (docs/plugins.md § Collaboration rules).
+  // this pane keeps the summary it always drew (docs/plugins/collaboration.md § Collaboration rules).
   const conversation = createMemo(() => clientCapability(AGENTS_CONVERSATION)?.Conversation)
   const drawsConversation = createMemo(() => shape() === 'agent' && !!conversation())
 

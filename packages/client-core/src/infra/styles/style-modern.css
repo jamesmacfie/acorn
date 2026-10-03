@@ -79,16 +79,16 @@
 }
 
 /* Escape hatch, every rule here is a bug report against the token vocabulary. Budget 25 selectors
-   (docs/ui-design.md § Style packs). Currently 3. */
+   (docs/ui-design/tokens.md § Style packs). Currently 3. */
 
 
-/* docs/ui-design.md § Style packs covers why selection needs to read from the fill here. */
+/* docs/ui-design/tokens.md § Style packs covers why selection needs to read from the fill here. */
 :root[data-style='modern'] .ui-row[data-selected] {
   background: color-mix(in srgb, var(--accent) 12%, var(--bg));
   border-radius: var(--radius-control);
 }
 
-/* docs/ui-design.md § Style packs covers why `solid` is excluded here as well as `bare`. */
+/* docs/ui-design/tokens.md § Style packs covers why `solid` is excluded here as well as `bare`. */
 :root[data-style='modern'] .ui-btn:not([data-variant='bare']):not([data-variant='solid']) {
   background: var(--bg-subtle);
   font-weight: var(--fw-medium);

@@ -2,7 +2,7 @@
 //
 // In `protocol` rather than in the client because both ends have to say the same thing: the node
 // prints this phrase on its own terminal at boot and the desktop shows it on the pairing confirm
-// step, and comparing those two is the entire security of pairing (docs/api-reference.md § Pairing).
+// step, and comparing those two is the entire security of pairing (docs/api-reference/transport.md § Pairing).
 // Two copies of the word list would be two things that can drift into a comparison that always
 // passes.
 

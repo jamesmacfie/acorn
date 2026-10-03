@@ -1,5 +1,5 @@
 // The consuming half of the harness seam: what plugins/agents does with a harness another plugin's
-// manifest declared. See docs/managed-agents.md § Harnesses.
+// manifest declared. See docs/managed-agents/harnesses.md § Harnesses.
 //
 // The host already minted the runtime id, resolved the adapter entry inside the plugin's package, and
 // turned each probe route into a call (node-core/server/pluginHost/harnesses.ts). What is left is the
@@ -113,7 +113,7 @@ const harnessProfile = (harness: ManifestHarness): AgentProfileContribution => {
     // `aiArgv` is admitted where those two are refused, and the difference is the whole reason it can
     // be: a one-shot text turn has two variables in fixed positions and no conditions, so there is
     // nothing to substitute and nothing to branch on. The line we hold is that `oneShot` never grows a
-    // placeholder syntax. See docs/plugin-authoring.md § Harnesses.
+    // placeholder syntax. See docs/plugin-authoring/harnesses.md § Harnesses.
     ...(oneShot
       ? {
         aiArgv: (command, opts) => ({

@@ -1,5 +1,5 @@
 // The plugin host: builds every plugin's context in declaration order, then runs all of their inits at
-// once. See docs/plugins.md § Activation and § Loaded plugins.
+// once. See docs/plugins/activation.md § Activation and § Loaded plugins.
 //
 // Declaration order must not be load-bearing, because a disabled plugin removes a step from the
 // sequence and because the inits now overlap. Cross-plugin needs resolve through the capability
@@ -124,7 +124,7 @@ export type PluginHostResult = {
   // bridge holds this array by reference.
   roster: readonly PluginRosterEntry[]
   /** Swap one loaded plugin's node half in a running process, candidate-then-commit.
-   * See docs/plugins.md § The dev loop.
+   * See docs/plugins/dev-loop.md § The dev loop.
    *
    * The candidate's `init` runs against a buffered registration set (server/pluginHost/context.ts §
    * pending), so a throw leaves the previous instance registered, serving and holding its database. */
@@ -478,7 +478,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // binary. The difference from the serial loop is that its neighbours have already run, so all of
   // them are torn down rather than the prefix: each holds a WAL-mode SQLite handle and the composition
   // root's catch releases the data-root lock. A loaded plugin is contained instead
-  // (docs/plugins.md § Loaded plugins).
+  // (docs/plugins/loaded-plugins.md § Loaded plugins).
   let fatal: { error: unknown } | null = null
   for (const [index, outcome] of inits.entries()) {
     const { plugin, ctx, loaded } = running[index]

@@ -20,7 +20,7 @@ Start with these owners:
 - `plugins/agents/src/server/drivers/acpDriver.ts` and `acpSession.ts`.
 - `plugins/agents/src/server/drivers/harness.ts` and `registry.ts`.
 - `plugins/agents/src/contract/sessionExecute.ts` and the managed execution implementation.
-- [Harness manifest contract](../../../plugin-authoring/the-manifest.md#harnesses).
+- [Harness manifest contract](../../../plugin-authoring/harnesses.md#harnesses).
 
 The checked execution contract maps built-in profile IDs through `managedProviderForProfile`.
 Do not assume a contributed ACP profile also runs through workflow steps because it works in the
@@ -65,7 +65,7 @@ successful manifest parse. Acceptance requires:
 
 ## Documentation and handoff
 
-Update [harness authoring](../../../plugin-authoring/the-manifest.md#harnesses),
+Update [harness authoring](../../../plugin-authoring/harnesses.md#harnesses),
 [managed agents](../../../managed-agents.md), and
 [agents/provider acceptance](../../../testing/agents-and-providers.md) with verified behavior.
 Record the standalone package revision and the provider capability matrix here. That matrix supplies

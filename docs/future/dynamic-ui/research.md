@@ -62,14 +62,14 @@ Almost every piece this programme needs has shipped for another reason.
 
 | Need | Acorn seam | Where it is documented |
 | --- | --- | --- |
-| Sandboxed UI in host components | Remote component trees, run in a worker, drawn by the host on desktop and in the terminal | [Descriptors, trees, rectangles](../../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md) |
+| Sandboxed UI in host components | Remote component trees, run in a worker, drawn by the host on desktop and in the terminal | [Descriptors, trees, rectangles](../../plugins/ui-tiers.md) |
 | A plugin with no build step | The scaffold inlines the bridge handshake and tree protocol | [Start from the scaffold](../../plugin-authoring/start-from-the-scaffold.md) |
-| Agent-written bundles without a prompt per save | Dev mode, a device-side grant that records acceptances as `dev` and `partial` | [Activation](../../plugins/activation.md#the-dev-loop) |
+| Agent-written bundles without a prompt per save | Dev mode, a device-side grant that records acceptances as `dev` and `partial` | [Activation](../../plugins/dev-loop.md#the-dev-loop) |
 | Teaching an agent the contract from the running host | `plugin_authoring` | [Agent tools](../../agent-tools.md) |
 | A custom card in the transcript | `agents:tool-card`, a `replace` remote point keyed by tool name | [Cooperative extension points](../../plugins/cooperative-extension-points.md) |
 | The conversation inside another pane | The `agents.conversation` client capability | `plugins/agents/src/contract/conversation.ts` |
 | Cross-plugin data | Typed data sources, with host-dispatched row actions and a risk confirm | [Data sources](../../data-sources.md) |
-| A read-only archived view | Panes that declare `readsArchived` | [Workspaces and tasks](../../workspaces-and-tasks.md#restoring-a-task) |
+| A read-only archived view | Panes that declare `readsArchived` | [Workspaces and tasks](../../workspaces-and-tasks/archive.md#restoring-a-task) |
 | Project-scoped panes beside a rail list | The `/p/:projectId/x/<plugin-id>/` routes | [Panes](../../panes.md) |
 | Find or create a task for an item | The reference panel action | [Panes](../../panes.md#not-a-pane-the-reference-panel) |
 

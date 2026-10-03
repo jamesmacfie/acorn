@@ -179,7 +179,7 @@ export default function FileTree(props: {
       // `false` on a file, because a file does not fold and a handler that claims the key anyway is a
       // key that does nothing: the host gives it back to the tier below instead, which in the
       // terminal is the column move that takes the reader from the tree to the document beside it
-      // (docs/command-palette-and-shortcuts.md § Focus and typing).
+      // (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
       onExpand={(key, expand) => {
         if (!items().find((item) => item.key === key)?.dir) return false
         setOpen(key, expand)

@@ -85,7 +85,7 @@ export function PluginPage(props: PluginPageProps) {
   }
 
   // Development mode is this device's answer and names one node, because the same plugin may be a plain
-  // install on the owner's other laptop (docs/security.md § The dev grant).
+  // install on the owner's other laptop (docs/security/plugin-install.md § The dev grant).
   const devGrant = () => (props.custody?.devGrants ?? []).find((grant) => grant.pluginId === props.plugin.id
     && (props.plugin.kind === 'device' ? grant.source?.kind === 'device' : grant.nodeId === props.nodeId))
   const status = createMemo(() => statusOf(distribution(), props.nodeId, props.plugin, !!devGrant()))
@@ -345,7 +345,7 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
 }
 
 // Which version is on disk and which is running, and the one way to change it. No background check and no
-// "an update is available" badge (docs/security.md § Supply chain): an update is the moment a compromised
+// "an update is available" badge (docs/security/plugin-storage-and-supply-chain.md § Supply chain): an update is the moment a compromised
 // maintainer gets to run new code, so it happens when the owner asks.
 function Versions(props: PluginPageProps & Actions) {
   const row = () => pluginRow(props.plugin)

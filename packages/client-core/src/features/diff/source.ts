@@ -19,7 +19,7 @@ export type DiffLineAnchor = { path: string; side: 'old' | 'new'; line: number }
  * needing a stub. A source with no `fileText` renders gaps that cannot be expanded; a source with no
  * `reply` gets thread rows whose reply box is disabled.
  *
- * The diff itself arrives as a document (docs/diff-rendering.md § The source port): a topology that
+ * The diff itself arrives as a document (docs/diff-rendering/document.md § The source port): a topology that
  * lays out every file and segment without any source text, and segments of plain rows the viewer asks
  * for as the reader comes near them. The source never hands over a whole patch.
  */

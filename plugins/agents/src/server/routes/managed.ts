@@ -34,7 +34,7 @@ import {
 import { agentMcpSessionSelectionSchema, type AgentSessionMcp } from '../../shared/mcpServers'
 
 export type ManagedAgentsBridge = {
-  // Ownership resolvers for the task-scope guard below. See docs/security.md § Transport and auth.
+  // Ownership resolvers for the task-scope guard below. See docs/security/transport-and-auth.md § Transport and auth.
   // Three of them, because three opaque ids each reach another task's agent: a session id, an
   // attachment id, and an artifact id. `null` means no such row, and the guard treats that the same as
   // "not yours", so nobody can probe which ids exist.
@@ -112,7 +112,7 @@ const idempotencyKey = (headers: Headers): string | null => {
 // Reaching another task's session is the hole `requireTaskScope` closes for core: read its transcript,
 // enqueue a turn, fork it, hand it to a terminal. None of these paths carries a taskId, so the mount
 // over /v1/p/:plugin/tasks/:id cannot see them and this router resolves the owner itself. See
-// docs/security.md § Transport and auth. One factory over three id kinds, because only the resolver
+// docs/security/transport-and-auth.md § Transport and auth. One factory over three id kinds, because only the resolver
 // differs.
 const owns = (param: string, resolve: (b: ManagedAgentsBridge, id: string) => Promise<string | null>) =>
   createMiddleware<AppEnv>(async (c, next) => {
@@ -180,7 +180,7 @@ export const managedAgents = new Hono<AppEnv>()
     : viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.runs()))
   .get('/providers', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.providers(c.req.query('force') === 'true')))
-  // Settings > Storage and memory (docs/managed-agents.md § Operations and failure). Device only: the
+  // Settings > Storage and memory (docs/managed-agents/operations.md § Operations and failure). Device only: the
   // numbers cover every task's agents, and the stop reaches every task's processes, so neither is
   // something a task-scoped agent may ask for.
   .get('/footprint', requireDevice, (c) => viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.footprint()))

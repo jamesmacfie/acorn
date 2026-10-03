@@ -6,7 +6,7 @@ import type { SegmentCache } from '../../features/diff/segmentCache'
 import { _resetClientTelemetry, flushTelemetry, setTelemetryEnabled, startClientTelemetry } from './emitter'
 import { _resetPageFacts, PAGE_FACTS_MS, registerPageFact, startPageFacts } from './pageFacts'
 
-// The page counts beside the renderer's memory (docs/telemetry.md § Diagnosing an unresponsive view).
+// The page counts beside the renderer's memory (docs/telemetry/diagnosis.md § Diagnosing an unresponsive view).
 
 let posted: TelemetryRecord[]
 let stop: (() => void) | undefined

@@ -1,6 +1,6 @@
 // Editor pane backing: read, write, and list files on the task's worktree. The EditorBridge
 // behind the HTTP routes in server/routes/editor.ts. The taskId is the capability, and every call
-// re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security.md §
+// re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security/process-and-paths.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // node/index.ts.
 import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
@@ -34,7 +34,7 @@ export type EditorChanged = (taskId: string) => void
 export const editorBridge = (
   core: EditorCoreServices,
   changed: EditorChanged = () => {},
-  /** The owner's half of `editor:before-save` (docs/plugins.md § Hooks). Absent means nobody objects,
+  /** The owner's half of `editor:before-save` (docs/plugins/hooks.md § Hooks). Absent means nobody objects,
    *  which is also what an empty chain means. */
   hooks?: Pick<PluginHookRegistry, 'run'>,
   /** Providers are resolved per read because plugin init order and unload are runtime facts. */
@@ -118,7 +118,7 @@ export const editorBridge = (
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, reason: 'Path is outside the worktree.' }
-    // Format on save, as somebody else's plugin (docs/plugins.md § Hooks). The autosave loop calls this
+    // Format on save, as somebody else's plugin (docs/plugins/hooks.md § Hooks). The autosave loop calls this
     // on every pause, so the chain's timeout is what keeps a slow formatter from stalling typing; a
     // handler that does not answer leaves the text as the person wrote it.
     const verdict = await hooks?.run('before-save', { taskId, path: relPath, text: content })
@@ -130,9 +130,9 @@ export const editorBridge = (
       // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
       invalidateWorktreeStatus(root)
       // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
-      // (docs/plugins.md § What is not an event). A save from another client used to move nothing on this one —
+      // (docs/plugins/events.md § What is not an event). A save from another client used to move nothing on this one —
       // its tree, its dirty markers and its git status all went stale until something else pinged
-      // (docs/plugins.md § Hearing a core event).
+      // (docs/plugins/events.md § Hearing a core event).
       changed(taskId)
       return { ok: true, text, revision: createHash('sha256').update(text, 'utf8').digest('hex') }
     } catch (e) {

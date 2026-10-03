@@ -1,7 +1,0 @@
-{
-  "plugins/editor/src/server/search.ts": "ce00da7b94b29a69de9136df2aaccc72f093662620fc8d790e44ee64fb2c9b27",
-  "plugins/editor/src/client/FileTree.tsx": "577c70f6a5c4cc9fe377dec7cd7695178d8883838d9782bea8229d0d7a574820",
-  "plugins/editor/src/client/EditorPane.tsx": "1e7b93893a421f3165eb53d38dc1f4600b8ec9ce092c55acda23a2774f5409f0",
-  "packages/client-core/src/kit/components/layout/Rows.tsx": "bf67e0ee74228f095a1addd9e94f31822a3bf4d2529f85c5ad0af8175969f4fa",
-  "plans/performance/12-probe.config.ts": "e6f4448e23fc60fd69a8bcfe0e9ad6e0f108728c50c37e212d8ccaeab9a96bfe"
-}

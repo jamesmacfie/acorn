@@ -30,7 +30,7 @@ type GitHubPull = {
   updated_at: string | null
 }
 
-// Factory over this plugin's own database, not a module-scope router (docs/data-layer.md § Plugin
+// Factory over this plugin's own database, not a module-scope router (docs/data-layer/plugin-databases.md § Plugin
 // databases).
 export const pulls = (db: PluginDatabase, core: Pick<CoreServices, 'tasks'>, emit: GithubEmit = NO_EMIT) => new Hono<AppEnv>().get('/:owner/:repo/pulls', async (c) => {
   const uid = ownerId(c)

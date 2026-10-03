@@ -1,4 +1,4 @@
-// Per-plugin SQLite (docs/data-layer.md § Plugin databases).
+// Per-plugin SQLite (docs/data-layer/plugin-databases.md § Plugin databases).
 //
 // Two reasons this is a separate function rather than a parameter on openDb:
 //
@@ -18,7 +18,7 @@ import { installPluginStoragePolicy } from './storagePolicy'
 import { securePluginDbFiles, validatePluginDbFiles } from './pluginDbFiles'
 
 // One directory for every plugin DB, so a backup can enumerate them without knowing the plugin list
-// (docs/data-layer.md § Backup), and so `plugins/` stays visibly separate from core.sqlite.
+// (docs/data-layer/backup-and-retention.md § Backup and import), and so `plugins/` stays visibly separate from core.sqlite.
 export const PLUGIN_DB_DIR = 'plugins'
 
 const PLUGIN_ID_RE = /^[a-z][a-z0-9-]*$/
@@ -88,7 +88,7 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
 
     const withBatch = db as unknown as PluginDatabase
     // `.batch([...])` as a synchronous transaction, matching openDb. All-or-nothing within this file
-    // only, since a transaction never spans databases (docs/data-layer.md § Plugin databases).
+    // only, since a transaction never spans databases (docs/data-layer/plugin-databases.md § Plugin databases).
     withBatch.batch = (async (statements: ReadonlyArray<{ run(): unknown }>) =>
       db.transaction((_tx) => statements.map((stmt) => stmt.run()))) as PluginDatabase['batch']
     withBatch.close = () => sqlite.close()

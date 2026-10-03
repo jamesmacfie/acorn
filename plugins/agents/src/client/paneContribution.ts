@@ -11,7 +11,7 @@ const AgentTaskSidebar = lazy(() => import('./sessions/AgentTaskSidebar'))
 const AgentSidebarHeader = lazy(async () => ({ default: (await import('./sessions/AgentTaskSidebar')).AgentSidebarHeader }))
 
 // `list-detail`, with the sessions in this task on the left and the open one on the right
-// (docs/panes.md § Layout model). The header over the list is its own region so it stays put while
+// (docs/panes/layout.md § Layout model). The header over the list is its own region so it stays put while
 // the list scrolls; the conversation's own header, transcript and composer are siblings inside the
 // detail region, because the transcript owns the scroll and the other two are pinned by sitting
 // beside it.

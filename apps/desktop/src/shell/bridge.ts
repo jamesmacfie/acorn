@@ -158,7 +158,7 @@ const receiveBytes = (frame: Uint8Array): void => {
 
 // A histogram and not a span. Every node read the renderer makes crosses this socket, so it is far
 // past ten a second while a person is scrolling, and the span that describes the same round trip is
-// already `api.request` one layer up (docs/telemetry.md § Renderer seams). What this adds is the
+// already `api.request` one layer up (docs/telemetry/renderer.md § Renderer seams). What this adds is the
 // helper's own leg of it: a slow `bridge.call` with a fast node says the broker is the problem.
 //
 // `method` is the label, which is a fixed vocabulary of about thirty names rather than a per-call
@@ -263,7 +263,7 @@ const acorn = {
 
   // Cmd/Ctrl+W closes the focused pane, never the window. `before-input-event` has no Tauri
   // equivalent, so the accelerator is a menu item and the shell emits this
-  // (docs/shell.md § Startup: data directory, environment, and the singleton lock).
+  // (docs/shell/process.md § Startup: data directory, environment, and the singleton lock).
   onClosePane: (cb: () => void) => onEvent('acorn:close-pane', cb),
   // The same native crossing for Cmd/Ctrl+K. A child preview webview has its own document, so the
   // renderer's keymap cannot see the chord while that page owns focus.
@@ -308,7 +308,7 @@ const acorn = {
   fleetList: () => call('fleet-list'),
   nodeProbe: (endpoint: string) => call('node-probe', { endpoint }),
   nodePair: (request: unknown) => call('node-pair', request),
-  // The second door (docs/plugins.md § Node providers). The renderer names a provider and a node id;
+  // The second door (docs/plugins/node-providers.md § Node providers). The renderer names a provider and a node id;
   // the endpoint, the fingerprint and the credential are all fetched by the helper from the node that
   // listed it, so nothing new crosses this bridge in either direction.
   nodeAdopt: (request: unknown) => call('node-adopt', request),
@@ -392,7 +392,7 @@ const acorn = {
 
   // Host-owned page surfaces for accepted loaded plugins. The manifest host allowlist rides on
   // `ensure` and is checked again in Rust, which is the second of the two independent checks
-  // docs/shell.md § Host-owned webviews asks for.
+  // docs/shell/webviews.md § Host-owned webviews asks for.
   webview: {
     ensure: (key: string, url: string, hosts: readonly string[]) => webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
     setBounds,

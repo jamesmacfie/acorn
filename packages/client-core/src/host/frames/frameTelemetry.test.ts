@@ -6,7 +6,7 @@ import { createFrameBridge, type FrameBinding, type FrameServices } from './brok
 // The frame's telemetry verb, driven over a real MessageChannel through the real broker, for the
 // reason broker.test.ts gives: the thing under test is what happens when untrusted data arrives on
 // a port, and a fake that only delivers well-formed messages would test the protocol's happy path
-// rather than the checking (docs/telemetry.md § A frame's own records).
+// rather than the checking (docs/telemetry/plugins-and-sinks.md § A frame's own records).
 
 const BINDING: FrameBinding = {
   pluginId: 'board',

@@ -1,4 +1,3 @@
-import { TaskScriptDetails } from './TaskScriptDetails'
 import { createEffect, createSignal, createUniqueId, For, onCleanup, Show, type JSX } from 'solid-js'
 import type { PaneSwitcherProps } from '@acorn/protocol/paneSwitcher.ts'
 import type { Task } from '../../infra/queries'
@@ -198,7 +197,7 @@ export default function TaskPaneHost(props: {
                 data-pane-id={pane.id}
               >
                 <div class="pane-slot-actions">
-                  {/* docs/ui-design.md § Connection and staleness vocabulary asks for offline and
+                  {/* docs/ui-design/states.md § Connection and staleness vocabulary asks for offline and
                       stale rendering on every node-backed surface. `.pane-slot-actions` is the one
                       piece of chrome every pane has, so this is one edit rather than thirteen. It
                       reports the node's state; see registries/panes.ts for why there is no per-pane
@@ -248,7 +247,6 @@ export default function TaskPaneHost(props: {
 
       <nav class="pane-switcher" aria-label="Task panes">
         <ExclusiveSlotHost slot="pane.switcher" value={switcherProps()} />
-        <TaskScriptDetails taskId={props.task.id} />
         {props.extraButtons}
         {/* Whole-control busy rather than a marker: while the teardown runs there is no close
             action left to offer, so the glyph itself becomes the spinner. RailTab keeps it hoverable

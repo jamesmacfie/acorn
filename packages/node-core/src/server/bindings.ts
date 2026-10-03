@@ -30,9 +30,9 @@ export type RuntimeBindings = {
   DATA_DIR: string
   // This Node's durable identity, minted into node.json on first start (server/storage/dataRoot.ts). Every
   // resource a client caches is keyed (nodeId, id), so two nodes holding the same UUID never
-  // collide (docs/architecture-overview.md § Fleet semantics).
+  // collide (docs/architecture/fleet.md § Fan-out and partial results).
   NODE_ID: string
-  // The sha256 of this node's TLS certificate, the value a client pins (docs/api-reference.md §
+  // The sha256 of this node's TLS certificate, the value a client pins (docs/api-reference/transport.md §
   // Pairing), advertised at GET /v1/node.
   //
   // The fingerprint, not the certificate and not the private key: c.env reaches every core and
@@ -40,7 +40,7 @@ export type RuntimeBindings = {
   // inside server/transport/tls.ts and server/transport/listener.ts, which are the only modules that need it.
   NODE_FINGERPRINT: string
   // The app version this node is running, reported at GET /v1/node to an authenticated caller
-  // (docs/api-reference.md § Versioning). Injected rather than read from a package.json, because the
+  // (docs/api-reference/transport.md § Versioning). Injected rather than read from a package.json, because the
   // service is a bundled artifact by then and only the composition root knows the real version.
   APP_VERSION: string
   // A CLI-owned standalone process's ephemeral identity. Only the authenticated Node probe
@@ -60,7 +60,7 @@ export type RuntimeBindings = {
   // (ensureBoundIdentity below), read by every principal. Installs that bound a GitHub login under
   // the old scheme keep that login as the opaque id, with no data rewrite. Providers never bind.
   ACTIVE_IDENTITY: ActiveIdentityStore
-  // Node auth root (docs/api-reference.md § Pairing): paired devices and their revocable bearer
+  // Node auth root (docs/api-reference/transport.md § Pairing): paired devices and their revocable bearer
   // tokens, the replay store behind Idempotency-Key, and the one-time pairing window.
   DEVICES: DeviceService
   IDEMPOTENCY: IdempotencyStore

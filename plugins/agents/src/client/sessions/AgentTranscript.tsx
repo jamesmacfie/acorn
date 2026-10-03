@@ -99,7 +99,7 @@ export default function AgentTranscript(props: {
   const itemKeys = createMemo(() => items().map((item) => item.key))
   const itemsByKey = createMemo(() => new Map(items().map((item) => [item.key, item])))
   // The rows drawn are the newest page of those keys and as many older pages as the reader asked for
-  // (docs/managed-agents/client-surfaces.md § Client surfaces). The canonical 7,000-event session
+  // (docs/managed-agents/transcript.md § The window). The canonical 7,000-event session
   // projects to 3,387 cards, and building all of them on open was the cost the window removes. The
   // projection above still covers the whole session: only the drawing is windowed.
   const sessionId = createMemo(() => props.snapshot.session.id)

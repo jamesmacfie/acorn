@@ -16,13 +16,13 @@ afterAll(() => dispose.forEach((d) => d()))
 
 describe('parseInAppTarget', () => {
   it('recognises GitHub PR links (ignoring trailing path)', () => {
-    // `item`/`providerId` make the reference panel reachable (docs/plugins.md § Client authoring and
+    // `item`/`providerId` make the reference panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and
     // the UI kit). The spelling matches the pulls collection's row id.
     expect(parseInAppTarget('https://github.com/runn/acorn/pull/42/files'))
       .toEqual({ kind: 'pr', providerId: 'github', owner: 'runn', repo: 'acorn', number: '42', item: 'runn/acorn#42' })
   })
   it('recognises bare GitHub repo links but not deep paths or profiles', () => {
-    // No provider on this one: docs/github-integration.md § Content links explains why a repo has no
+    // No provider on this one: docs/github-integration/tasks-and-references.md § Content links explains why a repo has no
     // reference panel.
     expect(parseInAppTarget('https://github.com/runn/acorn')).toEqual({ kind: 'repo', providerId: undefined, owner: 'runn', repo: 'acorn' })
     expect(parseInAppTarget('https://github.com/runn/acorn/issues')).toBeNull()
@@ -90,7 +90,7 @@ describe('project-keyed content navigation', () => {
 
   it('leaves a PR in an untracked repo to the real browser URL', () => {
     // An untracked repo has no in-app route, so the click is left unhandled rather than swallowed
-    // with nowhere to land (docs/github-integration.md § Content links).
+    // with nowhere to land (docs/github-integration/tasks-and-references.md § Content links).
     const navigate = vi.fn()
     const { event, preventDefault } = click(hrefAnchor('https://github.com/someone/untracked/pull/7'))
 
@@ -184,7 +184,7 @@ describe('openInAppUrl over github rows', () => {
     expect(navigate).not.toHaveBeenCalled()
   })
 
-// Real casing, not an invented spelling: docs/github-integration.md § Content links covers why the
+// Real casing, not an invented spelling: docs/github-integration/tasks-and-references.md § Content links covers why the
 // comparison must be case-insensitive.
   it('matches owner and repo case-insensitively, as GitHub does', () => {
     setProjectsLookup(() => [project('proj-runn', 'runn-fast', 'runn')])

@@ -8,7 +8,7 @@ import { Toolbar } from '../../kit/components/layout/Toolbar'
 import { createSettingSave } from './settingSave'
 import { useUnsavedChanges } from './unsavedChanges'
 
-// A project's run targets (docs/workflows.md § Routes and UI) as a table, where they used to be a JSON
+// A project's run targets (docs/workflows/routes-and-ui.md § Routes and UI) as a table, where they used to be a JSON
 // array typed into a box. The stored value has not changed: the `runTargets` column is still that JSON
 // array, written whole through the run-targets route, which checks it again.
 //

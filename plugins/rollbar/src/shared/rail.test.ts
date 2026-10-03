@@ -40,7 +40,7 @@ describe('Rollbar descriptor rows', () => {
       task: {
         origin: 'rollbar',
         title: 'Checkout failed',
-        // What a workflow started from this row is told (docs/workflows.md § Starting a run). Facts
+        // What a workflow started from this row is told (docs/workflows/starting-runs.md § Starting a run). Facts
         // the row already has, and no payload: an occurrence body would be a second call and would
         // walk straight past the privacy allowlist.
         body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',

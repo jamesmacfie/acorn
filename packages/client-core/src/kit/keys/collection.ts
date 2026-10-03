@@ -3,7 +3,7 @@
 // Every roving-focus list in the kit is this: `Rows`, `TreeRow` runs, `Tabs`, `Menu`, `ChipRow`,
 // `SegmentedControl`, `Timeline`, `Grid`. They differ in what they draw and in nothing else, which is
 // why the arrows, Home, End, page keys, type-ahead and `aria-activedescendant` are written once
-// rather than eight times (docs/command-palette-and-shortcuts.md § Focus and typing).
+// rather than eight times (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 //
 // The rules about the *list* — what wraps, where the first press lands, which of select and activate
 // picks — moved to `collectionIntents.ts` in terminal phase 2, so the terminal host keeps them

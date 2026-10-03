@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { shouldWarnAboutDisk } from './nodeSecurity'
 
 // The disk-encryption warning's decision, isolated from the fetch and the notice ring around it
-// (docs/data-layer.md § Backup and import). Extracted for a test because it is a three-valued input
+// (docs/data-layer/backup-and-retention.md § Backup and import). Extracted for a test because it is a three-valued input
 // to a boolean, and getting it wrong either way is easy to miss: warn on `null` and every Linux node
 // nags forever about a perfectly well encrypted volume; treat `null` as encrypted and that happens to
 // be right, which is what makes the wrong version look reasonable while you write it.

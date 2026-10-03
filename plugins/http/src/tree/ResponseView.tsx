@@ -172,7 +172,7 @@ export default function ResponseView(props: {
   error: string | null
   sending: boolean
   /** The bridge's copy: a plugin's code has no document to copy from, so the host copies on its
-   *  behalf (docs/http-client.md § Client). */
+   *  behalf (docs/http-client/client.md § Client). */
   onCopy: (text: string) => void
 }) {
   const success = createMemo((): SendSuccess | null => {

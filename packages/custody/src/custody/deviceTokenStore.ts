@@ -5,7 +5,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 
 const log = createLogger('device-token')
 
-// Device-token custody. See docs/architecture-overview.md, "How the client talks to nodes". The
+// Device-token custody. See docs/architecture-overview.md § Process ownership. The
 // renderer never holds a token, so the credential lives here and only here.
 //
 // The encryption is the shell's, injected as a `TokenCipher`, because it is the one part of custody

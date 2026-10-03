@@ -6,7 +6,7 @@ import type { PanelTone } from './model'
 // Renders a cell by its semantic type: datetime gets an age, enum
 // gets a toned chip, number gets its field's unit. Hints come off the field, never the panel, the
 // same choice model.ts makes for PanelDefinition. Pure and returns a description rather than JSX for
-// the reason docs/dashboards.md § The generated editor gives: the component that draws this can't be
+// the reason docs/dashboards/mapping-and-editor.md § The generated editor gives: the component that draws this can't be
 // tested in this repo, so the decision lives where it can be.
 
 export type FormattedCell =

@@ -1,4 +1,4 @@
-/* Invariant tokens, owned by neither axis. See docs/ui-design.md § Token axes for why. */
+/* Invariant tokens, owned by neither axis. See docs/ui-design/tokens.md § Token axes for why. */
 :root {
   /* ── Stacking ladder ───────────────────────────────────────────────────────────────────────
      Collapsed from 28 raw z-index declarations spanning 18 distinct values. See docs/ui-design.md
@@ -20,7 +20,7 @@
 
   /* ── Brand marks ───────────────────────────────────────────────────────────────────────────
      What sits on top of a brand colour. The colours themselves ride on the mark now, as `--brand`,
-     because core cannot know a third party's hex. See docs/ui-design.md § Icons. */
+     because core cannot know a third party's hex. See docs/ui-design/icons.md § Icons. */
   --brand-fg: #ffffff;
 
   /* Numeric alignment: load-bearing for diff gutters, line counts and timestamps in every pack. */

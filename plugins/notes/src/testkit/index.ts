@@ -1,4 +1,4 @@
-// The test seam for this package (docs/architecture-overview.md § Package boundaries).
+// The test seam for this package (docs/architecture/packages.md § Package boundaries).
 //
 //   apps/node/test/integration/coreTools.test.ts     notesAgentTools, NotesStore
 //   apps/node/test/integration/taskContext.test.ts   NotesStore, notesSection

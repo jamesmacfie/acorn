@@ -7,7 +7,7 @@ import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `wizard`: one step at a time, the step count on the header line, the actions on the footer line
-// (docs/panes.md § Layout model). Its projection is "unchanged", and the only thing a terminal cannot
+// (docs/panes/layout.md § Layout model). Its projection is "unchanged", and the only thing a terminal cannot
 // spend is the horizontal room a numbered indicator takes, so the indicator is `Step 2 of 5 · Repos`.
 //
 // The plugin owns which step it is on and what happens when someone advances; the host owns the

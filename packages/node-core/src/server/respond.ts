@@ -18,7 +18,7 @@ import type { AppEnv } from './middleware/auth'
 // this is the outermost one and the id is minted here: a duration nobody can tie back to a request
 // correlates with nothing. The span's name is `http.request` for every route, and the matched route
 // pattern rides as an attribute, so a hundred task ids read as one row rather than a hundred
-// (docs/telemetry.md § The admission rule for a span).
+// (docs/telemetry/model.md § The admission rule for a span).
 //
 // The owner comes from the path and never from a header. `/v1/p/<id>` is a plugin's namespace, so a
 // request under one is that plugin's; anything else is core's. Reading it from the path is what lets
@@ -47,7 +47,7 @@ export const requestIdMiddleware = createMiddleware<AppEnv>(async (c, next) => {
   try {
     // The whole request runs inside the ambient context, so a git spawn or a SQL statement anywhere
     // under this handler reports the trace and the owner without the frames in between passing
-    // either one (telemetry/context.ts, docs/telemetry.md § Ambient attribution).
+    // either one (telemetry/context.ts, docs/telemetry/runtimes.md § Ambient attribution).
     await runWithTelemetry({ traceId, spanId, owner }, next)
   } finally {
     const ms = Number(process.hrtime.bigint() - hrStart) / 1e6
@@ -128,7 +128,7 @@ export const onServerError = (err: Error, c: Context<AppEnv>) => {
   //
   // The error record carries exactly what the log line carries and no more. A boundary that already
   // withholds a message keeps withholding it once there is somewhere to send it to
-  // (docs/telemetry.md § What never leaves the machine).
+  // (docs/telemetry/model.md § What never leaves the machine).
   const code = typeof value.code === 'string' && /^[A-Z0-9_:-]{1,80}$/i.test(value.code) ? value.code : undefined
   log.error('unhandled error', {
     name: err.name,

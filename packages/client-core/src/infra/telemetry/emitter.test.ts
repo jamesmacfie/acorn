@@ -289,7 +289,7 @@ describe('histograms', () => {
   it('keeps a row per label set, so a varying label does not report one value for every series', async () => {
     // The bug this replaced merged by owner and seam alone and kept the first sample's attributes,
     // so `tui.frame` reported the layout timings under every phase's name
-    // (docs/telemetry.md § Hot seams are metrics).
+    // (docs/telemetry/model.md § Hot seams are metrics).
     start()
     setTelemetryEnabled(true)
     for (const phase of ['layout', 'paint', 'flush']) {

@@ -1,4 +1,4 @@
-// The two places another plugin may come into this pane (docs/plugins.md § Cooperative extension
+// The two places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative extension
 // points): a mark on a line of the diff, and a button under the branch bar once the work is pushed.
 // The host mints the qualified ids from the bare ones. The node-side `changes:before-commit` and
 // `changes:before-push` hooks are declared in ../node/index.ts instead, because a hook runs there.

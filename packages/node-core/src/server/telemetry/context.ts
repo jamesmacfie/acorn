@@ -5,7 +5,7 @@
 // nothing about their caller, so their histograms all read `owner: core` and answer "the node spent
 // four seconds in git" without answering whose four seconds. Threading an owner down to them would
 // change hundreds of signatures. Entering one store at the five seams that already know touches
-// five (docs/telemetry.md § Ambient attribution).
+// five (docs/telemetry/runtimes.md § Ambient attribution).
 //
 // **It holds three fields and no more.** A request-scoped logger or a per-request deadline could
 // ride the same store later; a bag of whatever a caller felt like adding could not be reasoned

@@ -1,7 +1,7 @@
 // The plugin's domain-to-StatusDot tone mapping, declared once.
 //
 // StatusDot takes a semantic tone, not a domain state, because the shared component has no business
-// knowing what "reconnecting" means. See docs/ui-design.md § The closed kit.
+// knowing what "reconnecting" means. See docs/ui-design/closed-kit.md § The closed kit.
 
 import type { AgentSubagentStatus } from '../../contract/wire.ts'
 
@@ -24,7 +24,7 @@ export const runtimeTone = (state: string): Tone => {
 }
 
 /** The icon for a runtime state, beside the tone above, because the two are one decision: a shape
- *  and a colour saying the same thing. Host icon names (docs/ui-design.md § Icons), so both the
+ *  and a colour saying the same thing. Host icon names (docs/ui-design/icons.md § Icons), so both the
  *  sidebar's own markup and the dashboard panel's enum values draw from this one map. */
 const RUNTIME_ICON: Record<string, string> = {
   creating: 'clock',

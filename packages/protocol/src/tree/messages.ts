@@ -1,5 +1,5 @@
 // The wire between a plugin's sandbox and the host renderer: nodes, a mutation batch, an event, and
-// the mount lifecycle. See docs/plugins.md § The tree contract.
+// the mount lifecycle. See docs/plugins/tree-contract.md § The tree contract.
 //
 // Nothing here names the DOM. A terminal host applies the same mutations to a cell buffer, and the
 // events are the kit's twelve semantic names rather than keys or pointers, so a terminal host maps
@@ -46,7 +46,7 @@ export const TREE_LIMITS = {
   hostRequestMs: 10_000,
 } as const
 
-/** What a tree may ask the host for, as opposed to describe to it (docs/plugins.md § Asking the host).
+/** What a tree may ask the host for, as opposed to describe to it (docs/plugins/tree-contract.md § Asking the host).
  *
  *   owner.invoke   call one action the owning extension point declared and this `Slot` bound.
  *   overlay.open   present the one overlay frame this contribution's own descriptor associated.

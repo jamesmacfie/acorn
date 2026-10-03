@@ -81,7 +81,7 @@ export function Row(props: {
    *  frame is a separate document with no Router above it. */
   href?: string
   /** Absolute placement from a virtualizer, in pixels. A measurement, not a design decision: a
-   *  virtualizer computes both and no stylesheet can. See docs/ui-design.md § The closed kit. */
+   *  virtualizer computes both and no stylesheet can. See docs/ui-design/closed-kit.md § The closed kit. */
   offset?: number
   height?: number
   /** The accessible name, where the row's own text is not one. */
@@ -111,7 +111,7 @@ export function Row(props: {
    *  JSON, so an `Icon` element cannot cross the wire; a name can. `collapsed` wins when both are set. */
   collapsedIcon?: string
   title?: string
-  /** The app's tooltip for the row at full width (docs/ui-design.md § Tooltips). A collapsed row's
+  /** The app's tooltip for the row at full width (docs/ui-design/tooltips.md § Tooltips). A collapsed row's
    *  tip stays its name. `tipAt` adds a relative age under whichever tip is showing. A row with a tip
    *  drops the browser's `title` tooltip, which would otherwise open on top of it. */
   tip?: string

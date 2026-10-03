@@ -3,7 +3,7 @@
 // secret resolution must not be reachable through an internal token.
 //
 // A factory over the plugin's own database, not a module-scope router reading a handle off `c.env`
-// (docs/data-layer.md § Plugin databases).
+// (docs/data-layer/plugin-databases.md § Plugin databases).
 //
 // http ships as a loaded plugin, so these routes run behind `portableCarrier`. A loaded bundle sits
 // outside the host's Hono stack, so the identity comes off the request context rather than
@@ -231,7 +231,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
     // The host draws these three, not this plugin's frame. A descriptor's data has to come from a
     // route, because the node is always running and a frame is not.
 
-    // The rail's list of this project's saved requests (docs/http-client.md § Client, "the rail
+    // The rail's list of this project's saved requests (docs/http-client/client.md § Client, "the rail
     // source"). `?project=` is minted by the host from the shell's routed project
     // (client-core/host/chrome/chromeData.ts § scopedSourceItemsPath).
     //
@@ -257,7 +257,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
       } satisfies PluginRailItems)
     })
 
-    // ── The command palette's rows (docs/plugins.md § Command kinds) ──
+    // ── The command palette's rows (docs/plugins/commands.md § Command kinds) ──
 
     // The `Find a saved request` command's rows, over the same set the rail lists.
     //
@@ -351,7 +351,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
     })
 
     // The agent composer's option list and capture, for the task the composer named
-    // (docs/http-client.md § Client). Both resolve the project from the task rather than taking one
+    // (docs/http-client/client.md § Client). Both resolve the project from the task rather than taking one
     // from the caller: a project parameter here would be a second thing to check ownership of.
     //
     // The set is this task's ad-hoc requests, so a task with no ad-hoc requests offers nothing.

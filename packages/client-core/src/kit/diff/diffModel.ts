@@ -92,14 +92,14 @@ export type TokenizeLine = (path: string, content: string) => Tok[]
 export const isCodeRow = (r: Row): r is CodeRow => r.kind === 'normal' || r.kind === 'insert' || r.kind === 'delete'
 export const fileAnchor = (path: string) => `diff-file:${path}`
 
-// Fixed row heights, and the single source for these numbers (docs/diff-rendering.md § Row geometry).
+// Fixed row heights, and the single source for these numbers (docs/diff-rendering/geometry.md § Row geometry).
 export const DIFF_LINE_HEIGHT = 20
 export const DIFF_FILE_HEADER_HEIGHT = 36
 export const DIFF_THREAD_HEIGHT = 140
 export const DIFF_RESOLVED_THREAD_HEIGHT = 50
 export const DIFF_GAP_ROW_HEIGHT = 28
 
-// Widest code line, in columns of 1ch (see docs/diff-rendering.md § Row geometry for why the row
+// Widest code line, in columns of 1ch (see docs/diff-rendering/geometry.md § Row geometry for why the row
 // canvas has to be this wide rather than sized by layout). Tabs advance to the next stop
 // (@acorn/diff-document § lineColumns).
 export const maxLineCols = (rows: readonly Row[]) => {
@@ -151,7 +151,7 @@ export function highlighterTokenize(hl: Awaited<ReturnType<typeof getHighlighter
 /**
  * Plain rows as the renderer's rows: the path and the new-side key put back, and every code line
  * showing its raw text until enrichment colours it. This is what a loaded segment paints first
- * (docs/diff-rendering.md § Parsing and highlighting).
+ * (docs/diff-rendering/loading.md § Parsing and highlighting).
  */
 export function diffRowsFromPlain(path: string, sha: string | null, plain: readonly PlainDiffRow[]): DiffRow[] {
   return plain.map((row): DiffRow => {

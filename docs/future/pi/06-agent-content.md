@@ -110,7 +110,7 @@ reached. Disabling one removes it at the next start or resume.
   commands for free. A command for every harness would be a composer feature that expands a template
   before sending, which `agents:before-send` with `transform` can already do.
 - **Subagent definitions.** These are custom agents, which a plugin can contribute today
-  ([managed-agents.md § From a plugin](../../managed-agents.md#from-a-plugin)).
+  ([managed-agents.md § From a plugin](../../managed-agents/custom-agents.md#from-a-plugin)).
 - **Hooks.** Claude Code plugin hooks run shell commands inside Claude only. They are code, and they
   belong to the harness's trust model, not acorn's.
 

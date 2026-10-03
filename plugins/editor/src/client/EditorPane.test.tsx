@@ -508,7 +508,7 @@ describe('the editor pane', () => {
 
   // The waterfall the pane used to make a reader sit through: the checkout path, then the mount that
   // path gated, then the file. The file the reader left open does not depend on the path, so it goes
-  // out beside it (docs/editor.md § One round trip to text).
+  // out beside it (docs/editor/editor-pane.md § One round trip to text).
   it('reads the remembered file while the checkout path is still in flight', async () => {
     editorOpen(taskId, 'a.ts', false)
     let releaseRoot!: (path: string) => void

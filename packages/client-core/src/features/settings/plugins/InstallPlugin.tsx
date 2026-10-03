@@ -15,7 +15,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 // its own form stored before, through the same call.
 //
 // No browse-and-discover list, because anything acorn could offer there would be unreviewed
-// (docs/plugins.md § Non-goals).
+// (docs/extensibility.md § Some decisions that look like gaps).
 
 export type InstallTarget = 'node' | 'device'
 type SourceKind = 'github' | 'npm' | 'url' | 'path'
@@ -113,7 +113,7 @@ export function InstallPlugin(props: {
           </Show>
         </SettingRow>
         {/* A folder is linked, not copied, so it is the one install whose bytes keep changing after the
-            fact (docs/security.md § Installing from a folder). */}
+            fact (docs/security/plugin-install.md § Installing from a folder). */}
         <Show when={kind() === 'path' && target() === 'node'}>
           <Alert tone="warn">
             acorn links to this folder instead of copying it. Whatever is in it when the node starts is what runs, so acorn

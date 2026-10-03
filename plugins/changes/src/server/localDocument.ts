@@ -1,4 +1,4 @@
-// A working tree's diff as a document (docs/diff-rendering.md § The document): the stacked files'
+// A working tree's diff as a document (docs/diff-rendering/document.md § The document): the stacked files'
 // patches, cut into segments on the node, answered as descriptors, and then segment by segment as the
 // viewer comes near them.
 //

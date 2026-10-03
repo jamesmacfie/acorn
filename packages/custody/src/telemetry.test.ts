@@ -10,7 +10,7 @@ import { _resetHelperMarks, helperMark } from './bootMarks'
 import { recordCrash } from './supervision/crashBudget'
 import { FOOTPRINT_MS, startHelperTelemetry, type HelperTelemetry } from './telemetry'
 
-// What the helper reports and how it leaves (docs/shell.md § What the helper reports).
+// What the helper reports and how it leaves (docs/shell/node-child.md § What the helper reports).
 //
 // The broker is a stub rather than a real socket: what is under test is which batches this builds
 // and when, and `nodeBroker.test.ts` already drives the real one against a real server.

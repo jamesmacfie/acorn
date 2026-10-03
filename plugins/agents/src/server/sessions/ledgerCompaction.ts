@@ -20,7 +20,7 @@ import { cardKeyColumns, cardKeyOf, foldCard, parseStoredEvent, type CardKeyFiel
 // could hold, so it folds to the same card whichever prefix that is.
 //
 // The space it frees stays inside the file, because the database has no auto-vacuum and turning it
-// on takes a full VACUUM. New rows reuse the pages. docs/data-layer.md § Retention says why nothing
+// on takes a full VACUUM. New rows reuse the pages. docs/data-layer/backup-and-retention.md § Retention says why nothing
 // here runs a VACUUM.
 
 export type LedgerCompaction = { sessions: number; deleted: number; rewritten: number }

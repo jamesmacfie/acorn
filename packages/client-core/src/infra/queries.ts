@@ -116,7 +116,7 @@ export const prefsOptions = (enabled: boolean) => ({
 })
 
 // What Settings → Telemetry draws under the switch: counters from the node's collector, per owner
-// and kind, plus who is subscribed (docs/telemetry.md § What the page shows).
+// and kind, plus who is subscribed (docs/telemetry/diagnosis.md § What the page shows).
 //
 // It refetches every five seconds while the page is open, which is the collector's own flush
 // window. Counts that move while you watch are the evidence the switch is doing something, and a
@@ -155,7 +155,7 @@ export const integrationsOptions = (enabled: boolean) => ({
 // Everything a Generate control can spend: every connected model-provider key, plus every agent CLI
 // installed on this machine. Its own query rather than a projection of `integrationsOptions`, because
 // half the answer is a question only the node can answer — whether `claude` is on PATH — and the node
-// probes it per read (docs/integrations.md § Model providers).
+// probes it per read (docs/integrations/model-providers.md § Model providers).
 //
 // A short `staleTime`, unlike the five minutes integrations get: installing a CLI is a trip to a
 // terminal and back, and a list that took five minutes to notice would look broken.

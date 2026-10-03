@@ -48,7 +48,7 @@ describe('priming the managed-session roster', () => {
     activateManagedAgentNotifications()
     await settle()
     // The regression this exists for: `acorn` draws its shell in front of a node it just started
-    // (docs/tui.md § Attach or start), so a prime at activation was a request that could only come
+    // (docs/tui/process.md § Attach or start), so a prime at activation was a request that could only come
     // back ECONNREFUSED, with a stack printed onto a terminal the renderer owns.
     expect(sessionCalls).toHaveLength(0)
 

@@ -1,4 +1,4 @@
-// Turning a definition back into the file the loader reads (docs/workflows.md § Database
+// Turning a definition back into the file the loader reads (docs/workflows/definitions.md § Database
 // definitions). "Save to repo" is the one caller: a row drafted in the editor becomes
 // `.acorn/workflows/<slug>.toml`, which the trust snapshot then covers like any other committed
 // configuration.

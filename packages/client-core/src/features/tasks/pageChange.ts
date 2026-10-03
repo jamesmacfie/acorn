@@ -8,7 +8,7 @@ import {
 } from '../../infra/telemetry/emitter'
 
 // The `nav.change` span: how long it takes between asking for a different page and seeing one
-// (docs/frontend.md § Telemetry).
+// (docs/frontend/shell-state.md § Telemetry).
 //
 // A page change here is a signal write, not a navigation. Routes mount a no-op component and
 // `App.tsx` draws from `selectedSource()` and `activeTaskId()`, so there is no router event to hang

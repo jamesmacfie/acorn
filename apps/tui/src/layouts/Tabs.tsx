@@ -9,7 +9,7 @@ import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 import { PANE } from '../keys/tiers'
 
-// `tabs`: the bar is one line, the current panel below (docs/panes.md § Layout model).
+// `tabs`: the bar is one line, the current panel below (docs/panes/layout.md § Layout model).
 //
 // Distinct from the `Tabs` kit node this borrows the strip from, which switches panels inside a tree.
 // This is for a pane whose top level is tabs, so the host persists the selection under the pane id —

@@ -1,6 +1,6 @@
 import type { PanelDefinition } from './model'
 
-// What makes a recorded series still true. See docs/dashboards.md § Sampling and retention for what
+// What makes a recorded series still true. See docs/dashboards/sampling.md § Sampling and retention for what
 // goes into the signature and why the rest is left out.
 
 /** Deterministic JSON: object keys sorted at every depth, so two definitions that differ only in the

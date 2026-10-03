@@ -14,7 +14,7 @@ import { _resetBoot, bootMark, emitBootSpans } from './boot'
 import { renderFixture } from './harness'
 
 // What this host reports, through the app rather than through the seams
-// (docs/tui.md § What the terminal client reports).
+// (docs/tui/reporting.md § What the terminal client reports).
 //
 // The fixture is the point. A frame histogram asserted by calling `screen.frame()` on a renderer
 // built here would be testing four `performance.now()` reads; driven through `renderFixture` it is

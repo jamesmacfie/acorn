@@ -62,7 +62,7 @@ Revisit: if owners ask for "always a different family" often enough that picking
 
 `omp` lets an extension register a full model provider with streaming and usage reporting. Acorn's
 loaded plugins can already register a model adapter through `ctx.providers.model` for a connection
-provider they own ([integrations.md § Model providers](../../integrations.md#model-providers)). Agent
+provider they own ([integrations.md § Model providers](../../integrations/model-providers.md#model-providers)). Agent
 sessions spend the harness's own login, not acorn's keys, so a provider registered in acorn would not
 reach Claude or Codex sessions anyway.
 

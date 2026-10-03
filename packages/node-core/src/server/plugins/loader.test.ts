@@ -449,7 +449,7 @@ export default { name: 'socket-client', marker: typeof dns.lookup, promises: typ
   })
 })
 
-// What the node offers to devices (docs/plugins.md § Loaded plugins). The hash here is a claim the
+// What the node offers to devices (docs/plugins/loaded-plugins.md § Loaded plugins). The hash here is a claim the
 // device cross-checks against the bytes it receives; it is never the thing trust binds to.
 describe('the installed enumeration', () => {
   it('reports the client bundle hash and size', async () => {
@@ -520,7 +520,7 @@ describe('the installed enumeration', () => {
 })
 
 // The manifest is the only place a shell contribution can be declared, so what it parses is the whole
-// vocabulary a third-party plugin's UI has (docs/plugins.md § Loaded plugins).
+// vocabulary a third-party plugin's UI has (docs/plugins/loaded-plugins.md § Loaded plugins).
 describe('declared frame contributions', () => {
   const withFrames = (frames: unknown[]) =>
     manifest('board', { client: './dist/client.js', contributions: { frames } })

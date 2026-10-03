@@ -37,12 +37,12 @@ export const DRAFT_PREFIX = 'changes:commit-draft:'
 
 export function createCommitState(deps: CommitDeps) {
   // A draft is losable and device-local by the recorded decision
-  // (docs/state-ownership.md § Scope rules), which is what lets it live in `localStorage` rather than
+  // (docs/state-ownership/scope-rules.md § Scope rules), which is what lets it live in `localStorage` rather than
   // in a row somebody has to migrate. Written on every keystroke and reseeded when the task changes.
   //
   // Held here, above the footer, because the footer is a region the host can unmount on its own:
   // below 80 columns the pane shows the list or the diff and never both, and a message typed before
-  // a trip to the diff has to still be there afterwards (docs/panes.md § Layout model).
+  // a trip to the diff has to still be there afterwards (docs/panes/layout.md § Layout model).
   const [draft, setDraft] = createSignal('')
   persistDraft(() => deps.taskId, draft, setDraft, DRAFT_PREFIX)
 

@@ -50,7 +50,7 @@ export type AttachTaskPullInput = {
 
 export type TaskService = {
   // The task's plugin-facing projection (server/worktrees/taskWorktree.ts § TaskRef), or undefined when the id
-  // does not resolve. A TaskRef, never the `tasks` row (docs/plugins.md § What is published, and
+  // does not resolve. A TaskRef, never the `tasks` row (docs/plugins/publishing.md § What is published, and
   // what acorn promises about it).
   load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree
@@ -60,7 +60,7 @@ export type TaskService = {
   // collapsing to null, which is reserved for read-only panes that can show an empty state.
   requireRoot(taskId: string): Promise<string>
   // The cwd a task's commands run in, creating the worktree on first use
-  // (docs/workspaces-and-tasks.md § Worktrees and setup). Takes the row rather than the id, because
+  // (docs/workspaces-and-tasks/worktrees.md § Worktrees and setup). Takes the row rather than the id, because
   // the one caller already loaded it and re-reading would be a second query across a database
   // boundary.
   resolveCwd(task: TaskRef | undefined, baseCheckout: string | undefined): Promise<{ cwd: string; isWorktree: boolean; created: boolean }>
@@ -120,7 +120,7 @@ export type CompiledTaskService = TaskService & {
   /** Replay-safe root creation for internal orchestrators such as approved workflow schedules. */
   createRoot(projectId: string, seed: RootTaskSeed, intendedTaskId: string): Promise<string>
   // Every task archived before `before`, a millisecond timestamp. plugins/agents reads it to remove the
-  // agent history of tasks archived longer than the owner keeps it (docs/data-layer.md § Retention).
+  // agent history of tasks archived longer than the owner keeps it (docs/data-layer/backup-and-retention.md § Retention).
   // Only tasks still archived: a restore clears `archivedAt`, so a restored task is never in the list.
   // First-party only, because deleting on a task's archive date is a retention policy and no loaded
   // plugin has one. plugins/permissions.ts § scopeCore strips it from the loaded tier's facet.

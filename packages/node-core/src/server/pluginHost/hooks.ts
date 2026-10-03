@@ -1,10 +1,10 @@
-// A turn in a decision before it happens (docs/plugins.md § Hooks).
+// A turn in a decision before it happens (docs/plugins/hooks.md § Hooks).
 //
 // Everything else in the extension-point family is about drawing. This one is about deciding. The owner
 // declares the moment and what is allowed at it, contributors register a handler, and this module runs
 // the chain and hands the owner a verdict.
 //
-// A hook is not an event (docs/plugins/node-side-extension-points.md § Hooks). An event has already
+// A hook is not an event (docs/plugins/hooks.md § Hooks). An event has already
 // happened, fans out, and carries no answer; a hook runs before, in order, with a return value, a
 // timeout and a validated payload. The two contracts stay different on purpose: a producer that
 // declares no `emits` has said no to listeners, and an owner that declares no hook has said no to
@@ -212,7 +212,7 @@ export const hookHandlers = (): (HookHandlerRegistration & { matched: boolean; l
 
 // One handler's turn in the chain: when it started, and the ids its span and everything it does
 // inside it share. A chain is one trace, not one per handler, because three handlers answering one
-// question are one thing that happened (docs/telemetry.md § Traces). Empty ids when nothing is
+// question are one thing that happened (docs/telemetry/model.md § Traces). Empty ids when nothing is
 // collecting, so a chain costs no allocation it will not use.
 type HookRun = { started: number; traceId: string; spanId: string }
 const beginRun = (traceId: string): HookRun => ({ started: Date.now(), traceId, spanId: traceId ? newSpanId() : '' })

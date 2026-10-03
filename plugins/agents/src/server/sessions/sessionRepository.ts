@@ -53,7 +53,7 @@ const jsonOrUndefined = (roster: AgentSubagent[] | undefined): string | undefine
  * superseded rows into the new one in the same step (./ledgerFold.ts). Turn queue operations remain in
  * AgentStore; both slices share one inherited database handle.
  *
- * See docs/managed-agents.md § Session model for how a workspace-scoped read resolves task ids
+ * See docs/managed-agents/sessions.md § Session model for how a workspace-scoped read resolves task ids
  * through core before filtering this plugin's own tables.
  */
 export class AgentSessionRepository {
@@ -124,7 +124,7 @@ export class AgentSessionRepository {
       // reader can never see a roster that disagrees with the ledger it was folded from. It is on the
       // row rather than in a table of its own because runtimeEngine.record() broadcasts the row
       // whenever an event changes it, which is what makes the sidebar's sub-rows live for a session nobody
-      // has opened (docs/managed-agents.md § Subagents).
+      // has opened (docs/managed-agents/subagents.md § Subagents).
       // An event the harness attributed to a child marks that child heard from, which is what keeps a
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
       // clock the roster has is one that stopped ticking minutes ago.
@@ -560,7 +560,7 @@ export class AgentSessionRepository {
     return { attachmentIds, artifactObjects }
   }
 
-  // Removing a session's history, for the retention pass (docs/data-layer.md § Retention). It works in
+  // Removing a session's history, for the retention pass (docs/data-layer/backup-and-retention.md § Retention). It works in
   // three steps so the caller can yield between them: find a session, delete its events a batch at a
   // time, then finish it. The session row stays, so an archived or restored task still lists the
   // session, and its transcript says what happened to it.

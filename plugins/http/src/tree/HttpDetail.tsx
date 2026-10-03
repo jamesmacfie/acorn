@@ -1,5 +1,5 @@
 // The API panel's `detail` region: the request being edited, its tabs, and what came back
-// (docs/http-client.md § Client). The variables editor takes the same region when the list's
+// (docs/http-client/client.md § Client). The variables editor takes the same region when the list's
 // Variables button is on, because it is what the reader asked to look at.
 //
 // A region rather than a column inside one tree. Everything it shares with the list beside it is in

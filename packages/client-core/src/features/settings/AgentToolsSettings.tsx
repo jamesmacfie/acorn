@@ -16,7 +16,7 @@ import { openPluginPage } from './plugins/installed'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import type { SettingsNavigate } from '../../host/registries/shell/settings'
 
-// Settings → Agents → Tools and permissions (docs/agent-tools.md § Projections): the permission surface
+// Settings → Agents → Tools and permissions (docs/agent-tools.md § Permissions): the permission surface
 // over the agent-tool registry. The three risk tiers (read, write, execute) come first, then every tool,
 // grouped by the plugin that contributed it or by its tier. A tier switch and the per-tool switches
 // persist as one prefs slice. Turning a tier or tool off removes it from every projection (MCP

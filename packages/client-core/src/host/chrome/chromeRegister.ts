@@ -56,7 +56,7 @@ const log = createLogger('plugin-chrome')
 // Same shape as that file: one module-level map of per-plugin disposables, a dispose-then-register pass
 // so a re-run replaces a plugin's whole contribution set rather than reconciling it, and a per-surface
 // try/catch so one duplicate id doesn't cost the plugin its other chrome. What differs is the gate:
-// frames asks `trusted`, chrome asks the weaker `hasWithheldCode` (docs/plugins.md § One shared
+// frames asks `trusted`, chrome asks the weaker `hasWithheldCode` (docs/plugins/distribution.md § One shared
 // eligibility and trust check).
 //
 // Per-node presence stays the render-time gate. A plugin installed on node A contributes nothing to a

@@ -29,7 +29,7 @@ import { githubBrowsePath, githubCreateRoute } from './clientRoutes'
 // project is routed, which pull request is open, and where to navigate. A plugin's `init` runs at boot
 // with no router in scope. They are consequently core-owned per-mount registrations at the root rather
 // than a github-owned group, because a group would have to be registered from the same place to be
-// parentable at all (docs/command-palette-and-shortcuts.md § What the palette refuses). The one
+// parentable at all (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses). The one
 // command here that needs no router — the rail source — is in ./index.ts through `ctx`.
 
 /** At most this many pull requests reach the palette. The host caps a search at 50 anyway; saying it

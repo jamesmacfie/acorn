@@ -1,6 +1,6 @@
 // GitHub's own content-link recognisers, and one click handler that adds github's project resolution
 // to the host's ladder. The general registry, target type, and `parseInAppTarget` live in
-// @acorn/client-core/host/registries/panes/contentLinks.ts (docs/plugins.md § Client authoring and the UI kit).
+// @acorn/client-core/host/registries/panes/contentLinks.ts (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit).
 import {
   activeTaskId,
   allProjects,
@@ -23,14 +23,14 @@ const GH_RESERVED = new Set(['orgs', 'sponsors', 'settings', 'notifications', 'm
 //
 // The PR recogniser declares `providerId: 'github'` so a click can open the reference panel
 // (./PullRefPanel.tsx). The repo recogniser declares none, because a repository is a list rather than
-// a card (docs/github-integration.md § Content links).
+// a card (docs/github-integration/tasks-and-references.md § Content links).
 export const githubContentLinkContributions: ContentLinkContribution[] = [
   {
     id: 'github.pull-request',
     providerId: 'github',
     parse: (href) => {
       const match = GH_PR_RE.exec(href)
-      // `item` is what makes the panel reachable (docs/plugins.md § Client authoring and the UI kit).
+      // `item` is what makes the panel reachable (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit).
       // Spelled `owner/repo#number`, the same identity the pull-request source gives its rows, so a row,
       // a URL, and the panel name the same thing.
       return match ? { kind: 'pr', owner: match[1], repo: match[2], number: match[3], item: formatPullRef(match[1], match[2], match[3]) } : null
@@ -58,7 +58,7 @@ const str = (value: unknown): string => (typeof value === 'string' ? value : '')
 // owner/name to the project acorn tracks it as. Null means an untracked repo, which is a normal
 // answer: `makeContentLinkHandler` below falls through to the browser for that case.
 //
-// Compared case-insensitively (docs/github-integration.md § Content links). GitHub treats owner and
+// Compared case-insensitively (docs/github-integration/tasks-and-references.md § Content links). GitHub treats owner and
 // repo names as case-insensitive, and the URL's casing does not match `projects.github_owner`.
 const eq = (a: unknown, b: unknown): boolean => str(a).toLowerCase() === str(b).toLowerCase()
 
@@ -66,7 +66,7 @@ const projectIdFor = (target: InAppTarget): string | null =>
   allProjects().find((project) => eq(project.github?.owner, target.owner) && eq(project.github?.name, target.repo))?.id ?? null
 
 // A delegated click handler for a PR content container, wrapping the host's
-// `handlePluginContentLinkClick` (docs/plugins.md § Client authoring and the UI kit). A null from
+// `handlePluginContentLinkClick` (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit). A null from
 // `projectIdFor` means an untracked repo, and the URL opens the real github.com page.
 //
 // `prefer: 'refPanel'` is the one local choice: a reader half-way through a diff who clicks a link

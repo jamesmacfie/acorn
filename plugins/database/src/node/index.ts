@@ -31,7 +31,7 @@ export const databasePlugin = (): NodePlugin => {
       bridge = data
       ctx.routes.fetch(createDatabaseFetch(db, ctx.core, data, ctx.events.send), { prefix: '', note: '/tasks/:taskId/*' })
       // One read path for the two workflow steps and for anything later that wants a repo's data, so
-      // the row cap and the read-only refusal are written once (docs/database.md § Workflow steps).
+      // the row cap and the read-only refusal are written once (docs/database/palette-and-workflows.md § Workflow steps).
       const query = databaseQuery(data)
       ctx.capabilities.provide(DATABASE_QUERY, query)
       // Contributed rather than granted, like http's step: workflows opens the point and any plugin may

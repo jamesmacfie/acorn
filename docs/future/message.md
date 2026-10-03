@@ -10,8 +10,8 @@ them. Acorn shipped the parent-to-child half first: `agent_spawn`, `agent_prompt
 still under consideration.
 
 Owning docs win where this disagrees with them.
-[agent-tools.md](../agent-tools.md#managed-session-orchestration) holds the five orchestration tools,
-and [managed-agents.md](../managed-agents.md#reports-back-to-the-owner) holds the reports, the role
+[agent-tools.md](../agent-tools/orchestration.md#managed-session-orchestration) holds the five orchestration tools,
+and [managed-agents.md](../managed-agents/delegation.md#reports-back-to-the-owner) holds the reports, the role
 note, and the labels.
 
 ## What the reference apps do

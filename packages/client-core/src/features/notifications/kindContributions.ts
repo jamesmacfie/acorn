@@ -12,7 +12,7 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'run-failed', glyph: 'triangle-alert', severity: 'danger', toast: true },
   { id: 'background-error', glyph: 'triangle-alert', severity: 'danger', toast: false },
   { id: 'repo-config-trust', glyph: 'triangle-alert', severity: 'warn', toast: true },
-  // An agent asked for a plugin to be installed, updated or removed (docs/plugins.md §
+  // An agent asked for a plugin to be installed, updated or removed (docs/plugins/agent-install.md §
   // Approval-mediated install). `toast: true` because it's a question waiting on the owner, and unlike
   // the plugin-authored `plugin` kind below, its title is written by acorn and names no agent text.
   { id: 'plugin-request', glyph: 'puzzle', severity: 'warn', toast: true },
@@ -23,7 +23,7 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'agent-completed', glyph: 'circle-dot', severity: 'info', toast: true },
   { id: 'agent-needs-input', glyph: 'circle-alert', severity: 'warn', toast: true },
   { id: 'agent-error', glyph: 'triangle-alert', severity: 'danger', toast: true },
-  // The one-time disk-encryption warning (docs/data-layer.md § Backup). `toast: false` deliberately: an
+  // The one-time disk-encryption warning (docs/security/audit.md § Filesystem and backup). `toast: false` deliberately: an
   // OS notification fires whether or not the window has focus, and this is a standing condition rather
   // than something that just happened. It belongs in the bell.
   { id: 'disk-unencrypted', glyph: 'triangle-alert', severity: 'warn', toast: false },

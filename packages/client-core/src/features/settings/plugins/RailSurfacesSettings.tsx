@@ -17,7 +17,7 @@ import { createSettingSave, type SettingSave } from '../settingSave'
 import { savePref } from '../savePref'
 
 // Settings > Plugins > Rail and surfaces: what plugins put in this device's chrome
-// (docs/frontend.md § Rail source visibility). A switch for every plugin source's left-rail icon, so a
+// (docs/frontend/rail-and-routing.md § Rail source visibility). A switch for every plugin source's left-rail icon, so a
 // source that starts hidden, or one whose plugin has no settings page, can always be found and shown.
 // Then the core surfaces a plugin has offered to draw instead of acorn.
 //
@@ -83,7 +83,7 @@ function RailSources() {
   )
 }
 
-// The exclusive-slot picker (registries/exclusiveSlots.ts, docs/plugins.md § Replacing a core
+// The exclusive-slot picker (registries/exclusiveSlots.ts, docs/plugins/replacing-core-surfaces.md § Replacing a core
 // surface). Hides when nobody has offered a replacement.
 function ReplacedSurfaces() {
   const qc = useQueryClient()

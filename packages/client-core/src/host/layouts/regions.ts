@@ -1,8 +1,8 @@
 import type { JSX } from 'solid-js'
 import type { PaneLayoutName } from '@acorn/protocol/paneLayouts.ts'
 
-// What every layout is handed. See docs/panes.md § Layout model for the two layers of layout and
-// docs/panes.md § Layout model for each layout's regions and its narrow and terminal projections.
+// What every layout is handed. See docs/panes/layout.md § Layout model for the two layers of layout and
+// docs/panes/layout.md § Layout model for each layout's regions and its narrow and terminal projections.
 //
 // One props type for all seven layouts rather than seven, because the render path in
 // registries/panes.ts and, from phase 3, the remote root both build these props without knowing which

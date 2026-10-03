@@ -32,7 +32,7 @@ import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 // A plain module rather than two memos inside the dialog, for the reason frames/layouts.ts gives:
 // the repo's client suites run in bare Node with no Solid transform, so anything in a `.tsx` file is
 // structurally untestable, and the two things here are the ones worth pinning. The tier split is a
-// security claim (docs/security.md § Design rules, rule 6): `Enforced` is a fence the client broker and
+// security claim (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6): `Enforced` is a fence the client broker and
 // isolated Node worker hold; `Declared` describes plugin-authored scheduled/check behavior, and the
 // three lists may never be merged. And `decide` is
 // where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
@@ -78,7 +78,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         // agent, and a second line when it also declares a one-shot text mode, because that is a second
         // invocation with its own arguments. `Enforced`, because the host spawns exactly the declared
         // command with the declared arguments and the plugin never gets a process of its own
-        // (docs/managed-agents.md § Harnesses).
+        // (docs/managed-agents/harnesses.md § Harnesses).
         ...harnessPermissionLines(harnessGrants(installed.contributions)),
         ...agentToolPermissionLines(agentToolGrants(installed.contributions)),
       ],

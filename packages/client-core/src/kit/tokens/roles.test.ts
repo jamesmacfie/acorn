@@ -5,7 +5,7 @@ import { ROLE_ENUMS, type RoleName } from './tokens'
 
 // A role with no answer on a host is a value pretending to be a meaning, so both columns are
 // checked. The DOM column must name a token the appearance contract already declares, or a pack
-// could never move it. See docs/ui-design.md § Token axes.
+// could never move it. See docs/ui-design/tokens.md § Token axes.
 //
 // The terminal column is checked twice over, because it says two things now: a sentence, which is
 // the documentation, and the cells a component is handed. `ignored` is an answer in both — the

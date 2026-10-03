@@ -3,7 +3,7 @@ import { detectBackend, notification, sanitise, sequence, wrapTmux } from './not
 
 // The sequences byte for byte, because there is no reply to check them against: a terminal that does
 // not understand one ignores it in silence, so the only place a mistake can be caught is here.
-// The backend table and each sequence are documented in docs/notifications.md § The channels.
+// The backend table and each sequence are documented in docs/notifications/channels.md § The channels.
 
 const ESC = '\u001b'
 

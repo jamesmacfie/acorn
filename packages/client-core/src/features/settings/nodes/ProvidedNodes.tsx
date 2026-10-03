@@ -25,7 +25,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 import '../../fleet/nodes.css'
 
 // Settings → Nodes, second half: the nodes a plugin's node provider knows about, and the four
-// lifecycle verbs (docs/plugins.md § Node providers).
+// lifecycle verbs (docs/plugins/node-providers.md § Node providers).
 //
 // Beside the paired list rather than on Fleet home, because Fleet home only appears once more than one
 // node is paired, and the first cloud node someone adopts is adopted while exactly one node exists.
@@ -107,7 +107,7 @@ export default function ProvidedNodes() {
         help="Machines a plugin, such as a cloud provider, can run for you. Add one to use it here. acorn checks its identity when it connects."
       >
         {/* A provider that could not answer is a line, never a failed page: the rest of the list is
-            still true (docs/architecture-overview.md § Client state and fleet behavior). */}
+            still true (docs/architecture/fleet.md § Client state and fleet behavior). */}
         <For each={providerFailures(provided())}>
           {(failure) => <Alert tone="warn" variant="banner">{providerName(failure.providerId)} couldn't list its machines: {failure.reason}</Alert>}
         </For>

@@ -1,5 +1,5 @@
 -- Index each assistant or reasoning message once instead of each streamed fragment, and put tool text in
--- its own column so it can rank below the conversation (docs/managed-agents.md § Transcript search).
+-- its own column so it can rank below the conversation (docs/managed-agents/transcript-search.md § Tool rows).
 --
 -- A streamed message is a run of `append` events in one session, consecutive by seq, with the same type,
 -- turn and message id: the same test DurableAgentEventBuffer uses to coalesce them. The first event of

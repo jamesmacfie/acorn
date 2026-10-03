@@ -133,7 +133,7 @@ export async function generateTextForHarness(
     const text = run.capture.result?.trim() ?? ''
     if (run.status !== 'ok' || !text) {
       // The stderr tail goes to the log and never to the client, which is the flatten rule in
-      // docs/integrations.md § Provider boundaries. A CLI's stderr can quote a config file or a path,
+      // docs/integrations/provider-boundaries.md § Provider boundaries. A CLI's stderr can quote a config file or a path,
       // and a failed generate is not the place to find out what else.
       log.warn(`${profile.id} ${run.status} in ${Date.now() - started}ms: ${run.stderrTail.trim().slice(-500)}`)
       throw new ProviderOperationError('provider_unavailable', 502)

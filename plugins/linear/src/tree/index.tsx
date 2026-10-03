@@ -2,7 +2,7 @@ import { mountTree } from '@acorn/plugin-api/ui/sdk'
 import { solidTree } from '@acorn/plugin-api/ui/tree'
 import { LinearIssuePane } from './app'
 
-// The tree path (docs/plugin-authoring.md § The client half). This bundle runs in a worker with no
+// The tree path (docs/plugin-authoring/the-client-half.md § The client half). This bundle runs in a worker with no
 // DOM: what it emits is a tree of acorn's own component names, and the shell mounts its own
 // components for them. So there is no stylesheet here and no root element.
 //

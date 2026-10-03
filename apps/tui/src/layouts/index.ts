@@ -9,7 +9,7 @@ import { Tabs } from './Tabs'
 import { Wizard } from './Wizard'
 
 // The terminal host's layout table: eight names, seven components, the same mismatch and the same
-// reason as the DOM's (docs/panes.md § Layout model). `document-over-frame` and
+// reason as the DOM's (docs/panes/layout.md § Layout model). `document-over-frame` and
 // `frame-beside-document` are one component with the axis in the name.
 //
 // Handed to the pane registry through `setLayouts` at boot, which is the seam terminal phase 2 added

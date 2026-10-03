@@ -25,7 +25,7 @@ export type DataRoot = {
 }
 
 // Atomic write: temp file, fsync, rename, so a crash mid-write cannot leave a truncated file behind
-// (docs/data-layer.md § Data root). Exported because server/sessionKey.ts needs the same posture, where
+// (docs/data-layer/data-root.md § Where it lives). Exported because server/sessionKey.ts needs the same posture, where
 // a half-written key would make every stored credential unrecoverable.
 export function writePrivateAtomic(path: string, body: string): void {
   const temporary = `${path}.${process.pid}.tmp`
@@ -53,7 +53,7 @@ function processIsAlive(pid: number): boolean {
 
 /** The pid of the node holding this data root, or null when nothing live holds it. Reads the lock
  *  rather than taking it, because the one caller that asks is not a node: `acorn` decides between
- *  attaching to a running node and starting one (docs/tui.md § Attach or
+ *  attaching to a running node and starting one (docs/tui/process.md § Attach or
  *  start), and taking the lock to find out would be the very thing it is checking for.
  *
  *  A stale file naming a dead process reads as unlocked, the same judgement `acquireLock` makes. */
@@ -175,7 +175,7 @@ export function recordEnrollmentFailure(dir: string, reason: string): void {
   updateIdentity(identityPathOf(dir), { enrollmentError: { at: Date.now(), reason } })
 }
 
-// Open the data root at `dir`, initialising it if needed (docs/data-layer.md § Data root). Throws
+// Open the data root at `dir`, initialising it if needed (docs/data-layer/data-root.md § Opening a root). Throws
 // rather than falling back to a fresh identity when the directory holds a source database, another
 // node holds it, or the identity file is unreadable.
 export function openDataRoot(dir: string): DataRoot {
@@ -205,7 +205,7 @@ export function openDataRoot(dir: string): DataRoot {
     if (existed && !existing) {
       throw new Error(`${identityPath} is unreadable or has no matching ${ACORN_BASELINE} baseline. Reset this root; its identity cannot be adopted.`)
     }
-    // No `protocolVersion` field (docs/data-layer.md § Data root, docs/api-reference.md § Versioning).
+    // No `protocolVersion` field (docs/data-layer/data-root.md § `node.json`, docs/api-reference/transport.md § Versioning).
     let identity: NodeIdentity = existing ?? { baseline: ACORN_BASELINE, nodeId: randomUUID(), createdAt: Date.now() }
     if (!existing) writePrivateAtomic(identityPath, `${JSON.stringify(identity, null, 2)}\n`)
     else chmodSync(identityPath, 0o600)

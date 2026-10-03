@@ -1,6 +1,6 @@
 // Canonical language id -> the CodeMirror extension that highlights it.
 //
-// One direction, one map, no abstraction layer (docs/editor.md § Naming: "neutral contract,
+// One direction, one map, no abstraction layer (docs/editor/document-surface.md § Naming: "neutral contract,
 // un-neutral implementation"). The published vocabulary is @acorn/protocol/languageIds.ts; this is
 // the half that knows what CodeMirror calls things, and the shiki half sits beside the highlighter.
 //

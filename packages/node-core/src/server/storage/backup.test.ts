@@ -10,7 +10,7 @@ import { openSqlite } from './sqlite'
 import { schema } from '../db'
 import * as processBroker from '../core/proc'
 
-// The backup, against a real data root and unpacked with the real `tar` (docs/data-layer.md §
+// The backup, against a real data root and unpacked with the real `tar` (docs/data-layer/backup-and-retention.md §
 // Backup and import).
 //
 // The archive is the deliverable, so the assertions are about what comes back out of it. A test
@@ -118,7 +118,7 @@ describe('createBackup', () => {
     const dir = unpack(archive)
     try {
       const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
-      // Blanked rather than deleted (docs/data-layer.md § Backup and import).
+      // Blanked rather than deleted (docs/data-layer/backup-and-retention.md § Backup and import).
       expect(core.prepare('SELECT encrypted_credentials, label FROM integrations').all()).toEqual([
         { encrypted_credentials: '', label: 'Linear – work' },
       ])

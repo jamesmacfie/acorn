@@ -305,7 +305,7 @@ describe('viewNodes', () => {
   })
 })
 
-// The annotation point this pane opens on its diff lines (docs/plugins.md § Cooperative extension
+// The annotation point this pane opens on its diff lines (docs/plugins/cooperative-extension-points.md § Cooperative extension
 // points). The fields have to be the ones the shared viewer mints per row, in that order, or a
 // contributor's marks look up under a string nothing ever wrote and draw nothing — silently, because
 // an unmatched contribution is silent by design.

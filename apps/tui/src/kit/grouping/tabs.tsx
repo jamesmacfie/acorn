@@ -59,7 +59,7 @@ export function Tabs(props: {
           // And back out the way it came. Up is the previous stop beside the strip and nothing else:
           // a strip is one stop from outside, so its own tabs are not what Up walks. `walkStops`
           // answers false where the strip is the first stop in the box around it, which is the
-          // bubble the contract asks for (docs/tui.md § The five key groups). Without this a strip
+          // bubble the contract asks for (docs/tui/keys.md § The five key groups). Without this a strip
           // was the one stop on the screen with no Up at all: a reader who reached a `Sections` strip
           // by walking down to it had no arrow that took them back off it.
           ...['up', 'k'].map((key) => ({ key, cmd: () => walkStops(element, -1) })),

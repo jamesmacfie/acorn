@@ -1,5 +1,5 @@
 // The small vocabulary a step kind emits through `StepHandlerContext.emit`, so the run pane can draw
-// progress without knowing which plugin contributed the kind (docs/workflows.md § Contributed step
+// progress without knowing which plugin contributed the kind (docs/workflows/step-kinds.md § Contributed step
 // kinds).
 //
 // `emit` stays typed as an open record: a kind may send anything, and the pane shows what it does not

@@ -1,5 +1,5 @@
 // What a plugin has to say about a task the owner is about to archive, and the cleanup they may opt
-// into. See docs/plugins.md § Task checks for why this lives node-side and why a concern carries no
+// into. See docs/plugins/task-checks.md § Task checks for why this lives node-side and why a concern carries no
 // callback.
 import type { TaskArchiveConcern } from '@acorn/protocol/task.ts'
 import type { TaskRef } from '../core'
@@ -7,10 +7,10 @@ import { createLogger, describeError } from '../telemetry/logger'
 
 const log = createLogger('task-check')
 
-/** How long one check may take before the fan-out gives up on it (docs/plugins.md § Task checks). */
+/** How long one check may take before the fan-out gives up on it (docs/plugins/task-checks.md § Task checks). */
 export const CHECK_TIMEOUT_MS = 2_000
 
-/** How long a cleanup may take once the owner has opted in (docs/plugins.md § Task checks). An order
+/** How long a cleanup may take once the owner has opted in (docs/plugins/task-checks.md § Task checks). An order
  *  of magnitude below server/storage/archive.ts's TEARDOWN_TIMEOUT_MS, which runs alongside it. */
 export const APPLY_TIMEOUT_MS = 60_000
 
@@ -28,7 +28,7 @@ export type TaskConcern = {
   id: string
   message: string
   /** The plugin's to declare, unlike a context-menu `tone`. This is a claim about the plugin's own
-   *  data, not a core resource (docs/plugins.md § Task checks). */
+   *  data, not a core resource (docs/plugins/task-checks.md § Task checks). */
   severity: 'warn' | 'danger'
   /** Up to five lines under the message: changed paths, container names. */
   details?: string[]

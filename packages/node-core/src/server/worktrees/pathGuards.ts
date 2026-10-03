@@ -7,7 +7,7 @@ import { resolve, sep } from 'node:path'
 // PR worktree directory name (docs/workspaces-and-tasks.md): `<owner>-<repo>-pr-<number>` under the worktrees root.
 export const worktreeDirName = (owner: string, repo: string, number: number | string) => `${owner}-${repo}-pr-${number}`
 
-// The filesystem and DNS-safe branch slug (docs/terminal-and-agents.md), shared by the worktree dir
+// The filesystem and DNS-safe branch slug, shared by the worktree dir
 // name and the ACORN_TASK_SLUG env var that isolates parallel tasks.
 // plugins/docker/main/matcher.ts duplicates this one-liner to keep its plugin boundary frozen. Keep
 // the two in sync.

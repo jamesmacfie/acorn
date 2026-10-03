@@ -1,7 +1,7 @@
 // Migration tooling for EVERY chain in the workspace, not just core's.
 //
 // Phase 2 split the single 45-table core.sqlite into core plus one SQLite file per plugin
-// (docs/vNext/data.md § Plugin DBs), so "the migration chain" became N chains: core's plus one per
+// (docs/data-layer/plugin-databases.md § Plugin databases), so "the migration chain" became N chains: core's plus one per
 // plugin that owns tables. This script discovers them from the filesystem — any package with a
 // drizzle.config.ts is a chain — so adding a plugin DB needs no edit here.
 //
@@ -76,7 +76,7 @@ async function check(chain, Database) {
             console.error(
               '  This is the drizzle NOT-NULL table-rebuild quirk: the INSERT INTO __new_… SELECT\n' +
                 '  copies a column that does not exist in the source table. Hand-trim the new column\n' +
-                '  from the SELECT list (see docs/local-development.md → "Schema change workflow").',
+                '  from the SELECT list (see docs/local-development.md → "Database workflow").',
             )
           }
           break // later statements in this file depend on this one; later files on this file

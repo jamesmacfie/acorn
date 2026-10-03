@@ -5,7 +5,7 @@ import Icon from './Icon'
 import { eagerIconNodes, loadIconNodes } from '../../tokens/iconNodes'
 
 // The three ways a name can resolve, which is the whole contract of the eager/lazy split
-// (docs/ui-design.md § Icons, kit/tokens/iconNodes.ts).
+// (docs/ui-design/icons.md § Icons, kit/tokens/iconNodes.ts).
 describe('Icon', () => {
   const draw = (name: string) => {
     const host = document.createElement('div')

@@ -1,4 +1,4 @@
-// Use-scoped secret access (docs/security.md § Credential handling). `use()` scrubs the plaintext out
+// Use-scoped secret access (docs/security/credentials.md § Credential handling). `use()` scrubs the plaintext out
 // of anything thrown from its own scope. It does not stop a caller returning the plaintext out of
 // `use()`, which internal-token scoping closes instead.
 import { decryptSecret, encryptSecret } from '../secretBox'

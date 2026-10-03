@@ -8,7 +8,7 @@ import { dropNode } from '@acorn/client-core/infra/node/fleet.ts'
 // admitted the problem: every new module signal had to remember to add itself here, and nothing
 // enforced it. Forgetting was silent and looked like a data bug: node A's agent roster rendered under
 // node B, against ids that may collide across nodes by construction
-// (docs/architecture-overview.md § Client state and fleet behavior).
+// (docs/architecture/fleet.md § Client state and fleet behavior).
 //
 // Inverted: each state owner registers its own evictor beside the signal it clears
 // (client-core/host/registries/shell/scopeEviction.ts). The shell no longer knows, or needs to know, who is

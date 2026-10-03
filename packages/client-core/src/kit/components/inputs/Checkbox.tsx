@@ -2,7 +2,7 @@ import { createEffect, Show, type JSX } from 'solid-js'
 import type { Size } from '../../tokens/tokens'
 import { claimField } from './controlAttrs'
 
-/* Checkbox. See docs/ui-design.md § How the kit is built for why it styles the native
+/* Checkbox. See docs/ui-design/kit-internals.md § How the kit is built for why it styles the native
    input rather than rebuilding it, and how `switch` reuses the same element. */
 export function Checkbox(props: {
   label?: JSX.Element

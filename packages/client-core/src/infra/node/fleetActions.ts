@@ -87,7 +87,7 @@ export const closeNodePairingWindow = (nodeId: string): Promise<void> =>
   sendJson(corePairRoute, { method: 'DELETE', nodeId })
 
 // Revoking a device closes its sockets immediately and fails its in-flight requests
-// (docs/security.md § Transport and auth). Revoking this client's own row is possible and is not
+// (docs/security/transport-and-auth.md § Transport and auth). Revoking this client's own row is possible and is not
 // stopped here: it is the same thing `removeNode(nodeId, true)` does, and the caller is better placed
 // to warn about it.
 export const revokeNodeDevice = async (nodeId: string, deviceId: string): Promise<void> => {

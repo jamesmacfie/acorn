@@ -42,7 +42,7 @@ export default defineConfig({
     passWithNoTests: true,
     // Keeps each compiled module on disk between runs, in node_modules/.experimental-vitest-cache at
     // the repo root, keyed on the file's path, its content and the config. Every package config sets
-    // it, because each package is its own Vitest process. See docs/testing.md.
+    // it, because each package is its own Vitest process. See docs/testing/commands.md § The Vitest module cache.
     experimental: { fsModuleCache: true },
     projects: [
       {

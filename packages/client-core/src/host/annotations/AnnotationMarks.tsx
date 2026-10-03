@@ -4,7 +4,7 @@ import Icon from '../../kit/components/content/Icon'
 import { annotationsFor } from './annotations'
 import './annotations.css'
 
-// One item's marks, drawn by the host with the host's own components (docs/plugins.md § Cooperative
+// One item's marks, drawn by the host with the host's own components (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `annotation` kind).
 //
 // The whole of what a contributor gets to say is a severity, a line of text and an icon name. No

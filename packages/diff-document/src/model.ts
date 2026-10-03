@@ -1,5 +1,5 @@
 // The segmented diff document: what a provider's route sends and what the shared viewer reads
-// (docs/diff-rendering.md § The document).
+// (docs/diff-rendering/document.md § The document).
 //
 // A document arrives in two parts. The topology is every file and, for each, the bounded segments its
 // patch was cut into, described by counts alone: rows, split bands, gaps, the widest line, and which

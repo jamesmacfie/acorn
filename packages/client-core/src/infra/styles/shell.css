@@ -112,7 +112,7 @@
 .document-surface { flex: 1; min-height: 0; display: flex; flex-direction: column; overflow: hidden; }
 
 /* ── The host's pane layouts ────────────────────────────────────────────────────────────────
-   One block per layout in client-core/src/layouts (docs/panes.md § Layout model). These rules are
+   One block per layout in client-core/src/layouts (docs/panes/layout.md § Layout model). These rules are
    the host's, and in a composed pane that matters twice over: the splitter is the boundary between
    two realms, so neither side could style it alone.
 
@@ -121,7 +121,7 @@
    overflow below wins over its `auto`.
 
    Nothing here reads the window width. Breakpoints are style tokens, so a narrower host can set
-   them differently without touching a layout (docs/ui-design.md § What the kit and layouts must never do). */
+   them differently without touching a layout (docs/ui-design/closed-kit.md § What the kit and layouts must never do). */
 .layout-single,
 .layout-hbf,
 .layout-tabs,
@@ -233,8 +233,9 @@
    Every padded region above insets its contents, which is right for a paragraph and wrong for a bar:
    a `Toolbar`, a `Tabs` strip, a pane-level `SectionHeader` and a `Row` each carry `--pane-pad`
    themselves and each have a background that belongs to the pane's edge. Inset, they were padded
-   twice and their backgrounds stopped short of the border — which is docs/panes.md § The host owns a
-   region's inset promising something only `list-detail` delivered, and only to its own children.
+   twice and their backgrounds stopped short of the border — which is
+   docs/panes/regions.md § The host owns a region's inset promising something only `list-detail`
+   delivered, and only to its own children.
 
    A `Row` is in the set for the same two reasons, one of them quieter: its selected tint and its left
    accent marker are the rail's full-bleed look, and inset they read as a different component from the

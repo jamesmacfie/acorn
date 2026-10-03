@@ -10,7 +10,7 @@ import { principalMayActOnTask } from './requireUser'
 // /v1/core/* and every plugin at /v1/p/<plugin>/* are covered by the same middleware, so a plugin
 // cannot mount itself outside it. This table is the mount contract: a router added outside `/v1/*`
 // (or a public hole) would not appear here and would silently escape the gate, so keep it
-// exhaustive. (docs/security.md § Transport and auth · docs/api-reference.md § Request processing)
+// exhaustive. (docs/security/transport-and-auth.md § Transport and auth · docs/api-reference/transport.md § Request processing)
 const PROTECTED_PATHS: [string, string][] = [
   ['GET', '/v1/core/prefs'],
   ['GET', '/v1/core/workspaces'],

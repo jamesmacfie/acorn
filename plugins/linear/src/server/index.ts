@@ -42,14 +42,14 @@ export async function linearData<T>(res: Response): Promise<T> {
 export const VIEWER_QUERY = `query { viewer { name organization { name } } }`
 export type Viewer = { viewer: { name: string; organization: { name: string } } }
 
-// Projects in the workspace, for the per-repo project picker (docs/workspaces-and-tasks.md § Workspace
-// and project).
+// Projects in the workspace, for the per-repo project picker (docs/workspaces-and-tasks/projects.md
+// § External projects).
 export const PROJECTS_QUERY = `query { projects(first: 250) { nodes { id name } } }`
 export type LinearProjectNode = { id: string; name: string }
 
 // Teams, offered to the same picker. An issue belongs to exactly one team and may belong to no
 // project at all, so a workspace that works out of team backlogs has nothing to map without this
-// (docs/integrations.md § Linear).
+// (docs/integrations/linear.md § Linear).
 export const TEAMS_QUERY = `query { teams(first: 250) { nodes { id name } } }`
 
 // How a team is spelled in a `workspace_external_projects` row. Core stores an external id opaquely,
@@ -61,7 +61,7 @@ export const linearTeamScopeId = (teamId: string): string => `${TEAM_PREFIX}${te
 // The fields a rail/browse row needs. branchName is Linear's suggested git branch, the promote
 // default. `description` is the issue's own prose, capped before it reaches a row: a workflow
 // started from a row menu puts the title and this in its `issue` input, and the alternative was a
-// second call per issue at the moment somebody opened a menu (docs/workflows.md § Starting a run).
+// second call per issue at the moment somebody opened a menu (docs/workflows/starting-runs.md § Starting a run).
 // `labels` has an explicit page size because Linear multiplies a nested list's cost by it (default
 // 50) and rejects a query over 10,000 points. At 50 labels, 250 issues is about 17,000 points; at 10
 // it is about 4,600. The detail pane reads its own labels, so a row never needs more.
@@ -105,7 +105,7 @@ export const projectIssuesFilter = (mappedIds: string[]): Record<string, unknown
 
 /**
  * The same filter, narrowed by what somebody typed. The palette's search sends this
- * (docs/integrations.md § From the command palette).
+ * (docs/integrations/linear.md § Palette search).
  *
  * Provider-side rather than a filter over a fetched page, because the mapping half is a filter Linear
  * supports — `project: { id: { in: … } }` is the one the rail already sends — so the narrowing can ride
@@ -246,7 +246,7 @@ export const ISSUE_ID_QUERY = `query($filter: IssueFilter) { issues(filter: $fil
 // as `id`, so a retried request with the same one fails instead of posting twice.
 export const COMMENT_CREATE = `mutation($input: CommentCreateInput!) { commentCreate(input: $input) { success comment { id url } } }`
 
-// The only host this plugin will spend a credential downloading from: docs/integrations.md § Linear.
+// The only host this plugin will spend a credential downloading from: docs/integrations/linear.md § Linear.
 // Pure, so a branch carrying the owner's Linear key can be checked without a request context.
 const UPLOAD_HOST = 'uploads.linear.app'
 export const linearUploadTarget = (raw: string | undefined): URL | null => {

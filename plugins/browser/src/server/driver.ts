@@ -3,7 +3,7 @@ import { buildAxTree, isAllowedBrowserUrl, renderAxTree, resolveRef, type AxSnap
 import { BrowserDiagnostics } from './diagnostics'
 
 // One Playwright browser for the node, one incognito context and page per task, and a CDP session on
-// each page for the accessibility tree. See docs/agent-tools.md § Browser tools.
+// each page for the accessibility tree. See docs/agent-tools/browser-and-scripts.md § Browser tools.
 //
 // CDP rather than Playwright locators, because an agent needs stable per-snapshot refs it can name back
 // to us, and `Accessibility.getFullAXTree` plus ./axTree.ts produce those. Playwright covers launching,
@@ -33,7 +33,7 @@ export type Outcome = { ok: true } | { ok: false; reason: string }
 export type Capture = { id: string; mime: string; bytes: Buffer; taskId: string }
 
 /// Where a screenshot goes. The plugin's own table implements it, a test passes something simpler, and
-/// this file never learns what a database is. See docs/agent-tools.md § Browser tools.
+/// this file never learns what a database is. See docs/agent-tools/browser-and-scripts.md § Browser tools.
 export type CaptureStore = { put(capture: Omit<Capture, 'id'>): Promise<{ id: string }> }
 
 type Session = { context: BrowserContext; page: Page; cdp: CDPSession; console: BrowserDiagnostics; snapshot: AxSnapshot | null; closing: boolean }

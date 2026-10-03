@@ -15,7 +15,7 @@ export type ExternalItemStore = {
   listForConnection(connectionId: string): Promise<ExternalItemRow[]>
   /**
   /**
-   * The same identifiers across every connection of the provider; see docs/integrations.md § Linear
+   * The same identifiers across every connection of the provider; see docs/integrations/linear.md § Linear
    * for why a bare id is resolved by trying each connected workspace in turn.
    */
   listByIdentifier(identifiers: string[]): Promise<ExternalItemRow[]>

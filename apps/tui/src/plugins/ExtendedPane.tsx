@@ -10,7 +10,7 @@ import { Line } from '../kit/cells'
 // named `client-core/host/chrome/ChromeExtendedPane.tsx` directly, which is `<div class="extended-pane">`
 // and an `<aside>` holding a `PanelGrid` sized in pixels, so a loaded plugin's pane that declared a
 // footer or an aside handed the reconciler a `div` and it refused
-// (client-core/host/chrome/extendedPane.ts, docs/tui.md § Loaded plugins).
+// (client-core/host/chrome/extendedPane.ts, docs/tui/plugins.md § Loaded plugins).
 //
 // The regions the owner reserved are drawn in reading order under the owner's own tree rather than
 // pinned around it. A terminal pane is one rectangle; there is no second column to give an aside and
@@ -20,7 +20,7 @@ export function ExtendedPane(props: ExtendedPaneProps) {
     <box flexDirection="column" flexGrow={1}>
       {props.children}
       {/* Two rectangles that need pixels, each named on one line so a reader knows the box was
-          reserved and why it is empty (../kit/host.tsx § InlineSlot, docs/tui.md § Rectangles). */}
+          reserved and why it is empty (../kit/host.tsx § InlineSlot, docs/tui/rectangles.md § Rectangles). */}
       <Show when={props.inlineBesidePointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>
       <Show when={props.inlineBelowPointId}>{(pointId) => <InlineSlot point={pointId()} />}</Show>
       {/* The `rows` kind, as a collection at the end of the pane. Draws nothing when nobody fills it. */}

@@ -1,7 +1,7 @@
 // The client's telemetry emitter: the same five record kinds and the same verbs as the node's
 // collector, and one thing the node does not have, a trace that spans an interaction.
 //
-// docs/telemetry.md owns the model and docs/frontend.md § Telemetry owns what the renderer measures.
+// docs/telemetry.md owns the model and docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
 // Three shape decisions belong here.
 //
 // **The verbs match the node's, argument for argument.** `measure`, `recordDuration`, `startSpan`
@@ -9,7 +9,7 @@
 // does. The terminal client reuses this file and changes only the poster, so a second copy of the
 // verbs would be two vocabularies for one record model. The desktop helper reuses the node's
 // collector instead, because it is a Node process that already depends on node-core and cannot
-// reach a package that draws (docs/shell.md § What the helper reports).
+// reach a package that draws (docs/shell/node-child.md § What the helper reports).
 //
 // **There is no scrubber here.** A browser cannot know this machine's home directory or its data
 // root, which are the two prefixes worth collapsing, so the node re-scrubs every posted record at
@@ -46,7 +46,7 @@ const FLUSH_EVERY_MS = 5_000
 const MAX_SAMPLES = 20_000
 /** How many label sets one window may hold, the node's number for the node's reason: a label whose
  *  value varies per call would otherwise mint one series per call, which is the cardinality failure
- *  the vocabulary rule exists to prevent (docs/telemetry.md § The attribute vocabulary). */
+ *  the vocabulary rule exists to prevent (docs/telemetry/model.md § The attribute vocabulary). */
 const MAX_SERIES = 200
 let slowSamples = 0
 
@@ -496,7 +496,7 @@ export function measureRenderBatch<T>(
 }
 
 /** One sample into a histogram, aggregated over the flush window. What a seam past about ten a
- *  second uses instead of a span (docs/telemetry.md § Hot seams are metrics). */
+ *  second uses instead of a span (docs/telemetry/model.md § Hot seams are metrics). */
 export const recordDuration = (owner: string, seam: string, ms: number, attrs?: TelemetryAttrs): void =>
   recordSample(owner, seam, ms, 'ms', attrs)
 

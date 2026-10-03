@@ -10,7 +10,7 @@ import type { AgentWebAction } from '../../contract/wire.ts'
  *
  * Shared between drivers rather than owned by one, because a second driver importing the first is
  * how a provider name ends up somewhere it does not belong. A future harness maps its own wire shape
- * to `AgentWebAction` and gets the title from here (docs/managed-agents.md § Web activity).
+ * to `AgentWebAction` and gets the title from here (docs/managed-agents/activity.md § Web activity).
  */
 const WEB_TITLES: Record<AgentWebAction['type'], string> = {
   search: 'Search web',

@@ -4,7 +4,7 @@ import ExtensionPointsDev from './ExtensionPointsDev'
 import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '../../host/registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
-// The screen that exists because everything else is silent (docs/plugins.md § Seeing what matched).
+// The screen that exists because everything else is silent (docs/plugins/cooperative-extension-points.md § Seeing what matched).
 //
 // An unmatched contribution draws nothing and throws nothing, which is right for a user and the worst
 // possible thing for an author: a typo in `point` produces an empty pane and no error. What a render

@@ -12,7 +12,7 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { ManagedAgentRuntime } from './runtime'
 import { createSessionExecute } from './sessionExecute'
 
-// A workflow step's turn (docs/workflows.md § Execution model). The step names the provider options
+// A workflow step's turn (docs/workflows/execution.md § Execution model). The step names the provider options
 // it wants and they have to be applied to the session, because the Claude driver takes a switch only
 // through `setConfig` and never off the turn.
 

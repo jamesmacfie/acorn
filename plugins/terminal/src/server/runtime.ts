@@ -1,4 +1,4 @@
-// Runtime service: owns run-target instances per task (docs/terminal-and-agents.md § Process
+// Runtime service: owns run-target instances per task (docs/terminal/run-targets.md § Process
 // broker). An instance is just a terminal session in the task's worktree, so status derives from the
 // session map. Reachability comes from the target's `url` (fixed) or `url_command`
 // (run-and-parse-stdout, the existing term:previewUrl shape). acorn allocates no ports; isolation is
@@ -10,7 +10,7 @@ import type { LayoutRecipe, PluginHookRegistry, RunTarget } from '@acorn/plugin-
 export type RuntimeDeps = {
   // Config + cwd for a task (loadRepoConfig over worktree/checkout + DB fallback in the app).
   // `errors` carries structured config parse errors for the palette rows; `layouts` the
-  // [layout.<id>] recipes (docs/workspaces-and-tasks.md § Task).
+  // [layout.<id>] recipes (docs/workspaces-and-tasks/project-config.md § Layout recipes).
   // `repoTargetIds` names the targets whose winning layer was the checkout's own `.acorn/config.toml`,
   // which is untrusted input: those are the ones that must pass the trust gate before they run. It is
   // required, not optional. Both halves of this gate used to be optional, so a deps object that simply
@@ -25,7 +25,7 @@ export type RuntimeDeps = {
   isRunning(sessionId: string): boolean
   /** Observe authoritative PTY exits for sessions started by this service. */
   onExit(listener: (sessionId: string, exitCode: number | null) => void): () => void
-  /** The owner's half of `terminal:before-run-target` (docs/plugins.md § Hooks). Absent means nobody
+  /** The owner's half of `terminal:before-run-target` (docs/plugins/hooks.md § Hooks). Absent means nobody
    *  objects, which is also what an empty chain means. */
   hooks?: Pick<PluginHookRegistry, 'run'>
   exitCode(sessionId: string): number | null | undefined
@@ -37,7 +37,7 @@ export type RuntimeDeps = {
   // Throws when the repo's configuration has not been acknowledged (server/repoConfigTrust.ts). Required
   // for the same reason `repoTargetIds` is. The expected hash must match the current approved snapshot.
   authorizeRepoConfig(taskId: string, expectedHash: string): Promise<void>
-  // A declared target started or stopped through this service (docs/plugins.md § Hearing a core event
+  // A declared target started or stopped through this service (docs/plugins/events.md § Hearing a core event
   // § Run target state). Optional so callers that only need the read model need not observe it.
   onChange?(taskId: string, targetId: string, running: boolean): void
 }
@@ -152,7 +152,7 @@ export class RuntimeService {
       await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
     }
     this.assertLive()
-    // Another plugin's turn before a process starts in this worktree (docs/plugins.md § Hooks). Observe
+    // Another plugin's turn before a process starts in this worktree (docs/plugins/hooks.md § Hooks). Observe
     // and veto only: the design sketched a transform over the target's environment, and a payload is
     // scalars and arrays of scalars, so an env map is not expressible in the declared vocabulary. That
     // section's "What is refused" carries the argument.
@@ -273,7 +273,7 @@ export class RuntimeService {
     return { running: true, url }
   }
 
-  // The default target's URL for the browser/preview home (docs/terminal-and-agents.md § Process
+  // The default target's URL for the browser/preview home (docs/terminal/run-targets.md § Process
   // broker).
   async defaultUrl(taskId: string): Promise<string | undefined> {
     const cfg = await this.deps.loadTargets(taskId)

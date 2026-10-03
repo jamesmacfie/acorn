@@ -1,4 +1,4 @@
-// The client half of `project:changed` (docs/plugins.md § Hearing a core event).
+// The client half of `project:changed` (docs/plugins/events.md § Hearing a core event).
 //
 // Every project write on the node announces itself (node-core/server/notify.ts § broadcastProjectChanged)
 // and this turns it into one cache invalidation plus a re-emit on the client bus, exactly as

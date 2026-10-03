@@ -128,7 +128,7 @@
       "cache": false
     },
     // Never cached. The boundary suite reads every package off disk, and docPaths checks that every
-    // path cited in docs/, README.md and CLAUDE.md exists anywhere in the repo, so its true input set
+    // path cited in docs/, README.md and AGENTS.md exists anywhere in the repo, so its true input set
     // is the repository. The glob list this replaced missed docs/, so a doc edit served a stale pass.
     "@acorn/arch-tests#test": {
       "cache": false

@@ -11,7 +11,7 @@ import {
 import { topology } from './chrome/topology'
 
 // The focus model's invariants as properties over the pane roster, rather than one scenario per bug
-// (docs/tui.md § Keys and focus).
+// (docs/tui/keys.md § Keys and focus).
 //
 // A scenario pins one path, and every bug the fourteen fix commits chased was a path nobody had
 // written a scenario for. This walks every stop on every pane's first screen and asks the same five
@@ -85,7 +85,7 @@ const SURFACES: Surface[] = [
  * Eight surfaces walked at eighty presses each is about a minute on a warm worker, and doubling
  * it buys one thing: the layouts that split at a hundred cells draw both their columns. That is worth
  * running and it is not worth paying for on every save, so CI sets `ACORN_TUI_WIDE`
- * (docs/testing.md § Test layers).
+ * (docs/testing/layers.md § Test layers).
  */
 const SIZES: { width: number; height: number }[] = process.env.ACORN_TUI_WIDE
   ? [{ width: 80, height: 24 }, { width: 120, height: 40 }]
@@ -130,7 +130,7 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   //    answer, which is what symptoms B and D looked like from the reader's seat. The store owns focus
   //    now and the renderer holds no opinion to disagree with, so what is left to ask is whether the
   //    one value is honest — the node is in the tree under the root, and it is still something that
-  //    can hold the keys (./keys/regions.ts § The one owner, docs/tui.md § The invariants).
+  //    can hold the keys (./keys/regions.ts § The one owner, docs/tui/reporting.md § The invariants).
   const drawn = focusedRenderable()
   expect(attached(drawn, renderer.root), `${where}: the keys are on ${name(drawn)}, which is not in the tree`).toBe(true)
   if (drawn) expect(drawn.focusable, `${where}: the keys are on a node that cannot hold them`).toBe(true)
@@ -138,7 +138,7 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   // 10. Focus is inside the top scope. With a dialog open, no key moves the keys out of it: the
   //     store answers every question inside the scope, so there is nothing behind the dialog for a
   //     key to reach. Tab used to reach it, because the layer that contained the keys named the keys
-  //     it contained and named the wrong ones (./keys/regions.ts § Scopes, docs/tui.md § Traps). On
+  //     it contained and named the wrong ones (./keys/regions.ts § Scopes, docs/tui/traps.md § Traps). On
   //     a surface with no dialog the screen is the scope, and then this is true of everything.
   expect(focusedInScope(), `${where}: ${name(drawn)} has the keys from outside the open scope`).toBe(true)
 
@@ -174,7 +174,7 @@ const invariants = (where: string, caret: Caret, frame: string, renderer: Render
   // Read off the drawn frame and not off `activeHints()` on purpose. The hint was in the list all
   // along; it was last in reading order and the footer cuts rather than wraps, so the line ran out
   // before it on every screen, the cheat sheet's own footer included. A list a reader never sees is
-  // the same as no list (./chrome/bindings.ts § specs, docs/tui.md § The footer).
+  // the same as no list (./chrome/bindings.ts § specs, docs/tui/footer.md § The footer).
   const footer = frame.split('\n').slice(-2)[0] ?? ''
   expect(footer, `${where}: the footer never says how to get out: "${footer.trim()}"`).toContain('esc')
 }
@@ -192,7 +192,7 @@ const content = (frame: string): string => frame.split('\n').slice(0, -2).join('
  * claimed the key moved nothing at all.
  *
  * Each word promises one of two outcomes, because the contract says an edge bubbles
- * (docs/tui.md § The five key groups):
+ * (docs/tui/keys.md § The five key groups):
  *
  *   column   the keys are in a different column
  *   tab      the strip's marked tab moved
@@ -203,7 +203,7 @@ const content = (frame: string): string => frame.split('\n').slice(0, -2).join('
  * tier, which is the column move, so "it bubbled" and "there was no column that way, and there is no
  * wrap" are the same escape and both are honest. For `column` that escape is the whole check: with a
  * column in that direction the keys must be in it afterwards, which is the assertion a `list-detail`
- * pane used to fail (./keys/regions.ts § moveColumn, docs/tui.md § Focus regions).
+ * pane used to fail (./keys/regions.ts § moveColumn, docs/tui/focus.md § Focus regions).
  *
  * A field is skipped. Its `h` and `l` type, the footer never offers the pair there because the
  * bindings are inactive while somebody is typing, and pressing would put an `l` in a filter box and

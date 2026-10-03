@@ -6,7 +6,7 @@ import { PLUGIN_API_MAJOR } from './manifest'
 import { installedPluginInfo, loadExternalPlugins, pluginInstallDir } from './loader'
 
 // One plugin package on disk declaring all five extension kinds, and filling one of somebody else's
-// point in each of them (docs/plugins.md § Cooperative extension points).
+// point in each of them (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // Every kind has tests of its own — the manifest parser's, the hook runner's, the arbitration rule's,
 // the two slot hosts'. What none of them answers is whether the five fit together in one manifest:

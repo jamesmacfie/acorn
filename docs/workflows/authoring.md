@@ -1,11 +1,9 @@
 # Workflow authoring
 
-Part of [workflows.md](../workflows.md).
-
-The Node's `plugins/workflows/src/server/authoring/` generates and grounds proposed definitions.
-`definitions/` loads saved definitions, `files/` handles repository and user file writes, and
-`publication/` records published revisions and drafts. The client editor stays under
-`plugins/workflows/src/client/editor/`.
+This page covers the Workflows rail source, the editor, scheduling a published workflow, and child
+workflow steps. The editor is in `plugins/workflows/src/client/editor/`. On the Node,
+`plugins/workflows/src/server/authoring/` generates proposals, `definitions/` loads definitions,
+`files/` writes repository and user files, and `publication/` records revisions.
 
 ## Authoring
 
@@ -68,25 +66,9 @@ requiredness. Raw pointers and JSON Schema remain available in **Code**, but the
 not require them. Task title templates, ordinary-array identity keys, and execution limits remain
 under **Advanced** until validation requires them.
 
-### Scheduling a published workflow
+<a id="scheduling-a-published-workflow"></a>
 
-**Schedule…** appears only for a published database workflow. It opens one shared-kit editor on both
-hosts; cadence, timezone, project, and typed input values are schedule setup, not fields on a normal
-workflow draft. The first review shows three concrete future checks with their timezone offsets,
-effective execution limits, and whether the first check processes current matches or establishes a
-baseline from now.
-
-Record repeat handling appears only for `workflow-map` loops. **Run again when these fields change**
-uses the same typed field picker as authoring. **Since the last completed check** appears only when
-the source declares incremental continuation and the query feeds one unambiguous loop. Saving stores
-a disabled Node draft; activation is a separate device-only action and is never queued while offline.
-
-The workflows list gives schedules their own section and labels Active, Paused, Needs review, or
-Unavailable. A changed published dependency retains the prior approved snapshot and processing
-history, pauses admission, and links back to both activation review and the published workflow.
-**Start fresh** is folded under advanced review and names the consequence that matching records may
-run again. Pause stops future checks, **Run now** still works while paused, an active run opens its run
-surface for cancellation, and deletion retains run and processing history.
+[Scheduled roots](./scheduled-roots.md#schedule-a-published-workflow) covers **Schedule…**.
 
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
 select per option that harness advertises through `GET /v1/p/agents/providers`, then where the step
@@ -193,183 +175,15 @@ Renaming a step preserves map sources, structured bindings, graph edges, and pro
 The JSON tab, TOML import and export, save-to-repository flow, undo, and redo use the same
 child workflow contract.
 
-### Generating and editing with AI
+<a id="generating-and-editing-with-ai"></a>
 
-**AI authoring** opens a bounded conversation in a dialog over the workflow draft. Closing the dialog
-keeps the conversation on the device, and opening it again picks up the same thread. Each turn can request
-allowlisted source metadata, dynamic source discovery, option IDs, or compatible child workflows;
-ask an inline clarification; or return a proposal. API-backed model connections and text-only agent
-harnesses use the same JSON response protocol over the existing `generateText` service.
+[AI authoring](./ai-authoring.md) covers generating and editing a workflow with a model.
 
-The conversation stores pending context, clarifications, and proposals in device-local recovery
-state keyed by Node and workflow. Source records stay out of the prompt unless the user enables
-**Use preview records to help AI**. An enabled sample contains at most three selected records and
-16 KiB. Cancellation keeps the draft unchanged, and each result reports model request and token use.
+<a id="the-draft-rules"></a>
+<a id="the-graph-view"></a>
+<a id="the-json-tab"></a>
+<a id="saving"></a>
+<a id="where-positions-live"></a>
 
-A proposal shows a semantic diff before it can change the draft. Applying it reconciles a stale
-base against the current definition by stable step ID, refuses conflicts, and runs the workflow
-validator again. One accepted proposal creates one undo entry. Rejecting it changes nothing. The
-conversation cannot save, publish, run, activate, change a provider, or read credentials.
-
-#### Legacy one-shot endpoint
-
-The device-only `/defs/generate` route remains for compatibility with callers of the earlier
-one-shot generation contract. The workflow editor uses `/defs/authoring/turn` for interactive AI
-editing.
-
-The edit projection removes provider choices, configured execution targets, tool allowlists,
-triggers, and the `headers` and `auth` fields of contributed step configuration from each step. The
-scoped catalog separately lists the child targets that the model may use on a new step. After the
-answer is grounded, the server restores protected values onto each surviving step with the same name
-and kind. Deleting, renaming, or changing the kind of a step deliberately breaks that identity and
-does not carry its protected configuration onto the replacement.
-
-What the model is told about acorn is assembled at request time, not written down. The step kinds
-with the fields each one describes, the policies and the agent profiles all come out of the same
-catalog `GET /v1/p/workflows/catalog` answers, so a plugin that contributes a step kind makes it
-available to the model with no prompt to edit here. That list is also the list the answer is checked
-against: a kind in the catalog but missing from the prompt would be one the model can never use and
-nothing would ever strip. The workspace's own definitions ride along as worked examples, ranked so
-that one with a step waiting on two others comes first, because a fan-in is the thing a model gets
-wrong on its own. The definition being edited is left out of its own examples, and so is any
-definition that does not itself pass the checker: a workspace's broken workflow is the wrong thing to
-learn house style from.
-
-`plugins/workflows/src/server/authoring/generate.ts` is the prompt API. Its private `generate/`
-modules own the fixed teaching text, catalog rendering, example selection, and prompt assembly.
-`generationRequest.ts` makes the model calls, and `ground.ts` checks the reply against the same
-forbidden-key list used by kind rendering. A prompt digest test pins the complete system, edit, and
-repair text because whitespace and section order affect model behavior and provider cache keys.
-
-Generation also receives the selected project's bounded child workflow catalog. It contains the
-same references, input signatures, and output schemas that the child workflow picker uses. Grounding
-removes a reference outside that catalog, an input binding the target does not declare, and a source
-that is not a structured predecessor. If the catalog is empty, the prompt forbids both child
-workflow kinds.
-
-The server does not silently restore a changed child target. Both the conversation and compatibility
-route keep only references in the scoped child catalog, and the conversation exposes a target change
-in the semantic diff for review.
-
-The reply is read back rather than trusted. Anything named in it that this node does not have is
-taken out before the draft is touched. An invented step kind becomes a plain agent step keeping its
-prompt, rather than a deleted step, because deleting one cascades through every `after` and `branches`
-target that names it. An invented policy loses its value and stays a policy gate, because
-retargeting it to a human gate would silently turn a hard check into a no-op under an autonomous
-posture. A generated gate form that would not load is dropped and the gate is kept, never the other
-way round, so a bad answer still stops for a person. An unknown `with` key goes, while the step's stable ID keeps every reference intact when its
-display name changes. Each grounding change is reported in a dismissible alert above the node list,
-because a list of things that were changed is not something to read in a toast. What the definition
-still gets wrong is not repeated there: the footer already draws it.
-
-There is one repair pass and never two. When the first answer passes the checker, which is the common
-case, that is the only model call. When it does not, the checker's own messages go back once,
-verbatim, along with the definition as it stands after the stripping, and the second answer is taken
-if it parses and has at least one step. It is never chosen on having fewer problems, because the
-cheapest way for a model to shorten a problem list is to delete the steps carrying the problems. The
-answer is applied either way. A definition with problems in the footer is every workflow partway
-through being built, and **Run** is what refuses to start one. The alert above the node list
-describes the answer that was applied and only that one. When the repair is the one kept, a note
-about the first draft would be about a definition nobody ever sees.
-
-The AI authoring button is not drawn when the owner has nothing to generate with, meaning no
-model provider connected and no agent CLI installed either
-([integrations.md](../integrations.md) § Model providers), on the rule the commit-message wand
-follows: a control whose only message is "connect one first" is a control in the way of the ones
-beside it, and Settings, under AI models, is where a key is added. Repository file drafts
-use the same conversation and keep their separate review-before-publication flow.
-
-One submitted instruction can make at most eight metadata requests and two candidate attempts. The
-client uses an 11-minute broker timeout for the bounded sequence and exposes **Cancel** while it runs
-([api-reference.md](../api-reference.md) § Transport).
-
-### The draft rules
-
-These are why the editor is safe to type in:
-
-- A new node takes one edge from the selected node, or none when nothing is selected. It is never
-  inserted between two nodes, so adding a step changes nothing about what an existing step waits on.
-- Deleting a node removes every edge that touched it and never bridges its predecessor to its
-  successor. A chain that loses its middle becomes two roots, which is visible.
-- Renaming changes only the display name. `${steps.<id>.output}`, every `after` entry, branch target,
-  binding, and graph position continue to use the stable ID. The field accepts 1–200 characters.
-- The picker offers a step as a predecessor only when the edge would be accepted, so a self edge, a
-  duplicate and anything that closes a cycle are never on the list.
-- Undo and redo cover the whole draft, with typing folded into one step inside a 600 ms window, 60
-  deep.
-- Save is grey only while the draft is unchanged or a write is in flight. A draft that does not
-  validate still saves, because that is every workflow partway through being built: the footer says
-  what is wrong, and **Run** is what refuses. A new definition has no steps, so the node list says so
-  under its rows and the footer reports it.
-
-### The graph view
-
-**Graph** in the tab strip draws the same nodes as a picture: cards on a grid, the edges as curves,
-the selected card the one the list has selected. The list column stays beside it on a wide layout and
-collapses under it on a narrow one, which is the `list-detail` layout's own rule.
-
-Drag from a card's bottom port onto another card to make it wait on the first. The `×` on a wire
-removes that edge. Delete or Backspace removes the card the keys are on. Drag a card to put it where
-you want it; it lands on a 22 px grid and stays there. Every one of those is the same draft operation
-the inspector's own controls call, so the rules are the same: no self edge, no duplicate, nothing that
-closes a cycle, and a delete never bridges what it stood between.
-
-A card with no position of its own is placed from the edges: one rank below the deepest step it waits
-on, sharing that rank with its siblings. So a new node appears at its rank without anybody placing it,
-and moving a card is an override rather than a commitment to place the rest.
-
-The canvas is the kit's `Graph` node, not this plugin's drawing
-([ui-design.md](../ui-design.md) § The closed kit). That is what gives the terminal client this view
-too: there it is the indented list, with a picker under it to draw an edge out of the selected card.
-
-### The JSON tab
-
-The escape hatch: the definition as the runner's own JSON, formatted. **Apply** is atomic. A document
-that parses and is a definition replaces the draft; one that does not leaves the draft exactly as it
-was, keeps the text for correction, and says what is wrong. **Format** reprints what is in the box
-and **Revert** puts the draft's own projection back. Node positions are not in this document.
-
-The box is a real editor — highlighting, line numbers, bracket matching — through
-`mountEmbeddedEditor` on `@acorn/plugin-api/ui/editor`
-([editor.md](../editor.md) § A code box that is not a document), so this plugin holds no CodeMirror of
-its own. The terminal client draws the same rectangle as a plain textarea, since it has no library to
-draw one with.
-
-### Saving
-
-The header carries the editor's actions: AI authoring, Undo, Redo, Save, **Publish…** and **Run…**.
-The rarer ones are in its overflow menu: **Schedule…**, **Export to repository…** and **Delete**,
-which asks for a second press. A badge beside the name says **Not published** or which revision is
-published, because Run and Schedule use the published revision, not the draft. The tab strip under
-the header only picks the view.
-
-**Save** flushes the draft at the revision it was read at. Autosave uses the same operation.
-A stale revision answers 409 and opens conflict choices without discarding the local draft.
-The editor keeps pending edits on their originating Node through navigation and cleanup. A held save
-acknowledges only its submitted content. For ownership and recovery rules, see
-[draft recovery and publication](../workflows.md#draft-recovery-and-publication).
-**Publish…** opens a review dialog that names the dependency set. **Publish** makes the set
-executable only after all writes complete. **Resume publishing** continues an interrupted operation.
-For a repository or user file, Save persists the visual draft on the Node; **Publish…** checks
-external edits and file dependencies, and **Write files** atomically replaces that file while leaving
-the working tree uncommitted. A database definition uses **Export to repository…** to review and
-write its portable published dependency graph. Dismissing a review dialog keeps the prepared review
-on the Node; a strip under the header offers it again until it is published or discarded. The old direct Save to repo operation is
-refused because it cannot provide that review or preserve every workspace original.
-
-**Run…** opens the start dialog, one box per declared input with a task picker when no task is
-in scope, and starts the run when the required ones are filled. A definition that declares no inputs
-and already has a task starts without a dialog.
-
-A committed or user file opens in the same visual editor with a recoverable Node draft and its file
-destination visible in publication review. Parse failures preserve the file and direct the user to
-repair its raw TOML; they never open an empty visual definition. An address that names no layer at
-all says that instead, because unreadable and an empty draft are different states.
-
-### Where positions live
-
-Node positions for the graph view are device preferences under
-`plugin:workflows:layout:<defId>`, never in the definition, so a definition stays portable and a
-committed file has no x and y in its diff. A rename carries a node's position with it and deleting a
-definition drops its layout. A drag writes 400 ms after it stops, and a draft with no row yet keeps
-its positions in memory for the session.
+[Editor details](./editor-details.md) covers the draft rules, the graph view, the JSON tab, saving, and
+where positions live.

@@ -9,7 +9,7 @@ import {
 } from './registry'
 
 // The node-provider registry: id qualification, the create-obliges-destroy rule, and disposal on
-// unload (docs/plugins.md § Node providers).
+// unload (docs/plugins/node-providers.md § Node providers).
 
 const listOnly = (id = 'file'): NodeProviderContribution => ({ id, label: 'From a file', list: async () => [] })
 

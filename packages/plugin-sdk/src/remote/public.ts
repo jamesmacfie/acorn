@@ -1,6 +1,6 @@
 // Published declaration for `acorn-plugin-sdk/remote`, hand-written and copied verbatim to
 // dist/remote.d.ts, for the same reason ../public.ts is: the built file is a bundle and carries no
-// types of its own. See docs/plugins.md § What is published, and what acorn promises about it.
+// types of its own. See docs/plugins/publishing.md § What is published, and what acorn promises about it.
 //
 // Only two things here are yours to call. Everything else is what the Solid JSX preset compiles
 // against, and its names are Solid's; they are exported because the preset imports them by name, not

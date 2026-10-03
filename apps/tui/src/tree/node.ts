@@ -9,7 +9,7 @@ import type { Node as YogaNode } from 'yoga-layout'
 // from Yoga, so an unmeasured node hands `NaN` to something strict from inside the render loop. A
 // plain object cannot do any of the three: it has whatever fields the layout pass wrote, it holds
 // whatever children it was given, and there is nothing to be "already destroyed"
-// (docs/tui.md § Rendering).
+// (docs/tui/rendering.md § Rendering).
 //
 // Deliberately absent, so nobody adds them back by habit: focus is the region store's one value
 // (`../keys/regions.ts`), visibility is `props.visible` which layout turns into `DISPLAY_NONE`, and

@@ -35,7 +35,7 @@ The first version of this file planned an `acorn-ui` repository: the Solid UI ki
 `client-core/src/kit`, published, and depended on by the host. That plan is withdrawn, and the reason
 is what the kit became.
 
-The kit is **closed and host-owned** ([docs/ui-design.md](../ui-design.md) § The closed kit): a fixed node set
+The kit is **closed and host-owned** ([docs/ui-design.md](../ui-design/closed-kit.md) § The closed kit): a fixed node set
 with semantic props, no `class` or `style`, a support matrix per host. A plugin does not import
 components to render itself; it renders a tree of kit node names and the host mounts its own
 components. What a plugin author installs is therefore the *types* of the kit and the remote

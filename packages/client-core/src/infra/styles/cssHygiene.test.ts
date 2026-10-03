@@ -17,7 +17,7 @@ describe('no phantom tokens', () => {
     }
 
     // Runtime-set custom properties: a component measurement or count, never a design decision
-    // (docs/ui-design.md § Runtime-set custom properties).
+    // (docs/ui-design/tokens.md § Runtime-set custom properties).
     const runtimeSet = new Set([
       '--term-drawer-h', // TerminalPanel.tsx sets it on documentElement
       '--left', // reserved override hook for the left pane width
@@ -33,13 +33,13 @@ describe('no phantom tokens', () => {
       '--rail-accent',
       '--diff-cols',
       // The kit's space role, written inline from ui/kit/roles.ts. Always a var() into a style
-      // token, so it carries a role rather than a value (docs/ui-design.md § The closed kit).
+      // token, so it carries a role rather than a value (docs/ui-design/closed-kit.md § The closed kit).
       '--kit-gap',
       '--dash-cell', '--dash-pitch',
     ])
 
     // Local constants scoped to their own block, not tokens for `:root`
-    // (docs/ui-design.md § Runtime-set custom properties).
+    // (docs/ui-design/tokens.md § Runtime-set custom properties).
     const locallyDeclared = new Set([
       '--diff-gutter-w', '--diff-marker-w', '--diff-btn-w', '--diff-chrome-w', '--diff-card-inset',
       '--row-field-w', '--row-owner-inset',
@@ -70,7 +70,7 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/border(?:-(?:top|right|bottom|left))?:\s*\d+px/g)).toBe(0)
   })
 
-  // docs/ui-design.md § Border roles covers why an all-four-sides shorthand can never use --divider.
+  // docs/ui-design/tokens.md § Border roles covers why an all-four-sides shorthand can never use --divider.
   it('four-sided border using the row-divider recipe', () => {
     expect(count(/border:\s*var\(--divider\)/g)).toBe(0)
   })
@@ -79,7 +79,7 @@ describe('literal ratchets (these may only go down)', () => {
     expect(count(/box-shadow:(?!\s*var\()[^;]+;/g)).toBe(0)
   })
 
-  // docs/ui-design.md § Token axes covers why calc(var(--z-x) ± 1) is allowed here.
+  // docs/ui-design/tokens.md § Token axes covers why calc(var(--z-x) ± 1) is allowed here.
   it('raw z-index not using the ladder', () => {
     expect(count(/z-index:(?!\s*(?:var\(|calc\())[^;]+;/g)).toBe(0)
   })
@@ -99,7 +99,7 @@ describe('literal ratchets (these may only go down)', () => {
     expect(leaked).toBe(0)
   })
 
-  // docs/ui-design.md § How the kit is built covers why a class handed to a primitive
+  // docs/ui-design/kit-internals.md § How the kit is built covers why a class handed to a primitive
   // must compound onto it.
   it('classes merged onto Card are compounded with it', () => {
     // Anchored at the start of a selector: a descendant rule like `.dash-slot > .dash-panel`
@@ -121,7 +121,7 @@ describe('literal ratchets (these may only go down)', () => {
 })
 
 // A plugin frame is served exactly the sheets scripts/stage.mjs lists, primitives.css among them
-// (docs/ui-design.md § How the kit is built).
+// (docs/ui-design/kit-internals.md § How the kit is built).
 //
 // A font shorthand needs a size and a family. `font: var(--font-ui)` parses, because any var()
 // might expand to anything, but it is invalid once substituted with a family alone. An

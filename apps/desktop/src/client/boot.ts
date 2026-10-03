@@ -10,13 +10,13 @@ import { answerSurfaceHealthRequests, createLogger } from '@acorn/client-core/in
 // The switch is localStorage rather than `ACORN_PERF`, which is the environment variable the node and
 // the helper read: there is no environment in a webview, and the renderer is loaded by Rust's custom
 // scheme rather than spawned. `localStorage.setItem('acorn.perf', '1')` and reload
-// (docs/local-development.md § Timing a cold start).
+// (docs/local-development/profiling.md § Timing a cold start).
 //
 // `performance.now()` counts from this document's navigation, so these offsets are the renderer's own
 // and start where the helper's ready line left off.
 //
 // The second reader is telemetry, which turns the same marks into spans once the owner has switched
-// it on (docs/telemetry.md § The renderer). The terminal client and the helper do the same with their
+// it on (docs/telemetry/renderer.md § Renderer seams). The terminal client and the helper do the same with their
 // own marks (apps/tui/src/boot.ts, packages/custody/src/bootMarks.ts).
 
 const log = createLogger('renderer:boot')
@@ -31,12 +31,12 @@ const printing = (() => {
 })()
 
 // The same switch puts every renderer span on the performance timeline, which is how a task switch is
-// timed locally (docs/local-development.md § Timing a task switch). Spans still need telemetry on.
+// timed locally (docs/local-development/profiling.md § Timing a task switch). Spans still need telemetry on.
 setSpansOnTimeline(printing)
 
 // Large diffs and timelines count their own mounted rows, observers and queued work, and this is how
 // a WebDriver flow reads those counts: it dispatches the request event and reads one performance mark
-// back (docs/telemetry.md § Rendered-surface health). Always on, because the snapshot is numbers only
+// back (docs/telemetry/surface-health.md § Rendered-surface health). Always on, because the snapshot is numbers only
 // and a flow should not need a switch that the automation window shares with a developer's own app.
 // Guarded because this module is also imported by a test in bare Node, which has no `window`.
 if (typeof window !== 'undefined') answerSurfaceHealthRequests(window)

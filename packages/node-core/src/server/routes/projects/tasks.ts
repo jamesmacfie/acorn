@@ -29,7 +29,7 @@ import { saveTaskBranch, TaskBranchError, withBranchReservation } from '../../wo
 
 type Row = typeof schema.tasks.$inferSelect
 
-// Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). The positive-integer
+// Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). The positive-integer
 // constraint on pullNumber used to be three conjuncts of a `typeof` chain; getting it wrong here writes
 // a bad row rather than returning a 400.
 const taskPatchBody = z.object({
@@ -128,13 +128,13 @@ async function stampedLink(db: ReturnType<typeof getDb>, userId: string, input: 
 
 export const tasks = new Hono<AppEnv>()
   // Filtered for a task-confined caller rather than gated, the same answer /task-statuses and
-  // terminal's session roster give (docs/security.md § Transport and auth). A row carries the task's
+  // terminal's session roster give (docs/security/transport-and-auth.md § Transport and auth). A row carries the task's
   // title, branch and absolute worktree path, so the unfiltered list hands an agent the shape of every
   // other piece of work on the machine. Its own row still comes back, because the renderer surfaces a
   // frame draws are entitled to it.
   //
   // `?status=archived` is the archive page's list instead: archived tasks, newest first, each with its
-  // `archivedAt` (docs/workspaces-and-tasks.md § Restoring a task). Unbounded, like the active list. A
+  // `archivedAt` (docs/workspaces-and-tasks/archive.md § Restoring a task). Unbounded, like the active list. A
   // few hundred rows is a small scan; page it if a node ever holds thousands.
   .get('/', async (c) => {
     const db = getDb(c.env)
@@ -243,7 +243,7 @@ export const tasks = new Hono<AppEnv>()
     }
     // Every write on this router announces itself (server/notify.ts § broadcastTasksChanged). The task
     // list is what the rail draws, so a second window that missed a create used to sit on a stale list
-    // until it reconnected (docs/plugins.md § Hearing a core event).
+    // until it reconnected (docs/plugins/events.md § Hearing a core event).
     await recordSetupDecision(db, id, false)
     broadcastTasksChanged({ taskId: id })
     return c.json(

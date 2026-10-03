@@ -103,7 +103,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       ctx.extensionPoints.declare(WORKFLOW_POLICY, 'Workflow gate policies')
       ctx.extensionPoints.declare(WORKFLOW_TRIGGER, 'Workflow triggers')
 
-      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A veto here is a
+      // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A veto here is a
       // safety-rail, not a failure, which is why the point allows nothing else: a plugin that could
       // rewrite a step would be rewriting the workflow the owner read before running it.
       ctx.hooks.declare({
@@ -146,7 +146,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           // `managedProviderForProfile(undefined)` answers null and the managed path returns before it
           // creates anything.
           //
-          // Resolved per call, not at init (docs/plugins.md § Collaboration rules): plugin init
+          // Resolved per call, not at init (docs/plugins/collaboration.md § Collaboration rules): plugin init
           // order is not defined.
           const managed = await ctx.capabilities.get(AGENTS_SESSION_EXECUTE)?.({
             taskId,
@@ -245,7 +245,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         // Per step, unlike run-changed: the run pane moves one node's glyph without re-reading the run.
         stepChanged: (runId, stepId, status) => ctx.events.send({ channel: 'workflow:step-changed', runId, stepId, status }),
         statusChanged: ctx.events.status,
-        // `plugin:workflows:run-changed` (docs/plugins.md § Hearing another plugin).
+        // `plugin:workflows:run-changed` (docs/plugins/events.md § Hearing another plugin).
         runChanged: (taskId, runId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'run-changed'), taskId, runId, status }),
         gateChanged: (taskId, runId, stepId, status) => ctx.events.send({ channel: pluginChannel('workflows', 'gate-changed'), taskId, runId, stepId, status }),
         emitStepEvent: notices.stepEvent,
@@ -353,7 +353,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         remove: target => scheduleService!.remove((target as { scheduleId: string }).scheduleId),
       })
 
-      // `plugin:workflows:defs-changed` (docs/plugins.md § Hearing another plugin): the rail list and
+      // `plugin:workflows:defs-changed` (docs/plugins/events.md § Hearing another plugin): the rail list and
       // the editor re-read on it. The workspace, not the row, because the list is workspace-scoped.
       const defsChanged = (workspaceId: string) => ctx.events.send({ channel: pluginChannel('workflows', 'defs-changed'), workspaceId })
 
@@ -427,7 +427,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           await deps.reconciled
           return runner.retryStep(runId, stepId, prompt)
         },
-        // The chip the agent pane draws over a workflow session (docs/managed-agents.md § Sessions).
+        // The chip the agent pane draws over a workflow session (docs/managed-agents/sessions.md § Sessions).
         // Two indexed reads rather than a join, because the session row is in another plugin's
         // database and this one only holds the id.
         runForSession: async (sessionId) => {
@@ -438,7 +438,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
         },
       })
 
-      // The second store a definition can live in (docs/workflows.md § Database definitions). Every
+      // The second store a definition can live in (docs/workflows/definitions.md § Database definitions). Every
       // route behind it is device-only, because a row is executable configuration with no committed
       // bytes for the trust snapshot to hash.
       const draftQueries = workflowDraftQueries(store, (scope, id, consumer, remove) => {
@@ -502,7 +502,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
           mergedList(store, workspaceId, await core.projects.byWorkspace(workspaceId), { userDir: homedir(), catalog: runner.validationCatalog() }),
         // A row, or a committed file the editor opens read-only. The merged list carries a summary of
         // each definition and the editor needs the whole thing, so a file id resolves here rather than
-        // fattening every list read (docs/workflows.md § Authoring).
+        // fattening every list read (docs/workflows/authoring.md § Authoring).
         get: async (id, projectId) => {
           const file = /^(repo|user):(.+)$/.exec(id)
           if (!file) {
@@ -650,7 +650,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       //
       // 300s because that is the plugin cadence floor the host clamps to anyway, and a trigger sweep
       // is a poll of external state, not a deadline.
-      // The reactive half of the same sweep (docs/plugins.md § Hearing another plugin, the proving
+      // The reactive half of the same sweep (docs/plugins/events.md § Hearing another plugin, the proving
       // consumer). github announces `checks-changed` only when a check row actually flipped, so a
       // green-to-red flip starts a trigger sweep within a round trip instead of at the next tick. The
       // schedule below stays as the backstop for a node whose github half is absent.

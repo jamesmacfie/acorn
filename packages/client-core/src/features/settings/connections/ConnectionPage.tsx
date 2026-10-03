@@ -20,7 +20,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 import { connectionStatusText } from './connections'
 import { CredentialFields } from './CredentialFields'
 
-// One connection's page, a detail of Services or AI models (docs/integrations.md § Settings). What is
+// One connection's page, a detail of Services or AI models (docs/integrations/settings.md § Settings). What is
 // wrong with it comes first, with the button that fixes it, then its name and switch, where its projects
 // show up, and disconnecting it in the danger zone.
 //

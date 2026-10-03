@@ -1,6 +1,6 @@
 // Ordering and the priority projection for the browse list. A rail row is data the host renders, with
 // no filter inputs, facet selects, or state columns, so the filter, group, and facet halves are gone
-// (docs/integrations.md § Linear). Ordering stays, because the rail is still a list.
+// (docs/integrations/linear.md § Linear). Ordering stays, because the rail is still a list.
 //
 // Both runtimes use both halves: the node sorts and labels rows, the frame labels the open ticket. So
 // this sits in shared/.
@@ -30,7 +30,7 @@ export function priorityMeta(priority: number | null | undefined, priorityLabel?
   return { level, label: priorityLabel || PRIORITY_FALLBACK[level] }
 }
 
-// Status is a toned badge with a word (docs/ui-design.md § States). The tone comes from Linear's fixed
+// Status is a toned badge with a word (docs/ui-design/states.md § States). The tone comes from Linear's fixed
 // state type, never the colour a team picked, so "In Progress" reads the same in every workspace. The
 // word stays the team's own name. `Badge` has no muted tone, so canceled is neutral.
 export type StatusTone = 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'

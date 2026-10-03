@@ -57,7 +57,7 @@ function runChanged(node: Node): void {
 export function createElement(tag: string): Renderable {
   const kind = KINDS[tag]
   // A tag this host has no kind for is a surface on the wrong host — `<main>` from a DOM component —
-  // and saying so is better than drawing an empty box (docs/tui.md § A descriptor source's list).
+  // and saying so is better than drawing an empty box (docs/tui/sources-and-settings.md § A descriptor source's list).
   if (!kind) throw new Error(`Unknown component type: <${tag}>`)
   const node = make(kind)
   node.yoga = createYogaNode(node)

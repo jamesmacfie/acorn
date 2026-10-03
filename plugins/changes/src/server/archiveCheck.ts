@@ -1,10 +1,10 @@
-// changes' task check: which files an archive would discard (docs/plugins.md § Task checks).
+// changes' task check: which files an archive would discard (docs/plugins/task-checks.md § Task checks).
 // This plugin's node half already parses `git status --porcelain` for its own bridge, so the check
 // reuses those paths instead of the polled TaskStatus count.
 import type { TaskConcern, TaskRef } from '@acorn/plugin-api/node'
 import type { LocalGitBridge } from './routes/localGit'
 
-/** How many paths the concern sends; capped at five per docs/plugins.md § Task checks. */
+/** How many paths the concern sends; capped at five per docs/plugins/task-checks.md § Task checks. */
 const SHOWN = 5
 
 export async function changesArchiveConcern(bridge: LocalGitBridge, task: TaskRef): Promise<TaskConcern | null> {

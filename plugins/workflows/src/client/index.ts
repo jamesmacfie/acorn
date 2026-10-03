@@ -18,7 +18,7 @@ const StartFromItemHost = lazy(() => import('./StartFromItemHost'))
 export const workflowsClientPlugin: ClientPlugin = {
   name: 'workflows',
   init: (ctx) => {
-    // The reads plugins/agents' pane needs (docs/plugins.md § Collaboration rules). Published under
+    // The reads plugins/agents' pane needs (docs/plugins/collaboration.md § Collaboration rules). Published under
     // the id agents declares (contract/workflowControl.ts). A node with workflows disabled never
     // provides it.
     ctx.capabilities.provide(WORKFLOW_CONTROL, {
@@ -69,12 +69,12 @@ export const workflowsClientPlugin: ClientPlugin = {
       openPane(taskId, WORKFLOWS_PANE_ID, { kind: 'workflows:show-run', runId: target.resourceId, stepId: target.subresourceId })
     })
     // Through `ctx.contribute`, because the project-surface registry has no named member on the
-    // context and this is the compiled way in (docs/contribution-kinds.md § Project surfaces). The
+    // context and this is the compiled way in (docs/contribution-kinds.md § Client contributions). The
     // host records the disposable, so a disable takes the surface with it.
     ctx.contribute(projectSurfaceRegistry, workflowsSurfaceContribution)
     // "Start workflow…" on a Rollbar, Linear or GitHub row (./startFromItem.ts). One registration
     // serves all three, because all three draw their row menu from the context-menu registry
-    // (docs/plugins.md § Context menus). After Create task, which is the commoner verb.
+    // (docs/plugins/menus-and-markers.md § Context menus). After Create task, which is the commoner verb.
     ctx.contribute(contextMenuRegistry, {
       id: 'workflows.start-from-item',
       location: 'item.row',

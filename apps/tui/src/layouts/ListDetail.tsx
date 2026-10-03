@@ -9,7 +9,7 @@ import { regionFocus } from '../keys/regions'
 import { PANE } from '../keys/tiers'
 import { createKeySplit } from './split'
 
-// `list-detail` in cells, from its written projection (docs/panes.md § Layout model): two columns
+// `list-detail` in cells, from its written projection (docs/panes/layout.md § Layout model): two columns
 // above 80 cells, one at a time below it, and a key to switch groups.
 //
 // `LayoutProps` and `Region` are already host-neutral — a region is a thunk that returns JSX — so
@@ -93,7 +93,7 @@ export function ListDetail(props: LayoutProps) {
                 owns no offset for the caret's reveal to move, so `j` past the twentieth row of a
                 thirty-row list walked the caret off the screen. Round the list region only, not the
                 header and footer strips: those are the list's own chrome and do not scroll with it
-                (../kit/scrolling.tsx, docs/tui.md § Scrolling viewports). */}
+                (../kit/scrolling.tsx, docs/tui/scrolling.md § Scrolling viewports). */}
             <ScrollViewport>{props.regions.list?.()}</ScrollViewport>
             {props.regions['list-footer']?.()}
           </Panel>

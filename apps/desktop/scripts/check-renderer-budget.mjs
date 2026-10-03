@@ -17,7 +17,7 @@ import { basename, resolve } from 'node:path'
 // small guard that loads the app with one dynamic import, the HTML named a single 9.6 KB script, and
 // this check passed on that while the window loaded 870 KB.
 //
-// docs/frontend.md § Startup budget owns the contract. The terminal client's analogue is
+// docs/frontend/startup-budget.md § Startup budget owns the contract. The terminal client's analogue is
 // apps/tui/scripts/check-startup-graph.mjs, which holds the first group of the same denylist for its
 // own graph.
 
@@ -185,7 +185,7 @@ if (offenders.length) {
   problems.push(
     `Denylisted names in the renderer's startup list: ${offenders.flatMap(hit).join(', ')}. `
     + 'A name on that list is a lazy surface that leaked into the eager graph — the table that names it '
-    + 'should hold a loader, not the value (docs/frontend.md § Startup budget).',
+    + 'should hold a loader, not the value (docs/frontend/startup-budget.md § Startup budget).',
   )
 }
 if (fixed.length) {

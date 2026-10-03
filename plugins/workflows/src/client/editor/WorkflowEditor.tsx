@@ -62,7 +62,7 @@ import { requestWorkflowSchedule } from '../schedules/scheduleRequest'
 import { openWorkflowRun } from '../runs/runStore'
 
 // The editor: one definition as a list of nodes with an inspector, on both hosts
-// (docs/workflows.md § Authoring).
+// (docs/workflows/authoring.md § Authoring).
 //
 // The four regions of a list-detail layout from one file, as plugins/changes' pane does: header, list,
 // detail, footer. It is drawn by the Workflows rail source's detail region, which is where a
@@ -218,7 +218,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   }
 
   // Two steps, because saving to the repository is a decision about where this definition lives from
-  // now on (docs/workflows.md § Authoring). The modal asks it; the terminal draws the same one.
+  // now on (docs/workflows/authoring.md § Authoring). The modal asks it; the terminal draws the same one.
 
   const copyToDatabase = async (): Promise<void> => {
     const id = await store.copyToDatabase(workspaceId())

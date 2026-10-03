@@ -80,7 +80,7 @@ export type CoreServices = {
   // folders. The returned ProjectRef never exposes core config or the core SQLite handle.
   projects: ProjectService
   // Read this node's telemetry stream. The only read-everything facet on this object, which is why
-  // its token draws high in the trust prompt (./telemetry.ts, docs/telemetry.md § Writing a sink).
+  // its token draws high in the trust prompt (./telemetry.ts, docs/telemetry/plugins-and-sinks.md § Writing a sink).
   telemetry: TelemetryService
 }
 

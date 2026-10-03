@@ -24,12 +24,12 @@ import { keybindingRegistry, type KeybindingContribution } from '../commands/key
 import { integrationFlowRegistry, type IntegrationFlowContribution } from '../sources/integrationFlows'
 import { projectImporterRegistry, type ProjectImporterContribution } from '../sources/projectImporters'
 // From ./slots, not ./uiSlots. The slot hosts contain JSX, which makes this file unimportable in a
-// bare-Node vitest run (docs/frontend.md § Registries and plugins).
+// bare-Node vitest run (docs/frontend/registries.md § Registries and plugins).
 import { uiSlotRegistry, type UiSlotContribution } from './slots'
 import { registerSessionSource, type SessionSource } from '../sessions/sessionSources'
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
-// (docs/plugins.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
+// (docs/plugins/activation.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
 export type ClientContributionPoint<T> = {
   register(entry: T): void
 }
@@ -65,7 +65,7 @@ export type ClientPluginContext = {
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
   // or just a task id (registries/slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
-  // A place in this plugin's own tree that another plugin may fill (docs/plugins.md § Cooperative
+  // A place in this plugin's own tree that another plugin may fill (docs/plugins/cooperative-extension-points.md § Cooperative
   // extension points). The compiled half of the manifest's `extensionPoints`; the host mints
   // `<pluginId>:<id>` and stamps the owner, so a plugin cannot open a point in somebody else's name.
   extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
@@ -75,13 +75,13 @@ export type ClientPluginContext = {
   extensions: ClientContributionPoint<CompiledExtension>
   refPanels: ClientContributionPoint<RefPanelContribution>
   agentContexts: ClientContributionPoint<AgentContextContribution>
-  // One number on a Fleet home node card (docs/frontend.md § Registries and plugins;
+  // One number on a Fleet home node card (docs/frontend/registries.md § Registries and plugins;
   // registries/nodeStats.ts).
   nodeStats: ClientContributionPoint<NodeStatContribution>
   // Rows for the attention inbox: states on a node that need the owner, fetched per node
-  // (docs/frontend.md § Shell state; registries/attention.ts).
+  // (docs/frontend/shell-state.md § Shell state; registries/attention.ts).
   attentionSources: ClientContributionPoint<AttentionSourceContribution>
-  // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design.md §
+  // A brand logo as one SVG path, looked up under the `brand:` glyph prefix (docs/ui-design/icons.md §
   // Icons).
   brandMarks: ClientContributionPoint<BrandMark>
   // A recogniser that turns an external URL into an in-app destination (registries/contentLinks.ts).
@@ -131,7 +131,7 @@ export type ClientCapabilities = {
 export type ClientPlugin = {
   name: string
   // The shell assumes a required plugin's contributions exist, so it cannot be disabled
-  // (docs/plugins.md § Activation).
+  // (docs/plugins/activation.md § Activation).
   required?: boolean
   // Registration only, and synchronous. Nothing here does I/O, so async would put a promise between
   // `render()` and the first paint for no gain.

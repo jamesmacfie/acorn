@@ -1,9 +1,9 @@
 # Docker
 
-The Docker plugin exposes Node-local Docker state through a bounded CLI adapter using the shared
-broker's environment filter. Docker itself is
-authoritative; acorn caches short-lived projections and never stores the full inventory as application
-data.
+The Docker plugin shows the Node's own Docker state through a bounded CLI adapter that uses the shared
+process broker's environment filter. Read this page for its surfaces, how containers are matched to a
+task, and how commands and streams run. Docker is the authority: acorn caches short-lived projections
+and doesn't store the inventory as application data. The plugin is in `plugins/docker/`.
 
 ## Surfaces
 
@@ -15,8 +15,8 @@ data.
 
 ## Client
 
-Both surfaces are host layouts filled with kit nodes, and the plugin ships no stylesheet. For more
-information, see the layout model in [the panes doc](./panes.md).
+Both surfaces are host layouts filled with kit nodes, and the plugin ships no stylesheet. See
+[pane layouts](./panes/layout.md).
 
 The task pane is `header-body-footer` with no footer. The header is a `ChipRow`, one chip per linked
 container, and the body is the shared container detail. The Docker Source is a `list-detail`: a tab
@@ -30,8 +30,8 @@ it with the keyboard, and xterm owns everything inside.
 
 Two extension points sit on these surfaces. `docker:stats-beside` is a `remote` slot on the Stats tab,
 for a plugin with a graph or a cost estimate to put beside the numbers. `docker:container` is an
-`annotation` point keyed by container id, drawn under the rows of the Source list. For more
-information, see the cooperative extension points in [the plugins doc](./plugins.md).
+`annotation` point keyed by container id, drawn under the rows of the Source list. See
+[cooperative extension points](./plugins/cooperative-extension-points.md).
 
 Log buffers retain the exact last 512 × 1024 UTF-16 code units in bounded 4,096-unit blocks.
 Ingestion does not join the tail. The text accessor projects on demand and caches the result until
@@ -50,11 +50,11 @@ persisted query cache. Plugin retirement disposes application refresh subscripti
 ## From the command palette
 
 Two rows, registered by the plugin in `plugins/docker/src/client/commands.ts`.
-[command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) covers how the palette runs a
-search, and [plugins.md](./plugins.md) § Command kinds holds the vocabulary.
+[Command palette and shortcuts](./command-palette-and-shortcuts.md) covers how the palette runs a
+search, and [command kinds](./plugins.md#command-kinds) holds the vocabulary.
 
 **Open Docker** selects the rail source. **Find a Docker resource** is one search over all four
-lists — containers, images, volumes, and networks — with a badge on each row saying which list it came
+lists, containers, images, volumes, and networks, with a badge on each row saying which list it came
 from, because a reader looking for `postgres` does not know whether they are about to find a container
 or an image. The containers come from the store this plugin already keeps in step with the daemon; the
 other three are read when the frame opens, and the filtering after that is local
@@ -62,8 +62,7 @@ other three are read when the frame opens, and the filtering after that is local
 empty query is the whole list. A row id is `<scope>:<id>`, because a volume is keyed by its name and
 everything else by an id, and a bare id could collide across the four namespaces.
 
-A pick names the rail source, never the task pane, and that is the correction the design took during
-implementation rather than the shape it started in. The pane draws one task's containers and appears
+A pick names the rail source, not the task pane. The pane draws one task's containers and appears
 only on a task that has some (`plugins/docker/src/client/paneContribution.ts`), so an image, a volume,
 and a network have nowhere in it to be revealed, and a container has no pane either on a task the
 matcher linked nothing to. Selection therefore sets the source and leaves the browse surface a reveal
@@ -71,8 +70,8 @@ to land on (`plugins/docker/src/client/dockerViewStore.ts`). The surface consume
 mounted or opens because of the pick, and taking it clears it, so a later remount does not jump
 somewhere the reader has since navigated away from.
 
-Lifecycle actions are not attached to results. Start, stop, and restart wait for result actions to be
-designed. Remove, prune, and Compose down stay pane operations behind their confirmation, where what
+Lifecycle actions are not attached to results. Start, stop, and restart need palette result actions, which
+don't exist. Remove, prune, and Compose down stay pane operations behind their confirmation, where what
 is about to be destroyed is on screen.
 
 ## Matching

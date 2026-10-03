@@ -23,7 +23,7 @@ export const routeCapabilityFor = <T>(c: Context<AppEnv>, id: CapabilityId<T>): 
 export const routeTestCapabilityFor = <T>(id: CapabilityId<T>): T | undefined => routeTestOverrides.get(id) as T | undefined
 
 // Thrown by a bridge to classify a failure as something other than a 500. `code` is the stable
-// machine code (docs/api-reference.md §error-codes); `detail` carries human prose. Anything else a
+// machine code (docs/api-reference/transport.md § Errors); `detail` carries human prose. Anything else a
 // bridge throws propagates to onServerError → 500 'internal'.
 export class BridgeError extends Error {
   constructor(

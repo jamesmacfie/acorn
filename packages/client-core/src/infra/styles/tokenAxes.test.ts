@@ -15,7 +15,7 @@ import {
 } from '../../kit/tokens/tokenAxes'
 import { declaredByBlock, readAxisSheets, readStylePacks, readStyleSheets } from './readStyleSheets'
 
-// The appearance contract, as executable assertions. See docs/ui-design.md § Token axes for what
+// The appearance contract, as executable assertions. See docs/ui-design/tokens.md § Token axes for what
 // the two axes are and why they stay disjoint. If disjointness were only a convention it would
 // rot on the first busy afternoon, so it is a test instead.
 
@@ -67,7 +67,7 @@ describe('token axes are complete', () => {
   })
 
   it('declares every primitive palette token in every named theme block', () => {
-    // docs/ui-design.md § Token axes covers why derived and series tokens are excluded here. The
+    // docs/ui-design/tokens.md § Token axes covers why derived and series tokens are excluded here. The
     // split is data now rather than a list written out in this file (ui/tokenAxes.ts), because a
     // plugin-contributed theme is validated against the same primitives.
     const derived = new Set<string>([...DERIVED_THEME_TOKENS, ...SELF_DESCRIPTION_TOKENS, ...SERIES_TOKENS])
@@ -84,7 +84,7 @@ describe('token axes are complete', () => {
   })
 
   it('keeps the derived tokens derived — declared on bare :root, never inside a theme block', () => {
-    // docs/ui-design.md § Token axes covers why a manifest naming a derived token is refused, and
+    // docs/ui-design/tokens.md § Token axes covers why a manifest naming a derived token is refused, and
     // why restating `--danger` in a theme block would make that refusal a lie.
     const blocks = declaredByBlock(sheet('tokens-theme.css'))
     const root = blocks.get(':root') ?? new Set()
@@ -137,7 +137,7 @@ describe('style packs stay in their lane', () => {
     }
   })
 
-  // docs/ui-design.md § Style packs covers why the budget exists and why the fix for exceeding it
+  // docs/ui-design/tokens.md § Style packs covers why the budget exists and why the fix for exceeding it
   // is always a new token, never a 26th override.
   it('keeps each pack within its escape-hatch budget of 25 override selectors', () => {
     for (const pack of packs) {
@@ -173,7 +173,7 @@ describe('cross-axis selectors are banned', () => {
 })
 
 describe('canvas bridge tokens', () => {
-  // docs/ui-design.md § Token axes covers why xterm and the code editor read these by string via
+  // docs/ui-design/tokens.md § Token axes covers why xterm and the code editor read these by string via
   // getComputedStyle, and why renaming one breaks them with no type error anywhere.
   it('declares every bridge token somewhere in the axis sheets', () => {
     const declared = new Set(readAxisSheets().flatMap((f) => [...declaredIn(f.text)]))

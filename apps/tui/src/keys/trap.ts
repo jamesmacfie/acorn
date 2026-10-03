@@ -10,7 +10,7 @@ import { OVERLAY_OWN, TRAP } from './tiers'
 // There is nothing to walk here and it is not ported. What a terminal modal is instead is a scope:
 // the box goes on the region store's stack while it is drawn, and every question the store answers
 // is answered inside it, so there is nothing behind the dialog for a key to reach
-// (../keys/regions.ts § Scopes, docs/tui.md § Traps). Which leaves one layer here, for the key that
+// (../keys/regions.ts § Scopes, docs/tui/traps.md § Traps). Which leaves one layer here, for the key that
 // closes the thing.
 //
 // It was two. The second bound every intent but `dismiss` to a handler that returned true, and that
@@ -19,7 +19,7 @@ import { OVERLAY_OWN, TRAP } from './tiers'
 // out. This file read `keysFor()`, where `nextRegion` is `f6` alone, while ./install.ts binds
 // `hostKeysFor()`, which adds `tab` for this host. So the one key the footer advertised walked the
 // keys onto a rail row behind the plugin trust prompt, and the swallow then ate everything but
-// Escape. A scope names nothing and has nothing to leak (docs/tui.md § Traps).
+// Escape. A scope names nothing and has nothing to leak (docs/tui/traps.md § Traps).
 //
 // The layer is global rather than bound to the overlay's box, and that is the point: a layer with a
 // target only fires when focus is inside it, and Escape has to close the dialog from anywhere.

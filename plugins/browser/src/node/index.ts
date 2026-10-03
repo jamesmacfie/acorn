@@ -6,7 +6,7 @@ import { BrowserPool } from '../server/driver'
 import { BROWSER_CAPTURES } from '../contract/captures'
 
 // The browser plugin's node part: an agent's browser, driven by Playwright against an installed
-// Chrome. See docs/agent-tools.md § Browser tools.
+// Chrome. See docs/agent-tools/browser-and-scripts.md § Browser tools.
 //
 // Compiled rather than loaded, because of `playwright-core`. A loaded package is one inlined bundle
 // with no node_modules of its own, and Playwright brings native bits with it: its own driver, and

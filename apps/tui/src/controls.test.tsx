@@ -8,7 +8,7 @@ import { recordedRequests } from './fixture'
 // `kit/kit.test.tsx` § every control is a stop asserts that each node presses when the keys are on it.
 // This asserts the other half, which no unit case can: that a reader arriving at a pane can get the
 // keys onto a control at all, and that pressing it reaches the node
-// (docs/tui.md § Keys and focus).
+// (docs/tui/keys.md § Keys and focus).
 //
 // The worked example in that folder's focus-model.md is the sequence below. Phase 0 reached the first
 // stop of a panel; phase 2 reaches the rest of them, so the merge method — the second stop in Details,
@@ -130,7 +130,7 @@ describe('the pull request from the keyboard', () => {
     // The arrows type in a field, so the walk of a panel used to end at its first one: on this pane
     // the `[Comment]` button, the review box under it and its verbs could not be reached at all.
     // Tab is the next control before it is the next region, and it says so in the footer
-    // (../kit/asking/fieldRef.ts § step, docs/tui.md § The five key groups).
+    // (../kit/asking/fieldRef.ts § step, docs/tui/keys.md § The five key groups).
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })
     try {
       await screen.until('[Merge]', 45)

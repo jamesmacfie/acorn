@@ -305,7 +305,7 @@ const cellsOf = (value: unknown): number => Math.max(0, Math.trunc(Number(value)
  * are both props here, for the reason `../kit/asking/fieldRef.ts` already gives about the first: an edit
  * buffer that says neither draws opaque white and a hardcoded `#666666`, and neither is one of the
  * sixteen colours a terminal has or comes from any theme. So the kit names the slot and both painters
- * read it (docs/ui-design.md § Roles, and what each host makes of them).
+ * read it (docs/ui-design/appearance.md § Roles, and what each host makes of them).
  */
 function drawField(node: Node, buffer: Buffer, clip: Clip): void {
   const own = intersect(clip, clipOf(node.rect))

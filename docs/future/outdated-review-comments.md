@@ -105,7 +105,7 @@ remain available; their current line must not be replaced by their original line
 
 ## Refresh consistency
 
-[GitHub integration](../github-integration.md#diff-documents) records that detail and file mirrors
+[GitHub integration](../github-integration/mirror.md#diff-documents) records that detail and file mirrors
 refresh separately. A thread can describe a different head from the displayed code during refresh.
 Removing the fallback fixes the demonstrated defect after provider status is read, but does not
 prove compatibility between independently cached detail and patches.

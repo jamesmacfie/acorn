@@ -1,114 +1,96 @@
 # acorn
 
-acorn is a local macOS workspace for reviewing GitHub pull requests and running coding agents in
-isolated git worktrees. The desktop app is a SolidJS renderer inside a Tauri shell. Its Node service
-owns the data, integrations, worktrees, terminals, agents, workflows, and processes.
-The `acorn` launcher opens the terminal client with no arguments and runs headless commands with a
-subcommand. See [CLI](./docs/cli.md).
+acorn is an agent workspace. You group projects into workspaces, open a task for each piece of work,
+and run coding agents, terminals, and review panes inside that task, each in its own Git worktree. It
+has a desktop app, a terminal client, a headless command-line client, and a tree of plugins.
 
-The desktop can manage the bundled local Node and any other Nodes paired to the same installation.
-Every Node has its own data root and is addressed through the same HTTPS protocol.
+Agents read [AGENTS.md](./AGENTS.md) first. Everyone else starts at [docs/README.md](./docs/README.md),
+which indexes every doc.
 
-## Product surfaces
+## What it does
 
-- GitHub pull-request browsing and review: diffs, comments, reviews, labels, reviewers, checks, and
-  Actions logs.
-- Workspaces group projects. Tasks represent work on one project and may own a branch,
-  worktree, linked PR, panes, terminals, and managed agent sessions.
-- Task panes provide PR review, changes, notes, context, editor, search, preview, Docker, database,
-  HTTP requests, Linear, and Rollbar surfaces.
-- Agent Center and the task Agent pane manage Claude and Codex sessions, normalized transcripts,
-  approvals, artifacts, usage, and search. A terminal drawer also supports shells, Aider, and raw
-  provider sessions.
-- Workflows run file-defined orchestration with durable run state, gates, budgets, branching, and
-  joins.
-- Settings is a full-window, searchable place for connections, model providers, agents, MCP,
-  terminals, Docker, HTTP requests, workflows, nodes, plugins, security, and appearance.
-- The headless CLI manages workspaces, projects, tasks, managed agents, workflows, and plugin commands
-  through the same paired Node API. It can explicitly start a persistent local Node service.
+- **Workspaces and tasks.** Workspaces group projects. A task is work on one project and can own a
+  branch, a worktree, a linked pull request or issue, panes, terminals, and agent sessions.
+- **Agents.** The Agent pane and Agent Center run Claude Code and Codex sessions with normalized
+  transcripts, approvals, artifacts, usage, and search. The terminal drawer runs shells, Aider, and
+  raw provider sessions.
+- **Task panes.** Pull-request review, changes, notes, context, editor, search, preview, Docker,
+  database, HTTP requests, Linear, and Rollbar.
+- **GitHub review.** Diffs, comments, reviews, labels, reviewers, checks, and Actions logs.
+- **Workflows.** Orchestration defined in a file or in the app, with durable run state, gates,
+  budgets, branching, and joins.
+- **Settings.** A full-window, searchable place for connections, model providers, agents, MCP,
+  terminals, Docker, workflows, Nodes, plugins, security, and appearance.
+- **The `acorn` command.** With no arguments it opens the terminal client. With a subcommand it runs
+  headless commands against a paired Node. See [CLI](./docs/cli.md).
 
-## Runtime shape
+[Features](./docs/features.md) describes each surface.
 
-A small Rust shell owns the window and supervises a Node helper process, which starts `apps/node` as
-an ordinary child under the bundled Node runtime. The Node binds an HTTPS Hono server with TLS 1.3 on
-loopback and an ephemeral port, then reports its endpoint, certificate fingerprint, and local device
-token back. `ACORN_PORT` may pin a port for development or tests; the last successful port is kept in
-`node.json` as a preference.
+## How it runs
 
-The renderer loads from the shell's `app://acorn` scheme. It does not hold device tokens or node
-certificates and cannot connect to a Node directly. One loopback WebSocket reaches the helper's
-connection broker, which performs pinned HTTPS/WebSocket connections and attaches the device bearer.
+The desktop app is a SolidJS renderer inside a Tauri shell, built for macOS and Windows. A small Rust
+shell owns the window and supervises a Node helper process, which starts `apps/node` as a child under
+the bundled Node runtime. Each Node owns its data root, integrations, worktrees, terminals, agents,
+workflows, and processes. The desktop can manage the bundled local Node and any other Node paired to
+the same installation.
 
-The Node serves only `/v1`: core routes under `/v1/core/*`, plugin routes under
-`/v1/p/<plugin>/*`, and the authenticated event/stream socket at `/v1/events`. It serves no web
-assets and has no SPA fallback.
+A Node serves only `/v1` over HTTPS with TLS 1.3 on loopback: core routes under `/v1/core/*`, plugin
+routes under `/v1/p/<plugin>/*`, and the event and stream socket at `/v1/events`. It serves no web
+assets. The renderer loads from the shell's `app://acorn` scheme, holds no tokens or certificates, and
+reaches Nodes through the helper's connection broker. [Architecture overview](./docs/architecture-overview.md)
+has the full picture.
 
 ## Repository layout
 
 ```text
-apps/desktop/     Rust shell, desktop helper, renderer bridge, renderer, and packaging
-apps/cli/         Headless command client and shared acorn launcher
-apps/tui/         Interactive terminal client
-apps/node/        Node composition roots, standalone entry, plugin activation, and integration tests
-packages/protocol Wire contracts and route/query builders
-packages/node-core Node server, auth, storage, core services, MCP, and shared registries
-packages/client-core Renderer runtime, fleet state, persistence, registries, settings, and UI kit
-packages/plugin-api The only host import surface for loaded plugins (node/client/ui entrypoints)
-plugins/*         First-party feature packages with client/server/shared code as needed
-tools/arch/        Import-boundary and package-graph tests
+apps/desktop/          Rust shell, desktop helper, renderer bridge, renderer, and packaging
+apps/cli/              Headless command client and the shared acorn launcher
+apps/tui/              Interactive terminal client
+apps/node/             Node composition roots, standalone entry, plugin activation, and integration tests
+packages/protocol      Wire contracts and route and query builders
+packages/node-core     Node server, auth, storage, core services, MCP, and shared registries
+packages/client-core   Renderer runtime, fleet state, persistence, registries, settings, and UI kit
+packages/plugin-api    The only host import surface for loaded plugins
+plugins/*              First-party feature packages
+tools/arch/            Architecture and documentation checks
 ```
 
-Every first-party package is consumed as TypeScript source through its exports map. Cross-package
-imports include the real `.ts` extension. `apps/desktop` embeds the built Node artifact; it never
+First-party packages are consumed as TypeScript source through their exports maps, and imports
+across packages use the real `.ts` extension. `apps/desktop` embeds the built Node artifact and never
 imports Node source.
 
-First-party plugins ship in two tiers. Most are compiled into the composition roots. Rollbar,
-Linear, model-providers, HTTP, and database ship as loaded packages: bundled with the app, installed
-like third-party plugins, importing the host only through `@acorn/plugin-api`. The record of those
-migrations is [docs/loaded-plugin-migration.md](./docs/loaded-plugin-migration.md).
+Most first-party plugins are compiled into the app. agent-cost, database, HTTP, Linear, model
+providers, Rollbar, and Sentry telemetry ship as loaded plugins instead. They're bundled with the
+app, installed like third-party plugins, and import the host only through `@acorn/plugin-api`.
+[Plugins](./docs/plugins.md) explains the two tiers.
 
-## Development
+## Develop
+
+You need Node in the range the root `package.json` allows, pnpm 11, and a Rust toolchain. The desktop
+bundle and the tests use the Node version pinned in `node-runtime.json`.
 
 ```sh
-pnpm install
+pnpm install --frozen-lockfile
 pnpm rebuild:node
 pnpm dev
 ```
 
-Useful commands:
+Other commands you'll use:
 
 ```sh
 pnpm dev:node                              # standalone Node, no desktop window
-pnpm --filter @acorn/cli build             # headless CLI bundle for node apps/cli/bin/acorn.mjs
+pnpm dev:agent -- --session <name>         # isolated desktop session you can drive
 pnpm dev:plugin <id>                       # rebuild one loaded plugin's package on every save
-pnpm lint                                  # oxlint and TypeScript checks
-pnpm test                                  # native rebuild plus Vitest suites
+pnpm --filter @acorn/cli build             # headless CLI bundle for node apps/cli/bin/acorn.mjs
+pnpm lint                                  # oxlint, then TypeScript checks
+pnpm test                                  # native rebuild, then every Vitest suite
 pnpm db:check                              # replay every SQLite migration chain
-pnpm --filter @acorn/desktop dist          # build, package, and verify the macOS DMG
+pnpm dist                                  # build and package the desktop app
 pnpm pack:node                             # build the standalone Node tarball
 ```
 
-`SESSION_ENC_KEY` (64 hexadecimal characters) is optional in development. A Node without one
-generates its own. Setting it in `.env` pins a stable key across throwaway data roots. GitHub connects
-with acorn's public client ID by default. Set `GITHUB_CLIENT_ID` only to use your own app. For more
-information, see [GitHub integration](./docs/github-integration.md#connecting).
+GitHub connects with acorn's public client ID, so development needs no environment file.
+[Local development](./docs/local-development.md) covers the optional `.env`, the native module, the
+database commands, and the dev loops. [Testing](./docs/testing.md) covers the test commands.
 
-`node-pty` is the only native module, because SQLite is the runtime's own `node:sqlite`. There is
-one ABI to match: the desktop runs the Node under the same pinned runtime the tests use, so
-`pnpm rebuild:node` covers both. For more information, see
-[local-development.md](./docs/local-development.md).
-
-## Documentation
-
-[docs/README.md](./docs/README.md) is the index. It names every document under `docs/`, grouped by
-kind, with a line each, and it says which document owns what.
-
-The short version: read [architecture-overview.md](./docs/architecture-overview.md) for the runtimes
-and the contracts between them, [features.md](./docs/features.md) for what the product does, and
-[conventions.md](./docs/conventions.md) for where a new file goes and what it is called. If your first
-task is a plugin, [plugin-map.md](./docs/plugin-map.md) is the orientation map over the whole plugin
-system and is much shorter than the reference.
-
-Design material for work that has not shipped lives under [docs/future/](./docs/future/README.md),
-whose README indexes every programme and single file. Runtime contracts live in the topic docs and in
-the code.
+Designs for work that hasn't shipped live under [docs/future/](./docs/future/README.md).

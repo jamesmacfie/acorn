@@ -40,11 +40,11 @@ export type PluginFrameContext = {
   // nothing. The bridge's allowlist is keyed on scopes, never on this field.
   //
   // `remote` is the one value that is not a rectangle at all: the bundle is drawing a tree of the
-  // host's own components rather than pixels (docs/plugins.md § The tree contract). It has no
+  // host's own components rather than pixels (docs/plugins/tree-contract.md § The tree contract). It has no
   // document, no webview and no modal to dismiss, so the verbs those gate on refuse it by default.
   //
   // `inline` is a rectangle drawn as a sibling of another plugin's pane, where that plugin's manifest
-  // declared a `rectangle` extension point (docs/plugins.md § Cooperative extension points). Like
+  // declared a `rectangle` extension point (docs/plugins/cooperative-extension-points.md § Cooperative extension points). Like
   // `coreSlot`, being told so grants nothing: the bridge's allowlist is keyed on scopes, and standing
   // inside somebody else's pane gives a frame none of that plugin's reach.
   target: 'pane' | 'refPanel' | 'settings' | 'importer' | 'webview' | 'overlay' | 'coreSlot' | 'remote' | 'inline'
@@ -60,7 +60,7 @@ export type PluginFrameContext = {
   // a snapshot by contract.
   item?: string
   // Overlay surfaces only, and only when a remote tree opened this one as its companion
-  // (docs/plugins.md § Companion overlays): what the opener handed over. A snapshot like the rest of
+  // (docs/plugins/remote-points.md § Companion overlays): what the opener handed over. A snapshot like the rest of
   // this record, and the only thing the frame is told about who opened it.
   //
   // Data, and small: bounded to MAX_OVERLAY_INPUT_BYTES below. An overlay that needs a file gets its id
@@ -86,7 +86,7 @@ export type PluginBridgeApiRequest = {
 }
 
 /**
- * The same call, for a route whose body is bytes in one direction or both (docs/plugins.md § Binary
+ * The same call, for a route whose body is bytes in one direction or both (docs/plugins/frames.md § Binary
  * bridge calls).
  *
  * A separate kind rather than a flag on the request above, so a JSON call can never acquire byte
@@ -155,12 +155,12 @@ export type PluginBridgeUiRequest =
   // Importer lifecycle, valid only from a frame whose surface is an importer. `done` closes the modal
   // and triggers the host's post-import refresh; `close` is plain dismissal.
   | { id: number; kind: 'ui'; op: 'importer.done' }
-  // `result` is an overlay closing with an answer for whoever opened it (docs/plugins.md § Companion
+  // `result` is an overlay closing with an answer for whoever opened it (docs/plugins/remote-points.md § Companion
   // overlays). Refused from an importer, which has `done` for "I finished" and nobody awaiting a value,
   // and bounded to MAX_OVERLAY_INPUT_BYTES in the same way the input is.
   | { id: number; kind: 'ui'; op: 'importer.close'; result?: unknown }
 
-// The document a composed pane shares with its frame (docs/editor.md § Communication
+// The document a composed pane shares with its frame (docs/editor/composed-panes.md § Communication
 // between regions). Valid only from a frame whose pane declares a `document-over-frame` layout;
 // every other surface is denied, because there is no document on the other side of the port to
 // touch.
@@ -197,7 +197,7 @@ export type PluginBridgeWebviewRequest =
 export type PluginBridgeCancelRequest = { id: number; kind: 'cancel'; target: number }
 export type PluginBridgeKeydown = { kind: 'keydown'; chord: string }
 
-// One telemetry record from inside a frame (docs/telemetry.md, docs/plugin-authoring.md § Telemetry
+// One telemetry record from inside a frame (docs/telemetry.md, docs/plugin-authoring/the-bridge.md § Telemetry
 // from a frame).
 //
 // A frame has no `ctx`, so this is the whole of its telemetry API. It carries the five record kinds
@@ -280,7 +280,7 @@ export type PluginBridgeSelect = { kind: 'select'; item: string }
 // A surface-scoped command the host resolved on this frame's behalf. The chord landed in the host's
 // half of a composed pane (its editor), where a frame could never have seen it. `command` is the id
 // the manifest declared, and the frame handles it exactly as it would its own button click. See
-// docs/plugins.md § Loaded plugins: the client half (surface actions) for the flush guarantee this
+// docs/plugins/client-half.md § Loaded plugins: the client half (surface actions) for the flush guarantee this
 // depends on.
 export type PluginBridgeSurfaceAction = { kind: 'surfaceAction'; command: string }
 

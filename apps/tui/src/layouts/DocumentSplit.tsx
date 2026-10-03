@@ -12,12 +12,12 @@ import { regionFocus } from '../keys/regions'
 // The written projection said the frame half is absent in a terminal and the document half fills the
 // pane. That was drawn before the `editor` rectangle existed and before it was clear what a `frame`
 // region actually holds here: a frame is a *loaded plugin's* tree, and a tree draws in cells like any
-// other (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels). What cannot
+// other (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels). What cannot
 // cross is an iframe's pixels, and a frame region is not one. So both halves are drawn, and the
 // projection in docs/panes.md now says so.
 //
 // One component and two names, because the axis is in the name and never in a prop
-// (docs/panes.md § Layout model, on adding a ninth).
+// (docs/panes/layout.md § Layout model, on adding a ninth).
 
 const DEFAULT_DOCUMENT = 10
 const MIN_DOCUMENT = 3

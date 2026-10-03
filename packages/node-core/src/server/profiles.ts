@@ -1,7 +1,7 @@
 import { execFileSync } from 'node:child_process'
 import { agentProfileRegistry, type AgentProfileContribution } from './agentProfiles'
 
-// Built-in agent profiles (docs/terminal-and-agents.md), covering shell plus the common coding
+// Built-in agent profiles (docs/terminal.md § Profiles), covering shell plus the common coding
 // agents. `command` is the binary we look for on PATH, or $SHELL for the shell profile. We never
 // install it.
 export type ProfileDef = AgentProfileContribution
@@ -23,7 +23,7 @@ export function onPath(command: string): boolean {
 
 export const tmuxAvailable = (): boolean => onPath('tmux')
 
-// The shell profile is always available; agents only if their command is on PATH (docs/terminal-and-agents.md).
+// The shell profile is always available; agents only if their command is on PATH (docs/terminal.md § Profiles).
 export const profileAvailable = (p: ProfileDef): boolean => (p.kind === 'shell' ? true : onPath(p.command))
 
 // A profile that cannot be opened interactively is not a terminal, whatever else it can do. One that

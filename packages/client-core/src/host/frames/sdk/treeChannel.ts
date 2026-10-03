@@ -5,7 +5,7 @@ import { createRemoteRoot, type RemoteRoot } from '../remoteRoot'
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
 //
-// The second render path (docs/plugins.md § The tree contract). Same bundle, same bridge, same
+// The second render path (docs/plugins/tree-contract.md § The tree contract). Same bundle, same bridge, same
 // sandbox rules; what differs is that the code emits a tree of kit node names instead of pixels, and
 // the host mounts its own components for them.
 //
@@ -36,7 +36,7 @@ export type TreeMount = {
   readonly host: {
     /**
      * Call one action the owning extension point declared and this slot's owner bound
-     * (docs/plugins.md § Asking the owner).
+     * (docs/plugins/remote-points.md § Asking the owner).
      *
      * The owner's answer to a request, not a setter: a tree asks the composer to replace an attachment
      * and the composer decides whether to. Payload and result are JSON under 64 KiB, and eight may be
@@ -45,7 +45,7 @@ export type TreeMount = {
     invoke<TResult = unknown>(action: string, payload?: unknown): Promise<TResult>
     /**
      * Present the one overlay this contribution's own manifest descriptor associated, and wait for it
-     * (docs/plugins.md § Companion overlays).
+     * (docs/plugins/remote-points.md § Companion overlays).
      *
      * Resolves with whatever the overlay passed to `bridge.ui.close(result)`, or `null` for every
      * dismissal: Escape, the backdrop, the close button, this tree unmounting, another overlay opening.
@@ -154,7 +154,7 @@ export function runTreeChannel(port: MessagePort, renderers: Record<string, Tree
     const slot: MountedSlot = {
       // Measured here, on the sandbox's own thread, and declared on the message. The host used to
       // stringify every batch again to check it against the cap, on the thread that also has to draw
-      // (docs/plugins.md § The tree contract).
+      // (docs/plugins/tree-contract.md § The tree contract).
       //
       // Spelled out rather than imported from @acorn/protocol/tree/messages.ts, which is the same three
       // lines: that module pulls zod in, and nothing this file imports may reach a stranger's bundle

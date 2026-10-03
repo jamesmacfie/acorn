@@ -1,4 +1,4 @@
-// The live channel a loaded plugin owns, on the renderer's side. See docs/plugins.md § The live
+// The live channel a loaded plugin owns, on the renderer's side. See docs/plugins/freshness.md § The live
 // channel for the cadence rules and why a loaded plugin cannot claim a prefix of its own.
 //
 // Core claims the one `plugin` prefix and routes by the plugin id inside the channel name. A
@@ -47,7 +47,7 @@ const route = (frame: WsServerFrame): void => {
   if (!parsed) return
   // Owned by the plugin whose channel it is, and a histogram rather than a span: a plugin sampling
   // twice a second is the polite case and nothing stops a chattier one
-  // (docs/telemetry.md § Hot seams are metrics).
+  // (docs/telemetry/model.md § Hot seams are metrics).
   measure(parsed.pluginId, 'plugin.frame', () => {
     const listeners = frameListeners.get(frame.channel)
     if (listeners?.size) {
@@ -76,7 +76,7 @@ export function onPluginPush(listener: (pluginId: string) => void): () => void {
 }
 
 /** One frame's subscription to a plugin channel: its own, or another plugin's that the manifest named
- *  in `permissions.events` (docs/plugins.md § Hearing another plugin). The grant
+ *  in `permissions.events` (docs/plugins/events.md § Hearing another plugin). The grant
  *  check is the broker's, before this is reached; this only refuses a malformed channel.
  *
  *  Whether the producer declared the verb in its `emits` is enforced on the node for node halves and not

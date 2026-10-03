@@ -16,7 +16,7 @@ import { openTerminalRenderer, type Renderer } from './renderer'
 //   acorn --node <https://host>     pair with a node elsewhere, then open it
 //   acorn --node <name>             open a node this device already paired with
 //
-// The shell is whole (docs/tui.md § The screen): a rail of tasks, a pane strip, a palette, a footer
+// The shell is whole (docs/tui/chrome.md § The screen): a rail of tasks, a pane strip, a palette, a footer
 // that says what the keyboard will do, and the same twelve client plugins the desktop registers.
 
 // The boot account and the held lines are `./boot.ts`, which says why they are held and how they
@@ -34,7 +34,7 @@ const { values } = parseArgs({
 // Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
 // no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
 // soon as the child is spawned, and the shell draws from the persisted cache while it boots
-// (./node/open.ts, docs/tui.md § Attach or start).
+// (./node/open.ts, docs/tui/process.md § Attach or start).
 const opened = await openNode(values.node).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
@@ -77,11 +77,11 @@ const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/
 
 // This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
 // off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
-// arrangement the desktop's composition root has (docs/telemetry.md § The switch).
+// arrangement the desktop's composition root has (docs/telemetry/model.md § The switch).
 //
 // The poster is client-core's, unchanged. A batch leaves over the ordinary API client, which on this
 // host is the platform seam installed above, so the terminal client needed no transport of its own —
-// only a different `runtime` on the batch (docs/tui.md § What the terminal client reports).
+// only a different `runtime` on the batch (docs/tui/reporting.md § What the terminal client reports).
 startClientTelemetry({ runtime: 'tui', post: postTelemetryBatch('tui') })
 
 // The query cache persists to files rather than to IndexedDB, which there is none of here. Installed
@@ -130,7 +130,7 @@ bootMark('App imported')
 // binds to it and `render` hands it back to nobody.
 //
 // `exitOnCtrlC` is off: Ctrl+C at the shell is the TUI's, and inside an entered PTY rectangle it is
-// the PTY's, which is the whole reason a rectangle owns its keys (docs/tui.md § Signals and exit).
+// the PTY's, which is the whole reason a rectangle owns its keys (docs/tui/process.md § Signals and exit).
 // The renderer handles `SIGWINCH` itself, so a resize is its alone and nothing here listens for one.
 // The surface: the two halves composed. The terminal owns the modes and the bytes, the screen owns
 // the cells, and the screen closes first on the way out so the last frame lands while the alternate
@@ -142,7 +142,7 @@ bootMark('App imported')
 // same single byte for Return with Ctrl and Return without it, so the chord does not exist to be
 // bound. Disambiguation is the one flag that fixes it, and it fixes the same ambiguity for a lone
 // Escape, which the parser otherwise has to wait out
-// (docs/tui.md § The adapter, ./kit/asking/composition.tsx § Composer).
+// (docs/tui/keys.md § The adapter, ./kit/asking/composition.tsx § Composer).
 //
 // Nothing here focuses anything. Focus is the region store's and the surface has no second opinion
 // about it: a click is a hit test into the store (./keys/regions.ts § Clicks are hit tests).
@@ -161,7 +161,7 @@ const renderer: Renderer = openTerminalRenderer()
 // The logger is held by this too, and that is the arrangement rather than an accident. A line written
 // through `createLogger` still reaches the emitter and still becomes a record; what the hold catches
 // is the `console.error` the logger writes underneath, which is the half that would draw on the
-// screen (docs/telemetry.md § Logging, docs/tui.md § What the terminal client reports).
+// screen (docs/telemetry/logging.md § Logging, docs/tui/reporting.md § What the terminal client reports).
 const CONSOLE_METHODS = ['log', 'info', 'warn', 'error', 'debug'] as const
 const realConsole = new Map(CONSOLE_METHODS.map((name) => [name, console[name].bind(console)]))
 const releaseConsole = (): void => {
@@ -204,7 +204,7 @@ async function fillIn(): Promise<void> {
   stopDeviceCommands = registerDevicePluginCommands().dispose
 
   // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
-  // of the client the shell reads — which it now is (docs/plugins.md § Hearing a core event). The
+  // of the client the shell reads — which it now is (docs/plugins/events.md § Hearing a core event). The
   // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
   // another window moved nothing on screen until a restart.
   watchTaskChanges()

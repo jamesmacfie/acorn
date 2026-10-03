@@ -14,7 +14,7 @@
 // A binding whose handler returns false is not handled, so dispatch carries on to the next layer.
 // That is how an intent bubbles: the focused collection answers it, or the region layer does, or
 // nothing does. Which is also why a handler that changed nothing must say so
-// (docs/tui.md § The five key groups).
+// (docs/tui/keys.md § The five key groups).
 
 import { createWriteStream, mkdirSync, type WriteStream } from 'node:fs'
 import { homedir } from 'node:os'
@@ -49,7 +49,7 @@ export type TuiKeymap = Keymap<Renderable, KeyEvent>
 // The intent is the shared one and the table is still `intentKeys`. This is a host adding a key to an
 // intent it already has, which is what a per-host key table is for; a key that meant something a
 // desktop intent does not would be a second keymap, and that is refused
-// (docs/tui.md § What must never happen).
+// (docs/tui/reporting.md § What must never happen).
 const HOST_KEYS: Partial<Record<Intent, readonly string[]>> = {
   nextRegion: ['tab'],
   prevRegion: ['shift+tab'],
@@ -69,10 +69,10 @@ export function hostKeysFor(): Record<Intent, readonly string[]> {
 // ── The trace, and the key histogram ──────────────────────────────────────────────────────────
 //
 // One line per key, behind `ACORN_TUI_KEYS_TRACE`, because "the keys stopped working" is a report
-// nobody can act on and this turns it into a log (docs/tui.md § Keys and focus). And one histogram
+// nobody can act on and this turns it into a log (docs/tui/keys.md § Keys and focus). And one histogram
 // sample per key, always, because a key press is far past ten a second under a held arrow and the
 // question a reader asks about it is a distribution rather than a list
-// (docs/telemetry.md § Hot seams are metrics).
+// (docs/telemetry/model.md § Hot seams are metrics).
 //
 // A `key:after` intercept rather than a layer: it runs once per key after dispatch has finished, so
 // it can say what answered and why without claiming the key. The hyphenated `key-after` is not a
@@ -200,7 +200,7 @@ function installKeyIntercepts(engine: TuiKeymap): void {
 // keymap, so nothing below the shadow's tier ever sees it, and the key still gets typed. That is the
 // same shape as a `Modal`'s key claim — a scope, not a swallow — with one difference worth stating:
 // a scope is pushed by the box that is drawn, and this follows focus instead, because "is the focused
-// thing a field" is a fact about focus (./regions.ts § The one owner, docs/tui.md § Focus regions).
+// thing a field" is a fact about focus (./regions.ts § The one owner, docs/tui/focus.md § Focus regions).
 
 /** The keys a field types. The shared table, so the shadow cannot name a key the bindings below it
  *  do not, which is the drift that made the old swallow layer leak Tab (./trap.ts). */
@@ -224,7 +224,7 @@ const isTypingTarget = (node: Renderable | null): boolean => !!node && isField(n
  * that route is a coincidence — it works while the caret mirror happens to agree — so the dispatcher
  * says it instead. A field's own `handleKeyPress` reads the key and nothing else — it has no focus
  * of its own to check — so calling it directly is the whole of typing
- * (docs/tui.md § The five key groups).
+ * (docs/tui/keys.md § The five key groups).
  *
  * Claimed afterwards, so the renderer's own route does not type the same key a second time into the
  * node the caret mirror focused. A key some binding took arrives prevented and is left alone, and the

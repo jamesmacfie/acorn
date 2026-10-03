@@ -7,7 +7,7 @@ import { segmentCacheFor } from './segmentCache'
 import { createSegmentLoader } from './segmentLoader'
 
 // A few lines of a diff around one anchor, for a card that quotes the code it is about: a review
-// thread in a pull request's conversation (docs/github-integration.md § Conversation).
+// thread in a pull request's conversation (docs/github-integration/surfaces.md § Conversation).
 //
 // Read from the one segment that holds the line, through the same loader and node cache the diff
 // viewer uses (./segmentLoader.ts, ./segmentCache.ts), so a segment the reader has already seen in the

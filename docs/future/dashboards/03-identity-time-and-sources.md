@@ -56,7 +56,7 @@ These contracts belong to the data-source format, so workflows gain them as well
 - `DataBinding` addresses in `packages/protocol/src/data/values/dataBindings.ts` are `literal`,
   `input`, `step`, and `item`.
 - Workspace links live in `workspace_external_projects`, described in
-  [integrations](../../integrations.md#project-sources). GitHub repositories attach to projects
+  [integrations](../../integrations/project-sources.md#project-sources). GitHub repositories attach to projects
   through the project's repository facet instead.
 
 ## Requirements

@@ -8,7 +8,7 @@ import { Tabs } from './TabsLayout'
 import { Wizard } from './Wizard'
 import type { Layout } from './regions'
 
-// The host's layouts, one per name (docs/panes.md § Layout model).
+// The host's layouts, one per name (docs/panes/layout.md § Layout model).
 //
 // A pane declares a name and fills the regions; nothing here is exported to a plugin. That is the
 // point: responsiveness is paid once per layout instead of once per pane, and a terminal projection

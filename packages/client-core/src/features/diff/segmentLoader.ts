@@ -6,7 +6,7 @@ import { diffRowsFromPlain, type DiffRow } from '../../kit/diff/diffModel'
 import type { SegmentRef } from './documentView'
 import { residentKey, type SegmentCache } from './segmentCache'
 
-// Loads and colours the segments near the reader, and nothing else (docs/diff-rendering.md § Parsing
+// Loads and colours the segments near the reader, and nothing else (docs/diff-rendering/loading.md § Parsing
 // and highlighting).
 //
 // The viewer says which segments are on screen and which are near, every time its range moves. The

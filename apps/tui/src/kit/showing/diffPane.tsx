@@ -43,7 +43,7 @@ type TuiDiffSource = {
 /** Draw a unified diff from document topology. The pane loads only segments inside the viewport
  *  window; spacers preserve its total height and let `ScrollViewport` own keys, wheel, and offset.
  *  Annotation rows add one visual line that the topology does not count. A variable-height row kind
- *  would require cumulative row offsets (docs/diff-rendering.md § The document). */
+ *  would require cumulative row offsets (docs/diff-rendering/document.md § The document). */
 export function DiffPane(props: { source: TuiDiffSource; annotations?: string }) {
   // Every file header and segment at its first line. Bounded by segments, not rows: the whole of what
   // the window is found in. A header is block `-1`.

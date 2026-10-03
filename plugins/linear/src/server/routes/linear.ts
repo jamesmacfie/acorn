@@ -69,7 +69,7 @@ const ISSUES_TTL_MS = linearProvider.resources.find((resource) => resource.id ==
 // MessagePort into an iframe, so a large video attachment would stall the frame rather than draw inline.
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024
 
-// The portable carrier: docs/plugins.md § Loaded plugins. Linear ships loaded, so these routes run on
+// The portable carrier: docs/plugins/loaded-plugins.md § Loaded plugins. Linear ships loaded, so these routes run on
 // the one tier a loaded plugin gets, and the identity-bound runtime rides in through `c.env`.
 const { requestContext, portableFetch } = portableCarrier(PROVIDER)
 
@@ -137,11 +137,11 @@ type LinearProjectScope = Pick<CoreServices['projects'], 'byId' | 'externalProje
 
 /**
  * Which Linear scopes this rail should show, keyed by connection. A scope is a Linear project, or a
- * whole team where the workspace mapped one (docs/integrations.md § Linear); either way it is an
+ * whole team where the workspace mapped one (docs/integrations/linear.md § Linear); either way it is an
  * opaque id core stored and this plugin reads back.
  *
  * A link hangs off the workspace, and may narrow itself to one project in it
- * (docs/workspaces-and-tasks.md § Workspace and project), so the routed project decides twice: it
+ * (docs/workspaces-and-tasks/projects.md § External projects), so the routed project decides twice: it
  * names the workspace, then it filters that workspace's links down to the ones that either name it or
  * name no project at all.
  *
@@ -178,7 +178,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // passthrough.
   //
   // Enumerating a connection's projects is a provider contribution the host calls, so there is no
-  // `/projects` route here (docs/integrations.md § Project sources).
+  // `/projects` route here (docs/integrations/project-sources.md § Project sources).
   .get('/project-issues', async (c) => {
     const connections = await linearConnections(c)
     const connection = connections.find(({ row }) => row.id === c.req.query('integration'))
@@ -192,10 +192,10 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
     return c.json({ issues: issues.nodes.map((node) => triageRow(row, node)) } satisfies LinearProjectIssuesResponse)
   })
-  // The declarative rail source's rows (docs/plugins.md § Descriptors). Degrades to an empty list at
+  // The declarative rail source's rows (docs/plugins/descriptors.md § Descriptors). Degrades to an empty list at
   // every step rather than erroring: none of these conditions is the user doing something wrong.
   // There is no fallback to the viewer's own assigned issues; the source authors an `emptyState`
-  // instead (docs/integrations.md § Linear).
+  // instead (docs/integrations/linear.md § Linear).
   .get('/rail-items', async (c) => {
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
@@ -224,7 +224,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
       items: sortLinearIssues(issues).map((issue) => linearRailItem(issue, named ? names.get(issue.integrationId) : undefined)),
     } satisfies LinearRailItemsResponse)
   })
-  // The `Find a Linear issue` command's rows (docs/plugins.md § Command kinds).
+  // The `Find a Linear issue` command's rows (docs/plugins/commands.md § Command kinds).
   //
   // Same scope as the rail above and by the same code: the routed project names its workspace, the
   // workspace's links name the Linear projects and teams, and a connection with nothing mapped is
@@ -275,7 +275,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
   // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
   // Stale identifiers are resolved across all connections; each result is cached under its connection.
   //
-  // Declared as this plugin's `refResolvers` route (docs/plugins.md § Loaded plugins: the client half),
+  // Declared as this plugin's `refResolvers` route (docs/plugins/client-half.md § Loaded plugins: the client half),
   // answering the host's shape rather than a Linear-flavoured one.
   .post('/issues', async (c) => {
     const storedConnections = await linearStored(c)
@@ -422,7 +422,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     }
     return c.json({ ok: true })
   })
-  // One image out of a ticket body, inlined as a data URL: docs/integrations.md § Linear covers why
+  // One image out of a ticket body, inlined as a data URL: docs/integrations/linear.md § Linear covers why
   // this route exists (the frame's CSP, and the private upload host) and why `url` is host-locked.
   .get('/uploads', async (c) => {
     const target = linearUploadTarget(c.req.query('url'))
@@ -449,7 +449,7 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     return respondError(c, 404, 'provider_resource_not_found')
   })
 
-// The Hono routes over the portable carrier (docs/plugins.md § Loaded plugins), the only way in. Its
+// The Hono routes over the portable carrier (docs/plugins/loaded-plugins.md § Loaded plugins), the only way in. Its
 // request context supplies the identity-bound provider runtime without exposing host database or
 // secret-service handles to the bundle. `projects` is optional for suites that drive these routes
 // without a project scope; `/rail-items` then returns no rows.

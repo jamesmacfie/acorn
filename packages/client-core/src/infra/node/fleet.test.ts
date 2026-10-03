@@ -48,7 +48,7 @@ beforeEach(() => {
 describe('per-node cache partitioning', () => {
   it('does not collide when two nodes hold the same resource UUID', () => {
     // Two nodes may coincidentally hold the same UUID; that must never collide in the client
-    // (docs/architecture-overview.md § Client state and fleet behavior). This is why the partition is
+    // (docs/architecture/fleet.md § Client state and fleet behavior). This is why the partition is
     // a QueryClient per node rather than a nodeId prefix on 34 query-option factories.
     const sharedId = 'f6a1c0de-0000-4000-8000-000000000000'
     const key = ['task', sharedId]

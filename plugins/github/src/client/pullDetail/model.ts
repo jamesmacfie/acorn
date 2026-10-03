@@ -60,7 +60,7 @@ export const threadCreatedAt = (thread: Thread) => firstThreadComment(thread)?.c
 
 // `key` is the turn's identity in the conversation's Timeline: the kind and the provider's id, so a
 // commit SHA, a review's node id and a comment's id can never collide. It survives a refetch, a body
-// arriving and a sort tie, which is what lets a turn keep its element (docs/github-integration.md §
+// arriving and a sort tie, which is what lets a turn keep its element (docs/github-integration/surfaces.md §
 // Conversation).
 export type ConversationEntry =
   | { kind: 'review'; id: string; key: string; createdAt: number | null; review: Review }

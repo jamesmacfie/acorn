@@ -88,7 +88,7 @@ does not run it. Restore the task. The app runs at the same head with its ticks.
 ## Docs that change
 
 - [Panes](../../panes.md): the Apps pane.
-- [Workspaces and tasks](../../workspaces-and-tasks.md#restoring-a-task): apps on archive and restore.
+- [Workspaces and tasks](../../workspaces-and-tasks/archive.md#restoring-a-task): apps on archive and restore.
 - [Testing](../../testing.md): the manual checks above.
 
 ## Verify before building

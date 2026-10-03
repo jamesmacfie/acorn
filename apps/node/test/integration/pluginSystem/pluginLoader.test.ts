@@ -149,7 +149,7 @@ describe('loading rollbar from disk', () => {
             origin: 'rollbar',
             title: 'Checkout failed',
             // The seed text a workflow started from this row reads
-            // (docs/workflows.md § Starting a run).
+            // (docs/workflows/starting-runs.md § Starting a run).
             body: 'Level: error\nEnvironment: production\nOccurrences: 12\nhttps://rollbar.com/item/999/',
             link: {
               connectionId: 'rollbar-production', identifier: '142',
@@ -207,7 +207,7 @@ describe('loading rollbar from disk', () => {
       })
 
       // And the whole point: what the owner is told. The route is parse, call, respond over this
-      // (docs/plugins.md § Loaded plugins covers why a load failure used to read as a permanently
+      // (docs/plugins/loaded-plugins.md § Loaded plugins covers why a load failure used to read as a permanently
       // stuck Restart banner).
       const state = pluginState(await buildPluginStateBridge({
         dataDir: broken,
@@ -232,7 +232,7 @@ describe('loading rollbar from disk', () => {
   })
 
   it('lets a newer bundled package replace what build:plugin wrote, without touching a user install', () => {
-    // The script marked what it wrote (`.acorn-dev-build`), the whole fix: docs/plugins.md § Loaded
+    // The script marked what it wrote (`.acorn-dev-build`), the whole fix: docs/plugins/loaded-plugins.md § Loaded
     // plugins covers what happened before it existed.
     const built = pluginDir(dataRoot, 'rollbar')
     expect(existsSync(join(built, DEV_BUILD_MARKER))).toBe(true)
@@ -256,7 +256,7 @@ describe('loading rollbar from disk', () => {
       }
       expect(readBundledPluginState(dataRoot, 'rollbar')).toMatchObject({ status: 'installed', version: `${manifest.version}-bundled` })
 
-      // The protection that must not move: docs/plugins.md § Loaded plugins covers why an owner
+      // The protection that must not move: docs/plugins/loaded-plugins.md § Loaded plugins covers why an owner
       // install wins outright.
       markPluginUserManaged(dataRoot, 'rollbar')
       writeFileSync(join(pluginDir(dataRoot, 'rollbar'), 'acorn-plugin.json'), JSON.stringify({ ...manifest, version: '9.9.9' }))

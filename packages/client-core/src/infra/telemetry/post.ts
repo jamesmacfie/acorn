@@ -3,7 +3,7 @@ import { encodeTelemetryBatches, type PostedTelemetryRuntime, type TelemetryReco
 import { sendJson } from '../node/apiClient'
 import type { TelemetryPoster } from './emitter'
 
-// How a batch leaves a client and reaches the node's collector (docs/telemetry.md § Other runtimes).
+// How a batch leaves a client and reaches the node's collector (docs/telemetry/runtimes.md § Other runtimes).
 //
 // Through the ordinary API client, so it goes over the broker with the device token and the pinned
 // certificate like every other request, and `unmeasured` so it does not produce a span of its own. A

@@ -13,7 +13,7 @@ export type ModelBackend = {
    * `connection:<uuid>` or `harness:<profileId>`. Core mints it and core parses it.
    *
    * Ids reach saved workflow steps and device prefs, so a profile id rename is a compatibility break —
-   * the same rule docs/managed-agents.md § Harnesses states for harness ids.
+   * the same rule docs/managed-agents/harnesses.md § Harnesses states for harness ids.
    */
   id: string
   kind: 'connection' | 'harness'
@@ -89,7 +89,7 @@ export const availableModelConnections = (response: IntegrationsResponse): Model
  * Here rather than beside the picker that used to hold it, because two sides now need the same answer
  * and neither may import the other. The desktop's picker opens on it, and the Database plugin's node
  * half chooses it when the palette's `Generate SQL` generates with no picker at all — so the fast path
- * and the modal start on the same model by construction (docs/database.md § From the command palette,
+ * and the modal start on the same model by construction (docs/database/palette-and-workflows.md § From the command palette,
  * step 3).
  *
  * `''` when the backend declares neither, which is a real answer: the caller omits the model and the

@@ -1,4 +1,4 @@
-// Test-only helper. See testkit/db.ts for why this directory exists, and docs/plugins.md § What is
+// Test-only helper. See testkit/db.ts for why this directory exists, and docs/plugins/publishing.md § What is
 // published, and what acorn promises about it, for why this calls the real host code path instead
 // of forging a context.
 import { mkdtempSync, rmSync } from 'node:fs'
@@ -34,7 +34,7 @@ export type TestNodeContextOptions = {
   // belongs to initPlugins, and a test usually wants to assert on what init did, or on it throwing.
   plugin: Pick<NodePlugin, 'name'>
   // Pass this to get the loaded tier: scoped core and capabilities, no routes.register and no
-  // events.channel/streams (docs/plugins.md § What is published, and what acorn promises about it).
+  // events.channel/streams (docs/plugins/publishing.md § What is published, and what acorn promises about it).
   // Omit for the built-in tier, the full context exactly as the host builds it. `ctx.storage` is
   // present in both tiers.
   permissions?: Partial<NodePermissions>
@@ -106,7 +106,7 @@ export function makeTestNodeContext(options: TestNodeContextOptions): TestNodeCo
   const undos: (() => void)[] = []
 
   // The recorder, which is a sink like any other: nothing in the collector is test-specific
-  // (../server/telemetry/collector.ts, docs/plugin-authoring.md § In tests). The preference is
+  // (../server/telemetry/collector.ts, docs/plugin-authoring/testing.md § In tests). The preference is
   // stated rather than read, because a test has no `telemetry.enabled` row and building nothing is
   // not what a test asking about telemetry wants. It stays on for the process, which costs a
   // record per emit and is the same bargain `startTelemetry` makes.
@@ -181,7 +181,7 @@ export type TestRequestContextOptions = {
 }
 
 // A `PluginRequestContext` as the host builds it, for driving a loaded plugin's fetch handler
-// (docs/plugins.md § What is published, and what acorn promises about it).
+// (docs/plugins/publishing.md § What is published, and what acorn promises about it).
 //
 // Async because it goes through a one-route Hono app. `pluginRequestContext()` takes a Hono `Context`,
 // and standing one up for real is cheaper, and truer, than casting an object literal into the shape.

@@ -1,6 +1,6 @@
 import type { TelemetryRecord } from '../../runtime/telemetry.ts'
 
-// Run targets (docs/workflows.md § Routes and UI): the renderer shares the RunBridge routes the MCP
+// Run targets (docs/workflows/routes-and-ui.md § Routes and UI): the renderer shares the RunBridge routes the MCP
 // run tools use (server/routes/plugins/harness.ts). Replaced the `run:*` IPC channels.
 export const runTargetsRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run`
 export const runDefaultUrlRoute = (taskId: string) => `/v1/core/tasks/${taskId}/run/default-url`
@@ -8,11 +8,11 @@ export const runStartRoute = (taskId: string, targetId: string) => `/v1/core/tas
 export const runStopRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/stop`
 export const runStatusRoute = (taskId: string, targetId: string) => `/v1/core/tasks/${taskId}/run/${encodeURIComponent(targetId)}/status`
 
-// Where every runtime that is not the node posts its telemetry (docs/telemetry.md § Other runtimes).
+// Where every runtime that is not the node posts its telemetry (docs/telemetry/runtimes.md § Other runtimes).
 // Device-only, because a record admitted here reaches every sink, and a sink can send it off the
 // machine.
 export const coreTelemetryRoute = '/v1/core/telemetry'
-// What Settings → Telemetry draws: counters, never records (docs/telemetry.md § What the page
+// What Settings → Telemetry draws: counters, never records (docs/telemetry/diagnosis.md § What the page
 // shows). Device-only, like the route above, and for a smaller reason: it names which plugins are
 // reading the stream, which is a fact about this machine's installation.
 export const coreTelemetrySummaryRoute = '/v1/core/telemetry/summary'
@@ -57,7 +57,7 @@ export const scheduleTargetsRoute = `${schedulesRoute}/targets`
  *  the host just showed. */
 export const scheduleConfirmRoute = (key: string) => `${scheduleRoute(key)}/confirm`
 
-// Dashboards: the measure series behind a stat's trend (docs/dashboards.md § Trends). Read-only by
+// Dashboards: the measure series behind a stat's trend (docs/dashboards/views.md § Trends). Read-only by
 // design, not by phase: the sampler and the store share a process, so the only writer is the
 // `core:sample-measures` schedule and a write route would have nobody to serve.
 //

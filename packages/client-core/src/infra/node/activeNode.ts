@@ -9,12 +9,12 @@ import { homeNode, nodeIsStarting, nodes, ORIGIN_NODE_ID, refreshFleet } from '.
 //
 // It has to be readable synchronously, because it picks the query cache's partition
 // (`activeCacheId()` below, node/fleet.ts § clientFor) and the window now renders before anything has
-// asked the helper anything (docs/frontend.md § Startup readiness). Reading
+// asked the helper anything (docs/frontend/data-and-startup.md § Startup readiness). Reading
 // it a tick late would mount the shell on the `origin` partition and then remount it on the real one,
 // which is a flash and a thrown-away first paint.
 //
 // Device state, and a hint rather than a fact: it says which machine's window this is, not anything
-// about a node's data (docs/state-ownership.md § Scope rules). `selectActiveNode` below corrects it
+// about a node's data (docs/state-ownership/scope-rules.md § Scope rules). `selectActiveNode` below corrects it
 // against the fleet, and a node that has gone reaches the `node-replaced` reload.
 const LAST_NODE_KEY = 'acorn.last-node'
 

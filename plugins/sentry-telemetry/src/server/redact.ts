@@ -2,7 +2,7 @@
 //
 // Core scrubs at the ingest door: a log body, an error message, an error stack and every string
 // attribute go through `scrub` on the way into the ring, and a batch posted by another runtime is
-// re-scrubbed on arrival (docs/telemetry.md § What never leaves the machine). So this pass is not
+// re-scrubbed on arrival (docs/telemetry/model.md § What never leaves the machine). So this pass is not
 // cleaning up after core. It is the check a sink owes, and it covers the strings core takes on
 // trust as patterns rather than as content: a span's name, a metric's name, an event's name, a
 // logger tag. Those are supposed to be `http.request` and `schedules`. A plugin that puts a path or

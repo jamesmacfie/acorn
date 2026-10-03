@@ -236,7 +236,7 @@ describe('scopeCapabilities', () => {
 
   it('lets any plugin fill the two host-declared hooks', () => {
     // These are invitations rather than property: whichever plugin owns worktree side-effects or agent
-    // sessions on this node fills them (docs/plugins.md § Collaboration rules).
+    // sessions on this node fills them (docs/plugins/collaboration.md § Collaboration rules).
     const real = registry()
     for (const id of HOST_OWNED_CAPABILITY_IDS) {
       expect(() => scopeCapabilities(real, [], 'ntfy').provide(capabilityId(id), () => 'ok')).not.toThrow()

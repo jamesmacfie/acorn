@@ -52,7 +52,7 @@ import {
 // same bar the run pane's step detail has (../runs/NodeDetail.tsx): the mark, the title at level 2,
 // and for a step, its kind and the controls that act on it. A node's form is drawn
 // from its kind's description, so a plugin's own step kind gets an inspector without shipping a
-// component (docs/workflows.md § Contributed step kinds). The two shapes a field cannot express —
+// component (docs/workflows/step-kinds.md § Contributed step kinds). The two shapes a field cannot express —
 // a decide's branches are drawn beside it.
 
 export type InspectorActions = {

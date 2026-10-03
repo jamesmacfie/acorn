@@ -164,7 +164,7 @@ export default function TaskView(props: {
       // A plain shell only. A terminal running a harness CLI is that harness's command and is
       // registered by the agents plugin (plugins/agents/src/client/terminalProfileCommands.ts), which
       // is a different owner and so cannot hang inside this group
-      // (docs/command-palette-and-shortcuts.md § What the palette refuses).
+      // (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
       { id: 'task.terminal.new-shell', parentId: TERMINAL_GROUP, title: 'New terminal', hint: 'open a shell in the task worktree', category: 'terminal', palette: true, requires: { plugin: 'terminal' }, run: () => openProfile('shell') },
       // Top-level, and deliberately: one guarded action with a confirmation behind it is not a group,
       // and burying it a keystroke deeper would not make it safer.

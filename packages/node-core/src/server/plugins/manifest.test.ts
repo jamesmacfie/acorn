@@ -481,7 +481,7 @@ describe('surface actions', () => {
   // A document beside the region is NOT required, although the verb was born in a pane that has one.
   // The palette is the other way in, and from there "do this in the thing I am looking at" is a sentence
   // about any pane the plugin draws — http's `list-detail` request panel as much as database's
-  // editor-over-panel (docs/http-client.md § From the command palette).
+  // editor-over-panel (docs/http-client/client.md § From the command palette).
   it('accepts a plain frame pane and a pane whose regions are trees, neither of which has a document', () => {
     expect(manifest({ frames: [PANE], commands: [execute('board')] }).success).toBe(true)
     const trees = {
@@ -837,7 +837,7 @@ describe('chrome descriptors', () => {
   })
 
   it('accepts a data-only harness and insists a spawn names exactly one thing to run', () => {
-    // The whole opencode plugin from docs/plugin-authoring.md § Harnesses, minus the icon: no node half,
+    // The whole opencode plugin from docs/plugin-authoring/harnesses.md § Harnesses, minus the icon: no node half,
     // no client half, no build step. If this stops parsing, that document is wrong.
     const opencode = manifest({
       harnesses: [{
@@ -1101,7 +1101,7 @@ describe('project-scoped surfaces and their routes', () => {
 
   // The one click site inside a command that can carry `navigate`: a search result. It has a picked
   // row and, at project scope, the project the palette session captured, which is exactly the pair the
-  // verb was missing everywhere else (docs/plugins.md § Command kinds).
+  // verb was missing everywhere else (docs/plugins/commands.md § Command kinds).
   it('lets a search result navigate, and counts it as a mount site for the surface', () => {
     const find = {
       id: 'find', title: 'Board: find a card', kind: 'search', scope: 'project',
@@ -1314,7 +1314,7 @@ describe('plugin commands and keybindings', () => {
 })
 
 describe('themes', () => {
-  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design.md § Appearance). The
+  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design/appearance.md § Appearance). The
   // client re-checks all of it before generating CSS, because a roster row is bytes a node sent, but this
   // is where an author finds out, so each rule is pinned at the door it is enforced at.
   const palette = Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456']))
@@ -1511,7 +1511,7 @@ describe('extension points', () => {
     }))).toContain("'board' already has an extension point at 'pane.footer'")
   })
 
-  // ── The aside: a region the user fills (docs/dashboards.md § Placements) ────────────────────
+  // ── The aside: a region the user fills (docs/dashboards/placements.md § Placements) ────────────────────
 
   it('accepts an aside beside the same pane that has a footer, and defaults its allowances', () => {
     const parsed = manifest({
@@ -1755,7 +1755,7 @@ describe('the exclusive slot', () => {
 })
 
 describe('forward compatibility: unknown is retained and reported', () => {
-  // docs/plugins.md § Forward compatibility. A manifest written for a later acorn still loads on this
+  // docs/plugins/forward-compatibility.md § Forward compatibility. A manifest written for a later acorn still loads on this
   // one; what changed is that it no longer does so in silence.
   const parse = (extra: Record<string, unknown>) =>
     parsePluginManifest({ id: 'board', name: 'Board', version: '1.0.0', baseline: 'acorn-1', apiVersion: '3', ...extra })

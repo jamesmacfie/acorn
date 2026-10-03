@@ -18,7 +18,7 @@ export type SettingsSectionProps = {
   children?: JSX.Element
 }
 
-/* SettingsSection: one titled group of setting rows on a settings page (docs/frontend.md § Settings).
+/* SettingsSection: one titled group of setting rows on a settings page (docs/frontend/settings.md § Settings).
 
    The anchor is a data attribute rather than an element id, because two pages can each declare a
    section called `general` and a document holds one element per id. The settings view looks for it

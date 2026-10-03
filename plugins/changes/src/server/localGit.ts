@@ -9,7 +9,7 @@ import { localDocument, localSearch, localSegments } from './localDocument'
 import { buildCommitPrompt, cleanCommitMessage, COMMIT_MESSAGE_SYSTEM, commitDiffScope, commitFiles, splitByBudget, splitPatch } from './commitMessage'
 import { COMMIT_MESSAGE_MAX_OUTPUT_TOKENS, emptyLocalStatus } from '../shared/api'
 
-// The two decisions this plugin lets other plugins take a turn in (docs/plugins.md § Hooks). Declared
+// The two decisions this plugin lets other plugins take a turn in (docs/plugins/hooks.md § Hooks). Declared
 // on the context in ../node/index.ts; spelled here because this is where they are run, and a hook whose
 // declaration and call site sit in different files drifts.
 //
@@ -22,7 +22,7 @@ export const CHANGES_HOOKS = [
     label: 'commit',
     // `amend` is here so a commit-lint handler can leave an amend alone: rewriting the message of a
     // commit that already exists is a different decision from writing a new one
-    // (docs/plugins.md § Hooks).
+    // (docs/plugins/hooks.md § Hooks).
     payload: { taskId: 'string', branch: 'string', message: 'string', amend: 'boolean' },
     allows: ['observe', 'transform', 'veto'],
   },
@@ -31,7 +31,7 @@ export const CHANGES_HOOKS = [
     label: 'push',
     // `force` is here so a branch-protection handler can refuse the one push that replaces a commit
     // somebody else may be standing on, while leaving an ordinary push alone. Payload matching is
-    // exact, so declaring it makes it a field every call carries (docs/plugins.md § Hooks).
+    // exact, so declaring it makes it a field every call carries (docs/plugins/hooks.md § Hooks).
     payload: { taskId: 'string', branch: 'string', force: 'boolean' },
     allows: ['observe', 'veto'],
   },
@@ -39,11 +39,11 @@ export const CHANGES_HOOKS = [
 
 // Takes CoreServices, not a database handle: this module shells out to git in the task's worktree
 // and needs core's task-to-worktree resolution and its model seam, nothing else
-// (docs/data-layer.md § Plugin databases).
+// (docs/data-layer/plugin-databases.md § Plugin databases).
 //
 // `models` is here for one call, the generated commit message. The alternative was a second bridge
 // for one member, and the diff that feeds the prompt is read by this module anyway
-// (docs/integrations.md § Model providers).
+// (docs/integrations/model-providers.md § Model providers).
 //
 // `hooks` is the owner's half of the two points above. Optional so a test can build the bridge with no
 // host around it, and absent means nobody objects, which is also what an empty chain means.
@@ -95,7 +95,7 @@ export function localGitBridge(
     discard: (taskId, path, untracked, oldPath) => withRoot(taskId, (root) => discardFile(root, path, !!untracked, oldPath)),
     // The two hooked mutations. The refusal reaches the pane as the same `{ ok: false, reason }` a git
     // failure does, with the blaming plugin's name in front of it, so the owner's UI needs no second
-    // shape for "somebody said no" (docs/plugins.md § Hooks).
+    // shape for "somebody said no" (docs/plugins/hooks.md § Hooks).
     headCommit: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return null
@@ -122,7 +122,7 @@ export function localGitBridge(
     // Which operation to abort is read off the tree here, not taken from the caller: `merge` and
     // `rebase` are argv, and the panel only offers Abort while its own status read says one is in
     // flight. A request that arrives after somebody finished the rebase in a terminal is refused
-    // rather than guessed at (docs/security.md § Process, path, and configuration controls).
+    // rather than guessed at (docs/security/process-and-paths.md § Process, path, and configuration controls).
     abort: (taskId) => withRoot(taskId, async (root) => {
       const operation = await gitOperation(root, { fresh: true })
       if (!operation) return { ok: false, reason: 'No merge or rebase is in progress.' }

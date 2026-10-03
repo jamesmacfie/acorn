@@ -1,8 +1,9 @@
 # Agent tools
 
-Agent tools are Node-owned capabilities projected to the renderer and to task-scoped MCP clients.
-The registry and schemas live in `packages/node-core/src/server/agentTools/` and plugin contributions
-live beside the feature they operate.
+Agent tools are Node-owned capabilities that agents call through MCP and the renderer calls through
+HTTP. Read this page for the contribution type, the shipped tools, permissions, and the topic pages.
+The registry and schemas are in `packages/node-core/src/server/agentTools/`, and each plugin keeps
+its tools beside the feature they operate.
 
 ## Contribution
 
@@ -17,476 +18,100 @@ type AgentToolContribution = {
 }
 ```
 
-The exact type carries more metadata for rendering, permissions, and task context. A contribution
-must validate input again at execution time and use CoreServices for files, Git, processes, secrets,
-and task lookup.
+The full type carries more metadata for rendering, permissions, and task context. A contribution
+validates input again when it runs, and uses `CoreServices` for files, Git, processes, secrets, and
+task lookup. To add a tool, add the contribution to the owning plugin, register it through
+`ctx.tools.register` in the plugin's Node entry, add protocol and client rendering metadata if it
+needs any, and test it through the real `createApp()` route and the MCP projection.
 
-Tool groups cover task and context inspection, the issue and error trackers, Git and changes, the
-pull request, notes, memory, terminal handoff, and browser operations. Nothing drives a workflow,
-opens a database, or talks to Docker: [the MCP doc](./mcp.md) § Tool surface says why, and the
-registry is the authority on the list.
+## Shipped tools
 
-## GitHub
+The registry is the authority on this list. These tools ship:
 
-Three tools, one write and two reads.
+| Owner | Tools |
+| --- | --- |
+| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request` |
+| `github` | `github_pull_create`, `pr_review_comments`, `pr_checks` |
+| `changes` | `local_changes`, `local_diff`, `git_log` |
+| `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
+| `memory` | `memory_list`, `memory_search`, `memory_get`, `memory_write`, `memory_delete` |
+| `terminal` | `run_targets`, `run_status`, `run_start`, `run_stop`, `run_restart`, in tasks with run targets |
+| `agents` | `agent_spawn`, `agent_prompt`, `agent_wait`, `agent_read`, `agent_cancel` |
+| `browser` | `browser_navigate`, `browser_snapshot`, `browser_click`, `browser_fill`, `browser_screenshot`, `browser_console` |
 
-`github_pull_create` is write-tier. It is available only for a managed session on a task with a
-GitHub project and branch, creates from that branch, and records the session in core's task-PR
-relation before returning whether the new PR became primary or related.
+A loaded plugin adds tools named `<pluginId>_<id>` ([loaded tools](./agent-tools/loaded-tools.md)).
+No tool drives a workflow, opens a database, or talks to Docker. [MCP](./mcp.md#tool-surface) says
+why.
 
-`pr_review_comments` and `pr_checks` are read-tier, and both read the mirror this plugin already keeps
-fresh, so neither spends a credential or touches the network. Between them they answer the two
-questions an agent on a reviewed PR has: what did people say, and what is red. The first groups the
-mirror's per-comment `review_threads` rows back into threads and leaves resolved ones out unless
-asked; the second returns every check with its raw status plus the failing names, by the same rule the
-ci-loop step uses (`checkFailed` in `plugins/github/src/server/mirrorQueries.ts`).
-
-Both distinguish an unmirrored pull request from an empty one, and say which in a `status` field. A
-task whose PR has never been mirrored is not a PR with no feedback, and it is not a green one.
-
-## issue_detail
-
-`linked_issues` answers "what is attached to this task" with the bounded items from the `issues`
-context section: provider, label, and cached status detail. An agent asked to implement a ticket needs the description and the
-comments, and an agent asked to fix an error needs the trace. Neither is in a summary, and neither is
-in the task-context prompt, which is why an agent used to fall back to its own Linear connector and
-fail.
-
-`issue_detail` is the read that closes that gap. It takes an identifier, an optional provider and an
-optional `refresh`, asks every connected workspace in turn, and returns the first that answers.
-Read-tier, so it is permitted by default.
-
-Core owns the tool and the provider owns the read. That split remains intentional even though Linear
-and Rollbar can now declare loaded tools: one shared `issue_detail` name searches every connected
-provider, while a manifest tool belongs to one package and one owned route. What each provider
-declares is `detail` on its provider contribution, a function core calls once per
-connection with one method lent back to it:
-
-```ts
-export type ProviderDetailContext = {
-  resource<TInput, TOutput>(resourceId: string, input: TInput, force?: boolean): Promise<RouteResult<TOutput>>
-}
-export type ProviderItemDetail = (context: ProviderDetailContext, identifier: string) => Promise<unknown | null>
-```
-
-That one method is the same resource runtime the provider's own routes go through, so the cache, the
-TTL, the request budget and the credential scope are the ones already in place. The provider composes
-its own resources rather than pointing at one, because only it knows how many the answer takes:
-Linear reads the issue, and Rollbar reads the item, its occurrence list and the newest occurrence,
-where the trace is.
-
-Three answers have to stay apart. A value is the item. `null` is "not in this connection", which is
-what every workspace but one legitimately says. A throw is that workspace refusing, and core reports
-it rather than the not-found, because a 401 from the workspace that owns the ticket must not read as
-"no such ticket".
-
-A provider that declares no `detail` offers summaries only. Naming it explicitly is a `bad_request`
-that says so, and when no provider declares one the tool's `when` withholds it entirely.
-
-## issue_comment and issue_image
-
-`issue_comment` posts a comment on an issue, and is write-tier. `issue_image` returns one image from
-an issue, such as a screenshot in a Linear ticket, and is read-tier. Both live in
-`packages/node-core/src/server/agentTools/issueTools.ts` and follow the `issue_detail` split. Core
-owns the tool, and each provider owns the call through its `comment` or `image` hook
-([integrations](./integrations.md) § Comments and images).
-
-Unlike `issue_detail`, both tools act only on an item linked to the task. The link names the
-connection, so neither tool asks each workspace in turn. An agent also cannot comment on a ticket
-nobody attached to its work, or use the owner's key to read files from one. An unlinked identifier is
-`not_found`, and the message tells the agent to ask the user to link it.
-
-`issue_comment` also checks the capability the connection was granted, which can be narrower than
-what the provider offers. It passes the tool call ID to the hook as `idempotencyKey`. After a
-successful post, it refreshes the item's cached detail in the background, so the next `issue_detail`
-shows the new comment. The comment appears under the name of the person who connected the tracker,
-and the tool description tells the agent so.
-
-`issue_image` accepts a URL only if it appears in the item's detail, so the key fetches nothing the
-ticket does not reference. It accepts PNG, JPEG, GIF, and WebP up to 5 MB. Its result is a
-`ToolImageResult` (`@acorn/protocol/api.ts`), and the MCP server returns it as an image block instead
-of JSON text. That is the only tool result the MCP server treats differently.
-
-## Loaded manifest carriers
-
-A loaded package does not receive the live `ctx.tools` or `ctx.contextSections` registries. It
-declares data in `acorn-plugin.json`, and the host adapts that data into the same registries used by
-compiled plugins:
-
-```json
-{
-  "contributions": {
-    "agentTools": [{
-      "id": "lookup",
-      "description": "Read the package's task-local record.",
-      "inputSchema": {
-        "type": "object",
-        "properties": { "id": { "type": "string", "minLength": 1, "maxLength": 100 } },
-        "required": ["id"],
-        "additionalProperties": false
-      },
-      "risk": "read",
-      "scope": "task",
-      "handler": "/v1/p/example/tools/lookup",
-      "timeoutMs": 5000,
-      "maxOutputBytes": 65536
-    }],
-    "contextSections": [{
-      "id": "references",
-      "label": "Example references",
-      "scope": "task",
-      "order": 60,
-      "read": "/v1/p/example/context/references",
-      "defaultIncluded": false,
-      "timeoutMs": 5000,
-      "maxBytes": 32768,
-      "maxTokens": 4096
-    }]
-  }
-}
-```
-
-Tool IDs are lowercase snake case and become `<pluginId>_<id>` in the registry. The compatibility
-case where a context section's local ID equals its plugin ID keeps the established `<pluginId>`
-section ID; other sections become `<pluginId>:<id>`. Persisted tool and inclusion preference IDs must
-not be renamed casually.
-
-The accepted JSON Schema language is deliberately small: one object root, object/array/scalar types,
-`properties`, `required`, boolean `additionalProperties`, `items`, `enum`, string/number/array limits,
-and descriptions. `$ref`, remote or recursive schemas, combinators, executable validators, and every
-unknown keyword fail manifest validation. A schema is limited to 64 KiB, eight levels, 64 properties,
-and 64 enum values. The host compiles it once and validates arguments on every call.
-
-The handler receives `POST { arguments, origin: { taskId, sessionId?, callId? } }`. Those origin fields
-are informational: the route's `PluginRequestContext.principal` is built by the host from the verified
-task/session token and signed tool ceiling. The handler route is confined to the declaring plugin,
-and the internal task principal cannot use device-only routes. Owner preferences, session requirement,
-risk permission and signed ceiling all run before dispatch. Handler output must be JSON and fit the
-declared limit (1–256 KiB); timeouts are 100 ms–30 seconds and return the ordinary `timeout` tool error.
-
-A context read receives `POST { origin: { taskId }, scope: "task" }` under a host-built task
-principal and returns:
-
-```json
-{
-  "items": [{
-    "id": "record-1",
-    "kind": "reference",
-    "label": "Record one",
-    "body": "Bounded reference text",
-    "details": ["optional detail"],
-    "sources": [{ "label": "origin", "uri": "urn:example:record-1" }]
-  }],
-  "compact": "## Example references\n- Record one",
-  "omitted": 0,
-  "unavailable": { "detail": "optional non-fatal status" }
-}
-```
-
-The response is a strict, bounded data shape, never a renderer or formatter function. The assembler
-applies the descriptor's byte/token ceilings and the 512 KiB global budget in deterministic
-`order`, then ID order. A timeout, HTTP failure, oversized response or invalid response marks that
-section unavailable (with `timeout`, `unavailable`, or `invalid-response`) and does not discard its
-siblings. `defaultIncluded` supplies only the initial inclusion; an owner's explicit include list
-remains authoritative. Returned text is reference data, not host instructions.
-
-The descriptor adapter never retries a handler. The MCP loopback proxy may reconnect after a node
-restart, but it keeps one `x-acorn-tool-call-id` for the logical call. A mutating domain must use that
-ID (or its own domain key) for idempotency; a lost plugin reply is not permission to repeat a write.
-Reload first removes the old owner's registrations and replays the new descriptor set. Failed reload
-restores the prior set; successful update and unload cannot leave a stale tool or context section.
+The four data source tools are read-only. The Node derives their workspace and project scope from the
+task, and inputs can narrow the connection and source parameters but not substitute another task.
+They return descriptors, schemas, or bounded option pages, and don't query records, return
+credentials, or change provider state.
 
 ## Projections
 
-The same registry is projected into:
+The same registry is projected three ways:
 
-1. `GET /v1/core/agent-tools` for the Settings → Tools and permissions catalog. Each entry names its
-   `owner`, the plugin id that contributed it or `core`, so the page can group a plugin's tools
-   together. The page shows the three tiers first, then every tool grouped by owner or by tier, and a
-   row names the other grouping in a chip.
-2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name` for the renderer.
-3. The stdio MCP server for a spawned agent.
+1. `GET /v1/core/agent-tools`, for the Settings → Tools and permissions catalog. Each entry names its
+   `owner`, a plugin ID or `core`. The page shows the three tiers first, then every tool grouped by
+   owner or by tier.
+2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name`, for the renderer.
+3. The stdio MCP server, for a spawned agent.
 
-Renderer calls require a device principal. MCP calls require an internal principal whose token is
-bound to the task. The Node applies the caller scope, task identity, and the owner's per-tool
-permission preference before executing.
+Renderer calls need a device principal. MCP calls need an internal principal whose token is bound to
+the task. The Node applies the caller's scope, the task identity, and your per-tool permission before
+it runs a tool.
 
-Core contributes four read-only typed-source tools: `data_sources_list`,
-`data_sources_discover`, `data_source_describe`, and `data_source_options`. The Node derives their
-workspace and project scope from the addressed task. Inputs can narrow the connection and source
-parameters, but cannot substitute another task scope. The source runtime performs its normal provider
-authorization and returns descriptors, schemas, or bounded option pages. These tools do not query
-records, return credentials, or mutate provider state.
+## Permissions
 
-Permissions have two layers, persisted together as one prefs slice under `agentTools.perms`: a
-**tier** default (`read` / `write` / `execute`) and a **per-tool** override. A per-tool toggle wins
-over its tier. Turning a tier off removes every tool at that risk level from `tools/list` and rejects a
-direct harness call for one of them. This applies before any workflow or profile ceiling, which can
-only narrow the tool list further.
+Permissions have two layers, stored together as one prefs slice under `agentTools.perms`: a tier
+default for `read`, `write`, and `execute`, and a per-tool override that wins over its tier. Turning a
+tier off removes its tools from `tools/list` and rejects direct calls. Workflow and profile ceilings
+apply after this and can only narrow.
 
-A tier the owner has never touched falls back to `TOOL_TIER_DEFAULTS`
-(`@acorn/protocol/toolPermissions.ts`): `read` and `write` allowed, **`execute` denied**. That is the
-state every installation is in for a tool that ships in a later release, which is why the fallback
-matters more than it looks. Adding an execute tool used to grant it to everyone on upgrade with nothing
-shown to the owner; now it is inert until someone turns the tier on in Settings → Tools and permissions. The
-node's `isToolPermitted` and the settings page read the same constant, so what the page draws is what
-the wire enforces.
-
-## Managed-session orchestration
-
-The Agents plugin contributes five execute-tier tools for agent-driven delegation. They operate on
-managed sessions through `ManagedAgentRuntime`; they do not create workflow runs or mutate workflow
-definitions.
-
-| Tool | Input | Result |
-| --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, optional `profileId` or `agent`, `isolation`, `baseBranch`, `resultSchema`, `configOptions`, and `toolCeiling` | Stable spawn, task, session, and initial-turn IDs; depth; provisioning state; and cursor |
-| `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Durable turn ID, queue state and ordinal, session state, and cursor |
-| `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether the condition matched or timed out, plus state, attention, and the latest sequence |
-| `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
-| `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and resulting session state |
-
-An agent learns how to use these tools only from their descriptions and the `describe()` text on each
-field in `plugins/agents/src/shared/delegationSchemas.ts`, which the MCP schema carries. When a rule
-below changes, change that text too.
-
-Settings > Agents > Harnesses and defaults > Spawned agents controls the defaults for shared-task
-and worktree spawns. Inherit from parent copies the parent's harness and its live model and reasoning
-options at spawn time. Use explicit defaults selects a harness and separate model and effort choices.
-An omitted explicit harness means the parent's harness. Changing these settings affects future spawns.
-
-The parent can override the harness with `profileId` and model and effort with `configOptions`.
-For example, `{ profileId: 'codex', configOptions: { model: '<model id>', reasoning: 'high' } }`
-selects all three for one child. Option IDs belong to the provider; use the IDs it advertises.
-The precedence is spawn-call choices, then custom-agent choices, then the configured spawn defaults.
-Inheritance copies model and reasoning only, leaving permissions and collaboration mode to their
-separate policies. It does not copy provider-specific options when the spawn selects another harness.
-A terminal-drawer parent has no live managed model metadata, so inheritance supplies its harness only.
-In those cases the child's provider selects unspecified model and effort values.
-Resolved worktree settings are recorded in the provisioning ledger, so restart recovery retains the
-choices made at spawn time. Unsupported option values produce a warning in the child's transcript.
-
-`agent_spawn` can start a custom agent by passing its name or id as `agent`
-([managed-agents.md](./managed-agents.md) § Custom agents). The agent picks the harness, so naming a
-different `profileId` beside it is refused. The agent's options override the spawn defaults and the call's
-`configOptions` go on top, and its tool ceiling narrows between the caller's and the call's own. The
-child's system prompt gets the agent's instructions the same way an interactive session does.
-
-`agent_spawn` defaults to shared-task isolation and starts the first turn before returning. Worktree
-isolation creates a selectable child task. Its optional `baseBranch` starts from an existing local
-branch's last commit; uncommitted changes do not carry over. Without it, the child starts from the
-project folder's `HEAD`. Shared isolation rejects `baseBranch`. The managed session remains the
-execution authority.
-The caller can prompt, wait for, read, or cancel only a direct child recorded in the Agents plugin's
-spawn ledger. A missing, foreign, sibling, ancestor, descendant, or cross-task ID returns
-`not_found`.
-
-These contributions set `requiresSession`, so the registry hides them unless authentication supplies
-a signed task and session claim. A transport `x-acorn-session-id` header cannot satisfy that gate.
-The MCP proxy assigns one `x-acorn-tool-call-id` to each logical call and keeps it across a loopback
-retry. Spawn, prompt, and cancel scope that ID to the signed owner and operation so a retry cannot
-create a second resource.
-
-The owner must enable the execute tier or the individual tools. The server also intersects a child's
-requested tool ceiling with the signed parent's ceiling and persists the result in the child session.
-A workflow-owned managed session cannot see `agent_spawn`, because delegated descendants are not
-charged to workflow budgets. Delegation depth is capped at two, and each root can have at most 12
-live descendants. Managed runtime workspace and provider concurrency limits still apply.
-
-If a turn declares `resultSchema`, the Agents plugin adds the result contract to the prompt and
-validates the returned JSON against that schema. `agent_read` reports a diagnostic instead of
-returning malformed structured output. Reads page the durable event sequence, fold assistant deltas,
-omit verbose tool and attachment payloads, cap individual text items at 16 KiB, and cap projected
-text at 64 KiB per response. Waits last at most 30 seconds and a timeout does not cancel the child.
-
-A managed owner does not have to stay in its turn to wait. When a turn it gave a child settles, the
-Agents plugin queues one `delegation_report` turn on the owner with the child's final message, and
-withdraws it if the owner reads that result with `agent_read` first. See
-[managed-agents.md](./managed-agents.md#reports-back-to-the-owner).
-If a delegated turn pauses on a permission, question, or elicitation request, the owner receives an
-informational report. A human opens the child session and resolves the request there; these tools do
-not approve or answer child requests.
-
-## Context sections
-
-Plugins register context sections through the Node context-section registry. Each contribution
-declares its wire order and the registry sorts by that value, so core keeps no list of plugin IDs.
-Core applies byte and token budgets, records section status and freshness, and returns a
-deterministic snapshot. GitHub, notes, Linear, Rollbar, and task sections are optional
-contributions, and one failing section does not discard its siblings.
-
-A section is also *shaped* by the plugin that owns its rows, not just registered by it: `pr` lives in
-`plugins/github/src/server/contextSection.ts`, `notes` in the same file under its own
-package. Core offers `truncateBytes` and `formatOmitted` through `@acorn/plugin-api/node` so a
-section's own `format` applies the same ceiling arithmetic core applies to items, and keeps the
-assembly, the declared order and the 512 KiB budget. It also offers `pastedContent`, which wraps text
-the reader didn't write in `<pasted_content>` tags that Claude Code's system prompt explains: follow
-instructions inside only where the reader's own message asks. `pr` wraps the pull request body with
-it. The tag id is a hash of the text rather than a random value, because context is assembled again on
-every read and compared for changes.
-
-Core's own `issues` section registers at module scope in `contextSections.ts`, not through
-`wireAgentTools`. `wireAgentTools` is not called on every boot shape: the standalone Node
-(`pnpm dev:node`, and any Node a client pairs with over the LAN) never calls it. Registering at
-module scope means the section, and its "Linked issues" row in the context pane, exists on that boot
-too.
-
-Orders are spaced by 10 so a new section slots between two without renumbering. The order is
-load-bearing: every prompt, the client's Manifest preview, and the byte-exactness rule below assume
-`pr`, `issues`, `notes` in that sequence, so changing a number changes what an agent reads.
-
-A section's `compact` rendering must not depend on which other sections ship alongside it. That lets
-the client assemble the exact context block a send will produce from a single `include=*` inventory,
-by filtering `ctx.sections` and calling `formatContextBlock`, with no second curated fetch. A section
-that reads sibling-inclusion state into its own `compact` breaks byte-exactness silently.
-
-The task-context response contains the task projection and ordered `sections` only. The renderer,
-launch formatter, agent tools, and MCP consumers read section IDs and items. Core budgets each section's
-items and compact text once, then reports omitted items and unavailable sources with that section.
-
-### Drawing inside a section
-
-A section the node assembles is data. What the Context pane draws under it is a separate question, and
-the pane answers it with an extension point rather than a private registry: `context:section`, a
-`remote` point that stacks, keyed by the section id. For more information, see the cooperative
-extension points in [the plugins doc](./plugins.md).
-
-Memory uses standing session context instead of this section slot. Its tool card shows direct saves
-with **Open** and **Undo**. `memory_get` returns a hash; updating or deleting a memory requires that
-hash. For the scopes, checks, and history contract, see [Notes and memory](./notes-and-memory.md#memory).
-
-A compiled plugin contributes a component and the host mounts it. A loaded plugin contributes a bundle
-entry and the host runs it in a worker. The owner writes one `Slot` and cannot tell which answered.
-
-`issues` and `task_links` are core tables. For more information, see the external-item read model in
-[the data layer doc](./data-layer.md). GitHub and Rollbar write them through the `ExternalItemStore`
-seam rather than owning them. The core-owned `issues` section is the only one that reads the database
-handle, which is why the shared `PluginContextSection` contract can withhold that handle from every
-other section at no cost.
-
-## plugin_authoring
-
-`server/agentTools/pluginAuthoring.ts` (`read` tier) teaches an agent to write a plugin for the node
-that will run it. It takes no arguments and answers with a markdown guide plus the same facts
-structured, so a manifest can be checked without parsing prose.
-
-The rule it enforces is: never answer a plugin API question from memory. Everything an author gets
-wrong by remembering is derived at call time. The manifest key list, the cap on each contribution,
-the two closed action-verb sets, the frame targets, the host slots, and the command categories all
-come out of `z.toJSONSchema(pluginManifestShape)`. The `permissions.node` blocks come from the same
-schema, and its `core` facet list from `server/plugins/permissions.ts`. The frame bridge's message kinds,
-`ui` ops, document ops, webview ops, and HTTP methods are read off the wire union in
-`@acorn/protocol/plugin/bridge.ts` through `satisfies`, so a new message kind is a compile error here
-rather than a silent omission. Only process is hand-written, because no schema states it, and
-`pluginAuthoring.test.ts` re-derives every list and asserts it reached the rendered text.
-
-Two things it leaves out. The `@acorn/plugin-api` export list, because a hand-written plugin cannot
-import that package and a packaged node has no copy of `surface.snapshot.txt` to read. The snapshot
-has its own drift gate and is the answer for a plugin that is built. And the grantable
-`permissions.api` scope names, because that allowlist lives in the client and the node cannot import
-it. A wrong scope name in a guide the agent believes is worse than none.
-
-It answers through a context section rather than an `agentContexts` descriptor because the shapes
-don't match. `agentContexts` is a manifest key, so a core-owned entry would mean core pretending to
-be a plugin, and its contract is an `options` GET plus a `capture` POST against a plugin's own
-namespace, a picker over rows. `contextSections` already has the one dial this needs,
-`defaultIncluded: false`.
-
-Neither door is a new route. The tool call and the context section both resolve inside the Node
-process, so nothing was added to the frame allowlist (`client-core/host/frames/scopes.ts`). The
-one place a frame can reach this text is `GET /v1/core/tasks/:id/context` with an explicit
-`include=plugin-authoring`, a read of acorn's own published contract under a scope the task owner
-already granted.
-
-The `defaultIncluded: false` flag is what makes the section affordable. A task that is not writing a
-plugin never assembles it and pays nothing, while a human who is can tick **Plugin authoring** in the
-composer's context picker, or an agent can ask for it with
-`task_context { include: 'plugin-authoring' }`.
-
-## plugin_request
-
-One core tool sits apart from the rest, and it is worth reading before adding anything like it. It
-lets an agent ask the owner to install, update, or remove a plugin on this node
-(`server/agentTools/pluginRequests.ts`, `execute` tier, never projected to the renderer). It is the
-only tool whose subject is which code the node runs.
-
-It installs nothing. It writes a row in an in-memory queue, broadcasts a content-free notice, and
-throws `needs-trust` (409) with a sentence telling the agent to call again with the same arguments to
-collect the owner's answer. The owner answers in the shell, and the device then performs the install
-over the device-gated `/v1/core/plugins/*` routes with its own principal. Prompt injection is a named
-threat, so an agent must never hold a credential that can install code. The defence is structural:
-that module imports no installer, no data root, and no filesystem, and a test pins its import list so
-a convenience import fails the build rather than the boundary.
-
-Only the first raise of a given request rings the bell, 20 outstanding requests is the cap, and
-collecting a decision spends the row, so a second identical call is a new question rather than a
-second use of an old yes. The agent's `reason` string is capped and rendered as text. It explains the
-request and is not evidence for it. For the full flow, see approval-mediated install in
-[the plugins doc](./plugins.md).
+A tier you've never touched falls back to `TOOL_TIER_DEFAULTS` in
+`packages/protocol/src/agents/toolPermissions.ts`: `read` and `write` allowed, `execute` denied. So an
+execute tool added in a later release stays off until you turn the tier on. The Node's
+`isToolPermitted` and the Settings page read the same constant.
 
 ## Safety rules
 
-- Tool input and all path and task IDs are validated at the Node boundary.
-- Task-scoped callers cannot address another task.
-- Secrets are used through scoped provider APIs and never returned by a tool.
+- The Node validates tool input and every path and task ID at its boundary.
+- A task-scoped caller can't address another task.
+- Secrets are used through scoped provider APIs and never returned.
 - Child processes use the process broker and bounded output.
-- Agent text is not control flow. Workflow gates consume structured step output only.
-- Tool failures use the common API error envelope and do not expose provider payloads or credentials.
+- Agent text isn't control flow. Workflow gates read structured step output only.
+- Tool failures use the common API error envelope and don't expose provider payloads or credentials.
 
-## Adding a tool
+## Pages
 
-Add the contribution to the owning plugin, register it in the Node plugin host, add the protocol and
-client rendering metadata if needed, and test it through the real `createApp()` route and MCP
-projection.
+<a id="github"></a>
+<a id="issuedetail"></a>
+<a id="issuecomment-and-issueimage"></a>
 
-## Browser tools
+- [Tracker and GitHub tools](./agent-tools/tracker-tools.md) covers `issue_detail`, `issue_comment`,
+  `issue_image`, and the GitHub tools.
 
-`plugins/browser` contributes the `browser_*` tools (navigate, snapshot, act, screenshot) through the
-same registry, so they project to the renderer and to MCP like every other contribution, and an agent
-on any node, including a headless remote one, gets a browser. The plugin ships `playwright-core` and
-drives an installed Chrome. The browser itself is in no bundle, and the tools report why they are
-unavailable on a machine without one. The plugin is compiled rather than loaded because
-`playwright-core` carries native bits a hash-addressed loaded bundle cannot.
+<a id="loaded-manifest-carriers"></a>
 
-The Node retains at most eight task contexts and closes the oldest before opening a replacement.
-Concurrent requests for one task share its pending allocation. Release cancels pending creation;
-shutdown waits for late allocations to close. A failed context close retains its capacity until cleanup
-succeeds or the browser disconnects. Console messages and page errors share a recent-output budget:
-200 entries, 8 KiB of UTF-8 per entry, and 256 KiB in total. Oversized entries show a truncation marker.
+- [Loaded tools and context sections](./agent-tools/loaded-tools.md) covers the manifest form.
 
-Rich results are audit-ready by construction. A screenshot is a row in the plugin's own table, keyed
-to the task and capped per task, and the tool result is a URL handle rather than inline base64, so it
-outlives the transcript. An audit trail of tool usage belongs at the registry dispatch seam, where
-every call already passes, not inside this plugin.
+<a id="managed-session-orchestration"></a>
 
-The insert and newest-20 retention sweep complete before
-`plugin:browser:captures-changed { taskId }` is published. `browser.captures` then lists ordered
-metadata for that task; pixels stay behind the authenticated capture route. Task credentials can read
-only their own task's capture bytes; device and service credentials can read any task's captures.
-Foreign and unknown capture IDs both return an empty 404 response. The older
-`capture-created` frame remains for one compatibility period, but new consumers use the collection
-event so a missed frame or retention deletion self-heals on re-read.
+- [Managed-session orchestration](./agent-tools/orchestration.md) covers the `agent_*` tools.
 
-The user's preview pane and the agent's browser are two surfaces on purpose. The shell's child
-webview is view-only for the person, covered by host-owned webviews in [the shell doc](./shell.md),
-and when the agent needs to see what the user sees, it points its own browser at the same tunnel URL.
+<a id="context-sections"></a>
+<a id="drawing-inside-a-section"></a>
 
-## Task script tools
+- [Context sections](./agent-tools/context-sections.md) covers task context assembly and the route.
 
-Core registers three read-tier tools, scoped to the authenticated task:
+<a id="pluginauthoring"></a>
+<a id="pluginrequest"></a>
 
-- `task_scripts_status {}` returns both current phases and bounded attempt summaries.
-- `task_scripts_wait { phase, timeoutMs, attemptId? }` waits at most 30,000 ms for the selected
-  attempt and generation. Timeout returns `matched: false`; it does not cancel the process.
-- `task_scripts_logs { phase, tailLines, maxBytes?, attemptId? }` returns bounded diagnostic output
-  and explicit availability/truncation metadata (100 lines by default).
+- [Plugin tools](./agent-tools/plugin-tools.md) covers `plugin_authoring` and `plugin_request`.
 
-`phase` is `setup` or `teardown`. Inputs cannot select another task. All three tools call the
-same service as the Core task API and CLI; none starts setup or creates a worktree. Before work
-that needs installed dependencies, reread setup status and, when it is starting or running,
-wait for that attempt. Confirmed script success does not establish general environment readiness.
+<a id="browser-tools"></a>
+<a id="task-script-tools"></a>
 
-`task_current` includes a compact snapshot of both phases. The `task-scripts` context section
-includes the phase states and tool discovery guidance without script bodies or log tails.
-Launch context is a captured snapshot; use the tools for current authority. Older tasks without
-trustworthy history remain `unknown` rather than being inferred successful from an existing root.
+- [Browser and task script tools](./agent-tools/browser-and-scripts.md) covers the browser plugin and
+  the setup and teardown tools.

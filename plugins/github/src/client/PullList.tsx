@@ -53,7 +53,7 @@ const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed
 // The list is a `Rows` collection with `virtual`, so the scroller, the row placement, the arrows,
 // type-ahead and the place it keeps across a refetch are all the kit's. This pane used to own a
 // virtualizer, a scroll element, two animation frames and a pair of hand-registered `j` / `k`
-// bindings; none of that is here now (docs/command-palette-and-shortcuts.md § Focus and typing).
+// bindings; none of that is here now (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 export default function PullList() {
   const params = useParams()
   // The same signal the source's list column reads, so the rows narrow exactly when the column does
@@ -127,7 +127,7 @@ export default function PullList() {
   }
 
   // Promotes a pull into a task: origin github-pr, branch = headRef, pullNumber
-  // (docs/workspaces-and-tasks.md § Task creation and navigation).
+  // (docs/workspaces-and-tasks/task-creation.md § Task creation and navigation).
   //
   // Created inline rather than through PromoteToTaskModal, because a pull already carries its title
   // and branch. That makes this the only place a create failure can be reported, so keep the error
@@ -153,7 +153,7 @@ export default function PullList() {
   }
 
   // What a row's menu is about, in the shape core's rail list uses, so one registry serves both
-  // (docs/plugins.md § Context menus). The pull itself rides along as `item`; only `providerId` and
+  // (docs/plugins/menus-and-markers.md § Context menus). The pull itself rides along as `item`; only `providerId` and
   // `projectId` are facts a contributed row may match on.
   //
   // `body` comes from the warmed detail cache when the row has one, because the list route does not

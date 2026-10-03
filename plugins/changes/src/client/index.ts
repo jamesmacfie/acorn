@@ -1,4 +1,4 @@
-// The changes plugin's client part (docs/plugins.md § The plugin API).
+// The changes plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 import { openPane, type ClientPlugin } from '@acorn/plugin-api/client'
 import { lazy } from 'solid-js'
 import { changeViewSlice } from './changesPrefs'
@@ -13,7 +13,7 @@ export const changesClientPlugin: ClientPlugin = {
   init: (ctx) => {
     ctx.panes.register(changesPaneContribution)
     // How the list is drawn: one device preference, so it survives a relaunch and stays on this
-    // machine (./changesPrefs.ts, docs/state-ownership.md § Scope rules).
+    // machine (./changesPrefs.ts, docs/state-ownership/scope-rules.md § Scope rules).
     ctx.persistedStateSlices.register(changeViewSlice)
     // A row that says what this pane is for, beside core's generic `Show pane: Changes`. Somebody
     // reaching for the palette types "diff" or "staged", not "pane"
@@ -36,7 +36,7 @@ export const changesClientPlugin: ClientPlugin = {
     })
     // What another plugin may say about a line of this pane's diff: coverage, a lint result, a blame
     // note. Keyed by file, line and side, which is what the viewer already knows about a row
-    // (docs/plugins.md § Cooperative extension points). The node-side `changes:before-commit` and
+    // (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The node-side `changes:before-commit` and
     // `changes:before-push` hooks are declared next door in ../node/index.ts.
     ctx.extensionPoints.register({
       id: 'diff-line', label: 'Changes diff line', kind: 'annotation', key: [...DIFF_LINE_KEY], max: 4,
@@ -48,7 +48,7 @@ export const changesClientPlugin: ClientPlugin = {
     //
     // A `remote` point rather than a `rows` one, because the verb is "go to a route of mine with a
     // parameter from the props", which is code, and a kit tree is the cheapest code that runs in
-    // another plugin's surface (docs/plugins.md § Cooperative extension points).
+    // another plugin's surface (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
     ctx.extensionPoints.register({
       id: 'push-actions', label: 'After a push', kind: 'remote', mode: 'stack', max: PUSH_ACTIONS_MAX,
     })
@@ -58,7 +58,7 @@ export const changesClientPlugin: ClientPlugin = {
     // Keyed on the harness's tool kind rather than on "did this call touch a path", which is what the
     // private client registry this replaced matched on. A point's arbitration has to be decidable
     // without running a contributor's code, so a predicate is not on offer, and these four kinds are
-    // what the drivers report for a call that names files (docs/plugins.md § Cooperative extension
+    // what the drivers report for a call that names files (docs/plugins/cooperative-extension-points.md § Cooperative extension
     // points).
     ctx.extensions.register({
       id: 'changes.tool-card',

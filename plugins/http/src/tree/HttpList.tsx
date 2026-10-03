@@ -1,5 +1,5 @@
 // The API panel's `list` region: the project's saved requests, the task's ad-hoc ones above them, and
-// the way into the variables editor (docs/http-client.md § Client).
+// the way into the variables editor (docs/http-client/client.md § Client).
 //
 // A region rather than a column inside one tree. Everything it shares with the detail beside it — the
 // selection and the draft — is in ./panelModel.ts, which one worker holds for both. The delete

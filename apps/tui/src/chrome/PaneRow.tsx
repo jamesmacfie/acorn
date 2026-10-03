@@ -45,7 +45,7 @@ export function PaneStrip(props: { task: Task; focused: boolean }) {
 // The pane itself is the contribution's own component, model root, layout and all — the same object
 // the desktop mounts, drawn by this host's layout table (../layouts/index.ts). One error boundary per
 // pane, as on the DOM, drawn as an `Alert` in `warn` tone: a pane that throws is one pane with a
-// message in it, not a blank terminal (docs/tui.md § Unknown nodes and failed
+// message in it, not a blank terminal (docs/tui/rectangles.md § Unknown nodes and failed
 // trees). `ContributionBoundary` itself is not reused — its fallback is `<section>` and `<strong>`.
 export function PaneBody(props: { task: Task; nodeId: string }) {
   const shown = () => shownPane(props.task)

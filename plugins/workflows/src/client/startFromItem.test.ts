@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { collectItemWorkflowInputs, itemWorkflowInputsReady, prefillFromItem } from './startFromItem'
 
-// The prefill rule (docs/workflows.md § Starting a run). It is the whole reason "Start workflow…" is
+// The prefill rule (docs/workflows/starting-runs.md § Starting a run). It is the whole reason "Start workflow…" is
 // one click rather than a form: a Rollbar error, a Linear issue and a GitHub pull request all arrive
 // as a title, a body and a link, and the rule maps those onto the names a definition declares.
 

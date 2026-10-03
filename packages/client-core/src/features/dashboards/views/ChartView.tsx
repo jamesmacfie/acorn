@@ -9,7 +9,7 @@ import type { PanelViewProps } from './props'
 //
 // Colour is an attribute, never a literal: `data-tone` or `data-series`, never both, with
 // `dashboards.css` owning the colour. No `fill="#…"` here, so a swatch and its mark cannot drift
-// apart. See docs/dashboards.md § Views are derived, not chosen from a menu.
+// apart. See docs/dashboards/views.md § Views are derived, not chosen from a menu.
 
 export default function ChartView(props: PanelViewProps) {
   // The box scales uniformly (`meet`), so its scale is the smaller of the two ratios. Dividing the

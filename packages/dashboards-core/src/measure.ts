@@ -7,7 +7,7 @@ import { aggregateRows, shapeRows } from './shaping'
 // Its own module because two callers need the same answer: the renderer composes these four steps as
 // memos (client-core/features/dashboards/data.ts § createPanelData) and the node's measure sampler composes
 // them once per pass with no reactivity in sight. Written twice, they would drift, and a stored
-// history is only honest if it means what the number on screen means (docs/dashboards.md §
+// history is only honest if it means what the number on screen means (docs/dashboards/sampling.md §
 // Sampling and retention).
 //
 // The four steps, in order and nothing else: map the sources into one schema, union their rows,

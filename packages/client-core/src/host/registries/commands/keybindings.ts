@@ -157,7 +157,7 @@ export function KeybindingDispatcher(props: {
   // `@opentui/keymap` on the document root and registers these bindings as a layer over the command
   // registry. What used to be a `scopeActive` check inside a keydown handler is a matcher on each
   // binding; everything else — the layers, the command catalog, the shadowing diagnostics — is the
-  // engine's. See docs/command-palette-and-shortcuts.md § Focus and typing.
+  // engine's. See docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
   onMount(() => {
     installKeymap(document.documentElement, {
       prefs: () => ({ taskActive: props.taskActive, ...(props.focusedPane ? { focusedPane: props.focusedPane } : {}) }),

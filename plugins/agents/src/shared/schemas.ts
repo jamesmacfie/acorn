@@ -77,7 +77,7 @@ export const createAgentSessionSchema = z.object({
   parentSessionId: z.string().uuid().optional(),
   parentTurnId: z.string().uuid().optional(),
   // Start from a saved custom agent. The node reads it and copies what the session keeps onto `config`,
-  // so a caller names the agent and never sends its instructions (docs/managed-agents.md § Custom agents).
+  // so a caller names the agent and never sends its instructions (docs/managed-agents/custom-agents.md § Custom agents).
   customAgentId: z.string().min(1).max(200).optional(),
   config: z.record(z.string(), z.unknown()).default({}),
 }).superRefine((input, context) => {

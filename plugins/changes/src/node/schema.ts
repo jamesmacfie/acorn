@@ -1,4 +1,4 @@
-// The changes plugin's own tables. See docs/data-layer.md § Plugin databases.
+// The changes plugin's own tables. See docs/data-layer/plugin-databases.md § Plugin databases.
 import { integer, sqliteTable, text } from 'drizzle-orm/sqlite-core'
 
 // Inline review notes on uncommitted changes. Anchored to (path, side, line range) with the

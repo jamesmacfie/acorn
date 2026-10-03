@@ -57,7 +57,7 @@ export type LinearUploadResponse = { dataUrl: string }
 export type LinearIssuesRequest = { identifiers: string[] }
 // A project list is not a Linear wire type. Core's workspace picker reads projects through the
 // provider's `projects` contribution and its own `IntegrationProject` shape
-// (docs/workspaces-and-tasks.md § Workspace and project).
+// (docs/workspaces-and-tasks/projects.md § External projects).
 //
 // Browse-row triage fields ride the live /project-issues fetch, internal only, so they are required
 // here.

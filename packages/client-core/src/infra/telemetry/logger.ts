@@ -12,7 +12,7 @@
 // A second argument is allowed and is not an attribute. Half the renderer's log sites pass a caught
 // error as a second argument to get the console's expandable object, and the record takes the
 // error's name and message instead, because a record cannot carry an object
-// (docs/telemetry.md § The attribute vocabulary).
+// (docs/telemetry/model.md § The attribute vocabulary).
 import type { TelemetryAttrs } from '@acorn/protocol/telemetry.ts'
 import { emitLog } from './emitter'
 

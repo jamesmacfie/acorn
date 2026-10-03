@@ -7,7 +7,7 @@ import { createLogger } from '@acorn/node-core/server/telemetry'
 // The desktop opens in three processes and the helper is the middle one: Rust spawns it, it sweeps its
 // caches, starts and supervises the node, binds the WebSocket the renderer talks to, and only then
 // prints the ready line Rust is blocked on. Every one of those steps is in front of the window
-// appearing, and none of them was timed (docs/local-development.md § Timing a cold start).
+// appearing, and none of them was timed (docs/local-development/profiling.md § Timing a cold start).
 //
 // stderr, not stdout: stdout is the line protocol Rust parses, and a timing line on it is a handshake
 // Rust cannot read (apps/desktop/src/helper/helperMain.ts). The *printing* is behind the switch rather
@@ -45,7 +45,7 @@ export function helperMark(label: string): void {
  * a node has been adopted, which is itself one of the marks, so a span emitted where the mark was
  * taken would always be built with collection off and dropped. The marks are held for the printed
  * account anyway, so turning them into spans afterwards costs nothing
- * (./telemetry.ts § The switch, docs/shell.md § What the helper reports).
+ * (./telemetry.ts § The switch, docs/shell/node-child.md § What the helper reports).
  *
  * Called once, by `startHelperTelemetry` the first time the answer is yes.
  */

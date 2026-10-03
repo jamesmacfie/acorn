@@ -39,7 +39,7 @@ export const nodePermissions = z.object({
 
 
 // The plugin's logo, as one SVG path's `d` attribute rather than an SVG document, so the regex below is
-// the whole check. See docs/ui-design.md § Icons.
+// the whole check. See docs/ui-design/icons.md § Icons.
 const PATH_D_RE = /^[MmLlHhVvCcSsQqTtAaZz0-9eE,.\s+-]+$/
 
 export const brandMark = z.object({

@@ -17,9 +17,9 @@ import type {
   PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
 
-// Which plugins this node runs, and the owner's toggle (docs/ui-design.md § New surfaces, "Settings →
-// Plugins"). A bridge rather than a direct read, because the roster only exists once the composition
-// root has run the plugin host, and the persisted list is a file in the data root rather than a table,
+// Which plugins this node runs, and the owner's toggle (docs/frontend/settings-groups.md § Plugins).
+// A bridge rather than a direct read, because the roster only exists once the composition root has
+// run the plugin host, and the persisted list is a file in the data root rather than a table,
 // both live one layer above the server (server/plugins/disabled.ts).
 //
 // The bridge and the reconciliation below sit together, one layer under the route, because they answer
@@ -304,6 +304,6 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
     !row.pendingReview && (!row.disabled !== row.running || row.state === 'pending-restart' || (row.active !== null && stale(row.name))))
   // The agent-raised approval queue rides the roster rather than getting a GET of its own: it is read by
   // the same device-only mount, refreshed by the same `plugins:changed` reconcile, and a second route
-  // would be a second thing to remember to gate (docs/plugins.md § Approval-mediated install).
+  // would be a second thing to remember to gate (docs/plugins/agent-install.md § Approval-mediated install).
   return { plugins: rows, restartRequired, requests: pendingPluginRequests() }
 }

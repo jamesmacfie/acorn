@@ -80,7 +80,7 @@ export function DiffPane(props: {
   source: DiffSource
   /**
    * The qualified id of an `annotation` extension point this pane draws marks for, when its owner
-   * declared one (docs/plugins.md § Cooperative extension points).
+   * declared one (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
    *
    * A prop rather than something the source supplies, because the marks are drawn inside the
    * virtualized item and their height has to be measured with it — that is this component's
@@ -161,9 +161,9 @@ export function DiffPane(props: {
   const items = view.items
 
   // Spans per batch and per coloured segment, and the batch size as a sample: what reading near the
-  // viewport costs, rather than what the whole document would (docs/telemetry.md § Rendered-surface
+  // viewport costs, rather than what the whole document would (docs/telemetry/surface-health.md § Rendered-surface
   // health). Counts and times only. The rows go into the node's segment cache, the one beside this
-  // pane's query client, so they outlive the pane (docs/diff-rendering.md § Resident segments).
+  // pane's query client, so they outlive the pane (docs/diff-rendering/loading.md § Resident segments).
   const mountedAt = performance.now()
   const loader = createSegmentLoader({
     cache: segmentCacheFor(queryClient),
@@ -587,7 +587,7 @@ export function DiffPane(props: {
   })
 
   // Scroll to the selected file once its header exists, which is as soon as the topology does: its
-  // offset is exact before any of its rows load (docs/diff-rendering.md § Review threads and state).
+  // offset is exact before any of its rows load (docs/diff-rendering/review.md § Review threads and state).
   createEffect(() => {
     const path = selectedPath()
     items()

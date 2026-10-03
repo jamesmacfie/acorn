@@ -4,7 +4,7 @@ import { focusableIn, restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/controls/dismissable'
 import { IconButton } from '../inputs/IconButton'
 
-// Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
+// Modal chrome. Behaviour comes from createDismissable. See docs/ui-design/overlays.md § Chrome and
 // overlays for why that split keeps this component purely cosmetic, and why the overlay palettes
 // don't use it.
 //
@@ -42,7 +42,7 @@ function firstFocus(dialog: HTMLElement, role: 'dialog' | 'alertdialog'): HTMLEl
 export function Modal(props: {
   /** `onDismiss` rather than `onClose` because dismissal is one of the kit's eleven events, and only
    *  a name in that list can carry a handler across the remote root
-   *  (docs/plugins.md § The tree contract). */
+   *  (docs/plugins/tree-contract.md § The tree contract). */
   onDismiss: () => void
   title?: string
   size?: 'sm' | 'md' | 'lg' | 'wide'

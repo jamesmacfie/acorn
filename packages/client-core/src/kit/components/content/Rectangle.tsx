@@ -2,7 +2,7 @@ import { createSignal, Show, type JSX } from 'solid-js'
 
 /* Rectangle: a box the kit owns and something else fills with pixels.
 
-   The kit's one admission of defeat, and a deliberate one (docs/plugins.md § Cooperative extension points,
+   The kit's one admission of defeat, and a deliberate one (docs/plugins/cooperative-extension-points.md § Cooperative extension points,
    "does it own pixels, heavy typing, or a third-party library?"). A PTY, a webview and a plugin's own
    iframe are not trees of nodes and never will be; what the kit can still own is the box they sit in,
    and the keyboard contract for getting in and out of it.
@@ -37,7 +37,7 @@ export function Rectangle(props: {
    * rectangle holds is expensive to build and expensive to throw away — an xterm carries a WebGL
    * context and a screen the node had to serialize — so a tab strip over several of them keeps them
    * all and hides the ones nobody is looking at, the same trade `Tabs.Panel` makes for scroll
-   * position (docs/terminal.md § Client).
+   * position (docs/terminal/client.md § Client).
    */
   hidden?: boolean
   children?: JSX.Element

@@ -5,7 +5,7 @@ import { RemoteTree } from './RemoteTree'
 import { resolveSlot } from './arbitration'
 import { createSlotChoice } from './slotChoice'
 
-// A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins.md §
+// A place in one plugin's tree where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md §
 // Cooperative extension points, the `remote` kind).
 //
 // The counterpart to ExclusiveSlotHost.tsx one directory up, and the same division of labour: the
@@ -18,14 +18,14 @@ import { createSlotChoice } from './slotChoice'
 // Two render paths, one node. A compiled plugin's contribution is a component in this process and is
 // mounted here; a loaded plugin's is a bundle in a worker and goes through RemoteTree. The owner writes
 // the same `Slot` either way and cannot tell which answered, which is the whole reason first-party and
-// third-party share a component API (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
+// third-party share a component API (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
 // Neither plugin sees the other's nodes. The contributor's code has exactly the permissions its own
 // manifest declared: sitting inside somebody else's pane grants it nothing of theirs.
 //
 // Cooperative slots remain one level. The special `Slot` tree node for replaceable chrome is outside
 // KIT_NODES and needs a host-minted reference; a cooperative contributor receives no such reference.
-// The chrome host clears that reference before mounting the child. See docs/security.md § Rung 0.
+// The chrome host clears that reference before mounting the child. See docs/security/plugin-client-sandbox.md § Refused for good.
 
 export type SlotProps = {
   /** `<owner>:<point>`, the id the host minted from the owner's manifest. */
@@ -37,7 +37,7 @@ export type SlotProps = {
    *  does not add to it. */
   props?: () => unknown
   /**
-   * What this owner will do if a contributor asks (docs/plugins.md § Asking the owner).
+   * What this owner will do if a contributor asks (docs/plugins/remote-points.md § Asking the owner).
    *
    * The counterpart to `props`, and the reason it exists: props are data, so a contributor drawing a
    * replacement for one of the owner's own items has had no way to ask the owner to change that item.
@@ -109,7 +109,7 @@ export function Slot(props: SlotProps) {
   })
   const outcome = () => resolved()?.outcome
   // `stack` is the owner's default PLUS everyone who matched; `replace` is one contributor instead of
-  // it (docs/plugins.md § Arbitration). The difference is only visible here, which is why it lives
+  // it (docs/plugins/cooperative-extension-points.md § Arbitration). The difference is only visible here, which is why it lives
   // here and not in the arbitration rule: `resolveSlot` answers who draws, not what else is on screen.
   const drawDefault = () => resolved()?.mode !== 'replace' || !outcome()?.occupants.length
 

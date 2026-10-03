@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import { _resetPluginChannels, ensurePluginChannel, onPluginFrame, onPluginPush } from './pluginChannel'
 import { routeWsFrame, wsChannelPrefixes } from '../../infra/node/wsChannels'
 
-// The prefix core claims for every loaded plugin's live channel (docs/plugins.md § The live channel).
+// The prefix core claims for every loaded plugin's live channel (docs/plugins/freshness.md § The live channel).
 // A subscribed frame gets every frame, chrome gets a coalesced nudge.
 //
 // `wsClient` is stubbed because `wsConnect()` would open a socket from a unit test.
@@ -52,7 +52,7 @@ describe('frame delivery', () => {
   })
 
   it('accepts another plugin\'s channel (the broker holds the grant), and refuses a non-channel', () => {
-    // Cross-plugin subscription (docs/plugins.md § Hearing another plugin). Whether the manifest named the
+    // Cross-plugin subscription (docs/plugins/events.md § Hearing another plugin). Whether the manifest named the
     // channel is checked upstream in the broker; this layer only cares that it parses.
     const seen: unknown[] = []
     onPluginFrame('board', 'plugin:other:sample', (payload) => seen.push(payload))

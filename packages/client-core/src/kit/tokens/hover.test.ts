@@ -2,7 +2,7 @@ import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
-// Hover is never load-bearing (docs/ui-design.md § What the kit and layouts must never do, item 11,
+// Hover is never load-bearing (docs/ui-design/closed-kit.md § What the kit and layouts must never do, item 11,
 // and § What the kit refuses).
 //
 // Anything reachable on hover has to be reachable by focus. The idiom in these stylesheets is a

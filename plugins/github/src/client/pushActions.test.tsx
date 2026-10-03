@@ -4,7 +4,7 @@ import type { Task } from '@acorn/plugin-api/client'
 import { CHANGES_PUSH_ACTIONS_POINT, GithubPushActions } from './pushActions'
 
 // This plugin's one contribution into somebody else's surface: the button that turns a pushed branch
-// into a pull request, drawn under the Changes pane's branch bar (docs/plugins.md § Cooperative
+// into a pull request, drawn under the Changes pane's branch bar (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points).
 //
 // Three states worth pinning, and all three are decisions this side makes from facts the owner handed

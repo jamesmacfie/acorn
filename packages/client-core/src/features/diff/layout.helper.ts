@@ -1,4 +1,4 @@
-// A layout model for the diff in jsdom, which has none (docs/testing.md § Large-surface fixture).
+// A layout model for the diff in jsdom, which has none (docs/testing/desktop.md § The large-surface fixture).
 //
 // - The scroller is 800 by 600 over a canvas as tall as the layout sets it, and its `scrollTop` clamps
 //   to what that canvas can reach, the way a browser's does. jsdom's does not clamp, and a test that

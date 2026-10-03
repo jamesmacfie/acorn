@@ -16,7 +16,7 @@ import { laysOut, type Node } from './node'
 // the deepest thing this can answer is the `text` that measured them.
 //
 // The wheel is here rather than in the region store because it is not a focus question: a scroll
-// moves a viewport's offset and leaves the keys where they are (docs/tui.md § What the TUI never
+// moves a viewport's offset and leaves the keys where they are (docs/tui/rectangles.md § What the TUI never
 // does). A press is the other half and it is delivered the same way, from the node under the pointer
 // upwards — what it *means* is the store's, which reads it off the root
 // (../keys/regions.ts § Clicks are hit tests).
@@ -70,7 +70,7 @@ const WHEEL_ROWS = 3
  *
  *   a handler below wins    a virtual `Rows` is inside a viewport and owns its own window, so it
  *                           takes the wheel and stops it before the viewport underneath it moves as
- *                           well (docs/tui.md § Scrolling viewports).
+ *                           well (docs/tui/scrolling.md § Scrolling viewports).
  *   a handler above reads   `DiffPane` windows its content against the viewport's offset and catches
  *   the offset that moved   the wheel on a box *around* the viewport precisely so that it runs after
  *                           the move rather than before it.
@@ -124,7 +124,7 @@ type Pressed = { onMouseDown?: (event: Press) => void }
  * the event to its parent, and both ends of the walk are load-bearing. A stop's own handler presses
  * what was clicked; the root's is the store's, which walks back up from `target` to the nearest thing
  * that can hold the keys and focuses it. So a click focuses and presses, in that order, which is the
- * whole of this host's pointer model (docs/tui.md § What the TUI never does).
+ * whole of this host's pointer model (docs/tui/rectangles.md § What the TUI never does).
  */
 export function pressAt(root: Renderable, x: number, y: number): void {
   const target = hit(root, x, y)

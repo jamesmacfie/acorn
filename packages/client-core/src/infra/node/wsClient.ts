@@ -1,6 +1,6 @@
 // The renderer end of the one authenticated stream socket. This file does not own the socket: the
 // desktop main's connection broker does, because the device token rides the upgrade request's headers
-// and a browser cannot set those (docs/architecture-overview.md § Node API and client flow).
+// and a browser cannot set those (docs/architecture/node-api.md § The platform seam).
 //
 // What stays here is node filtering, envelope dispatch and reconnect signaling. The broker owns
 // the URL, socket lifecycle, outbox and reconnect backoff. Stream owners manage their payloads.
@@ -106,7 +106,7 @@ function connect(): void {
 
   // The nodeId is a filter, not decoration. Main opens a socket to every paired node and pushes every
   // frame here. Without the filter, node B's output for a colliding stream id feeds node A's reader
-  // (docs/architecture-overview.md § Client state and fleet behavior).
+  // (docs/architecture/fleet.md § Client state and fleet behavior).
   //
   // Dropping rather than routing works because only the active node's surfaces are subscribed. A
   // fleet-wide live surface would need a nodeId in the subscription key, not a wider filter here.
@@ -136,7 +136,7 @@ function connect(): void {
     // re-subscribes each PTY and restores its display snapshot. Each channel owner supplies its own
     // frames (wsChannels.ts).
     for (const frame of wsReattachFrames()) rawSend(frame)
-    // Reconnect means refetch (docs/api-reference.md § WebSocket). There is no cursor into history, so
+    // Reconnect means refetch (docs/api-reference/websocket.md § WebSocket). There is no cursor into history, so
     // the client marks the node's cache stale instead of replaying. The QueryClient lives in the app
     // shell, so this announces rather than performs it.
     reconnectSubs.forEach((cb) => cb())
@@ -148,7 +148,7 @@ function dispatch(raw: unknown): void {
   const frame = raw as WsServerFrame
   // A histogram and never a span. Terminal output alone is hundreds of frames a second while an
   // agent is writing, so this is one record every five seconds however hot the socket is
-  // (docs/telemetry.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
+  // (docs/telemetry/model.md § Hot seams are metrics). Keyed on the prefix, because `term:out` and
   // `plugin:machine-stats:sample` are different questions and one channel per session is not.
   measure('core', `ws.inbound.${frame.channel.split(':')[0]}`, () => {
     // The broker's gap detection strips `seq` before this point. Core reads `channel` and the owner
@@ -168,7 +168,7 @@ registerWsChannel('workflow', (frame) => {
   if (frame.channel === 'workflow:step-changed') stepChangedSubs.forEach((cb) => cb(frame as unknown as Parameters<StepChangedCb>[0]))
 })
 
-// Core's third prefix (docs/api-reference.md § WebSocket). Content-free like `term:status`, so the
+// Core's third prefix (docs/api-reference/websocket.md § WebSocket). Content-free like `term:status`, so the
 // subscriber re-reads the roster route (plugins/reload.ts).
 registerWsChannel('plugins', (frame) => {
   if (frame.channel === 'plugins:changed') pluginsSubs.forEach((cb) => cb())
@@ -250,14 +250,14 @@ export function _resetWsClient(): void {
 
 // "Re-read a plugin's chrome descriptors." One subscriber, `host/chrome/chromeData.ts`, and the
 // argument is what keeps it from being a fan-out: a plugin's own ping refreshes that plugin's rows and
-// nobody else's (docs/plugins.md § Hearing a core event).
+// nobody else's (docs/plugins/events.md § Hearing a core event).
 export function wsOnStatus(cb: StatusCb): () => void {
   statusSubs.add(cb)
   connect()
   return () => void statusSubs.delete(cb)
 }
 
-// A reload swapped a plugin's node half (docs/plugins.md § The dev loop). A subscriber rather than a
+// A reload swapped a plugin's node half (docs/plugins/dev-loop.md § The dev loop). A subscriber rather than a
 // direct call, because plugins/chrome imports this module and the reverse edge would be a cycle.
 export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)

@@ -1,12 +1,12 @@
 // The wire between a host-owned document surface and the plugin routes behind it. See
-// docs/editor.md § Naming for why nothing here names an editor, a vendor, or a rendering
+// docs/editor/document-surface.md § Naming for why nothing here names an editor, a vendor, or a rendering
 // engine, and why the spellings are LSP's.
 
 /** What a document `read` route answers, and what its `write` route is sent. The host defines this
  * shape, unlike everything else a plugin route serves, because the host is the one rendering it. */
 export type PluginDocumentBody = { text: string }
 
-// The completions capability (§ Language smarts). See docs/editor.md § Language smarts:
+// The completions capability (§ Language smarts). See docs/editor/document-surface.md § Language smarts:
 // completions, and the growth rule for why the host is a dumb proxy, and why capabilities grow only
 // as LSP-shaped request/response routes.
 

@@ -4,7 +4,7 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { cascadeDeletePluginData } from './cascade'
 import { schema } from './index'
 
-// The purge half of an uninstall (docs/plugins.md § Uninstalling). This exists because
+// The purge half of an uninstall (docs/plugins/data-ownership.md § Uninstalling). This exists because
 // `dataPurged: true` used to be audited over rows that were still there.
 describe('cascadeDeletePluginData', () => {
   let core: TestDb

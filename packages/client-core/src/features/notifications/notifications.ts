@@ -100,7 +100,7 @@ export function markAllRead(): void {
 }
 // Viewing a task acknowledges its notices on the active node, matching `unreadForTask` and
 // `markAllRead`. Without the filter, a task with the same id on another node loses its badge. Two
-// nodes holding one task UUID must never collide (docs/architecture-overview.md § Client state and
+// nodes holding one task UUID must never collide (docs/architecture/fleet.md § Client state and
 // fleet behavior).
 export function markTaskRead(taskId: string): void {
   const visible = new Set(noticesForActiveNode().filter((n) => n.taskId === taskId).map((n) => n.id))

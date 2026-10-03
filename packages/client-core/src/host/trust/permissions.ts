@@ -12,7 +12,7 @@ import { describeScope, GRANTABLE_SCOPES } from '../frames/scopes'
 // A plain module rather than exports on the dialog, so a node-env suite can import it. A .tsx does not
 // parse under plain Node with no Solid plugin.
 //
-// For why the update diff runs on `key` and never on `text`, see docs/security.md § Third-party plugin
+// For why the update diff runs on `key` and never on `text`, see docs/security/plugin-bundles.md § Third-party plugin
 // bundles, "What 'gained' means".
 export type PermissionLine = {
   // The stable grant identifier the update diff compares. Never shown.
@@ -42,7 +42,7 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   // High for the same reason the three below are: it reads something the plugin did not produce.
   // A sink sees every record from every owner — core's request timings, another plugin's schedule
   // runs, and the log lines of packages the owner installed for a different reason
-  // (docs/security.md § Telemetry sinks). Writing telemetry needs no grant and gets no line.
+  // (docs/security/plugin-node-realm.md § Telemetry sinks). Writing telemetry needs no grant and gets no line.
   telemetry: { text: 'Read this node’s telemetry: request timings, schedule and hook runs, logs, and error names from every plugin', icon: 'activity', high: true },
   // The three that hand over where code lives on disk, and the reason `high` exists.
   'projects:read': { text: 'Read projects, including where every codebase lives on disk', icon: 'folder-tree', high: true },
@@ -176,7 +176,7 @@ export const harnessGrants = (contributions: PluginContributions): PluginHarness
 
 // `Enforced`, and the only line in that group that names a program. The claim does not depend on the
 // plugin behaving: the host spawns this command with these arguments and nothing else, and the plugin
-// never gets a process of its own (docs/managed-agents.md § Harnesses).
+// never gets a process of its own (docs/managed-agents/harnesses.md § Harnesses).
 //
 // `high`, because "acorn will run this binary" is the fact an owner most needs to read.
 //
@@ -246,7 +246,7 @@ export const customAgentGrants = (contributions: PluginContributions): PluginCus
 // `Declared`, beside the context sections, because the host holds the shape but the words are the
 // plugin's own: text it puts into the system prompt of every session an owner starts from the agent.
 // The instructions are in the sentence and in the key, so the owner reads what the agent will be told
-// and a version that changes one word asks again (docs/managed-agents.md § Custom agents).
+// and a version that changes one word asks again (docs/managed-agents/custom-agents.md § Custom agents).
 export const customAgentPermissionLines = (grants: readonly PluginCustomAgentGrant[]): PermissionLine[] =>
   [...grants]
     .sort((a, b) => a.id.localeCompare(b.id))
@@ -321,7 +321,7 @@ const HOOK_MODE_COPY: Record<HookMode, string> = {
 
 // A grant this build has no sentence for. It still gets a line, and the line still carries the target
 // in its key, because "this package reaches into that one" is the disclosure and a shell that cannot
-// name the kind must not therefore say nothing (docs/security.md § Design rules, rule 6).
+// name the kind must not therefore say nothing (docs/security/plugin-storage-and-supply-chain.md § Design rules, rule 6).
 const UNKNOWN_KIND_COPY = { hosts: 'Open part of its own “%l” to other plugins', extends: 'Reach into %s’s “%l”' }
 
 const fill = (template: string, grant: PluginExtensionGrant): string =>

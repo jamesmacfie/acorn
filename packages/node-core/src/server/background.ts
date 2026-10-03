@@ -11,7 +11,7 @@ const background = new Set<Promise<unknown>>()
 
 /** `resource` is the caller-defined name of the thing being refreshed, and it must not carry an
  *  account: it reaches every sink, and a login is the owner's identity rather than a fact about the
- *  work (docs/telemetry.md § What never leaves the machine). */
+ *  work (docs/telemetry/model.md § What never leaves the machine). */
 export const trackBackgroundRefresh = (resource: string, promise: Promise<unknown>) => {
   const p = promise
     .catch((error) => {

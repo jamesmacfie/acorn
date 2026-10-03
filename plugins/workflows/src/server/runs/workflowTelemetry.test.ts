@@ -5,7 +5,7 @@ import { WorkflowRunner, type RunnerDeps, type WorkflowExtensions } from './runn
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
 // A run and its steps as spans, raised by this plugin through `ctx.telemetry` and owned by it
-// (docs/workflows.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
+// (docs/workflows/child-runs.md § What a run reports). Core adds nothing workflow-shaped: a compiled plugin
 // with a context measures its own work.
 
 const noExtensions: WorkflowExtensions = { entries: <T>(_point: ExtensionPointId<T>) => [] }
@@ -21,7 +21,7 @@ type Span = Extract<TelemetryRecord, { kind: 'span' }>
 
 /** The spans this plugin raised, from the testkit's recorder rather than a stand-in for
  *  `ctx.telemetry`: these are the records a sink would receive, built by the real verbs
- *  (docs/plugin-authoring.md § In tests). A span appears once it has ended, and the attributes it
+ *  (docs/plugin-authoring/testing.md § In tests). A span appears once it has ended, and the attributes it
  *  ended with are merged into the ones it opened with. */
 const spans = (ctx: TestNodeContext): Span[] =>
   ctx.recorded.filter((record): record is Span => record.kind === 'span')

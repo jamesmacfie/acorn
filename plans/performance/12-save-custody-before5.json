@@ -1,5 +1,0 @@
-{
-  "fixture": "actual keyed Node/QueryClient swap; actual editorApi and apiClient to synthetic platform NodeFetch",
-  "outgoingWrites": [],
-  "expected": "Outgoing task/file writes are pinned to node-a even after activeNodeId becomes node-b; incoming editor store is not mutated by late completion."
-}

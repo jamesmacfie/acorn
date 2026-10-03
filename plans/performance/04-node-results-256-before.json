@@ -1,6 +1,0 @@
-{
-  "environment": { "node": "v24.11.0", "platform": "darwin", "arch": "arm64" },
-  "ring": [
-    { "chunkBytes": 256, "retainedBytes": 262144, "retainedChunks": 1024, "heapDelta": 151408, "fillMs": 0.724458, "fillCpuMs": 2.915, "overflowChunks": 128, "overflowMs": 0.114708, "overflowCpuMs": 0.116, "tailValid": true }
-  ]
-}

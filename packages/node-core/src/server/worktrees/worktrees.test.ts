@@ -120,7 +120,7 @@ describe('worktree branch source (docs/workspaces-and-tasks.md)', () => {
     expect(res).toEqual({ ok: false, reason: expect.stringContaining(`already checked out at '${realpathSync(checkout)}'`) })
   })
 
-  describe('copyWorktreeFiles (docs/workflows.md §2 copy)', () => {
+  describe('copyWorktreeFiles (docs/workspaces-and-tasks/worktrees.md § Copy files into a worktree)', () => {
     it('copies a gitignored file into the worktree, creating parents', async () => {
       writeFileSync(join(checkout, '.env.local'), 'SECRET=1')
       mkdirSync(join(checkout, 'config'), { recursive: true })

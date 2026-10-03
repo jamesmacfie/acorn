@@ -19,7 +19,7 @@ export const BASELINE = 'acorn-1'
  */
 export const SCHEMA_URL = 'https://acorn.sh/schemas/acorn-plugin.schema.json'
 
-/** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring.md § The manifest for the
+/** Manifest ids: `/^[a-z][a-z0-9-]{1,31}$/`. See docs/plugin-authoring/the-manifest.md § The manifest for the
  * dot-ban rule. Returns null when nothing usable survives. */
 export function toPluginId(input) {
   const id = String(input ?? '')
@@ -555,7 +555,7 @@ function mount(slot, props, context, bridgePort) {
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────
 
 async function main(argv) {
-  // One flag, and it picks the render path. A tree by default; see docs/plugin-authoring.md § Two ways
+  // One flag, and it picks the render path. A tree by default; see docs/plugin-authoring/the-client-half.md § Two ways
   // to draw for when a rectangle is the right answer.
   const rectangle = argv.includes('--rectangle')
   let requested = argv.find((arg) => !arg.startsWith('--'))

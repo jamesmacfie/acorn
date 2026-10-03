@@ -20,7 +20,7 @@ import { schema } from '@acorn/node-core/server/db/index.ts'
 // http is the first plugin to ship loaded with tables of its own, so this is the suite the storage
 // path never had: a manifest-declared migrations directory staged inside the package, a host-opened
 // database bound to the manifest id, and a schema change arriving through the installer against a
-// database that already has rows in it (docs/third-party/README.md § "http has moved").
+// database that already has rows in it (docs/plugins/data-ownership.md § Data ownership).
 //
 // Not folded into pluginLoader.test.ts. That suite is about the load path being the same for a loaded
 // plugin as for a built-in; this one is about what happens on the second boot, which is a different

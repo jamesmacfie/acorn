@@ -1,5 +1,5 @@
 // A type-level test. It has no assertions to run: `tsc --noEmit` across every package is what checks
-// it, which is the same pass `pnpm lint` already makes. See docs/ui-design.md § The closed kit.
+// it, which is the same pass `pnpm lint` already makes. See docs/ui-design/closed-kit.md § The closed kit.
 //
 // What it holds: no kit node's props accept a class, a style, or an arbitrary string where a role
 // token is meant. Those three are the whole of the rule, and a component that grows one back fails

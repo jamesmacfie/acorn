@@ -34,7 +34,7 @@ export function Log(props: { lines: readonly string[]; follow?: boolean; find?: 
     <box flexDirection="column" flexGrow={1}>
       {/* A viewport, where this was a yoga clip. A clip owns no offset, so a log longer than its
           frame drew its first screenful and nothing could reach the tail (../scrolling.tsx,
-          docs/tui.md § Scrolling viewports). The find bar stays outside it, so it is on the bottom
+          docs/tui/scrolling.md § Scrolling viewports). The find bar stays outside it, so it is on the bottom
           line wherever the lines above it have been scrolled to. */}
       <ScrollViewport>
         <For each={props.lines}>{(line) => <Line role="mono">{line}</Line>}</For>

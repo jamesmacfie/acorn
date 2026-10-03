@@ -7,7 +7,7 @@ import { createDef, defsForProject, getDef, mergedList, removeDef, saveDefToRepo
 import type { WorkflowValidationCatalog } from '../validation/definition'
 import type { WorkflowDef } from '../../shared/workflowContracts'
 
-// The second store a definition can live in (docs/workflows.md § Database definitions). What matters
+// The second store a definition can live in (docs/workflows/definitions.md § Database definitions). What matters
 // here is the merged read's precedence, the stale-revision refusal, and that save-to-repo writes
 // inside the folder and nowhere else.
 

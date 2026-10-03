@@ -162,7 +162,7 @@ export const workspaces = new Hono<AppEnv>()
   })
   .put('/:id/external-projects', async (c) => {
     const id = c.req.param('id')
-    // Zod at the mutation boundary (docs/architecture-overview.md § Wire validation). Non-empty rather
+    // Zod at the mutation boundary (docs/architecture/node-api.md § Wire validation). Non-empty rather
     // than merely present: an empty id would have passed the old `typeof` filter and then failed the
     // connection check below with a confusing 403.
     const parsed = workspaceExternalProjectsBody.safeParse(await c.req.json().catch(() => ({})))

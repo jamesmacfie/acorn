@@ -121,7 +121,7 @@ boundary.
 The conversation that started this programme said loaded plugins cannot spend model keys. That was
 wrong. A loaded node plugin with `permissions.node.core: ["models"]` calls
 `ctx.core.models.generateText` and spends whichever backend it names
-([the manifest § Permissions](../../plugin-authoring/the-manifest.md#permissions)). What a loaded
+([the manifest § Permissions](../../plugin-authoring/permissions.md#permissions)). What a loaded
 plugin cannot do is spend a provider credential from inside an agent tool handler, which runs as a
 task principal. File 04 is written against the corrected picture.
 
