@@ -6,6 +6,8 @@ import { agentContextRegistry } from '../sources/agentContexts'
 import { attentionRegistry, type AttentionSourceContribution } from '../rail/attention'
 import { nodeStatRegistry, type NodeStatContribution } from '../rail/nodeStats'
 import { paneRegistry, type PaneRegistration } from '../panes/panes'
+import { contextMenuRegistry, type ContextMenuContribution } from '../panes/contextMenus'
+import { isRailMenuLocation } from '@acorn/protocol/contextMenus.ts'
 import { refPanelRegistry, type RefPanelContribution } from '../panes/refPanels'
 import { clientScheduleRegistry, type ClientScheduleContribution } from '../shell/schedules'
 import { contentLinkRegistry, type ContentLinkContribution } from '../panes/contentLinks'
@@ -56,6 +58,8 @@ export type ClientPluginContext = {
   sources: { register<Item>(entry: SourceContribution<Item>): void }
   commands: ClientContributionPoint<ContributedCommand>
   keybindings: ClientContributionPoint<KeybindingContribution>
+  /** Register an icon menu row. Rail rows must name a source or pane owned by this plugin. */
+  contextMenus: ClientContributionPoint<ContextMenuContribution>
   projectImporters: ClientContributionPoint<ProjectImporterContribution>
   settingsPages: ClientContributionPoint<SettingsContribution>
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
@@ -246,6 +250,14 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     sources: { register: <Item>(entry: SourceContribution<Item>) => sources.register(entry) },
     commands: ownCommand,
     keybindings,
+    contextMenus: { register: (entry) => {
+      if (isRailMenuLocation(entry.location) && !entry.surface) throw new Error(`Plugin '${name}' must name a rail menu surface`)
+      if (isRailMenuLocation(entry.location) &&
+        (entry.location === 'rail.source' ? sourceRegistry.ownerOf(entry.surface!) : paneRegistry.ownerOf(entry.surface!)) !== name) {
+        throw new Error(`Plugin '${name}' cannot add a menu to '${entry.surface}'`)
+      }
+      record(contextMenuRegistry.register(entry, name))
+    } },
     integrationFlows: ownIntegrationFlow,
     projectImporters: own(projectImporterRegistry),
     settingsPages: ownSettingsPage,

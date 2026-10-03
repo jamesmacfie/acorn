@@ -1456,9 +1456,21 @@ describe('context menus', () => {
   })
 
   it('caps the list and counts its ids in the one-id-per-contribution rule', () => {
-    expect(manifest({ contextMenus: Array.from({ length: 8 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(true)
-    expect(manifest({ contextMenus: Array.from({ length: 9 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(false)
+    expect(manifest({ contextMenus: Array.from({ length: 32 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(true)
+    expect(manifest({ contextMenus: Array.from({ length: 33 }, (_, i) => menu({ id: `row-${i}` })) }).success).toBe(false)
     expect(messages(manifest({ contextMenus: [menu(), menu()] }))).toContain("duplicate contribution id 'open-card'")
+  })
+
+  it('allows rail actions only for a declared source or task pane of this plugin', () => {
+    const source = { id: 'feed', label: 'Feed', order: 1, items: '/v1/p/board/items' }
+    const contributions = { sources: [source], frames: [PANE] }
+    expect(manifest({ ...contributions, contextMenus: [menu({ location: 'rail.source', surface: 'feed' }), menu({ id: 'pane-action', location: 'rail.pane', surface: 'board' })] }).success).toBe(true)
+    for (const [location, surface] of [['rail.source', 'other-feed'], ['rail.pane', 'other-pane'], ['rail.source', undefined]]) {
+      expect(messages(manifest({ ...contributions, contextMenus: [menu({ location, surface })] })))
+        .toContain(`${location} requires a surface declared by this plugin`)
+    }
+    expect(messages(manifest({ ...contributions, contextMenus: [menu({ surface: 'feed' })] })))
+      .toContain('task.row does not accept a surface')
   })
 })
 

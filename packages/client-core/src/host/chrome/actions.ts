@@ -26,6 +26,10 @@ export type ChromeActionContext = {
   // The row that was clicked, for the surfaces that have rows. It is the whole reason `openPane` is not
   // the same thing twenty times over on a twenty-row rail list.
   item?: PluginRailItem
+  /** Host-derived identity for an icon menu. Never inferred from the active task or a list row. */
+  rail?:
+    | { location: 'rail.source'; sourceId: string; projectId: string }
+    | { location: 'rail.pane'; paneId: string; taskId: string; projectId: string }
   promote?: (item: PluginRailItem) => void
   // The task this click is about, when the click site knows one and it is not the task on screen. Only a
   // dashboard record supplies it today from its task link: a panel is drawn outside every
@@ -106,6 +110,7 @@ function goToTask(context: ChromeActionContext): Task | 'unknown-task' | undefin
 export async function runChromeAction(action: PluginChromeAction, context: ChromeActionContext): Promise<ChromeActionResult> {
   switch (action.verb) {
     case 'openPane': {
+      if (context.rail?.location === 'rail.source') return toast(context.pluginId, 'open a task first', 'A source icon does not name a task.')
       // A task-scoped pane lives in a task's layout, so there is nothing to open into outside a task.
       // Saying so is better than a click that appears to do nothing, since the rail is reachable with no
       // task open. This refusal used to fire for every rail row of a plugin whose detail belonged to the
@@ -165,7 +170,7 @@ export async function runChromeAction(action: PluginChromeAction, context: Chrom
           method: 'POST',
           nodeId: context.nodeId,
           headers: { 'content-type': 'application/json' },
-          body: JSON.stringify(context.item === undefined ? {} : { item: context.item.id }),
+          body: JSON.stringify(context.rail ? { rail: context.rail } : context.item === undefined ? {} : { item: context.item.id }),
         })
         // Success is silent. The node's status ping is what tells the chrome to re-read. Only a failure
         // needs saying, because nothing else on screen would show it.

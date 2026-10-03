@@ -140,6 +140,12 @@ export default {
       onSelect: { verb: 'navigate', surface: 'http-project' },
       emptyState: { message: 'No saved requests in this project yet. Open the API pane in a task to make one.' },
     }],
+    // Both icon menus use the host's menu surface. The IDs deliberately differ from the plugin ID;
+    // ownership is checked against the declared source and task pane, not guessed from that ID.
+    contextMenus: [
+      { id: 'source-http-reference', location: 'rail.source', surface: 'http-requests', label: 'HTTP reference', icon: 'globe', action: { verb: 'openUrl', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP' } },
+      { id: 'pane-http-reference', location: 'rail.pane', surface: 'http', label: 'HTTP reference', icon: 'globe', action: { verb: 'openUrl', url: 'https://developer.mozilla.org/en-US/docs/Web/HTTP' } },
+    ],
     agentContexts: [{
       id: 'saved-requests',
       label: 'Saved API requests',

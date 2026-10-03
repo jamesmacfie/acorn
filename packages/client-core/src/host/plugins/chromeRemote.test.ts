@@ -7,12 +7,13 @@ const slot = 'host-minted' as SlotRef
 describe('chrome action boundary', () => {
   it('hands the rail tree data without functions and accepts only visible source IDs', () => {
     const selectSource = vi.fn()
+    const openContextMenu = vi.fn()
     const reorderSources = vi.fn()
     const props: RailProps = {
       sources: [{ id: 'home', label: 'Home', icon: 'house', selected: true, markers: [] }],
       workspaces: [{ id: 'w1', label: 'Work', active: true }],
       collapsed: false, formFactor: 'desktop', slots: { taskList: slot },
-      selectSource, openWorkspace: vi.fn(), toggleCollapsed: vi.fn(), reorderSources, createTask: vi.fn(),
+      selectSource, openWorkspace: vi.fn(), toggleCollapsed: vi.fn(), reorderSources, createTask: vi.fn(), openContextMenu,
     }
     const remote = railRemote(props)
     expect(() => structuredClone(remote.data)).not.toThrow()
@@ -21,6 +22,10 @@ describe('chrome action boundary', () => {
     expect(() => remote.actions.selectSource?.('hidden')).toThrow()
     expect(() => remote.actions.reorderSources?.(['hidden'])).toThrow()
     expect(reorderSources).not.toHaveBeenCalled()
+    remote.actions.openContextMenu?.({ id: 'home', at: { x: 40, y: 50 } })
+    expect(openContextMenu).toHaveBeenCalledWith('home', { x: 40, y: 50 })
+    expect(() => remote.actions.openContextMenu?.({ id: 'hidden', at: { x: 40, y: 50 } })).toThrow()
+    expect(() => remote.actions.openContextMenu?.({ id: 'home', at: { x: -1, y: 50 } })).toThrow()
   })
 
   it('rejects node and route choices the topbar did not offer', () => {

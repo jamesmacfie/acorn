@@ -666,6 +666,13 @@ the other side when its requested side has less room, then clamps any remaining 
 point-anchored menu only clamps — the pointer really can be a pixel from the bottom edge, and there
 is no trigger rect to flip around.
 
+The desktop's source and pane rail icons use this same point-anchored surface. Their focused-icon
+keyboard path uses the icon's bounding rect when the platform reports (0, 0), so Shift+F10 and the
+context-menu key open beside the icon. Source Open and pane Open, Open beside, Pin/Unpin, and Close
+remain available through the existing click, modifier-click, layout, and command controls. The
+native overlay inventory recognizes `.ui-popover`, so these menus stay clickable over a child
+webview. Only one host context menu is open at a time.
+
 Surfaces nest. A `Select` drawn inside a `Popover` puts its list in a portal of its own, so that
 list is not inside the popover holding it, and a press on one of its rows would otherwise read as a
 press outside. `anchor.ts` keeps the open surfaces in the order they opened, and a surface closes

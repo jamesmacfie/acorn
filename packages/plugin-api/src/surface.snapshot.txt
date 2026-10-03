@@ -95,7 +95,9 @@ client: RailMarkerContribution
 client: RailMarkerDot
 client: RailMarkerPosition
 client: RailMarkerTarget
+client: RailPaneTarget
 client: RailProps
+client: RailSourceTarget
 client: RailTone
 client: RefPanelProps
 client: RefPanelTarget
@@ -313,6 +315,7 @@ client: writeDraft
 client: writeJson
 client: writeLocal
 client: wsConnect
+client: wsOnNodeEvent
 client: wsOnNotice
 client: wsOnPluginsChanged
 client: wsOnReconnect
@@ -709,13 +712,16 @@ ui/diff: rowIdentityKeys
 ui/diff: synth
 ui/diff: toBands
 ui/diff: tokenizeDocument
+ui/editor: DocumentCustody
 ui/editor: EditorViewState
 ui/editor: EmbeddedEditor
 ui/editor: applyViewState
 ui/editor: captureViewState
+ui/editor: documentCustody
 ui/editor: editorTheme
 ui/editor: languageForPath
 ui/editor: mountEmbeddedEditor
+ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
 ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
@@ -723,6 +729,8 @@ ui/host: Acorn
 ui/host: AnnotationMarks
 ui/host: Concern
 ui/host: Drawer
+ui/host: IconPicker
+ui/host: IconPickerProps
 ui/host: InlineSlot
 ui/host: ModelPickerPopover
 ui/host: PaletteSurface
@@ -768,6 +776,7 @@ ui/sdk: removeNode
 ui/sdk: setProperty
 ui/sdk: setText
 ui/tokens: Border
+ui/tokens: HOST
 ui/tokens: Host
 ui/tokens: KitNode
 ui/tokens: NODE_SUPPORT

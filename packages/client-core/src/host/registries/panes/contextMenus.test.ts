@@ -139,7 +139,8 @@ describe('a declared `when`, compiled', () => {
 describe('running a row', () => {
   it('runs the contribution against the target it was drawn for', () => {
     const run = vi.fn()
-    runContextMenuItem(item({ run }), target({ id: 't7' }))
+    register([item({ run })])
+    runContextMenuItem(contextMenuItems('task.row', target({ id: 't7' }))[0], target({ id: 't7' }))
     expect(run).toHaveBeenCalledWith(expect.objectContaining({ id: 't7' }))
   })
 
@@ -147,7 +148,8 @@ describe('running a row', () => {
     // The menu has already closed by the time this runs, so the alternative to swallowing is an
     // unhandled error from a component that's no longer on screen.
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    expect(() => runContextMenuItem(item({ id: 'boom', run: () => { throw new Error('nope') } }), target())).not.toThrow()
+    register([item({ id: 'boom', run: () => { throw new Error('nope') } })])
+    expect(() => runContextMenuItem(contextMenuItems('task.row', target())[0], target())).not.toThrow()
     expect(warn).toHaveBeenCalled()
     warn.mockRestore()
   })
