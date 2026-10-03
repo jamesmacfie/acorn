@@ -145,7 +145,7 @@ const crossPackage = firstParty.filter((e) => e.target.pkg!.name !== e.fromPkg.n
 // 'shared', and so on.
 const segment = (pkg: Pkg, file: string): string => relative(pkg.src, file).split('/')[0]
 
-// contract/ is the one cross-plugin import surface (docs/plugins.md § Package shape). A plugin may
+// contract/ is the one cross-plugin import surface (docs/plugins/package-shape.md § Package shape). A plugin may
 // import another plugin's contract/; anything else is a coupling edge.
 const isContract = (pkg: Pkg | undefined, file: string | null): boolean =>
   !!pkg && !!file && pkg.kind === 'plugin' && segment(pkg, file) === 'contract'
@@ -404,7 +404,7 @@ describe('architecture boundaries', () => {
     // The third console rule, and the strictest, because a plugin has no reason to be an exception.
     // A plugin's line goes through `ctx.log` where a context is in reach, and through
     // `createLogger(tag, '<plugin id>')` from `@acorn/plugin-api` where one is not: a module-level
-    // engine, a route factory, a driver (docs/plugin-authoring.md § Telemetry and logging).
+    // engine, a route factory, a driver (docs/plugin-authoring/telemetry.md § Telemetry and logging).
     //
     // The baseline is empty and stays empty. Thirteen sites moved on 2026-09-11, and the arguments
     // the other two rules make for their entries, that stdout is a wire, that the file is the
@@ -426,7 +426,7 @@ describe('architecture boundaries', () => {
 
   it('a loaded plugin that draws a tree writes no DOM and ships no stylesheet', () => {
     // The tree path's whole premise: the plugin names acorn's components and the host draws them
-    // (docs/plugins.md § The tree contract). A raw element or a class in one of these directories is
+    // (docs/plugins/tree-contract.md § The tree contract). A raw element or a class in one of these directories is
     // markup the host cannot draw, cannot style with the reader's pack, and cannot give focus or ARIA
     // to — it would render as the labelled placeholder and nothing would say why.
     //
@@ -735,7 +735,7 @@ describe('architecture boundaries', () => {
   })
 
   it('core never names a plugin', () => {
-    // The claim docs/plugins.md § Adding a plugin contribution makes: a fourth tracker, harness or
+    // The claim docs/plugins/adding-a-contribution.md § Adding a plugin contribution makes: a fourth tracker, harness or
     // terminal-shaped plugin is one roster line and no core edit. A plugin id spelled inside
     // `packages/*` is how that claim stops being true, so each surviving one is named here with its
     // reason and the list may only shrink.
@@ -1230,7 +1230,7 @@ describe('architecture boundaries', () => {
   })
 
   it('gives a plugin no way to draw inside the palette', () => {
-    // docs/plugins.md § Command kinds. A plugin returns facts and declares a closed verb; the host
+    // docs/plugins/commands.md § Command kinds. A plugin returns facts and declares a closed verb; the host
     // draws them. A frame or a remote tree targeting the palette would put one palette per plugin
     // inside the one surface that owns global focus, the reserved keys and every loading and error
     // state — and it would have no terminal half at all.

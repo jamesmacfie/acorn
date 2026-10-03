@@ -8,7 +8,7 @@
 import type { AgentCapability, AgentSession } from '../../contract/wire.ts'
 
 /** What the protocol cannot ask the agent, so the harness declares it. A quirk joins this list when a
- *  second harness needs it. See docs/plugin-authoring.md § Harnesses. */
+ *  second harness needs it. See docs/plugin-authoring/harnesses.md § Harnesses. */
 export type HarnessQuirks = {
   /** The agent accepts an explicit compaction request. Gates the pane's Compact action. */
   manualCompaction?: boolean

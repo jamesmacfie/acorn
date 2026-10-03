@@ -9,7 +9,7 @@ and the Kimi API research behind the optional usage and auth probes.
 
 Owning docs win where this disagrees with them. [managed-agents.md](../managed-agents/harnesses.md#harnesses)
 holds the two driver tiers and the delivery seam, and
-[the manifest](../plugin-authoring/the-manifest.md#harnesses) holds the authoring contract. Neither is
+[the manifest](../plugin-authoring/harnesses.md#harnesses) holds the authoring contract. Neither is
 restated here.
 
 ## Why this one, and why from outside the repository

@@ -98,7 +98,7 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
    *
    * A pane drawn from a remote tree cannot author one-mark rows because its worker cannot read a host
    * signal. Loaded `list-detail` panes therefore use the empty form, leaving only the host-owned
-   * expand control (docs/plugins.md § The tree contract).
+   * expand control (docs/plugins/tree-contract.md § The tree contract).
    */
   collapsible?: boolean
   /** Use an empty rail when the list has no useful one-mark representation. */

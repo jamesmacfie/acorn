@@ -31,7 +31,7 @@ Another plugin gets a turn before a process starts. `terminal:before-run-target`
 `RuntimeService.start`, after the trust gate and before the spawn. A veto stops the start, and the
 reason reaches the caller prefixed with the vetoing plugin's ID. It can observe and veto, not
 transform, because a hook payload holds scalars and arrays of scalars, which can't express an
-environment map ([hooks](../plugins/node-side-extension-points.md#hooks)).
+environment map ([hooks](../plugins/hooks.md#hooks)).
 
 Operations are serialized per task and target before any await. Adjacent **Start** calls join one
 admission. **Stop** and **Restart** keep their place in the queue, and other targets run concurrently.

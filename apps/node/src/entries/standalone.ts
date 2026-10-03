@@ -80,7 +80,7 @@ reconcileBundledPackages({ dataDir: root.dir, bundledRoot, development })
 
 // The same deps the supervised composition root supplies (service/runtime.ts explains each one). A
 // standalone node runs a real terminal engine, not a stub, because terminal is a required plugin
-// (docs/plugins.md § Activation) and this node answers /v1/core/tasks/:id/archive for a task's live
+// (docs/plugins/activation.md § Activation) and this node answers /v1/core/tasks/:id/archive for a task's live
 // sessions.
 let apiUrl = ''
 const internalEnv: InternalEnvFactory = (claims) => ({

@@ -18,7 +18,7 @@ export const cascadeDeleteIntegration = async (db: AppDatabase, userId: string, 
 }
 
 // The same shape one entity over: everything in the core database that belongs to one plugin id, for
-// an uninstall the owner asked to purge (docs/plugins.md § Uninstalling).
+// an uninstall the owner asked to purge (docs/plugins/data-ownership.md § Uninstalling).
 //
 // Uninstall used to delete the package directory, the lockfile and the plugin's own SQLite files, then
 // audit `dataPurged: true` while leaving these behind. The prefs rows are the sharp edge: every

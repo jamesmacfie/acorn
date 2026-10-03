@@ -113,7 +113,7 @@ const harnessProfile = (harness: ManifestHarness): AgentProfileContribution => {
     // `aiArgv` is admitted where those two are refused, and the difference is the whole reason it can
     // be: a one-shot text turn has two variables in fixed positions and no conditions, so there is
     // nothing to substitute and nothing to branch on. The line we hold is that `oneShot` never grows a
-    // placeholder syntax. See docs/plugin-authoring.md § Harnesses.
+    // placeholder syntax. See docs/plugin-authoring/harnesses.md § Harnesses.
     ...(oneShot
       ? {
         aiArgv: (command, opts) => ({

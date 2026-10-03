@@ -52,7 +52,7 @@ const packageFingerprint = (root: string): string => {
 const packageManifest = (dir: string, expectedId: string): PluginManifest => {
   // The result form, so a bundled package that fails reconciliation names the field that broke
   // rather than saying "invalid". This sentence prints at boot and is the only account anyone gets
-  // (docs/plugins.md § Failures are contained).
+  // (docs/plugins/loaded-plugins.md § Failures are contained).
   const read = readPluginManifestResult(dir)
   if (!read.ok) throw new Error(read.reason)
   const manifest = read.manifest
@@ -95,7 +95,7 @@ const place = (dataRoot: string, id: string, source: string): void => {
 
 /** Written by `apps/node/scripts/build-plugin.mjs` into a package it builds straight into the data
  * root, never into `--package-root` staging. Reconciliation needs the marker to tell a developer's
- * own build from an owner-installed package (docs/plugins.md § Loaded plugins). Spelled again here
+ * own build from an owner-installed package (docs/plugins/loaded-plugins.md § Loaded plugins). Spelled again here
  * rather than imported, because the script is plain ESM with no build step, and one filename in two
  * places beats a build dependency between a script and this package. */
 export const DEV_BUILD_MARKER = '.acorn-dev-build'
@@ -155,7 +155,7 @@ export function reconcileBundledPlugins(dataRoot: string, bundledRoot: string): 
         }
 
         // A developer's own `build:plugin` output, treated as app-owned so a newer bundled version
-        // wins (docs/plugins.md § Loaded plugins). Checked before the state test, not only in the
+        // wins (docs/plugins/loaded-plugins.md § Loaded plugins). Checked before the state test, not only in the
         // no-row case, because a second dev build over an already-reconciled package leaves an
         // 'installed' row whose fingerprint has drifted. `place` replaces the directory, so the
         // marker goes with it and the package is an ordinary bundled one until the next build.

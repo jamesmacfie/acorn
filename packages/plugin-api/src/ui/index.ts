@@ -1,4 +1,4 @@
-// Frame-safe components: props in and DOM out. See docs/plugins.md § The plugin API for the
+// Frame-safe components: props in and DOM out. See docs/plugins/plugin-api.md § The plugin API for the
 // barrel and tier boundary this is held to.
 //
 // The diff toolkit sits on @acorn/plugin-api/ui/diff instead of here: it is a domain toolkit rather

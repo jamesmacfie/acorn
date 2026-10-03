@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// What a plugin's ref-resolver route may answer. See docs/plugins.md § Loaded plugins: the client
+// What a plugin's ref-resolver route may answer. See docs/plugins/client-half.md § Loaded plugins: the client
 // half (the `refResolvers` entry) for the full contract: why the vocabulary stays a label and a
 // state chip, and why `providerId` is absent and host-stamped instead.
 export const MAX_REF_RESOLVE_IDENTIFIERS = 50

@@ -1,4 +1,4 @@
-// The two places another plugin may draw inside Docker's surfaces (docs/plugins.md § Cooperative
+// The two places another plugin may draw inside Docker's surfaces (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points). The host mints the qualified ids from the bare ones below.
 
 /** Room beside the live numbers on a container's Stats tab: a graph, a cost estimate, a quota. */

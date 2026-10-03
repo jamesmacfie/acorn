@@ -39,7 +39,7 @@ const log = createLogger('plugin-chrome')
 // Reads a plugin's descriptor routes (badges, rail items, and agent context). The manifest's
 // routes were confined to `/v1/p/<id>/` at parse time, but this arrives as a roster row, so the path is
 // re-checked here and a malformed body is dropped rather than thrown into the shell chrome
-// (docs/security/plugin-bundles.md § Third-party plugin bundles; docs/plugins.md § Cooperative extension points).
+// (docs/security/plugin-bundles.md § Third-party plugin bundles; docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 
 // Re-spelled rather than imported: the namespace is node-core's (server/routes/registry.ts) and
 // @acorn/protocol may not name a plugin route, so the client holds its own copy. See
@@ -241,7 +241,7 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
   })
 }
 
-// ── Command search and input (docs/plugins.md § Command kinds) ──
+// ── Command search and input (docs/plugins/commands.md § Command kinds) ──
 
 /** The identifiers a scoped command may send. Derived by the host from the session it captured, never
  *  read off the descriptor or off a previous answer. */
@@ -426,7 +426,7 @@ export async function readExtensionItems(
 
 /**
  * A contribution's marks for the keys the owner is drawing, in one request
- * (docs/plugins.md § Cooperative extension points, the `annotation` kind).
+ * (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind).
  *
  * A POST rather than a GET, alone among the descriptor reads, because the question is "what do you
  * know about these two thousand items" and two thousand items do not fit in a query string. It is

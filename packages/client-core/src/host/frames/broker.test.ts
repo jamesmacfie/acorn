@@ -9,7 +9,7 @@ import { createFrameBridge, type FrameBinding, type FrameServices } from './brok
 // untrusted data arrives on a port, and a fake that only ever delivers well-formed messages would test
 // the happy path of the protocol rather than the enforcement.
 //
-// The enforcement itself is docs/plugins.md § Loaded plugins: the client half (the scope table, the
+// The enforcement itself is docs/plugins/client-half.md § Loaded plugins: the client half (the scope table, the
 // focus-gated and throttled `openUrl`, the importer/overlay-only close verb) and docs/security/plugin-bundles.md §
 // Third-party plugin bundles (the code-execution routes this suite asserts stay unmappable).
 
@@ -660,7 +660,7 @@ describe('malformed and hostile traffic', () => {
   })
 })
 
-// ── The binary path (docs/plugins.md § Binary bridge calls) ───────────────────────────────────────
+// ── The binary path (docs/plugins/frames.md § Binary bridge calls) ───────────────────────────────────────
 //
 // A separate wire kind, so the only thing it shares with the JSON path is the permission decision. That
 // sharing is the point: an image route and a JSON route are the same route table question, and a byte

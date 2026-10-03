@@ -11,8 +11,7 @@
 // exist only to populate params. That is why neither export takes props.
 //
 // The routed project is all this surface needs to render, the same gate every other Source applies
-// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins.md § Frame
-// authoring and the UI kit): the routes address a pull, they do not decide whether the surface
+// (plugins/http HttpBrowse). None of this plugin's own routes has to match (docs/plugins/descriptors.md § Routes): the routes address a pull, they do not decide whether the surface
 // renders.
 import { createSignal, lazy, Show, Suspense, type JSX } from 'solid-js'
 import { useMatch, useNavigate, useParams } from '@solidjs/router'

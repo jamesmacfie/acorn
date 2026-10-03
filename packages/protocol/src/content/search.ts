@@ -1,4 +1,4 @@
-// Search across core and plugins (docs/plugins.md § Search providers).
+// Search across core and plugins (docs/plugins/search-providers.md § Search providers).
 //
 // Each provider searches its own data and answers with a short list of hits. Results stay grouped by
 // provider: relevance scores from different indexes cannot be compared, so one merged ranking would

@@ -155,7 +155,7 @@ describe('the hook chains, as the bridge runs them', () => {
   const seen: Record<string, unknown>[] = []
 
   // What a handler answered, set per test. A transform returns the payload as it left the chain,
-  // which is the one thing the owner acts on (docs/plugins.md § Hooks).
+  // which is the one thing the owner acts on (docs/plugins/hooks.md § Hooks).
   let verdict: { ok: boolean; reason?: string; by?: string; transform?: (message: string) => string } = { ok: true }
   const hooks = {
     run: async <T extends Record<string, unknown>>(id: string, payload: T) => {
@@ -230,7 +230,7 @@ describe('the hook chains, as the bridge runs them', () => {
   })
 
   // `force` is the field a branch-protection handler exists to read. Payload matching is exact, so it
-  // is on every push whether or not the reader asked for one (docs/plugins.md § Hooks).
+  // is on every push whether or not the reader asked for one (docs/plugins/hooks.md § Hooks).
   it('hands a handler the force flag on both kinds of push', { timeout: 15_000 }, async () => {
     // No origin in this fixture, so both pushes fail in git. What is under test is what the chain
     // saw before that.

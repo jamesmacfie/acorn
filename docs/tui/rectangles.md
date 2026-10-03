@@ -50,7 +50,7 @@ lines have no blank row between them.
 natively. The `rectangle` extension kind, a sibling region an iframe fills, is absent.
 
 A remote tree can ask its host to present one of its plugin's overlay frames
-([companion overlays](../plugins/cooperative-extension-points.md#companion-overlays)). There's no iframe here, so
+([companion overlays](../plugins/remote-points.md#companion-overlays)). There's no iframe here, so
 `apps/tui/src/plugins/RemoteTree.tsx` answers `overlay.open` with a typed `unsupported_host`. The
 plugin catches it and keeps its static preview, and the extension point owner's fallback is what you
 see. `owner.invoke` works on both hosts through the shared check in

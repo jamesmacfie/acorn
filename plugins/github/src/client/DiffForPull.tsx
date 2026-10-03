@@ -146,7 +146,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
 
   // What another plugin knows about a line of this diff — coverage, a lint result — drawn under the
   // row it belongs to. The host fetches, batches and stamps; this only names the point
-  // (docs/plugins.md § Cooperative extension points, the `annotation` kind).
+  // (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind).
   // A sibling of the pane rather than a wrapper: DiffPane is a fragment that fills its container, and
   // the warning stays above it whichever file is on screen.
   return (

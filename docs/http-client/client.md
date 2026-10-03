@@ -52,7 +52,7 @@ only once the row is stored. Sending stays a separate act the reader takes in th
 request in front of them.
 
 All three surfaces are **trees**: the plugin's code runs in a worker and emits a tree of the host's own
-components ([the tree contract](../plugins/descriptors.md#the-tree-contract)). Four consequences are visible in the UI, and all
+components ([the tree contract](../plugins/tree-contract.md#the-tree-contract)). Four consequences are visible in the UI, and all
 four are the same consequence: the plugin has no document of its own.
 
 - Deleting a request or a variable takes two clicks rather than raising a dialog, and "Copy as curl"

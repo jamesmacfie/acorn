@@ -204,7 +204,7 @@ async function fillIn(): Promise<void> {
   stopDeviceCommands = registerDevicePluginCommands().dispose
 
   // Every task write on the node broadcasts `tasks:changed`, and this turns that into one invalidation
-  // of the client the shell reads — which it now is (docs/plugins.md § Hearing a core event). The
+  // of the client the shell reads — which it now is (docs/plugins/events.md § Hearing a core event). The
   // desktop has had this since the fleet; this host had nothing, so a task created by an agent or in
   // another window moved nothing on screen until a restart.
   watchTaskChanges()

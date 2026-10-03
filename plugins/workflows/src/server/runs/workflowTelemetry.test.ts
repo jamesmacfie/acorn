@@ -21,7 +21,7 @@ type Span = Extract<TelemetryRecord, { kind: 'span' }>
 
 /** The spans this plugin raised, from the testkit's recorder rather than a stand-in for
  *  `ctx.telemetry`: these are the records a sink would receive, built by the real verbs
- *  (docs/plugin-authoring.md § In tests). A span appears once it has ended, and the attributes it
+ *  (docs/plugin-authoring/testing.md § In tests). A span appears once it has ended, and the attributes it
  *  ended with are merged into the ones it opened with. */
 const spans = (ctx: TestNodeContext): Span[] =>
   ctx.recorded.filter((record): record is Span => record.kind === 'span')

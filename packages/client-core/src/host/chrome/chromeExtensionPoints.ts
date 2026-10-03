@@ -6,7 +6,7 @@
 //
 // Five kinds through one door, because the four rules are the same for all of them: the owner consents
 // in its manifest, the host mints every name, both sides appear in the trust prompt, and code does not
-// cross. See docs/plugins.md § Cooperative extension points for what the host binds over what a
+// cross. See docs/plugins/cooperative-extension-points.md § Cooperative extension points for what the host binds over what a
 // manifest can state, and for why no component, callback, or DOM crosses the seam.
 import {
   isExtensionPointKind,
@@ -28,7 +28,7 @@ import { runChromeAction } from './actions'
 import { ownsRoute, readAnnotationMarks, readExtensionItems } from './chromeData'
 
 /** `plugin:<pluginId>:<id>`. No core contribution id contains a colon, so a plugin's contribution can
- *  never take its place. Same shape a context-menu row's id takes (docs/plugins.md § Context menus). */
+ *  never take its place. Same shape a context-menu row's id takes (docs/plugins/menus-and-markers.md § Context menus). */
 export const pluginExtensionId = (pluginId: string, id: string): string => `plugin:${pluginId}:${id}`
 
 export type PluginExtensionBinding = {
@@ -100,7 +100,7 @@ export function pluginExtension(
   binding: PluginExtensionBinding,
 ): ExtensionContribution {
   // Checked for shape only, not resolved against the registry: the two manifests register in an order
-  // nobody controls (docs/plugins.md § Cooperative extension points).
+  // nobody controls (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
   if (!parseExtensionPointRef(descriptor.point)) {
     throw new Error(`extension '${descriptor.id}' names '${descriptor.point}', which is not a '<pluginId>:<pointId>' reference`)
   }
@@ -114,7 +114,7 @@ export function pluginExtension(
     ...(descriptor.matches ? { matches: descriptor.matches } : {}),
   }
   if (descriptor.items !== undefined) {
-    // Confines the contribution to the contributor's own namespace (docs/plugins.md § Cooperative
+    // Confines the contribution to the contributor's own namespace (docs/plugins/cooperative-extension-points.md § Cooperative
     // extension points; chrome/data.ts for why a roster row is re-checked here at all).
     if (!ownsRoute(pluginId, descriptor.items)) {
       throw new Error(`extension '${descriptor.id}' reads '${descriptor.items}', which is not ${pluginId}'s`)

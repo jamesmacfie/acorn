@@ -117,7 +117,7 @@ requires bounded contract fields rather than access to the event ledger.
    backend ignores the grant, a harness call counts against the cap.
 4. Prove the grant with [05](./05-advisor.md). Findings was removed by the shipped
    [memory replacement](../../notes-and-memory.md#memory) and is no longer a grant consumer.
-5. Document the grant in [the manifest § Permissions](../../plugin-authoring/the-manifest.md#permissions)
+5. Document the grant in [the manifest § Permissions](../../plugin-authoring/permissions.md#permissions)
    beside the `models` token, and the errors in [integrations.md](../../integrations/model-providers.md#model-providers).
 
 ## Verify before building

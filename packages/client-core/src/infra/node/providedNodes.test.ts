@@ -4,7 +4,7 @@ import type { NodeProvidersResponse, ProvidedNode } from '@acorn/protocol/nodePr
 import type { FleetResult, FleetRow } from './fanout'
 import { creatableProviders, hasNodeProviders, mergeProvidedNodes, providerFailures } from './providedNodes'
 
-// The fleet merge (docs/plugins.md § Node providers). Pure functions over a fan-out result, so they can
+// The fleet merge (docs/plugins/node-providers.md § Node providers). Pure functions over a fan-out result, so they can
 // be tested in this suite's node environment — `createFleetQuery` itself cannot run here, the same
 // split `fanout.test.ts` already lives with.
 //

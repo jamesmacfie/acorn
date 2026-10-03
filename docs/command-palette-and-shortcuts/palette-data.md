@@ -30,7 +30,7 @@ fetch when the frame opens, and local filtering after that.
 A loaded plugin's manifest `commands` join the same command registry. One command supplies both its
 optional palette row and any keybinding target. Every manifest command states its `kind`, and its
 `palette` flag says whether it appears in the palette. A manifest can declare an action, a group, a
-search, an input, or a setting. [The manifest](../plugin-authoring/the-manifest.md#contributions)
+search, an input, or a setting. [The manifest](../plugin-authoring/contributions.md#contributions)
 lists each kind's fields and bounds.
 
 A declarative search names a route in the plugin's own namespace and one fixed verb for the picked

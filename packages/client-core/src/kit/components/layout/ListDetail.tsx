@@ -174,7 +174,7 @@ export function ListDetail(props: {
 /* The two columns as nodes of their own, for a caller that cannot put an element in a prop.
    A remote tree is exactly that caller: its props are JSON on a message port, so `list` above is
    unreachable from a sandbox and the split has to be expressible as children
-   (docs/plugins.md § The tree contract).
+   (docs/plugins/tree-contract.md § The tree contract).
 
    `split` on ListDetail is what turns the grid on in that form, because the parent can no longer tell
    from `list` whether there are two columns.

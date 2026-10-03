@@ -153,7 +153,7 @@ export default function PullList() {
   }
 
   // What a row's menu is about, in the shape core's rail list uses, so one registry serves both
-  // (docs/plugins.md § Context menus). The pull itself rides along as `item`; only `providerId` and
+  // (docs/plugins/menus-and-markers.md § Context menus). The pull itself rides along as `item`; only `providerId` and
   // `projectId` are facts a contributed row may match on.
   //
   // `body` comes from the warmed detail cache when the row has one, because the list route does not

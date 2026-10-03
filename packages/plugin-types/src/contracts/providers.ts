@@ -9,7 +9,7 @@ export type PluginProviderRegistry = {
   connection(provider: HostOwned<'node-core/server/integrations/types.ConnectionProviderContribution'>): void
   model(adapter: ModelProviderAdapter): void
   /** A provider that knows about nodes, and optionally can make and remove them
-   *  (docs/plugins.md § Node providers). */
+   *  (docs/plugins/node-providers.md § Node providers). */
   nodes(provider: HostOwned<'node-core/server/nodeProviders/registry.NodeProviderContribution'>): void
   withConnection<T>(userId: string, providerId: string, visit: PluginProviderConnectionVisitor<T>): Promise<T | undefined>
 }

@@ -6,7 +6,7 @@ works, the workflow step, and the topic page for the client. The plugin is in `p
 
 It's a loaded plugin. Its Node half serves `/v1/p/http` through the portable fetch carrier. Its client
 half is one bundle drawing three host-drawn trees, and its rail entry is a manifest descriptor the host
-renders ([http has moved](./loaded-plugin-migration.md#http-has-moved-and-the-storage-path-is-proven)).
+renders ([http has moved](./plugins/data-ownership.md#data-ownership)).
 
 ## Data model
 

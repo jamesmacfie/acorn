@@ -1,5 +1,5 @@
 // The cooperative cross-plugin seam: plugin A opens a point, plugin B fills it, and the host is the
-// only thing that carries anything between them (docs/plugins.md § Cooperative extension points).
+// only thing that carries anything between them (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // No JSX import here (docs/frontend/registries.md § Registries and plugins). The host that draws these
 // deliveries is `plugins/chrome/ExtensionPointHost.tsx`.
@@ -20,11 +20,11 @@ import { Registry } from '../../../kit/lib/state/registry'
 export type { ArbitrationMode, ExtensionPointKind, ExtensionPointLocation }
 
 /** A point plugin A hosts. `id` is the qualified `<ownerId>:<pointId>` the host minted
- *  (docs/plugins.md § Cooperative extension points); nothing else in the app addresses a point by any
+ *  (docs/plugins/cooperative-extension-points.md § Cooperative extension points); nothing else in the app addresses a point by any
  *  other name. */
 export type ExtensionPointContribution = {
   id: string
-  /** The plugin that opened the point, stamped by the host (docs/plugins.md § Cooperative extension
+  /** The plugin that opened the point, stamped by the host (docs/plugins/cooperative-extension-points.md § Cooperative extension
    *  points). */
   ownerId: string
   label: string
@@ -44,7 +44,7 @@ export type ExtensionPointContribution = {
   /** `annotation` only: accepted marks retained from each contributor for one request. The raw
    * response ceiling is a separate protocol guard; this is the owner's surface policy. */
   acceptedMarks?: number
-  /** `remote` only: what a contributor's tree may ask this owner to do (docs/plugins.md § Asking the
+  /** `remote` only: what a contributor's tree may ask this owner to do (docs/plugins/remote-points.md § Asking the
    *  owner). Names only. The owner binds a handler of the same name on each `Slot` it draws, and the
    *  host refuses a request missing from either list, so declaring one here grants nothing on its own. */
   actions?: readonly string[]
@@ -67,7 +67,7 @@ export type ExtensionPointContribution = {
 export type ExtensionContribution = {
   id: string
   /** The contributing plugin, stamped host-side and rendered beside what it brought
-   *  (docs/plugins.md § Cooperative extension points, "what the host binds"). */
+   *  (docs/plugins/cooperative-extension-points.md § Cooperative extension points, "what the host binds"). */
   pluginId: string
   /** The qualified point this fills. */
   point: string
@@ -82,11 +82,11 @@ export type ExtensionContribution = {
   /** `remote`: the bundle this device accepted. The worker runs these bytes and no others. */
   hash?: string
   /** `remote`: the one overlay of this plugin's own that this tree may ask the host to present
-   *  (docs/plugins.md § Companion overlays). One association, bound to the mounted slot, rather than a
+   *  (docs/plugins/remote-points.md § Companion overlays). One association, bound to the mounted slot, rather than a
    *  list: a tree that could name any of its plugin's overlays would have a dispatcher, not a grant. */
   overlay?: string
   /** `component`: the first-party half of the same kind. A compiled plugin's tree is already in this
-   *  process, so the host mounts it where it would have mounted a worker's (docs/plugins.md §
+   *  process, so the host mounts it where it would have mounted a worker's (docs/plugins/cooperative-extension-points.md §
    *  Cooperative extension points, "two render paths"). `Component<any>` for the reason
    *  `sourceRegistry` is `SourceContribution<any>`: the registry is heterogeneous by construction and
    *  each entry's props are the point owner's, not this registry's. */
@@ -127,7 +127,7 @@ export const extensionPointFor = (
  * The eligibility rules are the same for all five, which is why this is one function: the point has to
  * exist, both plugins have to be running on the node being looked at, both have to be drawable on this
  * host, and the contributor's carrier has to be one the point's kind takes. A contribution that fails
- * any of them is silent rather than an error (docs/plugins.md § Cooperative extension points, "an
+ * any of them is silent rather than an error (docs/plugins/cooperative-extension-points.md § Cooperative extension points, "an
  * unmatched contribution is silent"), which is right for a user and wrong for an author, and is why
  * `unmatchedExtensions` below exists.
  *
@@ -177,7 +177,7 @@ export const carrierFits = (kind: ExtensionPointKind, carrier: ExtensionContribu
 }
 
 /**
- * Contributions that will never appear, and why, for the developer view (docs/plugins.md § Seeing what
+ * Contributions that will never appear, and why, for the developer view (docs/plugins/cooperative-extension-points.md § Seeing what
  * matched).
  *
  * Silent-when-absent is right for a user and the worst possible thing for an author: a typo in `point`

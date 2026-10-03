@@ -9,7 +9,7 @@ import { chromeDeps, chromeKey } from './chromeData'
 import './extension-points.css'
 
 // The one place another plugin's rows are drawn inside a plugin's surface, by the host, with the
-// shell's own primitives, from data (docs/plugins.md § Cooperative extension points).
+// shell's own primitives, from data (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
 //
 // `Row`, `Badge`, `SectionHeader` and `Icon` are the same primitives the descriptor rail list uses, so a
 // contributed section is pixel-identical to a first-party one under every appearance pack.
@@ -40,7 +40,7 @@ function ExtensionGroup(props: { contribution: ExtensionContribution }) {
       <section class="extension-group">
         <SectionHeader
           level="group"
-          // The stamp: not a decoration and not shortenable to an icon. See docs/plugins.md §
+          // The stamp: not a decoration and not shortenable to an icon. See docs/plugins/cooperative-extension-points.md §
           // Cooperative extension points for why provenance is drawn rather than only recorded.
           actions={<span class="muted extension-group-owner">{props.contribution.pluginId}</span>}
         >

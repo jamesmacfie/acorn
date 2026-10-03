@@ -1,4 +1,4 @@
-// The compiled-plugin feeder for rail status markers (docs/plugins.md § Rail markers). A plugin
+// The compiled-plugin feeder for rail status markers (docs/plugins/menus-and-markers.md § Rail markers). A plugin
 // publishes marker data next to the state that owns it; the host draws the pixels.
 //
 // JSX-free by design, like ./slots.ts: registries/plugin.ts imports this, and that file has to stay

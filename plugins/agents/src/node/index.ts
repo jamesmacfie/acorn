@@ -133,7 +133,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
       })
 
-      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks). A prompt policy,
+      // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,
       // a redactor or a context injector registers a handler here; the point exists whether or not
       // anybody does, because declaring it is the consent.
       ctx.hooks.declare({
@@ -288,7 +288,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // This plugin's sessions, for the merged run list core assembles (@acorn/protocol/runs.ts). A
       // pointer at the route above; nothing here knows workflows is on the same list.
       ctx.runs.register({ runs: '/v1/p/agents/runs' })
-      // Transcripts for the archive page's search (docs/plugins.md § Search providers).
+      // Transcripts for the archive page's search (docs/plugins/search-providers.md § Search providers).
       ctx.search.register({
         id: 'sessions',
         label: 'Agent sessions',

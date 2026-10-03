@@ -115,7 +115,7 @@ export default {
         // This plugin's own bundle below the editor, as a tree in a worker rather than a rectangle in
         // an iframe. Same bytes, same trust prompt; what differs is that the host mounts its own
         // components for what the bundle emits, so the two halves of this pane are now the same kind
-        // of thing (docs/plugins.md § The tree contract).
+        // of thing (docs/plugins/tree-contract.md § The tree contract).
         frame: { kind: 'remote', entry: 'panel' },
       },
     }],

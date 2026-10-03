@@ -59,7 +59,7 @@ export type AgentContextContribution = {
   capture(scope: AgentContextCaptureScope, optionIds?: readonly string[]): Promise<AgentContextSnapshot[]>
 }
 
-// What a loaded plugin's agent-context routes may answer. See docs/plugins.md § Loaded plugins: the
+// What a loaded plugin's agent-context routes may answer. See docs/plugins/client-half.md § Loaded plugins: the
 // client half (the `agentContexts` entry) for the full contract: why this is the one descriptor
 // response with a real parser, and which fields the host binds rather than the plugin.
 export const MAX_PLUGIN_AGENT_CONTEXT_OPTIONS = 200

@@ -1,4 +1,4 @@
-// The preview plugin's client part (docs/plugins.md § The plugin API).
+// The preview plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 import { activeNodeId, activeTaskId, clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
 import { previewConfigured, previewConfiguredSchedule } from './configuredStore'

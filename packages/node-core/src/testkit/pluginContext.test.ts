@@ -56,7 +56,7 @@ describe('makeTestNodeContext', () => {
 
   it('records what the plugin emitted, with no sink of the test\'s own', () => {
     // The recorder is the reason a plugin test does not stand up the collector by hand: three
-    // suites used to (docs/plugin-authoring.md § In tests).
+    // suites used to (docs/plugin-authoring/testing.md § In tests).
     const ctx = makeTestNodeContext({ plugin })
     try {
       ctx.telemetry.measure('reindex', () => 41 + 1)

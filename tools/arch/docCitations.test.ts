@@ -93,18 +93,21 @@ describe('source comments cite docs that exist', () => {
     expect(sectionsCited).toBeGreaterThan(1500)
   })
 
-  // A report, not a gate, until the documentation overhaul splits the long pages. Its last phase makes
-  // this a hard limit. `docs/future/` holds proposals and `docs/testing/` and the dated security
-  // review hold evidence, so none of them count.
-  it('reports docs longer than 200 lines', () => {
+  // A page past 200 lines mixes topics, so it gets split into a folder of topic pages
+  // (docs/future/documentation/style.md). `docs/future/` holds proposals, and `docs/testing/` and the
+  // dated security review hold evidence, so none of them count.
+  it('keeps every doc to 200 lines', () => {
+    // The index lists every page by design, so it grows with the docs. Nothing else is exempt.
+    const LONGER = new Set(['docs/README.md'])
     const docs = execFileSync('git', ['ls-files', '--', 'docs/*.md', 'README.md'], { cwd: ROOT, encoding: 'utf8' })
       .split('\n')
       .filter((file) => file && !/^docs\/(?:future|testing)\/|^docs\/security\/review-/.test(file))
     const long = docs
+      .filter((file) => !LONGER.has(file))
       .map((file) => ({ file, lines: readFileSync(join(ROOT, file), 'utf8').split('\n').length - 1 }))
       .filter(({ lines }) => lines > 200)
-      .sort((a, b) => b.lines - a.lines)
+      .map(({ file, lines }) => `${file}: ${lines} lines`)
     expect(docs.length).toBeGreaterThan(50)
-    console.info(`${long.length} docs over 200 lines:\n${long.map(({ file, lines }) => `  ${lines}  ${file}`).join('\n')}`)
+    expect(long, 'split each page into topic pages in a folder of the same name').toEqual([])
   })
 })

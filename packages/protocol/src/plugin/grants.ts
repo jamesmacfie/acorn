@@ -47,7 +47,7 @@ const contributedPointKind = (entry: { remote?: string; frame?: string; route?: 
 
 /**
  * Everything this manifest says about surfaces that are not its own, in both directions. See
- * docs/plugins.md § Cooperative extension points for why both directions matter and appear in the
+ * docs/plugins/cooperative-extension-points.md § Cooperative extension points for why both directions matter and appear in the
  * trust prompt.
  *
  * `pluginId` is passed in rather than read from the contributions, because a point's public name is
@@ -87,14 +87,14 @@ export const pluginExtensionGrants = (pluginId: string, contributions: PluginCon
       : []),
 ].sort((a, b) => a.kind.localeCompare(b.kind) || a.target.localeCompare(b.target))
 
-/** What this package will run on its own, and how often. See docs/plugins.md § Loaded plugins: the
+/** What this package will run on its own, and how often. See docs/plugins/client-half.md § Loaded plugins: the
  *  client half (the `schedules` entry) for why the `run` route itself is not part of the grant. */
 export const pluginScheduleGrants = (contributions: PluginContributions): PluginScheduleGrant[] =>
   (contributions.schedules ?? [])
     .map((schedule) => ({ id: schedule.id, label: schedule.name, cadence: schedule.cadence }))
     .sort((a, b) => a.id.localeCompare(b.id))
 
-/** What this package will say, and possibly do, when a task is archived. See docs/plugins.md §
+/** What this package will say, and possibly do, when a task is archived. See docs/plugins/client-half.md §
  *  Loaded plugins: the client half (task checks) for why neither route is part of the grant. */
 export const pluginTaskCheckGrants = (contributions: PluginContributions): PluginTaskCheckGrant[] =>
   (contributions.taskChecks ?? [])

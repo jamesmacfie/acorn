@@ -1,4 +1,4 @@
-// Compiled-host UI only. See docs/plugins.md § The plugin API for the boundary between this and
+// Compiled-host UI only. See docs/plugins/plugin-api.md § The plugin API for the boundary between this and
 // @acorn/plugin-api/ui: nothing here is safe to bundle into an isolated plugin frame.
 export { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 export { registerWillHandler } from '@acorn/client-core/host/registries/shell/willPhase.tsx'
@@ -36,7 +36,7 @@ export type { PromoteTaskAction } from '@acorn/client-core/features/integrations
 // panel to place in its own chrome. See docs/panes.md § Not a pane: the reference panel for why the
 // host draws it, and does the write, rather than the panel.
 export { default as RefPanelTaskLink } from '@acorn/client-core/host/components/RefPanelTaskLink.tsx'
-// A place in this surface where another plugin's tree may be grafted (docs/plugins.md § Cooperative
+// A place in this surface where another plugin's tree may be grafted (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `remote` kind). Host-only for the same reason the palette is: it acquires a
 // worker, wires a bridge and mounts the shell's own components. A plugin that owns a surface places
 // this where it wants a contributor's UI; it never sees the contributor's nodes.

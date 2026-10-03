@@ -141,7 +141,7 @@ Core's markers come from `tasks/railStatus.ts`. Compiled plugins publish theirs 
 `packages/client-core/src/features/tabs/railMarkers.ts` ([plugins](../plugins.md) § Rail markers).
 Loaded plugins publish task facts through the `core:task` annotation point, and the host turns each
 accepted fact into a marker. The plugin supplies severity, bounded text, and an optional icon, never
-placement, color, or action ([task annotations](../plugins/cooperative-extension-points.md#task-annotations)).
+placement, color, or action ([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
 
 Contributed priorities are clamped below core's, so a plugin can't push a core lifecycle state out of
 its corner. Placement requests are preferences. A CSS selector in a feature or plugin stylesheet that

@@ -3,7 +3,7 @@ import { annotationKeyOf } from '@acorn/protocol/extensionPoints.ts'
 import type { CodeRow } from '../../kit/diff/diffModel'
 import { DIFF_ANNOTATION_FIELDS, annotationKey } from './annotationKey'
 
-// The two halves of a diff annotation, held against each other (docs/plugins.md § Cooperative
+// The two halves of a diff annotation, held against each other (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `annotation` kind).
 //
 // An owner declares its key FIELDS in its manifest or its contribution; this module mints the VALUES

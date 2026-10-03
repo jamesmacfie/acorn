@@ -29,7 +29,7 @@ import { uiSlotRegistry, type UiSlotContribution } from './slots'
 import { registerSessionSource, type SessionSource } from '../sessions/sessionSources'
 
 // One contribution point. `register` returns nothing, because the host owns the disposable
-// (docs/plugins.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
+// (docs/plugins/activation.md § Activation), so a re-init replaces a plugin's contributions instead of appending.
 export type ClientContributionPoint<T> = {
   register(entry: T): void
 }
@@ -65,7 +65,7 @@ export type ClientPluginContext = {
   // One registry for both shapes: the slot id picks whether the component is handed the shell context
   // or just a task id (registries/slots.ts).
   slots: ClientContributionPoint<UiSlotContribution>
-  // A place in this plugin's own tree that another plugin may fill (docs/plugins.md § Cooperative
+  // A place in this plugin's own tree that another plugin may fill (docs/plugins/cooperative-extension-points.md § Cooperative
   // extension points). The compiled half of the manifest's `extensionPoints`; the host mints
   // `<pluginId>:<id>` and stamps the owner, so a plugin cannot open a point in somebody else's name.
   extensionPoints: ClientContributionPoint<CompiledExtensionPoint>
@@ -131,7 +131,7 @@ export type ClientCapabilities = {
 export type ClientPlugin = {
   name: string
   // The shell assumes a required plugin's contributions exist, so it cannot be disabled
-  // (docs/plugins.md § Activation).
+  // (docs/plugins/activation.md § Activation).
   required?: boolean
   // Registration only, and synchronous. Nothing here does I/O, so async would put a promise between
   // `render()` and the first paint for no gain.

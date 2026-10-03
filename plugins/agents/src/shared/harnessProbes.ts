@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-// What a contributed harness's optional probe routes answer with (docs/plugin-authoring.md § Harnesses).
+// What a contributed harness's optional probe routes answer with (docs/plugin-authoring/harnesses.md § Harnesses).
 //
 // Parsed, not cast: a plugin's own node half wrote these bytes, and the host hands them over as
 // `unknown` (node-core/server/pluginHost/harnesses.ts), so this is the boundary that checks them.

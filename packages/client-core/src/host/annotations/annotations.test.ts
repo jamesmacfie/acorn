@@ -14,7 +14,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 
 vi.mock('../plugins/surfaceFailures', () => ({ recordSurfaceFailure: vi.fn() }))
 
-// Facts one plugin knows about the items another already draws (docs/plugins.md § Cooperative
+// Facts one plugin knows about the items another already draws (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `annotation` kind).
 //
 // The two things worth pinning: two thousand keys are one request per contributor, not two thousand,

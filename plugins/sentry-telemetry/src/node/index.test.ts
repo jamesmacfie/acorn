@@ -6,7 +6,7 @@ import { PROVIDER_ID, SETTINGS_KEY } from '../shared/settings'
 
 // The whole path, through the real host: a plugin context built by the same code the node builds
 // one with, a real connection row, the real collector, and a fake `fetch` at the far end
-// (docs/plugins.md § The plugin API).
+// (docs/plugins/plugin-api.md § The plugin API).
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 const OWNER = 'owner-1'
 const DSN = 'https://abc123@o42.ingest.us.sentry.io/1234567'
@@ -60,7 +60,7 @@ describe('the sentry-telemetry plugin', () => {
       ctx.telemetry.event('cache.miss', { resource: 'issues' })
       ctx.telemetry.count('sync.fresh', 2)
       // Reading the recorder flushes the collector, which is what hands the batch to every sink
-      // including this plugin's (docs/plugin-authoring.md § In tests).
+      // including this plugin's (docs/plugin-authoring/testing.md § In tests).
       expect(ctx.recorded.length).toBeGreaterThan(0)
 
       await vi.waitFor(() => expect(itemTypes()).toContain('log'))

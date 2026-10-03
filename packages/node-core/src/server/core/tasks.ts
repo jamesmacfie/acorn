@@ -50,7 +50,7 @@ export type AttachTaskPullInput = {
 
 export type TaskService = {
   // The task's plugin-facing projection (server/worktrees/taskWorktree.ts § TaskRef), or undefined when the id
-  // does not resolve. A TaskRef, never the `tasks` row (docs/plugins.md § What is published, and
+  // does not resolve. A TaskRef, never the `tasks` row (docs/plugins/publishing.md § What is published, and
   // what acorn promises about it).
   load(taskId: string): Promise<TaskRef | undefined>
   // The task's worktree root, resolving through the project checkout and creating the worktree

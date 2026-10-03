@@ -1,5 +1,5 @@
 // terminal.sendToAgent: queue a text block into an agent session's pseudo-terminal
-// (docs/plugins.md § Collaboration rules).
+// (docs/plugins/collaboration.md § Collaboration rules).
 //
 // Part of the terminal plugin's contract, the only surface another plugin may import. It carries the
 // capability id and its signature, nothing executable.

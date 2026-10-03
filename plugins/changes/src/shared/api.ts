@@ -60,7 +60,7 @@ export const localActionRoute = (
  *  `all` is the client's answer to "nothing is staged": `git commit -a` stages every tracked
  *  modification and deletion and leaves untracked files alone, which is what the button that sets it
  *  says. `noVerify` skips git's own pre-commit and commit-msg hooks; acorn's `before-commit` chain
- *  runs either way (docs/plugins.md § Hooks). */
+ *  runs either way (docs/plugins/hooks.md § Hooks). */
 export type CommitOptions = { all?: boolean; amend?: boolean; signoff?: boolean; noVerify?: boolean }
 
 /** HEAD's hash and full message, which is what an amend puts in an empty field. */

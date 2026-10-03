@@ -207,7 +207,7 @@ export type SlotProps = {
   children?: JSX.Element
   taskId?: string
   projectId?: string | null
-  /** What this owner will do if a contributor asks (docs/plugins.md § Asking the owner). Host-only:
+  /** What this owner will do if a contributor asks (docs/plugins/remote-points.md § Asking the owner). Host-only:
    *  neither the handlers nor their names are sent to the worker. */
   actions?: Record<string, (payload: unknown) => unknown | Promise<unknown>>
   /** Whether a contributor is standing in for the owner's default right now, for an owner that has to
@@ -325,7 +325,7 @@ function ExtensionGroupRows(props: { contribution: ExtensionContribution }) {
     <Show when={items().length}>
       <box flexDirection="column" flexShrink={0}>
         {/* The stamp, on the header rather than on every row: provenance is drawn and not only
-            recorded (docs/plugins.md § Cooperative extension points), and a terminal row has one line
+            recorded (docs/plugins/cooperative-extension-points.md § Cooperative extension points), and a terminal row has one line
             to spend on the item itself. */}
         <SectionHeader level="group" actions={<Line role="muted">{props.contribution.pluginId}</Line>}>
           {props.contribution.label}

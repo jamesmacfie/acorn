@@ -246,7 +246,7 @@ export async function assembleContext(
     sections: [],
   }
   // Budget shaping and PII stripping, as somebody else's plugin (server/pluginHost/hooks.ts,
-  // docs/plugins.md § Hooks). What is offered is which sections are in, as names: a handler can drop
+  // docs/plugins/hooks.md § Hooks). What is offered is which sections are in, as names: a handler can drop
   // one, and nothing else. Core's, not the context plugin's — the context plugin is client-only, and
   // the assembler that makes a snapshot lives here.
   //

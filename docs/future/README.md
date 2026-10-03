@@ -110,7 +110,7 @@ house patterns, the deferred findings, and the open product decisions remain in 
 the single files `live-qa.md`, `dx.md`, `web_search_run.md`, and `rail-tab.md` are in git history. The
 rail component and compiled marker contract live in [ui-design.md](../ui-design.md), and loaded task
 annotations live in
-[Cooperative extension points](../plugins/cooperative-extension-points.md#task-annotations). Each ended by saying
+[Cooperative extension points](../plugins/rows-and-annotations.md#task-annotations). Each ended by saying
 where its behaviour moved.
 
 `node/` shipped on 2026-09-26. [Architecture overview](../architecture-overview.md) owns the
@@ -403,7 +403,7 @@ projections, [command-palette-and-shortcuts.md](../command-palette-and-shortcuts
 typing for the intents and the layers, [security.md](../security.md) §§ Trust boundaries, Transport
 and auth, Third-party plugin bundles and The containment ladder for the worker-thread sandbox,
 [plugins.md](../plugins.md) § The tree contract for the shared batch rules,
-[first-party-plugins.md](../first-party-plugins.md) § What each of these loses in a terminal for the
+[first-party plugins in the terminal](../first-party-plugins/terminal.md) for the
 plugin-by-plugin table, [terminal.md](../terminal.md) § Client and [editor.md](../editor.md) for
 `attachPty` and the `$EDITOR` handoff, [node-distribution.md](../node-distribution.md) § Reaching a
 node with `acorn`, and [testing.md](../testing.md) § Test layers for the six suites. Phase 7's tarball

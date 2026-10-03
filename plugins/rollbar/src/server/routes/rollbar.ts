@@ -122,7 +122,7 @@ export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<
     }
     return c.json({ items: response.items.map(rollbarRailItem) })
   })
-  // The `Find a Rollbar item` command's rows (docs/plugins.md § Command kinds).
+  // The `Find a Rollbar item` command's rows (docs/plugins/commands.md § Command kinds).
   //
   // The same three facts as the rail beside it — the routed project decides which connections, the
   // cached active-item listing decides which items, and one connection failing does not erase

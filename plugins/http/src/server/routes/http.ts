@@ -257,7 +257,7 @@ export const httpRoutes = (db: PluginDatabase, core: SendCoreServices, emit: Emi
       } satisfies PluginRailItems)
     })
 
-    // ── The command palette's rows (docs/plugins.md § Command kinds) ──
+    // ── The command palette's rows (docs/plugins/commands.md § Command kinds) ──
 
     // The `Find a saved request` command's rows, over the same set the rail lists.
     //

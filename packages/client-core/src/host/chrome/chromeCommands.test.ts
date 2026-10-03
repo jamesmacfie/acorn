@@ -155,7 +155,7 @@ describe('a search command', () => {
 
   // `navigate` is the verb Rollbar and Linear pick a row with: their detail belongs to the project, so
   // a pick changes the URL and the surface beside the list follows
-  // (docs/plugins.md § Command kinds).
+  // (docs/plugins/commands.md § Command kinds).
   describe('picking a row that navigates', () => {
     const navigating = searchDescriptor({ onSelect: { verb: 'navigate', surface: 'rollbar-item' } })
 

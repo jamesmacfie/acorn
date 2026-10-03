@@ -32,7 +32,7 @@ import './plugins.css'
 // is happening now. They diverge between saving and restarting, and this page is where the owner sees
 // the difference: in each row's status and in the restart banner above the list.
 
-// The seeded prompt behind "Create a plugin" (docs/plugins.md § Teaching the agent). The teaching
+// The seeded prompt behind "Create a plugin" (docs/plugins/agent-install.md § Teaching the agent). The teaching
 // lives in the `plugin_authoring` tool this text names, not in the text; that tool's test asserts
 // this file still names it.
 export const PLUGIN_STARTER_PROMPT = `I want to extend acorn with a plugin.
@@ -141,7 +141,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
     await refetch()
   })
 
-  // The agent writes the package; the owner still installs it (docs/plugins.md § Approval-mediated
+  // The agent writes the package; the owner still installs it (docs/plugins/agent-install.md § Approval-mediated
   // install). This button reaches an agent, never the install route. It lands a draft in the task's
   // composer rather than starting a turn, because a settings button that silently starts an agent turn
   // is one nobody presses twice.
@@ -174,7 +174,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
       })} />
 
       {/* No browse-and-discover surface, because any listing acorn could offer would be unreviewed
-          (docs/plugins.md § Non-goals). */}
+          (docs/extensibility.md § Some decisions that look like gaps). */}
       <SettingsSection
         id="installed"
         label="Installed plugins"

@@ -94,7 +94,7 @@ values is one row in a vendor's list. A hundred span names is a hundred rows nob
 
 ## What never leaves the machine
 
-This list matches what [lifecycle events](../plugins/forward-compatibility.md#shipped-first-party-lifecycle-events) keep out of broadcasts, plus
+This list matches what [lifecycle events](../plugins/events.md#shipped-first-party-events) keep out of broadcasts, plus
 what the audit trail refuses:
 
 - Prompt text, agent output, file contents, diffs, and terminal bytes.

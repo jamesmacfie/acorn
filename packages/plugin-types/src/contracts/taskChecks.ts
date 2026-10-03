@@ -2,7 +2,7 @@ import type { HostOwned } from './shared.js'
 import type { TaskRef } from './coreTasks.js'
 
 /** What this plugin has to say when the owner archives a task, and the cleanup it can offer
- *  (docs/plugins.md § Task checks). */
+ *  (docs/plugins/task-checks.md § Task checks). */
 export type PluginTaskCheckRegistry = {
   register(check: PluginTaskCheck): void
 }

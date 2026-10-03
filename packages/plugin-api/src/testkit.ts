@@ -1,4 +1,4 @@
-// The test half of the plugin API: how a plugin's tests reach the host. See docs/plugins.md § The
+// The test half of the plugin API: how a plugin's tests reach the host. See docs/plugins/plugin-api.md § The
 // plugin API for why this seam exists (every plugin used to forge `as unknown as NodePluginContext`
 // literals) and docs/architecture/packages.md § Package boundaries for the node-environment-safe
 // rule and the ban on importing testkit/ from production.
@@ -9,7 +9,7 @@
 
 // ── A real plugin context ─────────────────────────────────────────────────────────────────────────
 // Not a mock: calls the same server/pluginHost/context.ts the host calls at boot, over a temp data root
-// (docs/plugins.md § The plugin API). Pass `permissions` for the loaded tier, omit it for the
+// (docs/plugins/plugin-api.md § The plugin API). Pass `permissions` for the loaded tier, omit it for the
 // built-in tier.
 export { makeTestNodeContext, makeTestRequestContext } from '@acorn/node-core/testkit'
 // The handle a test holds onto, and nothing else. The options bags stay off: a test passes an object
@@ -31,7 +31,7 @@ export { schema } from '@acorn/node-core/server/db/index.ts'
 export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 
 // ── The manifest ──────────────────────────────────────────────────────────────────────────────────
-// Runs the real manifest schema over `acorn-plugin.config.mjs` (docs/plugins.md § The dev loop), so
+// Runs the real manifest schema over `acorn-plugin.config.mjs` (docs/plugins/dev-loop.md § The dev loop), so
 // a bad declaration fails in `pnpm test` rather than at the next boot. It takes the package root and
 // finds the file itself, so the filename constant and the result type stay its business.
 export { validatePluginConfig } from '@acorn/node-core/testkit'

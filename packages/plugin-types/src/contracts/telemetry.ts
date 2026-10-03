@@ -31,7 +31,7 @@ export type TelemetryErrorInput = {
   spanId?: string
 }
 
-/** Measure your own work (docs/plugin-authoring.md § Telemetry and logging).
+/** Measure your own work (docs/plugin-authoring/telemetry.md § Telemetry and logging).
  *
  * Every verb is stamped with your plugin id by the host, which is why there is no owner argument
  * and why an `owner` attribute you set is dropped. Every verb is a no-op when the owner has

@@ -20,7 +20,7 @@ import { makeTestDb, testSecretEnv, type TestDb } from '@acorn/node-core/testkit
 import type { Env } from '@acorn/node-core/server/bindings.ts'
 
 // The node-provider seam end to end, against the reference provider loaded off disk
-// (docs/plugins.md § Node providers).
+// (docs/plugins/node-providers.md § Node providers).
 //
 // Loaded, not imported. The acceptance criterion for the whole phase is that the first-party cloud
 // plugin will be a loaded plugin built only from published seams, and the way to know that is true is

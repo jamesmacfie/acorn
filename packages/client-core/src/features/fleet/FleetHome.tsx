@@ -82,8 +82,8 @@ export default function FleetHome() {
                   <span class="fleet-card-label">{node.label}</span>
                   <Show when={node.local}><Badge size="xs">This computer</Badge></Show>
                   {/* Provenance: adopted through a plugin's node provider rather than paired by hand,
-                      so this is a row that goes away if that plugin does (docs/plugins.md § Node
-                      providers). */}
+                      so this is a row that goes away if that plugin does (docs/plugins/node-providers.md
+                      § Node providers). */}
                   <Show when={node.provider}>
                     {(provider) => <Badge size="xs">From {pluginLabel(provider().providerId.split(':')[0]!)}</Badge>}
                   </Show>

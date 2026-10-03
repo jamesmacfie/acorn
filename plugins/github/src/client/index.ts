@@ -50,7 +50,7 @@ export const githubClientPlugin: ClientPlugin = {
       // known, rather than in core's route registry.
       taskPath: (task) => (task.pullNumber != null && task.github ? `${githubBrowsePath(task.projectId)}/${task.pullNumber}` : undefined),
       // The same knowledge read backwards, for "is there already a task for this PR"
-      // (docs/plugins.md § Client authoring and the UI kit, `tracksRef`). A github-pr task records its
+      // (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit, `tracksRef`). A github-pr task records its
       // pull request as `pullNumber` on the task row; `links` holds the Linear tickets from the body.
       tracksRef: (task, ref) => ref.providerId === 'github' && task.pullNumber != null && !!task.github
         && pullRefMatchesTask(ref.displayId, task.github, task.pullNumber),
@@ -75,7 +75,7 @@ export const githubClientPlugin: ClientPlugin = {
     })
     ctx.integrationFlows.register(githubIntegrationFlow)
     ctx.panes.register(prPaneContribution)
-    // The two places another plugin may come into a pull request (docs/plugins.md § Cooperative
+    // The two places another plugin may come into a pull request (docs/plugins/cooperative-extension-points.md § Cooperative
     // extension points). Marks on a line of the diff, keyed the way the shared viewer keys a row;
     // and room beside the state and checks on the overview, where the owner's own facts stay and a
     // contributor is added to them.

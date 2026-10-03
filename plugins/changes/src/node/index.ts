@@ -26,7 +26,7 @@ export const changesPlugin = (): NodePlugin => {
     // localGit holds no tables of its own: it shells out to git in the task worktree, so it needs
     // core's task resolution and nothing else.
     // The two decisions this plugin opens to other plugins, declared before the bridge that runs them
-    // (main/localGit.ts § CHANGES_HOOKS, docs/plugins.md § Hooks). Declaring is the whole consent: a
+    // (main/localGit.ts § CHANGES_HOOKS, docs/plugins/hooks.md § Hooks). Declaring is the whole consent: a
     // point this plugin did not declare has no chain and no trust line.
     for (const point of CHANGES_HOOKS) ctx.hooks.declare({ ...point, allows: [...point.allows] })
     const bridge = localGitBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)
@@ -36,7 +36,7 @@ export const changesPlugin = (): NodePlugin => {
       value: uncommittedEditorLineMarkers(ctx.core),
     })
     // Task check: warns about uncommitted work the archive would discard
-    // (docs/plugins.md § Task checks; details in main/archiveCheck.ts).
+    // (docs/plugins/task-checks.md § Task checks; details in main/archiveCheck.ts).
     ctx.taskChecks.register({ id: 'uncommitted', check: (task) => changesArchiveConcern(bridge, task) })
     ctx.routes.register(localGit, { prefix: '/tasks', note: '/:id/local/*' })
     // local_changes, local_diff, and git_log. Same module as the bridge above, so the agent and the

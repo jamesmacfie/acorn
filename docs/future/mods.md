@@ -37,10 +37,10 @@ Most of the Mods feature list has an acorn equivalent, built on the owner-declar
 | --- | --- | --- |
 | `ui.render` of a declared component | Remote trees drawn from the closed kit; `agents:tool-card` replaces the card for a named tool | [cooperative-extension-points.md](../plugins/cooperative-extension-points.md) |
 | `AbovePrompt`, status line | `agents:composer-actions`, `agents:session-header` | [cooperative-extension-points.md](../plugins/cooperative-extension-points.md) |
-| `prompt.submit` | `agents:before-send`, with observe, transform, and veto | [node-side-extension-points.md](../plugins/node-side-extension-points.md#hooks) |
+| `prompt.submit` | `agents:before-send`, with observe, transform, and veto | [node-side-extension-points.md](../plugins/hooks.md#hooks) |
 | `prompt.context`, `prompt.section` | Context sections and `core:before-snapshot` | [agent-tools.md](../agent-tools/context-sections.md#context-sections) |
 | `tool.register` | Agent tool contributions | [agent-tools.md](../agent-tools.md) |
-| `tool.check` on acorn's own tools | `core:before-tool-call` | [node-side-extension-points.md](../plugins/node-side-extension-points.md#hooks) |
+| `tool.check` on acorn's own tools | `core:before-tool-call` | [node-side-extension-points.md](../plugins/hooks.md#hooks) |
 | `$` as the only door, in a worker | The permission-scoped worker and its owner-bound context | [extensibility.md](../extensibility.md#the-node-half-is-isolated) |
 | Adding a noun to `$` | Capabilities with a `contract/` folder | [plugin-map.md](../plugin-map.md#talking-to-another-plugin) |
 | `turn.complete`, `agent.spawn` | Agents lifecycle events and managed delegation | [managed-agents.md](../managed-agents.md) |
@@ -53,7 +53,7 @@ DeepSeek.
 
 Mods lets any plugin wrap any method, and the admin's plugin order is the safety model. acorn lets a
 plugin change another plugin's behavior only where the owner opened a point
-([node-side-extension-points.md § There is no uncooperative extension](../plugins/node-side-extension-points.md#there-is-no-uncooperative-extension)).
+([node-side-extension-points.md § There is no uncooperative extension](../plugins/cooperative-extension-points.md#there-is-no-uncooperative-extension)).
 That stays. The Mods thread supports keeping it. Commenters found that when two handlers object, the
 chain returns one objection and drops the other, which acorn's `collect` flag already solves. They
 spent days on whether a handler that throws lets the action through or stops it, which an acorn owner
@@ -229,7 +229,7 @@ Say these plainly in the owning docs, because a policy people trust too far is w
    manual check to [testing/agents-and-providers.md](../testing/agents-and-providers.md) that drives
    one blocked command through each of Claude, Codex, and DeepSeek.
 5. **The owning docs.** Add the row to the hook table in
-   [node-side-extension-points.md § Hooks](../plugins/node-side-extension-points.md#hooks), the
+   [node-side-extension-points.md § Hooks](../plugins/hooks.md#hooks), the
    blocked path and the limits above to [managed-agents.md](../managed-agents.md), and the timeout
    reasoning beside the `core:before-tool-call` exception in [security.md](../security.md). Then
    delete this file's design section and keep the comparison.
@@ -256,7 +256,7 @@ Say these plainly in the owning docs, because a policy people trust too far is w
 
 - **A hook on every event.** Mods' `*` handler sees every call. In acorn, an audit or analytics plugin
   subscribes to events instead
-  ([node-side-extension-points.md § Hooks](../plugins/node-side-extension-points.md#hooks)).
+  ([node-side-extension-points.md § Hooks](../plugins/hooks.md#hooks)).
 - **Wrapping another plugin's UI or input without an open point.** Mods lets any plugin intercept
   another's button presses. acorn refuses that permanently.
 - **Hooks on the token stream.** Mods' `turn.step` lets a handler rewrite the model's output as it

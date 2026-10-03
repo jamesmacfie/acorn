@@ -80,7 +80,7 @@ export function DiffPane(props: {
   source: DiffSource
   /**
    * The qualified id of an `annotation` extension point this pane draws marks for, when its owner
-   * declared one (docs/plugins.md § Cooperative extension points).
+   * declared one (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
    *
    * A prop rather than something the source supplies, because the marks are drawn inside the
    * virtualized item and their height has to be measured with it — that is this component's

@@ -1,4 +1,4 @@
-// Facts one plugin knows about the items another plugin already draws (docs/plugins.md § Cooperative
+// Facts one plugin knows about the items another plugin already draws (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `annotation` kind).
 //
 // The owner registers the keys it is drawing, this module asks every contributor about all of them in

@@ -25,7 +25,7 @@ export type RuntimeDeps = {
   isRunning(sessionId: string): boolean
   /** Observe authoritative PTY exits for sessions started by this service. */
   onExit(listener: (sessionId: string, exitCode: number | null) => void): () => void
-  /** The owner's half of `terminal:before-run-target` (docs/plugins.md § Hooks). Absent means nobody
+  /** The owner's half of `terminal:before-run-target` (docs/plugins/hooks.md § Hooks). Absent means nobody
    *  objects, which is also what an empty chain means. */
   hooks?: Pick<PluginHookRegistry, 'run'>
   exitCode(sessionId: string): number | null | undefined
@@ -37,7 +37,7 @@ export type RuntimeDeps = {
   // Throws when the repo's configuration has not been acknowledged (server/repoConfigTrust.ts). Required
   // for the same reason `repoTargetIds` is. The expected hash must match the current approved snapshot.
   authorizeRepoConfig(taskId: string, expectedHash: string): Promise<void>
-  // A declared target started or stopped through this service (docs/plugins.md § Hearing a core event
+  // A declared target started or stopped through this service (docs/plugins/events.md § Hearing a core event
   // § Run target state). Optional so callers that only need the read model need not observe it.
   onChange?(taskId: string, targetId: string, running: boolean): void
 }
@@ -152,7 +152,7 @@ export class RuntimeService {
       await this.deps.authorizeRepoConfig(taskId, cfg.repoConfigHash)
     }
     this.assertLive()
-    // Another plugin's turn before a process starts in this worktree (docs/plugins.md § Hooks). Observe
+    // Another plugin's turn before a process starts in this worktree (docs/plugins/hooks.md § Hooks). Observe
     // and veto only: the design sketched a transform over the target's environment, and a payload is
     // scalars and arrays of scalars, so an env map is not expressible in the declared vocabulary. That
     // section's "What is refused" carries the argument.

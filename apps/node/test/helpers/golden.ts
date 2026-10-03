@@ -1,6 +1,6 @@
 import { readFileSync, writeFileSync } from 'node:fs'
 
-// Golden lists for the compiled-plugin composition: docs/plugins.md § The golden lists covers the
+// Golden lists for the compiled-plugin composition: docs/plugins/adding-a-contribution.md § The golden lists covers the
 // mechanism, the regeneration command, and why the comparison is exact equality.
 //
 // JSON rather than the line-oriented .txt the facade snapshot uses, because these lists are nested

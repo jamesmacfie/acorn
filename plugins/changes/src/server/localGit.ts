@@ -9,7 +9,7 @@ import { localDocument, localSearch, localSegments } from './localDocument'
 import { buildCommitPrompt, cleanCommitMessage, COMMIT_MESSAGE_SYSTEM, commitDiffScope, commitFiles, splitByBudget, splitPatch } from './commitMessage'
 import { COMMIT_MESSAGE_MAX_OUTPUT_TOKENS, emptyLocalStatus } from '../shared/api'
 
-// The two decisions this plugin lets other plugins take a turn in (docs/plugins.md § Hooks). Declared
+// The two decisions this plugin lets other plugins take a turn in (docs/plugins/hooks.md § Hooks). Declared
 // on the context in ../node/index.ts; spelled here because this is where they are run, and a hook whose
 // declaration and call site sit in different files drifts.
 //
@@ -22,7 +22,7 @@ export const CHANGES_HOOKS = [
     label: 'commit',
     // `amend` is here so a commit-lint handler can leave an amend alone: rewriting the message of a
     // commit that already exists is a different decision from writing a new one
-    // (docs/plugins.md § Hooks).
+    // (docs/plugins/hooks.md § Hooks).
     payload: { taskId: 'string', branch: 'string', message: 'string', amend: 'boolean' },
     allows: ['observe', 'transform', 'veto'],
   },
@@ -31,7 +31,7 @@ export const CHANGES_HOOKS = [
     label: 'push',
     // `force` is here so a branch-protection handler can refuse the one push that replaces a commit
     // somebody else may be standing on, while leaving an ordinary push alone. Payload matching is
-    // exact, so declaring it makes it a field every call carries (docs/plugins.md § Hooks).
+    // exact, so declaring it makes it a field every call carries (docs/plugins/hooks.md § Hooks).
     payload: { taskId: 'string', branch: 'string', force: 'boolean' },
     allows: ['observe', 'veto'],
   },
@@ -95,7 +95,7 @@ export function localGitBridge(
     discard: (taskId, path, untracked, oldPath) => withRoot(taskId, (root) => discardFile(root, path, !!untracked, oldPath)),
     // The two hooked mutations. The refusal reaches the pane as the same `{ ok: false, reason }` a git
     // failure does, with the blaming plugin's name in front of it, so the owner's UI needs no second
-    // shape for "somebody said no" (docs/plugins.md § Hooks).
+    // shape for "somebody said no" (docs/plugins/hooks.md § Hooks).
     headCommit: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return null

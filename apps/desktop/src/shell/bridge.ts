@@ -308,7 +308,7 @@ const acorn = {
   fleetList: () => call('fleet-list'),
   nodeProbe: (endpoint: string) => call('node-probe', { endpoint }),
   nodePair: (request: unknown) => call('node-pair', request),
-  // The second door (docs/plugins.md § Node providers). The renderer names a provider and a node id;
+  // The second door (docs/plugins/node-providers.md § Node providers). The renderer names a provider and a node id;
   // the endpoint, the fingerprint and the credential are all fetched by the helper from the node that
   // listed it, so nothing new crosses this bridge in either direction.
   nodeAdopt: (request: unknown) => call('node-adopt', request),

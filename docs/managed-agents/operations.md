@@ -80,7 +80,7 @@ a terminal, its task is archived, it sits idle past your limit, or the Node exit
 agent CLI and its MCP servers, about 450 MB.
 
 Archiving a task runs core's `core:task-archiving` hook
-([hooks](../plugins/node-side-extension-points.md#hooks)) before the worktree is removed.
+([hooks](../plugins/hooks.md#hooks)) before the worktree is removed.
 `stopTaskSessions` stops each of the task's processes, marks an active turn `interrupted`, expires
 pending requests, and records `stopped` with a note to restore the task and send a prompt. The sessions
 aren't archived. After a restore, the next prompt resumes them.

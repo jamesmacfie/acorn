@@ -109,7 +109,7 @@ export type NodeRecord = z.infer<typeof nodeRecordSchema>
 // confirms it, and no shape here lets a caller skip that by supplying its own token.
 //
 // Adoption, `nodeAdoptRequestSchema`, is the unattended one, added for provisioned nodes
-// (docs/plugins.md § Node providers). It is narrower than it looks: the renderer names a provider and
+// (docs/plugins/node-providers.md § Node providers). It is narrower than it looks: the renderer names a provider and
 // a node id, and the host asks the node that listed it for the endpoint, the fingerprint and the
 // credential, then probes that endpoint and refuses a certificate whose fingerprint is not the one
 // the provider vouched for. So the renderer still cannot introduce a node of its own invention, and

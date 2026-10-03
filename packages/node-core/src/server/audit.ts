@@ -47,7 +47,7 @@ export type CoreAuditAction =
   | 'plugins.reloaded'
   // An agent asked for a plugin to be installed, updated or removed, and the owner answered. The three
   // rows above say what happened to the node; this one says who asked for it and whether a human agreed
-  // (docs/plugins.md § Approval-mediated install).
+  // (docs/plugins/agent-install.md § Approval-mediated install).
   | 'plugins.request.decided'
   | 'plugins.review.decided'
   // Data leaving or entering the node.

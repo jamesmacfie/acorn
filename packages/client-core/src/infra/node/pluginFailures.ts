@@ -8,7 +8,7 @@ import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { nodes } from './fleet'
 
 // "Plugin X failed to start", in the notification bell, so the owner learns about it without opening
-// Settings → Plugins (docs/plugins.md § Activation).
+// Settings → Plugins (docs/plugins/activation.md § Activation).
 //
 // Core-owned rather than plugin-contributed, because the plugin that failed is not running to speak
 // for itself and the state belongs to the node.

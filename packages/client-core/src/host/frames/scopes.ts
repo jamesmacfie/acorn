@@ -171,7 +171,7 @@ const RULES: readonly RouteRule[] = [
   // directions: reading it names a control plane and the device row that vouches for it, and the DELETE
   // would let a plugin frame cut a node off from whoever provisioned it.
   { path: shape('/v1/core/attachment'), scopes: {}, note: 'Attachment is owner administration; the DELETE revokes a credential.' },
-  // Node providers (docs/plugins.md § Node providers). The sharpest entry added since the plugin-install
+  // Node providers (docs/plugins/node-providers.md § Node providers). The sharpest entry added since the plugin-install
   // routes below, and for the same reason: `adopt` hands over a durable credential for another machine,
   // `create` spends the owner's money, and `destroy` is irreversible. The list is no better — it
   // enumerates the owner's infrastructure. A plugin that wants to contribute nodes does it from its node

@@ -18,7 +18,7 @@ export { setProjectsLookup } from '@acorn/client-core/features/projects/projectL
 export type { Project } from '@acorn/client-core/infra/queries.ts'
 
 // The two registries a cooperative extension is registered through, for a test that renders one of
-// its own plugin's slots and needs somebody on the other side of it (docs/plugins.md § Cooperative
+// its own plugin's slots and needs somebody on the other side of it (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points). Production code never writes these — the chrome pass does, from a roster row —
 // which is exactly why they belong here rather than on ./client.
 export { extensionPointRegistry, extensionRegistry } from '@acorn/client-core/host/registries/extensionPoints/extensionPoints.ts'

@@ -22,7 +22,7 @@ import { setPluginDevGrant } from '../plugins/host'
 import { navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
 import './plugin-trust.css'
 
-// The owner's side of an agent's install request (docs/plugins.md § Approval-mediated install and
+// The owner's side of an agent's install request (docs/plugins/agent-install.md § Approval-mediated install and
 // § What the owner can know before the download own the two-screen design and why the split exists).
 //
 // Drawn in the shell, in the overlay slot beside the two other trust prompts, which is the part that

@@ -1,5 +1,5 @@
 // What a host's kit table is allowed to hold, and how a tree host turns one entry into something it
-// can mount (docs/plugins.md § The tree contract).
+// can mount (docs/plugins/tree-contract.md § The tree contract).
 //
 // A string-keyed table from a name to code is a registry, and a registry that holds values pulls
 // every value into whichever chunk holds the table. That is how a diff viewer and a syntax

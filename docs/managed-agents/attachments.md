@@ -46,7 +46,7 @@ A loaded plugin declares `requires.plugins: [{ id: "agents" }]` and the capabili
 Neither method changes the draft or deletes the source. The Node doesn't own the client's array, and
 deleting the source first would lose your only valid attachment. So `createReplacement` makes a
 candidate, and the composer commits it through the `agents:attachment` point's `replace` action
-([asking the owner](../plugins/cooperative-extension-points.md#asking-the-owner)).
+([asking the owner](../plugins/remote-points.md#asking-the-owner)).
 
 The commit is a compare-and-swap. The edited ID must still be in its slot, the replacement must
 belong to the same task and be an image, and the draft's count and size limits must still hold. One

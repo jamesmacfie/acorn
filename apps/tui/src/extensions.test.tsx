@@ -4,7 +4,7 @@ import { renderFixture } from './harness'
 import { fixtureBadgePresses } from './fixtureExtensions'
 
 // What another plugin reaches inside this one's surfaces, on the real shell
-// (docs/plugins.md § Cooperative extension points, docs/tui/plugin-losses.md § What a plugin loses here).
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, docs/tui/plugin-losses.md § What a plugin loses here).
 //
 // Its own file rather than a case in ./panes.test.tsx, for the reason ./browseLong.test.tsx and
 // ./diffLong.test.tsx are their own files: each of these needs an environment flag set before the
@@ -92,7 +92,7 @@ describe('a contribution inside somebody else’s surface', () => {
   // `toKeymapKey` spells `super` and `asCtrl` rewrites to `ctrl` — so `meta+ctrl+alt+shift+d` reaches
   // the engine as `ctrl+ctrl+meta+shift+d`. The parser reads modifiers into flags, so the repeat is
   // one flag and no dedupe is owed; what a reader presses is Ctrl+Option+Shift+D
-  // (./keys/commandLayer.ts, docs/plugin-authoring.md § Keybindings).
+  // (./keys/commandLayer.ts, docs/plugins/commands.md § Keybindings).
   it('fires a plugin’s own chord, with the command key read as Ctrl', async () => {
     process.env.ACORN_FIXTURE_PLUGIN_CHORD = '1'
     const screen = await renderFixture({ pane: 'pr', width: 100, height: 32 })

@@ -286,7 +286,7 @@ export function wsBroadcast(frame: WsServerFrame): void {
 }
 
 // Node-side subscribers on the same frames the sockets get: `ctx.events.on`
-// (server/pluginHost/types.ts, docs/plugins.md § Hearing another plugin). They receive whether or not a client
+// (server/pluginHost/types.ts, docs/plugins/events.md § Hearing another plugin). They receive whether or not a client
 // is connected, which is the point — a node with nobody attached still has to react to its own events.
 const nodeListeners = new Set<(frame: WsServerFrame) => void>()
 

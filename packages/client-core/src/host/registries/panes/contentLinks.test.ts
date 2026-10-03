@@ -256,7 +256,7 @@ describe('the host ladder', () => {
     stopped.dispose()
   })
 
-  // The third destination (docs/plugins.md § "Loaded plugins: the client half"): a target whose plugin
+  // The third destination (docs/plugins/client-half.md § "Loaded plugins: the client half"): a target whose plugin
   // has a project-scoped route rather than a pane or a panel. The null case has to keep working, so an
   // untracked repo still leaves for the browser.
   it('resolves a route for a target whose plugin declares one, and null for one it cannot place', () => {

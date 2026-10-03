@@ -6,7 +6,7 @@ import { fleetBridge } from '../platform'
 import { createFleetQuery, type FleetResult } from './fanout'
 import { refreshFleet } from './fleet'
 
-// Nodes this client's nodes know about, and the four lifecycle verbs (docs/plugins.md § Node
+// Nodes this client's nodes know about, and the four lifecycle verbs (docs/plugins/node-providers.md § Node
 // providers). The client half of the fleet's second door.
 //
 // Read by fanning out over every reachable node and unioning the answers, not by asking the local

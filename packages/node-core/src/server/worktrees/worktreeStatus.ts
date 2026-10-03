@@ -126,7 +126,7 @@ export async function worktreeGitText(path: string, args: readonly string[], opt
 
 // `--porcelain=v2 --branch` adds `# branch.oid` and `# branch.head` header lines ahead of the entries,
 // so one process answers "is it dirty", "how many files" and "where is HEAD"
-// (docs/plugins.md § Hearing a core event § HEAD moved). The changes plugin's own parser skips any
+// (docs/plugins/events.md § Hearing a core event § HEAD moved). The changes plugin's own parser skips any
 // line that does not start with `?`, `1`, `2` or `u`, so the headers cost it nothing and the two
 // callers share one process rather than spawning one each.
 //

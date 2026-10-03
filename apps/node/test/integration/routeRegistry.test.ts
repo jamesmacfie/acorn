@@ -83,7 +83,7 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 ]
 
 // Every route the compiled plugins mount, as a golden snapshot in routeRegistry.snapshot.json;
-// docs/plugins.md § The golden lists covers the mechanism and why it's exact equality now instead of
+// docs/plugins/adding-a-contribution.md § The golden lists covers the mechanism and why it's exact equality now instead of
 // a representative `some()` check per contribution. The segment doubling is visible here too
 // (docs/api-reference/plugin-routes.md § Plugin routes): a router that names its own top-level segment repeats it
 // under its plugin namespace, e.g. `/v1/p/memory/memory`.
@@ -93,7 +93,7 @@ const MOUNTED_CORE_ROUTES: ReadonlyArray<readonly [method: string, path: string]
 //
 // What's not in here, and would be a real change if it appeared: any route from a loaded package.
 // Linear's and http's routes left when those plugins did; a loaded plugin's routes reach the mount
-// table through the loader's fetch carrier (docs/plugins.md § Loaded plugins), which this suite
+// table through the loader's fetch carrier (docs/plugins/loaded-plugins.md § Loaded plugins), which this suite
 // doesn't assemble. `pluginLoader.test.ts` exercises a loaded plugin's routes, `httpLoaded.test.ts`
 // drives http's through that carrier, and `linear.test.ts` drives linear's router directly.
 const PLUGIN_ROUTES = join(import.meta.dirname, 'routeRegistry.snapshot.json')

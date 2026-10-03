@@ -11,7 +11,7 @@ Archive opens a confirmation dialog with the task title above the confirmation t
 every plugin what it has to say about the task, such as running containers, uncommitted files, or
 live sessions, and offers each cleanup the plugin declared. With nothing to report, the dialog still
 appears as the explicit barrier. A plugin reaches that dialog only through a
-[task check](../plugins/client-authoring-and-the-ui-kit.md#task-checks). A cleanup that fails names
+[task check](../plugins/task-checks.md#task-checks). A cleanup that fails names
 its plugin, and the task is archived anyway.
 
 Archive first claims the task's worktree lifecycle. While the claim holds, root reads return no path,
@@ -66,7 +66,7 @@ Two things delete later or elsewhere:
 ## Browse archived tasks
 
 The **Archive** entry at the bottom of the rail lists archived tasks, newest first, with a search box
-over every [search provider](../plugins/client-authoring-and-the-ui-kit.md#search-providers).
+over every [search provider](../plugins/search-providers.md#search-providers).
 Selecting a task previews it read-only in the ordinary pane host, without adding it to the rail.
 
 Only panes that declare `readsArchived` appear in the preview. The agents and notes panes opt in.

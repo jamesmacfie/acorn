@@ -2,7 +2,7 @@
 // per-task Postgres browse and edit, the project's saved queries, the task's scratch document, and
 // table/column completions.
 //
-// database ships as a loaded plugin (docs/plugins.md § Loaded plugins). The host gets `router.fetch`
+// database ships as a loaded plugin (docs/plugins/loaded-plugins.md § Loaded plugins). The host gets `router.fetch`
 // (createDatabaseFetch at the bottom), and identity rides in through `c.env` rather than `ownerId(c)`
 // or `c.get('principal')`, which a loaded bundle's Hono stack never sets. The bridge is a closure
 // argument, so a fake is injectable without a global registry.
@@ -291,7 +291,7 @@ export const databaseRoutes = (db: PluginDatabase, core: DatabaseRouteServices, 
       return c.json({ options: rows.map((row) => ({ value: row.id, label: row.name, ...(row.notes ? { description: row.notes } : {}) })) })
     })
 
-    // --- the command palette's two rows (docs/plugins.md § Command kinds) ---
+    // --- the command palette's two rows (docs/plugins/commands.md § Command kinds) ---
     //
     // Task-scoped, both of them, and that is the boundary rather than a convenience. Saved queries are
     // project-owned, but every route in this file addresses them through a task, because the task is

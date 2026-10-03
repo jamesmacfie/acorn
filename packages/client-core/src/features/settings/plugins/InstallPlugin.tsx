@@ -15,7 +15,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 // its own form stored before, through the same call.
 //
 // No browse-and-discover list, because anything acorn could offer there would be unreviewed
-// (docs/plugins.md § Non-goals).
+// (docs/extensibility.md § Some decisions that look like gaps).
 
 export type InstallTarget = 'node' | 'device'
 type SourceKind = 'github' | 'npm' | 'url' | 'path'

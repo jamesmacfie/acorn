@@ -1,4 +1,4 @@
-// The editor plugin's client part (docs/plugins.md § The plugin API).
+// The editor plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 //
 // One pane: find-in-files is a panel in its sidebar rather than a pane of its own
 // (docs/panes/contributions.md § Contributions).

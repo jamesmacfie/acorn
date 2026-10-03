@@ -87,7 +87,7 @@ Each alternative below will be suggested again. Reopen one only with evidence ag
   mounted components.
 - **Provider types in client-core.** The document describes files, rows, anchors, and threads only.
 - **An old-and-new `DiffSource` adapter.** Two shapes side by side double memory and behavior
-  ([package shape](./plugins/package-shape.md) § The plugin API).
+  ([the plugin API](./plugins/plugin-api.md)).
 - **Caching whole documents by count.** Documents range from 50 rows to a million, so the cache
   weighs segments.
 - **Persisting parsed rows, tokens, heights, or DOM.** They're large and cheap to rebuild. The Node's

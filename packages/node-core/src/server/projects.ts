@@ -28,7 +28,7 @@ async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): 
   })
 }
 
-// Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins.md §
+// Cross-plugin project identity, a projection rather than ProjectRow (docs/plugins/activation.md §
 // Activation): a plugin may resolve scope and filesystem ownership, but never receives core's
 // executable config, hidden/sort state, or a database handle.
 export type ProjectRef = {

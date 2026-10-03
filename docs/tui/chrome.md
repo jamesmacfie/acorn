@@ -67,7 +67,7 @@ placement. A row shows a count: `N marks` where seven cells fit, and `+N` in a n
 row and press `Shift+F10` or the menu key to open the **Task markers** dialog, a virtual list of every
 marker label. The plugin supplies no action or terminal UI. Loaded task marks arrive through the same
 `core:task` annotation point as on the desktop
-([task annotations](../plugins/cooperative-extension-points.md#task-annotations)).
+([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
 
 #### The palette and overlays
 

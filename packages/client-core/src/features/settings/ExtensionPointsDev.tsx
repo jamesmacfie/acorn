@@ -17,7 +17,7 @@ import {
 import { slotChoices, withSlotChoice } from '../../host/tree/arbitration'
 
 // Every extension point on this node, who fills it, and every contribution that fills nothing
-// (docs/plugins.md § Seeing what matched).
+// (docs/plugins/cooperative-extension-points.md § Seeing what matched).
 //
 // An unmatched contribution is silent by design: a point whose owner is missing, disabled, untrusted on
 // this device or renamed simply has nothing delivered into it, and nothing throws. That is right for a

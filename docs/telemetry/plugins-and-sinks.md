@@ -3,7 +3,7 @@
 This page covers how a plugin writes telemetry, how a sandboxed frame does, how a plugin reads the
 stream as a sink, and the Sentry sink that ships. Read it before you instrument a plugin or write an
 exporter. It's part of [telemetry](../telemetry.md).
-[The node half](../plugin-authoring/the-node-half.md#telemetry-and-logging) owns the verbs a plugin author calls.
+[The node half](../plugin-authoring/telemetry.md#telemetry-and-logging) owns the verbs a plugin author calls.
 
 ## Writing telemetry from a plugin
 

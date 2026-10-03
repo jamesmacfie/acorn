@@ -250,14 +250,14 @@ export function _resetWsClient(): void {
 
 // "Re-read a plugin's chrome descriptors." One subscriber, `host/chrome/chromeData.ts`, and the
 // argument is what keeps it from being a fan-out: a plugin's own ping refreshes that plugin's rows and
-// nobody else's (docs/plugins.md § Hearing a core event).
+// nobody else's (docs/plugins/events.md § Hearing a core event).
 export function wsOnStatus(cb: StatusCb): () => void {
   statusSubs.add(cb)
   connect()
   return () => void statusSubs.delete(cb)
 }
 
-// A reload swapped a plugin's node half (docs/plugins.md § The dev loop). A subscriber rather than a
+// A reload swapped a plugin's node half (docs/plugins/dev-loop.md § The dev loop). A subscriber rather than a
 // direct call, because plugins/chrome imports this module and the reverse edge would be a cycle.
 export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)

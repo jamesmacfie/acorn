@@ -63,7 +63,7 @@ export async function saveDisabledNodePlugins(disabled: readonly string[], nodeI
   return state
 }
 
-// Install, update and uninstall (docs/plugins.md § Activation). Per-node like the toggle, because a
+// Install, update and uninstall (docs/plugins/activation.md § Activation). Per-node like the toggle, because a
 // plugin is installed on a machine and a fleet is a set of independently administered nodes.
 //
 // `writeJson` rather than `postJson`, which carries an idempotency key but not a node id. The key is
@@ -102,7 +102,7 @@ export const uninstallNodePlugin = async (
   nodeId?: string,
 ): Promise<PluginUninstallResult> => await mutate(corePluginRoute(id), 'DELETE', options, nodeId)
 
-// Swap a loaded plugin's node half in the running process, with no restart (docs/plugins.md § The dev
+// Swap a loaded plugin's node half in the running process, with no restart (docs/plugins/dev-loop.md § The dev
 // loop). A 200 carrying `state: 'failed'` is the normal shape for code that would not start, and the
 // previous instance is still serving, so callers read the state rather than waiting for a rejection.
 export const reloadNodePlugin = async (id: string, nodeId?: string): Promise<PluginReloadResult> =>
@@ -117,7 +117,7 @@ export const reviewNodePlugin = async (
   await mutate(corePluginReviewRoute(id), 'POST', { ...review, decision }, nodeId)
 }
 
-// The owner's answer to one agent-raised approval request (docs/plugins.md § Approval-mediated
+// The owner's answer to one agent-raised approval request (docs/plugins/agent-install.md § Approval-mediated
 // install). It installs nothing: by this point the device has done the install, or decided not to,
 // under its own principal. This closes the record and settles what the agent is told.
 export const answerPluginRequest = async (

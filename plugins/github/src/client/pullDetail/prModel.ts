@@ -124,7 +124,7 @@ function build(scope: PrScope) {
   const integrations = createQuery(() => integrationsOptions(linearRefs().length > 0))
   const linearConnected = () =>
     (integrations.data?.integrations ?? []).some((entry) => entry.providerId === 'linear' && entry.status === 'connected')
-  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § github). The
+  // Enrichment through the host, addressed by provider (docs/first-party-plugins.md § First-party for one specific reason). The
   // connection check stays because a 403 with no connection wastes a round trip when the "connect
   // Linear" fallback is what should render.
   const linearIssues = createQuery(() =>

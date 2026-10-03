@@ -112,7 +112,7 @@ const manifestPermissions = z.object({
 })
 
 // What a plugin announces on its own `plugin:<id>:<verb>` channel that *other* plugins may subscribe
-// to (docs/plugins.md § Hearing another plugin). A verb works undeclared for the
+// to (docs/plugins/events.md § Hearing another plugin). A verb works undeclared for the
 // plugin's own frames; declaring it is what lets another manifest name it in `permissions.events`, and
 // what gives the settings page a line to render. The description is the author's own words and is
 // shown as text, never as trust-prompt copy.

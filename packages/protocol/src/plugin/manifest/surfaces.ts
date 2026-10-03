@@ -40,7 +40,7 @@ export const documentRegion = z.object({
 //
 // `'frame'` is this plugin's own bundle in a sandboxed iframe: the plugin draws, and the host sees a
 // rectangle. A `remote` region is the same bundle running in a worker with no DOM, emitting a tree of
-// the host's own component names, which the host draws (docs/plugins.md § The tree contract); `entry`
+// the host's own component names, which the host draws (docs/plugins/tree-contract.md § The tree contract); `entry`
 // is a key of the object the bundle passed to `mountTree`. A document region is host-drawn outright:
 // the plugin contributes routes and a language id, no code.
 //
@@ -73,7 +73,7 @@ export const frameSurface = z.object({
   // `overlay` is the full-screen picker slot: the host places the rectangle and the frame draws its
   // contents. It has no click site, so `openOverlay` is the only way to open one. `coreSlot` is drawn
   // where one of core's own surfaces normally is; registering one seizes nothing, because the user
-  // picks the provider in settings. See docs/plugins.md § Replacing a core surface.
+  // picks the provider in settings. See docs/plugins/replacing-core-surfaces.md § Replacing a core surface.
   // `inline` is the rectangle a *different* plugin's point holds: the surface is never registered as
   // one of this plugin's own panes, and it appears only where an `extensions` entry places it. Nothing
   // draws it until an owner's point takes it, which is what makes "the owner consents" true of the

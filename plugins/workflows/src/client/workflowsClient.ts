@@ -4,7 +4,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 //
 // Lives in contract/ rather than client/ because plugins/agents' task sidebar calls it as well as
 // this plugin's own palette rows, and contract/ is the one sanctioned cross-plugin surface
-// (docs/plugins.md § Package shape). It reads only client-core and protocol's workflow row types,
+// (docs/plugins/package-shape.md § Package shape). It reads only client-core and protocol's workflow row types,
 // never this plugin's own client/, so transitive contract purity holds.
 //
 // Commands use HTTP. Workflow notices and step events use the shared WebSocket.

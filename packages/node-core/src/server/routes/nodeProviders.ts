@@ -12,7 +12,7 @@ import type { AppEnv } from '../middleware/auth'
 import { respondError } from '../respond'
 
 // The nodes this node's plugins know about, and the four lifecycle verbs
-// (docs/plugins.md § Node providers).
+// (docs/plugins/node-providers.md § Node providers).
 //
 // Gated with requireDevice by mount in server/index.ts. Every route here either enumerates
 // infrastructure, hands over a credential, or spends money, and none of it is a fair question for a

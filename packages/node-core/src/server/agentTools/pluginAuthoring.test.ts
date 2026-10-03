@@ -199,7 +199,7 @@ describe('the two doors', () => {
 
   it('names the telemetry token, the two ctx members, and the frame verb', () => {
     // What a plugin author asks first about telemetry: can I write one, what does reading cost, and
-    // what does a frame do instead (docs/plugin-authoring.md § Telemetry and logging). The token
+    // what does a frame do instead (docs/plugin-authoring/telemetry.md § Telemetry and logging). The token
     // itself is derived from NODE_CORE_FACETS, so this is about the guide saying what it grants.
     const guide = renderPluginAuthoring()
     expect(guide).toContain('`ctx.log`')

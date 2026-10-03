@@ -143,7 +143,7 @@ turn followed by a new one, and the transcript draws it that way.
 4. Enable one TTSR rule and the advisor through an overlay and record how each looks in the transcript.
 5. Write up what broke as issues against the generic driver, not as quirks in the manifest.
 6. Add a numbered manual check to [agents and providers](../../testing/agents-and-providers.md) and
-   a short `omp` example beside OpenCode in [the manifest § Harnesses](../../plugin-authoring/the-manifest.md#harnesses).
+   a short `omp` example beside OpenCode in [the manifest § Harnesses](../../plugin-authoring/harnesses.md#harnesses).
 
 ## What this does not give acorn
 
@@ -153,7 +153,7 @@ files 02 to 06 still matter.
 
 ## Verify before building
 
-- The harness manifest fields in [the manifest § Harnesses](../../plugin-authoring/the-manifest.md#harnesses),
+- The harness manifest fields in [the manifest § Harnesses](../../plugin-authoring/harnesses.md#harnesses),
   especially whether `baseline` and `apiVersion` changed.
 - How `acpDriver.ts` picks between `session/load` and `session/resume` when an agent offers both.
 - How the generic driver handles `authMethods` in the `initialize` response.

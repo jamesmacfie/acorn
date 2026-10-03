@@ -80,7 +80,7 @@ export type SourceContribution<Item = unknown> = {
   defaultPane?: string
   // A third question again: given the integration behind `providerId` is connected, does it grant this
   // capability? Not `requires`, which asks about the platform, and not a plugin-to-plugin capability
-  // either — the three used to share a word (docs/plugins.md § Collaboration rules).
+  // either — the three used to share a word (docs/plugins/collaboration.md § Collaboration rules).
   requiresProvider?: ProviderCapabilityName
   // Does this surface read the routed project? Opt in, because most sources don't, and a source that
   // never said it was project-aware almost certainly isn't. The shell shows the project picker only
@@ -94,15 +94,15 @@ export type SourceContribution<Item = unknown> = {
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean
   routes?: readonly SourceRouteContribution[]
-  // Where a task belongs in the router, when this source owns it. See docs/plugins.md § Loaded
+  // Where a task belongs in the router, when this source owns it. See docs/plugins/client-half.md § Loaded
   // plugins: the client half.
   taskPath?: (task: Task) => string | undefined
   // The inverse of `taskPath`: does this task already track the thing a reference panel is showing?
-  // docs/plugins.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
+  // docs/plugins/client-half.md § Loaded plugins: the client half explains why `task.links` alone is not enough.
   tracksRef?: (task: Task, ref: { providerId?: string; displayId: string }) => boolean
   promotion?: SourcePromotion<Item>
   // No `emptyState` here, unlike the descriptor twin, because a first-party source is a component and
-  // renders its own empty case (docs/plugins.md § Loaded plugins: the client half).
+  // renders its own empty case (docs/plugins/client-half.md § Loaded plugins: the client half).
 }
 
 export const sourceRegistry = new Registry<SourceContribution<any>>('source')
@@ -194,7 +194,7 @@ export function defaultPaneForTask(task: Task): string | undefined {
 }
 
 /** Does this task already track this external reference? Host link matching first, then each
- *  source's own second spelling (docs/plugins.md § Loaded plugins: the client half). */
+ *  source's own second spelling (docs/plugins/client-half.md § Loaded plugins: the client half). */
 export function taskTracksRef(task: Task, ref: { providerId?: string; displayId: string; connectionId?: string }): boolean {
   // A link names a connection and a panel target usually does not. A PR body says `ENG-42`, not which
   // connected Linear owns it, so the connection is compared only when both sides have one.

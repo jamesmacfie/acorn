@@ -30,7 +30,7 @@ import { TerminalDisplay } from './terminalDisplay'
 import type { TerminalCompletedEvent } from '../contract/lifecycle'
 
 // This plugin's own logger. A module-level engine with no `ctx` in reach, so the id is stated here
-// rather than bound by the host (docs/plugin-authoring.md § Telemetry and logging).
+// rather than bound by the host (docs/plugin-authoring/telemetry.md § Telemetry and logging).
 const log = createLogger('terminal', 'terminal')
 
 // PTYs live in the node utility service. Sessions run on one of two backends:
@@ -795,7 +795,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
   // script run whichever surface created the worktree.
   //
   // It takes the task id rather than the row, because it is reached through core's `core:worktree-created`
-  // hook now and a hook payload is scalars (docs/plugins.md § Hooks). Loading the row here costs one
+  // hook now and a hook payload is scalars (docs/plugins/hooks.md § Hooks). Loading the row here costs one
   // read on a path that is about to spawn a shell.
   const worktreeCreated = async (taskId: string, cwd: string): Promise<void> => {
     assertOwner(engine)

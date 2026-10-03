@@ -1,26 +1,20 @@
 # Plugins
 
-Use the topic links below for the plugin API and host contracts. For a third-party package, start with the [authoring guide](./plugin-authoring.md).
+This is the plugin reference: how both plugin tiers work, from package layout to the contracts between
+plugins. Read it when you change a host seam or need the exact rules behind an authoring guide. For a
+third-party package, start with the [authoring guide](./plugin-authoring.md). For a one-page
+orientation, read the [plugin map](./plugin-map.md).
 
-Plugins come in two tiers. Built-ins are first-party packages compiled into acorn and registered by
-the Node/client composition roots. Loaded plugins are installed at runtime from a manifest plus ESM
-bundles. Either tier can contribute Node behavior, client behavior, or both; the available carriers
-and trust boundary differ by tier.
+Plugins come in two tiers. Compiled plugins are first-party packages built into acorn and registered
+by the Node and client composition roots. Loaded plugins are installed at runtime from a manifest plus
+ESM bundles, and run in sandboxes. Either tier can contribute Node behavior, client behavior, or both,
+and the carriers and trust boundary differ by tier. [Extensibility](./extensibility.md) explains why
+there are two tiers and which constraints are deliberate. Read it before widening a seam.
 
-This file is the mechanism. [extensibility.md](./extensibility.md) is the reasoning — why there are
-two tiers, where the line between them is, and which of the constraints below are deliberate rather
-than unfinished. Read it before widening a seam.
-[plugin-authoring.md](./plugin-authoring.md) is the subset of this file an author needs to write a
-loaded plugin **by hand, with no build step** — plain multi-file ESM on the node, one vanilla-JS file
-in the frame — with a complete worked example.
+## Packages and the API
 
-## Package shape
-
-
-[Package shape](plugins/package-shape.md)
-
-## The plugin API
-
+<a id="package-shape"></a>
+<a id="the-plugin-api"></a>
 <a id="one-vocabulary-across-the-registries"></a>
 <a id="the-two-contexts-one-per-tier"></a>
 <a id="what-is-published-and-what-acorn-promises-about-it"></a>
@@ -28,202 +22,136 @@ in the frame — with a complete worked example.
 <a id="hono-and-drizzle-cross-into-tier-1-on-purpose"></a>
 <a id="the-testkit"></a>
 
-[The plugin API](plugins/package-shape.md#the-plugin-api)
+- [Package shape](./plugins/package-shape.md): the folder layout and exports map every plugin uses.
+- [The plugin API](./plugins/plugin-api.md): the private facade, the two node context types, and the
+  shared registry verbs.
+- [Published packages](./plugins/publishing.md): the npm packages, the compatibility promise, and
+  what the host does with a manifest.
+- [Testing a plugin](./plugin-authoring/testing.md): the testkit.
 
-## Activation
+## Lifecycle and distribution
 
-
-[Activation](plugins/activation.md)
-
-## Managing installed plugins
-
-Settings > Plugins > Installed, its plugin pages, the one install flow, uninstalling, and the plugin
-strip above every plugin settings page: [What the owner sees](plugins/activation.md#what-the-owner-sees).
-Rail icon visibility: [frontend.md § Rail source visibility](./frontend/rail-and-routing.md#rail-source-visibility).
-
-## Loaded plugins
-
-
-[Loaded plugins](plugins/activation.md#loaded-plugins)
-
-## The dev loop
-
+<a id="activation"></a>
+<a id="managing-installed-plugins"></a>
+<a id="loaded-plugins"></a>
+<a id="the-dev-loop"></a>
 <a id="reloading-one-plugin-without-a-restart"></a>
-
-[The dev loop](plugins/activation.md#the-dev-loop)
-
-## Approval-mediated install
-
+<a id="approval-mediated-install"></a>
 <a id="what-the-owner-can-know-before-the-download"></a>
+<a id="development-mode"></a>
+<a id="teaching-the-agent"></a>
+<a id="the-client-half-of-a-loaded-plugin"></a>
+<a id="device-held-plugins"></a>
+<a id="one-shared-eligibility-and-trust-check"></a>
 
-[Approval-mediated install](plugins/activation.md#approval-mediated-install)
+- [Activation](./plugins/activation.md): start order, failures, what a plugin registers, and what the
+  owner sees under **Settings > Plugins > Installed**. Rail icon visibility is in
+  [rail source visibility](./frontend/rail-and-routing.md#rail-source-visibility).
+- [Loaded plugins](./plugins/loaded-plugins.md): the installer, contained failures, the context the
+  manifest shapes, and package input limits.
+- [Distribution](./plugins/distribution.md): bundled packages, running identity, device trust, and the
+  shared eligibility check.
+- [The dev loop](./plugins/dev-loop.md): rebuilding, reloading one plugin, and trust prompts in
+  development.
+- [Agent installs and development mode](./plugins/agent-install.md): approval-mediated install, the
+  dev trust grant, and teaching the agent.
+- [The client half of a loaded plugin](./plugins/client-half.md): how a device turns a manifest into
+  UI, and device-held plugins.
 
-## Development mode
+## Drawing UI
 
-
-[Development mode](plugins/activation.md#development-mode)
-
-## Teaching the agent
-
-
-[Teaching the agent](plugins/activation.md#teaching-the-agent)
-
-## The client half of a loaded plugin
-
-
-[The client half of a loaded plugin](plugins/activation.md#the-client-half-of-a-loaded-plugin)
-
-## Device-held plugins
-
-[Device-held plugins](plugins/activation.md#device-held-plugins)
-
-## Frames
-
+<a id="frames"></a>
 <a id="binary-bridge-calls"></a>
-
-[Frames](plugins/frames.md)
-
-## Remote trees
-
-
-[Remote trees](plugins/frames.md#remote-trees)
-
-## Document surfaces
-
+<a id="remote-trees"></a>
+<a id="document-surfaces"></a>
 <a id="document-over-frame"></a>
 <a id="language-smarts"></a>
+<a id="webviews"></a>
+<a id="the-tree-contract"></a>
+<a id="descriptors-for-facts-trees-for-ui-rectangles-for-pixels"></a>
+<a id="client-authoring-and-the-ui-kit"></a>
+<a id="command-kinds"></a>
 
-[Document surfaces](plugins/frames.md#document-surfaces)
-
-## Webviews
-
-
-[Webviews](plugins/frames.md#webviews)
+- [Choosing how a plugin draws](./plugins/ui-tiers.md): descriptors for facts, trees for UI,
+  rectangles for pixels, and the two descriptor slots.
+- [Frames](./plugins/frames.md): the iframe path, the bridge's enforcement, and binary calls.
+- [Remote trees](./plugins/remote-trees.md): the worker path and per-tree bridges.
+- [The tree contract](./plugins/tree-contract.md): the wire format between a sandbox and a host.
+- [Document surfaces and webviews](./plugins/document-surfaces.md): host-drawn documents and pages.
+- [Client authoring and the UI kit](./plugins/client-authoring-and-the-ui-kit.md): the build
+  transform, kit rules, client contribution points, and trust gating.
+- [Commands and keybindings](./plugins/commands.md): command kinds, chords, and claimed keys.
 
 ## Descriptors
 
-
-[Descriptors](plugins/descriptors.md)
-
-## The tree contract
-
-
-[The tree contract](plugins/descriptors.md#the-tree-contract)
-
-## One shared eligibility and trust check
-
-
-[One shared eligibility and trust check](plugins/descriptors.md#one-shared-eligibility-and-trust-check)
-
-## Descriptors for facts, trees for UI, rectangles for pixels
-
-
-[Descriptors for facts, trees for UI, rectangles for pixels](plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md)
-
-## Keeping a descriptor fresh
-
+<a id="descriptors"></a>
+<a id="keeping-a-descriptor-fresh"></a>
 <a id="raising-a-notification"></a>
 <a id="the-live-channel"></a>
-
-[Keeping a descriptor fresh](plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#keeping-a-descriptor-fresh)
-
-## Context menus
-
+<a id="context-menus"></a>
 <a id="three-lists-one-menu"></a>
+<a id="rail-markers"></a>
 
-[Context menus](plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#context-menus)
+- [Descriptors](./plugins/descriptors.md): rail sources, content links, routes, and action verbs.
+- [More descriptors](./plugins/more-descriptors.md): agent contexts, reference resolvers, typed data
+  sources, schedules, node actions, and themes.
+- [Keeping a descriptor fresh](./plugins/freshness.md): refresh, status, notices, and the live channel.
+- [Context menus and rail markers](./plugins/menus-and-markers.md).
 
-## Rail markers
+## Extension points
 
-
-[Rail markers](plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#rail-markers)
-
-## Cooperative extension points
-
+<a id="cooperative-extension-points"></a>
 <a id="five-kinds-four-rules"></a>
 <a id="rows"></a>
 <a id="annotations"></a>
-<a id="remote-trees"></a>
 <a id="asking-the-owner"></a>
 <a id="companion-overlays"></a>
 <a id="rectangles"></a>
 <a id="arbitration-who-fills-a-box"></a>
 <a id="what-the-host-binds"></a>
 <a id="seeing-what-matched"></a>
-
-[Cooperative extension points](plugins/cooperative-extension-points.md)
-
-## Node-side extension points
-
-
-[Node-side extension points](plugins/node-side-extension-points.md)
-
-## Hooks
-
-
-[Hooks](plugins/node-side-extension-points.md#hooks)
-
-## Node providers
-
+<a id="node-side-extension-points"></a>
+<a id="hooks"></a>
+<a id="node-providers"></a>
 <a id="the-first-party-rule"></a>
+<a id="replacing-a-core-surface"></a>
+<a id="there-is-no-uncooperative-extension"></a>
 
-[Node providers](plugins/node-side-extension-points.md#node-providers)
+- [Cooperative extension points](./plugins/cooperative-extension-points.md): the five kinds, the four
+  rules, arbitration, and what the host binds.
+- [Rows and annotations](./plugins/rows-and-annotations.md), including task annotations.
+- [Remote points](./plugins/remote-points.md): trees and rectangles in another plugin's surface,
+  asking the owner, and companion overlays.
+- [Node-side extension points](./plugins/node-side-extension-points.md).
+- [Hooks](./plugins/hooks.md): deciding before something happens.
+- [Node providers](./plugins/node-providers.md): putting Nodes in the fleet.
+- [Replacing a core surface](./plugins/replacing-core-surfaces.md).
 
-## Replacing a core surface
+## Node contributions
 
+<a id="task-checks"></a>
+<a id="search-providers"></a>
+<a id="harnesses"></a>
 
-[Replacing a core surface](plugins/node-side-extension-points.md#replacing-a-core-surface)
+- [Task checks](./plugins/task-checks.md): what a plugin says before an archive.
+- [Search providers](./plugins/search-providers.md): grouped search across plugins.
+- [Harnesses](./plugins/harnesses.md): how the host delivers a managed agent declared as data.
 
-## There is no uncooperative extension
+## Working together
 
-
-[There is no uncooperative extension](plugins/node-side-extension-points.md#there-is-no-uncooperative-extension)
-
-## Client authoring and the UI kit
-
-<a id="command-kinds"></a>
-
-[Client authoring and the UI kit](plugins/client-authoring-and-the-ui-kit.md)
-
-## Task checks
-
-
-[Task checks](plugins/client-authoring-and-the-ui-kit.md#task-checks)
-
-## Search providers
-
-
-[Search providers](plugins/client-authoring-and-the-ui-kit.md#search-providers)
-
-## Harnesses
-
-
-[Harnesses](plugins/client-authoring-and-the-ui-kit.md#harnesses)
-
-## Forward compatibility
-
-
-[Forward compatibility](plugins/forward-compatibility.md)
-
-## Collaboration rules
-
-
-[Collaboration rules](plugins/forward-compatibility.md#collaboration-rules)
-
-## Data ownership
-
+<a id="forward-compatibility"></a>
+<a id="collaboration-rules"></a>
+<a id="data-ownership"></a>
 <a id="uninstalling-and-what-purged-means"></a>
-
-[Data ownership](plugins/forward-compatibility.md#data-ownership)
-
-## Tool projection
-
-
-[Tool projection](plugins/forward-compatibility.md#tool-projection)
-
-## Adding a plugin contribution
-
+<a id="tool-projection"></a>
+<a id="adding-a-plugin-contribution"></a>
 <a id="the-files-a-contribution-touches"></a>
 <a id="the-golden-lists"></a>
 
-[Adding a plugin contribution](plugins/forward-compatibility.md#adding-a-plugin-contribution)
+- [Forward compatibility](./plugins/forward-compatibility.md): what happens to input this build
+  doesn't know.
+- [Events](./plugins/events.md): hearing core and other plugins, and the shipped event list.
+- [Collaboration rules](./plugins/collaboration.md): contracts, capabilities, and client capabilities.
+- [Data ownership](./plugins/data-ownership.md): plugin databases, uninstalling, and tool projection.
+- [Adding a plugin contribution](./plugins/adding-a-contribution.md): the steps, the files, and the
+  golden lists.

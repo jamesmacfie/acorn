@@ -1,6 +1,6 @@
 // Teaching the agent to write a plugin: the third piece of the dev loop. For the two doors, why the
 // vocabulary below is derived rather than written, and what it leaves out, see docs/agent-tools.md
-// § plugin_authoring, docs/plugins.md § Teaching the agent, and docs/plugin-authoring.md.
+// § plugin_authoring, docs/plugins/agent-install.md § Teaching the agent, and docs/plugin-authoring.md.
 import { z } from 'zod'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 import { pluginManifestShape } from '@acorn/protocol/plugin/contract.ts'

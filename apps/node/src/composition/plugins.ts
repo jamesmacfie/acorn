@@ -1,4 +1,4 @@
-// The Node activation list (docs/plugins.md § Activation). The host supplies routes, capabilities,
+// The Node activation list (docs/plugins/activation.md § Activation). The host supplies routes, capabilities,
 // CoreServices, tools, providers, context sections, storage, and lifecycle hooks through
 // NodePluginContext.
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'

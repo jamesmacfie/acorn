@@ -22,7 +22,7 @@ Some preparation already shipped:
   `packages/node-core/src/testkit/controlPlaneStub.ts`.
 - A loaded plugin can contribute a Node provider through `ctx.providers.nodes`. The host adopts a
   provided Node only after checking the fingerprint the provider vouched for
-  ([Node providers](../../plugins/node-side-extension-points.md#node-providers)).
+  ([Node providers](../../plugins/node-providers.md#node-providers)).
 - The loopback-API gates and plugin containment rung 2 shipped
   ([security](../../security.md)).
 - A task-scoped port tunnel exists at `/v1/tunnel` (`packages/node-core/src/server/transport/tunnel.ts`),
@@ -143,7 +143,7 @@ local tasks.
 ## Verify before building
 
 Recheck the shipped contracts named here: [Node enrollment](../../node-enrollment.md),
-[authentication](../../authentication.md), [Node providers](../../plugins/node-side-extension-points.md#node-providers),
+[authentication](../../authentication.md), [Node providers](../../plugins/node-providers.md#node-providers),
 [plugin activation](../../plugins/activation.md), and [backup](../../data-layer.md#backup-and-import).
 Recheck the dated provider facts in [hosting and cost](./hosting-and-cost.md). Do not describe a
 proposal in this folder as shipped.

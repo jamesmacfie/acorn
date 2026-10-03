@@ -4,7 +4,7 @@ import { makeTestNodeContext, validatePluginConfig } from '@acorn/plugin-api/tes
 import { describe, expect, it, vi } from 'vitest'
 import { rollbarPlugin } from '../node/index'
 
-// Context comes from makeTestNodeContext, the same boot path the host uses (docs/plugins.md § The
+// Context comes from makeTestNodeContext, the same boot path the host uses (docs/plugins/plugin-api.md § The
 // plugin API), so the tier differences below are the host's decisions, not this test's.
 const PACKAGE_ROOT = fileURLToPath(new URL('../../', import.meta.url))
 

@@ -1,4 +1,4 @@
-// The client half of the plugin API. See docs/plugins.md § The plugin API for the entrypoint
+// The client half of the plugin API. See docs/plugins/plugin-api.md § The plugin API for the entrypoint
 // table, the tier boundary, and the entry criterion, and for what a `// prune candidate:` comment
 // marks below.
 
@@ -59,7 +59,7 @@ export type { PaneContribution, PaneLayoutContribution, PaneModelContext, PaneRe
 export { paneModel } from '@acorn/client-core/host/registries/panes'
 export { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/host/registries/sources'
-// The context-menu registry (docs/plugins.md § Context menus). Both halves are here: a plugin
+// The context-menu registry (docs/plugins/menus-and-markers.md § Context menus). Both halves are here: a plugin
 // registers rows for a location, and a plugin that DRAWS a list asks the registry what to put in its
 // row menu, so github's pull-request list and core's rail list offer the same things. No component
 // crosses — the `<For>` over these rows is eight lines with each host's own `Menu.Item`.
@@ -80,7 +80,7 @@ export { projectPath } from '@acorn/client-core/host/registries/commands'
 // One slot registry, two component shapes: the slot id picks which (docs/frontend/registries.md § Registries and
 // plugins). `UiSlotContribution` is the union both arms satisfy.
 export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
-// Rail status markers (docs/plugins.md § Rail markers). A plugin publishes marker data next to the
+// Rail status markers (docs/plugins/menus-and-markers.md § Rail markers). A plugin publishes marker data next to the
 // state that owns it and the host draws the pixels: it picks the corner, the colour, the spin, and
 // the tooltip legend. The registry itself stays off this surface; register through
 // `ctx.railMarkers`, which binds the contribution to the plugin's own name.
@@ -144,7 +144,7 @@ export type { ContentLinkContribution, InAppTarget } from '@acorn/client-core/ho
 // no component scope that still has to ask which repos acorn tracks. Reader only.
 // `setProjectsLookup` belongs to the composition root and stays off this surface.
 export { allProjects } from '@acorn/client-core/features/projects/projectLookup.ts'
-// See docs/plugins.md § Loaded plugins: the client half for what a `refResolvers` entry answers.
+// See docs/plugins/client-half.md § Loaded plugins: the client half for what a `refResolvers` entry answers.
 // The query options only: a plugin consumes resolutions here but contributes a resolver from a
 // manifest row, never from client code.
 export { refResolutionsOptions } from '@acorn/client-core/host/registries/panes'
@@ -268,7 +268,7 @@ export { CHECK_TONE, checkStatusTone, checkStatusWord, checksState, checksSummar
 // ── Telemetry and logging ─────────────────────────────────────────────────────────────────────
 // The client half of what `ctx.telemetry` and `ctx.log` are on the node, and the id is an argument
 // here because a compiled client plugin's context is contribution points and nothing else: `init`
-// is the one place its own id is in hand (docs/plugin-authoring.md § Telemetry and logging).
+// is the one place its own id is in hand (docs/plugin-authoring/telemetry.md § Telemetry and logging).
 //
 // Not on ./ui, because none of it draws. A sandboxed frame gets neither: it has no host module to
 // import, and posts a `telemetry` message over the bridge instead, which the host stamps from the
@@ -290,13 +290,13 @@ export { latestOnly } from '@acorn/client-core/kit/lib'
 export { onClosePaneWhen, onClosePaneWithin } from '@acorn/client-core/host/keys'
 
 // Which sandboxed plugin, if any, draws a given agent tool call. Data, not a component: the component
-// that mounts it is `RemoteTree` on ./ui/host. See docs/plugins.md § The tree contract.
+// that mounts it is `RemoteTree` on ./ui/host. See docs/plugins/tree-contract.md § The tree contract.
 export type { RemoteContribution } from '@acorn/client-core/host/tree'
 
 // Per-device scraps — an unsent draft, a closed fold — through one guarded accessor. On this barrel
 // rather than on ./ui because a plugin's own model is a `.ts` file with a node-environment test, and
 // ./ui carries Solid components: one of those makes the whole entrypoint unloadable there
-// (docs/plugin-authoring.md § Testing). Nothing in the module below imports anything.
+// (docs/plugin-authoring/testing.md § Testing). Nothing in the module below imports anything.
 export { clearLocal, deviceStorage, readLocal, writeLocal } from '@acorn/client-core/kit/lib'
 export { DATA_VERSION, DATA_LIMITS, MISSING, parseDataValue, parseVersionedDataValue, parseDataPointer, readDataPointer, canonicalDataEncoding, canonicalDataProjection } from '@acorn/protocol/dataValues.ts'
 export type { DataValue, DataPrimitive, DataRead, VersionedDataValue } from '@acorn/protocol/dataValues.ts'

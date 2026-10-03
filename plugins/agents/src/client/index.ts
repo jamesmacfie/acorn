@@ -1,4 +1,4 @@
-// The agents plugin's client part (docs/plugins.md § The plugin API).
+// The agents plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 //
 // `required: true`, matching the node half: the Agent pane and the Agent Center rail source are what
 // the managed-agent runtime is for, and core's task view falls back to a pane list that assumes they
@@ -62,14 +62,14 @@ export const agentsClientPlugin: ClientPlugin = {
       isStale,
       Card: InlineDiffCard,
     })
-    // The four places another plugin may come into this pane (docs/plugins.md § Cooperative
+    // The four places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative
     // extension points). The tool card is keyed by the harness's own name for what a call did; the
     // attachment chip by the file's media type; the composer's action bar takes everyone who has
     // something to offer a draft, up to the owner's ceiling because it is the owner's bar.
     ctx.extensionPoints.register({
       id: 'tool-card', label: 'Agent tool call', kind: 'remote', mode: 'replace', max: 1,
     })
-    // `replace` is the one thing a contributor may ask this pane to do (docs/plugins.md § Asking the
+    // `replace` is the one thing a contributor may ask this pane to do (docs/plugins/remote-points.md § Asking the
     // owner). An editor that draws an attachment has to be able to hand back an altered one, and props
     // are data, so without a declared action it could draw the button and never do anything with it.
     // The composer binds the handler per attachment and decides whether to accept

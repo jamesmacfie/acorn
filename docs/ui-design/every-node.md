@@ -25,7 +25,7 @@ This is what the kit holds for it:
 - Collection state belongs to the host, so a cell host keeps `active`, `selected`, and `offset` the
   same way.
 - The tree protocol names nothing about the DOM
-  ([the tree contract](../plugins/descriptors.md#the-tree-contract)).
+  ([the tree contract](../plugins/tree-contract.md#the-tree-contract)).
 - Rectangles are the only DOM-only thing, and `kind="pty"` and `kind="editor"` are native in a
   terminal. `attachPty` takes the channel, so one plugin source drives xterm on the desktop and
   `@xterm/headless` in cells ([terminal](../terminal.md) § Client).

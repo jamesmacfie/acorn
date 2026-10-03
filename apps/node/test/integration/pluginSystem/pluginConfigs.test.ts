@@ -5,7 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { PLUGIN_CONFIG_FILE, validatePluginConfig } from '@acorn/node-core/testkit'
 
 // Checked against the real manifest schema at `pnpm test` time, for every loadable plugin
-// (docs/plugins.md § The dev loop: "A malformed acorn-plugin.config.mjs no longer waits for a
+// (docs/plugins/dev-loop.md § The dev loop: "A malformed acorn-plugin.config.mjs no longer waits for a
 // rebuild or a boot to announce itself").
 //
 // The rules it catches are the ones no reviewer checks by eye: a route or rail-items path outside

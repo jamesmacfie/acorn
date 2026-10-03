@@ -1,6 +1,6 @@
 // The bridge a third-party plugin's client bundle talks to the shell through, its own entrypoint
 // because nothing on ./ui can run inside the sandboxed frame that bundle loads into (Solid reaches
-// for `window` at module scope). See docs/plugins.md § Loaded plugins: the client half for the
+// for `window` at module scope). See docs/plugins/client-half.md § Loaded plugins: the client half for the
 // frame's full sandbox and the `mountFrame` boot sequence.
 //
 // `openLinkOnClick` is here rather than beside `renderMarkdown` on ./ui because it needs the bridge.
@@ -13,7 +13,7 @@ export type { AcornBridge } from '@acorn/client-core/host/frames/sdk'
 export type { PluginByteResponse } from '@acorn/client-core/host/frames/sdk'
 // What `bridge.telemetry` and `bridge.log` accept as attributes: scalars, and nothing else. Named
 // because an author who builds an attribute map in one function and emits it in another has nowhere
-// else to reach for the type (docs/plugin-authoring.md § Telemetry from a frame).
+// else to reach for the type (docs/plugin-authoring/the-bridge.md § Telemetry from a frame).
 export type { PluginTelemetryAttrs } from '@acorn/client-core/host/frames/sdk'
 // The context the host hands a frame on connect. Kept rather than pruned: the four things that name it
 // today are all host-side, and a frame that wants to type the context it was given has nowhere else to go.
@@ -21,7 +21,7 @@ export type { PluginFrameContext } from '@acorn/protocol/plugin/bridge.ts'
 
 // ── The tree path ─────────────────────────────────────────────────────────────────────────────────
 // The second way a sandboxed bundle draws: a tree of the host's own kit nodes instead of pixels
-// (docs/plugins.md § The tree contract). Same bundle, same bridge, same sandbox rules; what differs
+// (docs/plugins/tree-contract.md § The tree contract). Same bundle, same bridge, same sandbox rules; what differs
 // is that the host mounts its components for the names the tree carries, so the result inherits focus,
 // keys, ARIA and the reader's style pack.
 //

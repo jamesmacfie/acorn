@@ -2,7 +2,7 @@
 //
 // Its own module rather than a line in ./sourceContribution.tsx, because a palette command is a `.ts`
 // file with a node-environment test and that file carries the lazy components
-// (docs/plugin-authoring.md § Testing).
+// (docs/plugin-authoring/testing.md § Testing).
 
 export const WORKFLOWS_SOURCE_ID = 'workflows'
 export const WORKFLOWS_SURFACE_ID = 'workflows'

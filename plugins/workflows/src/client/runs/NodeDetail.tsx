@@ -164,7 +164,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
   }
 
   // Resolved per call, never captured: a node with the agents plugin disabled answers `undefined` and
-  // this pane keeps the summary it always drew (docs/plugins.md § Collaboration rules).
+  // this pane keeps the summary it always drew (docs/plugins/collaboration.md § Collaboration rules).
   const conversation = createMemo(() => clientCapability(AGENTS_CONVERSATION)?.Conversation)
   const drawsConversation = createMemo(() => shape() === 'agent' && !!conversation())
 

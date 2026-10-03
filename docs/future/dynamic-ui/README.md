@@ -72,7 +72,7 @@ alternative a reader might expect.
 
 ## Owning documents this programme extends
 
-Before changing code, read [descriptors, trees, rectangles](../../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md),
+Before changing code, read [descriptors, trees, rectangles](../../plugins/ui-tiers.md),
 [activation](../../plugins/activation.md), [security](../../security.md),
 [cooperative extension points](../../plugins/cooperative-extension-points.md),
 [data sources](../../data-sources.md), [dashboards](../../dashboards.md), [panes](../../panes.md),

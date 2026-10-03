@@ -147,13 +147,13 @@ export type PluginSchedule = {
 }
 
 // What this plugin has to say when the owner archives a task, and the cleanup it can offer
-// (./taskChecks.ts). See docs/plugins.md § Task checks. Declaring one is the whole lifecycle: the host
+// (./taskChecks.ts). See docs/plugins/task-checks.md § Task checks. Declaring one is the whole lifecycle: the host
 // binds the owner, qualifies every concern id, bounds the call and ties removal to teardown.
 export type PluginTaskCheckRegistry = {
   register(check: TaskCheck): void
 }
 
-// What this plugin can find for a search, and how a hit opens (./search.ts). See docs/plugins.md §
+// What this plugin can find for a search, and how a hit opens (./search.ts). See docs/plugins/search-providers.md §
 // Search providers. The host binds the owner, bounds the call, sanitises the hits and ties removal to
 // teardown.
 export type PluginSearchRegistry = {
@@ -161,7 +161,7 @@ export type PluginSearchRegistry = {
 }
 
 /**
- * A turn in one of this plugin's decisions, offered to other plugins (./hooks.ts, docs/plugins.md §
+ * A turn in one of this plugin's decisions, offered to other plugins (./hooks.ts, docs/plugins/hooks.md §
  * Hooks).
  *
  * The owner's half is `declare` plus `run`: declare the moment and what is allowed at it, then call
@@ -240,7 +240,7 @@ export type PluginNodeActionRegistry = {
 // capability when there is one right answer and for a point when there are many.
 //
 // The verbs are the same three words hooks uses, because it is the same shape: an owner declares a
-// point, anyone handles it, the owner reads the handlers (docs/plugins.md § The plugin API).
+// point, anyone handles it, the owner reads the handlers (docs/plugins/plugin-api.md § The plugin API).
 export type PluginExtensionPointRegistry = {
   // Declare a point this plugin hosts. The id must start with this plugin's own name.
   declare<T>(point: ExtensionPointId<T>, label: string): void
@@ -292,7 +292,7 @@ export type PluginProviderRegistry = {
   // result are portable values, so loaded and compiled providers use the same registration seam.
   model(adapter: ModelProviderAdapter): void
   // A provider that knows about nodes, and optionally can make and remove them
-  // (../nodeProviders/registry.ts, docs/plugins.md § Node providers). Host-qualified id, disposal on
+  // (../nodeProviders/registry.ts, docs/plugins/node-providers.md § Node providers). Host-qualified id, disposal on
   // unload, and `create` obliging `destroy`, validated at registration.
   //
   // Read the contract before writing one: a node provider runs on some node, not necessarily the one
@@ -320,7 +320,7 @@ export type PluginBroadcast = {
   // "Re-read my chrome descriptors": this plugin's rail rows, badges, sources and agent context.
   // Scoped to the calling plugin by the host, so one plugin saying its rows moved no longer costs every
   // other plugin a descriptor round trip on every connected client
-  // (docs/plugins.md § Hearing a core event).
+  // (docs/plugins/events.md § Hearing a core event).
   status(): void
   // "Something under this task's worktree changed": a stage, a commit, a discard, a push, a file
   // written. The dirty markers in the rail and footer come from a `git status` sweep, and this is what
@@ -348,7 +348,7 @@ export type PluginBroadcast = {
   // the half that was missing.
   notice(notice: PluginNotice): void
   // Hear a core event on this node, whether or not a client is attached
-  // (docs/plugins.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
+  // (docs/plugins/events.md § Hearing another plugin). `event` must be one of NODE_EVENT_CHANNELS, and for
   // a loaded plugin it must also be in its manifest's `permissions.events`. The frame is a hint: the
   // contract is "go re-read", not a payload schema.
   //
@@ -359,12 +359,12 @@ export type PluginBroadcast = {
   // Since 2026-08-28 `event` may also be another plugin's `plugin:<id>:<verb>`, when that plugin
   // declared the verb in its `emits` and, for a loaded subscriber, the channel is in its own
   // `permissions.events`. An absent producer delivers nothing and errors nothing
-  // (docs/plugins.md § Hearing another plugin).
+  // (docs/plugins/events.md § Hearing another plugin).
   on(event: NodeEventChannel | PluginEventChannel, listener: (frame: WsServerFrame) => void): Disposable
 }
 
 // The two broadcast members a loaded plugin never gets. Both are infrastructure exactly one plugin may
-// own, and neither survives a message-passing boundary (docs/plugins.md § Loaded plugins).
+// own, and neither survives a message-passing boundary (docs/plugins/loaded-plugins.md § Loaded plugins).
 export type CompiledPluginBroadcast = PluginBroadcast & {
   // Claim a WS channel prefix, the token before the first ':' in a channel name. The client mirror is
   // registerWsChannel (@acorn/client-core/infra/node/wsChannels.ts). Disposal is the host's.
@@ -388,7 +388,7 @@ export type PluginStorage = {
 
 // What a plugin loaded from disk is handed. One member per contribution kind the loaded tier has, and
 // no member it does not: reaching for a compiled-only seam is a `tsc` error here rather than a runtime
-// "not a function" (docs/plugins.md § The plugin API). packages/plugin-types/src/public.ts is the
+// "not a function" (docs/plugins/plugin-api.md § The plugin API). packages/plugin-types/src/public.ts is the
 // published twin of exactly this type, and contract.test.ts holds the two equal.
 //
 // Undeclared core facets are still absent at runtime and present in the type: describing those would
@@ -436,11 +436,11 @@ export type NodePluginContext = {
   events: PluginBroadcast
   // Both tiers, and no permission: measuring your own work is not reading anybody else's. Every verb
   // files under this plugin, because the host closed over the id rather than taking one
-  // (../telemetry/collector.ts, docs/plugin-authoring.md § Telemetry and logging).
+  // (../telemetry/collector.ts, docs/plugin-authoring/telemetry.md § Telemetry and logging).
   telemetry: PluginTelemetry
   // Both tiers. A stderr line prefixed with this plugin's id, exactly as `console.error` gave you,
   // and a log record with the owner bound when telemetry is on. That attribution is the whole reason
-  // this member came back after being removed on 2026-08-27 (docs/plugins.md § Activation).
+  // this member came back after being removed on 2026-08-27 (docs/plugins/activation.md § Activation).
   log: Logger
 }
 
@@ -492,7 +492,7 @@ export type NodePlugin = {
   // Ignored for a plugin loaded from disk, whatever its bundle sets: its chain is the
   // manifest-declared, package-confined one the loader resolved.
   migrationsModule?: string
-  // The compiled tier's `emits` (docs/plugins.md § Hearing another plugin): which of this plugin's
+  // The compiled tier's `emits` (docs/plugins/events.md § Hearing another plugin): which of this plugin's
   // `plugin:<id>:<verb>` verbs another plugin may subscribe to, with a sentence each for the settings
   // page. A loaded plugin declares the same thing in its manifest and this field is ignored for it.
   emits?: readonly PluginEmit[]

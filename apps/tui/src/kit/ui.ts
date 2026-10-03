@@ -1,6 +1,6 @@
 // What `@acorn/plugin-api/ui` is on this host.
 //
-// A compiled pane reaches the kit through that one facade (docs/plugins.md § The plugin API), so
+// A compiled pane reaches the kit through that one facade (docs/plugins/plugin-api.md § The plugin API), so
 // pointing the facade here is the whole host switch for it: the pane's source is unchanged, its
 // imports are unchanged, and a different component answers each name. `vite.config.ts` makes the swap
 // for the bundle and `tsconfig.json`'s `paths` makes it for tsc.

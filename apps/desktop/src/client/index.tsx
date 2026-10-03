@@ -126,20 +126,20 @@ createRoot(() => {
 // than here. A pass fired from this line ran before the fleet list had been read and while the node the
 // helper just started was still `offline`, so it asked nobody and found nothing, and no loaded plugin
 // appeared for the rest of the session. The watcher also keeps them reconciled afterwards: a node that
-// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins.md § The dev loop).
+// reloads a plugin in place broadcasts `plugins:changed` (docs/plugins/dev-loop.md § The dev loop).
 watchPluginChanges()
 void startDeviceConfigSync(() => clientFor(activeCacheId()).client)
 
 // The same shape for the task list: every task write on the node broadcasts `tasks:changed`, and this
 // window invalidates its cached list whether or not it was the one that wrote
-// (docs/plugins.md § Hearing a core event).
+// (docs/plugins/events.md § Hearing a core event).
 watchTaskChanges()
 
 // …and for connected accounts. A credential that stops working demotes itself on the node mid-request,
 // so Settings → Services and the Sources rail hear about it here rather than at the next 401
-// (docs/plugins.md § Hearing a core event).
+// (docs/plugins/events.md § Hearing a core event).
 watchConnectionChanges()
-// The rest of the core catalogue (docs/plugins.md § Hearing a core event): projects invalidate their query;
+// The rest of the core catalogue (docs/plugins/events.md § Hearing a core event): projects invalidate their query;
 // HEAD, run targets and agent sessions are re-emitted on the client bus for whoever listens.
 watchProjectChanges()
 watchWorkspaceChanges()

@@ -1,457 +1,111 @@
 # Descriptors
 
-[Back to plugins](../plugins.md)
+This page covers descriptors: contributions that are data the host draws, not code. It covers rail
+sources, content links, routes, and which action verbs each click site takes. It's part of the
+[plugin reference](../plugins.md). Agent contexts, resolvers, schedules, and themes are in
+[more descriptors](./more-descriptors.md).
 
-The public manifest schema is `@acorn/protocol/plugin/contract.ts`. Its private `manifest/` modules
-group surface, chrome, command, extension, display, and Node runtime descriptors. The Node's
-`packages/node-core/src/server/plugins/manifest.ts` applies rules that need the plugin id or compare sibling contributions.
-Clients use the wire types from `contract.ts` and recheck values received in roster rows.
+The public manifest schema is `@acorn/protocol/plugin/contract.ts`, and its private `manifest/`
+modules group surface, chrome, command, extension, display, and Node runtime descriptors.
+`packages/node-core/src/server/plugins/manifest.ts` applies the rules that need the plugin id or
+compare contributions. Clients use the same wire types and check values from roster rows again.
 
 ## Descriptors
 
-A rail source, a badge in the task footer or the topbar, commands and keybindings, attention items,
-node stats, context-menu rows (`contextMenus`), restricted URL recognizers (`contentLinks`), renderer
-routes (`routes`), agent-context entries (`agentContexts`), batch reference resolvers
-(`refResolvers`), typed data sources (`dataSources` and `dataSourceDiscoveries`), periodic node-side
-work (`schedules`), and colour themes (`themes`). These are data, not code: the host renders them with its own components and fetches their content
-from routes in the plugin's own `/v1/p/<id>/` namespace, so they stay live when no frame is
-mounted anywhere (`packages/client-core/src/host/chrome/`). Freshness rides the existing
-invalidation ping plus one shared timer. A plugin that ships only descriptors needs no client
-bundle at all, and therefore no trust prompt — nothing of its executes on the device. A source may
-declare `createTask`; its row supplies the task seed and optional external link, while the host owns
-the modal, origin namespace, connection ownership check, create-before-link ordering, and
-partial-failure reporting. A source may declare `projectScoped`, which says its items route reads
-the shell's project: the host then appends `?project=` to that route, keys the cache by it, and
-offers the topbar project picker while the source is on screen. It is opt in, so a manifest written
-before the field and a plugin that never thought about projects both get one shared list instead of
-an identical one refetched per project (docs/frontend.md § the router is registry-driven). A source may declare `showInRailByDefault: false` to start with no desktop rail icon. It is a default, not a gate: the source still registers, the palette offers **Open <label>** for it, and the user's **Show in left rail** switch under Settings > Plugins overrides it (docs/frontend.md § Registries and plugins). A source may also declare an `emptyState` — one bounded message and at most
-one context-free action — shown when its route answered with *no items*, in place of the host's fixed
-"Nothing to show.". Not when the fetch failed: an unreachable node already has its own banner, and
-telling someone "nothing is assigned to you" because a request timed out is a claim the host has no
-business making on a plugin's behalf. It is deliberately no richer than a sentence and a button; the
-field exists because a rail that cannot say what empty *means* pushes sources into showing a wrong
-list instead of an empty one, which is exactly what Linear did. `emptyState` belongs to this
-descriptor twin only (`@acorn/protocol/api.ts` § `PluginSourceEmptyState`): a first-party
-`SourceContribution` is a component and already renders whatever it wants when it has nothing, so
-the same field there would be one every first-party source carries and none reads. A `contentLinks` entry uses a
-bounded `https://` host/path grammar and delivers one captured path segment to one of **three**
-destinations: an optional **task-scoped** `openPane` from the same manifest, which receives it as a
-`plugin:select` intent in the active task; the plugin's own **reference panel**, shown over
-whatever the reader was looking at; or the plugin's own **route**, which takes the reader there —
-declared as a `path` resolver on a compiled recogniser, since only the owning plugin can turn a URL
-into one of its addresses (`plugins/github/src/client/contentLinks.ts` resolves owner/name to a
-project). Taking a route also selects the rail source that owns it, because the shell renders from
-the rail rather than from the location. A link must have at least one of the two, or the manifest is
-rejected — a recogniser that matches URLs and can never open anything looks installed and is not.
-Which destination a click gets is the *clicking surface's* call and not the manifest's, because it
-depends on where the link was: a pull-request conversation asks for the panel so the reader keeps
-their place, a note takes the pane, a dashboard row asks to be taken to the route. Each is a
-*preference*, and the host falls through the remaining two in a fixed order when the asked-for one is
-unavailable, so no surface has to know which destinations a given provider actually installed. The panel is never *named* — it is addressed by provider, the host stamps
-the plugin id onto every recogniser it registers, and a `refPanel`'s provider must already be the
-plugin itself, so a manifest cannot point a link at another plugin's panel. Likewise a target naming
-anything that is not a registered task pane resolves to nothing rather than pushing an unrenderable
-pane id into a task's persisted layout. A `routes` entry gives a project-scoped surface a URL. Its
-A source may also declare **`tracksRef`** — "does this task already track this external item?" — which
-is `taskPath` read backwards and exists for the same reason. `task.links` is not the only way a task can
-be attached to an external item: a github-pr task records its pull request as `pullNumber` on the task
-row, and its links hold the *Linear* tickets found in the PR body. The host asks links first, since that
-is provider-agnostic and covers everything that seeds them, then asks every source for its own second
-spelling. A source that has only one way of recording the relationship implements nothing.
+The descriptor kinds are rail sources, slot badges in the task footer or the topbar, commands and
+keybindings, attention items, node stats, context-menu rows (`contextMenus`), URL recognizers
+(`contentLinks`), renderer routes (`routes`), agent contexts (`agentContexts`), reference resolvers
+(`refResolvers`), typed data sources (`dataSources` and `dataSourceDiscoveries`), schedules
+(`schedules`), and color themes (`themes`).
 
-A source may also declare **`defaultPane`**, the pane a task it tracks opens on the first time it is
-activated. Like a content link's `openPane`, it is re-checked on the device against the panes this
-manifest declares, so a roster row cannot aim core's first-open at somebody else's pane.
+The host renders them with its own components and fetches their content from routes in the plugin's
+own `/v1/p/<id>/` namespace (`packages/client-core/src/host/chrome/`). They stay live when no frame
+of the plugin is mounted. A plugin that ships only descriptors needs no client bundle and no trust
+prompt, because none of its code runs on the device. [Keeping a descriptor
+fresh](./freshness.md) covers when the host reads them again.
 
-`path` is confined at parse time to the prefix the host mints from the plugin id —
-`/p/:projectId/x/<plugin-id>/` — so it cannot claim core's `/p/:projectId`, `/p/:projectId/new`, or
-another plugin's path, and a collision is a manifest error rather than a race between two loads. It
-names a project-scoped `surface` from the same manifest and one `item` parameter of its own path;
-the host does the matching and supplies the value. A source's `onSelect: { "verb": "navigate",
-"surface": … }` is what changes that URL from a clicked row — the URL is where a project-scoped
-surface's selection lives, because unlike a task pane it has no layout state to keep one in. A
-command may not carry `navigate`, for the same reason it may not carry `createTask`: a command
-registry row has neither a routed project nor the shell's navigator in scope. A slot badge's
-`onClick` takes the same narrowed verb set as a command — `openPane`, `runNodeAction`, `openUrl` —
-for the same reason: its click carries no selected row and no routed project, so a verb that needs
-either would parse and then only ever fail. Only a source's `onSelect` gets the full set, because a
-rail row is the one click site with a row, a project, and the promotion callback in scope.
-`surfaceAction` is the one verb whose effect lands *inside* a plugin rather than on the shell: it
-delivers the command's own id to a region of one of that plugin's own panes, and it may only name a
-pane the same manifest declares that draws such a region — an iframe or a worker tree qualifies alike,
-and a pane whose regions are all host-drawn does not, because there would be nothing on the far end of
-the bridge to receive it. A document beside the region is not required. The verb was born in a
-`document-over-frame` pane, where `⌘Enter` is pressed in the host's editor and the frame has no
-keyboard (§ Document surfaces above), but the palette is the other way in, and from there "do this in
-the thing I am looking at" is a sentence about any pane the plugin draws — http's `list-detail`
-request panel as much as database's editor-over-panel. It is useful only on a
-command, because what it delivers *is* the command id, and a footer badge has no command in scope. An `agentContexts`
-entry names two routes — `options`
-(GET) and `capture` (POST) — and puts a row in the agent composer's context picker. Its `capture`
-answer is the one descriptor response that ends up inside a model's prompt, so it is parsed against
-a schema rather than sniffed field by field, and the host binds what a plugin must not: `source`
-comes from the plugin id, the capture time is stamped here, and the bytes are measured from the
-content received rather than believed from the response, so the shared 512 KiB
-`MAX_AGENT_CONTEXT_BYTES` ceiling cannot be talked past. An over-budget capture is refused whole,
-never trimmed. The `revision?()` half of the first-party contract has no manifest form on purpose:
-it is synchronous, a descriptor answers across a fetch, and the invalidation ping already covers
-freshness. The whole entry is two routes and a label:
+## Rail sources
 
-```json
-{
-  "contributions": {
-    "agentContexts": [{
-      "id": "http-requests",
-      "label": "HTTP requests",
-      "description": "Saved requests and their latest responses",
-      "options": "/v1/p/http/agent-context/options",
-      "capture": "/v1/p/http/agent-context/capture"
-    }]
-  }
-}
-```
+A rail source's rows come from a route on the plugin's node half, and the host draws them. A source
+can declare:
 
-`options` answers `GET → [{ id, label, description?, defaultSelected? }]` for the picker; `capture`
-receives `POST { taskId, workspaceId?, optionIds? }` and answers
-`[{ contextId, label, content, resourceId?, provenance?, deepLink?, freshness?, sensitivity? }]`
-(`@acorn/protocol/agentContext.ts` is the schema). Everything else on a snapshot — `source`,
-`capturedAt`, `byteSize`, `estimatedTokens` — is measured and stamped by the host, never read from
-the response.
+- `createTask`: the row supplies the task seed and an optional external link. The host owns the
+  modal, the origin namespace, the connection ownership check, create-before-link ordering, and
+  partial-failure reporting.
+- `projectScoped`: the items route reads the shell's project. The host appends `?project=`, keys the
+  cache by it, and offers the topbar project picker while the source is on screen.
+- `showInRailByDefault: false`: the source starts with no desktop rail icon. It still registers, the
+  palette offers **Open <label>**, and the person's **Show in left rail** choice wins.
+- `requiresGitProject: true`: the source draws only while the active workspace has a Git project.
+- `emptyState`: one bounded message and at most one action, shown when the route answered with no
+  items. It isn't shown when the fetch failed, because an unreachable Node has its own banner. It
+  takes the narrow verb set described in [action verbs](#action-verbs).
+- `tracksRef`: whether a task already tracks an external item, for a source that records the
+  relationship somewhere other than `task.links`. A github-pr task records its pull request as
+  `pullNumber`. The host asks links first, then every source.
+- `defaultPane`: the pane a tracked task opens on the first time it's activated. The device checks it
+  against the panes this manifest declares.
 
-A `refResolvers` entry is the same carrier shape for a different question: **what another plugin's
-surface should draw** when it is holding identifiers of this plugin's items. Recognition already has
-an answer — `contentLinks` declares the URL shapes, and the host scans any text for every registered
-recogniser at once (`scanContentRefs`) — so this is only the enrichment half, and it exists because
-the alternative was a cross-plugin import (`github` importing `@acorn/plugin-linear/contract`) that
-cannot survive either side becoming a loaded package.
+A row may give its icon a semantic `severity` and ask for `fieldsFirst` when a stable identifier
+must come before the title. `short` is the row at the width of an icon rail, a few characters such
+as a ticket key or an HTTP verb. A row with neither `short` nor `icon` gets a dot and a tooltip. Two
+places in `client-core/host/chrome/chromeData.ts` rebuild a rail row field by field from an
+allowlist, so a field added to `PluginRailItem` must be added to both, or it's dropped silently.
 
-```json
-{
-  "contributions": {
-    "refResolvers": [{
-      "id": "linear-refs",
-      "kind": "linear.issue",
-      "resolve": "/v1/p/linear/issues"
-    }]
-  }
-}
-```
+A source can offer a panel area beside its list instead of a detail pane: a dashboard the person
+composes, under constraints the source declares in `panels`
+([placements](../dashboards/placements.md)). A source declaring both `panels` and a `navigate`
+`onSelect` is a parse error, because the detail half of the browse is drawn in that rectangle.
 
-The host POSTs `{ identifiers }`, count-capped, and parses the answer as
-`[{ identifier, label, state?: { name, color, kind }, url? }]`
-(`@acorn/protocol/refResolvers.ts`). `providerId` is **not** in the body — the host stamps it from
-the plugin whose route answered, the same rule that stops a recogniser claiming another provider,
-because a row that could name its own provider could publish a stranger's items behind a stranger's
-reference panel. A consumer addresses a resolver by provider and never by route
-(`refResolutionsOptions` in `client-core/host/registries/panes/refResolvers.ts` owns the query key and a
-five-minute staleness for every provider alike), so a surface enriches Linear and a tracker nobody
-has written yet with the same call.
+A device-held source uses `tree: { list, detail }` instead of a route ([device-held
+plugins](./client-half.md#device-held-plugins)). The list's mount props carry `collapsed`, which is
+`true` while the reader has the list at icon width. Give each row a `collapsedIcon` and a `label`
+for its tooltip then, and leave out headers and toolbars.
 
-The response vocabulary is deliberately a label and a state chip, and should stay that way. Every
-field added here is a field *every* provider's answer gets rendered with, which is the descriptor-tier
-slope this tier has declined more than once. The route spends provider credentials on a cache miss,
-and is already behind `requireProviderAccess` through the provider mount — that gate is the
-authorisation, the identifier cap is the budget, and neither replaces the other.
+## Content links
 
-A `dataSources` entry extends the descriptor tier from scalar facts to structured records. The
-plugin declares its schema, query capabilities, identity scope, and Node-owned handler. The host
-binds provenance, validates responses, and supplies the shared query editor and dashboard views.
-Dynamic catalogues use `dataSourceDiscoveries`; they do not depend on a client cache or an initial
-record read. Compiled plugins register the same descriptors through `ctx.dataSources`, and both
-carriers enter one Node registry. For the schema, operations, limits, provider scoping, and examples,
-see [Typed data sources](../data-sources.md) and [The manifest](../plugin-authoring/the-manifest.md).
+A `contentLinks` entry uses a bounded `https://` host and path grammar and delivers one captured path
+segment to one of three destinations:
 
-A `schedules` entry is the one descriptor that acts **when nobody is watching**. It names a route in
-the plugin's own namespace, a cadence from the vocabulary in [schedules.md](../schedules.md), and an
-optional timeout in seconds; the node's one scheduler POSTs `{ scheduleId }` to that route on that
-cadence with no client open, and ignores the answer beyond ok/error — a schedule is not a data
-channel. At most four, because a package with more than a handful of distinct periodic jobs is
-describing a daemon and the daemon here is the node.
+- A task-scoped `openPane` from the same manifest, which receives it as a `plugin:select` intent in
+  the active task.
+- The plugin's own reference panel, shown over whatever the reader was looking at.
+- The plugin's own route, for a compiled recognizer that declares a `path` resolver.
 
-```json
-{
-  "contributions": {
-    "schedules": [{
-      "id": "refresh-mirror",
-      "name": "Refresh issue mirror",
-      "run": "/v1/p/linear/schedules/refresh-mirror",
-      "cadence": { "every": 600 },
-      "timeout": 120
-    }]
-  }
-}
-```
+A link must have a pane or a panel, or the manifest is rejected. The grammar is exact-arity, with no
+trailing wildcard, so a URL shape with an optional last segment needs one entry per arity.
 
-A manifest declaring one must declare a `node` half — only a node half serves that namespace, so a
-client-only package's schedule would fire forever against a 404, and that is a parse error rather
-than a run row that fails every hour. The cadence floor for a plugin is 300 seconds and is enforced
-on read from the registry key, not restated in the manifest: below that a schedule is a poll, and
-polling is a client's job for a person who is present.
+The clicking surface picks the destination: a pull-request conversation asks for the panel, a note
+takes the pane, a dashboard row asks for the route. Each is a preference, and the host falls through
+the other two in a fixed order when the one asked for is missing. The panel is never named. The host
+stamps the plugin id onto every recognizer and resolves the panel by provider, so a manifest can't
+point a link at another plugin's panel. Taking a route also selects the rail source that owns it.
 
-It joins the trust dialog's **Declared** group — "Run *Refresh issue mirror* on the node every 10
-minutes, with nobody watching" — and is recorded with the decision, so a version that moves from
-daily to every five minutes reads as newly requested. Disclosure, not new capability: the run route
-is one the plugin already owns and could already reach from any of its surfaces. What changes is
-*when*, and that is exactly what the line says.
+## Routes
 
-A compiled plugin has no manifest to declare from, so it registers node-side instead, in `init`:
-`ctx.schedules.register({ scheduleId, name, cadence, timeout?, run })`, where `run` takes the run's
-`AbortSignal`. Both feeders land on the same registry under the same `<pluginId>:<scheduleId>` key,
-and the host owns removal — declaring the schedule *is* the lifecycle, so a `setInterval` in plugin
-node code is a review flag. The lifecycle table (what survives a disable, an uninstall, a manifest
-that drops an id) is in [schedules.md](../schedules.md).
+A `routes` entry gives a project-scoped surface a URL. Its `path` is confined at parse time to the
+prefix the host mints from the plugin id, `/p/:projectId/x/<plugin-id>/`, so it can't claim core's
+paths or another plugin's. It names a project-scoped `surface` from the same manifest and one `item`
+parameter of its own path. The host does the matching and supplies the value.
 
-One trap worth naming: a manifest-declared schedule on a dev-installed package needs the package
-**rebuilt** before the node sees it. Reconciliation will not do it, and the symptom is a plugin that
-reloads fine and schedules nothing.
+A source's `onSelect: { "verb": "navigate", "surface": … }` changes that URL from a clicked row. The
+URL is where a project-scoped surface keeps its selection, because it has no layout state. A route
+addresses an item inside a surface and never gates whether the surface renders, because the rail
+selects a source by signal and doesn't navigate.
 
-Typed sources follow the same two-carrier lifecycle. A compiled plugin calls
-`ctx.dataSources.register` or `ctx.dataSources.discover`; the host synthesises the same registrations
-from a loaded plugin's manifest. The registry owns cleanup on reload and disable. Node consumers,
-including unattended dashboard sampling, invoke that registry rather than a client callback. For
-the complete API, see [Typed data sources](../data-sources.md).
+## Action verbs
 
-**Node actions have no `ctx` member.** Which of this plugin's actions a person may put on a schedule
-is declared in the manifest, as a **command** whose verb is `runNodeAction`, and the host replays
-that through a host-only seam (`HostPluginContext` in `server/pluginHost/types.ts`). Declaring nothing
-means none of this plugin's actions can be scheduled, which is the right default for most of them;
-an action that declares no `risk` is treated as `execute`, so the omission fails safe rather than
-quiet. It sat on `NodePluginContext` until 2026-08-27, where it read as something an author writes,
-and across 21 plugins nobody ever did.
+A descriptor hands the host a verb from a closed set, and the host runs it. The full set belongs to a
+rail source's `onSelect`, the one click site with a selected row, a routed project, and the host's
+promotion callback in scope ([the action verbs](../plugin-authoring/contributions.md#the-action-verbs)).
 
-A `themes` entry is the descriptor tier taken to its limit: a **colour** theme with no route, no
-bundle and no CSS, declared as a map of the 22 palette tokens plus a `dark` flag. The host validates
-the map and generates the `:root[data-theme="plugin:<id>:<theme>"]` block itself, so nothing a plugin
-wrote is ever parsed as a stylesheet — which is why this seam needed no new trust boundary. A theme
-cannot express shape, density or layout, cannot restate a derived token, and cannot set the three
-self-description tokens (the host writes those from `dark`). Both ends validate: the node at parse
-time so an author sees the error at install, the client again before generating CSS because a roster
-row is bytes a node sent. The token contract, the value grammar and what happens to a stored
-preference when the owning plugin disappears are in `docs/ui-design.md § Plugin themes`.
+Commands, slot badges, context-menu rows, and a source's `emptyState` take the narrow set:
+`openPane`, `openTask`, `runNodeAction`, `openUrl`, `openOverlay`, and `surfaceAction`. `createTask`
+needs a selected row, and `navigate` needs a routed project. A `search` command's `onSelect` also
+takes `navigate`, because picking a row supplies both halves of the address.
 
-```json
-{
-  "contributions": {
-    "themes": [{
-      "id": "nightfall",
-      "label": "Nightfall",
-      "dark": true,
-      "tokens": { "--bg": "#12121a", "--text": "#dcd7ff", "…": "…" }
-    }]
-  }
-}
-```
-
-
-## The tree contract
-
-What actually crosses the port, for anyone reading `packages/protocol/src/tree/` or writing a second
-host. It is the tree half of the same story `frames/verbs.ts` tells for the bridge: one list both ends
-compile against, and neither end may reach for the other's copy. Nothing in it names the DOM, which is
-what lets a terminal renderer apply the same mutations to a cell buffer.
-
-**A second host exists and does exactly that.** `acorn`, the terminal client
-([tui.md](../tui.md)), applies these five mutations to cells (`apps/tui/src/plugins/TreeHost.tsx`). The rules are not written twice: the store,
-the whole-batch pre-flight check, the prop sanitiser and the one place a handler id becomes a closure
-are `packages/client-core/src/host/tree/treeState.ts`, which both hosts import, and each host owns only
-its shell — a table of components per node name, its quiet failure boundary, and when a batch flushes.
-What differs in the sandbox behind it is the realm and nothing else: a Web Worker under a CSP on the
-desktop, a
-`node:worker_threads` thread under `--permission` in a terminal, the same two ports and the same
-handshake either way (`docs/security.md § Rung 0 — The client sandbox`).
-
-**A host's table maps a name to a component or to a loader.** A tree names types, so each host keeps a
-table from a kit node name to the thing that draws it
-(`packages/client-core/src/host/tree/components.ts`, `apps/tui/src/kit/components.tsx`). Cheap
-primitives are the component; the heavy names — the diff viewer, the diff rows, `Markdown`, `Timeline`,
-`ModelBackendPicker` — are a loader, because a table that holds every value puts every value in the
-chunk that holds the table, and the DOM host's table is fetched on every cold window whether or not a
-loaded plugin exists (`packages/client-core/src/host/tree/kitEntry.ts` says which and why). Each root
-is drawn under a `Suspense` with a `null` fallback, so **a tree that names a heavy node draws nothing
-for one frame and then draws it**. Nothing else changes: the mutations, the caps and the events below
-are the same either way, and a plugin cannot tell which entry answered.
-
-**A node is `{ id, type, props, children }`.** `type` is a kit node name. `id` is minted by the
-sandbox adapter and is stable for the node's life; it is what events and patches address. `props` is a
-plain object. Text is its own node (`#text`), never an attribute, so the wire has one node shape
-rather than two. A prop cannot contain more UI: a shell component may accept a JSX-valued slot such
-as `Tabs.actions`, but a remote tree spells that control as an ordinary child or sibling node. The
-sandbox copies JSON data out of framework proxies before posting it, leaves out a field whose value is
-`undefined` the way `JSON.stringify` does, and drops a prop containing a function, cycle or class
-instance, so one bad prop cannot stop the shared plugin worker. A kit node reads its props
-defensively for the same reason: the host validates them one at a time and draws the node without the
-ones it refused, so a node that throws on a missing prop would take its whole region down.
-
-**Five mutation kinds, in a coalesced batch** — per animation frame on the desktop, per timer turn in
-a terminal, which is the host's decision rather than the protocol's: `insert(parent, index, node)`, `remove(id)`,
-`patch(id, props)`, `move(id, parent, index)`, `text(id, value)`. `parent: null` addresses the slot's
-root. A batch applies atomically or is dropped whole with a row on the plugin's page — half a batch is
-a tree the sandbox never described.
-
-The check that decides is a simulation: the host projects the batch against a copy of the parent map
-and a child index built once, so an op is judged against the tree the ops before it in the same batch
-would have left. A `remove` takes its whole subtree out of that projection by walking down the index,
-which means a batch costs its own ops rather than the tree it is applied to — emptying a tree at the
-5,000-node cap is 71 ms rather than the 1.1 seconds the earlier scan-every-node walk took
-(measured 2026-09-03).
-
-After simulating all operations, the host walks the final projected tree once to check every node's
-depth, including descendants of moved subtrees. Unknown nodes and cycles refuse the whole batch.
-Ancestor checks stop at the depth cap. A batch may temporarily deepen descendants before moving or
-removing them again, because rendering sees only its validated final state. Subtree deletion uses an
-iterative walk, so cleanup does not recurse through a temporary deep tree.
-
-**Twelve events, host to sandbox**: `onPress`, `onChange` (the committed value), `onSubmit`,
-`onSelect`, `onActivate`, `onToggle`, `onOpenChange`, `onExpand`, `onDismiss`, `onPick`, `onRemove`,
-`onConfirm`.
-Never a key and never a pointer event, because a terminal host has neither and has to be able to map
-its own keys onto these twelve names. A prop whose name is in the list carries a handler id; a prop
-whose name starts with `on` and is not in the list is dropped.
-
-**Lifecycle** is `tree:mount(slot, entry, props)` and `tree:unmount(slot)` from host to sandbox, with
-`tree:ready`, `tree:batch` and `tree:failed` coming back, plus a ping. One worker serves many trees —
-a tool card per call, a section per tray — so every message names its slot. A second `tree:mount` for
-a slot already mounted is a props update, which keeps a tool card's redraw one message rather than a
-teardown.
-
-**One message expects an answer**: `tree:host-request(slot, id, op, name, payload)`, replied to with
-`tree:host-reply(slot, id, ok, body | error)`. Two operations and no more — `owner.invoke` calls an
-action the point's owner declared, `overlay.open` presents this contribution's companion overlay — and
-neither is a dispatcher; [Asking the owner](cooperative-extension-points.md#asking-the-owner) has what each one grants. `id` is the
-sandbox's own sequence and the host only quotes it back, exactly as the bridge's request ids work one
-rung up. A payload or a reply body over 64 KiB is refused, eight may be outstanding per slot, and an
-owner has ten seconds to answer. The failure arm is a code and a sentence, never a host stack.
-
-This request rides the tree channel because its slot is the host's authority for the extension point.
-The host binds the request to the channel and slot that mounted it; plugin code supplies no authority
-identifier. Other SDK calls use a separate bridge port and context for each mounted tree, so two trees
-sharing one worker do not share document, scope, focus, or gesture authority. Selection and surface
-actions target a slot; appearance updates reach every live slot. An older SDK without the per-tree
-bridge handshake may mount only one tree in a worker.
-The host validates the slot generation before admission and publication. A retired slot's held
-result cannot reach another slot that reused its id.
-
-**Every message is validated**, because the host is the only thing between a stranger's code and the
-shell's DOM:
-
-- `type` has to be a node this build knows and can draw on this host. Anything else is omitted, so an
-  optional contribution cannot replace its owner's UI with an error.
-- A prop value is a handler id or plain JSON, bounded to 16 levels, 10,000 values and 1 MiB of
-  characters. `class`, `className`, `style`, `classList` and nested host handles such as `item` and
-  `drag` are refused outright. A role prop carrying a raw colour is refused, and a function cannot
-  cross because it is not JSON. A failing prop is dropped, the node still renders, and the row says
-  which prop.
-- Text is set as text. `Markdown` goes through the shell's own markdown policy. A tree may put only an
-  explicit HTTPS URL in an `href` prop; the kit validates every rendered anchor again. Programmatic
-  navigation uses `bridge.ui.openUrl` under the same focus and URL policy as a frame.
-- **Caps**, in `TREE_LIMITS`: 1 MiB and 4,000 mutations per batch, 5,000 live nodes and 64 levels of
-  depth per tree, 65,536 characters in one text node, 512 live or reserved tree slots per bundle, across its authority contexts. The byte cap is sized like
-  the state channel's 1 MiB per value: generous for anything honest, small enough that a bundle cannot
-  use the renderer as a memory bomb. The host checks message depth and size before recursive parsing
-  and measures batch bytes itself instead of trusting the sandbox's `bytes` field. Past a cap the batch
-  is dropped and recorded.
-- **Pending updates**: the host checks the combined queue before appending each incoming batch.
-  The queue has the same 4,000-mutation and 1 MiB limits, measured as UTF-8 JSON bytes. Overflow clears
-  the whole queue, cancels its scheduled flush, records one refusal, and fails that mounted tree.
-  Later updates to that mount are ignored. Remount the tree to establish a fresh state agreement.
-  Disposal also clears the queue, and callbacks already in delivery cannot apply updates afterward.
-- **Scheduling**: batches coalesce per animation frame on the desktop and per timer turn in the
-  terminal. A hidden desktop window flushes on a zero-delay timer. A visible window also has a
-  100 ms timer fallback if its animation frame stalls.
-
-The version travels in the handshake (`TREE_PROTOCOL_VERSION`), and a mismatch leaves the contribution
-empty rather than crashing the host. `packages/protocol/src/tree/nodes.ts` carries the node names, the
-twelve events and the role enums as plain constants with no Zod on them, because that file is bundled
-into a stranger's
-plugin; `messages.ts` holds the schemas the host parses with. The lists are duplicated from
-client-core's kit, which owns them, and a test over there fails the moment the two disagree.
-
-The sandbox includes one shared modern worker per accepted `(pluginId, hash)` and separate
-slot-affine legacy workers. Its environment, refusals, and failure behavior are described in
-`docs/shell.md § The plugin worker`.
-
-### Mounted bridge ownership and SDK compatibility
-
-The additive `treeSlotBridge: 1` and scoped-bridge handshakes keep the bridge and tree protocol
-versions unchanged. A capable SDK receives a bridge port on each initial `tree:mount`, and
-`TreeRender(bridge, mount)`
-receives that slot's bridge. Props updates reuse its port. Unmount removes subscriptions and pending
-requests, rejects held requests with `unmounted`, closes the port, and releases the remote root.
-Handler dispatch retains only callbacks referenced by nodes attached to that root.
-
-The bundle bootstrap has immutable initial metadata but no privileged API, state, document, or UI
-services. A capable SDK's global `connect()` reports `treeBridgeMode: 'bootstrap'`; use the bridge
-passed to `TreeRender` to construct services and models. Global context describes bootstrap metadata,
-not the authority of a subsequently mounted slot.
-
-| SDK and host | Bridge ownership |
-| --- | --- |
-| Capable SDK and capable host | One bundle worker, one privileged bridge per mounted slot. |
-| Legacy SDK and capable host | One immutable, slot-affine worker per mounted tree. |
-| Capable SDK and legacy host | Usable global bridge with `treeBridgeMode: 'legacy'` and a warning; the host's first-context limitations remain. |
-| Legacy SDK and legacy host | The host's global first-context behavior remains. |
-
-A legacy SDK cannot replace its module-global bridge or prove which equivalent tree produced an
-API request or trusted gesture. Each legacy worker therefore mounts one tree under immutable
-plugin/hash, QueryClient, Node, surface/target, task/project, permissions, document grant, and opening
-item authority. Equivalent concurrent trees use separate workers; their focus and gesture contexts
-never combine. The last lease terminates its worker immediately, with no idle legacy worker.
-
-Classification promotes the same detection worker on the legacy `connected` acknowledgement or its
-first bridge API request. Awaited top-level legacy API work executes once per admitted slot-affine worker.
-A retired detection authority is terminated before a replacement uses surviving metadata; it is never
-rebound to another document or Node. Modern workers retain warm modules for 30 seconds, with at most
-16 idle bundle workers. Historical capability hints are capped at 256 plugin/hash identities. Eviction does not affect
-live workers, and a live exact identity takes precedence over a missing hint.
-
-Each plugin/hash identity admits at most 512 live or reserved slots. Modern slots share one worker. Up to
-512 legacy trees need 512 workers, including equivalent contexts. This stricter per-tree authority
-policy preserves compatibility at additional process cost and provides no legacy memory gain. A detector occupies an admitted lease, rather than adding an
-unbounded extra pool. The terminal factory owns native termination settlement before constructing a
-same-hash replacement, while preserving live foreign contexts.
-
-A registered composed layout captures its QueryClient's Node before lazy regions mount. It consumes
-its opening `plugin:select` once and shares that immutable opening item across its regions; routed item
-props and subsequent selection events remain reactive. Only an actual document region grants document
-access. Delayed initial handle arrival preserves the grant; withdrawal or replacement advances its
-generation and permanently denies bridges admitted under the previous generation.
-
-These ownership guarantees cover API, cache, document, focus, and teardown. The renderer presentation
-bus still addresses pane intents by task/pane, and plugin frame channels follow the selected Node
-without a Node parameter on each subscription. They retain the selected-Node composition boundary.
-
-SDK bundles that embed the earlier remote-root implementation retain its callback bookkeeping until
-rebuilt. Host ownership repair cannot replace code embedded in accepted legacy bundle bytes.
-
-## One shared eligibility and trust check
-
-Both registration passes (frames and chrome) need the same answer to "who may contribute, and what did
-they declare": identity and trust. That answer used to be written out twice, in `frames/register.ts`
-and `chrome/register.ts`, including a byte-identical task-pane predicate that feeds the `openPane`
-allowlist, the list deciding which pane ids a sandboxed frame may ask the host to open. A security
-check maintained in two copies, connected by nothing, fails silently in whichever direction an author
-updates only one of them, and `tsc` stays quiet because each copy is locally consistent on its own.
-`packages/client-core/src/host/plugins/contributions.ts` now owns that shared half; the passes keep their
-own job, rendering a sandboxed iframe versus registering a command.
-
-`eligiblePlugins()` reads the active Node's observation and pairs its running declaration with that
-Node's selected hash. An installed update on the same Node, or a newer version on a different Node,
-does not change those registrations. `trusted` is true only when custody has cached and accepted the
-exact client bytes matching the active runtime. A declaration with no client half can still contribute
-host-drawn descriptors. Command and keybinding metadata may remain visible for an inactive plugin so
-saved bindings are explainable, but invocation checks current availability. A stale or unreachable
-observation supplies no live contribution. The snapshot and its per-Node availability selector own
-the reasons a loaded contribution is withheld.
-
-Frames and chrome ask different-strength questions of the same row. Frames gate code-bearing surfaces
-on `trusted` outright. Chrome asks the weaker `hasWithheldCode`: does this package carry code the device
-has not been cleared to run? A descriptor-only package has no such code, so withholding its rail rows
-and commands would hide a plugin that executes nothing.
-
-`declaredSurfaces()` classifies a manifest's frames into three disjoint sets, kept apart because folding
-them together would let `openPane` accept an id it must not: `panes` (task-scoped, the only surfaces a
-task's layout can hold, and the `openPane` allowlist itself), `projectPanes` (a rail source's detail
-view, addressed by URL rather than held in a task's layout), and `overlays` (full-screen pickers that
-belong to no task at all). The task-scoped predicate is re-exported from
-`@acorn/protocol/plugin/contract.ts` rather than written a third time here, because the node's manifest
-parser checks the same thing when it validates that an `openPane` names a pane the manifest declares.
+`surfaceAction` is the one verb whose effect lands inside a plugin. It delivers the command's own id
+to a region of one of the plugin's panes. It may only name a pane from the same manifest that draws a
+frame or tree region, and it's useful only on a command, because what it delivers is the command id.
+In a `document-over-frame` pane, the host flushes the document before delivering it
+([surface actions](../editor/composed-panes.md#surface-actions)).

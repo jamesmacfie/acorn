@@ -12,7 +12,7 @@ const selects: ((item: string) => void)[] = []
 const actions: ((command: string) => void)[] = []
 // `context` is the host's snapshot at connect, and `item` in it is the row that OPENED the pane: a task
 // pane has no URL to hold a selection, so a click or the palette's curl import arrives this way
-// (docs/plugins.md § The tree contract).
+// (docs/plugins/tree-contract.md § The tree contract).
 const bridge = (item?: string) => ({
   context: { surface: 'http', target: 'remote', nodeId: 'node-a', authority: 'node-a/http', ...(item ? { item } : {}) },
   onSelect: (handler: (item: string) => void) => {

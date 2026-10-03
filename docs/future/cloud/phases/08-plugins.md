@@ -22,7 +22,7 @@ misconfigured plugin blocks launch with a reason before any spend.
 - Hardened workers from [phase 7](./07-isolation.md).
 - The installer, with hash-pinned installs from GitHub, npm, and tarballs, in
   `packages/node-core/src/server/plugins/installer.ts`.
-- The approval-mediated install review in [plugin activation](../../../plugins/activation.md#approval-mediated-install).
+- The approval-mediated install review in [plugin activation](../../../plugins/agent-install.md#approval-mediated-install).
 - Per-device trust of client bundles by plugin ID and hash.
 
 ## In scope

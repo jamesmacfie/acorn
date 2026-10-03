@@ -8,7 +8,7 @@ import { mapLimited } from '../../mapLimited'
 // page up to GitHub's ceiling. Both return a staged value; prMirror.ts swaps it into the mirror in one
 // batch, so a failure on any page leaves the previous mirror exactly as it was.
 //
-// A module with no `ctx` in reach, so the owner is stated here (docs/plugin-authoring.md §
+// A module with no `ctx` in reach, so the owner is stated here (docs/plugin-authoring/telemetry.md §
 // Telemetry and logging).
 const log = createLogger('github', 'github')
 

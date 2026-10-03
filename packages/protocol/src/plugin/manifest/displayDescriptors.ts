@@ -55,7 +55,7 @@ export const contentLinkDescriptor = z.object({
   // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
   // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
   // the two a click gets is the clicking surface's call, not the manifest's.
-  // See docs/plugins.md § Loaded plugins: the client half.
+  // See docs/plugins/client-half.md § Loaded plugins: the client half.
   openPane: z.string().min(1).max(64).optional(),
   item: z.string().min(1).max(32),
 })

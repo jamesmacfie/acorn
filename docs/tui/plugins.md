@@ -59,7 +59,7 @@ bridge or tree adopts the ports. It closes unclaimed ports when the import fails
 10-second handshake deadline. The shared host keeps only the latest pre-ready props per slot and
 reports a failed start after its 20-second construction deadline. For capability negotiation and the
 512-slot bundle budget, see
-[mounted bridge ownership](../plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility).
+[mounted bridge ownership](../plugins/remote-trees.md#mounted-bridge-ownership-and-sdk-compatibility).
 
 ### Reserved regions
 

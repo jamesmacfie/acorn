@@ -11,7 +11,7 @@ import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { restoreFocusOnCleanup } from '../../kit/keys/trap'
 
 // The host's chrome around a plugin reference panel: the backdrop, the box, the title and the
-// dismiss affordance (docs/plugins.md § Frame contribution kind).
+// dismiss affordance (docs/plugins/frames.md § Frame contribution kind).
 //
 // The overlay is the host's here, unlike a first-party panel that draws its own. Two reasons, both
 // structural rather than stylistic. A frame is an iframe: it cannot Portal out of the box the consumer

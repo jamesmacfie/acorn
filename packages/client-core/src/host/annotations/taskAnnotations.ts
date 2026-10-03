@@ -10,7 +10,7 @@
 // the hover legend, which is what the rail already does for core's own states and for docker's
 // (../tabs/railMarkers.ts). So this module is a rail-marker contribution rather than a draw site: a
 // plugin publishes facts about a task, and where they land on the row is the host's business
-// (docs/plugins/cooperative-extension-points.md § Task annotations).
+// (docs/plugins/rows-and-annotations.md § Task annotations).
 //
 // Registered at module scope, and the lazy-import property is the same feature ../registries/
 // scopeEviction.ts names: the rail is the only thing that imports this, so the point exists exactly

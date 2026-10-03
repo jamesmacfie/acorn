@@ -208,7 +208,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       if (command === 'execute') void execute()
     }))
     // The selection that opened this pane rides in `context`; every later one is a message
-    // (docs/plugins.md § The tree contract). Both land in the same signal.
+    // (docs/plugins/tree-contract.md § The tree contract). Both land in the same signal.
     setRequested(props.bridge.context.item)
     onCleanup(props.bridge.onSelect((item) => { selectionGeneration++; setRequested(item) }))
     void connect()

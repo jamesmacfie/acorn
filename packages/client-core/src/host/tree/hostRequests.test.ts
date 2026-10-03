@@ -4,7 +4,7 @@ import type { FrameBridge } from '../frames/broker'
 import { _setWorkerFactory, _stopAllTreeWorkers, acquireTreeWorker, type TreeHostResult } from './workerHost'
 
 // What a mounted tree may ask the host for, and everything the host refuses
-// (docs/plugins.md § Asking the host).
+// (docs/plugins/tree-contract.md § Asking the host).
 //
 // The half tested here is the routing and the limits: which slot a request is answered on, what happens
 // when nobody is listening, and the four ways a request is refused before an owner ever sees it. Who is

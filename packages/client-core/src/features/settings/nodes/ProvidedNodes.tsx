@@ -25,7 +25,7 @@ import { useUnsavedChanges } from '../unsavedChanges'
 import '../../fleet/nodes.css'
 
 // Settings → Nodes, second half: the nodes a plugin's node provider knows about, and the four
-// lifecycle verbs (docs/plugins.md § Node providers).
+// lifecycle verbs (docs/plugins/node-providers.md § Node providers).
 //
 // Beside the paired list rather than on Fleet home, because Fleet home only appears once more than one
 // node is paired, and the first cloud node someone adopts is adopted while exactly one node exists.

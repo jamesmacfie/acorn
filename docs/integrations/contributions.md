@@ -58,7 +58,7 @@ routes refuse task-scoped callers the credential.
 ## The row menu
 
 Every integration list draws the same overflow menu on a row, from the context menu registry's
-`item.row` location ([context menus](../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#context-menus)).
+`item.row` location ([context menus](../plugins/menus-and-markers.md#context-menus)).
 Core's rail list draws it for Linear and Rollbar, and the GitHub pull request list draws its own, both
 filled from one registry. **Create task** is core's, or GitHub's for a pull request. **Start
 workflow…** is the workflows plugin's ([starting a run](../workflows/starting-runs.md#starting-a-run)).

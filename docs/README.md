@@ -107,11 +107,11 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | --- | --- |
 | [plugin-map.md](./plugin-map.md) | **Read this first.** The orientation map: every surface a plugin can reach, one line each, with two worked examples. |
 | [extensibility.md](./extensibility.md) | The reasoning: why two tiers, where the line is, and which constraints are deliberate. Read before widening a seam. |
-| [plugins.md](./plugins.md) | Topic index for package layout, APIs, lifecycle, UI, and collaboration. |
+| [plugins.md](./plugins.md) | The plugin reference: package layout, the API, lifecycle, UI, extension points, and collaboration. |
 | [plugin-authoring.md](./plugin-authoring.md) | Third-party authoring guide, manifest reference, and examples. |
 | [contribution-kinds.md](./contribution-kinds.md) | The table of every contribution kind and its two carriers. Test-enforced. |
-| [first-party-plugins.md](./first-party-plugins.md) | Which first-party plugins have to be, and which are only first-party by history. |
-| [loaded-plugin-migration.md](./loaded-plugin-migration.md) | The record of moving plugins out of the binary: what each move cost and what it found. |
+| [first-party-plugins.md](./first-party-plugins.md) | Which compiled plugins have to be first-party, and the reason for each. |
+| [loaded-plugin-migration.md](./loaded-plugin-migration.md) | A pointer only. The migration record was deleted on October 4, 2026, and lives in Git history. Its open items are in [the compiled tier](./future/compiled-tier.md). |
 
 ## Building, running, shipping
 
@@ -302,25 +302,49 @@ Update this index when adding a page. `tools/arch/docPaths.test.ts` checks file 
 links, and `tools/arch/docCitations.test.ts` checks the source comments that cite a doc. Review the
 implementation to verify API signatures and behavior.
 
-## Plugin reference topics
+## Plugin topic pages
 
-### Plugin contracts
+Each plugin landing page above has topic pages in a folder of the same name:
 
-- [Activation](./plugins/activation.md)
-- [Client authoring and the UI kit](./plugins/client-authoring-and-the-ui-kit.md)
-- [Cooperative extension points](./plugins/cooperative-extension-points.md)
-- [Descriptors for facts, trees for UI, rectangles for pixels](./plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md)
-- [Descriptors](./plugins/descriptors.md)
-- [Forward compatibility](./plugins/forward-compatibility.md)
-- [Frames](./plugins/frames.md)
-- [Node-side extension points](./plugins/node-side-extension-points.md)
-- [Package shape](./plugins/package-shape.md)
-
-### Authoring guides
-
-- [CLI commands](./plugin-authoring/cli-commands.md)
-- [Events and capabilities](./plugin-authoring/events-and-capabilities.md)
-- [Installing a hand-written package](./plugin-authoring/installing-a-hand-written-package.md)
-- [Start from the scaffold](./plugin-authoring/start-from-the-scaffold.md)
-- [The manifest](./plugin-authoring/the-manifest.md)
-- [The node half](./plugin-authoring/the-node-half.md)
+- [plugins.md](./plugins.md): [Activation](./plugins/activation.md), [Adding a plugin
+  contribution](./plugins/adding-a-contribution.md), [Agent installs and development
+  mode](./plugins/agent-install.md), [Client authoring and the UI
+  kit](./plugins/client-authoring-and-the-ui-kit.md), [The client half of a loaded
+  plugin](./plugins/client-half.md), [Collaboration rules](./plugins/collaboration.md), [Commands and
+  keybindings](./plugins/commands.md), [Cooperative extension
+  points](./plugins/cooperative-extension-points.md), [Data ownership](./plugins/data-ownership.md),
+  [Descriptors](./plugins/descriptors.md), [The dev loop](./plugins/dev-loop.md),
+  [Distribution](./plugins/distribution.md), [Document surfaces and
+  webviews](./plugins/document-surfaces.md), [Events](./plugins/events.md), [Forward
+  compatibility](./plugins/forward-compatibility.md), [Frames](./plugins/frames.md), [Keeping a
+  descriptor fresh](./plugins/freshness.md), [Harnesses](./plugins/harnesses.md),
+  [Hooks](./plugins/hooks.md), [Loaded plugins](./plugins/loaded-plugins.md), [Context menus and rail
+  markers](./plugins/menus-and-markers.md), [More descriptors](./plugins/more-descriptors.md), [Node
+  providers](./plugins/node-providers.md), [Node-side extension
+  points](./plugins/node-side-extension-points.md), [Package shape](./plugins/package-shape.md), [The
+  plugin API](./plugins/plugin-api.md), [Published packages](./plugins/publishing.md), [Remote
+  points](./plugins/remote-points.md), [Remote trees](./plugins/remote-trees.md), [Replacing a core
+  surface](./plugins/replacing-core-surfaces.md), [Rows and
+  annotations](./plugins/rows-and-annotations.md), [Search providers](./plugins/search-providers.md),
+  [Task checks](./plugins/task-checks.md), [The tree contract](./plugins/tree-contract.md), [Choosing
+  how a plugin draws](./plugins/ui-tiers.md).
+- [plugin-authoring.md](./plugin-authoring.md): [CLI command
+  authoring](./plugin-authoring/cli-commands.md), [A complete
+  example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),
+  [Custom agents](./plugin-authoring/custom-agents.md), [Events and
+  capabilities](./plugin-authoring/events-and-capabilities.md),
+  [Extensions](./plugin-authoring/extensions.md), [Harnesses](./plugin-authoring/harnesses.md),
+  [Install a hand-written package](./plugin-authoring/installing-a-hand-written-package.md),
+  [Permissions](./plugin-authoring/permissions.md), [Settings
+  pages](./plugin-authoring/settings-pages.md), [Start from the
+  scaffold](./plugin-authoring/start-from-the-scaffold.md), [Storage and
+  migrations](./plugin-authoring/storage.md), [Telemetry and logging](./plugin-authoring/telemetry.md),
+  [Testing a plugin](./plugin-authoring/testing.md), [The bridge](./plugin-authoring/the-bridge.md),
+  [The client half](./plugin-authoring/the-client-half.md), [The
+  manifest](./plugin-authoring/the-manifest.md), [The node half](./plugin-authoring/the-node-half.md),
+  [UI contributions](./plugin-authoring/ui-contributions.md).
+- [extensibility.md](./extensibility.md): [The node half and bundled
+  plugins](./extensibility/runtime.md), [UI and cooperation](./extensibility/ui-and-cooperation.md).
+- [first-party-plugins.md](./first-party-plugins.md): [Plugins to
+  copy](./first-party-plugins/examples.md), [First-party plugins in the
+  terminal](./first-party-plugins/terminal.md).

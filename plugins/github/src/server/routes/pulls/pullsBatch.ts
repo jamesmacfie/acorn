@@ -22,7 +22,7 @@ import { syncState } from '../../../node/schema'
 // response resource to hand back stale, so this always blocks. It shares the engine's TTL
 // (PULLS_STALE_AFTER_MS) and owns the per-item freshness gate below.
 // A route module with no `ctx` in reach, so the owner is stated here rather than bound by the host
-// (docs/plugin-authoring.md § Telemetry and logging).
+// (docs/plugin-authoring/telemetry.md § Telemetry and logging).
 const log = createLogger('github', 'github')
 
 const MAX_BATCH = 10 // the client sends ~5

@@ -216,7 +216,7 @@ export const plugins = new Hono<AppEnv>()
       return pluginState(bridge)
     })
   })
-  // Install, update, uninstall (docs/plugins.md § Loaded plugins). Owner surface, device-gated by
+  // Install, update, uninstall (docs/plugins/loaded-plugins.md § Loaded plugins). Owner surface, device-gated by
   // mount, never reachable with a task-scoped internal token (docs/security/credentials.md § Credential handling).
   //
   // Nothing here starts a plugin. Each answers "the disk says this", and the roster above turns that
@@ -225,7 +225,7 @@ export const plugins = new Hono<AppEnv>()
   // Every one of them broadcasts `plugins:changed`. Until 2026-08-28 only `/:id/reload` did
   // (server/plugins/reload.ts), so a second window kept a stale roster and a stale restart banner until
   // someone refetched by hand — one desktop and one node makes that an edge case, and a fleet makes it
-  // the normal one (docs/plugins.md § Hearing a core event). The frame is content-free: the client
+  // the normal one (docs/plugins/events.md § Hearing a core event). The frame is content-free: the client
   // re-reads the roster it can already fetch.
   .post('/install', async (c) => {
     const missing = requireIdempotencyKey(c)
@@ -296,7 +296,7 @@ export const plugins = new Hono<AppEnv>()
       return { ok: true }
     })
   })
-  // The one exception to "nothing here starts a plugin" (docs/plugins.md § The dev loop § Reloading
+  // The one exception to "nothing here starts a plugin" (docs/plugins/dev-loop.md § The dev loop § Reloading
   // one plugin without a restart). Loaded plugins only. A built-in is refused with the installer's own
   // 400 shape.
   .post('/:id/reload', async (c) => {
@@ -325,7 +325,7 @@ export const plugins = new Hono<AppEnv>()
       return result
     })
   })
-  // The owner's answer to an agent-raised request (docs/plugins.md § Approval-mediated install).
+  // The owner's answer to an agent-raised request (docs/plugins/agent-install.md § Approval-mediated install).
   // Device-gated by the same mount as everything above it, so the agent that raised the request cannot
   // reach this route to answer its own question.
   //

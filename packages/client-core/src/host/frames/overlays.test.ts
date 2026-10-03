@@ -9,7 +9,7 @@ import {
   pluginOverlayOpen,
 } from './overlays'
 
-// One overlay at a time, and exactly one answer per opening (docs/plugins.md § Companion overlays).
+// One overlay at a time, and exactly one answer per opening (docs/plugins/remote-points.md § Companion overlays).
 //
 // The property worth a suite is that nobody is ever left waiting. An overlay can be dismissed six ways
 // and answered one, and a remote tree awaiting `openOverlay` has to be resolved by every one of them —

@@ -10,7 +10,7 @@ import {
 } from '@acorn/plugin-api/testkit/client'
 import { AttachmentSlot } from './AttachmentSlot'
 
-// The composer's one extension point, rendered where it lives (docs/plugins.md § Cooperative
+// The composer's one extension point, rendered where it lives (docs/plugins/cooperative-extension-points.md § Cooperative
 // extension points, the `remote` kind). `Slot`'s arbitration is tested in client-core; what this adds
 // is the agents plugin's half — the key it passes is the media type, so a plugin that declared
 // `image/png` draws the `.png` and the composer's own chip draws everything else.

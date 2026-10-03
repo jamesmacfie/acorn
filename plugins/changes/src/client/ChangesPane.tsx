@@ -458,7 +458,7 @@ export function ChangesDiff(props: { task: Task; model: ChangesModel }) {
         fallback={<EmptyState title="No changes">Everything is committed.</EmptyState>}
       >
         {/* Marks from other plugins land under the same lines this pane's own review notes do
-            (docs/plugins.md § Cooperative extension points, the `annotation` kind). */}
+            (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind). */}
         <DiffPane source={model().source} annotations={DIFF_LINE_POINT} />
       </Show>
     </Show>

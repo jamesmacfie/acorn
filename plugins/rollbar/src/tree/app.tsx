@@ -135,7 +135,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
     void (async () => {
       // The subject comes from the mount props, not from `bridge.context`: one worker serves every
       // tree this bundle draws and therefore holds one bridge, so the context is the bundle's and the
-      // props are this slot's (docs/plugin-authoring.md § The client half).
+      // props are this slot's (docs/plugin-authoring/the-client-half.md § The client half).
       const selected = props.item ? parseRollbarRailItemId(props.item) : null
       if (selected) return load(selected)
 
@@ -178,7 +178,7 @@ export function RollbarPane(props: RollbarPaneProps & { bridge: AcornBridge }) {
   )
 
   // `split` with two column nodes rather than ListDetail's `list` prop: a tree's props are JSON on a
-  // message port, so an element cannot be one of them (docs/plugins.md § The tree contract). The
+  // message port, so an element cannot be one of them (docs/plugins/tree-contract.md § The tree contract). The
   // column only appears when there is more than one linked item, as it did before.
   return (
     <Show when={linkedTargets().length > 1} fallback={body()}>

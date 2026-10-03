@@ -42,7 +42,7 @@ export type NodeAttachmentState = {
 }
 export const coreAttachmentRoute = '/v1/core/attachment'
 
-// Nodes this node's plugins know about (docs/plugins.md § Node providers). The client fans this out
+// Nodes this node's plugins know about (docs/plugins/node-providers.md § Node providers). The client fans this out
 // over every reachable node and unions the answers, so a provider running on one node is visible from
 // a client sitting at another.
 //

@@ -1,5 +1,5 @@
 // What a manifest-declared hook handler actually does when the owner reaches its decision
-// (docs/plugins.md § Hooks).
+// (docs/plugins/hooks.md § Hooks).
 //
 // The same move ./taskCheckRun.ts and ./scheduleRun.ts make, for the same reason: a loaded plugin
 // declares its handler as a route rather than as a function, because a manifest is data and a manifest

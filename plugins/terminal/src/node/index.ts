@@ -57,7 +57,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
         ctx.capabilities.provide(TASK_CREATED, registrations.taskCreated),
       ]
       // The repo's setup script, as a handler on core's `core:worktree-created` hook rather than the
-      // single slot it used to fill (docs/plugins.md § Hooks). `transform` and not `observe` because
+      // single slot it used to fill (docs/plugins/hooks.md § Hooks). `transform` and not `observe` because
       // core awaits the chain: the terminal that opens next expects the setup to have finished, and an
       // observer runs alongside by design. The payload comes back untouched — there is nothing here to
       // change, only work to do before the caller carries on.
@@ -93,7 +93,7 @@ export const terminalPlugin = (deps: TerminalPluginDeps): NodePlugin => {
       // `run:changed` is a core event (@acorn/protocol/nodeEvents.ts) sent from here because terminal
       // holds the process, not because it owns the fact; the core-side spelling is
       // node-core/server/notify.ts § broadcastRunTargetChanged.
-      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a turn before a
+      // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a turn before a
       // process starts in a task's worktree.
       ctx.hooks.declare({
         id: 'before-run-target',

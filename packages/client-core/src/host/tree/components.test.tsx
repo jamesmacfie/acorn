@@ -7,7 +7,7 @@ import { kitComponent, type KitEntry } from './kitEntry'
 
 // The DOM host's kit table: every node in the kit has an entry, and the entries that would drag a
 // feature or a highlighter into the first paint are loaders rather than components
-// (docs/plugins.md § The tree contract).
+// (docs/plugins/tree-contract.md § The tree contract).
 //
 // The heavy list is this test's, not the table's, which is the point of writing it down twice. A
 // heavy component added to the table eagerly fails here, with the name in the message, before it

@@ -1,7 +1,7 @@
 // Test-only helper. See testkit/db.ts for why this directory exists.
 //
 // Validate a plugin's `acorn-plugin.config.mjs` against the real manifest schema, at test time
-// (docs/plugins.md § The dev loop). Without it, a malformed config surfaces only by running the
+// (docs/plugins/dev-loop.md § The dev loop). Without it, a malformed config surfaces only by running the
 // builder, or at the next boot, where the loader skips the package and says so in a console line a
 // packaged app shows to nobody.
 import { existsSync, readFileSync } from 'node:fs'
@@ -12,7 +12,7 @@ import { PLUGIN_API_MAJOR, parsePluginManifest, type PluginManifestResult } from
 
 export const PLUGIN_CONFIG_FILE = 'acorn-plugin.config.mjs'
 
-/** Run the manifest schema over a plugin's build config (docs/plugins.md § What is published, and
+/** Run the manifest schema over a plugin's build config (docs/plugins/publishing.md § What is published, and
  * what acorn promises about it).
  *
  * Pass the path to the config file, or to the directory holding it. Never throws: a config that
@@ -42,7 +42,7 @@ export async function validatePluginConfig(configPath: string): Promise<PluginMa
     return { ok: false, reason: `${PLUGIN_CONFIG_FILE} could not be imported: ${error instanceof Error ? error.message : String(error)}` }
   }
 
-  // The directory name is the plugin id (docs/plugins.md § Loaded plugins). It binds the route
+  // The directory name is the plugin id (docs/plugins/loaded-plugins.md § Loaded plugins). It binds the route
   // namespace, the provider ids and the task origins, so the config carries no second copy to
   // disagree with.
   const dir = dirname(file)

@@ -704,7 +704,7 @@ export function resetTelemetryForTest(): void {
 
 // ── The owner-bound projection ────────────────────────────────────────────────────────────────────
 
-/** What `ctx.telemetry` is (docs/plugin-authoring.md § Telemetry and logging). The owner is closed
+/** What `ctx.telemetry` is (docs/plugin-authoring/telemetry.md § Telemetry and logging). The owner is closed
  *  over by the host, so every verb on it files under the plugin the context belongs to. */
 export type PluginTelemetry = {
   /** Whether anything is collecting. For a sample that costs something to take, such as listing

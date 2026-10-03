@@ -30,5 +30,5 @@
 .annotation-mark-text { min-width: 0; overflow-wrap: anywhere; }
 
 /* The stamp. Not a decoration and not shortenable to an icon, for the reason the row groups' owner
-   label is not (docs/plugins.md § Cooperative extension points). */
+   label is not (docs/plugins/cooperative-extension-points.md § Cooperative extension points). */
 .annotation-mark-owner { font-size: var(--fs-xs); flex: 0 0 auto; }

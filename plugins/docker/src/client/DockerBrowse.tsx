@@ -167,7 +167,7 @@ export default function DockerBrowse() {
 
   // Every container on screen, asked about in one request per contributor. The effect re-runs when
   // the list does; `requestAnnotations` compares the key set and does nothing when it has already
-  // asked (docs/plugins.md § Cooperative extension points, the `annotation` kind).
+  // asked (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `annotation` kind).
   createEffect(() => {
     requestAnnotations(CONTAINER_POINT, filtered().map((c) => ({ container: c.id })))
   })

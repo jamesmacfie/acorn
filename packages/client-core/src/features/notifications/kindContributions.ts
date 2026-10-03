@@ -12,7 +12,7 @@ export const noticeKindContributions: NoticeKindContribution[] = [
   { id: 'run-failed', glyph: 'triangle-alert', severity: 'danger', toast: true },
   { id: 'background-error', glyph: 'triangle-alert', severity: 'danger', toast: false },
   { id: 'repo-config-trust', glyph: 'triangle-alert', severity: 'warn', toast: true },
-  // An agent asked for a plugin to be installed, updated or removed (docs/plugins.md §
+  // An agent asked for a plugin to be installed, updated or removed (docs/plugins/agent-install.md §
   // Approval-mediated install). `toast: true` because it's a question waiting on the owner, and unlike
   // the plugin-authored `plugin` kind below, its title is written by acorn and names no agent text.
   { id: 'plugin-request', glyph: 'puzzle', severity: 'warn', toast: true },

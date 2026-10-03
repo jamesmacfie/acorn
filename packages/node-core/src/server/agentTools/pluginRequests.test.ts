@@ -84,7 +84,7 @@ describe('the owner’s answer', () => {
     decidePluginRequest(pending.requestId, { decision: 'approved', message: 'board 1.0.0 is installed.' })
 
     expect(await call(tool, args)).toEqual({ state: 'approved', message: 'board 1.0.0 is installed.' })
-    // Spent (docs/plugins.md § Approval-mediated install): a second identical call is a new question,
+    // Spent (docs/plugins/agent-install.md § Approval-mediated install): a second identical call is a new question,
     // not a second use of the yes already given.
     await expect(call(tool, args)).rejects.toMatchObject({ kind: 'needs-trust' })
     expect(pendingPluginRequests()).toHaveLength(1)

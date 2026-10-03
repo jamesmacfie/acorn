@@ -11,7 +11,7 @@ import { activeTaskId } from '../../../features/tasks/tasks'
 //
 // It draws no chrome of its own, no backdrop, no header, no dismiss button, because a panel already
 // brings all three: a manifest-declared panel is wrapped in the host's overlay classes and owns the
-// close affordance, a first-party panel component draws its own (docs/plugins.md § "Loaded plugins:
+// close affordance, a first-party panel component draws its own (docs/plugins/client-half.md § "Loaded plugins:
 // the client half"). Adding a second wrapper here would letterbox one and double-frame the other.
 export function RefPanelHost() {
   return (

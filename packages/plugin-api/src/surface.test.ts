@@ -5,7 +5,7 @@ import { expect, it } from 'vitest'
 // This private workspace facade is consumed as source by compiled plugins. Pin its exported names so
 // a barrel edit is visible in review. Its snapshot has no loaded-plugin API major: removing a
 // compiled-only export does not change the published SDK, declarations, or manifest contract. See
-// docs/plugins/package-shape.md § The plugin API for the two compatibility boundaries.
+// docs/plugins/plugin-api.md § The plugin API for the two compatibility boundaries.
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 

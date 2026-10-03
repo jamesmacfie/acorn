@@ -16,7 +16,7 @@
 // What is refused belongs on the record next to what is offered: there is no uncooperative extension.
 // Nothing here lets B alter A's UI or behaviour without A's declared consent, no DOM access into another
 // realm, no patching another plugin's registrations, no reading another plugin's routes. A point that A
-// did not declare simply has nothing delivered into it. See docs/plugins.md § Cooperative extension
+// did not declare simply has nothing delivered into it. See docs/plugins/cooperative-extension-points.md § Cooperative extension
 // points and § There is no uncooperative extension.
 
 // These host extension props are small portable projections. The full agent event and usage models
@@ -58,7 +58,7 @@ export type AgentHeaderUsage = {
 
 /**
  * What a point lets somebody else bring. Five kinds, one manifest key, the same four rules
- * (docs/plugins.md § Cooperative extension points).
+ * (docs/plugins/cooperative-extension-points.md § Cooperative extension points).
  *
  *   rows        records the host draws with its own `Row`. Shipped first, and still the default.
  *   annotation  facts pinned to items the owner already draws: a mark on a diff line, a container.
@@ -76,7 +76,7 @@ export const isExtensionPointKind = (value: unknown): value is ExtensionPointKin
   typeof value === 'string' && (EXTENSION_POINT_KINDS as readonly string[]).includes(value)
 
 /**
- * Every place the host will draw a point's contributed items. See docs/plugins.md § Cooperative
+ * Every place the host will draw a point's contributed items. See docs/plugins/cooperative-extension-points.md § Cooperative
  * extension points for the full argument; what each contributor may put there, and why position is
  * encoded in the name rather than in an orientation knob, are covered there.
  *
@@ -106,7 +106,7 @@ export const kindNeedsLocation = (kind: ExtensionPointKind): boolean => kind ===
  *   replace  exactly one: the best match for the key the owner passed, else the owner's default.
  *
  * Applies to `remote` and `rectangle`. Rows already stack by construction, an annotation is a fact
- * rather than a seat, and a hook is a chain. See docs/plugins.md § Arbitration.
+ * rather than a seat, and a hook is a chain. See docs/plugins/cooperative-extension-points.md § Arbitration.
  */
 export const ARBITRATION_MODES = ['stack', 'replace'] as const
 
@@ -209,7 +209,7 @@ export const annotationKeyOf = (fields: readonly string[], key: PluginAnnotation
 
 // ── The hook half ─────────────────────────────────────────────────────────────────────────────────
 //
-// A turn in a decision before it happens (docs/plugins.md § Hooks). Node-side: the owner declares the
+// A turn in a decision before it happens (docs/plugins/hooks.md § Hooks). Node-side: the owner declares the
 // moment and what is allowed at it, contributors register a handler, the host runs the chain and hands
 // the owner a verdict.
 
@@ -313,7 +313,7 @@ export const CORE_TASK_KEY = ['task'] as const
 // ── The exclusive half ────────────────────────────────────────────────────────────────────────────
 
 /**
- * The core surfaces a plugin may offer to replace. See docs/plugins.md § Replacing a core surface.
+ * The core surfaces a plugin may offer to replace. See docs/plugins/replacing-core-surfaces.md § Replacing a core surface.
  *
  * One member, and it stays one until a second surface has both a reason and a fallback worth writing.
  */

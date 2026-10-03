@@ -3,7 +3,7 @@ import type { TreeMutation } from '@acorn/protocol/tree/messages.ts'
 import { createTreeScheduler, createTreeState } from './treeState'
 
 // The pre-flight check in treeState.ts, which decides whether a whole batch may be applied
-// (docs/plugins.md § The tree contract). The drawing half is TreeHost.test.tsx and Slot.test.tsx;
+// (docs/plugins/tree-contract.md § The tree contract). The drawing half is TreeHost.test.tsx and Slot.test.tsx;
 // this file is the arithmetic, so it runs in the bare-Node project.
 
 const transport = { send: () => {}, onBatch: () => () => {}, onFailed: () => () => {} } as never

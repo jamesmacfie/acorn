@@ -7,7 +7,7 @@ import type { ExtendedPaneProps } from './extendedPane'
 import './extension-points.css'
 
 // A pane whose owner reserved part of its rectangle for somebody else, drawn as `pane.footer` and
-// `pane.aside` extension points (docs/plugins.md § Cooperative extension points). The host draws both
+// `pane.aside` extension points (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The host draws both
 // regions; the owner's layout only reserves them, and needs no `layout` template entry for it.
 //
 // The DOM's answer to `chrome/extendedPane.ts`, which is the seam the terminal supplies its own

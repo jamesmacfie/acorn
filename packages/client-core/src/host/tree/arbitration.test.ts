@@ -15,7 +15,7 @@ import {
 } from '../registries/extensionPoints/extensionPoints'
 import type { Disposable } from '../../kit/lib/state/registry'
 
-// Who fills a box when more than one contributor could (docs/plugins.md § Arbitration).
+// Who fills a box when more than one contributor could (docs/plugins/cooperative-extension-points.md § Arbitration).
 //
 // The rule worth pinning is the tie: two contributors matching one key in `replace` mode draw the
 // owner's default until the user picks, because a package that could take a box by registering for it

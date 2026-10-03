@@ -3,7 +3,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 //
 // A module of its own rather than a signal inside ./StartDialog.tsx, because the palette asks for the
 // dialog and a palette command is a `.ts` file with a node-environment test: one Solid component on
-// the path makes that module unloadable there (docs/plugin-authoring.md § Testing).
+// the path makes that module unloadable there (docs/plugin-authoring/testing.md § Testing).
 import { createSignal } from 'solid-js'
 import { toast } from '@acorn/plugin-api/client'
 import type { WorkflowInput } from '../../contract/wire.ts'

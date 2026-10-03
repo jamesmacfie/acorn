@@ -200,7 +200,7 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     let finishReconcile!: () => void
     const reconciled = new Promise<void>((resolve) => (finishReconcile = resolve))
 
-    // The plugin composition seam (docs/plugins.md § Collaboration rules). Owned by this runtime
+    // The plugin composition seam (docs/plugins/collaboration.md § Collaboration rules). Owned by this runtime
     // rather than by the module, so a process that starts the service more than once (the tests do)
     // gets a clean graph each time instead of "capability already provided".
     const core = createCoreServices({ secrets: runtime.SECRETS, db, activeIdentity: runtime.ACTIVE_IDENTITY })

@@ -1,4 +1,4 @@
-// The client half of `connection:changed` (docs/plugins.md § Hearing a core event).
+// The client half of `connection:changed` (docs/plugins/events.md § Hearing a core event).
 //
 // Status writers and connection deletion announce the row's current state. Several status changes are
 // not the owner clicking anything: a credential that stopped being readable demotes itself to

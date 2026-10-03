@@ -60,7 +60,7 @@ After the title, the header hosts the `agents:session-header` remote `stack` poi
 projection: task and session IDs, provider ID, per-turn usage and prices, and token and cost
 accounting modes. The bundled `agent-cost` plugin prices and formats those. Disabling it removes the
 badge. The pane sends a new payload only when usage changed, because every payload crosses to the
-plugin's worker ([remote trees](../plugins/cooperative-extension-points.md#remote-trees)).
+plugin's worker ([remote trees](../plugins/remote-points.md#remote-points)).
 
 The pane shows the transcript, composer, queue, context, requests, artifacts, and roster. The first
 three are one component, `AgentConversation`, addressed by session ID. The Workflows run pane draws the

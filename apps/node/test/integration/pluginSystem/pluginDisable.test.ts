@@ -54,7 +54,7 @@ const SNAPSHOT_KEYS = ['routes', 'tools', 'sections', 'connectionProviders', 'in
 
 // The full boot's contribution set, and what each optional plugin owns within it: every entry that
 // must vanish when it's disabled, and by omission every entry that must not. Recorded in
-// pluginDisable.snapshot.json. See docs/plugins.md § The golden lists.
+// pluginDisable.snapshot.json. See docs/plugins/adding-a-contribution.md § The golden lists.
 //
 // No optional plugin owns a context section. The three belong to compiled plugins (`pr` → github,
 // `notes` → notes) or to core itself (`issues`), so `sections` is identical in
@@ -66,7 +66,7 @@ const GOLDEN = join(import.meta.dirname, 'pluginDisable.snapshot.json')
 const golden = (): Golden => readGolden<Golden>(GOLDEN)
 
 // Multiset subtraction: remove each expected entry once, leave the rest in order, report what didn't
-// match. For why a plain filter is wrong here, see docs/plugins.md § The golden lists.
+// match. For why a plain filter is wrong here, see docs/plugins/adding-a-contribution.md § The golden lists.
 const minus = (from: readonly string[], take: readonly string[]): { rest: string[]; unmatched: string[] } => {
   const remaining = [...take]
   const rest: string[] = []
@@ -197,7 +197,7 @@ describe('disabling a node plugin', () => {
     // instead.
     expect(all.length).toBeGreaterThanOrEqual(10)
     expect(optional.length).toBeGreaterThanOrEqual(6)
-    // Hand-written, and the only list in this file that is. See docs/plugins.md § The golden lists.
+    // Hand-written, and the only list in this file that is. See docs/plugins/adding-a-contribution.md § The golden lists.
     expect(required.sort()).toEqual(['agents', 'memory', 'notes', 'terminal'])
     // The ledger covers exactly the plugins that get cycled. A plugin added to the list without an
     // entry fails here rather than quietly getting a case that asserts nothing.
@@ -245,13 +245,13 @@ describe('disabling a node plugin', () => {
       expect(reduced.skipped).toEqual([name])
       expect(reduced.enabled).toEqual(full.enabled.filter((n) => n !== name))
 
-      // One exact equality per registry, checked in both directions at once. See docs/plugins.md §
+      // One exact equality per registry, checked in both directions at once. See docs/plugins/adding-a-contribution.md §
       // The golden lists. A plugin filling in for a disabled sibling breaks the equality too.
       const owned = golden().owned[name]
       for (const key of SNAPSHOT_KEYS) {
         expect(reduced.snapshot[key], `${key} after disabling '${name}'`).toEqual(without(full.snapshot[key], owned?.[key]))
       }
-      // Routes carry their owner in the key. See docs/plugins.md § The golden lists.
+      // Routes carry their owner in the key. See docs/plugins/adding-a-contribution.md § The golden lists.
       const lostRoutes = owned?.routes ?? []
       expect(lostRoutes.filter((id) => !id.startsWith(name))).toEqual([])
     })

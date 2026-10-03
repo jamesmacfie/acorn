@@ -143,7 +143,7 @@ export function buildPanel(subject: PanelSubject, bridge: () => AcornBridge, has
   // The routed item first, then the selection that opened the pane. Those are two different arrivals:
   // a project surface's selection is in the URL and comes down as a prop, and a task pane opened by a
   // click or by the palette's curl import has no URL to hold one, so it arrives in `context`
-  // (docs/plugins.md § The tree contract).
+  // (docs/plugins/tree-contract.md § The tree contract).
   const [requested, setRequested] = createSignal<string | undefined>(initialRequestId ?? bridge().context.item)
   createEffect(() => {
     const id = requested()

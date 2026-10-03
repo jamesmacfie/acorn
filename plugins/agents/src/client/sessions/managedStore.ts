@@ -19,7 +19,7 @@ import { clearComposerDraft } from '../composer/composerState'
 import { clearReadingPlaces } from './readingPlaceStore'
 
 // This plugin's client half has no `ctx.log`: a client context is contribution points and nothing
-// else, so the tag and the owner are stated here (docs/plugin-authoring.md § Telemetry and logging).
+// else, so the tag and the owner are stated here (docs/plugin-authoring/telemetry.md § Telemetry and logging).
 const log = createLogger('agents', 'agents')
 
 const [sessions, setSessions] = createSignal<AgentSession[]>([])

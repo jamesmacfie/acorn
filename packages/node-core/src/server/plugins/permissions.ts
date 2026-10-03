@@ -114,10 +114,9 @@ export function scopeCore(
   return granted as CoreServices
 }
 
-// The two ids the host declares itself, which are invitations rather than any plugin's property:
-// `core.taskWorktreeCreated` (server/worktrees/taskWorktree.ts) and `agents.harnessRegistry`
-// (server/pluginHost/harnesses.ts). Whoever owns worktree side-effects or agent sessions on a given node
-// fills them, so they are exempt from the namespace rule below. Held to the real constants by
+// The one id the host declares itself, which is an invitation rather than any plugin's property:
+// `agents.harnessRegistry` (server/pluginHost/harnesses.ts). Whoever owns agent sessions on a given node
+// fills it, so it is exempt from the namespace rule below. Held to the real constants by
 // pluginPermissions.test.ts, because a literal list is only safe if something checks it.
 export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegistry']
 

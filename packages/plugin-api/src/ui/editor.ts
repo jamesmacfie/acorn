@@ -8,7 +8,7 @@
 // changed is that it is no longer *unloadable* under node — CodeMirror touches no browser global at
 // module scope — which is why it is not on the browser-realm list in entrypoints.test.ts any more.
 //
-// `languageFor` stays off this surface (docs/plugins.md § The plugin API): a pane holds a path, so
+// `languageFor` stays off this surface (docs/plugins/plugin-api.md § The plugin API): a pane holds a path, so
 // it wants `languageForPath`.
 export { editorTheme, refreshEditorTheme, watchEditorTheme } from '@acorn/client-core/features/editor'
 export { languageForPath, shouldHighlightDocument } from '@acorn/client-core/features/editor'

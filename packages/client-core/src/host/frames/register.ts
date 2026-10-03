@@ -52,7 +52,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 
 const log = createLogger('plugins')
 
-// Turning accepted manifests into shell contributions (docs/plugins.md § Frame contribution kind).
+// Turning accepted manifests into shell contributions (docs/plugins/frames.md § Frame contribution kind).
 //
 // This file registers ordinary contributions, pre-bound to the plugin, surface and bundle. What draws
 // inside one is the surface's own declaration: a `remote` region is a tree of the host's own components
@@ -93,7 +93,7 @@ const PluginOverlay = lazy(() => import('./PluginOverlay'))
 const DomExtendedPane = lazy(() => import('../chrome/ChromeExtendedPane'))
 // The tree path's mount point, the counterpart to PluginFrame above: a region, a panel body or a slot
 // drawn from the host's own components rather than from the plugin's pixels
-// (docs/plugins.md § The tree contract).
+// (docs/plugins/tree-contract.md § The tree contract).
 //
 // Host-supplied, with the DOM's as the fallback, for the reason `paneLayouts` below is: this pass runs
 // on every host and a terminal draws a tree in cells (../tree/table.ts).
@@ -401,7 +401,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
         const point = points.find((entry) => entry.location === 'pane.footer')
         const pointId = point ? qualifiedExtensionPointId(pluginId, point.id) : null
         // The two rectangle locations, each holding another plugin's iframe beside this one's
-        // (docs/plugins.md § Cooperative extension points, the `rectangle` kind).
+        // (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `rectangle` kind).
         const inlineId = (location: string): string | null => {
           const entry = points.find((candidate) => candidate.location === location)
           return entry ? qualifiedExtensionPointId(pluginId, entry.id) : null
@@ -729,7 +729,7 @@ export function syncFrameContributions(): void {
   }
 }
 
-// The other half of the forward-compatibility rule (docs/plugins.md § Forward compatibility): the node
+// The other half of the forward-compatibility rule (docs/plugins/forward-compatibility.md § Forward compatibility): the node
 // retained what it could not understand, and this is where it gets reported. One row per declaration, on
 // the same path a surface that failed to register takes, because the owner's question is the same either
 // way — "why is this part of the plugin not doing anything?"

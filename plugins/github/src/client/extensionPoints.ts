@@ -1,5 +1,5 @@
 // The two places another plugin may say something inside github's pull-request surfaces
-// (docs/plugins.md § Cooperative extension points). The host mints the qualified ids from the bare
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points). The host mints the qualified ids from the bare
 // ones below.
 //
 // Its own module, with no Solid in it, so both the pane and a bare-Node test can reach it.

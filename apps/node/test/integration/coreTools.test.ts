@@ -62,10 +62,10 @@ describe('the full agent-tool manifest', () => {
     'linked_issues',
     'repo_info',
     // How to write a plugin against this node, read off its own schemas so the agent never answers a
-    // manifest question from memory (docs/agent-tools.md, docs/plugins.md § Teaching the agent).
+    // manifest question from memory (docs/agent-tools.md, docs/plugins/agent-install.md § Teaching the agent).
     'plugin_authoring',
     // The only core tool that can change what code this node runs, and it does so by asking: it raises a
-    // request the owner answers in the shell (docs/plugins.md § Approval-mediated install).
+    // request the owner answers in the shell (docs/plugins/agent-install.md § Approval-mediated install).
     'plugin_request',
     // Core owns the stable cross-provider tools; the provider-specific call belongs to whichever
     // integration answers (docs/agent-tools/tracker-tools.md § issue_detail, § issue_comment and issue_image).

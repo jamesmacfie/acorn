@@ -267,7 +267,7 @@ export default function TabRail() {
     navigate(pathForTask(w))
   }
 
-  // What a right-click on a task row is about (docs/plugins.md § Context menus). `origin`,
+  // What a right-click on a task row is about (docs/plugins/menus-and-markers.md § Context menus). `origin`,
   // `projectId`, and `pinned` are the only facts a contribution may match on; `id` and `title` are
   // payload for the action, not predicates.
   const rowTarget = (w: Task): TaskRowTarget => ({
@@ -287,7 +287,7 @@ export default function TabRail() {
     // soon as the rail exists, so a picked icon is drawn rather than briefly spelled
     // (kit/tokens/iconNodes.ts). Not awaited: the rail draws its rows either way.
     void loadIconNodes()
-    // Core's own row actions, registered rather than written inline (docs/plugins.md § Context
+    // Core's own row actions, registered rather than written inline (docs/plugins/menus-and-markers.md § Context
     // menus).
     const rowActions = registerContextMenuItems([
       {
@@ -547,8 +547,8 @@ export default function TabRail() {
                 {(menu) => (
                   <>
                     {/* No heading rows: the tab's tip already names the task and its branch. Both
-                        doors onto a task row draw from the same registry (docs/plugins.md § Context
-                        menus), so they cannot offer different things. */}
+                        doors onto a task row draw from the same registry (docs/plugins/menus-and-markers.md
+                        § Context menus), so they cannot offer different things. */}
                     <ContextMenuItems context={menu} location="task.row" target={rowTarget(w)} />
                   </>
                 )}

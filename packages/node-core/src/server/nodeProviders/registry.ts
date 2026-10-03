@@ -1,7 +1,7 @@
 import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescriptor, type ProvidedNode } from '@acorn/protocol/nodeProviders.ts'
 
 // Node providers: a plugin that knows about nodes, and optionally can make and remove them
-// (docs/plugins.md § Node providers). The second door into the fleet, beside probe-then-pair.
+// (docs/plugins/node-providers.md § Node providers). The second door into the fleet, beside probe-then-pair.
 //
 // **A provider runs on some node, not necessarily the one the person is sitting at, and with no
 // client necessarily attached.** Write nothing into a provider that assumes otherwise. That sentence

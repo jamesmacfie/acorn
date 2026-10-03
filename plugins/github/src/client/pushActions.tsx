@@ -6,7 +6,7 @@ import { Button } from '@acorn/plugin-api/ui'
 import { githubCreateRoute } from './clientRoutes'
 
 // What this plugin offers under the Changes pane's branch bar, once a task's branch is on its remote
-// (docs/plugins.md § Cooperative extension points, the `remote` kind). One button, and it opens this
+// (docs/plugins/cooperative-extension-points.md § Cooperative extension points, the `remote` kind). One button, and it opens this
 // plugin's own create form with the head branch already chosen.
 //
 // The changes plugin declared the point and knows none of this. It could not import this plugin, and
@@ -52,7 +52,7 @@ export function GithubPushActions(props: PushActionsProps) {
    * HEAD. A project with no mirrored repository has nowhere to open one. And a task that already has
    * a pull request has the PR pane, which owns everything about it from then on — `pullNumber` off
    * this plugin's own task query, never out of the slot's props, because the owner does not know the
-   * word (docs/plugins.md § Client authoring and the UI kit, `tracksRef`).
+   * word (docs/plugins/client-authoring-and-the-ui-kit.md § Client authoring and the UI kit, `tracksRef`).
    */
   const offered = () => !!props.upstream && !!props.branch && !!repo() && task()?.pullNumber == null
   return (

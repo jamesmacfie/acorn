@@ -9,7 +9,7 @@ this way. The projection is in `plugins/agents/src/server/sessions/searchProject
 `agent_events_fts` indexes `agent_events.search_text`. Migration-owned triggers project standalone
 rows and search-text changes, and `AgentSearchProjection` builds streamed message heads before reads
 that need them. Both search entrypoints read it, including the archive page's
-[search provider](../plugins/client-authoring-and-the-ui-kit.md#search-providers). When the retention
+[search provider](../plugins/search-providers.md#search-providers). When the retention
 pass removes a session's history, the delete trigger removes its rows, so archive search finds only
 the title and the note.
 

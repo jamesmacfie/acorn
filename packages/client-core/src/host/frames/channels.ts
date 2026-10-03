@@ -3,7 +3,7 @@
 // anyway: `presentation:*` are the shell's own intents.
 //
 // Two families live here, and the split is the point (settled 2026-08-28, before the first addition
-// made it unsettleable — docs/plugins.md § Hearing a core event):
+// made it unsettleable — docs/plugins/events.md § Hearing a core event):
 //
 //   `runtime:*`        the shell talking to itself, about this window. Mostly "something you were
 //                      displaying is gone or moved" — a deletion and invalidation list — plus
@@ -98,7 +98,7 @@ export const describeChannel = (channel: string, ownerId?: string): GrantDescrip
   // so it does not get interpolated in however well-formed it parsed.
   //
   // Another plugin's channel gets the same treatment at the producer grain
-  // (docs/plugins.md § Hearing another plugin): the plugin *id* is interpolated, because an id is
+  // (docs/plugins/events.md § Hearing another plugin): the plugin *id* is interpolated, because an id is
   // already rendered elsewhere and held to CHANNEL_PART by the parse, and the verb never is.
   const parsed = parsePluginChannel(channel)
   if (!parsed) return undefined

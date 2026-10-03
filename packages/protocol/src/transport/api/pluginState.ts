@@ -1,11 +1,11 @@
-// Settings → Plugins (docs/plugins.md § Activation). Per node, since which plugins a node runs
+// Settings → Plugins (docs/plugins/activation.md § Activation). Per node, since which plugins a node runs
 // decides which routes exist and which SQLite files open. `running` and `disabled` answer different
 // questions: a toggle takes effect at the node's next start, so the page shows the gap between saving
 // and restarting.
 //
 // `state` is the third answer, the only one a restart cannot change: a plugin loaded from disk whose
 // init threw is `'failed'`. It stays out of `running` because `restartRequired` is computed from
-// `running` alone, and a restart cannot fix a broken plugin (docs/plugins.md § Loaded plugins).
+// `running` alone, and a restart cannot fix a broken plugin (docs/plugins/loaded-plugins.md § Loaded plugins).
 export type NodePluginRow = {
   /** The plugin's id. Routes, files, settings keys and the command line all use it. */
   name: string
@@ -53,12 +53,12 @@ export type InstalledPluginRow = {
   // contribution kind, an unknown `permissions.node.core` facet. Absent when there is nothing to report.
   //
   // The forward-compatibility rule is that unknown is retained and reported, never dropped silently
-  // (docs/plugins.md § Forward compatibility). This is the reporting half: the device raises one
+  // (docs/plugins/forward-compatibility.md § Forward compatibility). This is the reporting half: the device raises one
   // attention row per entry, on the same path a surface that failed to register takes.
   unknown?: readonly string[]
   permissions: import('../../plugin/contract.ts').NodePluginPermissions
   contributions: import('../../plugin/contract.ts').PluginContributions
-  // What the plugin declared other plugins may hear (docs/plugins.md § Hearing another plugin). Optional
+  // What the plugin declared other plugins may hear (docs/plugins/events.md § Hearing another plugin). Optional
   // rather than defaulted for the same reason `reason` is: this row is persisted in the query cache
   // and a required field would need a bumped key.
   emits?: readonly import('../../plugin/contract.ts').PluginEmit[]
@@ -89,7 +89,7 @@ export type InstalledPluginRow = {
 export type PluginRuntimeIdentity = Omit<InstalledPluginRow, 'source' | 'bundled' | 'installedAt'> & {
   activation: 'node' | 'client-only'
 }
-// An install the agent asked for and the owner hasn't answered yet (docs/plugins.md §
+// An install the agent asked for and the owner hasn't answered yet (docs/plugins/agent-install.md §
 // Approval-mediated install). Raised by the `plugin_request` agent tool, which can't install anything:
 // the record is inert until a device reads it and installs over the device-gated route with its own
 // principal. A prompt-injected agent can produce this row and nothing else.
@@ -100,7 +100,7 @@ export type PluginApprovalRequest = {
   taskId: string
   action: 'install' | 'update' | 'uninstall'
   // Present for an install, exactly as the agent gave it. Nothing has been fetched yet. See
-  // docs/plugins.md § What the owner can know before the download.
+  // docs/plugins/agent-install.md § What the owner can know before the download.
   source?: PluginInstallSource
   // Present for an update or an uninstall.
   pluginId?: string
@@ -135,7 +135,7 @@ export type PluginUpdateResult = { id: string; fromVersion: string; toVersion: s
 export type PluginUninstallResult = { restartRequired: boolean; dataPurged: boolean }
 
 // The one exception, and only for a plugin the node loaded from disk: a reload swaps its node half in
-// the running process (docs/plugins.md § The dev loop). `failed` is a 200, not an error, because
+// the running process (docs/plugins/dev-loop.md § The dev loop). `failed` is a 200, not an error, because
 // candidate-then-commit means a failed reload changed nothing and the previous instance still serves.
 export type PluginReloadResult = { id: string; version: string; state: 'reloaded' | 'failed'; reason?: string }
 

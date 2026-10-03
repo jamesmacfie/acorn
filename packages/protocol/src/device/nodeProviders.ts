@@ -6,7 +6,7 @@ import type { ToolRisk } from '../transport/api'
 // (@acorn/node-core/server/nodeProviders/registry.ts), because a provider is code and this module
 // stays a pure sink.
 //
-// See docs/plugins.md § Node providers for the seam and docs/architecture/control-plane.md § The three
+// See docs/plugins/node-providers.md § Node providers for the seam and docs/architecture/control-plane.md § The three
 // parties for why a provider is the second door into the fleet.
 
 /** Where a provided node is in its life. `provisioning` is the state this exists for: a node being

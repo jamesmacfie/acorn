@@ -156,11 +156,11 @@ export type AgentRuntimeOptions = {
   currentUserId(): string | null
   registry?: AgentDriverRegistry
   // Any frame, not only the plugin's own: the core-named `agent-session:changed` goes out through the
-  // same door (docs/plugins.md § Hearing a core event).
+  // same door (docs/plugins/events.md § Hearing a core event).
   publish?(frame: PublishedFrame): void
   startTerminalHandoff?(session: AgentSession): Promise<string>
   terminalHandoffRunning?(sessionId: string): Promise<boolean>
-  // The owner's half of this plugin's hooks (docs/plugins.md § Hooks). Optional so a test can build an
+  // The owner's half of this plugin's hooks (docs/plugins/hooks.md § Hooks). Optional so a test can build an
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
   hooks?: Pick<PluginHookRegistry, 'run'>

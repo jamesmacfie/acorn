@@ -13,7 +13,7 @@ export const editorPlugin = (): NodePlugin => {
     label: 'Editor',
     init: (ctx) => {
       ctx.extensionPoints.declare(EDITOR_LINE_MARKERS, 'Editor line markers')
-      // The one decision this plugin opens to other plugins (docs/plugins.md § Hooks): a formatter's
+      // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a formatter's
       // turn at the text on its way to disk. A veto is allowed too, so a lint-on-save can refuse.
       ctx.hooks.declare({
         id: 'before-save',

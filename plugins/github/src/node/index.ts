@@ -38,7 +38,7 @@ export const githubPlugin = (): NodePlugin => {
     label: 'GitHub',
     required: false,
     // What other plugins may hear from this one
-    // (docs/plugins/forward-compatibility.md § Hearing another plugin). workflows hears
+    // (docs/plugins/events.md § Hearing another plugin). workflows hears
     // `checks-changed`.
     emits: [
       { verb: 'checks-changed', description: 'A pull request’s checks changed state' },
@@ -57,7 +57,7 @@ export const githubPlugin = (): NodePlugin => {
         id: 'pull-request',
         value: pullRequestEditorLineMarkers(store, ctx.core),
       })
-      // github's own `plugin:github:<verb>` channel (docs/plugins.md § Hearing another plugin).
+      // github's own `plugin:github:<verb>` channel (docs/plugins/events.md § Hearing another plugin).
       // Only the routers that write the PR mirror take it.
       const emit = githubEmitter(ctx.events.send)
 

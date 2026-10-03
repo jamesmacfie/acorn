@@ -65,7 +65,7 @@ IDs once per contributor. Each request's identity includes the contributor's reg
 Node, `chromeDeps(pluginId)`, and the visible keys, and the shared chrome watcher already advances that
 freshness, so annotations add no per-row query, timer, or subscription. A changed identity clears and
 aborts only that contributor, and a generation check rejects late answers. Results merge in
-registration order ([task annotations](../plugins/cooperative-extension-points.md#task-annotations)).
+registration order ([task annotations](../plugins/rows-and-annotations.md#task-annotations)).
 
 Tasks created through the workflow child seam carry `workflows:child`. Both rails use the same pure
 hierarchy projection to fold them under their root, show only an active descendant's ancestors, and

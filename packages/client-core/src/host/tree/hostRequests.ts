@@ -2,7 +2,7 @@ import { TREE_LIMITS, batchBytes } from '@acorn/protocol/tree/messages.ts'
 import type { TreeHostResult } from './workerHost'
 
 // The grant behind `mount.host.invoke`, in one place because there are two hosts
-// (docs/plugins.md § Asking the owner).
+// (docs/plugins/remote-points.md § Asking the owner).
 //
 // The desktop draws a tree into the DOM and the terminal draws the same tree into cells, and both
 // mount it through the same worker host. What a contributor is allowed to ask its owner to do must not

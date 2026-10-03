@@ -30,7 +30,7 @@ const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'da
 
 // The one rail list every descriptor source renders through. `Row`, `Badge` and `Icon` are the shell's
 // own primitives, so a third-party rail list matches a first-party one under every appearance pack
-// (docs/plugins.md § Descriptors for facts, trees for UI, rectangles for pixels).
+// (docs/plugins/ui-tiers.md § Descriptors for facts, trees for UI, rectangles for pixels).
 //
 // Two components rather than one, registered as the `regions` half of `SourceContribution`
 // (../registries/sources/sources.ts). This used to be a single component drawing `<main class="panes">`
@@ -146,7 +146,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const [promoteItem, setPromoteItem] = createSignal<PluginRailItem | null>(null)
 
   // The active task that already tracks this row, through `taskTracksRef` rather than a link check
-  // written here (docs/plugins.md § Context menus). First match, the ceiling RefPanelTaskLink states.
+  // written here (docs/plugins/menus-and-markers.md § Context menus). First match, the ceiling RefPanelTaskLink states.
   const trackingTask = (item: PluginRailItem): Task | undefined => {
     const link = item.task?.link
     if (!link) return undefined
@@ -160,7 +160,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
 
   // What a row's menu is about. `item` is the row itself, handed back untouched to whoever
   // contributed the action; only `providerId` and `projectId` are facts a `when` may name
-  // (docs/plugins.md § Context menus).
+  // (docs/plugins/menus-and-markers.md § Context menus).
   const rowTarget = (item: PluginRailItem): ItemRowTarget => ({
     location: 'item.row',
     id: item.id,
@@ -174,7 +174,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
 
   onMount(() => {
     // Core's own row actions, registered rather than written inline, so this list and github's cannot
-    // offer different things (docs/plugins.md § Context menus). Two items with opposite `when`s, the
+    // offer different things (docs/plugins/menus-and-markers.md § Context menus). Two items with opposite `when`s, the
     // pair github's pull list registers: a row that already has a task opens it rather than offering a
     // second. One registration per mounted panel and one panel on screen at a time: `Dynamic`
     // disposes the source it is leaving before it creates the one it is going to.

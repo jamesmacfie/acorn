@@ -14,7 +14,7 @@ If it grows into a product, it exports as an ordinary plugin.
 
 Lemma does a version of this with raw HTML in iframes. Acorn can do it better, because it already has
 the hard part: a remote component tree tier where plugin code runs in a sandboxed worker and draws the
-host's own components ([descriptors, trees, rectangles](../../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md)).
+host's own components ([descriptors, trees, rectangles](../../plugins/ui-tiers.md)).
 An agent-built app drawn that way gets the shell's keyboard handling, focus, accessibility, and style
 pack for free, and it draws in the terminal client too.
 
@@ -60,7 +60,7 @@ apps/
 ```
 
 The host installs the head revision through the local-folder install path that dev mode already uses
-([the dev loop](../../plugins/activation.md#the-dev-loop)), under a reserved plugin ID prefix so apps
+([the dev loop](../../plugins/dev-loop.md#the-dev-loop)), under a reserved plugin ID prefix so apps
 never collide with real plugins and never appear in **Settings > Plugins > Installed**. They appear on
 the Apps page instead.
 

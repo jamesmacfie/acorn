@@ -1,7 +1,7 @@
 import type { IntegrationConnectionStatus } from '../integrations/providers'
 
 // Core events a plugin's node half may subscribe to with `ctx.events.on`
-// (node-core/server/pluginHost/types.ts, docs/plugins.md § Hearing another plugin).
+// (node-core/server/pluginHost/types.ts, docs/plugins/events.md § Hearing another plugin).
 //
 // A named list rather than "any channel", for the same reason the frame side has one
 // (client-core/host/frames/channels.ts): a grant the trust prompt cannot describe is a grant the
@@ -9,12 +9,12 @@ import type { IntegrationConnectionStatus } from '../integrations/providers'
 // across the two sides of the wire.
 //
 // Deliberately thin. It holds what core broadcasts today, and it is the send side of
-// docs/plugins.md § Hearing a core event that will grow it. Another plugin's `plugin:<id>:<verb>` is not
+// docs/plugins/events.md § Hearing a core event that will grow it. Another plugin's `plugin:<id>:<verb>` is not
 // here on purpose: cross-plugin subscription is item 3 of that design and needs the producer's
 // `emits` declaration first.
 //
 // The naming, settled 2026-08-28 before the first addition made it unsettleable
-// (docs/plugins.md § Hearing a core event). Two families, two contracts:
+// (docs/plugins/events.md § Hearing a core event). Two families, two contracts:
 //
 //   `<noun>:changed`   a node-emitted fact. "Something happened here that you may want to act on."
 //                      Emitted where the write happens, delivered over the socket, heard by every
@@ -57,7 +57,7 @@ export type ConnectionChangedEvent =
   | { integrationId: string; providerId: string; status: IntegrationConnectionStatus }
   | { integrationId: string; providerId: string; deleted: true }
 
-// A task worktree's HEAD moved: a commit, a checkout, a pull or rebase (docs/plugins.md § Hearing a core event
+// A task worktree's HEAD moved: a commit, a checkout, a pull or rebase (docs/plugins/events.md § Hearing a core event
 // § HEAD moved). `head` is the SHA the tip is at now, `dirty` whether the tree still has uncommitted
 // changes, so a CI or deploy plugin can decide to act from the frame alone.
 export type HeadChangedEvent = {
@@ -70,7 +70,7 @@ export type HeadChangedEvent = {
 
 // A declared run target was started or stopped (docs/api-reference/websocket.md § WebSocket). Only the
 // declared targets: generic process and port lifecycle stays off the wire
-// (docs/plugins/forward-compatibility.md § What is not an event).
+// (docs/plugins/events.md § What is not an event).
 export type RunTargetChangedEvent = {
   taskId: string
   targetId: string

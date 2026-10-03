@@ -2,7 +2,7 @@ import { MAX_REF_RESOLVE_IDENTIFIERS, type PluginRefResolution } from '@acorn/pr
 import { Registry } from '../../../kit/lib/state/registry'
 
 // Turning identifiers of one plugin's items into something another plugin's surface can draw
-// (docs/plugins.md § "Loaded plugins: the client half", the `refResolvers` entry). The recognition
+// (docs/plugins/client-half.md § "Loaded plugins: the client half", the `refResolvers` entry). The recognition
 // half is ./contentLinks.ts; this is what happens after a ref has been found.
 //
 // The entry holds a closure rather than a route, exactly as `AgentContextContribution` does and for
@@ -30,7 +30,7 @@ export const refResolverRegistry = new Registry<RefResolverContribution>('ref re
 export const refResolverFor = (providerId: string): RefResolverContribution | undefined =>
   refResolverRegistry.entries().find((entry) => entry.providerId === providerId)
 
-// One TanStack options factory for every provider (docs/plugins.md § "Loaded plugins: the client
+// One TanStack options factory for every provider (docs/plugins/client-half.md § "Loaded plugins: the client
 // half" names the five-minute staleness as host policy: a resolver answers about someone else's
 // tracker, where a title changing within the minute is not worth a request per surface per mount).
 //

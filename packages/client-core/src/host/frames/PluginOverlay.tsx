@@ -6,7 +6,7 @@ import { closePluginOverlay, closePluginOverlayWith, pluginOverlayInvocation } f
 import { IconButton } from '../../kit/components/inputs/IconButton'
 
 // The host's chrome around a plugin overlay: the full-screen picker slot, what the editor's ⌘P file
-// palette occupies as a compiled contribution (docs/plugins.md § Frame contribution kind).
+// palette occupies as a compiled contribution (docs/plugins/frames.md § Frame contribution kind).
 //
 // Same division of labour as PluginRefPanel: the host draws the backdrop, the box and the dismiss
 // affordance, because an iframe cannot position itself against anything outside its own rectangle. And

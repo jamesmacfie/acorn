@@ -9,7 +9,7 @@ import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
 import type { SlotRef } from '@acorn/protocol/chrome.ts'
 import { useExclusiveSlotFailure } from '../plugins/ExclusiveSlotFailure'
 
-// The DOM host's end of the remote tree (docs/plugins.md § The tree contract).
+// The DOM host's end of the remote tree (docs/plugins/tree-contract.md § The tree contract).
 //
 // This component is the only thing standing between a stranger's code and the shell's DOM. What it is
 // not is the rules: the store, the pre-flight check and the mutation apply are ./treeState.ts, which

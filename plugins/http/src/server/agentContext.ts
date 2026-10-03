@@ -32,8 +32,8 @@ const TEMPLATE_ONLY = /^\{\{[A-Za-z0-9_.-]+\}\}$/
  * literal is a secret. Keys survive, so an agent still learns the endpoint takes `token`.
  *
  * Stricter than the client contribution it replaced, which sent the whole URL and leaked exactly
- * this way (docs/loaded-plugin-migration.md § http has moved, and the storage path is
- * proven).
+ * this way (docs/plugins/more-descriptors.md
+ * § Agent contexts).
  *
  * String surgery rather than `new URL()`: the stored URL is frequently a template
  * (`{{BASE_URL}}/users`) and would not parse.

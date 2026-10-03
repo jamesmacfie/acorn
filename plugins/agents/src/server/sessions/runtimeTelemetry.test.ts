@@ -11,7 +11,7 @@ import { ManagedAgentRuntime } from './runtime'
 
 /** The spans this plugin raised, from the testkit's recorder rather than a stand-in for
  *  `ctx.telemetry`: these are the records a sink would receive, built by the real verbs
- *  (docs/plugin-authoring.md § In tests). A span appears once it has ended, and the attributes it
+ *  (docs/plugin-authoring/testing.md § In tests). A span appears once it has ended, and the attributes it
  *  ended with are merged into the ones it opened with. */
 const spanNamed = (ctx: TestNodeContext, name: string): Extract<TelemetryRecord, { kind: 'span' }> | undefined =>
   ctx.recorded.find((record): record is Extract<TelemetryRecord, { kind: 'span' }> => record.kind === 'span' && record.name === name)

@@ -31,7 +31,7 @@ export type AcornBridgeApi = {
   del<T>(path: string, options?: { signal?: AbortSignal }): Promise<T>
   /**
    * Read a route of your own plugin's whose answer is bytes: an image, a PDF, an archive
-   * (docs/plugins.md § Binary bridge calls).
+   * (docs/plugins/frames.md § Binary bridge calls).
    *
    * The five methods above put every request and every response through `JSON.stringify` and
    * `JSON.parse`. Base64 over that would add a third to the wire, two copies in memory, and a decode on
@@ -104,7 +104,7 @@ export type AcornBridge = {
      * picker has picked. Refused from any other surface, because a pane doesn't get to close itself.
      *
      * An overlay a remote tree opened as its companion may pass a JSON `result`, which resolves that
-     * tree's `openOverlay` call (docs/plugins.md § Companion overlays). Closing without one resolves it
+     * tree's `openOverlay` call (docs/plugins/remote-points.md § Companion overlays). Closing without one resolves it
      * with `null`, and so does every dismissal the host owns, so an opener never has to tell
      * "cancelled" from "went away". Capped at 64 KiB: a result names an outcome, and anything with bytes
      * in it goes over the plugin's own route first.
@@ -143,7 +143,7 @@ export type AcornBridge = {
   }
   /**
    * Say what your frame is doing, in the six verbs the node half's `ctx.telemetry` has
-   * (docs/plugin-authoring.md § Telemetry from a frame).
+   * (docs/plugin-authoring/the-bridge.md § Telemetry from a frame).
    *
    * Every one is fire and forget: nothing here returns a promise, nothing throws, and nothing tells
    * you whether the owner has collection on. That is the one rule telemetry has, that it never

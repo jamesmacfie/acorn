@@ -1,7 +1,7 @@
 import { broadcastHeadChanged } from '../notify'
 
 // The last HEAD this node saw per task, so the status poll doubles as the HEAD observer
-// (docs/plugins.md § Hearing a core event). Nothing in the tree hooks HEAD directly, and a
+// (docs/plugins/events.md § Hearing a core event). Nothing in the tree hooks HEAD directly, and a
 // commit from a PTY, an agent, or an outside editor has no hook to catch, so the poll that already
 // runs `git status` on every active worktree is the one honest place to notice. The first sighting
 // of a task seeds the map without a frame: a fresh node has nothing to compare against, and

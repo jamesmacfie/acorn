@@ -173,8 +173,8 @@ export function RemoteBar(props: { model: ChangesModel }) {
         <RemoteMenu model={model()} />
       </Toolbar>
       {/* What another plugin does once the branch is on its remote, between the bar and the editor:
-          the GitHub plugin's "Open pull request" is the one filler today (docs/plugins.md §
-          Cooperative extension points).
+          the GitHub plugin's "Open pull request" is the one filler today (docs/plugins/remote-points.md
+          § Remote points).
 
           No children, so an unfilled point draws nothing and takes no space. With no contributor
           installed the footer is exactly the height it was before this slot existed, which is the

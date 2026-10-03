@@ -1,4 +1,4 @@
-// Which verbs each plugin has declared other plugins may hear (docs/plugins.md § Hearing another plugin
+// Which verbs each plugin has declared other plugins may hear (docs/plugins/events.md § Hearing another plugin
 // § The cross-plugin grant). Filled by the host from a manifest's `emits` or a built-in's
 // `NodePlugin.emits`, emptied on unload, and read at subscribe time by `ctx.events.on`.
 //

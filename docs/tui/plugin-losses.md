@@ -50,7 +50,7 @@ command layer rewrites `meta` to `ctrl`, because a terminal emulator keeps Cmd. 
 Ctrl+Shift+P, and `meta+ctrl+alt+shift+d` is Ctrl+Option+Shift+D. The manifest doesn't change.
 
 What a reader loses per plugin is one row each in
-[first-party plugins](../first-party-plugins.md) § What each of these loses in a terminal. Everything
+[first-party plugins in the terminal](../first-party-plugins/terminal.md). Everything
 crosses except three rectangles, and the PTY, the rectangle an agent workspace depends on, works well
 in a terminal.
 

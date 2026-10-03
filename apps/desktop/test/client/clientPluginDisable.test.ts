@@ -24,7 +24,7 @@ const REGISTRIES = {
   // The command graph, from 2026-09-03. A plugin's commands are the one contribution kind that can
   // hold each other: a group and the searches under it are registered together, and a disable has to
   // take the whole subtree, not the parent and a set of orphans
-  // (docs/plugins.md § Command kinds).
+  // (docs/plugins/commands.md § Command kinds).
   commands: commandRegistry,
   sources: sourceRegistry,
   settingsPages: settingsRegistry,

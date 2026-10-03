@@ -1,5 +1,5 @@
 // The context-menu registry: what a right-click offers, contributed rather than written inline
-// (docs/plugins.md § Context menus).
+// (docs/plugins/menus-and-markers.md § Context menus).
 //
 // This module holds no JSX import (docs/frontend/registries.md § Registries and plugins): the host that draws
 // these rows lives in `./contextMenuHost.tsx`, a `<For>` over `contextMenuItems()`.

@@ -127,7 +127,7 @@ On Windows, Wry maps custom schemes to HTTP origins: `app://acorn` to `http://ap
 `packages/client-core/src/host/tree/workerHost.ts` shares one modern worker per accepted
 `(pluginId, hash)`, with a separate bridge port and context per mounted slot, and a bounded idle pool.
 Legacy SDKs get one worker per mounted tree
-([mounted bridge ownership](../plugins/descriptors.md#mounted-bridge-ownership-and-sdk-compatibility)).
+([mounted bridge ownership](../plugins/remote-trees.md#mounted-bridge-ownership-and-sdk-compatibility)).
 `TreeHost.tsx` validates each batch and is the only thing that turns a handler ID into a function. A
 worker that misses two heartbeats is ended and its trees removed, with the failure in plugin
 diagnostics.

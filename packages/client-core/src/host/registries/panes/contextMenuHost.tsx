@@ -14,7 +14,7 @@ import {
 // only a person looking at the running app can check.
 
 /** The registry's rows for one target, as menu items. Rendered inside whatever menu is open, the
- *  button-triggered one the tab rail already had, and the right-click one below (docs/plugins.md §
+ *  button-triggered one the tab rail already had, and the right-click one below (docs/plugins/menus-and-markers.md §
  *  Context menus, "two doors, one list"). */
 export function ContextMenuItems(props: {
   context: MenuContext

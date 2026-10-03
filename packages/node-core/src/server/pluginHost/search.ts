@@ -1,5 +1,5 @@
 // Search providers: each plugin searches its own data, and core asks every provider at once. See
-// docs/plugins.md § Search providers for why results stay grouped and why a plugin answers with hits
+// docs/plugins/search-providers.md § Search providers for why results stay grouped and why a plugin answers with hits
 // rather than exposing tables.
 import type { SearchGroup, SearchHit } from '@acorn/protocol/search.ts'
 import { createLogger, describeError } from '../telemetry/logger'

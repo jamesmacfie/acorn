@@ -1,4 +1,4 @@
-// The context plugin's client part (docs/plugins.md § The plugin API).
+// The context plugin's client part (docs/plugins/plugin-api.md § The plugin API).
 import { openPane, type ClientPlugin } from '@acorn/plugin-api/client'
 import { taskContextAgentContribution } from './agentContextContribution'
 import { contextPaneContribution } from './paneContribution'

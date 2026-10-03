@@ -1,5 +1,5 @@
 // What a manifest-declared task check actually does when the owner opens the archive dialog
-// (docs/plugins.md § Task checks).
+// (docs/plugins/task-checks.md § Task checks).
 //
 // The same move ./scheduleRun.ts makes, for the same reason: a loaded plugin declares its check as a
 // route rather than as a function, because a manifest is data and a manifest is what the owner reads

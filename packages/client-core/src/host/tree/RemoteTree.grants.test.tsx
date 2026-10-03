@@ -2,7 +2,7 @@ import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { TreeHostRequest, TreeHostResult } from './workerHost'
 
-// Who is allowed to ask this host for what (docs/plugins.md § Asking the host).
+// Who is allowed to ask this host for what (docs/plugins/tree-contract.md § Asking the host).
 //
 // The routing and the limits are workerHost's and are tested in hostRequests.test.ts. What is tested
 // here is the pair of grants, which is the part a security review reads: an action has to be in both

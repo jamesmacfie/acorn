@@ -9,7 +9,7 @@ import { createLogger } from '../../infra/telemetry/logger'
 import type { TreeTransport } from './TreeHost'
 
 // The half of the remote tree host that is arithmetic rather than drawing: the store, the pre-flight
-// check, the mutation apply, and the coalescer that feeds them (docs/plugins.md § The tree contract).
+// check, the mutation apply, and the coalescer that feeds them (docs/plugins/tree-contract.md § The tree contract).
 //
 // Split out of TreeHost.tsx when the terminal grew a tree host of its own
 // (docs/tui.md). There are two hosts and one set of rules: a batch

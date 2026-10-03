@@ -1,4 +1,4 @@
-// Putting a third-party plugin on this node, and taking it off again (docs/plugins.md § Loaded
+// Putting a third-party plugin on this node, and taking it off again (docs/plugins/loaded-plugins.md § Loaded
 // plugins).
 //
 // Install is per node. A fleet is a set of independently administered nodes, so there is no

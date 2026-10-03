@@ -1,5 +1,5 @@
 // The client half of `head:changed`, `run:changed` and `agent-session:changed`
-// (docs/plugins.md § Hearing a core event). Each is re-emitted on the client bus, which is the only
+// (docs/plugins/events.md § Hearing a core event). Each is re-emitted on the client bus, which is the only
 // thing a plugin frame or a compiled-in consumer can subscribe to (plugins/frames/channels.ts).
 // `run:changed` also refreshes the task's run targets, the one query of the three the shell caches.
 import { clientEvents } from '../../host/registries/commands/clientEvents'

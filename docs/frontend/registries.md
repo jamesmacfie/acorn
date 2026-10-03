@@ -35,7 +35,7 @@ The desktop's left source icons and right pane icons use the shared context-menu
 project, and task. Replacement rail and pane switcher providers can request the host menu through
 `openContextMenu`, and remote trees send a serializable ID and point through their host action bridge.
 The terminal client draws no right-click menu.
-[Plugin context menus](../plugins/descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md#context-menus)
+[Plugin context menus](../plugins/menus-and-markers.md#context-menus)
 own the declaration contract.
 
 ### Slots

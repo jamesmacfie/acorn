@@ -1036,7 +1036,7 @@ describe('a contributor going away underneath', () => {
   // contributed may be on screen (registries/extensionPoints/plugin.ts). A group and the searches
   // under it are the first contribution kind that can hold each other, so the question is not only
   // "does the row go" but "does anything of it survive"
-  // (docs/plugins.md § Command kinds).
+  // (docs/plugins/commands.md § Command kinds).
 
   const plugin = (): Disposable[] => {
     const registrations = [

@@ -299,7 +299,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
       handle: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
       handlers: (point) => extensionsFor(point),
       // The names these three carried until 2026-08-31, kept for one major so a plugin outside this
-      // repository moves on its own schedule (docs/plugins.md § The plugin API). Aliases rather than
+      // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). Aliases rather than
       // wrappers, so the guard pass below wraps each of the six once and both spellings behave the same.
       open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
       contribute: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
@@ -464,7 +464,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
             : { taskId, title, detail, kind: 'plugin' })
         }
         : (notice) => broadcastNotice(plugin, notice),
-      // The receive side (docs/plugins.md § Hearing another plugin). Scoped by the same
+      // The receive side (docs/plugins/events.md § Hearing another plugin). Scoped by the same
       // `permissions.events` grant the plugin's frames are scoped by, so there is one vocabulary and
       // one prompt sentence per grant rather than two of each. A built-in has no manifest and hears
       // whatever the catalogue names.

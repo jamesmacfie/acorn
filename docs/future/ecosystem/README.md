@@ -64,6 +64,7 @@ both stuck behind.
 | `shell-vision.md` | The tension between "acorn as shell" and the permanent tier line, and the stance adopted. |
 | `work-plan.md` | The remaining sequenced work with dependencies, pointing at the owning design docs. |
 | `references-survey.md` | What the projects in `references/` do, which ones acorn can replace, and the five capabilities that recur across all of them. |
+| `where-this-is-going.md` | The next steps for the plugin system, moved from `docs/extensibility.md` on October 4, 2026. |
 
 `dx.md` was here and is gone: everything it asked for shipped. The bar it set is below; the
 differentiator it argued is in `shell-vision.md`; the residue it asked people to watch is enforced in

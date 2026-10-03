@@ -89,7 +89,7 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/attachment/*`, requireDevice)
     // Node providers. The sharpest of this group: the list enumerates the owner's infrastructure,
     // `adopt` hands over a durable credential for another machine, and `create` spends money. None of
-    // it is a question a task-scoped agent has any business asking (docs/plugins.md § Node providers).
+    // it is a question a task-scoped agent has any business asking (docs/plugins/node-providers.md § Node providers).
     .use(`${CORE_NAMESPACE}/nodes`, requireDevice)
     .use(`${CORE_NAMESPACE}/nodes/*`, requireDevice)
     // Schedules, same class again: a schedule is code this node runs unattended, so creating one buys
@@ -151,12 +151,12 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security and backup: this node's posture (security.md § On-disk)
     .route(`${CORE_NAMESPACE}/storage`, storage) // Settings → Storage and memory: memory and disk sizes (data-layer.md § What the node reports)
     .route(`${CORE_NAMESPACE}/attachment`, attachment) // Settings → Nodes: the control plane this node is attached to (docs/node-enrollment.md)
-    .route(`${CORE_NAMESPACE}/nodes`, nodeProviderRoutes) // plugin-provided nodes and their lifecycle (docs/plugins.md § Node providers)
+    .route(`${CORE_NAMESPACE}/nodes`, nodeProviderRoutes) // plugin-provided nodes and their lifecycle (docs/plugins/node-providers.md § Node providers)
     .route(`${CORE_NAMESPACE}/schedules`, schedules) // Settings → Schedules: periodic work owned by the node (docs/schedules.md)
     .route(`${CORE_NAMESPACE}/data-sources`, dataSources)
     .route(`${CORE_NAMESPACE}/queries`, queries)
     .route(`${CORE_NAMESPACE}/runs`, runs) // Settings → Run history: every plugin's runs, merged (@acorn/protocol/runs.ts)
-    .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins.md § Search providers)
+    .route(`${CORE_NAMESPACE}/search`, search) // core and plugin search providers, grouped (docs/plugins/search-providers.md § Search providers)
     .route(`${CORE_NAMESPACE}/backup`, backup) // docs/data-layer/backup-and-retention.md § Backup and import: core + plugin databases, minus credentials
     .route(`${CORE_NAMESPACE}/projects`, projects)
     .route(`${CORE_NAMESPACE}/workspaces`, workspaces)
