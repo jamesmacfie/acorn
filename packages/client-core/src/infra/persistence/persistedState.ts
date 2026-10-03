@@ -47,7 +47,7 @@ export const appStateBinding = <T>(read: () => T, hydrate: (value: T) => void): 
   hydrate: (_scopeId, value) => hydrate(value),
 })
 
-// A scope id qualified by the node that owns the resource it names (docs/state.md § Scope rules).
+// A scope id qualified by the node that owns the resource it names (docs/state-ownership.md § Scope rules).
 // The `app` scope is the exception: it describes this window, not a node's data, so qualifying it
 // would reset things like the left rail's collapse state on every node switch.
 //

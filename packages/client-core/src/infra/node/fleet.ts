@@ -110,7 +110,7 @@ export const nodeState = (nodeId: string): NodeConnectionState => statuses()[nod
 
 // The node this window opens on when nothing else is selected, and the one a notification with no node
 // of its own is attributed to. Not a prefs home: preferences follow the resource they describe
-// (docs/state.md § Scope rules).
+// (docs/state-ownership.md § Scope rules).
 export const homeNode = (): NodeRecord | undefined => nodes().find((node) => node.local) ?? nodes()[0]
 export const homeNodeId = (): string | null => homeNode()?.nodeId ?? null
 

@@ -55,7 +55,7 @@ export const staleWorktreeReason = (path: string, branch: string, on: string | n
   `${path} is ${on ? `checked out on '${on}', not '${branch}'` : `no longer a live git worktree for '${branch}'`}. Remove the directory and reopen the task.`
 
 // `created` tells a fresh `git worktree add` from reuse of an existing directory. Only the fresh
-// path runs setup (docs/terminal-and-agents.md).
+// path runs setup (docs/workspaces-and-tasks.md § Worktrees and setup).
 type EnsureWorktreeResult = { ok: true; path: string; created: boolean } | { ok: false; reason: string }
 
 // Git stderr can contain remote URLs with credentials. Surface the one actionable local setup

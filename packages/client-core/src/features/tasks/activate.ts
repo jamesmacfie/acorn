@@ -21,7 +21,7 @@ export function activateTaskSignals(t: Task, options?: { pane?: PaneId }): void 
   markPageChange('core', { to: 'task', 'task.id': t.id, ...(options?.pane ? { 'pane.id': options.pane } : {}) })
   setSelectedSource(null)
   setActiveTaskId(t.id)
-  markTaskRead(t.id) // viewing acknowledges its notices (docs/terminal-and-agents.md)
+  markTaskRead(t.id) // viewing acknowledges its notices (docs/notifications.md)
   if (options?.pane) return dispatchLayout(t.id, { type: 'show', pane: options.pane })
   // First open: the source that tracks this task says which pane it starts on. Seeding it keeps the
   // persisted layout explicit. A task no source claims is left alone, which is the reducer's default.

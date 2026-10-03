@@ -407,6 +407,13 @@ dependent baseline/checkpoint journeys still require an installed provider fixtu
   one narrow half of it is bought back: a denylist of the four directory names the 2026-08-30
   reorganisation deleted — `src/main/`, `src/app/`, `src/wiring/`, `src/service/` — each of which may
   appear only on a line that admits it is gone, as this one does;
+- the citation checker (`tools/arch/docCitations.test.ts`) reads the other direction: source files
+  under `apps/`, `packages/`, `plugins/`, `tools/`, and `scripts/` that cite a doc. Every
+  `docs/<page>.md` they name has to exist, with no exceptions. Every `§ Heading` after one has to
+  start with a heading or an explicit anchor in that doc, after wrapped comment lines are joined. The
+  section citations that failed when the check landed sit in `tools/arch/docCitations.allowlist.txt`,
+  and an entry that starts passing fails the test until you delete it, so the list only shrinks. The
+  same file prints the docs longer than 200 lines as a report, not a gate;
 - loadability tests EXECUTE the two rules that keep the workspace bootable, because a rule about
   whether something loads is honestly checked only by loading it:
   `packages/plugin-api/src/entrypoints.test.ts` imports every node-safe facade entrypoint in a

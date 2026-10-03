@@ -131,7 +131,7 @@ function parseLayer(text: string, source: string, errors: ConfigError[]): Layer 
       }
     }
   }
-  // [database] url_script: the Database pane's connection resolver (docs/pg.md).
+  // [database] url_script: the Database pane's connection resolver (docs/database.md § Connection resolution).
   const database = doc.database
   if (database && typeof database === 'object') layer.dbUrlScript = str((database as Record<string, unknown>).url_script)
   // [preview] mode and value: how the browser-preview pane resolves its URL (docs/panes.md).

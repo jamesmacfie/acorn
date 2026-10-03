@@ -157,7 +157,7 @@ export function scanContentRefs(texts: (string | null | undefined)[]): ContentRe
 // prefix already confirmed in the same surface by a URL the owning plugin's own recogniser claimed. The
 // prefix was witnessed, so there is no ambiguity to resolve, and the shape is host-owned, so there is no
 // pattern language to review. Cold-start bare refs with no witness are a different and later design,
-// recorded in docs/third-party/README.md.
+// recorded in docs/loaded-plugin-migration.md § What is still owed, beyond these findings.
 const BARE_REF_SHAPE = /^([A-Z][A-Z0-9]*)-\d+$/
 
 /** Prefix to the provider whose confirmed ref licensed it. First witness wins, so a second provider

@@ -1,6 +1,7 @@
 import { z } from 'zod'
 
-// The unified run list (docs/future/phased-review-steps/phase-4-node-autonomy.md 4.4).
+// The unified run list (docs/data-layer.md § Runs: a merged read, and the trigger for ever making it
+// a table).
 //
 // Three parts of the system model "a thing that started, took time, cost money, and ended" —
 // `workflow_runs`, agent sessions, `schedule_runs` — in three SQLite files, one per owner, so nothing

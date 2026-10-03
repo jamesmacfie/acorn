@@ -211,7 +211,7 @@ export type PluginHookHandler = {
 }
 
 // Where this plugin's data sources can be read from the node, with no client attached.
-// (docs/future/cron/targets.md § seam 1). Not a second way to declare a data source: the client-side
+// (docs/schedules.md § Sampling a published dashboard). Not a second way to declare a data source: the client-side
 // registration is what makes one appear in a panel editor, and this is the pointer that lets the
 // measure sampler ask the same route the same question. A loaded plugin registers nothing here.
 

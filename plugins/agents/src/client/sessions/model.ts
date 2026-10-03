@@ -1,4 +1,4 @@
-// Agent-surfaces model (docs/terminal-and-agents.md): pure mappers from headless stream-json events
+// Agent-surfaces model (docs/terminal.md § Activity and status): pure mappers from headless stream-json events
 // to the AgentState enum and to activity-feed items.
 //
 // The roster that merged PTY sessions with workflow steps went with the sidebar section that drew it

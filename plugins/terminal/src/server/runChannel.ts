@@ -21,7 +21,7 @@ export type RunSessionGlue = {
   retireSession(sessionId: string): void
 }
 
-// Runtime service: run targets as terminal sessions in the task worktree (docs/terminal-and-agents.md
+// Runtime service: run targets as terminal sessions in the task worktree (docs/terminal.md
 // § Process broker). Short-lived scripts (stop / url_command) run out-of-band with the same ACORN_*
 // env.
 export function createRuntimeService(

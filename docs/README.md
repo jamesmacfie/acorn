@@ -150,7 +150,8 @@ or external links depend on its path, and update relative links when moving a se
 Describe implemented behavior in reference pages. Put proposed application changes in
 [Future work](./future/README.md), and label dated measurements as historical evidence.
 Update this index when adding a page. `tools/arch/docPaths.test.ts` checks file paths and relative
-links; review the implementation to verify API signatures and behavior.
+links, and `tools/arch/docCitations.test.ts` checks the source comments that cite a doc. Review the
+implementation to verify API signatures and behavior.
 
 ## Plugin reference topics
 

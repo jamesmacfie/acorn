@@ -13,8 +13,7 @@ import { refreshFleet } from './fleet'
 // node. Today one node usually holds the cloud connection, so the two are indistinguishable — which
 // is exactly why the shortcut is worth refusing. The day the account credential moves off the local
 // node, or a second machine signs into the same account, the fan-out is already what the surface
-// does, and `providerNodeId` is stable across whoever answered, so nothing renumbers
-// (docs/future/phased-review-steps/cloud-guardrails.md rules 3 and 5).
+// does, and `providerNodeId` is stable across whoever answered, so nothing renumbers.
 
 const PROVIDED_KEY = ['provided-nodes'] as const
 

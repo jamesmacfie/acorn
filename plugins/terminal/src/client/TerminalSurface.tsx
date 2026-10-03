@@ -50,7 +50,7 @@ export default function TerminalSurface(props: { sessionId: string; fontSize: nu
   })
 
   // A PTY is pixels, so it is a rectangle rather than a tree: the kit owns the box and the way in and
-  // out of it with the keyboard, and xterm owns everything inside (docs/terminal-and-agents.md §
+  // out of it with the keyboard, and xterm owns everything inside (docs/terminal.md §
   // Client). `mount` is the element xterm attaches to, drawn by the host, which is why this file spells
   // no element and carries no stylesheet.
   return <Rectangle kind="pty" label="Terminal" hidden={props.hidden} mount={(element) => { host = element }} />

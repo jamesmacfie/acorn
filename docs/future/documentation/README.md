@@ -4,8 +4,13 @@ Date: October 3, 2026. Status: proposed, nothing started.
 
 The shipped docs under `docs/` run to 33,739 lines across 82 files. 55 of those files are longer
 than 220 lines, and the longest, [testing.md](../../testing.md), is 1,508. Many pages mix shipped
-behavior with dated measurements and design history. Source comments cite the docs about 3,000
-times, so a careless move breaks references that no test checks.
+behavior with dated measurements and design history.
+
+Source files cite the docs 3,008 times, and 2,493 of those name a section. The citation check from
+[phase 1](./01-guardrails.md) counted these on October 3, 2026. It found 206 distinct section
+citations, in 420 places, that name no heading in the cited doc. Its allowlist holds them until the
+phase that owns each doc fixes them. Two in three of those places cite `ui-design.md`, `tui.md`,
+`plugins.md`, or `dashboards.md`.
 
 This programme brings every shipped doc back in line with the code, restyles it to one house style,
 and splits long pages into topic folders. Six phases do the work in order. Each phase is sized so

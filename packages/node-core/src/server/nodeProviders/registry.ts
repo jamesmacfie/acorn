@@ -11,8 +11,7 @@ import { NODE_LIFECYCLE_VERBS, type NodeLifecycleVerb, type NodeProviderDescript
 // looking is broken in the case this seam exists for.
 //
 // Node-side, and staying that way. A renderer-side provider would put the cloud account credential in
-// the renderer, the one place the architecture has always kept credentials out of
-// (docs/future/phased-review-steps/cloud-guardrails.md rule 6). The credential is the thing that may
+// the renderer, the one place the architecture has always kept credentials out of. The credential is the thing that may
 // move later; the provider is not.
 
 /** What `list` answers with. The wire projection (`providedNodeSchema`) is strict and has no

@@ -1,7 +1,7 @@
 // Migration tooling for EVERY chain in the workspace, not just core's.
 //
 // Phase 2 split the single 45-table core.sqlite into core plus one SQLite file per plugin
-// (docs/vNext/data.md § Plugin DBs), so "the migration chain" became N chains: core's plus one per
+// (docs/data-layer.md § Plugin databases), so "the migration chain" became N chains: core's plus one per
 // plugin that owns tables. This script discovers them from the filesystem — any package with a
 // drizzle.config.ts is a chain — so adding a plugin DB needs no edit here.
 //

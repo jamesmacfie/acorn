@@ -179,7 +179,7 @@ describe('computeIdle', () => {
   })
 })
 
-describe('matchBlockedPrompt (docs/terminal-and-agents.md)', () => {
+describe('matchBlockedPrompt (docs/terminal.md § Activity and status)', () => {
   it.each([
     ['Do you want to proceed? (y/n)', true],
     ['Overwrite existing file? [Y/n]', true],

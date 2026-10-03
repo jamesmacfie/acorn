@@ -52,7 +52,7 @@ export const agentRailMarkerContribution: RailMarkerContribution = {
     if (target.kind !== 'task') return []
     return agentRailMarkers({
       // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
-      // working" (docs/terminal-and-agents.md).
+      // working" (docs/terminal.md § Activity and status).
       working: agentSessionsFor(target.id).filter((session) => !session.idle).length
         + forTask(target.id, isActiveAgent),
       attention: forTask(target.id, needsAttention),

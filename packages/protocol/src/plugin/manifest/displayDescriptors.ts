@@ -80,7 +80,7 @@ export const agentContextDescriptor = z.object({
 // One batch-enrichment route, so a surface holding identifiers of this plugin's items can display them
 // without importing this plugin. The host POSTs `{ identifiers }` and parses the answer against
 // @acorn/protocol/refResolvers.ts. There's no single-identifier form: ask for an array of one.
-// See docs/third-party/README.md § cross-plugin references.
+// See docs/plugins/descriptors.md § Descriptors.
 export const refResolverDescriptor = z.object({
   id: z.string().min(1).max(64),
   kind: z.string().min(1).max(64),

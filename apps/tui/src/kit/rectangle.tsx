@@ -19,7 +19,7 @@ import { boxBorder } from './roles'
 // running a terminal emulator written in JavaScript inside a browser inside an app; here the emulator
 // draws in cells, and the PTY's bytes go straight into it. The PTY itself does not move: it stays on
 // the node, reached over the same `term` WebSocket channel
-// (docs/terminal-and-agents.md), and this is a second emulator for it.
+// (docs/terminal.md § Sessions), and this is a second emulator for it.
 //
 // **The emulator is `@xterm/headless`**, which three other packages in this repo already depend on
 // and which the desktop draws the same PTY through — so a program's output is parsed by the same

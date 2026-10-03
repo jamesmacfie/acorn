@@ -1,4 +1,4 @@
-// Runtime service: owns run-target instances per task (docs/terminal-and-agents.md § Process
+// Runtime service: owns run-target instances per task (docs/terminal.md § Process
 // broker). An instance is just a terminal session in the task's worktree, so status derives from the
 // session map. Reachability comes from the target's `url` (fixed) or `url_command`
 // (run-and-parse-stdout, the existing term:previewUrl shape). acorn allocates no ports; isolation is
@@ -273,7 +273,7 @@ export class RuntimeService {
     return { running: true, url }
   }
 
-  // The default target's URL for the browser/preview home (docs/terminal-and-agents.md § Process
+  // The default target's URL for the browser/preview home (docs/terminal.md § Process
   // broker).
   async defaultUrl(taskId: string): Promise<string | undefined> {
     const cfg = await this.deps.loadTargets(taskId)

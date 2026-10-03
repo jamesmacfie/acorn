@@ -1,8 +1,7 @@
 import { Registry } from '../lib/state/registry'
 
 // A brand logo, as one SVG path's `d` attribute in a 24x24 box, not an SVG document. See
-// docs/ui-design.md § Icons for why, and docs/future/icons.md (git history) for the alternatives
-// this rules out.
+// docs/ui-design.md § Icons for why.
 export type BrandMark = {
   // Bare for a core mark, `<pluginId>` or `<pluginId>/<key>` for a plugin's. Icon looks it up under
   // a `brand:` prefix; the prefix keeps these out of ICON_NAMES and stays unambiguous if Lucide ever

@@ -8,8 +8,8 @@ export type TerminalSession = {
   profileId: string
   backend: 'node-pty' | 'tmux'
   status: 'running' | 'exited'
-  idle: boolean // agent has produced no output for a while (docs/terminal-and-agents.md); always false for shells
-  agentState: AgentState // docs/terminal-and-agents.md — PTY tier emits working|idle|blocked|unknown
+  idle: boolean // agent has produced no output for a while (docs/terminal.md § Activity and status); always false for shells
+  agentState: AgentState // docs/terminal.md § Activity and status: PTY tier emits working|idle|blocked|unknown
   // cwd is the task's isolated worktree, derived and never stored: `tasks.worktreePath` is the truth
   // (docs/workspaces-and-tasks.md), and main computes `cwd === task.worktreePath` at session create
   // and during `reconcileTmux`, so the flag survives app restarts. It stays on the wire as a
@@ -45,7 +45,7 @@ export type CreateOpts = {
   agentSessionId?: string
 }
 
-// A launchable profile as the renderer sees it (docs/terminal-and-agents.md). `available` is false when the command
+// A launchable profile as the renderer sees it (docs/terminal.md § Profiles). `available` is false when the command
 // isn't on PATH, the UI disables it. command/backend stay in main. `tmuxMissing` is true when the
 // profile prefers the durable tmux backend but tmux isn't installed, so a session would silently
 // degrade to node-pty (no restart survival). The drawer surfaces the hint.

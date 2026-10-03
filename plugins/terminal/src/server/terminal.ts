@@ -40,7 +40,7 @@ const log = createLogger('terminal', 'terminal')
 //    restart, because the tmux daemon is separate, and can be attached from a real terminal. Persisted
 //    to SQLite so startup can reconcile rows against `tmux list-sessions` and re-attach survivors.
 //
-// Terminal output is never persisted (docs/terminal-and-agents.md).
+// Terminal output is never persisted (docs/terminal.md § Sessions).
 //
 // This module is the session engine. HTTP bridges and WebSocket handlers are installed at the bottom;
 // plugin contributions and capabilities supply launch context and review snapshots.
@@ -54,7 +54,7 @@ type Session = {
   display: TerminalDisplay
   lastActivityAt: number
   sawIdle: boolean // has this session ever gone idle? the first idle uses a shorter window (FIRST_IDLE_MS)
-  // PTY output coalescing (docs/terminal-and-agents.md § Sessions).
+  // PTY output coalescing (docs/terminal.md § Sessions).
   pendingOut: string
   flushTimer: ReturnType<typeof setTimeout> | null
   callbacks: { dispose(): void }[]
@@ -65,7 +65,7 @@ type Session = {
   discardRow: boolean
 }
 
-// About one frame at 60 fps, the coalescing target (docs/terminal-and-agents.md § Sessions).
+// About one frame at 60 fps, the coalescing target (docs/terminal.md § Sessions).
 const OUTPUT_COALESCE_MS = 16
 
 const sessions = new Map<string, Session>()
@@ -95,7 +95,7 @@ function services(): TerminalCoreServices {
   return core
 }
 
-// sendToAgent (docs/terminal-and-agents.md § Sending text to an agent), with 'after-ready' queued
+// sendToAgent (docs/terminal.md § Sending text to an agent), with 'after-ready' queued
 // on the idle edge below. One instance over the live session map.
 const sendableSessions = new WeakMap<Session, SendableSession>()
 const agentSender = new AgentSender((id) => {
@@ -197,7 +197,7 @@ function worktreeSettled(s: Session): void {
   worktreeBroadcast(s.meta.taskId)
 }
 
-// PTY-tier AgentState (docs/terminal-and-agents.md): shells stay 'unknown'; agents flip between working
+// PTY-tier AgentState (docs/terminal.md § Activity and status): shells stay 'unknown'; agents flip between working
 // and idle with the silence detector, and 'blocked' lands with the prompt-pattern scan.
 const ptyState = (kind: 'shell' | 'agent', status: 'running' | 'exited', idle: boolean): TerminalSession['agentState'] =>
   kind !== 'agent' ? 'unknown' : status !== 'running' ? 'done' : idle ? 'idle' : 'working'
@@ -813,7 +813,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     list: async () => { assertOwner(engine); return [...sessions.values()].filter(s => s.admitted && !s.retired).map((s) => s.meta) },
     profiles: async () => listProfiles(),
     create: (opts) => create(opts ?? ({} as CreateOpts), engine),
-    // sendToAgent (docs/terminal-and-agents.md § Sending text to an agent).
+    // sendToAgent (docs/terminal.md § Sending text to an agent).
     sendToAgent: async (sessionId, text, submit) => {
       assertOwner(engine)
       if (!sessionId || !text) return { ok: false, reason: 'Invalid payload.' }

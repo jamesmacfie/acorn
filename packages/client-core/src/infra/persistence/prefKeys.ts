@@ -100,7 +100,7 @@ export const PrefKeys = {
   // the same reason, and the device's for the same reason too: the plugin behind a pick may not be
   // installed on the other machine paired with this node.
   remoteSlots: 'remote_slots',
-  // User-composed panel definitions and where they are placed (docs/state.md § Scope rules,
+  // User-composed panel definitions and where they are placed (docs/state-ownership.md § Scope rules,
   // dashboards/persist.ts). The node's, because a panel describes that node's resources, so every
   // client paired with the node renders the board its owner built.
   dashboards: 'dashboards',

@@ -22,8 +22,7 @@ export type ProvidedNodeState = z.infer<typeof providedNodeStateSchema>
 export const providedNodeSchema = z.strictObject({
   // The control plane's own id for this node, stable no matter which node asked. That stability is
   // what lets two nodes signed into one account list the same cloud nodes, and what makes moving
-  // credential custody later renumber nothing (docs/future/phased-review-steps/cloud-guardrails.md
-  // rule 5).
+  // credential custody later renumber nothing.
   providerNodeId: z.string().min(1),
   // acorn's own id, once the node has booted far enough to have one. Null before that.
   nodeId: z.string().nullable(),

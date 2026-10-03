@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
+import { ROOT, anchors } from './docAnchors'
 
 // The docs carry a second implementation of the design (architecture review, finding 7), so a
 // reference that points at nothing is a bug rather than a typo. Twelve of the source paths cited
@@ -11,16 +11,6 @@ import { describe, expect, it } from 'vitest'
 // between two docs has to resolve, and a fragment on either kind of doc link has to name a heading or
 // an explicit anchor in the target. A file-only check turns a moved section into a link that looks
 // valid in review and lands at the top of a long page.
-
-const ROOT = (() => {
-  let dir = dirname(fileURLToPath(import.meta.url))
-  for (;;) {
-    if (existsSync(join(dir, 'pnpm-workspace.yaml'))) return dir
-    const parent = dirname(dir)
-    if (parent === dir) throw new Error('Could not locate the workspace root')
-    dir = parent
-  }
-})()
 
 const DOCS = join(ROOT, 'docs')
 
@@ -66,37 +56,6 @@ const isDataRoot = (path: string) => path.endsWith('.sqlite')
 // that lands in `docs/` needs the same exemption.
 const REVIEWS: string[] = []
 const isReview = (file: string) => REVIEWS.some((prefix) => rel(file).startsWith(prefix))
-
-// GitHub-style heading ids: markup is removed, punctuation is dropped, spaces become hyphens, and a
-// repeated heading receives a numeric suffix. Explicit `<a id="…">` anchors are included because the
-// landing pages use them to preserve old section links after moving long references into subfolders.
-const anchors = (file: string): Set<string> => {
-  const found = new Set<string>()
-  const duplicates = new Map<string, number>()
-  let fenced = false
-  for (const line of readFileSync(file, 'utf8').split('\n')) {
-    if (line.startsWith('```')) {
-      fenced = !fenced
-      continue
-    }
-    if (fenced) continue
-    for (const match of line.matchAll(/<a\s+(?:name|id)=["']([^"']+)["'][^>]*>/gi)) found.add(match[1])
-    const heading = /^(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line)
-    if (!heading) continue
-    const base = heading[2]
-      .replace(/<\/?(?:a|span|code|em|strong)\b[^>]*>/gi, '')
-      .replace(/!?(?:\[([^\]]*)\])\([^)]*\)/g, '$1')
-      .replace(/[`*_~]/g, '')
-      .toLowerCase()
-      .replace(/[^\p{L}\p{N}\s-]/gu, '')
-      .trim()
-      .replace(/\s/g, '-')
-    const count = duplicates.get(base) ?? 0
-    duplicates.set(base, count + 1)
-    found.add(count === 0 ? base : `${base}-${count}`)
-  }
-  return found
-}
 
 const decodeFragment = (fragment: string): string => {
   try {
