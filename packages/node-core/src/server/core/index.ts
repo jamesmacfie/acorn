@@ -1,3 +1,4 @@
+import { taskScriptEvidence, type TaskScriptEvidenceService } from '../taskScripts/service'
 import type { AppDatabase } from '../db'
 import type { ActiveIdentityStore } from '../activeIdentity'
 import { createContextService, type ContextService } from './context'
@@ -85,6 +86,7 @@ export type CoreServices = {
 
 /** First-party orchestration seams that never cross the loaded-plugin boundary. */
 export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects'> & {
+  taskScripts: TaskScriptEvidenceService
   tasks: CompiledTaskService
   projects: CompiledProjectService
 }
@@ -107,6 +109,7 @@ export function createCoreServices(options: {
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
     tasks,
+    taskScripts: taskScriptEvidence(options.db),
     context: createContextService(options.db),
     models: createModelService(options.db, options.secrets),
     data: createDataSourceService({ tasks, projects, fs, proc }),

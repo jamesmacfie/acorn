@@ -17,7 +17,7 @@ import { createSourceScope } from './sourceScope'
 import { taskStatus } from '../tasks/taskStatus'
 import { markersFor } from '../../host/registries/rail/railMarkerFeed'
 import { railStatusMarkers } from '../tasks/railStatus'
-import { isSettingUp } from '../tasks/agentSessions'
+import { createTaskScripts } from '../tasks/taskScripts'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
@@ -441,6 +441,7 @@ export default function TabRail() {
           {(w) => {
             // CI checks are provider-owned data. The shared rail no longer reaches through a
             // repository source seam; the GitHub PR pane remains the authoritative check surface.
+            const scripts = createTaskScripts(() => w.id)
             const checks = () => []
             const st = () => taskStatus(w.id)
             // Core's own states plus whatever plugins publish for this task. RailTab orders them,
@@ -451,8 +452,8 @@ export default function TabRail() {
                 checks: w.pullNumber != null && checks().length ? checksState(checks()) : null,
                 unread: !!unreadForTask(w.id),
                 status: st(),
-                archiving: isArchiving(w.id),
-                settingUp: isSettingUp(w.id),
+                archiving: isArchiving(w.id) || scripts.freshness() === 'live' && !!scripts.query.data?.archiveInProgress,
+                settingUp: scripts.freshness() === 'live' && ['starting', 'running'].includes(scripts.query.data?.setup.state ?? ''),
                 pinned: pinnedTasks().has(w.id),
               }),
               ...markersFor({ kind: 'task', id: w.id }),

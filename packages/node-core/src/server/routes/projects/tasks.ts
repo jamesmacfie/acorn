@@ -1,3 +1,5 @@
+import { recordSetupDecision } from '../../taskScripts/setup'
+import { taskScripts } from '../../taskScripts/service'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { and, desc, eq, inArray, max } from 'drizzle-orm'
@@ -242,10 +244,11 @@ export const tasks = new Hono<AppEnv>()
     // Every write on this router announces itself (server/notify.ts § broadcastTasksChanged). The task
     // list is what the rail draws, so a second window that missed a create used to sit on a stale list
     // until it reconnected (docs/plugins.md § Hearing a core event).
+    await recordSetupDecision(db, id, false)
     broadcastTasksChanged({ taskId: id })
     return c.json(
       rowToTask(
-        { id, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
+        { id, scriptGeneration: 1, scriptHistoryKnown: true, title, icon, origin: seed.origin, projectId: project.id, branch, skipSetup: seed.skipSetup ?? false, pullNumber: seed.pullNumber ?? null, worktreePath, status: 'active', parentId: null, sort, createdAt: now, updatedAt: now, archivedAt: null },
         links,
         project,
       ),
@@ -279,6 +282,8 @@ export const tasks = new Hono<AppEnv>()
     // The client archives this way when it has no terminal plugin to run the full archive route. The
     // worktree stays, but the task's plugin work still stops (server/pluginHost/hooks.ts §
     // core:task-archiving). After the write, so nothing can start new work on the task in between.
+    if (patch.status === 'active' && existing.status === 'archived') taskScripts(db).newGeneration(id)
+    if (patch.status === 'archived' && existing.status !== 'archived') taskScripts(db).admit(id, 'teardown', 'not_applicable')
     if (patch.status === 'archived' && existing.status !== 'archived') await runHook('core:task-archiving', { taskId: id })
     const publicStateChanged =
       (patch.title !== undefined && patch.title !== existing.title)

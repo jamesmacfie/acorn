@@ -381,3 +381,61 @@ panes. An orphan or a lineage cycle stays visible as a top-level row instead of 
 Workflow descendants start collapsed under their ordinary root as described above; manual descendants
 remain visible. A run-history link to an archived or missing child explains that state and retains the
 record and attempt history instead of dropping the link's context.
+
+## Durable task script results
+
+Core owns setup and teardown attempts in `task_script_attempts`; the Terminal plugin owns the
+process and reports typed evidence through the compiled `CoreServices.taskScripts` facet.
+CLI, MCP, desktop, and TUI read the same Core service. Reading status, logs, or waiting never
+resolves a worktree or executes a script. A usable task root and a successfully created agent
+session do not prove that setup has finished.
+
+Each accepted execution or explicit skip has a unique `attemptId` and task `generation`.
+Worktree creation and restoration advance the generation; teardown retries get a new attempt.
+The current phase selects the latest attempt in the current generation. Status also includes
+up to 50 recent attempt summaries and `attemptsTruncated`; an explicit attempt ID reads retained
+history. Configuration edits cannot rewrite an attempt's outcome. Late evidence from a previous
+generation cannot mutate the current cycle.
+
+| State | Evidence or meaning |
+| --- | --- |
+| `not_started` | No request in this known cycle; no invented timestamps. |
+| `starting` | Core admitted execution before spawning. |
+| `running` | The process owner reported process creation. Installation may be incomplete. |
+| `succeeded` | Confirmed command exit code 0. |
+| `failed` | `spawn_failed`, `nonzero_exit`, or `timeout`. |
+| `skipped` | `user_skipped`, `disabled`, `not_configured`, or `not_applicable`. |
+| `interrupted` | Cancellation, terminal removal, shutdown, restart, lost process, or generation change. |
+| `unknown` | No trustworthy history, including legacy or adopted worktrees. |
+
+A null exit code never means success. A configured lazy setup remains `not_started` until its
+existing trigger runs. Teardown remains unrequested until archive reaches script admission;
+archive refusals before that point do not fabricate teardown attempts. Teardown success is
+independent of later cleanup or worktree-removal failure. `archiveInProgress` covers the entire
+archive operation, rather than only script execution.
+
+The desktop's task script controls open script details, a live terminal when available, and an on-demand
+log tail. The setup rail marker uses the durable snapshot. TUI task chrome shows both phases.
+Offline and stale snapshots are labeled; cached running state is not evidence of a live process.
+
+### Retention and recovery
+
+Each attempt retains a UTF-8 tail of at most 64 KiB. Log queries return at most 1,000 lines and
+32 KiB (default 100 lines), with availability, retained/returned byte counts, and truncation flags.
+Acorn task/device token patterns are redacted before storage. Script bodies and inherited
+credentials are not copied into metadata or launch summaries. Arbitrary script output may still
+contain secrets printed by the script itself; avoid printing them. Capture that was unavailable
+is reported as unavailable, never as a fabricated empty successful log.
+
+Terminal removal and successful archive preserve results and tails. Project deletion removes
+its tasks and their attempts, matching the owning task's lifetime. On boot, the Terminal owner
+reattaches known live durable sessions where possible; Core interrupts unrecoverable attempts
+with reason `restart`. A tmux attach-client exit cannot prove the script command succeeded.
+Node shutdown interrupts ordinary PTYs; durable attachments retain recoverable identity.
+Recovery does not rerun scripts.
+
+Waits bind to an attempt and generation, subscribe before their authoritative reread, and clean
+up subscriptions, timers, and abort listeners on settlement. A Node call waits at most 30 seconds.
+Not requested and unknown phases return promptly; settled skips include their reason. A timeout
+returns `matched: false` and does not stop the script. Content-free task invalidations publish
+after committed writes; clients reread after notices and reconnects.

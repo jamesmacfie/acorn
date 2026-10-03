@@ -6,6 +6,7 @@ import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 export type ToolRisk = SharedToolRisk
 
 export type ToolContext = {
+  signal?: AbortSignal
   taskId: string
   userLogin: string
   sessionId?: string

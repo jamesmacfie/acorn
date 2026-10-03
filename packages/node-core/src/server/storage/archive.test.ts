@@ -1,11 +1,13 @@
 import { execFileSync } from 'node:child_process'
-import { cpSync, existsSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, mkdtempSync, readFileSync, realpathSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
 import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
+import { taskScripts } from '../taskScripts/service'
+import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
 import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
 
@@ -108,6 +110,7 @@ describe('archiveTask teardown ordering', () => {
     const [row] = await t.db.select().from(schema.tasks)
     expect(row.status).toBe('archived')
     expect(row.worktreePath).toBeNull()
+    expect(taskScripts(t.db).status('task1').teardown).toMatchObject({ state: 'succeeded', exitCode: 0 })
   })
 
   it('stops managed agents after teardown and before worktree removal', async () => {
@@ -169,6 +172,39 @@ describe('archiveTask teardown ordering', () => {
     const res = await archiveTask(t.db, 'task1', {}, deps())
     expect(res).toEqual({ ok: true })
     expect(existsSync(worktree)).toBe(false)
+  })
+
+  it('retains teardown success when worktree removal refuses archive, then records a fresh retry', async () => {
+    await setTeardown('echo cleaned')
+    writeFileSync(join(worktree, 'dirty.txt'), 'x')
+    expect((await archiveTask(t.db, 'task1', {}, deps())).ok).toBe(false)
+    const scripts = taskScripts(t.db)
+    const first = scripts.status('task1').teardown
+    expect(first).toMatchObject({ state: 'succeeded', exitCode: 0 })
+    expect(scripts.logs('task1', { phase: 'teardown' }).output).toContain('cleaned')
+    expect(scripts.status('task1').archiveInProgress).toBe(false)
+    expect((await archiveTask(t.db, 'task1', { force: true }, deps())).ok).toBe(true)
+    expect(scripts.status('task1').teardown.attemptId).not.toBe(first.attemptId)
+    expect(scripts.logs('task1', { phase: 'teardown', attemptId: first.attemptId! }).snapshot.state).toBe('succeeded')
+  })
+
+  it('restoring a retained worktree gives fresh setup identity without rerunning a script', async () => {
+    const root = join(dir, 'managed'); mkdirSync(root)
+    setWorktreesRoot(root)
+    const managed = join(root, worktreeBranchDirName('acme', 'widget', 'feat/x'))
+    git(checkout, 'worktree', 'move', worktree, managed)
+    worktree = managed
+    await t.db.update(schema.tasks).set({ worktreePath: managed }).where(eq(schema.tasks.id, 'task1'))
+    const scripts = taskScripts(t.db)
+    const old = scripts.admit('task1', 'setup')
+    scripts.report({ attemptId: old.attemptId!, generation: old.generation }, { type: 'exit', exitCode: 0 })
+    expect(await archiveTask(t.db, 'task1', { deleteWorktree: false }, deps())).toEqual({ ok: true })
+    expect(await restoreTask(t.db, 'task1')).toEqual({ ok: true })
+    const current = scripts.status('task1')
+    expect(current.generation).toBeGreaterThan(old.generation)
+    expect(current.setup.attemptId).toBeNull()
+    expect(current.setup.state).toBe('unknown')
+    expect(scripts.logs('task1', { phase: 'setup', attemptId: old.attemptId! }).snapshot.state).toBe('succeeded')
   })
 
   it('still refuses a dirty worktree without force (guard unchanged)', async () => {

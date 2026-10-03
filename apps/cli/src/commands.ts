@@ -1,3 +1,4 @@
+import { runScriptCommand, validateScriptCommand } from './scriptCommands'
 import type { ArchivedTask, NodePluginState, Project, ProjectsResponse, Task, Workspace } from '@acorn/protocol/api.ts'
 import type { CliNode } from './node'
 import type { ParsedArgs } from './args'
@@ -20,6 +21,7 @@ const unexpected = (): never => { throw new CliError('invalid_response', 'The No
 
 export function validateCommand(args: ParsedArgs): void {
   const [subject, verb, id, , overflow] = args.positionals
+  if (subject === 'task' && verb === 'scripts') { validateScriptCommand(args); return }
   if (subject === 'plugin' && verb !== 'list') {
     if (!verb || !id || overflow || args.positionals.length !== 3) throw new CliError('usage', 'Use plugin ID commands or plugin ID COMMAND.', 2)
     const allowed = new Set(['node', 'output', 'no-header', 'help', ...(id === 'commands' ? [] : ['input-file', 'request-id'])])
@@ -80,6 +82,7 @@ export function validateCommand(args: ParsedArgs): void {
 }
 
 export async function runCommand(node: CliNode, args: ParsedArgs): Promise<unknown> {
+  if (args.positionals[0] === 'task' && args.positionals[1] === 'scripts') return runScriptCommand(node, args)
   validateCommand(args)
   const [subject, verb, id] = args.positionals
   if (subject === 'agent') return runAgentCommand(node, args)

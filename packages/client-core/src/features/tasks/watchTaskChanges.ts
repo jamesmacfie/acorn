@@ -1,3 +1,4 @@
+import { taskScriptsKey } from '@acorn/protocol/taskScripts.ts'
 // The client half of `tasks:changed` (docs/plugins.md § Hearing a core event).
 //
 // Every task write on the node announces itself (node-core/server/notify.ts § broadcastTasksChanged)
@@ -22,6 +23,7 @@ export function watchTaskChanges(): () => void {
     // The active node's cache only: the socket that delivered this belongs to it, and no other node
     // has a mounted query to refetch. Same reasoning as the reconnect sweep in the desktop bootstrap.
     void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: tasksKey })
+    void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: event.taskId ? [...taskScriptsKey, event.taskId] : taskScriptsKey })
     // …and re-emit for everything that listens on the client bus rather than on the cache, which is
     // how a plugin frame hears it: the bus is the only thing a frame can subscribe to, and the socket
     // is not (plugins/frames/channels.ts).

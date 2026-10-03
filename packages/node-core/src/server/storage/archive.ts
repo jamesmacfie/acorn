@@ -1,3 +1,5 @@
+import { recordSetupDecision } from '../taskScripts/setup'
+import { taskScripts } from '../taskScripts/service'
 // Task archive orchestration. docs/workspaces-and-tasks.md § Worktrees and setup covers the
 // lifecycle order.
 //
@@ -21,7 +23,7 @@ const exec = promisify(execFile)
 
 export const TEARDOWN_TIMEOUT_MS = 2 * 60 * 1000
 
-export type TeardownResult = { exitCode: number | null; output: string }
+export type TeardownResult = { exitCode: number | null; output: string; reason?: 'timeout' | 'spawn_failed' | 'cancelled' | 'nonzero_exit' }
 
 // Run a teardown script to completion in the worktree, which still exists at this point. The default
 // runner for tests and as a fallback. The app injects one that streams to the task drawer.
@@ -32,8 +34,10 @@ export async function runTeardownProcess(script: string, cwd: string, env: Recor
   } catch (err) {
     const e = err as { code?: number | string; stdout?: string; stderr?: string; killed?: boolean; message?: string }
     return {
-      exitCode: typeof e.code === 'number' ? e.code : e.killed ? null : 1,
-      output: `${e.stdout ?? ''}${e.stderr ?? ''}` || (e.message ?? 'teardown failed'),
+      exitCode: typeof e.code === 'number' ? e.code : null,
+      reason: e.killed ? 'timeout' : typeof e.code === 'number' ? 'nonzero_exit' : 'spawn_failed',
+      // exec errors can include the complete shell command. Keep only captured process output.
+      output: `${e.stdout ?? ''}${e.stderr ?? ''}`,
     }
   }
 }
@@ -45,7 +49,7 @@ export type ArchiveDeps = {
   killRunning: (taskId: string) => void
   dropTaskSessions: (taskId: string) => Promise<void>
   // Teardown runner. The app streams it through a drawer session, and tests use runTeardownProcess.
-  runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string) => Promise<TeardownResult>
+  runTeardown: (script: string, cwd: string, env: Record<string, string>, taskId: string, attempt?: { attemptId: string; generation: number }) => Promise<TeardownResult>
   // The plugin cleanups the owner ticked in the archive dialog, resolved and run by the caller
   // (server/pluginHost/taskChecks.ts). Injected rather than imported, like every other dep here, so this
   // module never reaches into the server layer. It returns the plugin ids whose cleanup failed. The
@@ -90,8 +94,11 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
   // Teardown runs while the worktree and any services still exist, before sessions stop and before
   // removal. A non-zero exit pauses the archive so the caller can abort or re-invoke with
   // skipTeardown. Nothing has been torn down yet.
+  const scripts = taskScripts(db)
+  const script = project ? await teardownScriptFor(db, project.id) : null
+  const skip = opts.skipTeardown ? 'user_skipped' : !deleteWorktree || !ownsWorktree || !t.worktreePath || !deps.isDir(t.worktreePath) || !project ? 'not_applicable' : !script ? 'not_configured' : undefined
+  const attempt = scripts.admit(id, 'teardown', skip)
   if (deleteWorktree && ownsWorktree && !opts.skipTeardown && t.worktreePath && deps.isDir(t.worktreePath) && project) {
-    const script = await teardownScriptFor(db, project.id)
     if (script) {
       const env = buildSessionEnv({
         taskId: t.id,
@@ -104,7 +111,15 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
           title: t.title,
         },
       })
-      const res = await deps.runTeardown(script, t.worktreePath, env, t.id)
+      const identity = { attemptId: attempt.attemptId!, generation: attempt.generation }
+      let res: TeardownResult
+      try { res = await deps.runTeardown(script, t.worktreePath, env, t.id, identity) }
+      catch { res = { exitCode: null, output: '', reason: 'spawn_failed' } }
+      // Fallback runners return evidence in their result; the PTY runner already reported it.
+      scripts.report(identity, { type: 'output', data: res.output })
+      if (res.reason === 'timeout' || res.reason === 'spawn_failed') scripts.report(identity, { type: 'failed', reason: res.reason })
+      else if (res.reason === 'cancelled') scripts.report(identity, { type: 'interrupted', reason: 'cancelled' })
+      else scripts.report(identity, { type: 'exit', exitCode: res.exitCode })
       if (res.exitCode !== 0) {
         return { ok: false, reason: `Teardown script failed (exit ${res.exitCode ?? 'timeout'}).`, teardownFailed: true, output: res.output.slice(-2000) }
       }
@@ -126,7 +141,7 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
 
   if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
     const res = await removeWorktree(project.path, t.worktreePath, force) // force discards a dirty tree
-      if (!res.ok) return res
+    if (!res.ok) return res
     // With no mapped checkout there is nothing to git-remove, so archive anyway and drop the
     // orphaned reference.
   }
@@ -162,6 +177,7 @@ export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts
   if (checkout && branch && t.pullNumber == null && !opts.newBranch && !(await branchExists(checkout, branch))) {
     return { ok: false, reason: `Branch '${branch}' no longer exists.`, branchMissing: true }
   }
+  if (!checkout || !branch) taskScripts(db).newGeneration(id)
   await db.update(schema.tasks).set({ status: 'active', archivedAt: null, updatedAt: Date.now() }).where(eq(schema.tasks.id, id))
   if (checkout && branch) {
     try {
@@ -174,6 +190,10 @@ export async function restoreTask(db: AppDatabase, id: string, opts: RestoreOpts
       return { ok: false, reason: err instanceof Error ? err.message : 'Could not rebuild the worktree.' }
     }
   }
+  // Git can reuse a retained worktree without firing worktree-created. Restoration still owns a
+  // fresh cycle; existing folders provide no proof that this cycle ran setup.
+  if (taskScripts(db).status(id).generation === t.scriptGeneration) taskScripts(db).newGeneration(id)
+  await recordSetupDecision(db, id)
   broadcastTasksChanged({ taskId: id })
   return { ok: true }
 }

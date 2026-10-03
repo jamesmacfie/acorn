@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { FleetStore, NodeBroker, type FleetNode } from '@acorn/custody/broker'
+import { FleetStore, NodeBroker, openTaskConnection, type FleetNode } from '@acorn/custody/broker'
 import { probeNode } from '@acorn/custody/broker/nodePairing.ts'
 import { AmbiguousNodeError, custody, dataRootDir, pairInteractively, rememberedNode, runningNode } from '@acorn/custody/local'
 import { LOCAL_TOKEN_SCOPE } from '@acorn/custody/custody/deviceTokenStore.ts'
@@ -10,7 +10,8 @@ import { CliError } from './error'
 export type CliNode = {
   nodeId: string
   endpoint: string
-  get(path: string): Promise<unknown>
+  taskId?: string
+  get(path: string, signal?: AbortSignal): Promise<unknown>
   mutate(method: 'POST' | 'PATCH' | 'PUT' | 'DELETE', path: string, body: unknown, key: string): Promise<unknown>
   waitForHint?(sessionId: string, timeoutMs: number): Promise<void>
   close(): void
@@ -36,6 +37,19 @@ const localPairingInstructions = (pid: number): string =>
   `If it is standalone, run kill -USR1 ${pid} and read its terminal output.`
 
 export async function openCliNode(target?: string): Promise<CliNode> {
+  if (process.env.ACORN_TASK_ID || process.env.ACORN_API_TOKEN) {
+    try {
+      const task = await openTaskConnection(process.env, target)
+      return { ...task, get: async (path, signal) => {
+        try { return await task.get(path, signal) }
+        catch (error) {
+          if (signal?.aborted) throw error
+          const api = error as { status?: number; code?: string }
+          throw new CliError(api.code ?? 'task_connection', error instanceof Error ? error.message : String(error), api.status === 401 ? 3 : api.status && api.status < 500 ? 4 : 3)
+        }
+      }, mutate: async () => { throw new CliError('task_scope', 'Task credentials permit only task script reads in the CLI.', 4) } }
+    } catch (error) { throw new CliError('task_connection', error instanceof Error ? error.message : String(error), 3) }
+  }
   const { tokens, fleet } = custody()
   let selected: FleetNode
   if (target) {
@@ -84,22 +98,28 @@ export async function openCliNode(target?: string): Promise<CliNode> {
     bytes() {}, status(status) { latest = status; if (status.state === 'online') wake() },
   })
   broker.upsert({ ...selected, token })
-  const request = async (method: string, path: string, body?: unknown, key?: string): Promise<unknown> => {
+  const request = async (method: string, path: string, body?: unknown, key?: string, signal?: AbortSignal): Promise<unknown> => {
       if (latest?.state === 'incompatible') throw new CliError('protocol_mismatch', 'The Node protocol is incompatible.', 3)
       if (latest?.error?.code === 'identity_mismatch') throw new CliError('identity_mismatch', 'The Node certificate changed.', 3)
       let response: NodeFetchResponse
+      const requestId = randomUUID()
+      const abort = () => broker.abort(requestId)
+      if (signal?.aborted) throw signal.reason
+      signal?.addEventListener('abort', abort, { once: true })
       try {
         response = await broker.fetch(selected.nodeId, {
-          requestId: randomUUID(), path, method,
+          requestId, path, method, ...(/\/scripts\/wait(?:\?|$)/.test(path) ? { timeoutMs: 35_000 } : {}),
           headers: { ...(key ? { 'idempotency-key': key } : {}), ...(body !== undefined ? { 'content-type': 'application/json' } : {}) },
           ...(body !== undefined ? { body: { kind: 'bytes' as const, bytes: new TextEncoder().encode(JSON.stringify(body)) } } : {}),
         })
       } catch (error) {
+        if (signal?.aborted) throw error
         if ((error as { code?: unknown } | null)?.code === 'ACORN_PIN_MISMATCH') throw new CliError('identity_mismatch', 'The Node certificate changed.', 3)
         throw new CliError(method === 'GET' ? 'node_unreachable' : 'ambiguous_mutation',
           `${error instanceof Error ? error.message : String(error)}${key ? ` Request ID: ${key}. Inspect the resource before retrying.` : ''}`,
           method === 'GET' ? 3 : 7, key)
       }
+      finally { signal?.removeEventListener('abort', abort) }
       let result: unknown
       try { result = JSON.parse(new TextDecoder().decode(response.body)) }
       catch { throw new CliError('invalid_response', `Node returned invalid JSON for ${path}.`, method === 'GET' ? 1 : 7, key) }
@@ -115,7 +135,7 @@ export async function openCliNode(target?: string): Promise<CliNode> {
   return {
     nodeId: selected.nodeId,
     endpoint: selected.endpoint,
-    get: (path) => request('GET', path),
+    get: (path, signal) => request('GET', path, undefined, undefined, signal),
     mutate: (method, path, body, key) => request(method, path, body, key),
     waitForHint(sessionId, timeoutMs) {
       return new Promise<void>((resolve) => {

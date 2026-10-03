@@ -1,3 +1,5 @@
+import { recordSetupDecision } from '../taskScripts/setup'
+import { taskScripts } from '../taskScripts/service'
 // The task read seam (CoreServices.tasks). Plugins hold task ids and ask core to resolve them here,
 // so database handles stay private to their owning layer.
 import { and, eq, isNull, lt, max, or, sql } from 'drizzle-orm'
@@ -156,6 +158,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         return true
       })
       if (created) {
+        await recordSetupDecision(db, intendedTaskId, false)
         broadcastWorktreeStatusChanged({ taskId: intendedTaskId })
         broadcastTasksChanged({ taskId: intendedTaskId })
       }
@@ -359,6 +362,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
         })
       })
       if (!created) return id
+      await recordSetupDecision(db, id, false)
       broadcastWorktreeStatusChanged({ taskId: id })
       broadcastTasksChanged({ taskId: id })
       return id
@@ -366,6 +370,7 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
     cancel: async (taskId) => {
       const [task] = await db.select({ status: schema.tasks.status }).from(schema.tasks).where(eq(schema.tasks.id, taskId))
       if (!task || task.status === 'cancelled') return
+      taskScripts(db).interruptTask(taskId, 'cancelled')
       await db.update(schema.tasks).set({ status: 'cancelled', updatedAt: Date.now() }).where(eq(schema.tasks.id, taskId))
       broadcastWorktreeStatusChanged({ taskId })
       broadcastTasksChanged({ taskId })

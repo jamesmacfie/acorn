@@ -1,3 +1,4 @@
+import { scripts } from './routes/projects/taskScripts'
 import { Hono } from 'hono'
 import { authMiddleware, type AppEnv } from './middleware/auth'
 import { buildIntegrationProviderRoutes } from './integrations/providerRoutes'
@@ -162,6 +163,7 @@ export function createApp() {
     .route(`${CORE_NAMESPACE}/tasks`, tasks)
     .route(`${CORE_NAMESPACE}/tasks`, configTrust)
     .route(CORE_NAMESPACE, worktree)
+    .route(CORE_NAMESPACE, scripts)
     .route(`${CORE_NAMESPACE}/tasks`, taskContext) // /:id/context: the assembled task context (docs/agent-tools.md §4)
     .route(`${CORE_NAMESPACE}/tasks`, harness) // /:id/run: the renderer's run-target surface (docs/workflows.md §2)
     .route(`${CORE_NAMESPACE}/tasks`, agentTools) // /:id/tools + /:id/tools/:name: the agent-tool registry projection (docs/agent-tools.md)

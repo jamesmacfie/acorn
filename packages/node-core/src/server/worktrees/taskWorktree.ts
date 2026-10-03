@@ -1,3 +1,4 @@
+import { taskScripts } from '../taskScripts/service'
 // Task-to-checkout/worktree resolution shared by every privileged main-process surface. The task
 // ID, never a renderer-supplied absolute path, is the capability; paths are re-derived from the
 // database on every call.
@@ -284,11 +285,18 @@ export async function resolveTaskCwd(
     // (docs/plugins.md § Hearing a core event).
     broadcastTasksChanged({ taskId: t.id })
     if (wt.created) {
+      const scripts = taskScripts(db)
+      scripts.newGeneration(t.id)
+      const setup = await projectSetup(db, t.projectId)
+      scripts.prepareSetup(t.id, setup.script, t.skipSetup ? 'user_skipped' : setup.trigger === 'off' ? 'disabled' : !setup.script?.trim() ? 'not_configured' : undefined)
       await copyConfiguredFiles(db, t, checkout, wt.path)
-      // Awaited, not fired and forgotten: setup runs real commands in this worktree and the terminal
-      // that opens next expects to find them done. The chain runner bounds each handler, so an
+      // Awaited, not fired and forgotten: the hook admits the setup process before the next terminal opens.
+      // This awaits spawning, not completion; callers read task scripts for completion. The chain runner bounds each handler, so an
       // interceptor that hangs delays this by its own timeout and no longer.
       await runHook('core:worktree-created', { taskId: t.id, path: wt.path })
+      // No process owner accepted the admission (disabled/unavailable hook).
+      const pending = scripts.select(t.id, 'setup')
+      if (pending.state === 'starting' && pending.attemptId) scripts.report({ attemptId: pending.attemptId, generation: pending.generation }, { type: 'failed', reason: 'spawn_failed' })
     }
     return { cwd: wt.path, isWorktree: true, created: wt.created }
   })()

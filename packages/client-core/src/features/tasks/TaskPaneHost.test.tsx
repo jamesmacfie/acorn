@@ -6,7 +6,7 @@ import type { Disposable } from '../../kit/lib/state/registry'
 import TaskPaneHost from './TaskPaneHost'
 import { applyLayoutAction, type LayoutAction, type TaskLayout } from './taskLayout'
 
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
 
 // The busiest host in the shell: it decides which panes a task shows, drops the ones this task or
 // this environment cannot offer, and contains a pane that throws. The layout reducer has its own unit
