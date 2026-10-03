@@ -31,6 +31,7 @@ Start with the first three, in order. Take the topic files as a phase needs them
 | [identity.md](./identity.md) | Accounts, sign-in from each client, grants, enrollment v2, roles, route classification, and revocation. |
 | [relay.md](./relay.md) | How a client reaches a Node with no public address while still pinning its certificate. |
 | [projects-and-tasks.md](./projects-and-tasks.md) | Shared projects, snapshots, the attempt state machine, history transfer, and results. |
+| [memory.md](./memory.md) | Shared project memory, private memory per account, worker seeds and write forwarding, attribution, roles, and optional approval. Depends on phase 9. |
 | [archive.md](./archive.md) | The whole-root archive, verify-then-destroy, encryption, and restore with fresh credentials. |
 | [plugins-and-secrets.md](./plugins-and-secrets.md) | Plugin policy and locks, cloud connections, team secrets, and how model keys reach an agent. |
 | [isolation.md](./isolation.md) | How the sandbox programme applies inside a worker, egress, team policy, and the adversarial test. |

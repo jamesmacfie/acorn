@@ -119,7 +119,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
   dependencies, evidence, refusals, and sustained-use acceptance.
 
 - [Cloud tasks and control plane](./future/cloud/README.md) — proposed architecture, provider and
-  security gates, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
+  security gates, team memory, and sequenced delivery plan for team-owned projects and ephemeral task Nodes.
 - [Dashboards programme](./future/dashboards/README.md) — seven proposed workstreams, delivered in
   four milestones, that widen panels from 30 example requests: a typed panel plan, a source-first
   editor, identity and time, richer sources, row actions, composition, datasets, and gated write-back.

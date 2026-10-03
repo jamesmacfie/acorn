@@ -23,11 +23,10 @@ No application fix for this unit is included in the units 01–08 commit.
 
 ## Main-merge context
 
-[Simple memory](../memory/README.md) proposes direct agent writes and removal of Findings and its
-search index. It is not shipped. Revalidate its status before implementation: keep this performance
-work reusable at the current reconciliation owner, and avoid introducing new approval coupling or
-an index architecture that makes the proposed removal harder. If the proposal ships first, retire
-superseded acceptance checks and measure the replacement owner rather than optimizing deleted code.
+[Notes and memory](../../notes-and-memory.md) owns the shipped direct-write and file-scan contract.
+Findings and the SQLite search index were removed on 2026-10-02. The assignment below describes the
+October 1 audit snapshot. Revalidate it against the file-scan owner before implementation, retire
+superseded database and Findings acceptance checks, and measure the replacement owner.
 
 ## Detailed assignment
 

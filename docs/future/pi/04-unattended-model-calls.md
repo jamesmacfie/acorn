@@ -106,8 +106,8 @@ task-authorized, and that is enough for a reviewer. A plugin builds its own prom
    request.
 3. Test: a call with no grant fails without spending, a call over the cap fails, a call naming a
    backend ignores the grant, a harness call counts against the cap.
-4. Move Findings onto the grant, or leave it if [memory phase 2](../memory/02-remove-findings.md) is
-   about to delete it. Prove the grant with [05](./05-advisor.md).
+4. Prove the grant with [05](./05-advisor.md). Findings was removed by the shipped
+   [memory replacement](../../notes-and-memory.md#memory) and is no longer a grant consumer.
 5. Document the grant in [the manifest § Permissions](../../plugin-authoring/the-manifest.md#permissions)
    beside the `models` token, and the errors in [integrations.md](../../integrations.md#model-providers).
 

@@ -102,8 +102,8 @@ not ship 03 or 04 without 05, or another real consumer, landing behind them.
 ## Relation to other programmes
 
 - [mods.md](../mods.md) owns the design for 02. File 02 only adds to it.
-- [memory/](../memory/README.md) phase 2 deletes Findings. Findings is the only other consumer of
-  `agents.reviewInput.v1` and the precedent 04 generalizes. Memory phase 2 has shipped first and
+- The shipped [memory contract](../../notes-and-memory.md#memory) replaces Findings, which consumed
+  `agents.reviewInput.v1` and supplied the precedent 04 generalizes. The Findings removal also
   removed that capability. Phase 05 must introduce its bounded read contract when implemented.
 - [sandbox/](../sandbox/README.md) owns containment. Nothing here is containment, and 02 says so.
 - [ecosystem/](../ecosystem/README.md) owns discovery and signing. File 06 touches the Claude Code

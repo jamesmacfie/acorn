@@ -670,12 +670,26 @@ checklist, by [shell.md](./shell.md) § Signing gates and the updater, or by
     panes keep their layout, and the slow section reports itself without stalling the others
     ([notes-and-memory.md](./notes-and-memory.md) § Context integration).
 
-Memory phase 1 also needs a real-window check. In an isolated `dev:agent` session, add a project
+<a id="memory-acceptance"></a>
+
+Memory needs a real-window check. In an isolated `dev:agent` session, add a project
 memory from the Memory page and open its body. Confirm the file and change log stay under the
 session's data root. Open a `memory_write` transcript card from a task URL; **Open** must show that
 task's project memory, and **Undo** must remove a newly created file or restore its prior version.
-The Context pane must have no memory section. Harness behavior and the two-week noise measurement
-are recorded separately in [phase 1](./future/memory/01-direct-writes.md).
+The Context pane must have no memory section.
+
+The 2026-10-02 delivery checks covered the isolated Tauri page and transcript Open/Undo. Memory
+page acceptance also covered conflicting edits with the draft preserved, delete/restore, body-only
+search, standing-context preview, and cap settings. Isolated TUI checks at 120 by 40 covered reading,
+session links, context preview, and Undo; a real PTY test covered the disposable `$EDITOR` draft.
+These checks do not establish ordinary external-model behavior.
+
+Open acceptance: use managed Claude, managed Codex, and terminal agents in ordinary work to verify
+useful memory saves, standing-context delivery, and snapshot behavior on resume. Driver and admission
+tests verify prompt delivery and stored snapshots, but cannot establish whether a model chooses
+useful memories. Over two weeks of ordinary work, record writes per project, owner Undo/deletion
+counts and reasons, examples of good and bad saves, and whether the owner wants a review queue.
+The owner requested removal of Findings before this measurement finished; it remains open.
 
 The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
 [tui.md](./tui.md) § Keys and focus. Every one of them needs a real terminal and none can be

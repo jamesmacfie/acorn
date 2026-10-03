@@ -69,9 +69,9 @@ The [native validation notes](../../../plans/performance/native-validation-notes
 
 ## Main-merge context
 
-Re-read [simple memory](../memory/README.md), [agent-built apps](../dynamic-ui/README.md), and
+Re-read [notes and memory](../../notes-and-memory.md), [agent-built apps](../dynamic-ui/README.md), and
 [the terminal review](../tui-review/README.md) when their owners overlap a performance assignment.
-These proposals are context, not authorization to build them. Main also contains resident diff
+The proposals are context, not authorization to build them. Main also contains resident diff
 segments, provider idle handling, and native preview retention beyond the audit snapshot. Reproduce
 remaining costs before applying an older proposed fix. Historical measurements stay attached to the
 source versions that produced them.

@@ -38,6 +38,12 @@ anything. Admins remove people, and removed people lose access at once.
 
 Per-project roles. Single sign-on. GitHub organization sync.
 
+## Related work
+
+[Team memory](../memory.md) depends on this phase's roles and route classification. It specifies
+shared project memory, private memory per account, worker seeds and write forwarding, attribution,
+and optional approval, with its own delivery checkpoints.
+
 ## Steps and checkpoints
 
 ### 1. Invitations

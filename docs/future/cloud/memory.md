@@ -1,6 +1,6 @@
-# Phase 4: team memory
+# Team memory
 
-Status: proposed, 2026-10-01. Waits on [cloud phase 9](../cloud/phases/09-teams.md), which brings
+Status: proposed, 2026-10-01. Waits on [cloud phase 9](./phases/09-teams.md), which brings
 invitations, roles, and route classification. Nothing here changes a local Node with no account.
 
 ## Goal
@@ -20,10 +20,11 @@ write says who made it, and roles decide who can write and who can undo.
 
 ## Starting point
 
-- Phases 1 to 3: files, standing context, the tools, history, the change log, and the page.
+- The shipped [memory contract](../../notes-and-memory.md#memory): files, standing context, the tools,
+  history, the change log, and the page.
 - From the cloud programme: the team Node owns shared projects, a worker is a full Node for one task
   attempt, and grants carry a role of `admin`, `member`, or `viewer`
-  ([cloud identity](../cloud/identity.md), [cloud architecture](../cloud/architecture.md)).
+  ([cloud identity](./identity.md), [cloud architecture](./architecture.md)).
 
 ## Requirements
 
@@ -45,7 +46,7 @@ write says who made it, and roles decide who can write and who can undo.
    Node applies the same checks, hash rule, history, and change log as a local write.
 7. `memory_search` and `memory_get` on a worker read the seed copy plus that attempt's own writes. A
    write made by another attempt appears in sessions created after the next seed. This matches the
-   snapshot rule in [the design](./design.md#when-it-is-built).
+   snapshot rule in [context integration](../../notes-and-memory.md#context-integration).
 
 ### Roles and attribution
 
@@ -105,8 +106,8 @@ session does not see it until a member approves.
 
 - [Notes and memory](../../notes-and-memory.md): team scope, per-account private memory, roles, and
   approval.
-- The cloud programme's [projects and tasks](../cloud/projects-and-tasks.md) and
-  [identity](../cloud/identity.md), for the worker seed and the route classes.
+- [Projects and tasks](./projects-and-tasks.md) and [identity](./identity.md), for the worker seed
+  and the route classes.
 
 ## Verify before building
 

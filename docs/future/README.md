@@ -14,14 +14,13 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
-| [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
+| [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [sandbox/](./sandbox/README.md) | Per-task OS isolation, the loopback-API gates, and the enterprise policy layer. | API gates and the project-row trust snapshot shipped; the sandbox and policy layer remain. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | Panels that answer real questions: trustworthy results, a source-first editor on a typed panel plan run by the Node, identity and time, richer sources, author-chosen row actions, composition and analysis, datasets, and gated write-back. Seven workstreams delivered in four end-to-end milestones, built from 30 example panels and accepted against unseen requests. | Proposed, 2026-10-02; nothing built. Replaces the August 2026 backlog. |
 | [performance/](./performance/README.md) | Remaining sequential performance assignments, paired evidence, resource ownership, and sustained-use validation. | Units 01–08 reviewed; units 09–28 and final validation deferred, 2026-10-01. |
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
-| [memory/](./memory/README.md) | Simple memory: direct agent writes, the memory index in every session's system prompt, undo instead of review, and the removal of Findings. Four phases. | Phases 1 and 2 implemented for verification, 2026-10-02; phases 3 and 4 remain proposed. |
 | [pi/](./pi/README.md) | What acorn takes from oh-my-pi: run `omp` as a harness, then widen the edges acorn owns with a permission hook, plugin session messages, unattended model calls, an advisor, plugin skills, and a resource-read experiment. | Proposed, 2026-10-02; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
@@ -58,6 +57,12 @@ rung-2 containment is recorded in `blockers.md` and sandbox's
 `phases.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`memory/` phases 1–3 were implemented on 2026-10-02, and the folder was deleted on 2026-10-03.
+[Notes and memory](../notes-and-memory.md) owns direct writes, standing context, history, Undo,
+the Memory page, and import. [Testing](../testing.md#memory-acceptance) retains the open harness
+and usage checks. The proposed fourth phase moved to [cloud team memory](./cloud/memory.md).
+The design, research, refused alternatives, and delivery records remain in Git history.
 
 `client-plugins/` shipped its five phases in 2026-09 and was deleted on 2026-09-27.
 [Plugins](../plugins.md), [security](../security.md), [frontend composition](../frontend.md),
