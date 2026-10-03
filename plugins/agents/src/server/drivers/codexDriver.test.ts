@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
-import type { AgentDriverEvent } from './types'
+import type { AgentDriverEvent, AgentDriverMcpServer } from './types'
 
 const wire = vi.hoisted(() => ({
   requests: [] as Array<{ method: string; params: Record<string, unknown> }>,
@@ -144,7 +144,12 @@ const turn = (mode: string): AgentTurn => ({
   completedAt: null,
 })
 
-async function start(mode: string | null = null, resumed = false, config: Record<string, unknown> = {}) {
+async function start(
+  mode: string | null = null,
+  resumed = false,
+  config: Record<string, unknown> = {},
+  mcpServers: readonly AgentDriverMcpServer[] = [],
+) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
   const { CodexAgentDriver } = await import('./codexDriver')
@@ -153,7 +158,7 @@ async function start(mode: string | null = null, resumed = false, config: Record
     session: { ...base, config: { ...base.config, ...config } },
     cwd: '/tmp',
     env: {},
-    mcpServers: [],
+    mcpServers,
     noProviderExecutionHistory: false,
     onEvent: (event) => {
       driverEvents.push(event)
@@ -193,6 +198,29 @@ describe('Codex collaboration modes', () => {
     wire.requests.length = 0
     await (await start()).handle.stop()
     expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
+  })
+
+  it.each([false, true])('passes explicit MCP credentials for a custom agent with resumed=%s', async (resumed) => {
+    const { handle } = await start(null, resumed, {
+      customAgent: { id: 'a1', name: 'Phase delegator', instructions: 'Use Acorn delegation tools.' },
+    }, [{
+      transport: 'stdio',
+      name: 'acorn-dev',
+      command: '/opt/acorn/node',
+      args: ['/opt/acorn/mcp.js'],
+      env: { ACORN_API_TOKEN: 'signed', ACORN_TASK_ID: 'task-1', ACORN_SESSION_ID: 'session-1' },
+    }])
+    await handle.stop()
+
+    expect(wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params)
+      .toMatchObject({
+        developerInstructions: 'Use Acorn delegation tools.',
+        config: { mcp_servers: { 'acorn-dev': {
+          command: '/opt/acorn/node',
+          args: ['/opt/acorn/mcp.js'],
+          env: { ACORN_API_TOKEN: 'signed', ACORN_TASK_ID: 'task-1', ACORN_SESSION_ID: 'session-1' },
+        } } },
+      })
   })
 
   it('advertises the modes provider capability', async () => {

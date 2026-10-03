@@ -14,7 +14,7 @@ const sessionEnv = {
   ACORN_TASK_ID: 'task-1',
   ACORN_SESSION_ID: 'session-1',
 }
-const session = (profileId: string) => ({ profileId })
+const session = (profileId: string, driverKind = 'acp') => ({ profileId, driverKind })
 
 const profile = (id: string, extra: Partial<AgentProfileContribution> = {}): (() => void) =>
   agentProfileRegistry.register({
@@ -53,11 +53,28 @@ describe('acorn hands a harness its own tool server through one door', () => {
     }])
   })
 
-  it('offers nothing to a harness that registers acorn through its own CLI', () => {
-    // Claude Code and Codex both do. Offering it again here would list every acorn tool twice.
+  it('offers nothing to an ACP harness that registers acorn through its own CLI', () => {
     registered.push(profile('claude-code', { mcpRegistration: async () => ({ ok: true }) }))
 
     expect(acornMcpServers(mcp, session('claude-code'), sessionEnv)).toEqual([])
+  })
+
+  it('gives managed Codex its signed task context even when its CLI registers the server', () => {
+    registered.push(profile('codex', { mcpRegistration: async () => ({ ok: true }) }))
+
+    expect(acornMcpServers(mcp, session('codex', 'codex-app-server'), sessionEnv)).toEqual([{
+      transport: 'stdio',
+      name: 'acorn-dev',
+      command: '/opt/acorn/node',
+      args: ['/opt/acorn/mcp.js'],
+      env: {
+        ACORN_MCP_NAME: 'acorn-dev',
+        ACORN_API_TOKEN: 'signed',
+        ACORN_API_URL: 'https://127.0.0.1:4317',
+        ACORN_TASK_ID: 'task-1',
+        ACORN_SESSION_ID: 'session-1',
+      },
+    }])
   })
 
   it('offers nothing when the node never learned where its own server is', () => {
