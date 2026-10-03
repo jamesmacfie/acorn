@@ -17,7 +17,7 @@ export const dockerClientPlugin: ClientPlugin = {
   name: 'docker',
   activate: () => () => { retireDockerClient(); disposeDockerStore() },
   init: (ctx) => {
-    // The other feeder (docs/ui-design.md § Icons): a loaded plugin declares its mark in the manifest
+    // The other feeder (docs/ui-design/icons.md § Icons): a loaded plugin declares its mark in the manifest
     // and the host registers it, so every `brand:docker` glyph string below reads the same either
     // way.
     //

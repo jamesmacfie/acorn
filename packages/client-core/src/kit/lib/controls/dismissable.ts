@@ -3,7 +3,7 @@ import { trapTab } from '../../keys/trap'
 import { focusInAnchoredSurface, anchoredSurfacesWithin } from './anchor'
 
 // Dismissal plumbing for modal surfaces: Escape, backdrop click, and Tab focus containment. See
-// docs/ui-design.md § Chrome and overlays for why this exists and why the overlay palettes don't
+// docs/ui-design/overlays.md § Chrome and overlays for why this exists and why the overlay palettes don't
 // use it.
 
 export type Dismissable = {

@@ -1,4 +1,4 @@
-// The role tokens: the only values a kit node's props accept. See docs/ui-design.md § The closed
+// The role tokens: the only values a kit node's props accept. See docs/ui-design/closed-kit.md § The closed
 // kit for why a plugin names a meaning and never a pixel, a colour, or a class.
 //
 // Each host owns the mapping from a role to its own value; `kit/roles.ts` holds the DOM one and the
@@ -22,7 +22,7 @@ export const tone = ['neutral', 'muted', 'accent', 'ok', 'warn', 'danger'] as co
  *  the host class `.ui-find-mark` directly, which a plugin is not allowed to spell. */
 export const text = ['body', 'strong', 'muted', 'mono', 'eyebrow', 'heading', 'match'] as const
 
-/** Which border this is, by the job it does. See docs/ui-design.md § Borders: a pack may set any of
+/** Which border this is, by the job it does. See docs/ui-design/tokens.md § Border roles: a pack may set any of
  *  these to zero width, so picking the wrong role renders nothing at all. */
 export const border = ['none', 'divider', 'control', 'surface', 'stripe'] as const
 

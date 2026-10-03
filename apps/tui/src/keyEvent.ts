@@ -6,7 +6,7 @@ import type { KeyEvent as ParsedKey } from './input/events'
 // adapter needs `keyEvent` and it is in `App`'s eager graph, while `./renderer.ts` reaches the whole
 // painter — the screen, the buffers and the parser. Importing one from the other put 59 KB into a
 // startup closure that had no use for it, which the budget check caught
-// (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget).
+// (../scripts/check-startup-graph.mjs, docs/frontend/startup-budget.md § Startup budget).
 //
 // The parser's own vocabulary meets the engine's here, and the whole of the difference is one word:
 // what our parser calls `alt` the keymap calls `meta` (§ keyPressed). Everything else is the same

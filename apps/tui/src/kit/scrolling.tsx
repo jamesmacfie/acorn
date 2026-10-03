@@ -59,7 +59,7 @@ const KEY_SCROLLS: readonly { key: string; move: (box: Viewport) => void }[] = [
 // The page group, wherever the keys are inside the viewport. Focus-within rather than focus, because
 // the reader who most needs it is standing on a control halfway down a long panel and wants to see
 // the rest of the panel without giving up their place: arrows move between stops, page keys scroll
-// (docs/tui.md § Scrolling viewports).
+// (docs/tui/scrolling.md § Scrolling viewports).
 const PAGE_KEYS: Partial<Record<Intent, (box: Viewport) => void>> = {
   pagePrev: (box) => box.scrollBy(-1 / 2, 'viewport'),
   pageNext: (box) => box.scrollBy(1 / 2, 'viewport'),
@@ -134,7 +134,7 @@ const descendant = (at: Node, id: unknown): Node | null => {
  *
  * Nothing on the node knows how to scroll. The offset is a signal here and a prop there, so a node
  * cannot be in a scroll state the component disagrees with, and paint reads one number
- * (docs/tui.md § Scrolling viewports).
+ * (docs/tui/scrolling.md § Scrolling viewports).
  */
 function viewportBox(props: ViewportProps): JSX.Element {
   const [offset, setOffset] = createSignal(0)

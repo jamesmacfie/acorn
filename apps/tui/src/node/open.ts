@@ -5,7 +5,7 @@ import { pairInteractively } from './pair'
 import { startNode, type Handshake } from './supervise'
 
 // The `acorn` command's one decision: which node this run talks to, and whether it owns that node's
-// lifetime (docs/tui.md § Attach or start).
+// lifetime (docs/tui/process.md § Attach or start).
 //
 // Everything here is custody and process work. Nothing in it imports client-core, and nothing in
 // client-core imports it: the seam between them is `platform.ts`, which is handed the fleet store this
@@ -78,7 +78,7 @@ export async function openNode(target: string | undefined, at: Custody = custody
   // Nothing holds the root, so start one — and do not wait for it. A started node's boot is the
   // longest thing on this command's critical path (120 seconds of budget, and a full tsx boot in a
   // checkout), and the shell has a persisted cache it can draw from meanwhile
-  // (docs/tui.md § Attach or start).
+  // (docs/tui/process.md § Attach or start).
   const node = startNode(dataDir, tokens.read(LOCAL_TOKEN_SCOPE))
   const remember = (handshake: Handshake): Handshake => {
     fleet.remember(

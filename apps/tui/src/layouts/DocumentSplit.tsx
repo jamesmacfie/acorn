@@ -17,7 +17,7 @@ import { regionFocus } from '../keys/regions'
 // projection in docs/panes.md now says so.
 //
 // One component and two names, because the axis is in the name and never in a prop
-// (docs/panes.md § Layout model, on adding a ninth).
+// (docs/panes/layout.md § Layout model, on adding a ninth).
 
 const DEFAULT_DOCUMENT = 10
 const MIN_DOCUMENT = 3

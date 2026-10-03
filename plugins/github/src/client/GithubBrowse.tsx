@@ -113,7 +113,7 @@ export function GithubBrowseDetail() {
           what decides what the region shows while a chunk is loading, on either host. They arrived as
           a workaround for a cell host refusing the empty string a pending `lazy()` resolves to, and
           they are no longer that — the terminal paints a loose string as a one-line run
-          (docs/tui.md § Rendering). They stay because a boundary at a lazy mount is correct
+          (docs/tui/rendering.md § Rendering). They stay because a boundary at a lazy mount is correct
           either way. */}
       <Show
         when={isNew()}

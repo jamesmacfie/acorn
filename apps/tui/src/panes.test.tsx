@@ -14,7 +14,7 @@ import { renderFixture } from './harness'
 // something new shows up here as a missing line rather than as a silent pass.
 
 /** No line wider than the terminal, on any pane. A wider one is a node that read a width it does not
- *  have (docs/ui-design.md § What the kit and layouts must never do). */
+ *  have (docs/ui-design/closed-kit.md § What the kit and layouts must never do). */
 const fitsIn = (frame: string, width: number): void => {
   for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(width)
 }
@@ -99,7 +99,7 @@ describe('every pane at 80 by 24', () => {
     // `+12` and not `+12 −3`: the row's counts are decoration, and at 80 the pane is 54 cells shared
     // between the badge, the name, the directory, the checkbox and the row's two verbs. The name and
     // the checkbox stay legible and the deletions fall off the end, which is what
-    // docs/ui-design.md § Every node at 80 by 24 says a row's `meta` gives up first.
+    // docs/ui-design/every-node.md § Every node at 80 by 24 says a row's `meta` gives up first.
     expect(frame).toContain('+12')
     // The editor is always there, where the one-line field used to appear only once something was
     // staged, and the button says which commit it is about to make: the fixture has one file in the
@@ -128,7 +128,7 @@ describe('every pane at 80 by 24', () => {
     expect(frame).toContain('Editor')
     // The handoff, as a device preference rather than a suspend-and-resume: turning it on opens the
     // reader's own editor in a PTY on the node, and on this host that PTY draws in cells
-    // (docs/editor.md § Editing in your own editor). The switch is an icon on the desktop, so the
+    // (docs/editor/editor-pane.md § Editing in your own editor). The switch is an icon on the desktop, so the
     // terminal prints its label.
     expect(frame).toContain('[ ] Edit in your terminal editor')
   }, 60_000)

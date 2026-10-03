@@ -33,7 +33,7 @@ import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
 // (docs/command-palette-and-shortcuts.md).
 //
 // Stopping is deliberately absent: it is the one destructive verb here, and it needs the runtime
-// state a low-context row cannot carry (docs/command-palette-and-shortcuts.md § What the palette
+// state a low-context row cannot carry (docs/command-palette-and-shortcuts/palette-data.md § What the palette
 // refuses). The rest of the open session's menu is at the bottom of this file, registered by the pane
 // while it is on screen rather than at boot.
 

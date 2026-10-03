@@ -7,7 +7,7 @@ import { targetTriple } from './node-runtime.mjs'
 import { verifyResources, verifyRuntime } from './bundle-inventory.mjs'
 import { verifyWindowsBundle } from './verify-windows-bundle.mjs'
 
-// What a built `.app` has to contain before anybody installs it (docs/shell.md § Build and packaging).
+// What a built `.app` has to contain before anybody installs it (docs/shell/packaging.md § Build and packaging).
 //
 // The shell resolves the node runtime, the helper, the renderer, the frame assets and the bundled
 // plugins from fixed places inside the bundle, and every one of them is copied there by the bundler
@@ -70,7 +70,7 @@ try {
 }
 
 // Generated from the first release even with no updater endpoint, so turning updates on later is
-// configuration rather than a re-release (docs/shell.md § Build and packaging).
+// configuration rather than a re-release (docs/shell/packaging.md § Build and packaging).
 const updater = readdirSync(join(bundle, 'macos')).filter((name) => name.endsWith('.app.tar.gz'))
 if (updater.length === 0) fail('no updater artifact was produced; `bundle.createUpdaterArtifacts` should be on.')
 else if (!existsSync(join(bundle, 'macos', `${updater[0]}.sig`))) fail(`${updater[0]} has no minisign signature beside it.`)

@@ -49,7 +49,7 @@ The startup budget checks run in `build` scripts, because they check built outpu
   external import in the emitted modules, including lazy chunks.
 
 Both budget checks fail the build over a byte ceiling or on a denylisted chunk or module name.
-[Frontend](../frontend.md) § Startup budget owns what they enforce.
+[Frontend](../frontend/startup-budget.md) § Startup budget owns what they enforce.
 
 The macOS desktop job builds the renderer but doesn't run the budget check. `build-desktop.yml`
 applies it to the real build output. The terminal client's checks run whenever someone builds that

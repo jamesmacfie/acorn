@@ -56,7 +56,7 @@ const keyPrefix = (key: readonly unknown[]): string =>
  *
  * Handled, always. The UI has already dealt with these: a failed read leaves the last-known data on
  * screen with a stale badge, and a failed write surfaces a notice and keeps the draft
- * (docs/ui-design.md § Connection and staleness vocabulary). What the record adds is a count.
+ * (docs/ui-design/states.md § Connection and staleness vocabulary). What the record adds is a count.
  */
 const failureCaches = () => ({
   queryCache: new QueryCache({
@@ -130,7 +130,7 @@ function subscribeStatuses(): void {
     // A status for a node this list has never heard of. It used to be impossible: membership was read
     // after the local node had been adopted. The window now opens first, so on a first-ever launch the
     // list is empty and the local node's first status is the only news that it exists
-    // (docs/frontend.md § Startup readiness). Re-reading costs the helper one
+    // (docs/frontend/data-and-startup.md § Startup readiness). Re-reading costs the helper one
     // file read.
     if (chased.has(status.nodeId) || nodes().some((node) => node.nodeId === status.nodeId)) return
     chased.add(status.nodeId)

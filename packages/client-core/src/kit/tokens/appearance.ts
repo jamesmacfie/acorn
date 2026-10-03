@@ -1,4 +1,4 @@
-// Reading the appearance axes from JavaScript. See docs/ui-design.md § Token axes for why these
+// Reading the appearance axes from JavaScript. See docs/ui-design/tokens.md § Token axes for why these
 // tokens are read this way and why renaming one fails silently.
 //
 // This is a core concern, not a terminal one: it lives here so the editor, database, and github

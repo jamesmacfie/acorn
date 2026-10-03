@@ -113,7 +113,7 @@ type Modifiers = { shift?: boolean; ctrl?: boolean; meta?: boolean; super?: bool
  *
  * Its own shape rather than seven loose consts because it is what a test is allowed to do to a
  * screen, said once: everything below it — the fixture, the resets, the roster, the tree — is about
- * the app rather than about the surface it is drawn on (docs/tui.md § Tests).
+ * the app rather than about the surface it is drawn on (docs/tui/tests.md § Tests).
  */
 type Surface = {
   renderer: Renderer
@@ -129,7 +129,7 @@ type Surface = {
 /** A screen with no terminal under it, read straight out of the cell buffer.
  *
  *  No FFI and no flag: this draws on the Node the repo pins
- *  (./paint/screen.ts, docs/tui.md § The runtime floor). */
+ *  (./paint/screen.ts, docs/tui/process.md § The runtime floor). */
 function openSurface(size: { width: number; height: number }): Surface {
   const renderer = openRenderer({ cols: size.width, rows: size.height })
   return {
@@ -412,7 +412,7 @@ export async function renderFixture(size: {
    * Down rather than a breadth-first fan of Down, Right and Enter, which the design asked for.
    * What the property is over is `_allStops()`, and that is `stopsIn` per region: a panel's contents
    * are the level below and are not in it. Right and Enter only reach that level, so they would cost
-   * presses and prove nothing (docs/tui.md § The invariants).
+   * presses and prove nothing (docs/tui/reporting.md § The invariants).
    *
    * `each` returning `true` ends the walk where it stands, which is how `reach` stops on what it
    * came for rather than spending the whole budget behind it.

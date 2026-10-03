@@ -13,7 +13,7 @@ use std::time::{SystemTime, UNIX_EPOCH};
 //
 // The file is the telemetry error record's own shape, minus the `kind` the reader adds. That is the
 // door the design left open: a crash reporter in the shell, a native dialog offering to send it,
-// reads the same file (docs/shell.md § What the shell reports).
+// reads the same file (docs/shell/node-child.md § What the shell reports).
 //
 // Nothing here may panic. A panic inside a panic hook aborts the process without running any of the
 // other hooks, so every step is a `let _ =` and the message is built from pieces that cannot fail.

@@ -28,7 +28,7 @@
   padding: var(--pane-pad);
   border-bottom: var(--chrome-divider);
 }
-/* See docs/ui-design.md § Chrome and overlays for why a ref panel's iframe takes flex: 1 rather
+/* See docs/ui-design/overlays.md § Chrome and overlays for why a ref panel's iframe takes flex: 1 rather
    than height: 100%. */
 .plugin-ref-panel > iframe {
   flex: 1;

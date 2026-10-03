@@ -45,7 +45,7 @@ export function helperMark(label: string): void {
  * a node has been adopted, which is itself one of the marks, so a span emitted where the mark was
  * taken would always be built with collection off and dropped. The marks are held for the printed
  * account anyway, so turning them into spans afterwards costs nothing
- * (./telemetry.ts § The switch, docs/shell.md § What the helper reports).
+ * (./telemetry.ts § The switch, docs/shell/node-child.md § What the helper reports).
  *
  * Called once, by `startHelperTelemetry` the first time the answer is yes.
  */

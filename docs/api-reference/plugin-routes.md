@@ -65,7 +65,7 @@ A batch refresh that fails with `401`, `403`, or `429` fails the batch. Any othe
 pull's previous mirror.
 
 A diff document is `DiffDocumentTopology` from `@acorn/diff-document`
-([diff-rendering.md](../diff-rendering.md#the-document)). A segment request's `patchKey` must be a
+([diff-rendering.md](../diff-rendering/document.md#the-document)). A segment request's `patchKey` must be a
 digest this Node holds, or it answers `404 segment_not_found`. An ordinal past the file's last segment
 answers `400 bad_ordinal`, and more than 32 requests, none, or a malformed body answers
 `400 bad_request`. A search body is `{ query, caseSensitive, cursor, files }`, with a query of at most
@@ -119,7 +119,7 @@ The terminal plugin owns session control and stream attachment. Core owns worktr
 execution. Global Docker actions require a device ([Docker](../docker.md)).
 
 The Changes pane reads its diff as a document, one staging area at a time, with types in
-`plugins/changes/src/shared/api.ts` ([diff-rendering.md](../diff-rendering.md#data-flow)):
+`plugins/changes/src/shared/api.ts` ([diff-rendering.md](../diff-rendering/document.md#data-flow)):
 
 | Route | Body | Answer |
 | --- | --- | --- |

@@ -4,7 +4,7 @@ import { renderFixture } from './harness'
 import { fixtureBadgePresses } from './fixtureExtensions'
 
 // What another plugin reaches inside this one's surfaces, on the real shell
-// (docs/plugins.md § Cooperative extension points, docs/tui.md § What a plugin loses here).
+// (docs/plugins.md § Cooperative extension points, docs/tui/plugin-losses.md § What a plugin loses here).
 //
 // Its own file rather than a case in ./panes.test.tsx, for the reason ./browseLong.test.tsx and
 // ./diffLong.test.tsx are their own files: each of these needs an environment flag set before the

@@ -1,5 +1,5 @@
 // The notification switches, as one JSON device preference
-// (docs/notifications.md § Settings).
+// (docs/notifications/channels.md § Settings).
 //
 // One key holding six booleans, not six keys, for the reason `docker_prefs` and `exclusive_slots`
 // give: a value that is read together is stored together, and six keys would mean six `DEVICE_KEYS`

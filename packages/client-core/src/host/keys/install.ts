@@ -1,6 +1,6 @@
 // The keymap, installed once at the shell root.
 //
-// One engine for the whole app (docs/command-palette-and-shortcuts.md § Focus and typing, on layers over
+// One engine for the whole app (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing, on layers over
 // the same tree). `@opentui/keymap` holds the layers, the command catalog and the diagnostics; its
 // HTML adapter turns DOM keydowns into keymap events and tracks targets with a MutationObserver, and
 // its terminal adapter, which we do not use yet, is in the same package. Nothing here is an adapter
@@ -48,7 +48,7 @@ export { keymap, keysFor, registerIntentLayer, registerLayerWhenConnected, type 
  *
  *  Here rather than in `kit/keys/keymapHost.ts`, which stopped naming the DOM when the terminal host
  *  started using it: the terminal asks the same question of the focused renderable's rectangle kind
- *  (docs/tui.md § The adapter). */
+ *  (docs/tui/keys.md § The adapter). */
 export const isTerminalTarget = (target: EventTarget | null): boolean =>
   target instanceof HTMLElement && !!target.closest('.ui-rect[data-kind="pty"]')
 

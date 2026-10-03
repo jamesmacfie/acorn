@@ -102,7 +102,7 @@ stylesheet; only a person can tell whether the result is usable.
 
 The last item is older than the rest. `docs/next-review.md`, deleted in the 2026-08-30 hygiene pass,
 was a personal checklist with no inbound links. Every other line in it was already owned by this
-checklist, by [shell.md](../shell.md) § Signing gates and the updater, or by
+checklist, by [shell.md](../shell/packaging.md) § Signing gates and the updater, or by
 [caching.md](../caching.md). This one was not.
 
 26. Run the Rollbar pane against a live project rather than the recorded fixtures, and check that the

@@ -169,7 +169,7 @@ describe('acorn against a node it started', () => {
   }, 60_000)
 })
 
-// The start path, once the root has been opened before (docs/tui.md § Attach or start). The first-ever
+// The start path, once the root has been opened before (docs/tui/process.md § Attach or start). The first-ever
 // start has no id on disk and nothing cached, so it waits for the handshake; every start after that
 // returns as soon as the child is spawned, which is what lets the renderer draw in front of a booting
 // node.

@@ -1,84 +1,9 @@
 apps/desktop/src/client/index.tsx: docs/plugins.md § Hearing a core event
-apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — appearance'
-apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the panes'
-apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the rail sources'
-apps/desktop/test/client/parity.test.ts: docs/ui-design.md § Parity — the shell chords'
 apps/desktop/test/client/wsChannelPrefixes.test.ts: docs/plugins.md § Hearing a core event
 apps/node/test/integration/pluginSystem/pluginLoader.test.ts: docs/workflows.md § Starting a run
 apps/node/test/integration/taskContext.test.ts: docs/agent-tools.md § 4
-apps/tui/src/appearance.ts: docs/ui-design.md § Roles
-apps/tui/src/browse.test.tsx: docs/tui.md § The screen
-apps/tui/src/chrome/bindings.ts: docs/tui.md § The five key groups
-apps/tui/src/chrome/bindings.ts: docs/tui.md § The footer
-apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § The five key groups
-apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § The footer
-apps/tui/src/chrome/chrome.test.tsx: docs/tui.md § What is drawn bespoke
-apps/tui/src/chrome/Footer.tsx: docs/ui-design.md § Connection and staleness vocabulary
-apps/tui/src/chrome/Inbox.tsx: docs/tui.md § The screen
-apps/tui/src/chrome/Inbox.tsx: docs/tui.md § What is drawn bespoke
-apps/tui/src/chrome/Palette.tsx: docs/tui.md § What is drawn bespoke
-apps/tui/src/chrome/panes.ts: docs/tui.md § The screen
-apps/tui/src/chrome/Rail.tsx: docs/tui.md § Scrolling viewports
-apps/tui/src/chrome/topology.ts: docs/tui.md § Navigation
-apps/tui/src/controls.test.tsx: docs/tui.md § The five key groups
 apps/tui/src/extensions.test.tsx: docs/plugin-authoring.md § Keybindings
-apps/tui/src/harness.tsx: docs/tui.md § The invariants
-apps/tui/src/input/events.ts: docs/tui.md § The adapter
-apps/tui/src/input/parser.test.ts: docs/tui.md § The adapter
-apps/tui/src/input/parser.ts: docs/tui.md § The adapter
-apps/tui/src/input/terminal.ts: docs/tui.md § The adapter
-apps/tui/src/invariants.test.ts: docs/tui.md § Focus regions
-apps/tui/src/invariants.test.ts: docs/tui.md § Scrolling viewports
-apps/tui/src/invariants.test.ts: docs/tui.md § The adapter
-apps/tui/src/invariants.test.ts: docs/tui.md § The invariants
-apps/tui/src/keys/collection.ts: docs/tui.md § Collections
-apps/tui/src/keys/install.ts: docs/tui.md § Focus regions
-apps/tui/src/keys/install.ts: docs/tui.md § The five key groups
-apps/tui/src/keys/install.ts: docs/tui.md § What must never happen
-apps/tui/src/keys/keymapHost.ts: docs/tui.md § The adapter
-apps/tui/src/keys/regions.test.ts: docs/tui.md § Focus regions
-apps/tui/src/keys/regions.ts: docs/tui.md § Focus regions
-apps/tui/src/keys/regions.ts: docs/tui.md § The five key groups
-apps/tui/src/keys/regions.ts: docs/tui.md § Traps
-apps/tui/src/keys/tiers.test.ts: docs/tui.md § The five key groups
-apps/tui/src/keys/tiers.ts: docs/tui.md § The five key groups
-apps/tui/src/keys/tiers.ts: docs/tui.md § Traps
-apps/tui/src/keys/trap.ts: docs/tui.md § Traps
-apps/tui/src/kit/asking/fields.tsx: docs/ui-design.md § Roles
-apps/tui/src/kit/field.test.ts: docs/tui.md § The adapter
-apps/tui/src/kit/field.test.ts: docs/tui.md § The five key groups
-apps/tui/src/kit/field.ts: docs/tui.md § The adapter
-apps/tui/src/kit/field.ts: docs/tui.md § The five key groups
-apps/tui/src/kit/grouping/tabs.tsx: docs/tui.md § The five key groups
-apps/tui/src/kit/host.tsx: docs/tui.md § What is drawn bespoke
-apps/tui/src/kit/kit.test.tsx: docs/tui.md § Focus regions
-apps/tui/src/kit/kit.test.tsx: docs/tui.md § The five key groups
-apps/tui/src/kit/kit.test.tsx: docs/tui.md § The invariants
-apps/tui/src/kit/ptyKeys.ts: docs/tui.md § The adapter
-apps/tui/src/kit/rectangle.tsx: docs/tui.md § The footer
-apps/tui/src/kit/rectangle.tsx: docs/tui.md § The Rectangle contract
-apps/tui/src/kit/rectangle.tsx: docs/ui-design.md § Borders
-apps/tui/src/kit/scrolling.test.tsx: docs/tui.md § Scrolling viewports
-apps/tui/src/kit/scrolling.tsx: docs/tui.md § Scrolling viewports
-apps/tui/src/kit/showing/collection.tsx: docs/tui.md § Collections
-apps/tui/src/kit/showing/documents.tsx: docs/tui.md § Scrolling viewports
-apps/tui/src/layouts/ListDetail.tsx: docs/tui.md § Scrolling viewports
 apps/tui/src/main.tsx: docs/plugins.md § Hearing a core event
-apps/tui/src/main.tsx: docs/tui.md § The adapter
-apps/tui/src/main.tsx: docs/tui.md § The screen
-apps/tui/src/paint/paint.ts: docs/ui-design.md § Roles
-apps/tui/src/panel.tsx: docs/tui.md § The screen
-apps/tui/src/plugins/custody.ts: docs/tui.md § Custody
-apps/tui/src/plugins/RemoteTree.tsx: docs/tui.md § Plugin surfaces
-apps/tui/src/plugins/SourcePanel.tsx: docs/tui.md § The screen
-apps/tui/src/plugins/TrustPrompt.tsx: docs/tui.md § The trust prompt
-apps/tui/src/reachability.test.tsx: docs/tui.md § Focus regions
-apps/tui/src/reachability.test.tsx: docs/tui.md § The five key groups
-apps/tui/src/reachability.test.tsx: docs/tui.md § The footer
-apps/tui/src/reachability.test.tsx: docs/tui.md § The invariants
-apps/tui/src/reachability.test.tsx: docs/tui.md § Traps
-apps/tui/src/tree/hit.ts: docs/tui.md § Scrolling viewports
-apps/tui/src/tree/renderer.ts: docs/tui.md § A descriptor source's list
 packages/client-core/src/features/dashboards/chart.ts: docs/dashboards.md § The generated editor
 packages/client-core/src/features/dashboards/dashboards.css: docs/dashboards.md § The grid
 packages/client-core/src/features/dashboards/dashboards.css: docs/dashboards.md § The grid describes: one column in reading order
@@ -101,32 +26,18 @@ packages/client-core/src/features/dashboards/views/props.ts: docs/dashboards.md 
 packages/client-core/src/features/dashboards/views/Provenance.tsx: docs/dashboards.md § The mapping layer
 packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § The two vocabularies
 packages/client-core/src/features/dashboards/views/StatView.tsx: docs/dashboards.md § Trends
-packages/client-core/src/features/editor/theme.ts: docs/editor.md § The shared surface
 packages/client-core/src/features/fleet/FleetHome.tsx: docs/plugins.md § Node
 packages/client-core/src/features/integrations/watchConnectionChanges.ts: docs/plugins.md § Hearing a core event
-packages/client-core/src/features/notifications/invariants.test.ts: docs/notifications.md § Invariants
 packages/client-core/src/features/projects/watchProjectChanges.ts: docs/plugins.md § Hearing a core event
-packages/client-core/src/features/settings/appearancePrefs.ts: docs/ui-design.md § Token axes
-packages/client-core/src/features/settings/AppearanceSettings.tsx: docs/ui-design.md § Token axes
-packages/client-core/src/features/settings/builtInThemes.test.ts: docs/ui-design.md § Plugin themes
-packages/client-core/src/features/settings/nodes/NodesSettings.tsx: docs/ui-design.md § Node management
 packages/client-core/src/features/settings/plugins/InstallPlugin.tsx: docs/plugins.md § Non-goals
 packages/client-core/src/features/settings/plugins/PluginsSettings.tsx: docs/plugins.md § Non-goals
-packages/client-core/src/features/settings/uiStyles.test.ts: docs/ui-design.md § Style packs
-packages/client-core/src/features/tabs/RailTab.tsx: docs/ui-design.md § Rail controls
 packages/client-core/src/features/tabs/TabRail.tsx: docs/plugins.md § Context
 packages/client-core/src/features/tasks/task-view.css: docs/workflows.md § 2
-packages/client-core/src/features/tasks/TaskPaneHost.tsx: docs/ui-design.md § Connection and staleness vocabulary asks for offline and
 packages/client-core/src/features/tasks/tasks.ts: docs/workflows.md § 3
 packages/client-core/src/features/tasks/watchTaskChanges.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/features/workspaces/Home.tsx: docs/dashboards.md § Placements
 packages/client-core/src/features/workspaces/Home.tsx: docs/dashboards.md § Placements for why a deleted tab falls back to the default
-packages/client-core/src/host/annotations/annotations.css: docs/ui-design.md § Border roles
 packages/client-core/src/host/chrome/ChromeSourcePanel.tsx: docs/dashboards.md § Placements
-packages/client-core/src/host/chrome/chromeThemes.ts: docs/ui-design.md § Plugin themes
-packages/client-core/src/host/chrome/chromeThemes.ts: docs/ui-design.md § Plugin themes owns the token contract
-packages/client-core/src/host/chrome/chromeThemes.ts: docs/ui-design.md § Plugin themes: derived tokens follow the palette by referenc
-packages/client-core/src/host/chrome/sourcePanel.ts: docs/tui.md § The screen
 packages/client-core/src/host/frames/broker.ts: docs/plugins.md § Enforcement
 packages/client-core/src/host/frames/channels.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/host/frames/channels.ts: docs/plugins.md § Hearing another plugin
@@ -138,7 +49,6 @@ packages/client-core/src/host/frames/PluginRefPanel.tsx: docs/plugins.md § Fram
 packages/client-core/src/host/frames/register.test.ts: docs/plugins.md § Frame contribution kind
 packages/client-core/src/host/frames/register.ts: docs/dashboards.md § Placements
 packages/client-core/src/host/frames/register.ts: docs/plugins.md § Frame contribution kind
-packages/client-core/src/host/keys/install.ts: docs/tui.md § The adapter
 packages/client-core/src/host/plugins/pluginChannel.test.ts: docs/plugins.md § Hearing another plugin
 packages/client-core/src/host/plugins/pluginChannel.ts: docs/plugins.md § Hearing another plugin
 packages/client-core/src/host/registries/commands/clientEvents.ts: docs/plugins.md § Hearing a core event
@@ -151,85 +61,10 @@ packages/client-core/src/host/tree/arbitration.ts: docs/plugins.md § Arbitratio
 packages/client-core/src/host/tree/hostRequests.test.ts: docs/plugins.md § Asking the host
 packages/client-core/src/host/tree/RemoteTree.grants.test.tsx: docs/plugins.md § Asking the host
 packages/client-core/src/host/tree/Slot.tsx: docs/plugins.md § Arbitration
-packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting covers the lazy-grammar reasoning
-packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting covers why that is what lets Shiki threa
-packages/client-core/src/infra/highlight/highlighter.worker.ts: docs/diff-rendering.md § Syntax highlighting for why it needs to be a worker (the WAS
-packages/client-core/src/infra/highlight/messages.ts: docs/diff-rendering.md § Syntax highlighting for why neither side of the worker bound
-packages/client-core/src/infra/highlight/shiki.test.ts: docs/diff-rendering.md § Syntax highlighting
-packages/client-core/src/infra/highlight/shiki.ts: docs/diff-rendering.md § Syntax highlighting
-packages/client-core/src/infra/highlight/shiki.ts: docs/ui-design.md § Token axes
-packages/client-core/src/infra/highlight/worker.ts: docs/diff-rendering.md § Syntax highlighting for why every caller sends a whole docum
-packages/client-core/src/infra/node/apiClient.test.ts: docs/ui-design.md § Connection and staleness vocabulary
-packages/client-core/src/infra/node/fleet.ts: docs/ui-design.md § Connection and staleness vocabulary
 packages/client-core/src/infra/node/watchNodeEvents.ts: docs/plugins.md § Hearing a core event
 packages/client-core/src/infra/node/wsClient.ts: docs/plugins.md § Hearing a core event
-packages/client-core/src/infra/styles/base.css: docs/ui-design.md § Style packs for the null-default pattern and the specificity
-packages/client-core/src/infra/styles/cssHygiene.test.ts: docs/ui-design.md § Border roles covers why an all-four-sides shorthand can neve
-packages/client-core/src/infra/styles/cssHygiene.test.ts: docs/ui-design.md § How the kit is built
-packages/client-core/src/infra/styles/cssHygiene.test.ts: docs/ui-design.md § How the kit is built covers why a class handed to a primitiv
-packages/client-core/src/infra/styles/cssHygiene.test.ts: docs/ui-design.md § Runtime-set custom properties
-packages/client-core/src/infra/styles/cssHygiene.test.ts: docs/ui-design.md § Token axes covers why calc(var(--z-x
-packages/client-core/src/infra/styles/diff.css: docs/ui-design.md § How the kit is built for why this owns .file-status now
-packages/client-core/src/infra/styles/diff.css: docs/ui-design.md § Token axes
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § Border roles for why the border role is --chrome-divider
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built (Badge / Chip
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built (Button
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built (Field
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built (Meter
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built (Row
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for the specificity model behind base/v
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for the two colour vocabularies this
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for why the
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for why the base rule lives here rather
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for why this
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for why this owns what `.action-error`
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the kit is built for why this styles the native input
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § How the primitives
-packages/client-core/src/infra/styles/primitives.css: docs/ui-design.md § Runtime-set custom properties covers --row-field-w
-packages/client-core/src/infra/styles/shell.css: docs/panes.md § The host owns a
-packages/client-core/src/infra/styles/style-cozy.css: docs/ui-design.md § Style packs
-packages/client-core/src/infra/styles/style-cozy.css: docs/ui-design.md § Style packs covers why this reaches past the token block for
-packages/client-core/src/infra/styles/style-cute.css: docs/ui-design.md § Style packs
-packages/client-core/src/infra/styles/style-cute.css: docs/ui-design.md § Style packs covers why selection needs to read from the fill
-packages/client-core/src/infra/styles/style-cute.css: docs/ui-design.md § Style packs for why the springy hover/press comes from a nul
-packages/client-core/src/infra/styles/style-modern.css: docs/ui-design.md § Style packs
-packages/client-core/src/infra/styles/style-modern.css: docs/ui-design.md § Style packs covers why `solid` is excluded here as well as `
-packages/client-core/src/infra/styles/style-modern.css: docs/ui-design.md § Style packs covers why selection needs to read from the fill
-packages/client-core/src/infra/styles/tokenAxes.test.ts: docs/ui-design.md § Style packs covers why the budget exists and why the fix for
-packages/client-core/src/infra/styles/tokenAxes.test.ts: docs/ui-design.md § Token axes covers why a manifest naming a derived token is r
-packages/client-core/src/infra/styles/tokenAxes.test.ts: docs/ui-design.md § Token axes covers why derived and series tokens are excluded
-packages/client-core/src/infra/styles/tokenAxes.test.ts: docs/ui-design.md § Token axes covers why xterm and the code editor read these b
-packages/client-core/src/infra/styles/tokenAxes.test.ts: docs/ui-design.md § Token axes for what the two axes are and why they stay disjo
-packages/client-core/src/infra/styles/tokens-invariant.css: docs/ui-design.md § Token axes for why
-packages/client-core/src/infra/styles/tokens-style.css: docs/ui-design.md § Border roles covers why --stripe-w is a semantic sibling of 
-packages/client-core/src/infra/styles/tokens-style.css: docs/ui-design.md § Border roles covers why these four recipes split by role
-packages/client-core/src/infra/styles/tokens-style.css: docs/ui-design.md § Style packs for the null-default pattern this follows
-packages/client-core/src/infra/styles/tokens-style.css: docs/ui-design.md § Token axes covers why --font-mono cannot be repointed by a s
-packages/client-core/src/infra/styles/tokens-style.css: docs/ui-design.md § Token axes covers why --term-fs is a bridge token
 packages/client-core/src/infra/styles/tokens-theme.css: docs/dashboards.md § Views are derived
-packages/client-core/src/infra/styles/tokens-theme.css: docs/ui-design.md § Token axes
-packages/client-core/src/infra/styles/tokens-theme.css: docs/ui-design.md § Token axes covers why these two are self-description rather 
-packages/client-core/src/infra/styles/tokens-theme.css: docs/ui-design.md § Token axes covers why this has to work before any JavaScript
-packages/client-core/src/infra/styles/tokens-theme.css: docs/ui-design.md § Token axes for the contract with tokens-style.css
-packages/client-core/src/kit/components/content/Meter.tsx: docs/ui-design.md § How the kit is built for why it is a div and
-packages/client-core/src/kit/components/inputs/Checkbox.tsx: docs/ui-design.md § How the kit is built for why it styles the native
-packages/client-core/src/kit/components/inputs/Chip.tsx: docs/ui-design.md § How the kit is built
-packages/client-core/src/kit/keys/collectionIntents.test.ts: docs/tui.md § Collections
-packages/client-core/src/kit/keys/collectionIntents.test.ts: docs/tui.md § Scrolling viewports
-packages/client-core/src/kit/keys/collectionIntents.ts: docs/tui.md § Collections
-packages/client-core/src/kit/keys/collectionIntents.ts: docs/tui.md § Scrolling viewports
-packages/client-core/src/kit/keys/collectionIntents.ts: docs/tui.md § The five key groups
-packages/client-core/src/kit/keys/keymapHost.ts: docs/tui.md § The adapter
-packages/client-core/src/kit/tokens/appearance.ts: docs/ui-design.md § Token axes for why these tokens are read this way and why re
-packages/client-core/src/kit/tokens/roles.test.ts: docs/ui-design.md § Token axes
 packages/client-core/src/kit/tokens/tokenAxes.ts: docs/dashboards.md § Views are derived
-packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axes for the full list and why renaming one breaks the
-packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axes for the two axes and why they are disjoint
-packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axes for why each pair is ordered this way
-packages/client-core/src/kit/tokens/tokenAxes.ts: docs/ui-design.md § Token axes for why this is neither a palette primitive nor d
-packages/client-core/src/kit/tokens/tokens.ts: docs/ui-design.md § Borders: a pack may set any of these to zero width
 packages/create-acorn-plugin/index.mjs: docs/plugin-authoring.md § Two ways to draw for when a rectangle is the right answer
 packages/dashboards-core/src/chart.ts: docs/dashboards.md § Views are derived
 packages/dashboards-core/src/format.ts: docs/dashboards.md § The generated editor gives: the component that draws this ca
@@ -263,7 +98,6 @@ packages/node-core/src/server/notify.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/pluginHost/context.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/pluginHost/emits.ts: docs/plugins.md § Hearing another plugin § The cross-plugin grant
 packages/node-core/src/server/pluginHost/host.test.ts: docs/plugins.md § Hearing another plugin
-packages/node-core/src/server/pluginHost/state.ts: docs/ui-design.md § New surfaces
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing a core event
 packages/node-core/src/server/pluginHost/types.ts: docs/plugins.md § Hearing another plugin
 packages/node-core/src/server/plugins/bundled.ts: docs/plugins.md § Failures are contained
@@ -283,12 +117,9 @@ packages/plugin-api/src/client.ts: docs/dashboards.md § Provenance
 packages/plugin-api/src/client.ts: docs/plugin-authoring.md § Testing
 packages/plugin-types/src/contracts/attachments.ts: docs/managed-agents.md § Draft attachments
 packages/plugin-types/src/contracts/storage.ts: docs/plugins.md § What is published
-packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin themes for the three-group split and why only the pal
-packages/protocol/src/appearance/themeTokens.ts: docs/ui-design.md § Plugin themes for why only these are accepted
 packages/protocol/src/chrome/extensionPoints.ts: docs/plugins.md § Arbitration
 packages/protocol/src/plugin/contract.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/plugin/manifest/chromeDescriptors.ts: docs/dashboards.md § Placements and docs/plugins.md § Cooperative extension point
-packages/protocol/src/plugin/manifest/displayDescriptors.ts: docs/ui-design.md § Plugin themes for the token contract and what each group may
 packages/protocol/src/transport/api/pluginPresentation.ts: docs/workflows.md § Starting a run
 packages/protocol/src/transport/api/pluginState.ts: docs/plugins.md § Hearing another plugin
 packages/protocol/src/transport/api/runtime.ts: docs/dashboards.md § Trends
@@ -306,7 +137,6 @@ plugins/agents/src/client/sessions/AgentPane.test.tsx: docs/managed-agents.md §
 plugins/agents/src/client/sessions/AgentPane.tsx: docs/managed-agents.md § Sessions
 plugins/agents/src/client/sessions/AgentTaskSidebar.tsx: docs/managed-agents.md § Subagents
 plugins/agents/src/client/sessions/managedStore.ts: docs/managed-agents.md § The transcript store
-plugins/agents/src/client/sessions/readingPlaceStore.ts: docs/panes.md § there is no keepAlive
 plugins/agents/src/client/sessions/toolFoldPrefs.ts: docs/managed-agents.md § Tool call display
 plugins/agents/src/client/usage/AgentUsageSection.tsx: docs/managed-agents.md § Plan usage
 plugins/agents/src/contract/draftAttachments.ts: docs/managed-agents.md § Draft attachments
@@ -316,10 +146,6 @@ plugins/agents/src/server/sessions/runtimeEngine.ts: docs/managed-agents.md § S
 plugins/agents/src/server/sessions/runtimeEngine.ts: docs/plugins.md § Hearing a core event
 plugins/agents/src/server/sessions/sessionRepository.ts: docs/managed-agents.md § Subagents
 plugins/changes/src/client/RemoteBar.tsx: docs/plugins.md § 
-plugins/database/src/server/completions.ts: docs/editor.md § Language smarts
-plugins/database/src/shared/database.ts: docs/editor.md § Language smarts
-plugins/editor/src/client/EditorPane.tsx: docs/editor.md § Reload on focus
-plugins/editor/src/client/EditorPane.tsx: docs/editor.md § Status
 plugins/editor/src/server/editor.ts: docs/plugins.md § Hearing a core event
 plugins/editor/src/server/editor.ts: docs/plugins.md § What is not an event
 plugins/github/src/client/GithubBrowse.tsx: docs/plugins.md § Frame authoring and the UI kit
@@ -334,7 +160,6 @@ plugins/linear/src/tree/model.ts: docs/plugins.md § Frame authoring
 plugins/rollbar/src/shared/rail.test.ts: docs/workflows.md § Starting a run
 plugins/rollbar/src/shared/rail.ts: docs/workflows.md § Starting a run
 plugins/terminal/src/server/runtime.ts: docs/plugins.md § Hearing a core event § Run target state
-plugins/workflows/src/client/editor/draftStore.ts: docs/frontend.md § Reactivity
 plugins/workflows/src/client/editor/startRequest.ts: docs/plugin-authoring.md § Testing
 plugins/workflows/src/client/index.ts: docs/contribution-kinds.md § Project surfaces
 plugins/workflows/src/client/layoutPrefs.test.tsx: docs/workflows.md § Where positions live
@@ -350,5 +175,3 @@ plugins/workflows/src/server/authoring/edit.ts: docs/workflows.md § Generating 
 plugins/workflows/src/server/routes/workflow.ts: docs/managed-agents.md § Sessions
 plugins/workflows/src/server/runs/workflowTelemetry.test.ts: docs/workflows.md § What a run reports
 plugins/workflows/src/server/steps/builtins.ts: docs/workflows.md § What an agent step sees
-tools/arch/boundaries.test.ts: docs/tui.md § Focus regions
-tools/arch/primitiveAdoption.test.ts: docs/ui-design.md § How the primitives are built

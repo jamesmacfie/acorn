@@ -2,7 +2,7 @@
 // in. Both the editor (./draft.ts) and the run pane (../runs/runPaneModel.ts) read it.
 //
 // Its own module because the run pane's model is registered before the first draw, and importing it
-// from ./draft.ts put the whole editor on the renderer's startup graph (docs/frontend.md § Startup
+// from ./draft.ts put the whole editor on the renderer's startup graph (docs/frontend/startup-budget.md § Startup
 // budget).
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'

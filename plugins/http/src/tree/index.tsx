@@ -12,7 +12,7 @@ import { HttpDetailApp, HttpListApp, HttpSettingsApp } from './app'
 //
 // Both pane entries run in this one worker, which is what lets them share ./panelModel.ts. That is the
 // loaded-plugin half of the region seam: a compiled pane gets its shared model from the host, and a
-// loaded one already has module scope (docs/panes.md § Layout model).
+// loaded one already has module scope (docs/panes/layout.md § Layout model).
 mountTree({
   list: solidTree(HttpListApp),
   detail: solidTree(HttpDetailApp),

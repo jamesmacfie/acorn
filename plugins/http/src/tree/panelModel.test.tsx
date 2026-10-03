@@ -5,7 +5,7 @@ import type { HttpRequest } from '../shared/model'
 
 // The API pane is `list-detail`, so its two regions are two entries in this bundle that the host
 // mounts side by side. What makes that possible is here: one model per subject, in module scope, so
-// the list and the detail are looking at the same selection and the same draft (docs/panes.md §
+// the list and the detail are looking at the same selection and the same draft (docs/panes/layout.md §
 // Layout model). A compiled pane gets the equivalent from the host's `model` seam.
 
 const selects: ((item: string) => void)[] = []

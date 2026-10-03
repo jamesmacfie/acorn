@@ -1,7 +1,7 @@
 // Where the reader was, as data this app owns.
 //
 // Monaco handed back an opaque blob and asked for it back; CodeMirror has no such thing, and that is
-// an improvement rather than a gap (docs/editor.md § View state). Selection and scroll are the whole
+// an improvement rather than a gap (docs/editor/document-surface.md § View state). Selection and scroll are the whole
 // of what a reader notices across a tab swap, so both call sites persist exactly that and nothing
 // they cannot read.
 import type { EditorView } from '@codemirror/view'

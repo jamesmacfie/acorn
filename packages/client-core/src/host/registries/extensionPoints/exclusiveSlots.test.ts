@@ -16,7 +16,7 @@ import {
 // The exclusive-slot arbitration (docs/plugins.md § Replacing a core surface).
 //
 // The component is never rendered here: this repo's vitest runs in bare Node with no Solid transform
-// (docs/frontend.md § Registries and plugins), so the arbitration is a plain function over a
+// (docs/frontend/registries.md § Registries and plugins), so the arbitration is a plain function over a
 // registry, which can be tested; what the chosen provider draws cannot be, and is not claimed to be.
 
 const NOTHING = (() => null) as unknown as Component

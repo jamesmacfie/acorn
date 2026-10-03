@@ -124,7 +124,7 @@ Each workstream names the owning documents it updates. Across the programme:
   cover the enriched and new sources.
 - [Testing](../../testing.md) and [testing workflows](../../testing/workflows.md) carry the authoring
   evaluation suite, the unseen-request acceptance, and the manual checks.
-- [Terminal chrome and plugins](../../tui/chrome-and-plugins.md) changes when the terminal draws
+- [What a plugin loses in the terminal](../../tui/plugin-losses.md) changes when the terminal draws
   panels.
 
 ## Verify before building

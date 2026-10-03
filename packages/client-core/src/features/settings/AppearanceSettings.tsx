@@ -21,7 +21,7 @@ import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave } from './settingSave'
 import { DEFAULT_STYLE } from './uiStyles'
 
-// Settings → Appearance. Two orthogonal axes (docs/ui-design.md § Token axes): style owns shape,
+// Settings → Appearance. Two orthogonal axes (docs/ui-design/tokens.md § Token axes): style owns shape,
 // typography, spacing and density; theme owns colour. They compose freely, because the two token sets
 // are disjoint, which styles/tokenAxes.test.ts enforces.
 //

@@ -92,7 +92,7 @@ The accounts meet at `[helper:boot] service.start`, where the Node reports that 
 span from `ready line` to `service.start` is the Node's share of the launch. `node selected` is the
 fleet selection, which happens before the Node is up. `nodeReady` is the local Node's first status
 reaching the renderer, which is when the shell mounts and sends its first reads.
-[Frontend](../frontend.md) § Startup readiness describes the loader.
+[Frontend](../frontend/data-and-startup.md) § Startup readiness describes the loader.
 
 `[renderer:boot] first paint` doesn't print from a background window. It's a `requestAnimationFrame`
 callback, and macOS pauses those while the window is hidden. Bring the window to the front before you

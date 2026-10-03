@@ -116,7 +116,7 @@ describe('what the graph refuses', () => {
   })
 
   it('refuses a child whose owner is not its parent’s', () => {
-    // docs/command-palette-and-shortcuts.md § What the palette refuses. A plugin inserting rows
+    // docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses. A plugin inserting rows
     // into core's group, or another plugin's, is hidden lifecycle coupling nobody can see at the
     // registration site.
     const graph = buildCommandGraph([

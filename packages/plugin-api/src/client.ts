@@ -55,7 +55,7 @@ export type { PaneContribution, PaneLayoutContribution, PaneModelContext, PaneRe
 // The host's per-(pane, task) reactive root. A pane that declares `model` on a layout contribution
 // gets this for free; a pane drawing itself with one `component` reaches for it directly, which is
 // what the editor does to keep its per-file document pool across its own mounts
-// (docs/panes.md § Layout model).
+// (docs/panes/models.md § Pane models).
 export { paneModel } from '@acorn/client-core/host/registries/panes'
 export { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 export type { SourceContribution, SourceRouteContribution } from '@acorn/client-core/host/registries/sources'
@@ -70,14 +70,14 @@ export type {
   ContextMenuContribution, ContextMenuLocation, ContextMenuTarget, ItemRowTarget, TaskRowTarget,
   RailSourceTarget, RailPaneTarget,
 } from '@acorn/client-core/host/registries/panes'
-// Brand-mark registration. See docs/ui-design.md § Icons for the two feeders and the `brand:<id>`
+// Brand-mark registration. See docs/ui-design/icons.md § Icons for the two feeders and the `brand:<id>`
 // glyph name they share.
 export { brandMarkRegistry, brandStyle } from '@acorn/client-core/kit/tokens'
 // Core's own URL for a project. A plugin building its own routes on top of `/p/:projectId` needs a
 // way back to the bare project path, deselecting an item, a breadcrumb, without hardcoding a shape
 // core owns.
 export { projectPath } from '@acorn/client-core/host/registries/commands'
-// One slot registry, two component shapes: the slot id picks which (docs/frontend.md § Registries and
+// One slot registry, two component shapes: the slot id picks which (docs/frontend/registries.md § Registries and
 // plugins). `UiSlotContribution` is the union both arms satisfy.
 export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } from '@acorn/client-core/host/registries/extensionPoints/slots.ts'
 // Rail status markers (docs/plugins.md § Rail markers). A plugin publishes marker data next to the
@@ -87,7 +87,7 @@ export type { ShellSlotContribution, TaskSlotContribution, UiSlotContribution } 
 export type { RailMarkerContribution, RailMarkerTarget } from '@acorn/client-core/host/registries/rail'
 export type { RailMarker, RailMarkerDot, RailMarkerPosition, RailTone } from '@acorn/client-core/features/tabs'
 export type { ClientScheduleContribution } from '@acorn/client-core/host/registries/shell'
-// Rows for the attention inbox (docs/notifications.md § What a row points at). The registry stays off
+// Rows for the attention inbox (docs/notifications/rows-and-targets.md § What a row points at). The registry stays off
 // this surface; a plugin registers through `ctx.attentionSources`, which binds the source to its own
 // name. The types are here so a source that lives in its own file can say what it returns.
 export type { AttentionItem, AttentionSourceContribution } from '@acorn/client-core/host/registries/rail'
@@ -121,7 +121,7 @@ export type {
   SearchCommand,
   SettingCommand,
 } from '@acorn/client-core/host/registries/commands'
-// The load-once search adapter (docs/command-palette-and-shortcuts.md § Palette data). A plugin whose
+// The load-once search adapter (docs/command-palette-and-shortcuts/palette-data.md § Palette data). A plugin whose
 // rows are already on this machine — run targets, notes, docker resources — spreads this into a
 // `search` command and gets no debounce, no minimum query, one fetch when the frame opens and local
 // fuzzy filtering after that. A plugin querying a node instead writes its own `query`.
@@ -227,7 +227,7 @@ export {
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
-// The settings save model, for a page drawn with `SettingRow` (docs/frontend.md § Settings): the
+// The settings save model, for a page drawn with `SettingRow` (docs/frontend/settings.md § Settings): the
 // Saved signal and the error for a switch or select, a text field that keeps what was typed when its
 // write fails, the question a Save-and-Cancel form asks before settings drops its changes, and the
 // header's name and back link for one item a list page has open.

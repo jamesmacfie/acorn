@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
 // The focus model's invariants, where the invariant is a fact about the source rather than about a
-// render (docs/tui.md § The invariants). ../reachability.test.tsx turns the rest of them into
+// render (docs/tui/reporting.md § The invariants). ../reachability.test.tsx turns the rest of them into
 // properties over the pane roster; these three cannot be, because what they forbid is a second place
 // to put a decision, a chord nobody can press, and a second writer of where the keys are.
 
@@ -41,7 +41,7 @@ describe('no chord this host cannot press', () => {
     // macOS terminal emulators keep Cmd and never deliver it, so a binding spelled with the
     // platform's primary modifier is a binding nobody can press — and it looks right in review, which
     // is why this is a grep rather than a habit. The `tabs` layout and the key splits both shipped
-    // with one (docs/tui.md § Keys and focus). `keys/commandLayer.ts` is the one file allowed to say
+    // with one (docs/tui/keys.md § Keys and focus). `keys/commandLayer.ts` is the one file allowed to say
     // it, because saying it is how `asCtrl` finds it in a user's own keybinding and rewrites it.
     const said = filesIn(ROOT)
       .filter((file) => file !== fileURLToPath(import.meta.url))
@@ -58,7 +58,7 @@ describe('a scroll is a scrollbox and not a clip', () => {
     // and there is no offset for anything to move. It looks like a scroll right up to the moment the
     // caret walks below the fold and nothing follows it, which is what eight of the nine plugin lists
     // did. A body that can outgrow its frame is a `ScrollViewport` or a `Rows virtual`, and this is a
-    // grep because a clip reviews well (docs/tui.md § Scrolling viewports).
+    // grep because a clip reviews well (docs/tui/scrolling.md § Scrolling viewports).
     //
     // Tests may say it. `kit/markdown.test.tsx` puts a clip round a document on purpose, to assert
     // what the markdown pass drew rather than what a viewport did with it.
@@ -76,7 +76,7 @@ describe('the store is the only owner of focus', () => {
   // Invariant 9, as a fact about the source. Every "the border is lit and the keys do nothing" bug in
   // this app was a second owner: the renderer moved focus on its own, the store wrote the signal the
   // highlights are drawn from, and the two drifted. One owner cannot drift, and the only way to keep
-  // it to one is to count the places that could be a second (docs/tui.md § Focus regions).
+  // it to one is to count the places that could be a second (docs/tui/focus.md § Focus regions).
 
   /** Every non-test source file of this package, by its path from `src/`. */
   const sources = (): { path: string; text: string }[] => filesIn(ROOT)
@@ -145,7 +145,7 @@ describe('the store is the only owner of focus', () => {
 // parser, and the point of all four is that none of them is a wrapper around somebody else's
 // renderer. The keymap engine is still a dependency of this package, so an import of it here would
 // resolve and nothing else would notice — which is what this rule is for now that the painter
-// packages are gone (docs/tui.md § The adapter).
+// packages are gone (docs/tui/keys.md § The adapter).
 describe('the new painter is ours', () => {
   it('reaches for nothing from @opentui anywhere under tree, layout, paint or input', () => {
     const borrowed = ['tree', 'layout', 'paint', 'input'].flatMap((folder) => filesIn(join(ROOT, folder))

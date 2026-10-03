@@ -145,16 +145,16 @@ A few pages need more detail:
 - **Rail and surfaces** has a **Show in left rail** switch for every plugin source and the
   replaced-surface picker. A hidden source still opens from the palette.
 - **Notifications** switches sound, system notifications, the app-icon count, and each of the three
-  agent events worth interrupting for. See [notifications](./notifications.md) § Settings.
+  agent events worth interrupting for. See [notifications](./notifications/channels.md) § Settings.
 
 Each page's header says whether a change affects this device, a Node, a workspace, or a project. One
-Node switcher serves the Node pages that can read another Node. [Frontend](./frontend.md) § Settings
+Node switcher serves the Node pages that can read another Node. [Frontend](./frontend/settings.md) § Settings
 covers the window.
 
 The terminal client has a Settings route with the same groups, pages, and order. It draws the plugin
 pages written with the shared kit and its own Notifications page, which shows the `ACORN_TUI_NOTIFY`
 alert choice and the three event switches. Every other page is listed and says why to open it in the
-desktop app. See [terminal client](./tui.md) § Settings.
+desktop app. See [terminal client](./tui/sources-and-settings.md) § Settings.
 
 Plugins are managed per Node. With more than one Node, the shell adds Fleet home, Node labels,
 aggregate Agent Center, attention, and search, Node-aware palette rows, and partial and offline

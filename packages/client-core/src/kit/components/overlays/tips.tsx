@@ -8,7 +8,7 @@ import type { RailLegendItem } from '../../tokens/rail'
 import './tips.css'
 
 // The app's tooltip contract: data attributes, honoured on any element anywhere. See
-// docs/ui-design.md § Tooltips for the attributes, why they replace a wrapper component, and the
+// docs/ui-design/tooltips.md § Tooltips for the attributes, why they replace a wrapper component, and the
 // positioning rules.
 //
 // RailTab serialises each marker into `data-tip-legend`; the kit owns the display shape.

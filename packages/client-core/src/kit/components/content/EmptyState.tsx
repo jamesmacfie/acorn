@@ -5,7 +5,7 @@ import { Spinner } from './Spinner'
    data", and "unconfigured, do X" are one box with different contents.
 
    No illustration library and no built-in reasons. The call site supplies the why, this supplies
-   the geometry. See docs/ui-design.md § States. */
+   the geometry. See docs/ui-design/states.md § States. */
 export function EmptyState(props: {
   icon?: JSX.Element
   title?: string

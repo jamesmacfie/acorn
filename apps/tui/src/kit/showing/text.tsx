@@ -6,7 +6,7 @@ import { flatten, Line, runStyle } from '../cells'
 import { borderCell } from '../roles'
 import { stop } from '../../keys/stops'
 
-// The terminal form of these kit nodes follows docs/ui-design.md § Every node at 80 by 24.
+// The terminal form of these kit nodes follows docs/ui-design/every-node.md § Every node at 80 by 24.
 
 export function Text(props: { emphasis?: TextRole; tone?: Tone; wrap?: boolean; tip?: string; tipAt?: number; children: JSX.Element }) {
   return <Line role={props.emphasis} tone={props.tone} wrap={props.wrap}>{props.children}</Line>

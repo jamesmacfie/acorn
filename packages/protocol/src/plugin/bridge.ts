@@ -160,7 +160,7 @@ export type PluginBridgeUiRequest =
   // and bounded to MAX_OVERLAY_INPUT_BYTES in the same way the input is.
   | { id: number; kind: 'ui'; op: 'importer.close'; result?: unknown }
 
-// The document a composed pane shares with its frame (docs/editor.md § Communication
+// The document a composed pane shares with its frame (docs/editor/composed-panes.md § Communication
 // between regions). Valid only from a frame whose pane declares a `document-over-frame` layout;
 // every other surface is denied, because there is no document on the other side of the port to
 // touch.

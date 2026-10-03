@@ -46,7 +46,7 @@ describe('icon census', () => {
   })
 
   it('ignores a literal that is not a Lucide name, so an inline glyph stays lazy-free', () => {
-    // The fallback those rely on is deliberate (docs/ui-design.md § Icons). A census that treated
+    // The fallback those rely on is deliberate (docs/ui-design/icons.md § Icons). A census that treated
     // every string as an icon name would put half the tree's vocabulary in the startup chunk.
     writeFileSync(join(dir, 'Pane.tsx'), "export const glyph = { icon: 'brand-that-lucide-lacks' }\n")
     run(['--root', dir, '--eager', eager(), '--lucide', LUCIDE])

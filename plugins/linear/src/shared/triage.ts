@@ -30,7 +30,7 @@ export function priorityMeta(priority: number | null | undefined, priorityLabel?
   return { level, label: priorityLabel || PRIORITY_FALLBACK[level] }
 }
 
-// Status is a toned badge with a word (docs/ui-design.md § States). The tone comes from Linear's fixed
+// Status is a toned badge with a word (docs/ui-design/states.md § States). The tone comes from Linear's fixed
 // state type, never the colour a team picked, so "In Progress" reads the same in every workspace. The
 // word stays the team's own name. `Badge` has no muted tone, so canceled is neutral.
 export type StatusTone = 'neutral' | 'accent' | 'ok' | 'warn' | 'danger'

@@ -12,7 +12,7 @@ import type { SettingsContribution } from '../../host/registries/shell/settings'
 export type CoreSettingsPage = Omit<SettingsContribution, 'component'>
 
 // What each page offers search, here rather than in the page, because a page is a lazy chunk and
-// search must find it before it has ever loaded (docs/frontend.md § Search and deep links). A
+// search must find it before it has ever loaded (docs/frontend/settings.md § Search and deep links). A
 // section's `id` is the `SettingsSection` the page draws and `rows` are its row labels, so a change to
 // a page's sections is a change here too.
 type SearchDeclaration = Pick<SettingsContribution, 'keywords' | 'sections'>
@@ -192,7 +192,7 @@ const extensionPoints: SearchDeclaration = {
   ],
 }
 
-// Core's settings pages, placed in the rail's nine groups (docs/frontend.md § Settings). Ids are
+// Core's settings pages, placed in the rail's nine groups (docs/frontend/settings.md § Settings). Ids are
 // stable because callers deep-link by them: `openSettings('shortcuts')`, a notice target's page id,
 // the palette's rows. `order` counts within a group.
 //

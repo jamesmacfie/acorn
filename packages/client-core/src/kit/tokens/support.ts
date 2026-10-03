@@ -1,10 +1,10 @@
 // Which host can draw which node, as data with a test behind it — the pattern `tokenAxes.ts` uses
-// for "which axis owns this token". See docs/ui-design.md § The closed kit.
+// for "which axis owns this token". See docs/ui-design/closed-kit.md § The closed kit.
 //
 // Four levels, each with a defined behaviour, so an author can predict a host without running it:
 //
 //   full      same meaning, drawn natively
-//   reduced   drawn, with named things missing; the node's row in docs/ui-design.md § The closed kit
+//   reduced   drawn, with named things missing; the node's row in docs/ui-design/closed-kit.md § The closed kit
 //             says what
 //   fallback  not drawn; the host draws a stated substitute, and the author does nothing
 //   absent    nothing is drawn, unless the node has a <Fallback> child
@@ -16,7 +16,7 @@
 //
 // A `reduced` node says what is lost, in the same place its level is decided, so an author reading
 // this file knows what to expect without opening a doc. The sentence is the same one that ends the
-// node's row in docs/ui-design.md § Every node at 80 by 24.
+// node's row in docs/ui-design/every-node.md § Every node at 80 by 24.
 
 export type Host = 'dom' | 'tui'
 export type SupportLevel = 'full' | 'reduced' | 'fallback' | 'absent'
@@ -68,7 +68,7 @@ export const NODE_SUPPORT = {
   // The gap that pushes what follows to the far end of a toolbar.
   ToolbarSpacer: { dom: 'full', tui: 'full' },
   // A settings page's titled group and its one setting. Nodes rather than a convention, so a plugin's
-  // page lines up with core's and search has an anchor to land on (docs/frontend.md § Settings).
+  // page lines up with core's and search has an anchor to land on (docs/frontend/settings.md § Settings).
   SettingsSection: { dom: 'full', tui: 'full' },
   SettingRow: {
     dom: 'full', tui: 'reduced',

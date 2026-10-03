@@ -13,7 +13,7 @@ import type { Disposable } from '../../../kit/lib/state/registry'
 // talking to a disposed session.
 //
 // This is not a second dispatcher. The keymap remains the only thing that turns a key into a command
-// id (docs/command-palette-and-shortcuts.md § Focus and typing); what changes is what happens to the
+// id (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing); what changes is what happens to the
 // id once `executeCommand` has it and finds no executor behind it.
 
 /** What opens the palette at a command's own frame. The session implements it. */

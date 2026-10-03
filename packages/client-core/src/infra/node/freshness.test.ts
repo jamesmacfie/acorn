@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { formatLastSeen, freshnessOf } from './freshness'
 
-// docs/ui-design.md § States. Six values, and every input combination must land on exactly one: no
+// docs/ui-design/states.md § States. Six values, and every input combination must land on exactly one: no
 // infinite spinners, since anything past its deadline resolves to stale/offline/error.
 describe('freshnessOf', () => {
   it('reads an online node with fresh data as live', () => {
@@ -23,7 +23,7 @@ describe('freshnessOf', () => {
 
   it('reads every unreachable state as offline, fetching or not', () => {
     // An in-flight fetch against an unreachable node is going to fail; calling it "refreshing" is the
-    // infinite spinner docs/ui-design.md § States forbids.
+    // infinite spinner docs/ui-design/states.md § States forbids.
     for (const state of ['offline', 'incompatible', 'revoked'] as const) {
       expect(freshnessOf(state)).toBe('offline')
       expect(freshnessOf(state, { isFetching: true })).toBe('offline')

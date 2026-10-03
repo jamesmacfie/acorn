@@ -75,7 +75,7 @@ export function Acorn(props: { label?: string }) {
  *  A drawer is a place on the desktop's screen: between the two icon rails, above the task footer, at
  *  a height a grip dragged it to. None of those exist here — this host draws one pane, the drawer's
  *  sources are rows in the rail, and choosing one opens the PTY where the pane goes
- *  (docs/tui.md § What is drawn bespoke). So the box stays and the geography
+ *  (docs/tui/chrome.md § What is drawn bespoke). So the box stays and the geography
  *  goes, and `height` is ignored because a pixel count is not a thing a cell host can spend. */
 export function Drawer(props: { height: number; maximized?: boolean; ariaLabel: string; ref?: (element: HTMLElement) => void; children: JSX.Element }) {
   return <box flexDirection="column" flexGrow={1}>{props.children}</box>
@@ -146,7 +146,7 @@ export { RefPanelBoxDefault as RefPanelBox }
  *  Absent, and it says so, for the same reason `RefPanelTaskLink` below is: the box needs the routed
  *  project and the source's registered `promotion`, and this host has no router. The surface that
  *  opens it is a row menu on a descriptor source's list, and this host's source panel draws no row
- *  menu (../plugins/SourcePanel.tsx, docs/tui.md § What a plugin loses here). Nothing here mounts an
+ *  menu (../plugins/SourcePanel.tsx, docs/tui/plugin-losses.md § What a plugin loses here). Nothing here mounts an
  *  `overlay` slot either, so this stands in for a build, not for a screen. */
 export function PromoteToTaskModal(_props: {
   providerId: string
@@ -294,7 +294,7 @@ export { AnnotationMarks } from './showing'
  * A `Rows` collection per contributor, at the end of the region that hosts the point, rather than a
  * pinned strip of buttons under the pane: a strip is one more row of chrome on a 24-row screen, and a
  * collection is the one thing on this host every reader already knows how to drive
- * (docs/tui.md § What a plugin loses here). It draws nothing and registers no stop when the point has
+ * (docs/tui/plugin-losses.md § What a plugin loses here). It draws nothing and registers no stop when the point has
  * no deliveries, so an owner who reserved a footer nobody fills sees the pane exactly as it was.
  */
 export function ExtensionRows(props: { point: string }) {

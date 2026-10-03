@@ -21,7 +21,7 @@ import { confirmAction } from '../../../host/registries/shell/willPhase'
 import { createSettingSave } from '../settingSave'
 import { useUnsavedChanges } from '../unsavedChanges'
 
-// Settings → Nodes (docs/ui-design.md § Node management): add, rename, reconnect, unpair, revoke.
+// Settings → Nodes (docs/frontend/settings-groups.md § Node management): add, rename, reconnect, unpair, revoke.
 //
 // One component with three inline steps rather than a wizard framework. Step 2 exists because comparing
 // the fingerprint against the one the node itself displays is the security of pairing
@@ -113,7 +113,7 @@ export default function NodesSettings() {
   }
 
   // Unpair and revoke each name what goes and what stays, because the two are easy to confuse and only
-  // one of them can be undone with the same pairing (docs/ui-design.md § Node management).
+  // one of them can be undone with the same pairing (docs/frontend/settings-groups.md § Node management).
   const unpair = async (node: NodeRecord) => {
     const confirmed = await confirmAction({
       title: `Unpair ${node.label}`,
@@ -137,7 +137,7 @@ export default function NodesSettings() {
 
   // A step of the pairing form, in the one shape for a boxed form on a settings page: a card that says
   // where it is in the three, its fields, then its primary action and Cancel under the last one
-  // (docs/frontend.md § Forms and flows).
+  // (docs/frontend/settings-pages.md § Forms and flows).
   const pairingStep = (props: { step: number; children: JSX.Element; actions: JSX.Element }) => (
     <Card>
       <Stack gap="row">
@@ -317,7 +317,7 @@ export default function NodesSettings() {
                         Rename
                       </Button>
                       <NodePairingButton pairing={pairing} />
-                      {/* Labelled distinctly on purpose (docs/ui-design.md § Node management). Confusing the two is
+                      {/* Labelled distinctly on purpose (docs/frontend/settings-groups.md § Node management). Confusing the two is
                           how an owner loses access to a remote node: unpair is recoverable with the same
                           pairing code, revoke means the node has torn up this client's credential. */}
                       <Show when={!node().local}>

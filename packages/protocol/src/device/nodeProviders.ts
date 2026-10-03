@@ -66,7 +66,7 @@ export type NodeProvidersResponse = {
 }
 
 // `POST /v1/core/nodes/adopt`. The renderer names a provider and a node; the answer carries the
-// credential, so the desktop host is the only caller (docs/shell.md § Fleet membership).
+// credential, so the desktop host is the only caller (docs/shell/bridge-and-broker.md § Fleet membership).
 export const nodeAdoptBodySchema = z.strictObject({
   providerId: z.string().min(1),
   providerNodeId: z.string().min(1),

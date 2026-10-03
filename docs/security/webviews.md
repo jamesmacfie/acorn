@@ -2,7 +2,7 @@
 
 This page covers the native webviews the desktop hosts for previews and plugins, and the separate
 browser agents drive. Read it before you change preview loading or a browser tool. It's part of the
-[security model](../security.md). [The shell](../shell.md#host-owned-webviews) owns the webview
+[security model](../security.md). [The shell](../shell/webviews.md#host-owned-webviews) owns the webview
 lifecycle.
 
 ## Webviews

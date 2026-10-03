@@ -19,7 +19,7 @@ export type LocalChange = {
 
 // Everything the Changes pane draws, from one `git status --porcelain=v2 --branch` read. Two reads
 // would disagree for a poll interval, so the branch facts travel with the file list rather than beside
-// it (docs/diff-rendering.md § Data flow).
+// it (docs/diff-rendering/changes-pane.md § One status read).
 export type LocalStatus = {
   branch: string | null // null on a detached HEAD
   upstream: string | null // null when the branch has no upstream

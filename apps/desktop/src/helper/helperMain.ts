@@ -22,7 +22,7 @@ import { createLogger, describeError } from '@acorn/node-core/server/telemetry'
 //
 // The ready line means "this process is listening", not "the node is up". The node's boot runs behind
 // it and reports itself through the `node-status` pushes below, which is what lets the window open on
-// a persisted cache instead of on a 400 ms node boot (docs/shell.md § The shell process).
+// a persisted cache instead of on a 400 ms node boot (docs/shell/process.md § The shell process).
 
 // Every line Rust is meant to read carries this key. Everything else on stdout is a log.
 const TAG = 'acorn-helper'
@@ -89,7 +89,7 @@ const dataKeyCipher = (dataKey: string): TokenCipher => {
 // each preview tunnel's secret, which the shell seeds into the pane's cookie store because wry cannot
 // inject a request header. This pipe reaches Rust and nothing else, which is why a secret may travel
 // on it. See docs/shell.md, "Host-owned webviews". A footprint request asks Rust for memory numbers
-// only it can read, and the answer comes back as a command (docs/shell.md § What the shell reports).
+// only it can read, and the answer comes back as a command (docs/shell/node-child.md § What the shell reports).
 const emit = (event: 'crash-budget-exhausted' | 'tunnel-opened' | 'tunnel-closed' | 'footprint-request', detail?: object): void =>
   console.log(JSON.stringify({ [TAG]: event, ...detail }))
 
@@ -147,7 +147,7 @@ async function boot(handshake: Handshake): Promise<{ helper: Helper; server: Hel
   // line goes out here, and Rust opens the window on the helper being *listening* rather than on the
   // node being up.
   helper.bootComplete()
-  // The node boots behind the window (docs/shell.md § The shell process).
+  // The node boots behind the window (docs/shell/process.md § The shell process).
   // `startInBackground` rather than `void helper.start()`, because a start that rejects before it
   // spawns anything has to reach the recovery dialog — with the window already open there is nowhere
   // else to report it.

@@ -1,4 +1,4 @@
-// The colour half of the theme axis, as a contract both sides read. See docs/ui-design.md § Plugin
+// The colour half of the theme axis, as a contract both sides read. See docs/ui-design/appearance.md § Plugin
 // themes for the three-group split and why only the palette is declarable.
 
 /** The palette a theme block must state in full. Colour values only. */
@@ -16,7 +16,7 @@ export const THEME_PALETTE_TOKENS = [
 /** Room for `oklch(0.7 0.15 250 / 0.42)` and nothing like a stylesheet. */
 export const THEME_COLOR_VALUE_MAX = 64
 
-// A hex literal, or one colour function with a flat argument list. See docs/ui-design.md § Plugin
+// A hex literal, or one colour function with a flat argument list. See docs/ui-design/appearance.md § Plugin
 // themes for why only these are accepted.
 //
 // The character set inside the parentheses excludes `(`, `)`, `;`, `{`, `}`, `<`, `\`, quotes, and

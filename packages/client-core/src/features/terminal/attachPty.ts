@@ -7,7 +7,7 @@ import type { PtyIo } from '../../kit/lib/pty'
 // bound to the channel the caller described (../../kit/lib/pty.ts).
 //
 // Here rather than in `kit/` because it carries xterm and a stylesheet, and the kit may import neither
-// (docs/frontend.md § Registries and plugins). Reached by a plugin through `@acorn/plugin-api/ui`,
+// (docs/frontend/registries.md § Registries and plugins). Reached by a plugin through `@acorn/plugin-api/ui`,
 // which is where every other host-owned rule on the compiled surface already is.
 //
 // It exists because three plugins were each doing this — the editor's `$EDITOR` window and docker's

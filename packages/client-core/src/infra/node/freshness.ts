@@ -1,6 +1,6 @@
 import type { NodeConnectionState } from '@acorn/protocol/broker.ts'
 
-// Every Node-backed surface renders exactly one of these six values (docs/ui-design.md § States),
+// Every Node-backed surface renders exactly one of these six values (docs/ui-design/states.md § States),
 // derived from the node's connection state and the query's own status. Deriving it in one place is
 // what stops the same badge being computed three subtly different ways.
 export type Freshness = 'live' | 'refreshing' | 'stale' | 'offline' | 'disabled' | 'error'
@@ -14,7 +14,7 @@ export type FreshnessQuery = {
   disabled?: boolean
 }
 
-// Precedence follows docs/ui-design.md § States: `disabled`, then an unreachable node (which outranks
+// Precedence follows docs/ui-design/states.md § States: `disabled`, then an unreachable node (which outranks
 // `refreshing`), then `degraded` (WS-down/HTTP-up, which reads as `stale`), then the query's own
 // status.
 export const freshnessOf = (state: NodeConnectionState, query: FreshnessQuery = {}): Freshness => {
@@ -35,7 +35,7 @@ export const FRESHNESS_LABELS: Record<Freshness, string> = {
   error: 'Error',
 }
 
-// Ages are shown next to `stale`/`offline` per docs/ui-design.md § States; "never" rather than a
+// Ages are shown next to `stale`/`offline` per docs/ui-design/states.md § States; "never" rather than a
 // fabricated 0 when the node has not answered once in this session.
 export function formatLastSeen(lastSeenAt: number | undefined, now = Date.now()): string {
   if (lastSeenAt === undefined) return 'never'

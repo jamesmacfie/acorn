@@ -12,7 +12,7 @@
 //
 // What is *not* here: which source the rail is showing. That is `selectedSource()` and it is the
 // shell's, not the path's — "the shell renders from `selectedSource()`, not the location" is a rule
-// this host inherits rather than invents (docs/frontend.md § Registries and plugins). A path that
+// this host inherits rather than invents (docs/frontend/registries.md § Registries and plugins). A path that
 // names a source moves the rail to it; choosing a source does not rewrite the path.
 
 import { createEffect, untrack } from 'solid-js'

@@ -4,7 +4,7 @@ Run these checks when changing terminal key handling or the shared command palet
 The numbers retain their original acceptance-check IDs.
 
 The next four are the terminal keyboard's, from the programme that ended on 2026-09-02 by rewriting
-[tui.md](../tui.md) § Keys and focus. Every one of them needs a real terminal and none can be
+[tui.md](../tui/keys.md) § Keys and focus. Every one of them needs a real terminal and none can be
 automated: both harnesses ask for the kitty keyboard protocol, the trust queue is stubbed, and a
 suite drives one task at a time.
 
@@ -12,7 +12,7 @@ suite drives one task at a time.
     never decided about. The caret starts inside the dialog, Tab does not move it out, Enter on "Run
     it" records the decision, and Escape drops the queue entry. The harness stubs `pendingTrust`; the
     real flow comes through custody, which is the half no test sees
-    ([tui.md](../tui.md) § The trust prompt).
+    ([tui.md](../tui/plugins.md) § The trust prompt).
 28. Press Shift+Tab in a terminal that does not negotiate the kitty keyboard protocol. Both harnesses
     ask for it and get it, so a legacy terminal's spelling of that chord is untested; check that the
     region cycle still goes backwards, and that a lone Escape still leaves a rectangle without
@@ -21,7 +21,7 @@ suite drives one task at a time.
     palette with its chord from inside the PTY, close it, and type again. Run it with
     `ACORN_TUI_KEYS_TRACE=1` and read `keys.log`: no line may say `reason=no-match` on a key the
     footer offers, and none may say `region=none` while the screen has regions
-    ([tui.md](../tui.md) § Seeing what the keys did).
+    ([tui.md](../tui/footer.md) § Seeing what the keys did).
 30. Walk the cross and page keys where five different rules used to live. In a `list-detail` pane,
     Right crosses from the list to the detail, Left comes back, and PageDown lands on the last row
     and then scrolls the panel instead of wrapping. On the first tab of a `Sections` strip, Left goes one

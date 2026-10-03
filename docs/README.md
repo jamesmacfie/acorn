@@ -73,10 +73,8 @@ the whole plugin system in one page.
 | [native-overlays.md](./native-overlays.md) | Native composition, input routing, presentation authority, supported platforms, and degraded behavior. |
 | [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md) | The palette, the keymap, focus, and typing. |
 | [diff-rendering.md](./diff-rendering.md) | The diff document and its segments, row geometry, the resident segment cache, find, and what large-surface rendering refuses. |
-| [editor.md](./editor.md) | The host-owned document surface: why the host draws the editor and what it lends. |
+| [editor.md](./editor.md) | The host-owned editor: the shared surface, what it lends to plugins, and its limits. |
 | [notifications.md](./notifications.md) | What an agent is doing, which changes are worth interrupting for, and the gate every channel hangs off. |
-| [ui-design/appearance.md](./ui-design/appearance.md) | Themes, style packs, and the appearance token axes. |
-| [ui-design/closed-kit.md](./ui-design/closed-kit.md) | The closed component kit and its extension rules. |
 
 ## Features
 
@@ -159,10 +157,63 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [cli/agents-and-workflows.md](./cli/agents-and-workflows.md) | CLI agent sessions, workflow runs, and the run list. |
 | [cli/plugin-commands.md](./cli/plugin-commands.md) | Discovering and running a plugin's CLI commands. |
 | [cli/local-service.md](./cli/local-service.md) | The CLI-owned background Node: start, status, and stop. |
-| [tui/interaction.md](./tui/interaction.md) | Terminal key handling, focus, scrolling, and interaction telemetry. |
-| [tui/chrome-and-plugins.md](./tui/chrome-and-plugins.md) | Terminal chrome, loaded plugins, and their host fallbacks. |
 | [node-distribution.md](./node-distribution.md) | The standalone node tarball and how it boots without a desktop. |
 | [release-notes.md](./release-notes.md) | What is in the current release. |
+
+## Renderer, shell, and terminal topic pages
+
+Each landing page in the tables above has topic pages in a folder of the same name:
+
+- [frontend.md](./frontend.md): [Data and startup](./frontend/data-and-startup.md),
+  [Rail and routing](./frontend/rail-and-routing.md),
+  [Registries and plugins](./frontend/registries.md),
+  [Settings groups](./frontend/settings-groups.md), [Settings pages](./frontend/settings-pages.md),
+  [Settings](./frontend/settings.md), [Shell state](./frontend/shell-state.md),
+  [Startup budget](./frontend/startup-budget.md).
+- [ui-design.md](./ui-design.md): [UI appearance](./ui-design/appearance.md),
+  [The closed UI kit](./ui-design/closed-kit.md),
+  [Every node at 80 by 24](./ui-design/every-node.md), [Icons](./ui-design/icons.md),
+  [Interaction rules and menus](./ui-design/interaction.md),
+  [How the kit is built](./ui-design/kit-internals.md), [Chrome, overlays,
+  and dialogs](./ui-design/overlays.md), [Shell hierarchy](./ui-design/shell-hierarchy.md),
+  [States and accessibility](./ui-design/states.md), [Design tokens](./ui-design/tokens.md),
+  [Tooltips](./ui-design/tooltips.md), [Two-column panes](./ui-design/two-column-panes.md).
+- [panes.md](./panes.md): [Pane contributions](./panes/contributions.md),
+  [Pane layouts](./panes/layout.md), [Pane models](./panes/models.md),
+  [Pane regions](./panes/regions.md).
+- [command-palette-and-shortcuts.md](./command-palette-and-shortcuts.md): [Palette commands](./command-palette-and-shortcuts/commands.md),
+  [Focus and typing](./command-palette-and-shortcuts/focus-and-typing.md),
+  [Palette data](./command-palette-and-shortcuts/palette-data.md),
+  [The palette session](./command-palette-and-shortcuts/palette.md),
+  [Shortcuts](./command-palette-and-shortcuts/shortcuts.md).
+- [diff-rendering.md](./diff-rendering.md): [The Changes pane](./diff-rendering/changes-pane.md),
+  [The diff document](./diff-rendering/document.md),
+  [Diff row geometry and modes](./diff-rendering/geometry.md),
+  [Diff loading and highlighting](./diff-rendering/loading.md),
+  [Diff review threads and marks](./diff-rendering/review.md).
+- [editor.md](./editor.md): [Composed panes](./editor/composed-panes.md),
+  [The document surface](./editor/document-surface.md), [The editor pane](./editor/editor-pane.md),
+  [Find in files](./editor/find-in-files.md), [Line markers](./editor/line-markers.md),
+  [Saving and recovery](./editor/save-and-recovery.md).
+- [notifications.md](./notifications.md): [Notification channels and settings](./notifications/channels.md),
+  [The notification gate](./notifications/gate.md),
+  [Notification rows and targets](./notifications/rows-and-targets.md),
+  [Notification states and edges](./notifications/states-and-edges.md).
+- [shell.md](./shell.md): [The renderer bridge and the connection broker](./shell/bridge-and-broker.md),
+  [The Node child and shell telemetry](./shell/node-child.md),
+  [Origins and schemes](./shell/origins.md), [Build and packaging](./shell/packaging.md),
+  [The shell process](./shell/process.md), [Host-owned webviews](./shell/webviews.md).
+- [tui.md](./tui.md): [Terminal chrome](./tui/chrome.md), [Terminal focus](./tui/focus.md),
+  [Terminal footer and key trace](./tui/footer.md), [Terminal host switch](./tui/host-switch.md),
+  [Terminal keys](./tui/keys.md), [Terminal navigation](./tui/navigation.md),
+  [What a plugin loses in the terminal](./tui/plugin-losses.md),
+  [Terminal loaded plugins](./tui/plugins.md), [Terminal client process](./tui/process.md),
+  [Terminal rectangles and limits](./tui/rectangles.md), [Terminal rendering](./tui/rendering.md),
+  [Terminal reporting and invariants](./tui/reporting.md),
+  [Terminal collections and scrolling](./tui/scrolling.md),
+  [Terminal sources and settings](./tui/sources-and-settings.md),
+  [Terminal client tests](./tui/tests.md), [Terminal dialogs and rectangles](./tui/traps.md),
+  [Terminal typing](./tui/typing.md).
 
 ## Subfolders
 

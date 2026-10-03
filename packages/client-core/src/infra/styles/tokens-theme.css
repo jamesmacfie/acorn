@@ -1,5 +1,5 @@
 /* The theme axis: colour, and only colour. Selected by `data-theme` on <html>
- * (persistence/appStartup.ts). See docs/ui-design.md § Token axes for the contract with
+ * (persistence/appStartup.ts). See docs/ui-design/tokens.md § Token axes for the contract with
  * tokens-style.css, the primitives/derived split, the bridge tokens, and dark-mode precedence.
  */
 :root {
@@ -14,13 +14,13 @@
   --warn: #9a6700;      --badge-border: #d4d4d4;
   --shadow-popover: rgba(0, 0, 0, 0.12);
 
-  /* docs/ui-design.md § Token axes covers why these two are self-description rather than
+  /* docs/ui-design/tokens.md § Token axes covers why these two are self-description rather than
      colour. Dark blocks below flip both. */
   --is-dark: 0;
   --color-scheme: light;
 }
 
-/* Derived colour, declared once, following every theme (docs/ui-design.md § Token axes). These
+/* Derived colour, declared once, following every theme (docs/ui-design/tokens.md § Token axes). These
    also fill gaps that used to be referenced-but-undefined, where each call site invented its own
    fallback hex (two different reds for --danger; a dark-only #111 for --surface-sunken that broke
    under light themes). */
@@ -46,7 +46,7 @@
      glyph wants, and no single authored hex can clear both directions. 45% is the most brand that
      clears 3:1 in all twelve themes; solarized dark with that purple is the tight one, at 3.03:1.
      --brand is set per element by brandStyle() in ui/brandMarks.ts, so this resolves per mark; with
-     none set it is the accent, mixed the same way. See docs/ui-design.md § Brand colour. */
+     none set it is the accent, mixed the same way. See docs/ui-design/icons.md § Brand color. */
   --brand-legible: color-mix(in srgb, var(--brand, var(--accent)) 45%, var(--text));
 
   /* Theme-independent: a find highlight has to stay legible over syntax-coloured code in every
@@ -69,7 +69,7 @@
 }
 
 /* Series identity: chart marks that answer "which series is this", never "how is this doing"
-   (docs/dashboards.md § Views are derived, not chosen from a menu; docs/ui-design.md § Token axes
+   (docs/dashboards.md § Views are derived, not chosen from a menu; docs/ui-design/tokens.md § Token axes
    for why these are a defaults set rather than a light/dark pair). All three sit at L≈0.6 in
    oklch, clearing the 3:1 contrast floor against both the light ground (#ffffff) and the dark one
    (#121212), in hues no status tone occupies (ok green #1a7f37, warn amber #9a6700, bad red
@@ -114,7 +114,7 @@
   --is-dark: 1;  --color-scheme: dark;
 }
 
-/* docs/ui-design.md § Token axes covers why this has to work before any JavaScript runs. */
+/* docs/ui-design/tokens.md § Token axes covers why this has to work before any JavaScript runs. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: var(--dark-bg);        --bg-subtle: var(--dark-bg-subtle);   --bg-hover: var(--dark-bg-hover);   --bg-selected: var(--dark-bg-selected);

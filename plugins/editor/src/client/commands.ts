@@ -20,7 +20,7 @@ import { editorOpen } from './editorState'
 // (client-core/host/registries/commands/presenter.ts) and the session owns the typing, the ordering,
 // the cursor and the abort. Nothing about what it finds or what picking one does has changed — and
 // the terminal client gains it, because it draws the same session and never drew that overlay
-// (docs/tui.md § What a plugin loses here).
+// (docs/tui/plugin-losses.md § What a plugin loses here).
 //
 // **Why this ranks its own rows rather than using `localSearch`.** The adapter scores a row's title
 // and subtitle separately, and a file row is a filename and its directory drawn as two things. A query
@@ -97,7 +97,7 @@ export const editorCommands: readonly ContributedCommand[] = [
   },
   {
     // The entry point that keeps searching from starting with "open the editor first"
-    // (docs/panes.md § Contributions).
+    // (docs/panes/contributions.md § Contributions).
     id: 'editor.search.open',
     title: 'Find in files…',
     category: 'navigation',

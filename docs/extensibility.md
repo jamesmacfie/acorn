@@ -207,7 +207,7 @@ of making a plugin is the plugin's own logic rather than its chrome.
 The kit is **closed**, and that is the part that turned out to matter most. Every component a plugin
 may draw with is in one list; a node's props are role tokens, content, counts, booleans and handlers,
 and never `class`, `style` or a DOM attribute passed through
-([docs/ui-design.md § The closed kit](./ui-design.md#the-closed-kit)). Closing it is what lets the
+([docs/ui-design.md § The closed kit](./ui-design/closed-kit.md#the-closed-kit)). Closing it is what lets the
 same source render two ways — compiled in this process, or in a worker with no DOM at all — and it is
 what keeps a second host, a phone or a terminal, from being a rewrite.
 

@@ -17,7 +17,7 @@ export function Log(props: {
 }) {
   let scroller: HTMLPreElement | undefined
   // Keyed on the line count rather than the array, because a streaming buffer hands back a new
-  // array on every tick and `on()` fires on identity. See docs/ui-design.md § The closed kit.
+  // array on every tick and `on()` fires on identity. See docs/ui-design/closed-kit.md § The closed kit.
   createEffect(on(() => props.lines.length, () => {
     if (!props.follow || !scroller) return
     queueMicrotask(() => { if (scroller) scroller.scrollTop = scroller.scrollHeight })

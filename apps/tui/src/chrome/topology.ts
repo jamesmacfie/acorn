@@ -5,7 +5,7 @@
 // the screen first has any depends on how the session started; and which regions a first crossing
 // into a column passes over is a fact about what the shell calls chrome. All three were literals
 // spread between `./Rail.tsx`, `./Shell.tsx` and the keys module before this file
-// (docs/tui.md § Navigation).
+// (docs/tui/navigation.md § Navigation).
 //
 // This is the one file in `chrome/` that names region ids as strings anywhere but at the
 // `regionFocus` call that declares them. Everywhere else the ids arrive as a `RegionRef` from here.

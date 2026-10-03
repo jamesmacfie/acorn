@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { readStyleSheets, stripComments } from '../../infra/styles/readStyleSheets'
 import { STYLES } from './uiStyles'
 
-// Drift guard, mirroring themes.test.ts (docs/ui-design.md § Style packs): the Appearance styles
+// Drift guard, mirroring themes.test.ts (docs/ui-design/tokens.md § Style packs): the Appearance styles
 // picker is hand-synced with the `:root[data-style="…"]` blocks in styles/style-*.css. Offering a
 // style with no pack behind it would silently render as Terminal.
 describe('STYLES ↔ stylesheets', () => {

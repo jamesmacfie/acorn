@@ -3,7 +3,7 @@ import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 import { dockerTaskSummary } from './dockerStore'
 
 // `header-body`, which is `header-body-footer` with no footer: the chip strip stays put and the
-// container detail below it scrolls (docs/panes.md § Layout model).
+// container detail below it scrolls (docs/panes/layout.md § Layout model).
 const DockerChips = lazy(async () => ({ default: (await import('./DockerTaskPane')).DockerChips }))
 const DockerTaskDetail = lazy(async () => ({ default: (await import('./DockerTaskPane')).DockerTaskDetail }))
 

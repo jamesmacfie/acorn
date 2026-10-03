@@ -1,7 +1,7 @@
 // The exclusive-slot registry: a plugin offers to stand in for one of core's own surfaces, and the
 // user decides whether it does (docs/plugins.md § Replacing a core surface).
 //
-// No JSX import here (docs/frontend.md § Registries and plugins), so the arbitration rule can be
+// No JSX import here (docs/frontend/registries.md § Registries and plugins), so the arbitration rule can be
 // tested. The host that draws the resolved surface lives in a `.tsx`.
 import { createSignal, type Component } from 'solid-js'
 import { CORE_SLOT_PROVIDER, isCoreExclusiveSlot, type CoreExclusiveSlot } from '@acorn/protocol/extensionPoints.ts'

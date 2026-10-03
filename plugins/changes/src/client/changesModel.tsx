@@ -24,7 +24,7 @@ import { CHANGES_PANE, changesBindings, changesCommands } from './commands'
 import { createCommitState } from './commitState'
 
 // Everything the Changes pane knows, held once per task and read by all four of its regions
-// (docs/diff-rendering.md, docs/panes.md § Layout model).
+// (docs/diff-rendering.md, docs/panes/layout.md § Layout model).
 //
 // The pane is a `list-detail` layout, so the header, the file list, the commit bar and the diff are
 // four components the host mounts rather than one closure. They share a resource, a selection, a diff
@@ -47,7 +47,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const [statusRevision, setStatusRevision] = createSignal(0)
 
   // One read behind the whole panel: the changes, the branch, its upstream, how far each way, and
-  // whether a merge or rebase is mid-flight (docs/diff-rendering.md § Data flow). The list draws the
+  // whether a merge or rebase is mid-flight (docs/diff-rendering/changes-pane.md § One status read). The list draws the
   // changes, the branch bar draws the rest.
   const [status, { refetch }] = createResource(
     // Archive keeps the pane mounted so it can report teardown failures. Stop asking for Git state
@@ -82,7 +82,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // A commit is not a file change, so the dirty poll above does not see one: an agent committing in
   // its terminal leaves a clean tree and a branch one commit further ahead. `head:changed` is the
   // node noticing HEAD moved, and it is what makes the ahead count move within a poll rather than
-  // waiting for the next edit (docs/diff-rendering.md § Data flow).
+  // waiting for the next edit (docs/diff-rendering/changes-pane.md § The footer and freshness).
   onCleanup(clientEvents.on('head:changed', (event) => {
     if (event.taskId === task.id) refresh()
   }))
@@ -138,7 +138,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
 
-  // The stack as a document (docs/diff-rendering.md § The document). The node diffs, cuts and keys
+  // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts and keys
   // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
   // only the files whose key did (../server/localDocument.ts). The answer carries the request it was
   // for, so the topology is always the node's view of one moment rather than a mix of two.

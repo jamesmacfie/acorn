@@ -197,7 +197,7 @@ function registerSurfaces(pluginId: string, hash: string, row: NodePluginRow, tr
   // The two extension carriers that run the plugin's own bytes: a remote tree in a worker, and an
   // `inline` rectangle in an iframe. Both ride this pass rather than the chrome one, and both are gated
   // on trust for the same reason a pane is and with no second question asked — the prompt the owner
-  // answered was about these bytes (docs/shell.md § The plugin worker). The other two
+  // answered was about these bytes (docs/shell/origins.md § The plugin worker). The other two
   // carriers, `items` and `route`, are descriptors and register in the chrome pass.
   for (const entry of row.installed?.contributions.extensions ?? []) {
     if (entry.remote === undefined && entry.frame === undefined) continue
@@ -269,7 +269,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
       // Every pane declares one of the host's layouts. The host draws the arrangement and fills each
       // region: a document region is the host's editor and runs no plugin code at all, a `frame` region
       // is the plugin's own bundle in an iframe, and a `remote` region is that same bundle in a worker
-      // emitting a tree the host draws (docs/panes.md § Layout model). This comes before everything else
+      // emitting a tree the host draws (docs/panes/layout.md § Layout model). This comes before everything else
       // the `pane` case does, because a pane whose regions are all documents has no bundle to mount and
       // no bridge to open.
       //
@@ -329,7 +329,7 @@ function registerSurface(pluginId: string, hash: string, row: NodePluginRow, sur
                 // own bytes in the other half of a composed pane, and the grant is structural either
                 // way: what makes the `document` verb answerable is standing beside a host editor, not
                 // which of the two runtimes the bundle happens to be in
-                // (docs/editor.md § Communication between regions).
+                // (docs/editor/composed-panes.md § Communication between regions).
                 regions[name] = () => createComponent(RemoteTree, { contribution, props: regionScope, scope: regionScope, document: documentGrant, openingItem })
                 continue
               }

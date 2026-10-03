@@ -81,7 +81,7 @@ WebKit storage with a developer's own app. Each answer replaces the previous mar
 ## Reading a diff
 
 The diff measures only its dynamic blocks, threads and whatever a line draws under itself, through one
-observer ([row geometry](../diff-rendering.md#row-geometry)). Its topology is complete before any row
+observer ([row geometry](../diff-rendering/geometry.md#row-geometry)). Its topology is complete before any row
 loads, and its queue is the segments on screen and two either side.
 
 - `activeObservers` is one while the pane is mounted and zero after. `observedElements` is the

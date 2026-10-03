@@ -1,6 +1,6 @@
 // @vitest-environment node
 //
-// The eight invariants in docs/notifications.md § Invariants, as properties over generated
+// The eight invariants in docs/notifications/gate.md § Invariants, as properties over generated
 // sequences rather than as tables. Each part of the model already has its own tests with worked
 // examples; this file is about the whole, so that no adapter or sink added later can make an edge
 // you watched noisy, or the pill disagree with what the bell holds.
@@ -25,7 +25,7 @@ const pick = <T>(random: () => number, from: readonly T[]): T => from[Math.floor
 const snap = (state: AttentionState, over: Partial<Snapshot> = {}): Snapshot =>
   ({ nodeId: 'n1', sessionId: 's1', taskId: 't1', title: 'claude', state, sourceId: 'agents', notifyOnFinish: true, target: { kind: 'managed-agent', resourceId: 's1' }, ...over })
 
-// The three edges, transcribed from docs/notifications.md § Three edges rather than derived from the
+// The three edges, transcribed from docs/notifications/states-and-edges.md § Three edges rather than derived from the
 // code, so this is a second opinion and not an echo.
 const modelSays = (from: AttentionState, to: AttentionState, notifyOnFinish: boolean): EdgeKind | null =>
   from === to ? null
@@ -67,7 +67,7 @@ const start = (over: Partial<{ focused: boolean; settings: NotificationSettings 
 const observe = (...snapshots: Snapshot[]) => observeAttention(snapshots, context)
 const settle = () => vi.advanceTimersByTime(HOLD_MS)
 
-describe('the model holds over generated sequences (docs/notifications.md § Invariants)', () => {
+describe('the model holds over generated sequences (docs/notifications/gate.md § Invariants)', () => {
   it('1. standing still is never news', () => {
     const random = rng(1)
     for (let run = 0; run < 200; run++) {

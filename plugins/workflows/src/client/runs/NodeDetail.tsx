@@ -36,7 +36,7 @@ import { RunRecords } from './RunRecords'
 // Two shapes, and the difference is not cosmetic. The conversation's timeline is the scroller and it
 // sizes against the region, so that branch is a fragment; a `Stack` around it, or a row of buttons
 // after it, and the composer ends up below the fold with the pane's own scroll broken (client-core
-// infra/styles/shell.css, docs/panes.md § Layout model).
+// infra/styles/shell.css, docs/panes/layout.md § Layout model).
 
 const readJson = <T,>(raw: string | null | undefined): T | null => {
   if (!raw) return null

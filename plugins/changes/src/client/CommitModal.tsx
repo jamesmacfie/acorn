@@ -6,7 +6,7 @@ import type { ChangesModel } from './changesModel'
 // The commit message with room to write it in. Same draft as the footer's three-row field, so a
 // reader can open this, type a body, dismiss it, and see what they wrote back in the pane: both
 // fields read and write `draft` on the pane's model, and the model is what outlives either of them
-// (docs/panes.md § Layout model).
+// (docs/panes/models.md § Pane models).
 //
 // A `Modal`, not a pane and not a drawer: it is one field and one button, it goes away on Escape, and
 // it draws the same on both hosts.
@@ -25,10 +25,10 @@ export function CommitModal(props: { model: ChangesModel; onDismiss: () => void 
             the element is still detached, and a detached element cannot take focus. `focus?.()`
             because the terminal hands its `Textarea` ref a renderable with no such method, and it
             needs none — entering a dialog there lands on its first stop
-            (docs/tui.md § Keys and focus). */}
+            (docs/tui/keys.md § Keys and focus). */}
         <CommitField model={model()} grow rows={12} onField={(element) => queueMicrotask(() => element.focus?.())} />
         {/* Under the field rather than in the footer, which holds only buttons
-            (docs/ui-design.md § Chrome and overlays). */}
+            (docs/ui-design/overlays.md § Chrome and overlays). */}
         <Text emphasis="muted">{gitCommitLine(model())}</Text>
       </Modal.Body>
       <Modal.Actions>

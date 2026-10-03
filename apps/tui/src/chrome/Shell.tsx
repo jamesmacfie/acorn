@@ -88,7 +88,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   const [strip, setStrip] = createSignal<Renderable | undefined>()
   // The shell's own width, so the left column can take a share of it rather than a fixed number of
   // cells (./Rail.tsx § railCells). The one width anything in the chrome reads, and it is this box's
-  // rather than the terminal's — the same rule a layout keeps (docs/tui.md § What the TUI never does).
+  // rather than the terminal's — the same rule a layout keeps (docs/tui/rectangles.md § What the TUI never does).
   const [cells, setCells] = createSignal(80)
   // One way to lose the left column: a reader asked, on `ctrl+b`. There used to be a second —
   // collapsing to a two-cell strip
@@ -202,7 +202,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     const quit = () => {
       // A node this TUI started dies with it, and a reader who typed `q` by accident should not
       // discover that afterwards. One this TUI only attached to is left running, so there is nothing
-      // to confirm (docs/tui.md § Attach or start).
+      // to confirm (docs/tui/process.md § Attach or start).
       if (props.supervised) openOverlay('quit')
       else props.onQuit()
     }

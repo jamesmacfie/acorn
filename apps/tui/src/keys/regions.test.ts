@@ -180,7 +180,7 @@ describe('focus regions', () => {
   // sentence they are there to keep true. The pass they replaced had seven ordered steps and the bug
   // it produced was always two of them running in an order nobody had pictured, which is exactly the
   // kind of bug a scenario per path cannot find (./regions.ts § The landing rule,
-  // docs/tui.md § Focus regions).
+  // docs/tui/focus.md § Focus regions).
 
   /** Invariants 6, 9 and 10 about whatever holds the keys, asked after a pass. */
   const holdsTheKeys = (where: string): Renderable => {
@@ -636,7 +636,7 @@ describe('focus regions', () => {
     // and the list-to-detail edge alike, which is what the integer buys over the `'rail' | 'main'`
     // pair it replaced — under that pair every region a layout registered was `'main'`, so Right in a
     // `list-detail` had nothing to cross to and did nothing at all
-    // (docs/tui.md § Focus regions).
+    // (docs/tui/focus.md § Focus regions).
     const railRow = item()
     const rail = node([railRow])
     const listRow = item()
@@ -655,7 +655,7 @@ describe('focus regions', () => {
     expect(focusedRenderable()).toBe(listRow)
     expect(moveColumn(1)).toBe(true)
     expect(focusedRenderable()).toBe(detailStop)
-    // And no wrap at either end (docs/tui.md § Focus regions).
+    // And no wrap at either end (docs/tui/focus.md § Focus regions).
     expect(moveColumn(1)).toBe(false)
     // Back, one column at a time, each landing where it left off rather than resetting.
     expect(moveColumn(-1)).toBe(true)

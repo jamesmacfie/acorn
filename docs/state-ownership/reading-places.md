@@ -19,7 +19,7 @@ slot. Keying by the item's key is what makes a refetch keep your place.
 `packages/client-core/src/host/keys/focusRegions.ts` holds which region of which pane has focus. It's
 the one place `focusedPane` is written and the one place `runtime:focus-changed` is emitted. Where you
 are in a list is a reading posture, not a preference, so neither is persisted
-([focus and typing](../command-palette-and-shortcuts.md#focus-and-typing)).
+([focus and typing](../command-palette-and-shortcuts/focus-and-typing.md#focus-and-typing)).
 
 ## Timelines
 
@@ -52,4 +52,4 @@ The diff's parsed rows belong to the Node. `packages/client-core/src/features/di
 holds them in memory beside that Node's query client, so a pane mounted again on the same Node draws
 them without a request. One partition per Node, cleared when the Node is dropped, and never persisted.
 It holds no reader state, so a thread resolving changes a height and never a cached row
-([resident segments](../diff-rendering.md#resident-segments)).
+([resident segments](../diff-rendering/loading.md#resident-segments)).

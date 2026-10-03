@@ -14,7 +14,7 @@ import { resolveStyle, STYLES } from './uiStyles'
 // `resolveTheme`, and a second `savePref` call to keep in step. Two persistence paths for one value is
 // how a setting quietly starts disagreeing with itself.
 //
-// The two axes stay disjoint (docs/ui-design.md § Token axes): style owns shape, typography, spacing
+// The two axes stay disjoint (docs/ui-design/tokens.md § Token axes): style owns shape, typography, spacing
 // and density; theme owns colour. Theme additionally has a follow-the-OS mode with one pick per mode,
 // which is why there are three theme readers and not one.
 //

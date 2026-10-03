@@ -27,7 +27,7 @@ import { notesSelectionFor, rememberNotesSelection } from './notesPaneState'
 // not go with it.
 //
 // The host holds it. `model` on the pane contribution builds this once per task inside its own
-// reactive root and hands it to every region (client-core registries/paneModels.ts, docs/panes.md §
+// reactive root and hands it to every region (client-core registries/paneModels.ts, docs/panes/layout.md §
 // Layout model). This file used to keep that root map itself, and so did changes, agents and context.
 
 export type Selected = { scope: NoteScope; slug: string; virtual?: boolean }

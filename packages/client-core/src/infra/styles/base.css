@@ -27,7 +27,7 @@ body {
    marks used to live here too and no longer do; they are path data now, see ui/brandMarks.ts.
    These only align on a mono stack, so they stay pinned to --font-glyph even when a pack takes the
    surrounding chrome sans. ui/Icon.tsx emits this class on its fallback path.
-   See docs/ui-design.md § Icons. */
+   See docs/ui-design/icons.md § Icons. */
 .glyph {
   font-family: var(--font-glyph);
   font-variant-numeric: var(--tabular);
@@ -41,7 +41,7 @@ svg.glyph,
 }
 
 /* ── Null defaults ──────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § Style packs for the null-default pattern and the specificity hazard for
+   See docs/ui-design/tokens.md § Style packs for the null-default pattern and the specificity hazard for
    an element that relies on `transform` for positioning while hovered. Nothing does today; the
    only positioning transform is on .rail-tip, a div. Extend this block rather than adding an
    override rule to a pack. */

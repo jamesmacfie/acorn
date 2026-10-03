@@ -136,7 +136,7 @@ handler and any resource in it, which is what `send` above refuses too, and the 
 given is the one that stays out of the OS.
 
 For what a target is, how the click gets there, and which kinds exist, see
-[notifications.md](../notifications.md) § What a row points at.
+[notifications.md](../notifications/rows-and-targets.md) § What a row points at.
 
 ### The live channel
 

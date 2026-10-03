@@ -97,4 +97,4 @@ The `ui.scroll.place` causes are `opened`, a list mounting or swapping, `unasked
 reader nor the timeline made, and `took`, the reader's place changing without them, which happens only
 when their turn has left the list. The diff cache histograms are `.hit`, `.miss`, `.insert`, `.evict`,
 `.evicted_rows`, `.evicted_bytes`, `.oversize`, and the resident `.documents`, `.segments`, `.rows`,
-`.plain_bytes`, and `.enrichment_bytes` ([resident segments](../diff-rendering.md#resident-segments)).
+`.plain_bytes`, and `.enrichment_bytes` ([resident segments](../diff-rendering/loading.md#resident-segments)).

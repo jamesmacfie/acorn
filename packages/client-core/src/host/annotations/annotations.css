@@ -2,7 +2,7 @@
    Geometry and role tokens only, like the extension strip next door: a mark drawn under a diff line
    follows the appearance packs with everything else, and the contributor gets no say in any of it.
    `--stripe-w` is the ROLE width for a leading rule on a run of quoted or contributed text, and the
-   one border role no pack may zero (docs/ui-design.md § Border roles): a mark that lost its rule would
+   one border role no pack may zero (docs/ui-design/tokens.md § Border roles): a mark that lost its rule would
    read as the owner's own line rather than as somebody else's note about it. */
 .annotation-marks {
   display: flex;

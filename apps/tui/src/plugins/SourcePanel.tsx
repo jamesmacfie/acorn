@@ -32,7 +32,7 @@ import { openPromotion } from '../chrome/promotionStore'
 // `projectSurfaceRegistry` is what the detail is. So the two hosts cannot disagree about the cache
 // key, the verbs, or which surface a row addresses. What differs is where the halves go — the desktop
 // draws both across one window, and this host puts the list in its Browse panel and the detail in the
-// main one (docs/tui.md § The screen), which is why this exports a `regions` pair rather than a
+// main one (docs/tui/chrome.md § The screen), which is why this exports a `regions` pair rather than a
 // component.
 //
 // The desktop's dashboard panels beside the list are not here: they need a separate cell surface.

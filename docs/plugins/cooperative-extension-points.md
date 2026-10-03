@@ -197,7 +197,7 @@ resolved by the host, and a missing icon becomes a status dot. The desktop alloc
 only its four corners; every accepted mark remains in the ordered tooltip legend and accessible
 description. The terminal projection uses that complete ordered legend and discloses any glyphs that
 do not fit. See [Rail controls and status markers](../ui-design.md#rail-controls-and-status-markers)
-and [Terminal chrome and plugins](../tui/chrome-and-plugins.md#task-markers).
+and [terminal chrome](../tui/chrome.md#task-markers).
 
 This loaded path is task-only. A real plugin that needs source or pane status must first define an
 owner-declared annotation point for that surface. It must not add a rail-specific manifest

@@ -1,7 +1,7 @@
 import { Show } from 'solid-js'
 import type { Size, Tone } from '../../tokens/tokens'
 
-/* Meter: a ratio bar. See docs/ui-design.md § How the kit is built for why it is a div and
+/* Meter: a ratio bar. See docs/ui-design/kit-internals.md § How the kit is built for why it is a div and
    not a native <meter>.
 
    `label` is required, or a screen reader announces a number with nothing attached to it. `auto`

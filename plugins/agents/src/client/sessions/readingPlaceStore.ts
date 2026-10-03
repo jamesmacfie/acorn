@@ -1,7 +1,7 @@
 // Where the reader was left in each transcript, for as long as the window lives.
 //
 // Here rather than inside the kit's `Timeline`, which used to keep a map of its own. Navigation
-// disposes a task's panes on purpose (docs/panes.md § there is no keepAlive), so a place that lives in
+// disposes a task's panes on purpose (docs/panes/models.md § there is no keepAlive), so a place that lives in
 // the component is a place lost every time you switch workspace, and a map hidden inside a kit
 // component has no owner: nothing can scope it, clear it, or see it. This file is that owner, beside
 // the session's draft and its composer state, which are the same shape for the same reason

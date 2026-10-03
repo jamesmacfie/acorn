@@ -26,7 +26,7 @@ import { agentProvidersOptions, refreshAgentProviders } from '../providersClient
 // Everything the Agent pane's two regions have to agree on.
 //
 // The pane is a `list-detail` layout, so the sidebar and the conversation are two components the host
-// mounts side by side (docs/panes.md § Layout model). Which session is open, what went wrong, and
+// mounts side by side (docs/panes/models.md § Pane models). Which session is open, what went wrong, and
 // which dialog is up are shared between them, so none of it can live in either. Held once per task,
 // the same shape github's PR pane uses for the pull it is showing (github/pullDetail/prTabs.ts).
 

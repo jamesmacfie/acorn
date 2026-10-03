@@ -5,7 +5,7 @@ import type { FindHighlight } from '../../kit/diff/find'
 
 // In-diff find (Cmd+F). The diff is loaded a segment at a time, so the renderer cannot scan it: the
 // source searches the whole document and answers pages of matches by segment and row
-// (docs/diff-rendering.md § Modes). Pages are fetched as the reader steps past the last one, and a
+// (docs/diff-rendering/geometry.md § Modes). Pages are fetched as the reader steps past the last one, and a
 // match's segment loads when the reader is taken to it. The query goes to the source and nowhere
 // else; it never reaches telemetry.
 

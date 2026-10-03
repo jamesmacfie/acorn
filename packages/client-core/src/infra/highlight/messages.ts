@@ -1,5 +1,5 @@
 // The highlight worker's wire format. Its own module, importing nothing: see
-// docs/diff-rendering.md § Syntax highlighting for why neither side of the worker boundary may
+// docs/diff-rendering/loading.md § Syntax highlighting for why neither side of the worker boundary may
 // pull the other's graph across.
 //
 // The token shape is structural rather than an import of ui/diff/model.ts's `Tok`. They are the

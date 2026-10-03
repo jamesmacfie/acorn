@@ -5,7 +5,7 @@ import { loadGrammar } from './langs'
 
 // The main-thread highlighter, for the callers a worker would not pay for: the terminal's ANSI
 // palette, CI log output, and agent markdown code fences. Diffs tokenize in
-// highlighter.worker.ts under Oniguruma (docs/diff-rendering.md § Syntax highlighting), and
+// highlighter.worker.ts under Oniguruma (docs/diff-rendering/loading.md § Syntax highlighting), and
 // ./worker.ts falls back here when the worker cannot start.
 //
 // The engine is JavaScript regex rather than Oniguruma, which is what the renderer's CSP allows.
@@ -51,7 +51,7 @@ const htmlFlights = new Map<string, HtmlFlight>()
  * that will not load is a rejected dynamic import — so a caller catches and renders the fence plain.
  *
  * Each token carries both colours as --l/--r and the stylesheet picks a side with light-dark(), the
- * same way diff rows do (styles/primitives.css § Markdown, docs/ui-design.md § Token axes). Shiki's
+ * same way diff rows do (styles/primitives.css § Markdown, docs/ui-design/tokens.md § Token axes). Shiki's
  * own dual-theme default instead writes the light colour into `color` and the dark one into a
  * --shiki-dark no stylesheet here reads, so under a dark theme every fence drew github-light on a
  * white background.

@@ -7,7 +7,7 @@ import { _resetPrModels } from './prModel'
 import { _resetPrTabs } from './prTabs'
 
 // The PR pane is the navigator beside the diff, the same pair the browse surface draws
-// (docs/panes.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
+// (docs/panes/layout.md § Layout model). Nothing rendered it until this package had a jsdom tier: phase 7
 // deferred it and the pane has been unexercised since.
 //
 // What this holds is the shape rather than the content. The pane mounts, both columns draw, and
@@ -122,7 +122,7 @@ describe('the PR pane', () => {
   it('draws the navigator beside the diff', () => {
     const node = draw()
     // The kit's split, which is what makes this look like the browse surface rather than like a
-    // second design (docs/panes.md § Layout model).
+    // second design (docs/panes/layout.md § Layout model).
     const split = node.querySelector<HTMLElement>('.ui-listdetail')!
     expect(split).not.toBeNull()
     expect(node.querySelector('[aria-label="Pull request"]')).not.toBeNull()

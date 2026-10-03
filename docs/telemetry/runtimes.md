@@ -99,8 +99,8 @@ the route answers `202` with `{ accepted: 0 }`, and the sender stops when it nex
 | Desktop helper | The Node's collector, in the helper's process | Its own poster, over the broker with the device token | `helper.boot` spans, `broker.*` health, `node.crash`, and its log lines |
 | Rust shell | None. A panic hook writes a file, and the helper asks for memory numbers | The helper forwards the file on the next boot, and posts the numbers when they arrive | One fatal error with `runtime: shell`, and the renderer's and helper's `runtime.memory.footprint` |
 
-[What the terminal client reports](../tui.md#what-the-terminal-client-reports) and
-[what the helper reports](../shell.md#what-the-helper-reports) own the detail.
+[What the terminal client reports](../tui/reporting.md#what-the-terminal-client-reports) and
+[what the helper reports](../shell/node-child.md#what-the-helper-reports) own the detail.
 
 The terminal client runs client-core in process, so it reuses the renderer's emitter and changes only
 the poster. The helper already depends on `@acorn/node-core`, so it reuses the collector. The terminal

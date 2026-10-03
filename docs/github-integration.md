@@ -130,7 +130,7 @@ files received.
 
 ### Diff documents
 
-The diff viewer reads a pull request as a document ([diff-rendering.md](./diff-rendering.md) § The
+The diff viewer reads a pull request as a document ([diff-rendering.md](./diff-rendering/document.md) § The
 document), not as patches. When the files mirror writes a patch body, it also cuts the patch into
 segments with `@acorn/diff-document` and writes the segment descriptors as a small blob beside it,
 `diffdoc:v<version>:<patch digest>` (`plugins/github/src/server/routes/mirror/prDocument.ts`). Both
@@ -176,7 +176,7 @@ a subsequent request resolves mutable refs again. Each file runs its own PR diff
 PR-head-to-worktree translation. Remote base refs precede local refs, the resolved head must match
 the mirror's exact SHA, and missing refs produce no PR contribution. Diff failures do not publish
 untranslated ranges. Literal pathspecs and disabled external diff and text conversion preserve file
-and line identity. [Editor marker custody](./editor.md#line-provenance-markers) owns disk/body matching.
+and line identity. [Editor marker custody](./editor/line-markers.md#line-provenance-markers) owns disk/body matching.
 
 The GitHub source provides repository browse, PR lists/detail, diff files, checks, Actions logs,
 mentions, labels, reviewers, comments, review threads, and create-PR. Mutations call GitHub first and
@@ -333,7 +333,7 @@ first one opened fetches the whole job log once and slices every step out of it.
 ## Surfaces
 
 Every GitHub surface is a host layout filled with kit components; the plugin ships no stylesheet
-([panes.md](./panes.md) § Layout model, [ui-design.md](./ui-design.md) § The closed kit).
+([panes.md](./panes/layout.md) § Layout model, [ui-design.md](./ui-design.md) § The closed kit).
 
 | Surface | Arrangement |
 | --- | --- |
@@ -451,7 +451,7 @@ the host's props contract.
 
 The cost of mounting that way is named in `docs/tui.md` § What a plugin loses here: the terminal host
 does not fill the `overlay` slot, so both of these searches are desktop-only. The editor's `⌘P` is not,
-because it is registered in its plugin's `init` ([editor.md](./editor.md) § From the command palette).
+because it is registered in its plugin's `init` ([editor.md](./editor/editor-pane.md) § From the command palette).
 
 **Finding a pull request stays project-scoped and capped.** `scope: 'project'`, because the list is the
 routed repository's open pull requests and there is no fleet or workspace query behind it to widen it

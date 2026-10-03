@@ -26,14 +26,14 @@ import { boxBorder } from './roles'
 // parser on both hosts and looks the same. The one thing headless xterm has no notion of is a
 // keyboard, hence `./ptyKeys.ts`. Everything above the emulator — the arming, the intercept, the
 // Escape pair, the footer's answer — is the rectangle contract and knows nothing about it
-// (docs/tui.md § The Rectangle contract).
+// (docs/tui/traps.md § The Rectangle contract).
 
 /**
  * What a caller filling a `pty` rectangle is handed.
  *
  * The DOM hands over an element and the caller attaches xterm to it. There is no element here, so the
  * host hands over the three operations a terminal is: bytes in, keystrokes out, and the size of the
- * box in cells (docs/tui.md § Rectangles).
+ * box in cells (docs/tui/rectangles.md § Rectangles).
  */
 export type CellTerminal = {
   /** Bytes from the PTY, written into the emulator. */
@@ -62,7 +62,7 @@ type Inside = {
 // How long after leaving a rectangle a second Escape means "send an Escape to what is inside".
 //
 // The contract is "Escape alone leaves, Escape twice sends one"
-// (docs/tui.md § The Rectangle contract). Leaving on the first press
+// (docs/tui/traps.md § The Rectangle contract). Leaving on the first press
 // and treating a second press as re-enter-and-send is the same behaviour with no latency: holding the
 // first Escape for a window to see whether a second arrives would make every exit feel slow, and this
 // is the one key rule the desktop does not have, so it should not also be the slowest.
@@ -84,7 +84,7 @@ const ESCAPE_PAIR_MS = 400
 const [live, setLive] = createSignal<readonly (() => boolean)[]>([])
 
 /** Is a rectangle holding every key right now? Read by the footer, which says so and says how to get
- *  back out (docs/tui.md § The footer). */
+ *  back out (docs/tui/footer.md § The footer). */
 export const enteredRectangle = (): boolean => live().some((held) => held())
 
 // ── The emulator under our painter ────────────────────────────────────────────────────────────
@@ -101,7 +101,7 @@ const SCROLLBACK = 1000
  *  `plugins/agents/src/server/usage/processRunner.ts` already uses for it. Lazily, and that half is
  *  load-bearing: this module is in `App`'s eager graph, so a static import would put a whole terminal
  *  emulator into the startup of the build that draws its terminals with OpenTUI's instead
- *  (../scripts/check-startup-graph.mjs, docs/frontend.md § Startup budget). */
+ *  (../scripts/check-startup-graph.mjs, docs/frontend/startup-budget.md § Startup budget). */
 let loaded: typeof HeadlessTerminal | undefined
 
 const emulatorClass = (): typeof HeadlessTerminal => {
@@ -285,7 +285,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
     // At the `RECTANGLE` tier, above every layer there is: while a rectangle is entered the keys are
     // its, `Ctrl+C` included, and no app layer may fire. An intercept rather than a layer, because a
     // layer answers the keys it can name and a rectangle answers all of them
-    // (docs/tui.md § The Rectangle contract, ../keys/tiers.ts).
+    // (docs/tui/traps.md § The Rectangle contract, ../keys/tiers.ts).
     onCleanup(engine.intercept('key', (ctx) => {
       const key = ctx.event
       if (!entered()) {
@@ -334,7 +334,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
       // The same border either way, and the title carries the state instead. A `control` border is a
       // different role, not a brighter one, and a style pack may set any role to zero width — so
       // swapping roles to mean "focused" is how a box quietly stops being drawn at all
-      // (docs/ui-design.md § Borders).
+      // (docs/ui-design/tokens.md § Border roles).
       {...boxBorder('surface', { tone: entered() ? 'accent' : 'neutral' })}
       // Short, because a box title that does not fit its width is not drawn at all. The whole rule —
       // "esc leave · esc esc send escape" — is on the footer, which says it while a rectangle is
@@ -353,7 +353,7 @@ export function PtyRectangle(props: { label: string; hidden?: boolean; mount?: (
  *
  *  A box and a line. The read-only view and the search inside it are not built, and the handoff
  *  needed nothing built: the editor pane's terminal mode runs the reader's own editor in a PTY on the
- *  node, so in cells it simply draws (docs/tui.md § Rectangles).
+ *  node, so in cells it simply draws (docs/tui/rectangles.md § Rectangles).
  *  Drawn rather than absent because a pane that names one is telling the truth about what is there. */
 export function EditorRectangle(props: { label: string; children?: JSX.Element }) {
   return (

@@ -34,7 +34,7 @@ startClientTelemetry({ runtime: 'renderer', post: postTelemetryBatch('renderer')
 const stopResponsiveness = startResponsivenessMonitor(reportResponsiveness)
 window.addEventListener('pagehide', stopResponsiveness, { once: true })
 // Counts about the page every thirty seconds while collecting, read against the memory the shell
-// measures from outside (docs/shell.md § What the shell reports).
+// measures from outside (docs/shell/node-child.md § What the shell reports).
 const stopPageFacts = startPageFacts(() => clientFor(activeCacheId()).client)
 window.addEventListener('pagehide', stopPageFacts, { once: true })
 
@@ -184,7 +184,7 @@ bootMark('tree built')
 
 // After the frame the tree above produced, which is the first thing the owner sees, and separately the
 // moment the node could answer. The two are far apart on purpose: nothing between `script start` and
-// this frame waits on the helper or the node (docs/frontend.md § Startup readiness).
+// this frame waits on the helper or the node (docs/frontend/data-and-startup.md § Startup readiness).
 // macOS pauses `requestAnimationFrame` while the window is occluded, so this mark is the compositor's
 // and not the renderer's: a launch watched from behind another window prints every other mark and not
 // this one, which is why `tree built` above exists (docs/local-development/profiling.md § Timing a cold start).

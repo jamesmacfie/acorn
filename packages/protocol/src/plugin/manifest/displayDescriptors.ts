@@ -91,7 +91,7 @@ export const refResolverDescriptor = z.object({
 // A colour theme: a map of theme-token values the host validates, then generates a
 // `:root[data-theme="plugin:<pluginId>:<id>"]` block from. No plugin-authored CSS reaches the shell.
 // `z.strictObject` rather than `z.record` so every check happens at parse time.
-// See docs/ui-design.md § Plugin themes for the token contract and what each group may declare.
+// See docs/ui-design/appearance.md § Plugin themes for the token contract and what each group may declare.
 export const themeDescriptor = z.object({
   // Namespaced by the host into `plugin:<pluginId>:<id>`. The alphabet is bounded because the result
   // is written into a CSS attribute selector.

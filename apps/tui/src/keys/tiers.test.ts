@@ -28,7 +28,7 @@ import {
 //               happened to register in, and only a press can see an order
 //
 // Do not go looking for the enumeration API. If a release adds one, this file is where the two checks
-// collapse back into one (docs/tui.md § The five key groups).
+// collapse back into one (docs/tui/keys.md § The five key groups).
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url))
 

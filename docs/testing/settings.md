@@ -18,7 +18,7 @@ any issue for each check. The numbers keep their original acceptance-check IDs.
 
 ## The settings window
 
-The following checks cover [frontend.md](../frontend.md) § Settings. The rail's order, deep links, the
+The following checks cover [frontend.md](../frontend/settings.md) § Settings. The rail's order, deep links, the
 remembered page, and the settings-local node switcher have automated coverage in
 `packages/client-core/src/features/settings/SettingsView.test.tsx`. These checks cover the window.
 
@@ -45,7 +45,7 @@ remembered page, and the settings-local node switcher have automated coverage in
 
 ## Search, saving, and deep links
 
-The next checks cover [frontend.md](../frontend.md) § Search and deep links and § Pages and the save
+The next checks cover [frontend.md](../frontend/settings.md) § Search and deep links and § Pages and the save
 model. Saved, a failed write, the unsaved-changes question on Escape, and search ranking with the
 section highlight have automated coverage in `settingSave.test.tsx` and `SettingsView.test.tsx` beside
 the view. These checks cover the window and the pages.
@@ -72,7 +72,7 @@ the view. These checks cover the window and the pages.
 
 ## Workspaces and projects
 
-The next checks cover [frontend.md](../frontend.md) § Workspaces and projects. The run-targets table's
+The next checks cover [frontend.md](../frontend/settings-groups.md) § Workspaces and projects. The run-targets table's
 round trip, the read-only provenance row, Default's protection, a plugin's project tab, and the rail's
 tree with ⌘[ have automated coverage in `RunTargetsTable.test.tsx`, `ProjectSettings.test.tsx`,
 `WorkspaceSettings.test.tsx`, and `SettingsView.test.tsx`, and the node's `repoConfig` in
@@ -100,7 +100,7 @@ tree with ⌘[ have automated coverage in `RunTargetsTable.test.tsx`, `ProjectSe
 
 ## Agents, plugins, and connections
 
-The next checks cover [frontend.md](../frontend.md) § Agents. The header's detail and back link, old
+The next checks cover [frontend.md](../frontend/settings-groups.md) § Agents. The header's detail and back link, old
 page ids, and the device chip have automated coverage in `SettingsView.test.tsx` and the terminal kit
 test. The custom agent and MCP server editors, Harnesses and defaults, and both core pages are covered
 in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx`, and

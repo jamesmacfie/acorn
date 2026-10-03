@@ -42,7 +42,7 @@ export function createCommitState(deps: CommitDeps) {
   //
   // Held here, above the footer, because the footer is a region the host can unmount on its own:
   // below 80 columns the pane shows the list or the diff and never both, and a message typed before
-  // a trip to the diff has to still be there afterwards (docs/panes.md § Layout model).
+  // a trip to the diff has to still be there afterwards (docs/panes/layout.md § Layout model).
   const [draft, setDraft] = createSignal('')
   persistDraft(() => deps.taskId, draft, setDraft, DRAFT_PREFIX)
 

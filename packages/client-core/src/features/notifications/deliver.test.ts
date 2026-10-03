@@ -264,7 +264,7 @@ describe('the system channel', () => {
 })
 
 // A workflow notice names the run it came from, and that is what gives the bell row somewhere to go
-// (docs/notifications.md § What a row points at).
+// (docs/notifications/rows-and-targets.md § What a row points at).
 describe('workflow notices', () => {
   const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
     ({ taskId: 't1', kind: 'gate', title: 'a gate', ...over })
@@ -294,7 +294,7 @@ describe('workflow notices', () => {
 
 // The seam this channel grew for: any plugin can raise a row and say where it goes. The memory
 // proposal gate is why — it borrowed workflows' notice channel, which could only name a run, so its
-// row swallowed every click (docs/notifications.md § What a row points at).
+// row swallowed every click (docs/notifications/rows-and-targets.md § What a row points at).
 describe('a plugin notice', () => {
   const frame = (over: Partial<WorkflowNotice>): WorkflowNotice =>
     ({ title: 'something happened', ...over })

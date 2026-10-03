@@ -43,7 +43,7 @@
 .overlay:focus { outline: none; }
 
 /* A loaded plugin's `overlay` frame surface (docs/plugins.md): the host draws the box and the
-   dismiss affordance, the frame draws its contents. See docs/ui-design.md § Chrome and overlays
+   dismiss affordance, the frame draws its contents. See docs/ui-design/overlays.md § Chrome and overlays
    for why this takes an explicit height rather than max-height. */
 .plugin-overlay { height: min(60vh, 520px); }
 .plugin-overlay-head { display: flex; align-items: center; gap: var(--space-4); }
@@ -86,7 +86,7 @@
   justify-self: start;
 }
 
-/* File finder: input header + scrollable result list. See docs/ui-design.md § Chrome and overlays
+/* File finder: input header + scrollable result list. See docs/ui-design/overlays.md § Chrome and overlays
    for why the `.finder-*` family that used to live here is gone. */
 
 /* @mention autocomplete popup (MentionTextarea.tsx): fixed below the textarea. */

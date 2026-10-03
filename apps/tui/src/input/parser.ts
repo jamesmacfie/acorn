@@ -31,7 +31,7 @@ import {
 // is the first byte of every escape sequence there is, so pressing Escape and pressing Down are the
 // same first byte and only time tells them apart. A terminal that answered the kitty request sends
 // `CSI 27 u` for the Escape key and never a bare ESC, which is the ambiguity that flag exists to
-// settle (docs/tui.md § The adapter) — but the wait stays armed either way, because a byte that
+// settle (docs/tui/keys.md § The adapter) — but the wait stays armed either way, because a byte that
 // arrives late is a byte we have to do something with.
 
 /** How long a lone ESC waits for the rest of its sequence. OpenTUI's number, above. */

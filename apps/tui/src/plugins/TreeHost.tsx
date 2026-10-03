@@ -13,7 +13,7 @@ import { nextTick } from '../kit/tick'
 // Everything that decides anything is `client-core/host/tree/treeState.ts` — the store, the whole-batch
 // pre-flight check, the prop sanitiser, and the one place a handler id becomes a closure. This file is
 // the shell around it, and it is the shell that differs: a different table of components behind each
-// name, and the renderer's tick in place of a frame (docs/tui.md § Unknown nodes and failed trees).
+// name, and the renderer's tick in place of a frame (docs/tui/rectangles.md § Unknown nodes and failed trees).
 //
 // So a loaded plugin and a compiled one are indistinguishable here, which is what the tree protocol
 // exists to make true. `plugins.test.ts` is the twin of client-core's `twoPaths.test.tsx`.

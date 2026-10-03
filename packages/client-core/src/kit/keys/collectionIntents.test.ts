@@ -5,10 +5,10 @@ import { _resetCollectionState } from './collectionState'
 // The rules about a list, with no host under them.
 //
 // This file is shared: both hosts read it for what wraps, where the first press lands, which of
-// select and activate picks, and what the page keys move by (docs/tui.md § Collections). It had no
+// select and activate picks, and what the page keys move by (docs/tui/scrolling.md § Collections). It had no
 // test of its own, and the one that was owed is about what a handler *returns* — because that is what
 // decides whether the key stops here or carries on to the next layer
-// (docs/command-palette-and-shortcuts.md § Focus and typing).
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 //
 // The host's own share is two functions, so a test supplies two: `land`, which would put focus on an
 // item, and `onItem`, which says whether the item itself holds focus. Neither needs a DOM, and this
@@ -87,7 +87,7 @@ describe('a page key stops at the end of the list', () => {
   // in a three-row list PageDown moved one row, and in a list of exactly `PAGE` rows it moved
   // nowhere, which a reader cannot tell from a dead key. Returning `false` at the edge is the other
   // half of it, because it hands the key to the tier below, where a scrolling viewport does what the
-  // reader asked for (docs/tui.md § Scrolling viewports).
+  // reader asked for (docs/tui/scrolling.md § Scrolling viewports).
   //
   // The desktop gets this too, and that is intended: PageDown on the last row of a desktop list now
   // stops instead of wrapping round to the first.

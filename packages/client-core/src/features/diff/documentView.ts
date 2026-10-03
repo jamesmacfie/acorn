@@ -6,7 +6,7 @@ import {
 } from '../../kit/diff/diffModel'
 
 // The document as the viewer scrolls it: one item per file header, per segment, and per slice of an
-// expanded gap, built from the topology alone (docs/diff-rendering.md § Data flow). No row exists here.
+// expanded gap, built from the topology alone (docs/diff-rendering/loading.md § Parsing and highlighting). No row exists here.
 // A segment item's code rows have an exact height from its counts before its rows load, and a
 // segment's inline threads are known from their line numbers, so ./diffLayout.ts can reserve for them
 // and the scrollbar and every file's offset are right from the first frame.

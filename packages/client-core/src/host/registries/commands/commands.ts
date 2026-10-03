@@ -94,7 +94,7 @@ type CommandCommon = {
   /** Sibling order, before relevance. `DEFAULT_COMMAND_ORDER` when absent. */
   order?: number
   /** A `group` registered by the same owner. Cross-owner parenting is refused, so a plugin cannot
-   *  hang rows inside core's tree or another plugin's (docs/command-palette-and-shortcuts.md § What the palette refuses). */
+   *  hang rows inside core's tree or another plugin's (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses). */
   parentId?: string
   /** Discoverable in the palette. A shortcut may still target a command that is not. */
   palette?: boolean

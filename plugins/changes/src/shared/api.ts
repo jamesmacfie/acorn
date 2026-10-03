@@ -35,7 +35,7 @@ export const localStatusRoute = (taskId: string) => `/v1/p/changes/tasks/${taskI
  *  what the pane renders before its first read returns. A function rather than a constant so no two
  *  callers share one `changes` array. */
 export const emptyLocalStatus = (): LocalStatus => ({ branch: null, upstream: null, ahead: null, behind: null, operation: null, changes: [] })
-// The stacked diff as a document (docs/diff-rendering.md § The document). One staging area at a time:
+// The stacked diff as a document (docs/diff-rendering/document.md § The document). One staging area at a time:
 // the same path can be in both, and a document keys a file by its path. `key` is the pane's status key
 // for the file, which is how the node knows a file has not moved and need not be diffed again.
 export const localDocumentRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document`

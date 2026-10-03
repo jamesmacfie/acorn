@@ -13,7 +13,7 @@ import { PrConversation } from './Conversation'
 import { PrFileList } from './PrFiles'
 import type { PrModel } from './prModel'
 
-// What a pull request is made of, as a list a host arranges (`Sections`, docs/ui-design.md § The
+// What a pull request is made of, as a list a host arranges (`Sections`, docs/ui-design/closed-kit.md § The
 // closed kit).
 //
 // These were seven `Fold`s written down the middle of ./PrOverview.tsx and ./PrPane.tsx, and the two

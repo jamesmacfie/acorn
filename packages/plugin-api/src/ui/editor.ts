@@ -1,6 +1,6 @@
 // The editor surface, owned once by the host: the theme both compiled panes were carrying a copy
 // of, and the canonical-language-id to CodeMirror map that replaces their two divergent extension
-// tables. See docs/editor.md § Sequence step 1 for why it is its own entrypoint and why it is
+// tables. See docs/editor.md § The shared surface for why it is its own entrypoint and why it is
 // compiled-panes-only.
 //
 // It stays a separate entrypoint after the move off Monaco for the same reason it became one: an

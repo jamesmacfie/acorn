@@ -112,7 +112,7 @@ export const rule = (width: number): string => (isCompact() ? '' : borderCell('d
  *
  * Focus is the one that matters and it is the caret's equivalent for something that presses — a
  * terminal has no ring to draw, so a focused control is `strong` in the `accent` tone and everything
- * else about its characters is unchanged (docs/tui.md § Rendering). `strong` on its own is the
+ * else about its characters is unchanged (docs/tui/rendering.md § Rendering). `strong` on its own is the
  * pressed and armed state a `Button` already drew; `disabled` wins over both, because a control that
  * will not press should not look like the one that will.
  */

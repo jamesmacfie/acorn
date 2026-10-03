@@ -79,7 +79,7 @@ export function shouldWarnAboutDisk(posture: NodeSecurityPosture, nodeId: string
 }
 
 // Warn once per device and node. A notice rather than a modal, because nothing is blocked by an
-// unencrypted disk and docs/ui-design.md § Interaction rules reserves modal chrome for destructive
+// unencrypted disk and docs/ui-design/interaction.md § Interaction rules reserves modal chrome for destructive
 // confirmations, secret entry and agent approvals.
 //
 // Best-effort throughout. A node that cannot answer, or a device with no localStorage, does not warn.

@@ -9,7 +9,7 @@ import { Badge, Icon, Row, Rows, Text } from './showing'
 import { Picker } from './asking'
 
 // `Graph` in cells: the indented list, which is what a picture of a graph is on a host with no
-// pixels (docs/ui-design.md § Every node at 80 by 24).
+// pixels (docs/ui-design/every-node.md § Every node at 80 by 24).
 //
 // The same cards in the same order with the same selection, indented by rank instead of placed by
 // coordinate, and a card that waits on more than one other says `⇐ n`. Ranks come from the same

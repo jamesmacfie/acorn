@@ -1,7 +1,7 @@
 import { Registry } from '../lib/state/registry'
 
 // A brand logo, as one SVG path's `d` attribute in a 24x24 box, not an SVG document. See
-// docs/ui-design.md § Icons for why.
+// docs/ui-design/icons.md § Icons for why.
 export type BrandMark = {
   // Bare for a core mark, `<pluginId>` or `<pluginId>/<key>` for a plugin's. Icon looks it up under
   // a `brand:` prefix; the prefix keeps these out of ICON_NAMES and stays unambiguous if Lucide ever
@@ -21,10 +21,10 @@ export const BRAND = 'brand:'
 // catches. Its `get` reads a signal, so a mark registering after first paint re-renders the icon.
 export const brandMarkRegistry = new Registry<BrandMark>('brand mark')
 
-// Core's own marks. See docs/ui-design.md § Icons for the "core iff a core surface renders it"
+// Core's own marks. See docs/ui-design/icons.md § Icons for the "core iff a core surface renders it"
 // rule.
 const CORE: BrandMark[] = [
-  // See docs/ui-design.md § Icons for why this stays core's. Replaces the hand-inlined
+  // See docs/ui-design/icons.md § Icons for why this stays core's. Replaces the hand-inlined
   // ui/GithubMark.tsx. From simple-icons (CC0 artwork; the trademark remains GitHub's).
   {
     id: 'github',

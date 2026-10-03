@@ -28,7 +28,7 @@ other two allow, such as a handshake line on stdout, don't apply to a plugin.
 
 ## The closed kit
 
-These rules keep plugins inside the closed component kit. [UI design](../ui-design.md) § The closed kit
+These rules keep plugins inside the closed component kit. [UI design](../ui-design/closed-kit.md) § The closed kit
 describes the kit.
 
 - `tools/arch/primitiveAdoption.test.ts` fails on a raw `div` or `span` anywhere under `plugins/`.

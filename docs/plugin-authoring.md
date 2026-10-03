@@ -92,7 +92,7 @@ packs set, such as `--radius-surface: var(--radius-lg)` and `--font-ui`; see
 
 `DiffPane` is on `@acorn/plugin-api/ui` for compiled plugins; a loaded plugin's frame or tree cannot
 hand it a source, because a `DiffSource` is functions. A compiled plugin fills the port with a
-document rather than with patches ([diff rendering](./diff-rendering.md) § The source port). Plugin
+document rather than with patches ([diff rendering](./diff-rendering/document.md) § The source port). Plugin
 API major `2` is where that changed, and a source written for `1` moves like this:
 
 - `files` becomes `topology`, a `DiffDocumentTopology`. Build it on your node with

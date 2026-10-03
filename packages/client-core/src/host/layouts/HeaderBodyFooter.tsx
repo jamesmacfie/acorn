@@ -17,7 +17,7 @@ export function HeaderBodyFooter(props: LayoutProps) {
     <div class="pane layout-hbf" use:regionFocus={{ paneId: props.stateKey, regionId: 'body' }}>
       {/* Each strip is a box of its own so the host can inset it. A region's contents are a plugin's
           tree, and a chip row or a summary line sitting flush against the pane's border is the one
-          thing a plugin cannot fix from inside (docs/ui-design.md § The closed kit). */}
+          thing a plugin cannot fix from inside (docs/ui-design/closed-kit.md § The closed kit). */}
       <Show when={props.regions.header}><div class="layout-hbf-header">{props.regions.header!()}</div></Show>
       <div class="layout-hbf-body">{props.regions.body?.()}</div>
       <Show when={props.regions.footer}><div class="layout-hbf-footer">{props.regions.footer!()}</div></Show>

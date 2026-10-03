@@ -9,7 +9,7 @@ they reach it. Read it before you render provider data or change a sanitizer. It
 
 The privileged webview, the one that holds a capability so `invoke` works, loads from `app://acorn`
 and gets its Content-Security-Policy as a response header from
-`apps/desktop/src-tauri/src/app_scheme.rs`. [The shell](../shell.md#renderer-origin-and-protocol-handler)
+`apps/desktop/src-tauri/src/app_scheme.rs`. [The shell](../shell/origins.md#renderer-origin-and-protocol-handler)
 owns the directive list and the reason for each exception. A Rust test pins it, the same way
 `plugin_scheme.rs` pins the frame policy.
 

@@ -1,7 +1,7 @@
 // The cooperative cross-plugin seam: plugin A opens a point, plugin B fills it, and the host is the
 // only thing that carries anything between them (docs/plugins.md § Cooperative extension points).
 //
-// No JSX import here (docs/frontend.md § Registries and plugins). The host that draws these
+// No JSX import here (docs/frontend/registries.md § Registries and plugins). The host that draws these
 // deliveries is `plugins/chrome/ExtensionPointHost.tsx`.
 import {
   parseExtensionPointRef,

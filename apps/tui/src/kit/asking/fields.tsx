@@ -13,7 +13,7 @@ import { fieldRef, type FieldApi } from './fieldRef'
 /** The two colours a field would otherwise invent. A field that names neither draws its text opaque
  *  white and its placeholder `#666666` — neither is one of the sixteen a terminal has or comes from
  *  any theme, so both say a slot out loud
- *  (../../appearance.ts, docs/ui-design.md § Roles, and what each host makes of them). */
+ *  (../../appearance.ts, docs/ui-design/appearance.md § Roles, and what each host makes of them). */
 const fieldColors = () => ({
   textColor: slotColor('default'),
   placeholderColor: slotColor('muted'),

@@ -2,7 +2,7 @@ import { children, Show, type JSX } from 'solid-js'
 import type { Size, Tone } from '../../tokens/tokens'
 import Icon from '../content/Icon'
 
-/* Chip: Badge's interactive sibling. See docs/ui-design.md § How the kit is built
+/* Chip: Badge's interactive sibling. See docs/ui-design/kit-internals.md § How the kit is built
    (Badge / Chip) for when to use which, and for `data-colored`.
 
    The element switches on interactivity: `onPress` renders a <button>, otherwise a <span> whose

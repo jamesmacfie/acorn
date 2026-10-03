@@ -6,7 +6,7 @@ import { createAnchoredPopover, type AnchoredPopover, type Placement } from '../
 import { createArmedConfirm } from '../../lib/controls/confirm'
 import Icon from '../content/Icon'
 
-// A dropdown menu: Popover plus menu semantics. See docs/ui-design.md § Menus and right-click for
+// A dropdown menu: Popover plus menu semantics. See docs/ui-design/interaction.md § Menus and right-click for
 // why this replaced four earlier implementations and how ContextMenu below reuses the same surface.
 
 export type MenuContext = { close: () => void; register: (element: HTMLElement | undefined) => void }
@@ -30,7 +30,7 @@ function MenuSurface(props: {
   ariaLabel: string
   children: (context: MenuContext) => JSX.Element
 }) {
-  // See docs/ui-design.md § Menus and right-click for why this focuses the first item on mount, and
+  // See docs/ui-design/interaction.md § Menus and right-click for why this focuses the first item on mount, and
   // ../keys/trap.ts for the restore that goes with a trap.
   const collection = createDomCollection({ selector: '.ui-menu-item', focusOnMount: true })
   restoreFocusOnCleanup()
@@ -128,7 +128,7 @@ export function ContextMenu(props: {
 }
 
 /** One action. `onSelect` fires and the menu closes; an item that leaves it open is usually a
- *  checkbox in disguise. See docs/ui-design.md § Menus and right-click for `closeOnSelect`.
+ *  checkbox in disguise. See docs/ui-design/interaction.md § Menus and right-click for `closeOnSelect`.
  *
  *  `confirm` is the armed label a destructive item wears after its first press: the item stays put,
  *  reads `Discard?`, and only the second press calls `onSelect`. It belongs here rather than at the

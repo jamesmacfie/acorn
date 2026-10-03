@@ -14,7 +14,7 @@ import { initClientPlugins } from '@acorn/client-core/host/registries/extensionP
 
 // The roster: one line per plugin, through the registry rather than by importing each contribution,
 // because that is where a pane comes from on the desktop too. It is the same twelve the desktop
-// registers, and eight panes reach the strip (docs/tui.md § What a plugin loses here). A loaded plugin
+// registers, and eight panes reach the strip (docs/tui/plugin-losses.md § What a plugin loses here). A loaded plugin
 // is not on this list and never will be: it arrives from a node as a bundle, and
 // `watchPluginChanges` in main.tsx is what finds it, once a node is reachable.
 //

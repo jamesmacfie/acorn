@@ -13,7 +13,7 @@ import type { Size } from '../../tokens/tokens'
 // ordering (pinned-first projects, substring branches, and so on). Shared by project pickers and
 // the create-PR branch selectors so they look and behave identically. Esc / outside-click close it.
 //
-// Anchoring, dismissal and reflow come from ui/anchor.ts; see docs/ui-design.md § Menus and
+// Anchoring, dismissal and reflow come from ui/anchor.ts; see docs/ui-design/interaction.md § Menus and
 // right-click for why (this file was the extraction's starting point) and for the portal/fixed
 // positioning it relies on. Picker keeps only the filter/list semantics.
 //

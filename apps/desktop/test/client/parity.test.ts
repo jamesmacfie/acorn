@@ -59,7 +59,7 @@ const parity = {
 writeGolden(PARITY, parity)
 const PARITY_GOLDEN = readGolden<typeof parity>(PARITY)
 
-describe('docs/ui-design.md § Parity — the panes', () => {
+describe('docs/panes.md § Shipped panes', () => {
   it('is exactly the compiled panes, in their shipped order, with their shipped chords', () => {
     expect(parity.panes).toEqual(PARITY_GOLDEN.panes)
   })
@@ -85,7 +85,7 @@ describe('docs/ui-design.md § Parity — the panes', () => {
   })
 })
 
-describe('docs/ui-design.md § Parity — the rail sources', () => {
+describe('docs/frontend/rail-and-routing.md § Rail sources', () => {
   it('is exactly the core and provider sources, in rail order', () => {
     expect(parity.sources).toEqual(PARITY_GOLDEN.sources)
   })
@@ -100,9 +100,9 @@ describe('docs/ui-design.md § Parity — the rail sources', () => {
   })
 })
 
-describe('docs/ui-design.md § Parity — appearance', () => {
+describe('docs/ui-design/appearance.md § Appearance', () => {
   it('offers 12 themes and 4 style packs', () => {
-    // docs/ui-design.md § Appearance: "All 12 shipped themes and 4 style packs are registered literals
+    // docs/ui-design/appearance.md § Appearance: "All 12 shipped themes and 4 style packs are registered literals
     // and covered by parity tests." themes.test.ts and uiStyles.test.ts already check each list against
     // the stylesheets that define it, that is, that nothing is offered without a pack behind it.
     // Neither checks the counts docs/ui-design.md commits to, which is a different claim: a theme
@@ -126,7 +126,7 @@ const sourceOf = (relative: string): string =>
     .replace(/\/\*[\s\S]*?\*\//g, '')
     .replace(/(^|\s)\/\/[^\n]*/g, '$1')
 
-describe('docs/ui-design.md § Parity — the shell chords', () => {
+describe('docs/command-palette-and-shortcuts.md § Global commands', () => {
   const tabRail = sourceOf('../../../../packages/client-core/src/features/tabs/TabRail.tsx')
   const taskView = sourceOf('../../src/client/TaskView.tsx')
   const app = sourceOf('../../src/client/App.tsx')

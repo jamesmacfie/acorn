@@ -2,7 +2,7 @@ import { children, createMemo, createSignal, Show, type JSX } from 'solid-js'
 
 // A titled disclosure section. github's PullDetail is eight of these in a column, each hand-written
 // with its own localStorage closure across three different mechanisms, two of them missing
-// `aria-expanded`. See docs/ui-design.md § The closed kit for why it uses native `<details>` and has
+// `aria-expanded`. See docs/ui-design/closed-kit.md § The closed kit for why it uses native `<details>` and has
 // no accordion mode.
 
 // Reading and writing one localStorage key is the same carve-out ui/diff/DiffRows.tsx has for draft
@@ -51,7 +51,7 @@ export function Fold(props: {
   /** Where the fold starts, when nothing has been stored under `persistKey`. */
   defaultOpen?: boolean
   /** Controlled mode, and all of it: supplying `onOpenChange` hands the state to the caller for
-   *  every operation. See docs/ui-design.md § The closed kit for why the kit never mixes the two. */
+   *  every operation. See docs/ui-design/closed-kit.md § The closed kit for why the kit never mixes the two. */
   open?: boolean
   onOpenChange?: (open: boolean) => void
   children: JSX.Element

@@ -36,7 +36,7 @@ creating one, hides or shows them, or sets their colour. A row opens its project
 which holds the name, folder, colour, workspace, visibility, and the project's configuration below. A
 workspace's own page renames and deletes it, except the default, which is where a deleted workspace's
 projects land and so can be neither renamed nor deleted. A project whose workspace has vanished
-appears under `Unassigned` so it can always be rescued. [Frontend](./frontend.md) § Workspaces and
+appears under `Unassigned` so it can always be rescued. [Frontend](./frontend/settings-groups.md) § Workspaces and
 projects has the pages.
 
 Deleting a project takes its tasks and task links with it, because `tasks.project_id` has no foreign
@@ -182,7 +182,7 @@ numeric suffix, and an exact name is refused. This keeps the chosen base from be
 The project's setup script runs in the new worktree as an ordinary terminal session titled "Setup",
 so its output is readable while it works. The task's rail row says so too: a pulsing dot sits under
 the task glyph until that session exits, in the slot teardown's spinner uses at the other end of the
-task's life ([ui-design.md](./ui-design.md) § Rail controls).
+task's life ([ui-design.md](./ui-design/shell-hierarchy.md) § Rail controls).
 The New task dialog offers "Skip setup script" for a Git worktree task, and so does the box that
 makes a task from an integration's item, "Start workflow…" included. The choice is stored on the
 task, so it also skips setup if another surface creates the worktree later or the task is restored.

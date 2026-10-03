@@ -1,6 +1,6 @@
 import { measure, recordDuration, recordSample, telemetryEnabled } from '../telemetry/emitter'
 // The main-thread half of the highlight worker: one worker, lazily spawned, requests matched to
-// replies by id. See docs/diff-rendering.md § Syntax highlighting for why every caller sends a
+// replies by id. See docs/diff-rendering/loading.md § Syntax highlighting for why every caller sends a
 // whole document (for a diff, one side of one hunk: kit/diff/diffModel.ts § enrichDiffRows) rather
 // than a line.
 import { getHighlighter } from './shiki'

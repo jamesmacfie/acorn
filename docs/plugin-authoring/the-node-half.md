@@ -289,7 +289,7 @@ fills its `regions`; `single` is the trivial one, for a surface that is one tree
   "layout": "single", "regions": { "body": { "kind": "remote", "entry": "pane" } } }
 ```
 
-A pane may name any layout ([docs/panes.md](../panes.md) § Layout model). A reference panel and a
+A pane may name any layout ([docs/panes.md](../panes/layout.md) § Layout model). A reference panel and a
 settings page name `single` and nothing else, because the host already draws everything around them.
 All three have to name one: a surface that wants its own pixels says `"regions": { "body": "frame" }`,
 and there is no way to leave the layout out and mean the same thing.

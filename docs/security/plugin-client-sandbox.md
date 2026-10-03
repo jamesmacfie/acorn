@@ -8,12 +8,12 @@ verb or a way for plugins to cooperate. It's part of [plugin security](./node-pl
 
 A bundle that draws pixels runs in an iframe on its own hash-addressed origin, under
 `plugin_scheme.rs`'s policy. A bundle that draws a tree runs in a Web Worker with no DOM, under
-`PLUGIN_WORKER_CSP` ([the plugin worker](../shell.md#the-plugin-worker)). Both have
+`PLUGIN_WORKER_CSP` ([the plugin worker](../shell/origins.md#the-plugin-worker)). Both have
 `connect-src 'none'`, so the transferred `MessagePort` is the only way out, and both reach the host
 through one broker that decides every call from the manifest's scopes.
 
 The terminal has no iframe and no CSP, so a tree bundle there runs in a `node:worker_threads` thread
-([the terminal sandbox](../tui/chrome-and-plugins.md#the-sandbox)). `apps/tui/src/plugins/workerFactory.ts`
+([the terminal sandbox](../tui/plugins.md#the-sandbox)). `apps/tui/src/plugins/workerFactory.ts`
 starts it with `execArgv: ['--permission', '--allow-fs-read=<bootstrap>', '--allow-fs-read=<bundle>']`,
 and the two transferred ports are the only way out. The worker starts with an empty environment.
 

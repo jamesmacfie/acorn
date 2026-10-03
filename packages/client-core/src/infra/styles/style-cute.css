@@ -1,5 +1,5 @@
 /* Cute: rounded and playful, chunky radii, pill chrome, a springy press.
- * The pack that exercises the radius and motion axes hardest. See docs/ui-design.md § Style packs
+ * The pack that exercises the radius and motion axes hardest. See docs/ui-design/tokens.md § Style packs
  * for why the springy hover/press comes from a null default in base.css rather than a rule here.
  */
 :root[data-style='cute'] {
@@ -71,10 +71,10 @@
   --press-scale: scale(0.97);
 }
 
-/* Escape hatch, budget 25 selectors (docs/ui-design.md § Style packs). Currently 2. */
+/* Escape hatch, budget 25 selectors (docs/ui-design/tokens.md § Style packs). Currently 2. */
 
 
-/* docs/ui-design.md § Style packs covers why selection needs to read from the fill here; the
+/* docs/ui-design/tokens.md § Style packs covers why selection needs to read from the fill here; the
    rounded pill shape also needs the row inset from the pane edge or the corners clip. */
 :root[data-style='cute'] .ui-row[data-selected] {
   background: color-mix(in srgb, var(--accent) 16%, var(--bg));

@@ -23,7 +23,7 @@ type SettingCommand = import('../registries/commands/commands').SettingCommand
 // Two boundaries are worth the length. The host decides what a route is asked — the reader's text and
 // the identifiers the declared scope owns, and nothing a descriptor or a previous answer wrote. And the
 // answer decides nothing: it carries display facts and identity, and the verb that runs when a row is
-// picked is the static one the manifest declared (docs/command-palette-and-shortcuts.md § What the palette refuses).
+// picked is the static one the manifest declared (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
 const CONTEXT: CommandExecutionContext = {
   host: 'desktop', nodeId: 'node-b', workspaceId: 'w-1', projectId: 'p-1', taskId: 't-1',

@@ -2,7 +2,7 @@
 //
 // The same pattern as `support.ts` and `tokenAxes.ts`: the answer is data with a test behind it, so a
 // node cannot join the kit without someone deciding whether a keyboard can land on it. See
-// docs/command-palette-and-shortcuts.md § Focus and typing for the four values.
+// docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing for the four values.
 //
 //   stop        one tab stop
 //   collection  one tab stop with roving focus inside; the host owns `active`, `selected`, `offset`
@@ -14,7 +14,7 @@
 // most of its rows, so roving focus cannot be DOM focus: the arrows move a `selected` index the
 // caller owns and scroll it into view, which is the ratatui shape the design named. The intents and
 // the single tab stop are the same as every other collection's, and that is the part the role
-// promises; where the place is kept is not. See docs/command-palette-and-shortcuts.md § Focus and
+// promises; where the place is kept is not. See docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and
 // typing.
 //
 // `conditional` is the honest answer for the several nodes that are a stop only when they were given

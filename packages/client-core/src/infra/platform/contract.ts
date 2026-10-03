@@ -44,7 +44,7 @@ const members =
     keys as readonly string[]
 
 // Groups a host either implements or does not. Absent is a supported product state for all but the
-// first two: docs/shell.md § The renderer bridge.
+// first two: docs/shell/bridge-and-broker.md § The renderer bridge.
 const GROUPS = {
   desktop: {
     // Not an object, so it is checked rather than enumerated: the marker plus the platform string.

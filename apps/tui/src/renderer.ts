@@ -46,7 +46,7 @@ export type Renderer = {
   /** One left press at a cell: the stop it landed on is pressed and the nearest thing above it that
    *  can hold the keys takes them. The other and last thing done with the pointer, because focusing
    *  and pressing is the whole of this host's pointer model
-   *  (./keys/regions.ts § Clicks are hit tests, docs/tui.md § What the TUI never does). */
+   *  (./keys/regions.ts § Clicks are hit tests, docs/tui/rectangles.md § What the TUI never does). */
   mousePress: (x: number, y: number) => void
   /** Draw now rather than on the next turn of the event loop, which is what a test wants. */
   frame: () => void
@@ -58,7 +58,7 @@ export type Renderer = {
 // A paint is far past ten a second under a held key, so it is a histogram and never a span
 // (docs/telemetry/model.md § Hot seams are metrics). Four series under one name: the whole frame, and the
 // three halves of it, told apart by `phase` rather than by four seam names, so "which third is
-// slow" is a filter and not a second query (docs/tui.md § What the terminal client reports).
+// slow" is a filter and not a second query (docs/tui/reporting.md § What the terminal client reports).
 //
 // Nothing here is synchronous work on the paint path. `recordDuration` is a boolean read, a map
 // lookup and four numbers; the batch leaves on the emitter's own timer and never inside `frame()`.

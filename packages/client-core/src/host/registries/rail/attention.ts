@@ -1,6 +1,6 @@
 import { Registry } from '../../../kit/lib/state/registry'
 
-// The attention inbox's contribution point (docs/frontend.md § Shell state distinguishes it from a
+// The attention inbox's contribution point (docs/frontend/shell-state.md § Shell state distinguishes it from a
 // notice).
 //
 // An attention item is a state that persists until something changes on the node: a pending approval
@@ -26,7 +26,7 @@ export type AttentionItem = {
   projectId?: string
   title: string
   detail?: string
-  // The row's own glyph, a Lucide name (docs/ui-design.md § Icons). Absent falls back to the pair the
+  // The row's own glyph, a Lucide name (docs/ui-design/icons.md § Icons). Absent falls back to the pair the
   // inbox draws from `severity`, which is the right answer for a row about a blocked agent and the
   // wrong one for a source whose rows are all the same kind of thing.
   glyph?: string

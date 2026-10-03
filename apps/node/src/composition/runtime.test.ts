@@ -9,7 +9,7 @@ import type { ServiceStartResult, ServiceState } from '@acorn/protocol/servicePr
 // certificate; `rejectUnauthorized` stays true, so the IP:127.0.0.1 SAN has to match too.
 //
 // `expectedFingerprint` replaces hostname verification with the fingerprint comparison, the same
-// check the client's connection broker does (docs/shell.md § Connection broker). The shape is
+// check the client's connection broker does (docs/shell/bridge-and-broker.md § Connection broker). The shape is
 // restated here rather than imported, because a package or app may never import an app, so the pin
 // is proved in two halves: this file asserts the node really answers under the identity it reported,
 // and nodeBroker.test.ts asserts the broker accepts exactly that identity and no other. Neither half

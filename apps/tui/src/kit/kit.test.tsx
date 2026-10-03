@@ -32,7 +32,7 @@ import { Line } from './cells'
 import { _resetCollections } from '../keys/collection'
 import { focusedRenderable } from '../keys/regions'
 
-// One case per kit node, asserting the sentence its row in docs/ui-design.md § Every node at 80 by 24
+// One case per kit node, asserting the sentence its row in docs/ui-design/every-node.md § Every node at 80 by 24
 // promises, against the cells it actually drew.
 //
 // A case is written as "what would a reader look for on the screen", not as a snapshot of every cell.
@@ -1091,7 +1091,7 @@ describe('the kit in cells', () => {
 //
 // The cases above assert the characters a node draws. These assert that it does something: the keys
 // land on it, it says so, and the handler its props have always carried is called
-// (docs/tui.md § Keys and focus).
+// (docs/tui/keys.md § Keys and focus).
 //
 // Each case is drawn as the whole body of a pane, and nothing presses Tab first: a region takes the
 // keys when the pane opens, because this host has no pointer to click with
@@ -1720,7 +1720,7 @@ describe('every control is a stop', () => {
       const clicked = await screen.click(...cellOf(screen, '[Second]'))
       lit(clicked, '[Second]')
       // A click focuses and presses, which is the whole of this host's pointer model
-      // (docs/tui.md § What the TUI never does). Enter then presses the one under the caret, which is
+      // (docs/tui/rectangles.md § What the TUI never does). Enter then presses the one under the caret, which is
       // the half that says the click moved the keys and not only the highlight.
       expect(pressed).toEqual(['second'])
       await clicked.press('RETURN')
@@ -1735,7 +1735,7 @@ describe('every control is a stop', () => {
     // reads the key and nothing else — it has no focus of its own to check — so the dispatcher can
     // hand it a key without anything else having focused it. If that stopped being true, typing would
     // quietly start depending on the caret mirror agreeing with the store
-    // (docs/tui.md § The five key groups, ../keys/install.ts § typeInto).
+    // (docs/tui/keys.md § The five key groups, ../keys/install.ts § typeInto).
     const typed: string[] = []
     const screen = await renderCells(
       () => (
@@ -1786,7 +1786,7 @@ describe('every control is a stop', () => {
     // it has them is a node the landing pass has to leave. It used to be worse than a stuck caret:
     // `blur()` refuses a node that is not focusable, so the keys stayed for the rest of the run and
     // every box above went on reporting a focused descendant, and the reader saw a dialog whose
-    // buttons were lit and dead (../keys/stops.ts § pressable, docs/tui.md § The invariants).
+    // buttons were lit and dead (../keys/stops.ts § pressable, docs/tui/reporting.md § The invariants).
     const [off, setOff] = createSignal(false)
     const pressed: string[] = []
     const screen = await renderCells(
@@ -1878,7 +1878,7 @@ describe('every control is a stop', () => {
 // Two surfaces that looked the same behaved differently, because `Sections` handed its strip a list
 // of panels and a plugin drawing `Tabs` and `TabPanel` as siblings had no way to. The pairing is
 // `idPrefix` now, which both halves already carry, so the relation is drawn rather than passed
-// (./grouping/panelRegistry.ts § registerPanel, docs/tui.md § Focus regions).
+// (./grouping/panelRegistry.ts § registerPanel, docs/tui/focus.md § Focus regions).
 
 /** `Tabs` and its `TabPanel`s as siblings, the way a plugin writes them. */
 function TwoPanels() {

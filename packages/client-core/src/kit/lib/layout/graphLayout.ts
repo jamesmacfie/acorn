@@ -2,7 +2,7 @@
 //
 // Pure geometry: no components, no measuring, no host. The `Graph` node owns pan and zoom and this
 // owns the shape underneath, which is what lets the terminal host read the ranks out of the same
-// function and indent a list by them (docs/ui-design.md § Every node at 80 by 24).
+// function and indent a list by them (docs/ui-design/every-node.md § Every node at 80 by 24).
 //
 // The numbers are proliferate's, copied rather than re-derived, from
 // `references/proliferate/apps/packages/product-client/src/domain/workflows/graph-layout.ts`: 200 by

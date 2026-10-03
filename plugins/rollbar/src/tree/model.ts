@@ -39,7 +39,7 @@ export function occurrenceContext(item: RollbarItemMetadata, occurrence: Rollbar
   return lines.join('\n')
 }
 
-// Status is a toned badge with a word (docs/ui-design.md § States): a map per field, not a regex over
+// Status is a toned badge with a word (docs/ui-design/states.md § States): a map per field, not a regex over
 // whatever string arrived. An unknown value keeps its own word, capitalised, and stays neutral.
 type Tone = 'neutral' | 'ok' | 'warn' | 'danger'
 const LEVELS: Record<string, [string, Tone]> = {

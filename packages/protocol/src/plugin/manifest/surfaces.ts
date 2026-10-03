@@ -98,7 +98,7 @@ export const frameSurface = z.object({
   readsArchived: z.boolean().optional(),
   // Task `pane` only. A GET route that answers `{ [taskId]: boolean }` for the node's active tasks, so
   // the host can hide the pane on a task it has nothing to draw for. A task the answer leaves out is
-  // hidden too. See docs/panes.md § Contributions.
+  // hidden too. See docs/panes/contributions.md § Contributions.
   availability: pluginRoute.optional(),
   // Lets a mobile shell skip a desktop-shaped pane instead of rendering it unusably.
   formFactor: z.array(z.enum(['desktop', 'mobile'])).min(1).max(2).default(['desktop']),
@@ -131,7 +131,7 @@ export const frameSurface = z.object({
     .refine((list) => new Set(list.map((section) => section.id)).size === list.length)
     .optional().catch(undefined),
   // `settings` only. This plugin's own sources whose **Show in left rail** switch the host draws above
-  // the page, in the plugin's source order (docs/frontend.md § Rail source visibility). Caught like
+  // the page, in the plugin's source order (docs/frontend/rail-and-routing.md § Rail source visibility). Caught like
   // the lists above. An id that names no source of this plugin is reported by the manifest reader and
   // dropped on the device, because the host draws a switch only for a plugin's own source.
   railSourceVisibility: z.array(z.string().min(1).max(64)).max(RAIL_SOURCE_VISIBILITY_MAX).optional().catch(undefined),

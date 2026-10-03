@@ -534,7 +534,7 @@ export default function App() {
   const isNew = () => !!newMatch()
 
   // The gate covers the helper's fleet selection and the supervised local node's first connection
-  // (docs/frontend.md § Startup readiness). That keeps pane-owned resources from issuing requests
+  // (docs/frontend/data-and-startup.md § Startup readiness). That keeps pane-owned resources from issuing requests
   // before their routes exist. The `isRestoring` gate stays too: it is an IndexedDB read, and painting
   // in front of it would show the empty shell and then fill it.
   return (

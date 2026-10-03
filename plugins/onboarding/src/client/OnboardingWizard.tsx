@@ -421,7 +421,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   // `dismissOn={[]}`: a full-run setup must not vanish on a stray Escape or a backdrop click. The
   // custom full-screen backdrop this used to draw is gone, and so is the hand-rolled dot strip — the
   // `wizard` layout draws the step indicator and every action in its footer, including skip and the
-  // last step's finish (docs/panes.md § Layout model). What is left for the plugin is the step body.
+  // last step's finish (docs/panes/layout.md § Layout model). What is left for the plugin is the step body.
   // Busy blocks Next and finish, so a slow save cannot be pressed twice.
   return (
     <Modal onDismiss={() => {}} dismissOn={[]} size="lg" title="Set up acorn">

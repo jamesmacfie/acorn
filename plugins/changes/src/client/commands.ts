@@ -7,7 +7,7 @@ import type { RemoteAction } from './model'
 // model is the only thing that owns their lifetime (./changesModel.tsx). Neither chord is handled in
 // the pane: a pane that installed a key handler of its own would reach neither Settings → Shortcuts
 // nor the cheat sheet, and could not be rebound
-// (docs/command-palette-and-shortcuts.md § Focus and typing).
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 
 /** The pane both bindings are scoped to. The pane contribution's id, which is what the host writes
  *  into `focusedPane` (./paneContribution.ts). */

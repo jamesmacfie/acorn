@@ -5,7 +5,7 @@ import { prefsKey } from '@acorn/protocol/api.ts'
 import { _resetNotices, pushNotice, registerNoticeTargetHandler } from './notifications'
 
 // The bell and the app icon draw one number, so clearing the bell clears the icon
-// (docs/notifications.md § The channels). badge.ts owns the effect; what this asserts is the wiring
+// (docs/notifications/channels.md § The channels). badge.ts owns the effect; what this asserts is the wiring
 // around it, because the pill, the ring and the popover only meet in the component.
 //
 // The popover is opened rather than reached into: "Mark all read" is only in the DOM while it is

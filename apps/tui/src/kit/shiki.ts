@@ -16,7 +16,7 @@
 //
 // **Why an alias rather than a dependency.** The bundle externalises every bare import, so without
 // this shiki has to stay installed for three surfaces that cannot draw here
-// (docs/tui.md § The host switch).
+// (docs/tui/host-switch.md § The host switch).
 
 const absent = (what: string): never => {
   throw new Error(

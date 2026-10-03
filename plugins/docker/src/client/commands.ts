@@ -27,7 +27,7 @@ import type { DockerScope } from '../shared/model'
 //
 // Starting, stopping, removing, pruning and compose-down are all absent. Each is either a result
 // action this programme deliberately stops before, or a confirmed operation that belongs where the
-// consequences are visible (docs/command-palette-and-shortcuts.md § What the palette refuses).
+// consequences are visible (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
 const badge: Record<DockerScope, string> = {
   containers: 'container',

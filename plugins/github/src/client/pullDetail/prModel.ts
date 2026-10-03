@@ -16,7 +16,7 @@ import { buildConversationEntries, reviewDecision } from './model'
 import { actionFailure, type ActionFailure } from '../actionErrors'
 
 // Everything one pull request knows, held once per pull and read by every surface that draws it
-// (docs/github-integration.md, docs/panes.md § Layout model).
+// (docs/github-integration.md, docs/panes/layout.md § Layout model).
 //
 // Overview, the file list and the conversation are three components rather than one long closure, and
 // browse and the PR pane draw them in different arrangements. They share fifteen queries, six

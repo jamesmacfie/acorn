@@ -6,11 +6,11 @@
 // `solid-js/web` and the DOM kit's primitives. Registering it on a cell host handed the reconciler a
 // `main` and it refused, so selecting Linear or any other descriptor source in `acorn` threw
 // "[Reconciler] Unknown component type: main" rather than drawing a list
-// (docs/tui.md § The host switch).
+// (docs/tui/host-switch.md § The host switch).
 //
 // A whole contribution rather than a component, because the two hosts do not put the halves in the
 // same place: the desktop draws one surface across the window, and the terminal puts the list in its
-// Browse panel and the detail in the main one (docs/tui.md § The screen). Both shapes are already in
+// Browse panel and the detail in the main one (docs/tui/chrome.md § The screen). Both shapes are already in
 // `SourceContribution`, so this seam hands back the fields that say which.
 //
 // Types only, so a bare-Node suite can import the chrome registry without a Solid transform.

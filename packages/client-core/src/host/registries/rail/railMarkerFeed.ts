@@ -2,7 +2,7 @@
 // publishes marker data next to the state that owns it; the host draws the pixels.
 //
 // JSX-free by design, like ./slots.ts: registries/plugin.ts imports this, and that file has to stay
-// importable in the Node-only client-core suite (docs/frontend.md § Registries and plugins).
+// importable in the Node-only client-core suite (docs/frontend/registries.md § Registries and plugins).
 import { clampMarkerPriority, type RailMarker } from '../../../features/tabs/railMarkers'
 import { Registry } from '../../../kit/lib/state/registry'
 import { createLogger } from '../../../infra/telemetry/logger'

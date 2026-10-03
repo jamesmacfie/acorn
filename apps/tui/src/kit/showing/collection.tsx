@@ -17,7 +17,7 @@ const TRACK = '│'
  * `<For>` keys by object identity, so `items={tasks().map((task) => ({ key: task.id, task }))}` hands
  * it a new object per row on every change and every row renderable is destroyed and rebuilt — which
  * on the rail is every `tasks:changed`, and a rebuilt row is a row that has lost the caret and any
- * scroll position around it (docs/tui.md § Collections).
+ * scroll position around it (docs/tui/scrolling.md § Collections).
  *
  * Cache each wrapper by its source row. Query structural sharing then preserves renderables for
  * unchanged rows across refetches and reorders.
@@ -74,7 +74,7 @@ export function Rows<T extends CollectionItem>(props: {
     items,
     // Moving the caret selects. This host's own answer, and the same kind of departure the focus
     // rules already make: with no pointer there is nothing else the caret could mean, and a reader
-    // arrowing down a list of pull requests is asking to see them (docs/tui.md § Collections).
+    // arrowing down a list of pull requests is asking to see them (docs/tui/scrolling.md § Collections).
     //
     // Only `onSelect` fires on a move. `onActivate` still waits for Enter, so showing something is
     // immediate and opening it stays deliberate — which is the split `collectionIntents.ts` already
@@ -187,7 +187,7 @@ export function Rows<T extends CollectionItem>(props: {
         // The wheel is about to take the focused row out of the drawn slice, so the container has to
         // hold the keys while it is gone. Asked for here rather than left to the renderer, which
         // focuses what a left click lands on and hears nothing from a wheel
-        // (docs/tui.md § Collections).
+        // (docs/tui/scrolling.md § Collections).
         if (box) focusRenderable(box)
         setTop(next)
         event.preventDefault()

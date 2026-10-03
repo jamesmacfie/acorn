@@ -33,7 +33,7 @@ import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 // (apps/desktop/src/client/TaskView.tsx), and a terminal running a harness CLI is that harness's
 // (plugins/agents/src/client/terminalProfileCommands.ts). Neither is repeated here: two rows saying one
 // thing is one too many, and cross-owner parenting is refused anyway
-// (docs/command-palette-and-shortcuts.md § What the palette refuses).
+// (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
 
 /** The group these three hang under. Not core's `core.terminal`, which is the drawer and a shell: a
  *  plugin may not parent under another owner's group, and these are about the task's configuration. */

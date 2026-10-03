@@ -29,7 +29,7 @@ type PaneCommon = {
   when?: (task: Task) => boolean
   /**
    * Warm this pane's first read for a task the reader is pointing at but has not opened
-   * (docs/panes.md § Contributions).
+   * (docs/panes/contributions.md § Contributions).
    *
    * Called on a deliberate hover over a rail row rather than on a scroll past one, for every pane
    * this task could show. It is best-effort by construction: it returns nothing, and a rejection
@@ -40,7 +40,7 @@ type PaneCommon = {
   minWidth?: number
   /**
    * This pane can draw an archived task: it reads the task's stored history and needs no worktree
-   * (docs/panes.md § Contributions). The archive page previews an archived task in the ordinary pane
+   * (docs/panes/contributions.md § Contributions). The archive page previews an archived task in the ordinary pane
    * host, and a pane without this is omitted from both its layout and switcher.
    *
    * Opt in, because the safe default is not to run. An editor, a diff, a container or a run target
@@ -57,7 +57,7 @@ export type PaneContribution = PaneCommon & {
 
 /**
  * A pane that names one of the host's layouts and fills its regions
- * (@acorn/protocol/paneLayouts.ts, docs/panes.md § Layout model).
+ * (@acorn/protocol/paneLayouts.ts, docs/panes/layout.md § Layout model).
  *
  * The regions are components rather than elements, so a layout that draws one region at a time mounts
  * one. `tabs` names its panels `panel:<tab id>` and takes the bar from `tabs`.
@@ -66,7 +66,7 @@ export type PaneLayoutContribution<M = undefined> = PaneCommon & {
   layout: PaneLayoutName
   /**
    * What every region of this pane shares, built once per task and disposed when the task is evicted
-   * (./paneModels.ts, docs/panes.md § Layout model).
+   * (./paneModels.ts, docs/panes/models.md § Pane models).
    *
    * Regions are separate components the host mounts side by side, so a selection, a draft or an
    * autosave timer that two of them touch has to outlive both — and a region can be unmounted while
@@ -123,7 +123,7 @@ export type PaneRegistration = PaneContribution | PaneLayoutContribution<any>
 // by `prefetch` above. A hidden element tree per task is the memory shape this codebase already
 // declined for the agent transcript (docs/managed-agents.md), so it is not coming back as a pane field.
 //
-// There is no per-pane `freshness` hook here (docs/panes.md § Contributions has the reason).
+// There is no per-pane `freshness` hook here (docs/panes/contributions.md § Contributions has the reason).
 //
 // A pane's own query status is only knowable reactively. TanStack's `getQueryState` is a snapshot, so
 // a `freshness(task)` field returning one would render a badge that never updated, which is worse

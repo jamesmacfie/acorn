@@ -1,5 +1,5 @@
 // The syntax highlighter, off the main thread and behind its own Content-Security-Policy. See
-// docs/diff-rendering.md § Syntax highlighting for why it needs to be a worker (the WASM engine
+// docs/diff-rendering/loading.md § Syntax highlighting for why it needs to be a worker (the WASM engine
 // versus the renderer's CSP) and why it takes a whole document rather than a line.
 //
 // `shiki/wasm` has to stay the inlined build: it is 622 KB of base64 inside the module, which is
@@ -15,7 +15,7 @@ const THEMES = { light: 'github-light', dark: 'github-dark' } as const
 const loaded = new Map<string, Promise<void>>()
 
 let instance: Promise<HighlighterCore> | null = null
-// No `langs` up front: docs/diff-rendering.md § Syntax highlighting covers the lazy-grammar reasoning.
+// No `langs` up front: docs/diff-rendering/loading.md § Syntax highlighting covers the lazy-grammar reasoning.
 const highlighter = () =>
   (instance ??= createHighlighterCore({
     themes: [import('shiki/themes/github-light.mjs'), import('shiki/themes/github-dark.mjs')],
@@ -29,7 +29,7 @@ const plain = (code: string): HighlightLines => code.split('\n').map((line) => [
 async function tokenize(lang: string, code: string): Promise<HighlightLines> {
   const hl = await highlighter()
   if (!(await loadGrammar(hl, loaded, lang))) return plain(code)
-  // One call for the whole document: docs/diff-rendering.md § Syntax highlighting covers why that
+  // One call for the whole document: docs/diff-rendering/loading.md § Syntax highlighting covers why that
   // is what lets Shiki thread grammar state from line to line correctly.
   const lines = hl.codeToTokensWithThemes(code, { lang: lang as never, themes: THEMES })
   return lines.map((line) => line.map((t) => ({ content: t.content, light: t.variants.light.color ?? '', dark: t.variants.dark.color ?? '' })))

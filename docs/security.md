@@ -29,7 +29,7 @@ sandbox first-party compiled plugin code. A client still treats a paired Node as
 replies, events, content, and plugin offers until an owner authorizes code.
 
 The shell's Rust dependency patch and remaining upstream advisories are in
-[Rust dependency security](./shell.md#rust-dependency-security). The dated review of October 1, 2026
+[Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).
 
 ## Pages

@@ -4,13 +4,13 @@
 // baseline spelled ten of them across eight files, and the pair that collided — two Escapes at the
 // region tier — worked only because of the order the two layers happened to register in. So the
 // numbers live here, nothing else under `apps/tui/src` spells one, and `./tiers.test.ts` greps for a
-// relapse (docs/tui.md § Keys and focus).
+// relapse (docs/tui/keys.md § Keys and focus).
 //
 // Read top to bottom this is the order the engine asks in: the highest number answers first, and a
 // handler that returns `false` hands the key to the next one down. Which is why a handler must return
 // `false` when it changed nothing — a tier that claims a key it did nothing with is a key that does
 // nothing at all, and that was five of the six reported keyboard symptoms
-// (docs/tui.md § The five key groups).
+// (docs/tui/keys.md § The five key groups).
 
 /** An entered PTY, 200. Consumes everything, chords included, and consumes it before dispatch rather
  *  than from a layer, because it cannot name the keys it takes (../kit/rectangle.tsx). */
@@ -85,7 +85,7 @@ export const COLLECTION = 40
  * inside; the fix then is to gate the layers that can be an ancestor of a scope on
  * `scopeDepth() === 1`, not to add another tier. The swallow layer this replaced ate that PageDown at
  * 35 and, being a table of named keys, leaked the ones it forgot
- * (docs/tui.md § Traps).
+ * (docs/tui/traps.md § Traps).
  */
 export const LIST = 36
 

@@ -19,7 +19,7 @@ import { prSections } from './pullDetail/prSections'
 // It used to be the navigator column alone, with `GithubBrowse` writing the split and the diff column
 // around it. The split is the `Sections` node's now, so the surface that knows what a pull request is
 // made of is the one that says so, and the host decides whether that is folds beside a diff or a
-// strip of tabs (docs/ui-design.md § The closed kit). ./pullDetail/PrPane.tsx makes the same call
+// strip of tabs (docs/ui-design/closed-kit.md § The closed kit). ./pullDetail/PrPane.tsx makes the same call
 // from a task.
 export default function PullDetail() {
   const params = useParams()

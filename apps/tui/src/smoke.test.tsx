@@ -30,7 +30,7 @@ test('the notes pane draws its list at 80 by 24', async () => {
   expect(frame).toContain('What the agent found')
   expect(frame).toContain('Conventions')
   // 80 cells is the contract, not an accident of this fixture: a wider line is a node that read a
-  // width it does not have (docs/ui-design.md § What the kit and layouts must never do).
+  // width it does not have (docs/ui-design/closed-kit.md § What the kit and layouts must never do).
   for (const line of frame.split('\n')) expect(line.length).toBeLessThanOrEqual(80)
 }, 30_000)
 

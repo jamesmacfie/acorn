@@ -137,7 +137,7 @@ export function RemoteTree(componentProps: RemoteTreeProps) {
   // The fifth answer a terminal gives differently. An owner action is host-agnostic and goes through
   // the shared check; a companion overlay is a rectangle over the window, and this host has none, so it
   // says so rather than pretending. A plugin catches `unsupported_host` and leaves its static preview
-  // up, which is why the owner's chip is what a reader sees here (docs/tui.md § Plugin surfaces).
+  // up, which is why the owner's chip is what a reader sees here (docs/tui/rectangles.md § Rectangles).
   const detachHostRequests = worker.onHostRequest(slot, async (request) => {
     if (request.op === 'owner.invoke') {
       return answerOwnerInvoke({

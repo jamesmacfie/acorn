@@ -263,7 +263,7 @@ const acorn = {
 
   // Cmd/Ctrl+W closes the focused pane, never the window. `before-input-event` has no Tauri
   // equivalent, so the accelerator is a menu item and the shell emits this
-  // (docs/shell.md § Startup: data directory, environment, and the singleton lock).
+  // (docs/shell/process.md § Startup: data directory, environment, and the singleton lock).
   onClosePane: (cb: () => void) => onEvent('acorn:close-pane', cb),
   // The same native crossing for Cmd/Ctrl+K. A child preview webview has its own document, so the
   // renderer's keymap cannot see the chord while that page owns focus.
@@ -392,7 +392,7 @@ const acorn = {
 
   // Host-owned page surfaces for accepted loaded plugins. The manifest host allowlist rides on
   // `ensure` and is checked again in Rust, which is the second of the two independent checks
-  // docs/shell.md § Host-owned webviews asks for.
+  // docs/shell/webviews.md § Host-owned webviews asks for.
   webview: {
     ensure: (key: string, url: string, hosts: readonly string[]) => webviewOperation<boolean>(key, 'webview_ensure', { url, hosts: [...hosts] }),
     setBounds,

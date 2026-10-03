@@ -53,7 +53,7 @@ const LIST_TABS = [{ id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed
 // The list is a `Rows` collection with `virtual`, so the scroller, the row placement, the arrows,
 // type-ahead and the place it keeps across a refetch are all the kit's. This pane used to own a
 // virtualizer, a scroll element, two animation frames and a pair of hand-registered `j` / `k`
-// bindings; none of that is here now (docs/command-palette-and-shortcuts.md § Focus and typing).
+// bindings; none of that is here now (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing).
 export default function PullList() {
   const params = useParams()
   // The same signal the source's list column reads, so the rows narrow exactly when the column does

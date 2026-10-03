@@ -15,7 +15,7 @@ export default function AgentUsageSection(props: { showHeader?: boolean }) {
   return (
     <Stack gap="section">
       <Show when={props.showHeader !== false}>
-        {/* A popover's heading is a group label (docs/ui-design.md § Chrome and overlays). Each
+        {/* A popover's heading is a group label (docs/ui-design/overlays.md § Chrome and overlays). Each
             provider below has its own refresh. */}
         <SectionHeader level="group">Plan usage</SectionHeader>
       </Show>

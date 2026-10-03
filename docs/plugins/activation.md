@@ -87,7 +87,7 @@ offers **Manage plugin**, draws a **Show in left rail** switch for each source t
 the owner has to know about: off, waiting for approval, failed, and offline. An off Node plugin's page
 stays and still saves until the Node restarts; turning a device plugin off from its strip removes the
 page at once, so the view opens the plugin's page under **Installed** instead. For where the strip sits
-and why content cannot cover it, see [frontend.md § The plugin strip](../frontend.md#the-plugin-strip).
+and why content cannot cover it, see [frontend.md § The plugin strip](../frontend/settings-groups.md#the-plugin-strip).
 
 Node initialization happens before the listener accepts requests. Every plugin's `init` runs at once,
 and so does every plugin's `ready`, so **declaration order is not a contract**. A plugin whose `init`

@@ -22,7 +22,7 @@ import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 //
 // It also holds the boot ORDER, which is the thing a reader is most likely to undo by accident. The
 // ready line goes out when the helper is listening, not when the node is up
-// (docs/shell.md § The shell process), so the window can open on the persisted cache. `ACORN_PERF=1`
+// (docs/shell/process.md § The shell process), so the window can open on the persisted cache. `ACORN_PERF=1`
 // makes the helper print its own marks on stderr and this test reads their order back.
 //
 // What it deliberately does not do is drive the Rust shell. A headless Tauri app needs a display

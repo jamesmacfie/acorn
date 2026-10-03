@@ -376,7 +376,7 @@ test('a pane that reserved a footer draws the rows delivered into it', async () 
     expect(drawn.text).toContain('Tracked items')
     expect(drawn.text).toContain('tracker')
     // …and the aside named rather than drawn: a dashboard is a grid sized in pixels, and its terminal
-    // projection is the dashboards programme's question (docs/tui.md § What a plugin loses here).
+    // projection is the dashboards programme's question (docs/tui/plugin-losses.md § What a plugin loses here).
     expect(drawn.text).toContain('board:card-links is a dashboard')
   } finally {
     rows.dispose()

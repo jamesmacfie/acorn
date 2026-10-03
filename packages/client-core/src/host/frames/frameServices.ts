@@ -202,7 +202,7 @@ export function createFrameServices(props: PluginFrameProps, host: FrameServiceH
       // Nothing in-app claimed it. `window.open` is denied by main's setWindowOpenHandler, which hands
       // the URL to `shell.openExternal` behind the scheme allowlist, so this opens in the owner's
       // browser and never in-app, with no second policy to keep in step
-      // (docs/shell.md § Navigation policy).
+      // (docs/shell/origins.md § Navigation policy).
       if (host.openExternal) return host.openExternal(url)
       window.open(url, '_blank', 'noopener,noreferrer')
     },

@@ -1,7 +1,7 @@
 import { createEffect, createSignal, type Accessor } from 'solid-js'
 import { withFailuresThrown } from './savePref'
 
-// The save model every settings page shares (docs/frontend.md § Settings). A switch or a select saves
+// The save model every settings page shares (docs/frontend/settings.md § Settings). A switch or a select saves
 // when it changes. A text field saves on blur or Enter. Either way the row says **Saved** when the
 // write lands and the error when it does not, and a text field keeps what was typed after a failure.
 //

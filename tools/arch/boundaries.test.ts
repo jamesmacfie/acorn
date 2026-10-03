@@ -334,7 +334,7 @@ describe('architecture boundaries', () => {
       'packages/client-core/src/host/frames/sdk/frameMount.ts',
       'packages/client-core/src/host/frames/sdk/treeChannel.ts',
       // The terminal client's three deliberate ones. Its stderr is the screen, so none of these is
-      // a log line (docs/tui.md § What the terminal client reports).
+      // a log line (docs/tui/reporting.md § What the terminal client reports).
       //
       // A person answering a pairing prompt, before the renderer exists.
       'apps/tui/src/node/pair.ts',
@@ -379,12 +379,12 @@ describe('architecture boundaries', () => {
       'apps/node/src/entries/standalone.ts',
       // The desktop helper's stdout is the line protocol Rust parses. Those two writes are the
       // handshake, not log lines; everything else in the file goes through the logger
-      // (docs/shell.md § The shell process).
+      // (docs/shell/process.md § The shell process).
       'apps/desktop/src/helper/helperMain.ts',
     ]
     // The helper and the custody stack are here rather than with the renderer's rule: they are Node
     // processes, they already depend on node-core, and their lines belong on stderr
-    // (docs/shell.md § What the helper reports).
+    // (docs/shell/node-child.md § What the helper reports).
     const SCANNED = ['packages/node-core/src', 'apps/node/src', 'packages/custody/src', 'apps/desktop/src/helper']
     const files = SCANNED.flatMap((dir) => walk(join(ROOT, dir)))
       .filter((file) => !isTestCode(file))
@@ -517,7 +517,7 @@ describe('architecture boundaries', () => {
     ])
     // `@acorn/diff-document` beside protocol: a runtime-neutral contract with no host state in it,
     // which a provider's node builds diff documents with and its client hands the viewer
-    // (docs/diff-rendering.md § The document).
+    // (docs/diff-rendering/document.md § The document).
     const SHARED = new Set(['@acorn/plugin-api', '@acorn/protocol', '@acorn/diff-document'])
     const offenders = crossPackage
       .filter((e) => e.fromPkg.kind === 'plugin' && !isTestCode(e.fromFile))
@@ -965,7 +965,7 @@ describe('architecture boundaries', () => {
   it('the terminal client keeps custody out of everything that draws', () => {
     // The desktop runs the renderer and the broker in two processes, so "the renderer never holds a
     // token" is structural. The TUI is one process, so the same promise is a module boundary instead,
-    // and this is it (docs/tui.md § Shell and broker in one process). Custody — the token
+    // and this is it (docs/tui/process.md § Shell and broker in one process). Custody — the token
     // store, the fleet store, the broker, pairing — is reachable from the process model and from the
     // seam that installs it, and from nothing that draws a cell.
     //
@@ -987,7 +987,7 @@ describe('architecture boundaries', () => {
 
   it('the terminal focus store knows the keyboard and not the screen', () => {
     // `apps/tui/src/keys/` is the keyboard's: five levels, one settle pass, and no idea which region
-    // is the rail (docs/tui.md § Focus regions). Everything the shell knows about its own
+    // is the rail (docs/tui/focus.md § Focus regions). Everything the shell knows about its own
     // arrangement arrives through `setTopology` and `setPaneCycler`, installed from `chrome/Shell.tsx`.
     // An import the other way is how `moveBack` came to find Browse by spelling its id.
     const reaching = EDGES
@@ -1017,7 +1017,7 @@ describe('architecture boundaries', () => {
   it('plugin-api is a facade: re-exports only, and only of the core packages', () => {
     // The moment the facade grows behaviour of its own it becomes another core package with its own
     // bugs. `@acorn/diff-document` is on the list because `ui/diff` publishes the document types the
-    // viewer's port is written in (docs/diff-rendering.md § The document).
+    // viewer's port is written in (docs/diff-rendering/document.md § The document).
     const api = PACKAGES.find((p) => p.name === '@acorn/plugin-api')!
     const CORE = new Set(['@acorn/node-core', '@acorn/client-core', '@acorn/protocol', '@acorn/plugin-api', '@acorn/diff-document'])
     const foreign = EDGES.filter((e) => e.fromPkg.name === api.name && e.target.pkg && !CORE.has(e.target.pkg.name))
@@ -1246,7 +1246,7 @@ describe('architecture boundaries', () => {
   })
 
   it('gives a search response no way to choose what selecting it does', () => {
-    // docs/command-palette-and-shortcuts.md § Palette data. A route answer is untrusted wire input. A
+    // docs/command-palette-and-shortcuts/palette-data.md § Palette data. A route answer is untrusted wire input. A
     // result that could name a verb, a route or a URL would make a changing server response more
     // powerful than the manifest somebody reviewed, so the row carries display facts and identity and
     // the manifest's search command owns the one static action.

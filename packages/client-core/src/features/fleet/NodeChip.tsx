@@ -36,7 +36,7 @@ export default function NodeChip(props: { nodeId: string; label?: string; query?
     return code === 'identity_mismatch' || code === 'protocol_mismatch' ? HARD_ERRORS[code] : undefined
   }
   // The supervised local node before the broker has reported on it at all. The startup gate normally
-  // covers this interval (docs/frontend.md § Startup readiness), but the chip can also draw in host
+  // covers this interval (docs/frontend/data-and-startup.md § Startup readiness), but the chip can also draw in host
   // chrome outside that gate. "Offline" is the wrong word for a process that is coming up. Only the
   // wording changes: the freshness value stays `offline`, because nothing on screen is live yet, and
   // the six-value vocabulary in node/freshness.ts is not the place to say "not yet".

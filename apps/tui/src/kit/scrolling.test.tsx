@@ -73,7 +73,7 @@ describe('scrolling detail viewports', () => {
   it('moves between the stops of a document with the arrows and scrolls it with the page keys', async () => {
     // The rule the footer has to be able to say in two words: arrows move, page keys scroll. The
     // paragraph between the two buttons is skipped by `↓` and read with `pgup`/`pgdn`
-    // (docs/tui.md § Scrolling viewports).
+    // (docs/tui/scrolling.md § Scrolling viewports).
     const screen = await renderCells(() => (
       <HeaderBodyFooter
         stateKey="document"
@@ -140,7 +140,7 @@ describe('scrolling detail viewports', () => {
 
   it('moves the viewport under the pointer with the wheel and leaves the keys where they were', async () => {
     // A wheel is not a focus event, which is the whole of what this host does with the pointer
-    // (docs/tui.md § What the TUI never does). So the viewport moves and nothing else does: the
+    // (docs/tui/rectangles.md § What the TUI never does). So the viewport moves and nothing else does: the
     // button keeps the keys while it is scrolled off the top, and the key that presses it still
     // presses it. Nothing pulls the offset back either — the reveal only runs where the keys moved,
     // and they did not (../keys/regions.ts § The reveal).
@@ -212,13 +212,13 @@ describe('scrolling detail viewports', () => {
   //
   // The three cases below are one reported fault with two causes in it, and both are fixed: the List
   // region of every `list-detail` was a yoga clip rather than a viewport, and the page keys moved
-  // modulo the list length (docs/tui.md § Scrolling viewports).
+  // modulo the list length (docs/tui/scrolling.md § Scrolling viewports).
 
   it('follows the caret down a list longer than its list-detail region', async () => {
     // A non-virtual `Rows` of 30 in a region eight rows tall. This is the shape eight of the nine
     // plugin lists are, and until the List region became a viewport the caret simply walked off the
     // bottom of the panel: the clip round it hid the rows below the fold and owned no offset for the
-    // reveal to move (./scrolling.tsx, docs/tui.md § Scrolling viewports).
+    // reveal to move (./scrolling.tsx, docs/tui/scrolling.md § Scrolling viewports).
     const screen = await renderCells(() => (
       <ListDetail
         stateKey="long-list"

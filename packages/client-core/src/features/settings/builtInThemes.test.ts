@@ -3,7 +3,7 @@ import { readStyleSheets, stripComments } from '../../infra/styles/readStyleShee
 import { PLUGIN_THEME_PREFIX } from '../../host/chrome/chromeThemes'
 import { THEMES } from './builtInThemes'
 
-// Drift guard (docs/ui-design.md § Plugin themes): the Appearance themes picker is hand-synced with
+// Drift guard (docs/ui-design/appearance.md § Plugin themes): the Appearance themes picker is hand-synced with
 // the `:root[data-theme="…"]` blocks in styles/tokens-theme.css. This reads the stylesheets and
 // asserts the two sets match, so adding or removing a theme in one place fails the suite until both
 // agree.

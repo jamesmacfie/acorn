@@ -17,7 +17,7 @@ import { createSettingSave, type SettingSave } from './settingSave'
 import { Show } from 'solid-js'
 
 // Settings → Notifications: the switches the gate reads
-// (docs/notifications.md § Settings).
+// (docs/notifications/channels.md § Settings).
 //
 // The three event switches turn an edge off entirely, row included. Off means the owner does not
 // want to hear about it, and a row that lands silently but still counts in the pill is hearing

@@ -1314,7 +1314,7 @@ describe('plugin commands and keybindings', () => {
 })
 
 describe('themes', () => {
-  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design.md § Appearance). The
+  // The parse-time half of "a plugin theme cannot break the app" (docs/ui-design/appearance.md § Appearance). The
   // client re-checks all of it before generating CSS, because a roster row is bytes a node sent, but this
   // is where an author finds out, so each rule is pinned at the door it is enforced at.
   const palette = Object.fromEntries(THEME_PALETTE_TOKENS.map((name) => [name, '#123456']))

@@ -1,12 +1,12 @@
 // Focus groups: every region of every layout, in document order, and which one has focus.
 //
-// A layout region is a focus group (docs/command-palette-and-shortcuts.md § Focus and typing, on focus as a property of
+// A layout region is a focus group (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing, on focus as a property of
 // the tree). `nextRegion` cycles the groups inside one pane, `nextPane` cycles the panes of the task
 // row, and each group remembers the node focus was last on so coming back lands where you left.
 // This generalises the single `focusedPane` per task to every region of every pane.
 //
 // It is also the app's one emit point for `runtime:focus-changed`, whose contract lives beside this
-// focus model in docs/command-palette-and-shortcuts.md § Focus and typing. The event is renderer-local
+// focus model in docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing. The event is renderer-local
 // by construction: focus is a fact about a window, so a node has nothing to say about it and never
 // broadcasts one.
 

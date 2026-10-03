@@ -1,13 +1,13 @@
 /* Base styling for the shared kit components (kit/components/, Modal.tsx). This file is
  * the Terminal look for these roles: every value is a token, so a pack changes the look by
- * re-pointing tokens. See docs/ui-design.md § How the kit is built for the specificity
+ * re-pointing tokens. See docs/ui-design/kit-internals.md § How the kit is built for the specificity
  * model behind base/variant/pack layering.
  */
 
 /* ── Button ─────────────────────────────────────────────────────────────────────────────────
    Matches .overlay-btn exactly, so a converted call site can keep its old class alongside
    .ui-btn and render identically during migration. Height comes from --control-h, not padding
-   (docs/ui-design.md § How the kit is built); the pads stay inline-only so a block pad
+   (docs/ui-design/kit-internals.md § How the kit is built); the pads stay inline-only so a block pad
    cannot fight min-height and reintroduce the old mismatch. */
 .ui-btn {
   display: inline-flex;
@@ -37,7 +37,7 @@
 .ui-btn[data-variant='solid']:hover:not(:disabled) { opacity: 0.9; background: var(--accent); }
 .ui-btn[data-variant='ghost'] { background: transparent; border-color: transparent; }
 .ui-btn[data-variant='ghost']:hover:not(:disabled) { background: var(--bg-hover); border-color: transparent; }
-/* See docs/ui-design.md § How the kit is built (Button) for the `bare` variant. */
+/* See docs/ui-design/kit-internals.md § How the kit is built (Button) for the `bare` variant. */
 .ui-btn[data-variant='bare'] {
   background: transparent;
   border: 0;
@@ -67,7 +67,7 @@
 .ui-btn[data-tone='danger']:hover:not(:disabled) { border-color: var(--danger); }
 .ui-btn[data-tone='warn'] { color: var(--warn); }
 .ui-btn[data-tone='warn']:hover:not(:disabled) { border-color: var(--warn); }
-/* See docs/ui-design.md § How the kit is built (Button): tone must survive the solid variant. */
+/* See docs/ui-design/kit-internals.md § How the kit is built (Button): tone must survive the solid variant. */
 .ui-btn[data-variant='solid'][data-tone='accent'] { color: var(--accent-fg); }
 .ui-btn[data-variant='solid'][data-tone='danger'] { background: var(--danger); border-color: var(--danger); color: var(--accent-fg); }
 
@@ -154,7 +154,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 
 .ui-field { display: flex; flex-direction: column; gap: var(--space-3); }
 .ui-field[data-layout='row'] { flex-direction: row; align-items: center; gap: var(--space-4); }
-/* See docs/ui-design.md § How the kit is built (Field) for `data-layout='split'`. */
+/* See docs/ui-design/kit-internals.md § How the kit is built (Field) for `data-layout='split'`. */
 .ui-field[data-layout='split'] {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, var(--setting-control-w));
@@ -219,14 +219,14 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-icon[data-tone='danger'] { color: var(--state-bad); }
 /* A brand's own colour, pulled toward the theme's foreground until it is readable on it. `--brand`
    is set per element by Icon from the mark's registered colour, because core cannot know a third
-   party's hex (docs/ui-design.md § Brand colour). */
+   party's hex (docs/ui-design/icons.md § Brand color). */
 .ui-icon[data-tone='brand'] { color: var(--brand-legible); }
 /* No reduced-motion guard, unlike `.spin`: on a state icon the turn is the whole signal that
    something is running, and a 12px rotation is not the motion that setting exists to stop. */
 .ui-icon[data-spin] { animation: spin 1s linear infinite; }
 
 /* ── SectionHeader ──────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the kit is built for why the base rule lives here rather
+   See docs/ui-design/kit-internals.md § How the kit is built for why the base rule lives here rather
    than in shell.css (plugins/http/src/frame/http.css says the same about .settings-hint). */
 .section-header {
   flex: none;
@@ -387,9 +387,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
   color: var(--text-muted);
   font-variant-numeric: var(--tabular);
 }
-/* See docs/ui-design.md § How the kit is built (Row) for data-fields and minmax(0, …). */
+/* See docs/ui-design/kit-internals.md § How the kit is built (Row) for data-fields and minmax(0, …). */
 .ui-row {
-  /* docs/ui-design.md § Runtime-set custom properties covers --row-field-w. */
+  /* docs/ui-design/tokens.md § Runtime-set custom properties covers --row-field-w. */
   --row-field-w: 84px;
 }
 /* `flex: 0 1 auto` with `min-width: 0`, unlike the plain meta above: four reserved tracks are wider
@@ -434,7 +434,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 }
 
 /* ── Alert ──────────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the kit is built for why this owns what `.action-error`
+   See docs/ui-design/kit-internals.md § How the kit is built for why this owns what `.action-error`
    used to. */
 .ui-alert { font-size: var(--fs-sm); }
 .ui-alert-title { display: block; font-weight: var(--fw-semibold); }
@@ -491,7 +491,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-empty-action { display: inline-flex; gap: var(--gap-row); margin-top: var(--space-2); }
 
 /* ── StatusDot ──────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the kit is built for the two colour vocabularies this
+   See docs/ui-design/kit-internals.md § How the kit is built for the two colour vocabularies this
    replaces. 8px is the majority size (.check-dot, .checks-dot, .docker-dot); terminal's 7px and
    notes' 10px converge onto sm/md. */
 .ui-dot {
@@ -517,7 +517,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 @media (prefers-reduced-motion: reduce) { .ui-dot[data-pulse] { animation: none; } }
 
 /* ── Checkbox ───────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the kit is built for why this styles the native input. */
+   See docs/ui-design/kit-internals.md § How the kit is built for why this styles the native input. */
 .ui-check {
   display: flex;
   align-items: flex-start;
@@ -582,7 +582,7 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-btn[data-armed][data-icon-only] { width: auto; padding: var(--pad-control); }
 
 /* ── Popover ────────────────────────────────────────────────────────────────────────────────
-   The floating surface for ui/anchor.ts. See docs/ui-design.md § How the kit is built for
+   The floating surface for ui/anchor.ts. See docs/ui-design/kit-internals.md § How the kit is built for
    why this anchors at --z-picker. */
 .ui-popover-anchor { display: contents; }
 .ui-popover {
@@ -757,7 +757,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-chip:focus-visible,
 .ui-chip-remove:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 
-/* See docs/ui-design.md § How the kit is built (Badge / Chip) for `data-colored`. */
+/* See docs/ui-design/kit-internals.md § How the kit is built (Badge / Chip) for `data-colored`. */
 .ui-chip[data-colored] { border-color: var(--chip-color); color: var(--text); }
 .ui-chip[data-colored]::before {
   content: '';
@@ -938,7 +938,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-input[data-mono] { font-family: var(--font-mono); font-size: var(--fs-sm); resize: vertical; }
 
 /* ── Card ───────────────────────────────────────────────────────────────────────────────────
-   Eleven bespoke card rules. See docs/ui-design.md § How the kit is built for why the
+   Eleven bespoke card rules. See docs/ui-design/kit-internals.md § How the kit is built for why the
    stripe uses the same --stripe-w marker the diff rows and comment cards use. */
 .ui-card {
   display: block;
@@ -1051,7 +1051,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-graph-cut:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: var(--focus-ring-offset); }
 
 /* ── Meter ──────────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § How the kit is built (Meter) for why this is a div rather than
+   See docs/ui-design/kit-internals.md § How the kit is built (Meter) for why this is a div rather than
    a native <meter>. */
 .ui-meter {
   position: relative;
@@ -1259,7 +1259,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-split-handle:focus-visible::after { background: var(--accent); }
 
 /* ── ListDetail ─────────────────────────────────────────────────────────────────────────────
-   See docs/ui-design.md § Border roles for why the border role is --chrome-divider, not
+   See docs/ui-design/tokens.md § Border roles for why the border role is --chrome-divider, not
    --control-bw.
 
    No `data-list` means no list column, and the grid is a single track; see the component.
@@ -1385,11 +1385,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
   margin-block: calc(-1 * var(--space-5)) var(--gap-section);
 }
 
-/* See docs/ui-design.md § Two-column panes for ListDetail's narrow-width behaviour. */
+/* See docs/ui-design/two-column-panes.md § Two-column panes for ListDetail's narrow-width behaviour. */
 
 /* ── UserAvatar / comment meta ──────────────────────────────────────────────────────────────
-   Worn by ui/UserAvatar.tsx and ui/diff/DiffRows.tsx. See docs/ui-design.md § How the primitives
-   are built for why this owns .user-avatar now. */
+   Worn by ui/UserAvatar.tsx and ui/diff/DiffRows.tsx. See
+   docs/ui-design/kit-internals.md § How the kit is built for why this owns .user-avatar now. */
 .user-avatar {
   flex: none;
   width: 18px;
@@ -1416,7 +1416,7 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
 /* ── Markdown ───────────────────────────────────────────────────────────────────────────────
    Rendered markdown, wherever it comes from: a PR body, a review comment, a Linear description, a
-   note preview, an agent turn. See docs/ui-design.md § How the kit is built for why this
+   note preview, an agent turn. See docs/ui-design/kit-internals.md § How the kit is built for why this
    owns .ui-markdown now.
 
    A class as well as a component. `ui/Markdown.tsx` wraps it for a caller that holds Markdown source,
@@ -1726,7 +1726,7 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-row[data-variant='stacked'] .ui-row-body > * { max-width: 100%; }
 
 /* ── The kit's grouping and showing nodes ───────────────────────────────────────────────────
-   The ten nodes added when the kit closed (docs/ui-design.md § The closed kit). Each one replaces
+   The ten nodes added when the kit closed (docs/ui-design/closed-kit.md § The closed kit). Each one replaces
    a shape two or more panes were drawing with raw tags and a private class. `--kit-gap` is written
    inline from ui/kit/roles.ts: it is always a var() into a style token, so a pack still moves it. */
 /* ConfirmButton's wrapper. It exists to catch the blur and the Escape that disarm the button, which
@@ -1862,7 +1862,7 @@ a.ui-row:hover { background: var(--bg-hover); }
 .ui-help:focus-visible { outline-offset: calc(-1 * var(--focus-ring-w)); }
 
 /* ── SettingsSection / SettingRow ─────────────────────────────────────────────────────────────
-   A settings page is sections of rows (docs/frontend.md § Settings). An inline row is a two-column
+   A settings page is sections of rows (docs/frontend/settings.md § Settings). An inline row is a two-column
    grid, the words left and the control right, so every control on a page starts at the same edge
    whatever its label measures. A stacked row is one column with the control at the full width. */
 .ui-settings-section { display: flex; flex-direction: column; gap: var(--gap-inline); min-width: 0; scroll-margin-top: var(--space-5); }

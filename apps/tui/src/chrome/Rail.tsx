@@ -222,7 +222,7 @@ export function Rail(props: { model: ShellModel; cells: number; nodeId: string }
       {/* `scroll`, because a source's list is as long as the source says and the rail is one column
           of a fixed screen: without a viewport the rows past the fold were drawn nowhere and the
           caret walked off the bottom of the panel (../kit/scrolling.tsx,
-          docs/tui.md § Scrolling viewports). */}
+          docs/tui/scrolling.md § Scrolling viewports). */}
       <Panel title="Browse" grow scroll>
         <Show
           when={source()?.regions?.list}

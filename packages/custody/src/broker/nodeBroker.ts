@@ -17,7 +17,7 @@ import { BrokerFetch } from './brokerFetch'
 import { emitEvent, telemetryEnabled } from '@acorn/node-core/server/telemetry'
 import { createLogger } from '@acorn/node-core/server/telemetry'
 
-// What the broker reports, and it is health rather than traffic (docs/shell.md § What the helper
+// What the broker reports, and it is health rather than traffic (docs/shell/node-child.md § What the helper
 // reports). `broker.request` is a histogram because a renderer's reads run far past ten a second;
 // the four events are the moments a person would want a timestamp for, and each carries the node id
 // so a fleet view of slow or flapping nodes is a query rather than a bisect.

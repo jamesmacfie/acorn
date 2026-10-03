@@ -1,6 +1,6 @@
 // Who fills a box when more than one contributor could (docs/plugins.md § Arbitration).
 //
-// No JSX here (docs/frontend.md § Registries and plugins), because the decision is the part worth a
+// No JSX here (docs/frontend/registries.md § Registries and plugins), because the decision is the part worth a
 // test: which contributors match a key, who wins a `replace` tie, where the user's pick comes in, and
 // what happens past `max`. `Slot.tsx` is a `<For>` over the answer.
 //

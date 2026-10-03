@@ -14,7 +14,7 @@ import type { InputEvent, KeyEvent } from './events'
 // mistyped; `no key is respelled` reads the app's own binding tables and insists that every key they
 // name is a key this parser produces under that exact name. A parser that spells Page Down `pgdn` is
 // not a bug you find by reading, it is a binding that silently never fires
-// (./names.ts, docs/tui.md § Keys and focus).
+// (./names.ts, docs/tui/keys.md § Keys and focus).
 
 const bytes = (text: string): Uint8Array => new TextEncoder().encode(text)
 
@@ -105,7 +105,7 @@ describe('the legacy forms', () => {
 
   it('cannot tell Ctrl+Return from Return, which is why the app asks for the kitty protocol', () => {
     // Not a shortcoming of this parser: a legacy terminal sends the one byte for both, so `commit`
-    // does not exist to be bound (docs/tui.md § The adapter). The kitty case below is the same key.
+    // does not exist to be bound (docs/tui/keys.md § The adapter). The kitty case below is the same key.
     expect(chord(keys('\r')[0]!)).toBe('return')
   })
 

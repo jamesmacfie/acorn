@@ -4,5 +4,5 @@
 //
 // From its own module rather than the `render` barrel: the barrel also carries the chart and trend
 // code, and this re-export is on the startup graph, so through the barrel it pulled all of that into
-// the first load (docs/frontend.md § Startup budget).
+// the first load (docs/frontend/startup-budget.md § Startup budget).
 export { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'

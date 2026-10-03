@@ -5,7 +5,7 @@ import { mountEmbeddedEditor, type EmbeddedEditor } from '@acorn/plugin-api/ui/e
 // The escape hatch: the definition as the runner's own JSON.
 //
 // The box is a rectangle rather than a node, because what fills it is a code editor and that is the
-// one shape the closed kit cannot express (docs/ui-design.md § The closed kit). The editor itself is
+// one shape the closed kit cannot express (docs/ui-design/closed-kit.md § The closed kit). The editor itself is
 // the host's — the library, the theme and the JSON grammar all arrive through
 // `@acorn/plugin-api/ui/editor`, so this file holds no CodeMirror and the terminal client carries
 // none. There the same rectangle is a plain textarea, which is what a host with cells can draw.

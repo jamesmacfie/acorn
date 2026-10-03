@@ -10,7 +10,7 @@ const log = createLogger('client-event')
 export type PaneIntent =
   | { kind: 'notes:open'; slug: string; scope: NoteScope }
   | { kind: 'editor:reveal'; path: string; line: number; column?: number }
-  // Show the editor pane's find-in-files panel and focus its box (docs/panes.md § Contributions
+  // Show the editor pane's find-in-files panel and focus its box (docs/panes/contributions.md § Contributions
   // covers the fold into the editor pane). It has to be an intent for the same reason `editor:reveal`
   // is: the pane may not be mounted yet, and the request has to survive until it is.
   | { kind: 'editor:search' }
@@ -37,7 +37,7 @@ export type ClientEventMap = {
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
-  // (docs/editor.md § Communication between regions). Not retained like a pane intent:
+  // (docs/editor/composed-panes.md § Communication between regions). Not retained like a pane intent:
   // an intent describes a destination the reader is being taken to, so it waits for the pane to
   // exist, whereas this is a verb fired at a frame that is already on screen. Replaying "run the
   // query" into a pane that opens ten minutes later would be a surprise, not a fix.
@@ -64,7 +64,7 @@ export type ClientEventMap = {
   // (docs/plugins/forward-compatibility.md § What is not an event).
   //
   // The one emit point is the region focus store (keys/regions.ts); the full contract lives in
-  // docs/command-palette-and-shortcuts.md § Focus and typing.
+  // docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing.
   'runtime:focus-changed': { taskId: string | null; paneId: string; regionId: string }
   // ── Node-emitted facts ──────────────────────────────────────────────────────────────────────────
   //

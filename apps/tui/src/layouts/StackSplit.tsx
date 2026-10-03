@@ -7,7 +7,7 @@ import { Panel } from '../panel'
 import { regionFocus } from '../keys/regions'
 
 // `stack-split`: `top` over `bottom` with a rule between them, the split moved by a key. Its
-// projection is "native, as on desktop" (docs/panes.md § Layout model), and this is what that is in
+// projection is "native, as on desktop" (docs/panes/layout.md § Layout model), and this is what that is in
 // cells: two blocks, a divider line, and no grip.
 //
 // `bottom` carries the height and `top` takes what is left, which is the shape the terminal drawer
@@ -33,7 +33,7 @@ export function StackSplit(props: LayoutProps) {
     initial: DEFAULT_BOTTOM_LINES,
     min: MIN_BOTTOM_LINES,
     // This layout's own box, never the terminal's height. The rule is the same one the DOM layout
-    // keeps with `offsetHeight` (docs/ui-design.md § What the kit and layouts must never do).
+    // keeps with `offsetHeight` (docs/ui-design/closed-kit.md § What the kit and layouts must never do).
     ceiling: () => Math.floor(lines() * MAX_BOTTOM_FRACTION),
   })
 

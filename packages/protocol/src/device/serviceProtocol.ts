@@ -80,7 +80,7 @@ export const previewBrowserRuleSchema = z.strictObject({
 export type PreviewBrowserRule = z.infer<typeof previewBrowserRuleSchema>
 
 // The peer is symmetric, but every method here is one the shell calls on the service. Nothing on the
-// node side calls back the other way (docs/shell.md § Service protocol).
+// node side calls back the other way (docs/shell/node-child.md § Service protocol).
 export const serviceRpcMethods = [
   'service.start',
   'service.stop',

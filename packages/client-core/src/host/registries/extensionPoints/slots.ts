@@ -1,6 +1,6 @@
 // The slot registry and its contribution types, split out of uiSlots.tsx, which re-exports every name
 // below so existing imports keep working. This module holds no JSX import
-// (docs/frontend.md § Registries and plugins), which is what lets registries/plugin.ts have a unit
+// (docs/frontend/registries.md § Registries and plugins), which is what lets registries/plugin.ts have a unit
 // test.
 import type { Component } from 'solid-js'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'

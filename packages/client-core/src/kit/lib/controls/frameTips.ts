@@ -1,5 +1,5 @@
 // The frame-side half of the tooltip protocol (tips.tsx documents the attributes). See
-// docs/ui-design.md § Tooltips for why this is a separate, importless module.
+// docs/ui-design/tooltips.md § Tooltips for why this is a separate, importless module.
 
 /**
  * Mounts the tooltip listener into a plugin frame's own document. See docs/ui-design.md

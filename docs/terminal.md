@@ -345,7 +345,7 @@ initial profile/roster reads report to the current view, settle its loading stat
 that an empty roster should auto-launch another session.
 
 Terminals are the exception to the rule that a pane's view does not outlive its task
-([panes.md](./panes.md) § Layout model), for three reasons. A terminal is a running program the reader
+([panes.md](./panes/models.md) § Pane models), for three reasons. A terminal is a running program the reader
 expects to keep running, as it would in any terminal application. Its state is the emulator's own
 buffer, not a query the cache can hand back, so there is nothing cheaper to rebuild it from than the
 node's ring, and that rebuild loses scrollback. And rebuilding was the expensive part of going back
@@ -408,11 +408,11 @@ are both throwaway PTYs, both about fifteen lines now, and both work on a host w
 The terminal plugin's own desktop drawer surface keeps its own xterm, because it is not throwaway: it carries
 the app's theme, the font-size preference, the WebGL renderer and the Shift+Enter rule, and none of
 those has a meaning in cells. The terminal client presents the same Node sessions in its own cell
-view, described below ([tui.md](./tui.md) § Chrome).
+view, described below ([tui.md](./tui/chrome.md) § Chrome).
 
 **The `$EDITOR` handoff needed nothing built.** The editor pane already has a terminal mode: one device
 preference swaps the CodeMirror rectangle for a throwaway PTY running the reader's own editor on the
-worktree, and the pane refetches the file when the editor exits ([editor.md](./editor.md) § Editing in
+worktree, and the pane refetches the file when the editor exits ([editor.md](./editor/editor-pane.md) § Editing in
 your own editor). On the terminal client that PTY draws in cells, so the reader gets vim inside the
 terminal they were already in, and the design's suspend-the-renderer plan was never needed. What the
 terminal client draws when the preference is off is the box and a line saying the file opens there;

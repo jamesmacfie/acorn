@@ -4,7 +4,7 @@
 // The containment half was `ui/focus.ts`'s `trapOverlayFocus` and moves here unchanged; the restore
 // is new. An overlay that traps focus and then drops it on the body leaves the next Tab starting at
 // the top of the page, which is the bug every one of these grew separately
-// (docs/command-palette-and-shortcuts.md § Focus and typing: focus returns to the
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing: focus returns to the
 // opener on dismiss).
 
 import { anchoredSurfacesWithin } from '../lib/controls/anchor'

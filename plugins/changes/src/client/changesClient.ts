@@ -17,7 +17,7 @@ const post = <T>(url: string, body?: unknown, signal?: AbortSignal) =>
 
 export const localGitApi = {
   status: (taskId: string) => readJson<LocalStatus>(localStatusRoute(taskId)),
-  // The stacked diff as a document, its segments, and its search pages (docs/diff-rendering.md § The
+  // The stacked diff as a document, its segments, and its search pages (docs/diff-rendering/document.md § The
   // document).
   document: (taskId: string, request: LocalDocumentRequest, signal?: AbortSignal) => post<LocalDocumentResponse>(localDocumentRoute(taskId), request, signal),
   segments: (taskId: string, request: LocalSegmentsRequest, signal?: AbortSignal) => post<DiffSegmentPayload[]>(localSegmentsRoute(taskId), request, signal),

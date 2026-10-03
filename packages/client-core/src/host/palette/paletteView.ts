@@ -31,7 +31,7 @@ export type CommandPaletteView = {
  *
  * `id` becomes `overlay.<id>.toggle` for both the command and the keybinding, which is what
  * `createOverlayPalette` produced before and therefore what a reader's saved override is keyed on
- * (docs/command-palette-and-shortcuts.md § Plugin shortcuts, on binding ids as persistence keys).
+ * (docs/command-palette-and-shortcuts/shortcuts.md § Plugin shortcuts, on binding ids as persistence keys).
  * Changing it would silently unbind everybody's ⌘K.
  */
 export function createCommandPaletteView(options: CommandSessionOptions & {

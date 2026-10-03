@@ -59,7 +59,7 @@ is to open all three menus.
     with both investigators running. Do the same from a pull request that already has a task: it runs
     on that task rather than making a second one.
 
-Next is the graph view's ([ui-design.md](../ui-design.md) § The closed kit). A canvas is the one kit
+Next is the graph view's ([ui-design.md](../ui-design/closed-kit.md) § The closed kit). A canvas is the one kit
 node whose whole point is what it looks like, so a suite can check the geometry and nothing else.
 
 56. Open the owner's first workflow and press **Graph**. It draws two roots joining into the

@@ -7,7 +7,7 @@
 // emulator moved to the host: a channel to open, bytes in, bytes out, and a size.
 //
 // Types only, and no imports, so a node-environment test and a tree bundle can both name them
-// (docs/ui-design.md § The closed kit, docs/terminal.md § Client).
+// (docs/ui-design/closed-kit.md § The closed kit, docs/terminal.md § Client).
 
 /** What the far end of a PTY says. The same two messages every channel in the app already sends. */
 export type PtyEvent =

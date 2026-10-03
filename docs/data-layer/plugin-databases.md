@@ -95,7 +95,7 @@ digest the patch body is stored under. `sync_state` has four nullable columns, `
 `received`, `reported_total`, and `upstream_limit`, that only a files resource sets, when GitHub's
 3,000-file ceiling cut the list.
 
-The diff viewer's documents are generated data, not tables ([the document](../diff-rendering.md#the-document)).
+The diff viewer's documents are generated data, not tables ([the document](../diff-rendering/document.md#the-document)).
 A pull request's segment descriptors are a blob per patch, keyed by the patch digest and the
 diff-document version and written beside the patch body. A new segmenter version reads a different key
 and cuts again. Segment rows are cut from the patch body on request and never stored. A working tree's

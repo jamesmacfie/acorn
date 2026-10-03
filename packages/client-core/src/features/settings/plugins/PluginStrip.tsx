@@ -14,7 +14,7 @@ import type { SettingsNavigate } from '../../../host/registries/shell/settings'
 import './plugins.css'
 
 // The plugin strip: the host's handle on a plugin, drawn above every page a plugin contributes to
-// settings, whether the page is compiled, a remote tree or a frame (docs/frontend.md § The plugin strip).
+// settings, whether the page is compiled, a remote tree or a frame (docs/frontend/settings-groups.md § The plugin strip).
 // It names the plugin and where it came from, opens its page under Installed, and holds the two switches
 // only the host may draw: whether the plugin is on, and whether each of its sources has an icon in the
 // left rail. Then a line for the four states a person has to know about before trusting what the page

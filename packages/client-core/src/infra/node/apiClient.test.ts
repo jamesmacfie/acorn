@@ -11,7 +11,7 @@ import {
   startInteraction,
 } from '../telemetry/emitter'
 
-// The offline-mutation contract (docs/ui-design.md § Connection and staleness vocabulary): "reads come from
+// The offline-mutation contract (docs/ui-design/states.md § Connection and staleness vocabulary): "reads come from
 // cache with badges; mutations fail fast with a clear 'node offline' error and keep the user's input as a
 // draft. Nothing is queued for later automatic replay."
 

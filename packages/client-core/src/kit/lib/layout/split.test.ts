@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { createSplitDrag } from './split'
 
 // This package has no DOM env by design, but the hook renders nothing and touches only four APIs,
-// so faking them is cheap. It is worth it: see docs/ui-design.md § Drag-to-resize for the bug this
+// so faking them is cheap. It is worth it: see docs/ui-design/overlays.md § Drag-to-resize for the bug this
 // guards against.
 
 type Listener = () => void

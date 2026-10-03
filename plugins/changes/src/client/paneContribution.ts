@@ -3,7 +3,7 @@ import { createChangesModel, type ChangesModel } from './changesModel'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
 
 // Changes as a `list-detail` pane: the host draws the split, the divider and the drag handle, and these
-// four components fill the regions (docs/panes.md § Layout model).
+// four components fill the regions (docs/panes/layout.md § Layout model).
 const ChangesHeader = lazy(async () => ({ default: (await import('./ChangesPane')).ChangesHeader }))
 const ChangesList = lazy(async () => ({ default: (await import('./ChangesPane')).ChangesList }))
 const ChangesFooter = lazy(async () => ({ default: (await import('./ChangesPane')).ChangesFooter }))

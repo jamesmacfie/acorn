@@ -1,7 +1,7 @@
 // The client's telemetry emitter: the same five record kinds and the same verbs as the node's
 // collector, and one thing the node does not have, a trace that spans an interaction.
 //
-// docs/telemetry.md owns the model and docs/frontend.md § Telemetry owns what the renderer measures.
+// docs/telemetry.md owns the model and docs/frontend/shell-state.md § Telemetry owns what the renderer measures.
 // Three shape decisions belong here.
 //
 // **The verbs match the node's, argument for argument.** `measure`, `recordDuration`, `startSpan`
@@ -9,7 +9,7 @@
 // does. The terminal client reuses this file and changes only the poster, so a second copy of the
 // verbs would be two vocabularies for one record model. The desktop helper reuses the node's
 // collector instead, because it is a Node process that already depends on node-core and cannot
-// reach a package that draws (docs/shell.md § What the helper reports).
+// reach a package that draws (docs/shell/node-child.md § What the helper reports).
 //
 // **There is no scrubber here.** A browser cannot know this machine's home directory or its data
 // root, which are the two prefixes worth collapsing, so the node re-scrubs every posted record at

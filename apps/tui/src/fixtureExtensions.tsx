@@ -7,7 +7,7 @@ import { Button } from './kit/asking'
 import { Text } from './kit/showing'
 
 // Contributions nobody ships, so the cooperative extension kinds can be driven from a keyboard in a
-// test (docs/tui.md § What a plugin loses here).
+// test (docs/tui/plugin-losses.md § What a plugin loses here).
 //
 // Beside `./fixture.ts` rather than in it, because that file is the fixture *node* — routes and rows,
 // no JSX — and a `component` carrier is a component. Behind flags the same way

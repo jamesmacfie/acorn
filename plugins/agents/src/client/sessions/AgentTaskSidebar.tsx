@@ -31,7 +31,7 @@ import {
 //
 // Each group is a `Rows` collection, so the arrows, Home, End, type-ahead and the selection that
 // survives a refetch are the kit's and this file writes no key handling
-// (docs/command-palette-and-shortcuts.md § Focus and typing). Subagents are rows of the sessions collection at depth
+// (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). Subagents are rows of the sessions collection at depth
 // one, rather than a nested list, because stepping into a child run is a selection and not an
 // expansion.
 //
@@ -68,7 +68,7 @@ function OrderMenu(props: { taskId: string; group: SessionGroup; label: string }
 }
 
 /** The list column's header: how many sessions this task has. Its own region, so it stays put while
- *  the list under it scrolls (docs/panes.md § Layout model). */
+ *  the list under it scrolls (docs/panes/layout.md § Layout model). */
 export function AgentSidebarHeader(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return <SectionHeader count={model.taskSessions().length}>Agents</SectionHeader>

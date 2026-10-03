@@ -719,7 +719,7 @@ export const managedAgentStore = {
 export function activateManagedAgentNotifications(): () => void {
   const release = managedAgentStore.activate()
   // The prime waits for a node that can answer rather than firing at activation. `acorn` draws the
-  // shell in front of a node it started and has not heard from yet (docs/tui.md § Attach or start),
+  // shell in front of a node it started and has not heard from yet (docs/tui/process.md § Attach or start),
   // so a prime at activation failed with ECONNREFUSED on every launch, for a request that was never
   // going to land — and printed a stack onto a terminal the renderer owns.
   //

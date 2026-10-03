@@ -11,7 +11,7 @@ import { createLogger } from '@acorn/client-core/infra/telemetry'
 
 const log = createLogger('plugins')
 
-// Custody of third-party plugin bundles, from a terminal (docs/tui.md § Custody).
+// Custody of third-party plugin bundles, from a terminal (docs/tui/plugins.md § Custody).
 //
 // The desktop's helper holds these in a process the renderer cannot reach. There is no second process
 // here, so the boundary is this module: the cache and the trust store are built once, in the composition
@@ -92,7 +92,7 @@ export function createPluginCustody(broker: BundleFetcher): PluginCustody {
       const { pluginId, nodeId, source, path, grant } = devGrantSchema.parse(raw)
       if (!grant) return store.revokeDev(pluginId, source ?? nodeId)
       // `{ path }` is a device-provenance install: a person at a terminal installing a plugin is
-      // installing it here (docs/tui/chrome-and-plugins.md § Loaded plugins).
+      // installing it here (docs/tui/plugins.md § Custody).
       store.grantDev({ pluginId, nodeId, source: source ?? { kind: 'node', nodeId }, ...(path ? { path } : {}), grantedAt: Date.now() })
       if (source?.kind === 'device') {
         for (const [hash, entry] of Object.entries(bundles.list())) {

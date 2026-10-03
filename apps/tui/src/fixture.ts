@@ -250,7 +250,7 @@ const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
 })
 
 // One `LocalStatus`, the way the route answers it: the branch facts travel with the file list, so the
-// pane's header, groups and footer all read one record (docs/diff-rendering.md § Data flow).
+// pane's header, groups and footer all read one record (docs/diff-rendering/changes-pane.md § One status read).
 const LOCAL_STATUS = {
   branch: 'fix-login',
   upstream: 'origin/fix-login',
@@ -409,7 +409,7 @@ const FILE_TEXT = 'export async function signIn(email: string, password: string)
 // Every request the fixture was asked for, in order, so a test can assert that a control acted rather
 // than only that it drew. A control's whole job is to make one of these; the answer it gets back is
 // the route's business and mostly a 404 here, which is the right shape for "the press left the
-// building" (docs/tui.md § Keys and focus).
+// building" (docs/tui/keys.md § Keys and focus).
 const recorded: { path: string; method: string }[] = []
 
 /** What the fixture has been asked for since the last reset. */

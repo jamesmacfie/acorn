@@ -6,7 +6,7 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 
 // The startup budget, checked against a fixture rather than against a real build, so the assertion is
 // about the rule and not about whatever the renderer happens to weigh today
-// (docs/frontend.md § Startup budget).
+// (docs/frontend/startup-budget.md § Startup budget).
 const SCRIPT = resolve(import.meta.dirname, '../../scripts/check-renderer-budget.mjs')
 
 const run = (dir: string): { code: number; output: string } => {

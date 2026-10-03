@@ -73,7 +73,7 @@ The desktop persists:
 
 - paired Node records, labels, endpoints, certificate fingerprints, and local-Node identity;
 - which Node this window talked to last, so the next launch picks its cache partition before the fleet
-  answers ([startup readiness](./frontend.md#startup-readiness));
+  answers ([startup readiness](./frontend/data-and-startup.md#startup-readiness));
 - device-scoped appearance, shortcuts, rail order, and window geometry;
 - device-held plugin enablement and `plugin:<device-plugin-id>:*` state;
 - the per-Node IndexedDB query cache;
@@ -123,4 +123,4 @@ The Node owns preview configuration. The desktop shell owns each retained local 
 home, browsing location, loading state, and navigation cursor, outside the Node database and the query
 cache. Unmounting a pane hides the page. Node switches retire every preview, so task IDs can't cross Node
 ownership, and archive and shutdown release native resources. Browser process loss and app exit can
-discard unsaved page state ([host-owned webviews](./shell.md#host-owned-webviews)).
+discard unsaved page state ([host-owned webviews](./shell/webviews.md#host-owned-webviews)).

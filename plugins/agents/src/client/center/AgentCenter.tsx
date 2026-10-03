@@ -36,7 +36,7 @@ type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task
 //
 // A `header-body` surface that is not a pane, so it takes the kit's one-column split as its box
 // rather than a layout: a layout is a pane's arrangement and this is a source's
-// (docs/panes.md § Layout model).
+// (docs/panes/layout.md § Layout model).
 export default function AgentCenter() {
   const view = startAgentView('agents.center.open')
   onCleanup(view.dispose)

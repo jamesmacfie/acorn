@@ -5,7 +5,7 @@ import { workspaceRoot } from '../../infra/styles/readStyleSheets'
 import { NODE_SUPPORT } from './support'
 
 // The kit is closed, and this is what closes it: the node set a plugin can reach and the support
-// matrix have to be the same list. See docs/ui-design.md § The closed kit.
+// matrix have to be the same list. See docs/ui-design/closed-kit.md § The closed kit.
 //
 // Read from the barrel's text rather than imported, because client-core cannot import the package
 // that re-exports it, and because the contract is the barrel file people edit.

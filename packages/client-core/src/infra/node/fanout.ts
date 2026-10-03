@@ -127,7 +127,7 @@ async function fetchOne<T>(
     const cached = client.getQueryData<T>(queryKey)
     if (cached === undefined) return { unavailable: { nodeId: node.nodeId, label: node.label, reason: reasonOf(error) } }
     // `isStale`, not `isError`. A row served from cache has data, so the honest label is `stale`, or
-    // `offline` when the connection state says the node is gone (docs/ui-design.md § States).
+    // `offline` when the connection state says the node is gone (docs/ui-design/states.md § States).
     // `isError` would paint an error badge over a readable row.
     return { row: { nodeId: node.nodeId, node, data: cached, freshness: freshnessOf(state, { isStale: true }) } }
   }

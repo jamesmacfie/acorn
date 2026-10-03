@@ -14,7 +14,7 @@ import SaveQueryModal from './SaveQueryModal'
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
 //
-// The SQL editor lives in the host, in the region above this frame (docs/editor.md §
+// The SQL editor lives in the host, in the region above this frame (docs/editor/composed-panes.md §
 // Composed panes: decided). This file reaches it through three bridge methods: `document.read()`
 // behind Run, `document.write()` when the picker or Generate loads a query in, and
 // `document.flush()`, which Run also calls before reading the current SQL.

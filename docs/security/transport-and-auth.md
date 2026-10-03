@@ -29,7 +29,7 @@ route or a socket channel. It's part of the [security model](../security.md).
   every owner's hook on its own, including hooks that reject.
 - The preview tunnel enforces 64 KiB per message at the Node and custody receivers
   ([WebSocket](../api-reference/websocket.md#preview-tunnel)). The helper's request limit is in
-  [the shell contract](../shell.md#the-shell-process).
+  [the shell contract](../shell/process.md#the-shell-process).
 - Revoking a device closes its live sockets and fails its in-flight requests. A device may revoke
   its own row, which is the same as unpairing itself.
 - A bearer that authenticated is remembered for 60 seconds, keyed by the SHA-256 of the whole token

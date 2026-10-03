@@ -2,7 +2,7 @@
 
 The shell retains a document when `ensure` receives the same normalized home and policy.
 For the lifecycle, scheduling policy, and recovery matrix, see
-[Host-owned webviews](../shell.md#host-owned-webviews).
+[Host-owned webviews](../shell/webviews.md#host-owned-webviews).
 
 ## Reproduce the native trial
 

@@ -213,7 +213,7 @@ export type CommandSessionOptions = {
    *
    * A host that supplies none is not refused: its answer is the one node it captured, which is what a
    * single-node client's whole fleet is (apps/tui). Nothing fans out without a command asking for it
-   * (docs/command-palette-and-shortcuts.md § What the palette refuses).
+   * (docs/command-palette-and-shortcuts/palette-data.md § What the palette refuses).
    */
   fleet?: () => readonly CommandFleetNode[]
   /** The host's half of opening: claim focus, raise the overlay. Runs only on a closed-to-open

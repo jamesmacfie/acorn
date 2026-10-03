@@ -3,7 +3,7 @@
 // Split out of `collection.ts` in terminal phase 2. The arrows, Home, End, the page keys, wrapping,
 // where the first press lands, and which of `select` and `activate` picks are all rules about a list
 // rather than about a document, and a second host had to keep them exactly
-// (docs/tui.md § Collections). What stayed behind in `collection.ts`
+// (docs/tui/scrolling.md § Collections). What stayed behind in `collection.ts`
 // is the DOM half: `focus()`, `scrollIntoView`, the `aria-*` and `tabindex` getters.
 //
 // The host supplies two things and nothing else: `land`, which puts focus on an item, and `onItem`,
@@ -44,7 +44,7 @@ export type CollectionIntentOptions = {
    *  leaf, or a directory that was already in the state asked for — and lets the key bubble to the
    *  tier below, which on the terminal moves one column. Returning nothing keeps the old behaviour,
    *  where the collection claimed the key either way, so no caller changes until it opts in
-   *  (docs/command-palette-and-shortcuts.md § Focus and typing). */
+   *  (docs/command-palette-and-shortcuts/focus-and-typing.md § Focus and typing). */
   onExpand?: (key: string, expand: boolean) => boolean | void
   onMenu?: (key: string) => void
   /** Put the host's focus on this item. The host's whole share of a move. */
@@ -116,7 +116,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
    *  nowhere at all, which a reader cannot tell from a dead key. Returning `false` at the edge is
    *  the other half of it. The key then carries on to the tier below, where a scrolling viewport
    *  moves the page the reader asked for, which is the sentence the footer promises: arrows move,
-   *  page keys scroll (docs/tui.md § Scrolling viewports).
+   *  page keys scroll (docs/tui/scrolling.md § Scrolling viewports).
    *
    *  This is shared, so the desktop gets it too. PageDown on the last row of a desktop list now
    *  stops instead of wrapping round to the first, and that is intended: a page key is how a reader
@@ -143,7 +143,7 @@ export function createCollectionIntents(options: CollectionIntentOptions): Colle
       // been asked this question yet, and every DOM tree in the app is one of those. A handler that
       // says `false` gets its key back, which is how Right on a leaf reaches the tier that crosses a
       // column instead of being swallowed by a fold that did not happen
-      // (docs/tui.md § The five key groups).
+      // (docs/tui/keys.md § The five key groups).
       case 'expand': {
         if (horizontal()) return move(1)
         const current = active()

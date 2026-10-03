@@ -393,7 +393,7 @@ knows a session is missing and not why.
 The agent shape is a different arrangement, not a different pane. The controls move into the toolbar
 and the harness, the structured value and any events a handler emitted fold away, because the
 conversation's timeline owns the scroll and takes the height that is left
-([panes.md](./panes.md) § Layout model). Every other kind keeps the column it had.
+([panes.md](./panes/layout.md) § Layout model). Every other kind keeps the column it had.
 
 Naming the step is what makes it work while the step runs. The row records its `agentSessionId` in the
 completion write, so the pane passes the step id as well and the agents client resolves the session
@@ -488,7 +488,7 @@ and the palette. On success the modal closes and the task opens at
 
 The modal is drawn in the shell's `overlay` slot, because the list the row sits on belongs to
 somebody else. The terminal client mounts no overlay slot and its descriptor source panel draws no row
-menu, so this flow is desktop-only for now ([tui.md](./tui.md) § What a plugin loses here).
+menu, so this flow is desktop-only for now ([tui.md](./tui/plugin-losses.md) § What a plugin loses here).
 
 ## From the command palette
 
@@ -616,7 +616,7 @@ and nothing built so far writes. The read-only rule in `database:query` is the s
 
 **A canvas as a rectangle.** Refused. An iframe owning its own pixels draws as one muted line in the
 terminal. The kit's admission rule is how a canvas earns a cell projection instead, which is why the
-graph view is the kit's `Graph` node ([ui-design.md](./ui-design.md) § The closed kit). The list came
+graph view is the kit's `Graph` node ([ui-design.md](./ui-design/closed-kit.md) § The closed kit). The list came
 first for the same reason: every rule the picture needed was proven on rows both hosts already draw.
 
 **A task pane, or the Settings page, as the editor.** Refused. A definition is not task state and it

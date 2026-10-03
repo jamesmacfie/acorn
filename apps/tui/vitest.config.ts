@@ -8,7 +8,7 @@ import base from './vite.config'
 //
 // Nothing here passes a flag and nothing here skips. The painter is TypeScript, Yoga through wasm and
 // cells in an array, so every drawing test runs on the 24.21.0 the repo pins
-// (../../node-runtime.json, docs/tui.md § The runtime floor).
+// (../../node-runtime.json, docs/tui/process.md § The runtime floor).
 
 // The root `pnpm test` sets VITEST_MAX_WORKERS=3, and Vitest lets that variable override the
 // `maxWorkers: 2` below. Lower the variable rather than the config, so the suite cap can't lift this

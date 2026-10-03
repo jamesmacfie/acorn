@@ -35,7 +35,7 @@ import { connectionPageOf, openConnectionPage } from './connections/connections'
 import './settings.css'
 
 // Settings as a place: a full-window layer with a rail of nine groups on the left and one page on the
-// right (docs/frontend.md § Settings).
+// right (docs/frontend/settings.md § Settings).
 //
 // A layer and not a route. The shell mounts it over the workspace, which stays mounted underneath, so a
 // terminal, an agent stream or an editor keeps running and is where the person left it after Escape.

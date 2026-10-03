@@ -534,7 +534,7 @@ describe('broker WebSocket', () => {
   })
 
   it('reports a peer that stopped answering as an event a sink can read', async () => {
-    // The broker's half of the helper's health reporting (docs/shell.md § What the helper reports).
+    // The broker's half of the helper's health reporting (docs/shell/node-child.md § What the helper reports).
     // The collector is driven directly here rather than through `startHelperTelemetry`, because
     // what is under test is that the seam fires, not how the batch leaves.
     const batches: TelemetryRecord[] = []

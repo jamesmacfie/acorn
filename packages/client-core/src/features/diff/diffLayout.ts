@@ -8,7 +8,7 @@ import {
 import { createScrollAuthor } from '../../kit/lib/timeline/scrollAuthor'
 import type { DiffItem } from './documentView'
 
-// The diff's range and scroll authority (docs/diff-rendering.md § Row geometry).
+// The diff's range and scroll authority (docs/diff-rendering/geometry.md § Row geometry).
 //
 // Code rows have exact heights from the topology; the dynamic blocks between and under them (threads,
 // and whatever a line draws under itself: a review note, another plugin's marks, an open composer)

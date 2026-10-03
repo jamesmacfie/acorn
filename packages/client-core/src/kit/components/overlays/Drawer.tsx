@@ -2,7 +2,7 @@ import { Portal } from 'solid-js/web'
 import type { JSX } from 'solid-js'
 
 // The app's one drawer: a bottom dock between the two icon rails, above the task footer
-// (docs/ui-design.md § Chrome and overlays).
+// (docs/ui-design/overlays.md § Chrome and overlays).
 //
 // It exists because a drawer is a `drawer` slot rather than a pane, so no host layout owns its outer
 // box — and until phase 9 of the layout programme that box was the terminal plugin's own stylesheet.

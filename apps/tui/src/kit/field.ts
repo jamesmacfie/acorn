@@ -22,7 +22,7 @@ import { fromVisual, toVisual, type Row } from '../wrap'
 // from `defaultTextareaKeyBindings`, where they are `buffer-home` and `buffer-end` and the line
 // boundaries are on Ctrl+A and Ctrl+E. Both spellings reach the visual line here, because that is
 // what a reader in a wrapped composer means by the key and no frame here records a cursor press
-// (docs/tui.md § The five key groups).
+// (docs/tui/keys.md § The five key groups).
 
 /** A field's whole state.
  *
@@ -135,7 +135,7 @@ const rowAt = (field: Field, rows: readonly Row[]): { row: number; col: number }
  *
  *  `false` rather than clamping to the ends of the document, and that is what makes a single-line
  *  `Input` inert on Up and Down without a second table: there is one row, so there is nothing to move
- *  to, and a handler that changed nothing says so (docs/tui.md § The five key groups). */
+ *  to, and a handler that changed nothing says so (docs/tui/keys.md § The five key groups). */
 function byRow(field: Field, rows: readonly Row[], down: boolean): Field | false {
   const here = rowAt(field, rows)
   const goal = field.goal ?? here.col
@@ -243,7 +243,7 @@ export function edit(
   // A key carrying the platform's own modifier is refused outright, because that modifier is not in
   // the chord spelling below and without this it would match its Ctrl twin. A terminal emulator on
   // macOS keeps that key for itself and never delivers it; where the kitty protocol does deliver it,
-  // this table binds none of it (docs/tui.md § The adapter).
+  // this table binds none of it (docs/tui/keys.md § The adapter).
   if (key.super) return false
   if (newline && (key.name === 'return' || key.name === 'linefeed') && !key.ctrl && !key.meta) {
     return change(field, field.cursor, field.cursor, '\n')

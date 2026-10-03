@@ -5,7 +5,7 @@ use tauri::Manager;
 #[cfg(target_os = "macos")]
 use crate::commands::Shell;
 
-// The renderer's memory, measured from outside it (docs/shell.md § What the shell reports).
+// The renderer's memory, measured from outside it (docs/shell/node-child.md § What the shell reports).
 //
 // WebKit gives the page no way to read its own process's memory, and the page is the thing that
 // grows. So the helper asks on stdout, this reads the web content process and the helper from here,

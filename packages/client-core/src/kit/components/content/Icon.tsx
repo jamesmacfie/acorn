@@ -4,7 +4,7 @@ import { BRAND, brandMarkRegistry } from '../../tokens/brandMarks'
 import { iconNode } from '../../tokens/iconNodes'
 import type { Tone } from '../../tokens/tokens'
 
-// Two families behind one name. See docs/ui-design.md § Icons for the resolution order and the
+// Two families behind one name. See docs/ui-design/icons.md § Icons for the resolution order and the
 // `brand:` prefix, which brandMarks.ts owns because brandStyle resolves the same names.
 //
 // `tone` and `spin` are the two things a mark says beyond its shape, and they are here rather than at
@@ -43,7 +43,7 @@ export default function Icon(props: {
   })
   return (
     <Switch
-      // See docs/ui-design.md § Icons: this fallback is load-bearing, not a nicety.
+      // See docs/ui-design/icons.md § Icons: this fallback is load-bearing, not a nicety.
       fallback={
         <span
           class="ui-icon glyph"

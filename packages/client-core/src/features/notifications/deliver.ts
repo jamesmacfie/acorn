@@ -1,4 +1,4 @@
-// The one gate every agent notice goes through (docs/notifications.md § The gate).
+// The one gate every agent notice goes through (docs/notifications/gate.md § The gate).
 //
 // Two rules, and everything else hangs off them. An edge is held for a second and re-checked, so a
 // permission that policy auto-answers and a turn that a queued message immediately follows never
@@ -151,7 +151,7 @@ export function pushManagedAgentNotice(input: {
  *  proposal waiting for review. They come through the same gate an agent edge does, so one raised on
  *  the task you are watching lands read and silent.
  *
- *  Three ways a row learns where it goes, in order (docs/notifications.md § What a row points at):
+ *  Three ways a row learns where it goes, in order (docs/notifications/rows-and-targets.md § What a row points at):
  *
  *  1. The `target` the raiser passed. Every compiled plugin uses this.
  *  2. The `runId` shorthand, for a node built before `target` existed. A client and the node it talks

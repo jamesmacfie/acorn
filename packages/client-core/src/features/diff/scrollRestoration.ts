@@ -13,7 +13,7 @@ type DiffScrollRestorationOptions = {
 }
 
 // Where the reader was in this diff, kept for the session and put back when they return
-// (docs/diff-rendering.md § Review threads and state).
+// (docs/diff-rendering/review.md § Review threads and state).
 //
 // The place is an identity, not a pixel offset (./diffLayout.ts): the item the viewport started in and
 // how far into its code rows, or the thread it started in and how far into that. The layout is exact

@@ -37,7 +37,7 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | State | Scope |
 | --- | --- |
 | Fleet membership and token custody | Desktop installation: the token in the helper, membership in the fleet store |
-| Appearance, notification settings ([notifications](../notifications.md#settings)), shortcuts, rail order, notices, trust, and tokens | Device |
+| Appearance, notification settings ([notifications](../notifications/channels.md#settings)), shortcuts, rail order, notices, trust, and tokens | Device |
 | How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | Device |
 | Where a workflow's nodes sit in the graph view | Device |
 | Which workflow task roots are expanded in the rail | Device |

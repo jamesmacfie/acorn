@@ -46,7 +46,7 @@ its blob SHA, `filebody:<sha>`. Attachments and agent artifacts use the same sto
 
 Beside each patch body, the GitHub plugin stores the segment descriptors it cut,
 `diffdoc:v<version>:sha256:<hex>`, so a diff document's topology is read from small blobs rather than
-parsed ([the document](./diff-rendering.md#the-document)). A new segmenter version reads new keys and
+parsed ([the document](./diff-rendering/document.md#the-document)). A new segmenter version reads new keys and
 cuts again. A compare preview writes its patch bodies under the same `patch:` keys.
 
 A GitHub file row says whether its patch is available. An available patch whose body is missing is an
@@ -84,11 +84,11 @@ available for explanation but can't authorize a contribution.
 
 The renderer uses TanStack Query with one `QueryClient` and one persister per Node. The persister key is
 scoped to the Node, so identical task or repository IDs on two Nodes can't collide. One client per Node
-is a contract: nothing on any host may add another ([booting client-core](./tui.md#booting-client-core-under-node)).
+is a contract: nothing on any host may add another ([booting client-core](./tui/host-switch.md#booting-client-core-under-node)).
 
 The shell mounts on the last-known active Node's partition, read synchronously on the first tick
 (`packages/client-core/src/infra/node/activeNode.ts`), because the window opens before the helper says
-which Nodes exist ([startup readiness](./frontend.md#startup-readiness)). The fleet answer corrects it,
+which Nodes exist ([startup readiness](./frontend/data-and-startup.md#startup-readiness)). The fleet answer corrects it,
 and a Node that has gone triggers the `node-replaced` reload. A launch with nothing remembered renders
 onboarding.
 
@@ -151,7 +151,7 @@ It's a weighted least-recently-used cache with two ceilings, 40,000 rows and 32 
 Plain rows and colour are weighed apart, and colour goes first. Segments a pane shows, holds near, or is
 loading are never evicted. A working tree that saves a file drops that file's superseded patch.
 `dropNode` clears it, and **Clear cache** doesn't, because its `clear` drops claims a mounted pane holds
-([resident segments](./diff-rendering.md#resident-segments)).
+([resident segments](./diff-rendering/loading.md#resident-segments)).
 
 ## Fan-out cache safety
 

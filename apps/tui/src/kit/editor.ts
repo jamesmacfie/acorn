@@ -1,11 +1,11 @@
 // The editor surface, on a host with no CodeMirror in it. `@acorn/plugin-api/ui/editor` resolves here,
-// the same swap `./ui.ts` and `./host.tsx` make for the kit and the chrome (docs/tui.md § The host
+// the same swap `./ui.ts` and `./host.tsx` make for the kit and the chrome (docs/tui/host-switch.md § The host
 // switch).
 //
 // Why it exists. The facade's real half is a grammar per language and a stylesheet built from CSS
 // custom properties, and neither means anything in cells: this host's `editor` rectangle draws the
 // file read-only and hands the reader's own `$EDITOR` a PTY when they want to type (./rectangle.tsx,
-// docs/editor.md § Editing in your own editor). Left unaliased, `EditorPane.tsx` reached the real
+// docs/editor/editor-pane.md § Editing in your own editor). Left unaliased, `EditorPane.tsx` reached the real
 // module and the terminal client carried seventeen CodeMirror grammars and a colour theme it has no
 // way to draw.
 //

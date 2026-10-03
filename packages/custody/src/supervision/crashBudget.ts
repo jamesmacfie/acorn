@@ -9,7 +9,7 @@
 // around the shell's own lifecycle events.
 //
 // It also reports, because a node dying under the helper is a silent event today and the count in
-// the window is the number that decides what happens next (docs/shell.md § What the helper reports).
+// the window is the number that decides what happens next (docs/shell/node-child.md § What the helper reports).
 import { emitError, emitEvent } from '@acorn/node-core/server/telemetry'
 
 // Five backoffs for five permitted crashes: 1s, 2s, 4s, 8s, 16s. The sixth crash inside the window
@@ -34,7 +34,7 @@ export function recordCrash(times: number[], now: number): CrashDecision {
     // A fatal error rather than an event, because this is the end of the app's ability to recover on
     // its own: the recovery screen goes up and nothing restarts until the owner says so. `handled`
     // is true because acorn does have an answer for it, and it is not the process dying
-    // (docs/shell.md § What the helper reports).
+    // (docs/shell/node-child.md § What the helper reports).
     emitError('core', {
       name: 'CrashBudgetExhausted',
       message: `the background service crashed ${times.length} times in ${CRASH_WINDOW_MS / 60_000} minutes`,

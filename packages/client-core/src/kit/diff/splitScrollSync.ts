@@ -1,5 +1,5 @@
 // Split mode gives each column its own horizontal scroll, so the pair always fits the pane (see
-// docs/diff-rendering.md § Row geometry for why). The scroller is each row's own `.diff-code` box:
+// docs/diff-rendering/geometry.md § Row geometry for why). The scroller is each row's own `.diff-code` box:
 // `.diff-split-cell` wraps so an open composer can drop below the code, and a flex line breaks on
 // an item's hypothetical size, so the code span cannot be sized to its content without landing on
 // line two. Scrolling inside it works, and it puts the gutters outside the scroller.

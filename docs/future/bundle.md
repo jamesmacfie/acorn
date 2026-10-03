@@ -51,7 +51,7 @@ no compiler to have installed. The desktop helper runs the node under the Node i
 (`docs/shell.md § Node child`), so the desktop-supervised and standalone hosts share one story. The
 terminal client is a third supervisor of the same child: `acorn` attaches to a running node for its
 data root or starts one under the same bundled runtime
-([docs/tui.md](../tui.md) § Attach or start).
+([docs/tui.md](../tui/process.md) § Attach or start).
 (When this was written the desktop was Electron 42 with Node 24.17; the Tauri migration replaced the
 supervisor and kept the property.) Drizzle publishes no `node:sqlite` driver
 (0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `server/storage/sqlite.ts` presents the small
@@ -155,7 +155,7 @@ deliberately installing a headless service, and it keeps the artifact small enou
 It is not a reasonable ask of someone who typed `acorn`. The terminal client inverts the argument, so
 bundling the runtime moves from the last step of the order below to before the tarball carries the
 TUI. It is a floor rather than a flag now — `acorn` runs on the range `node-runtime.json` declares,
-the same one every other package here runs on ([tui.md](../tui.md) § The runtime floor) — so this is
+the same one every other package here runs on ([tui.md](../tui/process.md) § The runtime floor) — so this is
 about not asking a reader to install a Node at all rather than about asking them for an unusual one.
 The desktop already bundles it (`apps/desktop/src-tauri/tauri.conf.json`, `externalBin`), and both
 artifacts read the same pin, so the cost is size, not a second decision.
@@ -186,7 +186,7 @@ design and that is fine, because the TUI imports the kit's contract (`kit/tokens
 components, never `kit/components/primitives.tsx`. Nothing holds that half as a rule. What found the
 two barrels that broke it was the pane sweep importing them and watching the process fall over, and
 the fix in both cases was an alias rather than a smaller barrel
-([docs/tui.md](../tui.md) § The host switch).
+([docs/tui.md](../tui/host-switch.md) § The host switch).
 
 ## Shipping `acorn` (historical design)
 
@@ -212,7 +212,7 @@ Code offers `code`: off by default, behind a setting, never offered by a sandbox
 with the built output as the judge, took twenty packages out — nineteen CodeMirror grammars and
 themes, `shiki`, `lucide-static` and the three browser `@xterm` packages — and answered their
 specifiers with three local stubs that throw and name the host
-([tui.md](../tui.md) § The host switch). What went back in is what the build proves this host
+([tui.md](../tui/host-switch.md) § The host switch). What went back in is what the build proves this host
 reaches: `codemirror` and three of its packages, because the `editor` pane imports `basicSetup`
 directly, `@xterm/headless`, because it is the `pty` rectangle's emulator, and `idb-keyval`, because
 client-core imports it before the first frame. So the tarball lists what `apps/tui/package.json`

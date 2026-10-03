@@ -7,7 +7,7 @@ import { Line } from '../kit/cells'
 import { LAYOUTS } from './index'
 
 // One case per layout, drawn from the terminal projection written beside its desktop one in
-// docs/panes.md § Layout model, at the two sizes the kit's own suite uses.
+// docs/panes/layout.md § Layout model, at the two sizes the kit's own suite uses.
 //
 // Written as "what would a reader look for on the screen" rather than as a snapshot, for the reason
 // the kit's suite gives: a snapshot fails on every spacing decision anybody makes afterwards and
@@ -144,7 +144,7 @@ describe('the layouts in cells', () => {
       try {
         entry.check(frame)
         // 80 cells is the contract, not an accident: a wider line is a layout that read a width it
-        // does not have (docs/ui-design.md § What the kit and layouts must never do).
+        // does not have (docs/ui-design/closed-kit.md § What the kit and layouts must never do).
         for (const line of frame.lines) expect(line.length).toBeLessThanOrEqual(80)
       } finally {
         frame.done()
@@ -214,7 +214,7 @@ describe('the layouts in cells', () => {
   it('a layout re-lays out when the terminal is resized', async () => {
     // `SIGWINCH` is the renderer's: it listens for the signal itself and re-lays out, and no layout
     // reads the terminal's size, so a resize is one thing rather than eight
-    // (docs/tui.md § What the TUI never does).
+    // (docs/tui/rectangles.md § What the TUI never does).
     const frame = await draw(CASES.find((entry) => entry.layout === 'list-detail')!, { width: 60, height: 24 })
     try {
       expect(frame.text).not.toContain('a detail')

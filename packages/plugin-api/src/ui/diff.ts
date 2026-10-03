@@ -37,7 +37,7 @@ export { createSplitScrollSync } from '@acorn/client-core/kit/diff'
 export type { CommentSide, DiffLineAnchor, DiffSource } from '@acorn/client-core/features/diff'
 // The document the port carries: a topology, segments of plain rows, and search pages. A provider
 // builds these on its node (./node); a client source only ever moves them, except for assembling a
-// topology from descriptors its node sent (docs/diff-rendering.md § The document).
+// topology from descriptors its node sent (docs/diff-rendering/document.md § The document).
 export { documentTopology } from '@acorn/diff-document/document'
 // From its own file, not the feature's barrel: the Changes pane model is on the renderer's startup
 // graph, and the barrel would bring the diff view state and segment loaders along with it.

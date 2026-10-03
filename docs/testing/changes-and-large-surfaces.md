@@ -5,7 +5,7 @@ The numbers retain their original acceptance-check IDs.
 
 ## Changes pane
 
-The next four are the Changes panel's ([diff-rendering.md](../diff-rendering.md) § Data flow). The
+The next four are the Changes panel's ([diff-rendering.md](../diff-rendering/changes-pane.md) § One status read). The
 pane's own suites cover the parser, the routes, the checkbox, the editor's state and every remote state
 of the bar against a bare repository in a temp directory. What they cannot see is which diff the column
 swaps to when a checkbox moves, whether a keystroke in the message field reaches a command, and what a

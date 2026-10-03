@@ -1,5 +1,5 @@
 // The kit's vocabulary as data: the role tokens a node's props accept, and which host can draw
-// which node. See docs/ui-design.md § The closed kit.
+// which node. See docs/ui-design/closed-kit.md § The closed kit.
 //
 // Its own entrypoint, not part of ./ui, because nothing here is a component: a node-environment
 // test, a build step, or a node-side contribution can read the role enums without pulling a Solid

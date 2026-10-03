@@ -21,7 +21,7 @@ export type SourcePromotion<Item> = {
 }
 
 // A URL pattern a source wants registered on the Router. `order` decides registration order, so a
-// static path can be declared ahead of a parameter path that would swallow it (docs/frontend.md §
+// static path can be declared ahead of a parameter path that would swallow it (docs/frontend/registries.md §
 // Registries and plugins).
 export type SourceRouteContribution = {
   id: string
@@ -32,7 +32,7 @@ export type SourceRouteContribution = {
 export type SourceContribution<Item = unknown> = {
   id: string
   // The rail's position. Required rather than derived from plugin activation order. See
-  // docs/frontend.md § Registries and plugins.
+  // docs/frontend/registries.md § Registries and plugins.
   order: number
   // Absent for local sources with no integration row behind them (docker); always shown.
   providerId?: string
@@ -42,7 +42,7 @@ export type SourceContribution<Item = unknown> = {
   // have a desktop shell, does this node run terminals (../hostCapabilities.ts).
   requires?: HostCapabilityRequirement
   // An extra gate beyond `providerId`, for a source whose relevance is not an integration question.
-  // Core's Fleet home is the one user of it (docs/frontend.md § Registries and plugins).
+  // Core's Fleet home is the one user of it (docs/frontend/registries.md § Registries and plugins).
   when?: () => boolean
   // Draw only while the active workspace has a git project. A workspace question rather than a `when`,
   // because the active workspace is the rail's to know and `SourceScope` already carries its facts.
@@ -90,7 +90,7 @@ export type SourceContribution<Item = unknown> = {
   // Presentation only: the source still registers, still opens from a command, and the user's switch
   // wins over it (features/tabs/railVisibility.ts). Core's own sources ignore it.
   showInRailByDefault?: boolean
-  // The owning plugin may declare the initial browse surface (docs/frontend.md § Registries and
+  // The owning plugin may declare the initial browse surface (docs/frontend/registries.md § Registries and
   // plugins), so the shell does not need to know which provider is bundled first.
   isDefault?: boolean
   routes?: readonly SourceRouteContribution[]
@@ -115,7 +115,7 @@ const sourceOrder = (a: SourceContribution, b: SourceContribution): number => a.
 export const sourceIsProjectScoped = (sourceId: string | null | undefined): boolean =>
   !!sourceRegistry.get(sourceId ?? '')?.projectScoped
 
-// Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend.md §
+// Resolved lazily: plugins populate the registry after this module evaluates. docs/frontend/registries.md §
 // Registries and plugins covers the default/order fallback.
 export const defaultSource = (): SourceContribution | undefined => {
   const sources = sourceRegistry.entries()
@@ -143,7 +143,7 @@ export const sourceRouteContributions = (): SourceRouteContribution[] => sourceR
  *
  * Exported because the terminal has no router and matches with this instead: `apps/tui/src/kit/router.ts`
  * resolves `useParams` against the same patterns the desktop's Router is built from, so the two hosts
- * cannot disagree about what a path means (docs/tui.md § The router).
+ * cannot disagree about what a path means (docs/tui/host-switch.md § The router).
  */
 export function matchRoute(pattern: string, path: string): Record<string, string> | null {
   const expected = pattern.split('/').filter(Boolean)

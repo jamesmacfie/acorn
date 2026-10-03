@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// Primitive adoption ledger. See docs/ui-design.md § The closed kit for why this
+// Primitive adoption ledger. See docs/ui-design/closed-kit.md § The closed kit for why this
 // exists and how the list grew.
 
 // Anchored on the workspace root rather than a fixed hop to a src/ dir, because renderer code is
@@ -34,14 +34,14 @@ const rel = (p: string) => p.slice(SRC.length + 1)
 
 describe('primitive adoption', () => {
   it('no call site hand-writes a retired shared class', () => {
-    // `action-error` was the worst of the retired classes; see docs/ui-design.md § How the
-    // primitives are built. Alert owns it.
+    // `action-error` was the worst of the retired classes; see docs/ui-design/kit-internals.md § How the
+    // kit is built. Alert owns it.
     const retired = /class="[^"]*\b(overlay-btn|integration-key-input|ui-form-field|query-gate-\w+|action-error)\b/
     const offenders = tsx().filter((f) => retired.test(readFileSync(f, 'utf8'))).map(rel)
     expect(offenders).toEqual([])
   })
 
-  // See docs/ui-design.md § The closed kit for why a primitive spreads its own
+  // See docs/ui-design/closed-kit.md § The closed kit for why a primitive spreads its own
   // data-attributes after `rest`, and the bug this test caught.
   it('no call site passes a primitive its own data-attribute instead of the prop', () => {
     const owned = /<(?:Button|Badge|Chip|Row|Input|Select|Textarea|Spinner|Toolbar|SegmentedControl|ToggleButton|Card|Alert)\b[^>]*\sdata-(?:size|tone|variant|shape|dashed|icon-only|width|kind|invalid)=/
@@ -49,7 +49,7 @@ describe('primitive adoption', () => {
     expect(offenders).toEqual([])
   })
 
-  // See docs/ui-design.md § The closed kit for the specificity clash this guards
+  // See docs/ui-design/closed-kit.md § The closed kit for the specificity clash this guards
   // against. cssHygiene.test.ts already bans the bare shape for Card; this is the general rule,
   // checked against what each call site actually renders.
   const CSS_CLASH = (() => {

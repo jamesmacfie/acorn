@@ -20,7 +20,7 @@ export const previewClientPlugin: ClientPlugin = {
     ctx.panes.register(previewPaneContribution)
     ctx.schedules.register(previewConfiguredSchedule)
     // One row, gated on the same seam the pane is: a terminal installs no preview seam, so this is
-    // absent there rather than present and useless (docs/tui.md § What a plugin loses here). URL rules
+    // absent there rather than present and useless (docs/tui/plugin-losses.md § What a plugin loses here). URL rules
     // are repository configuration and reloading needs a mounted preview, so neither is a command
     // (docs/command-palette-and-shortcuts.md).
     ctx.commands.register({

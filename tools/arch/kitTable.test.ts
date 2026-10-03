@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 
-// docs/ui-design.md § Every node at 80 by 24 is the one place the kit's admission rule is actually
+// docs/ui-design/every-node.md § Every node at 80 by 24 is the one place the kit's admission rule is actually
 // satisfied: a node earns its place only if someone can write what it draws on a host with no pixels,
 // and that sentence exists nowhere else. A node added to the kit with no row leaves the rule unmet,
 // and the terminal host draws whatever it likes without anybody having decided what it should be.
@@ -75,9 +75,9 @@ const FOCUS = (() => {
 /** The doc's rows, as `node -> focus`. Every row of every table under the appendix heading looks like
  *  `| \`Node\` | focus | sentence |`, so one shape reads all four tables. */
 const DOC = (() => {
-  const page = read('docs/ui-design.md')
+  const page = read('docs/ui-design/every-node.md')
   const start = page.indexOf('## Every node at 80 by 24')
-  if (start === -1) throw new Error('docs/ui-design.md has no § Every node at 80 by 24')
+  if (start === -1) throw new Error('docs/ui-design/every-node.md has no § Every node at 80 by 24')
   const body = page.slice(start)
   return new Map(
     [...body.matchAll(/^\| `([A-Za-z][A-Za-z0-9]*)` \| ([a-z-]+) \| (.+?) \|$/gm)].map((m) => [m[1], { focus: m[2], at: m[3] }]),

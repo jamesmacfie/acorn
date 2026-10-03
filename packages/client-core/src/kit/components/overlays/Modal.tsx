@@ -4,7 +4,7 @@ import { focusableIn, restoreFocusOnCleanup } from '../../keys/trap'
 import { createDismissable } from '../../lib/controls/dismissable'
 import { IconButton } from '../inputs/IconButton'
 
-// Modal chrome. Behaviour comes from createDismissable. See docs/ui-design.md § Chrome and
+// Modal chrome. Behaviour comes from createDismissable. See docs/ui-design/overlays.md § Chrome and
 // overlays for why that split keeps this component purely cosmetic, and why the overlay palettes
 // don't use it.
 //

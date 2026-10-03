@@ -51,7 +51,7 @@ export function CollapseEdge(props: {
   )
 }
 
-/* ListDetail: list beside detail. See docs/ui-design.md § Two-column panes for what it replaces,
+/* ListDetail: list beside detail. See docs/ui-design/two-column-panes.md § Two-column panes for what it replaces,
    the layout rules, and when not to use it. */
 const MIN_LIST_DETAIL_WIDTH = 120
 const MAX_LIST_DETAIL_FRACTION = 0.6

@@ -319,7 +319,7 @@ on, sharing that rank with its siblings. So a new node appears at its rank witho
 and moving a card is an override rather than a commitment to place the rest.
 
 The canvas is the kit's `Graph` node, not this plugin's drawing
-([ui-design.md](../ui-design.md) § The closed kit). That is what gives the terminal client this view
+([ui-design.md](../ui-design/closed-kit.md) § The closed kit). That is what gives the terminal client this view
 too: there it is the indented list, with a picker under it to draw an edge out of the selected card.
 
 ### The JSON tab
@@ -331,7 +331,7 @@ and **Revert** puts the draft's own projection back. Node positions are not in t
 
 The box is a real editor — highlighting, line numbers, bracket matching — through
 `mountEmbeddedEditor` on `@acorn/plugin-api/ui/editor`
-([editor.md](../editor.md) § A code box that is not a document), so this plugin holds no CodeMirror of
+([editor.md](../editor/document-surface.md) § A code box that is not a document), so this plugin holds no CodeMirror of
 its own. The terminal client draws the same rectangle as a plain textarea, since it has no library to
 draw one with.
 
