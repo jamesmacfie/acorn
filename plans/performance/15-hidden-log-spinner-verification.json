@@ -1,8 +1,0 @@
-{
-  "fixture": "Actual Spinner/tick/tree/screen plus actual Log10k retained under visible=false parent, visible small sibling overlay;800ms settled hidden interval",
-  "frames": 10,
-  "writes": 0,
-  "cpuMs": 53.963,
-  "nodes": 20012,
-  "yoga": 10009
-}

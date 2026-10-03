@@ -54,7 +54,7 @@ jobs:
 
       # `pnpm test`, not `turbo run test`: the root script rebuilds node-pty for this ABI first and
       # bounds Turborepo's concurrency, and without the bound the suites that spawn processes or mint
-      # certificates time out under the load while passing in isolation (CLAUDE.md).
+      # certificates time out under the load while passing in isolation (AGENTS.md).
       #
       # The desktop suite needs macOS and Rust, so the separate jobs below run it.
       - run: pnpm test --filter='!@acorn/desktop'

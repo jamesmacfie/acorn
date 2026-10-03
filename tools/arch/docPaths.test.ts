@@ -33,9 +33,9 @@ const markdown = (dir: string, out: string[] = []): string[] => {
   return out
 }
 
-// The root README and CLAUDE.md are the two docs a reader meets first, and they cite the tree like any
+// The root README and AGENTS.md are the two docs a reader meets first, and they cite the tree like any
 // other. They sit outside `docs/`, so a walk of that folder alone left them unchecked.
-const FILES = [...markdown(DOCS), join(ROOT, 'README.md'), join(ROOT, 'CLAUDE.md')].filter(existsSync)
+const FILES = [...markdown(DOCS), join(ROOT, 'README.md'), join(ROOT, 'AGENTS.md')].filter(existsSync)
 const rel = (file: string) => relative(ROOT, file)
 
 // A repo-rooted path starts with a workspace directory. Anything else in backticks is a fragment, a

@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it } from 'vitest'
 const appRoot = resolve(dirname(fileURLToPath(import.meta.url)), '../../..')
 
 // Generous relative to the 30s deadline the drain itself carries. The point is to catch a hang, not
-// to police the drain's speed on a loaded runner (CLAUDE.md § the suite is load-sensitive).
+// to police the drain's speed on a loaded runner (AGENTS.md § Test and lint quickly).
 const EXIT_BUDGET_MS = 25_000
 
 type Handshake = { nodeId: string; endpoint: string; deviceToken: string }

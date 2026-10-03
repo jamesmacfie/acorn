@@ -1,7 +1,0 @@
-{
-  "fixture": "Actual workerHost.start with failing host connect",
-  "spawned": 10,
-  "terminatedAfterStopAll": 0,
-  "channels": 20,
-  "closedPorts": 0
-}

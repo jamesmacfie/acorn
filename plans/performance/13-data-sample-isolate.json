@@ -1,5 +1,0 @@
-{
-  "runtime": "v24.11.0",
-  "driver": "mocked pg, actual core owner",
-  "records": []
-}

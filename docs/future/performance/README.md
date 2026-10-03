@@ -10,40 +10,40 @@ This programme is separate from the performance plans retired in September 2026.
 
 Use the table below to select the next pending unit. Assign one specialist at a time, review its result, then
 advance in the order below. Each assignment includes the detailed coordinator brief, evidence
-references, contracts to preserve, and acceptance checks. Read [the main integration review](../../../plans/performance/merge-main-review.md) for unresolved
+references, contracts to preserve, and acceptance checks. Read the main integration review for unresolved
 verification failures deferred at the user's request. Revalidate the merged source first;
 main has independent fixes and architectural changes since the audit. If a dependency changes,
 record the reason and adjust the order without undoing completed work.
 
 Read [the implementation contract](./contract.md) and [the conditional work and refusals](./refused.md).
-The final assignment is [sustained-use validation](../../../plans/performance/implementation-29-sustained-validation.md). It belongs after
+The final assignment is sustained-use validation. It belongs after
 all selected fixes and includes the two-Node and native/TUI composition checks.
 
 ## Sequential assignments
 
 | Unit | Assignment | Reviewed prerequisites | Status |
 | --- | --- | --- | --- |
-| 09 | [Managed agent client implementation record](../../../plans/performance/implementation-09-agent-client.md) | 01–08 | Implemented |
-| 10 | [Managed agent process implementation record](../../../plans/performance/implementation-10-agent-processes.md) | Through 09 | Implemented |
-| 11 | [Agent queue implementation record](../../../plans/performance/implementation-11-agent-queue.md) | Through 10 | Implemented |
-| 12 | [Streamed search implementation record](../../../plans/performance/implementation-12-agent-search.md) | Through 11 | Implemented |
-| 13 | [Agent results implementation record](../../../plans/performance/implementation-13-agent-results.md) | Through 12 | Implemented |
-| 14 | [Git filesystem implementation record](../../../plans/performance/implementation-14-git-filesystem.md) | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
-| 15 | [PR markers implementation record](../../../plans/performance/implementation-15-pr-markers.md) | Through 14 | Implemented; native verification blocked by service bundle size gate |
-| 16 | [Editor custody implementation record](../../../plans/performance/implementation-16-editor-custody.md) | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
-| 17 | [Editor search and tree implementation record](../../../plans/performance/implementation-17-editor-search-tree.md) | Through 16 | Implemented; native and PTY driver verification blocked by service bundle budget |
-| 18 | [Database implementation record](../../../plans/performance/implementation-18-database.md) | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
-| 19 | [Docker implementation record](../../../plans/performance/implementation-19-docker.md) | Through 18 | Implemented; native verification blocked by service bundle size gate |
-| 20 | [HTTP implementation record](../../../plans/performance/implementation-20-http.md) | Through 19 | Implemented; native verification blocked by service bundle size gate |
-| 21 | [SQL recovery implementation record](../../../plans/performance/implementation-21-sql-recovery.md) | Through 20 | Implemented; native and PTY checks blocked by service bundle size gate |
-| 22 | [Preview implementation record](../../../plans/performance/implementation-22-preview.md) | Through 21 | Implemented; native verification blocked by service bundle size gate |
+| 09 | Managed agent client implementation record | 01–08 | Implemented |
+| 10 | Managed agent process implementation record | Through 09 | Implemented |
+| 11 | Agent queue implementation record | Through 10 | Implemented |
+| 12 | Streamed search implementation record | Through 11 | Implemented |
+| 13 | Agent results implementation record | Through 12 | Implemented |
+| 14 | Git filesystem implementation record | Through 13 | Implemented; native Changes verification blocked by service bundle size gate |
+| 15 | PR markers implementation record | Through 14 | Implemented; native verification blocked by service bundle size gate |
+| 16 | Editor custody implementation record | Through 15 | Implemented; unit 15 identity integrated, native verification remains open |
+| 17 | Editor search and tree implementation record | Through 16 | Implemented; native and PTY driver verification blocked by service bundle budget |
+| 18 | Database implementation record | Through 17 | Implemented; PostgreSQL 14/15 gates pass |
+| 19 | Docker implementation record | Through 18 | Implemented; native verification blocked by service bundle size gate |
+| 20 | HTTP implementation record | Through 19 | Implemented; native verification blocked by service bundle size gate |
+| 21 | SQL recovery implementation record | Through 20 | Implemented; native and PTY checks blocked by service bundle size gate |
+| 22 | Preview implementation record | Through 21 | Implemented; native verification blocked by service bundle size gate |
 | 23 | [Memory file reads, change feed, and UI work](./23-memory.md) | Through 22 | Revised for the direct-write store, 2026-10-03; fresh measurements and implementation pending |
-| 24 | [Workflow read implementation record](../../../plans/performance/implementation-24-workflow-reads.md) | Through 23 | Implemented; native verification blocked by bundle size gate |
-| 25 | [Workflow custody implementation record](../../../plans/performance/implementation-25-workflow-custody.md) | Through 24 | Implemented; native verification blocked by service bundle size gate |
+| 24 | Workflow read implementation record | Through 23 | Implemented; native verification blocked by bundle size gate |
+| 25 | Workflow custody implementation record | Through 24 | Implemented; native verification blocked by service bundle size gate |
 | 26 | [Terminal client viewport, wrapping, painting, and logs](./26-tui-rendering.md) | Through 25 | Pending |
 | 27 | [Terminal client selected Node and lifecycle composition](./27-tui-composition.md) | Through 26 | Pending |
-| 28 | [Telemetry implementation record](../../../plans/performance/implementation-28-telemetry.md) | Through 27 | Implemented; sustained-use acceptance remains separate |
-| 29 | [Sustained-use validation record](../../../plans/performance/implementation-29-sustained-validation.md) | Through 28 | Preparation recorded; final acceptance blocked |
+| 28 | Telemetry implementation record | Through 27 | Implemented; sustained-use acceptance remains separate |
+| 29 | Sustained-use validation record | Through 28 | Preparation recorded; final acceptance blocked |
 
 The order encodes important dependencies: client origin/draft custody before agent process work;
 process ownership before queue admission; raw/search completeness before wait/result projection;
@@ -53,9 +53,14 @@ Unit 27 requires two real authenticated disposable Nodes and actual terminal-hos
 
 ## Evidence and completed work
 
-[The original audit index](../../../plans/performance/README.md) links every area report and probe.
-[Accepted results](../../../plans/performance/implementation-results.md) record units 01–08 gains,
-costs, and limits. [Verification](../../../plans/performance/verification.md) preserves command
+The audit reports, unit briefs, implementation records, and verification logs lived in
+`plans/performance/`. That folder was deleted on October 3, 2026. Recover any of them from Git
+history with `git log --all -- plans/performance/`. Names below that used to link there refer to
+those files.
+
+The original audit index links every area report and probe.
+Accepted results record units 01–08 gains,
+costs, and limits. Verification preserves command
 results, source/evidence hashes, contract fixes, and failure/replay history. Keep those artifacts.
 Do not rerun or rewrite immutable before results; capture a fresh cumulative before baseline for
 each remaining unit.
@@ -65,7 +70,7 @@ The checkpoint passes the bounded repository tests: 35 package tasks, including 
 real Tauri Changes empty state and plain Shell prompt are visually checked, and every recorded
 fixture PID is absent after shutdown. This does not establish loaded-diff native latency, reliable
 repeated focus, two-Node composition, day-long stability, or completion of the remaining programme.
-The [native validation notes](../../../plans/performance/native-validation-notes.md) own those limits.
+The native validation notes own those limits.
 
 ## Main-merge context
 

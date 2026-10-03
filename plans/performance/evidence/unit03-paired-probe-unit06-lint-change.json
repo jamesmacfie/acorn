@@ -1,7 +1,0 @@
-{
-  "source": "plans/performance/03-transport-paired-probe.mts",
-  "preservedPreLintSource": "plans/performance/evidence/unit03-paired-probe-pre-unit06-lint-source.txt",
-  "beforeSha256": "24f2101ba741dee34b114ad2a9985b01e12f29bf183e7f12816676e9ae7cf155",
-  "afterSha256": "0539a2c684b8c5e81b755b22c97cf19137b93c0cc83e1c0a50975815524787e5",
-  "change": "Remove unused destructured encodeIdFrame binding; selected ws module and measured workload unchanged. No measurement artifacts modified."
-}

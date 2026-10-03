@@ -1,9 +1,0 @@
-{
-  "environment": { "node": "v24.11.0", "platform": "darwin", "arch": "arm64" },
-  "results": [
-    { "requestedChunkBytes": 8, "writes": 250, "ptyCallbacks": 250, "distribution": { "8": 250 }, "ringBytes": 2000, "ringChunks": 250, "exitCode": 0 },
-    { "requestedChunkBytes": 64, "writes": 250, "ptyCallbacks": 250, "distribution": { "64": 250 }, "ringBytes": 16000, "ringChunks": 250, "exitCode": 0 },
-    { "requestedChunkBytes": 256, "writes": 250, "ptyCallbacks": 250, "distribution": { "256": 250 }, "ringBytes": 64000, "ringChunks": 250, "exitCode": 0 },
-    { "requestedChunkBytes": 4096, "writes": 250, "ptyCallbacks": 1000, "distribution": { "1024": 1000 }, "ringBytes": 262144, "ringChunks": 256, "exitCode": 0 }
-  ]
-}

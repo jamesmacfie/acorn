@@ -1,2 +1,0 @@
-$ node apps/tui/scripts/agent/flow-cli.mjs -- --session perf-agent-client-tui-09 navigation
-Flow passed. Report: /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/.acorn/agent-dev/tui/perf-agent-client-tui-09/reports/navigation-2026-10-01T20-53-05.804Z.json

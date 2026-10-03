@@ -115,6 +115,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 - [future/](./future/README.md) — designs, analyses, sequenced plans, and delivery records retained
   while acceptance remains open. Its README indexes every programme and single file. Shipped
   behaviour belongs in an owning doc above.
+- [Documentation overhaul](./future/documentation/README.md). The house style for docs, and six
+  phases that check every shipped doc against the code, restyle it, and split the long pages.
 - [Remaining performance work](./future/performance/README.md) — one handoff per pending specialist,
   dependencies, evidence, refusals, and sustained-use acceptance.
 

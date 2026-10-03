@@ -1,8 +1,0 @@
-
- RUN  v4.1.11 /Users/jamesmacfie/Source/acorn/apps/node/.acorn/worktrees/jamesmacfie-acorn-performance/plugins/agents
-
-
- Test Files  1 passed (1)
-      Tests  15 passed (15)
-   Start at  12:23:19
-   Duration  35.17s (transform 217ms, setup 0ms, import 861ms, tests 34.22s, environment 0ms)

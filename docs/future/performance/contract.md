@@ -73,7 +73,7 @@ resource checks only. Process ownership probes must clean up every synthetic chi
 
 Return changed files and why the owner is correct, exact focused verification commands/results,
 before/after evidence paths and comparisons, documentation updates, remaining concrete risks, and
-any intentionally deferred finding. Write the implementation record under `plans/performance/`.
+any intentionally deferred finding. Write the implementation record into the unit file in this folder.
 Application behavior or contract changes must update their owning docs. No new source or report
 page belongs in `docs/` without the docs index entry and link validation.
 
