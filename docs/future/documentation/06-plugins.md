@@ -11,7 +11,7 @@
 > `docs/plugin-authoring/` has 19. `the-manifest.md` split into the manifest, contributions,
 > permissions, settings pages, UI contributions, extensions, harnesses, and custom agents.
 > `the-node-half.md` split into the node half, telemetry, testing, storage, the client half, and the
-> bridge. (2) `descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md` is `plugins/ui-tiers.md`.
+> bridge. (2) `descriptors-for-facts-trees-for-ui-rectangles-for-pixels.md` is `docs/plugins/ui-tiers.md`.
 > Its old anchors stay on `plugins.md`, and every doc link to it was repointed. (3)
 > `loaded-plugin-migration.md` is a short pointer page, not deleted, because this doc's own table
 > links to it and I couldn't edit the body. Its text is in Git history, and its open items moved to
