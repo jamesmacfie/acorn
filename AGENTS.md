@@ -12,12 +12,37 @@ of plugins. This page tells you where to look and how to check your work.
 - [docs/plugin-map.md](./docs/plugin-map.md) is the short way into the plugin system.
 - [docs/testing.md](./docs/testing.md) and
   [docs/local-development.md](./docs/local-development.md) hold the full test and dev workflows.
+- [docs/writing-docs.md](./docs/writing-docs.md) says where a doc goes, the house style, how to split
+  a long page, and how to cite a doc from code. Read it before you add or move a doc.
 - `docs/future/` holds designs for work that hasn't shipped. Its README lists every one.
 
 Before you change code, find the runtime that owns it. Trace the data from its source through the
 Node API, protocol, broker, client cache, and UI. Keep the Node/shell and plugin boundaries, and use
 the contribution and capability seams. When behavior or a contract changes, update the doc that
 owns it and add any new doc to `docs/README.md`.
+
+## Simplicity, readability, and maintainability
+
+Treat these as requirements for every change, including fixes, features, tests, and refactors.
+Optimize for a developer who needs to understand the behavior and change it safely later.
+
+- Use descriptive names, straightforward control flow, typed contracts, and explicit dependencies.
+  Make data flow, state ownership, side effects, and asynchronous lifetimes visible in the code.
+- Keep modules focused on a coherent responsibility and place them beside the feature they own.
+  Keep entrypoints focused on composition and registration; put domain rules in their owning modules.
+- Give mutable state one owner. Reuse stores and public contracts, and keep imports acyclic.
+  Pass the specific operations a module needs instead of exposing a broad service or mutable state bag.
+- Introduce abstractions for demonstrated needs. Explain what they simplify and which callers need
+  them. Avoid speculative frameworks, unnecessary indirection, and mechanical file splitting.
+- Before adding a dependency, check what the repository already provides. Weigh the behavior it
+  supplies against its transitive graph, shipped payload, runtime requirements, and upgrade burden.
+  Keep useful libraries when they reduce the code and behavior Acorn must maintain.
+- Preserve behavior, persisted data, public contracts, and security boundaries when simplifying.
+  Keep changes focused, remove obsolete paths created by the change, and verify observable behavior.
+
+Before handoff, review whether another developer can find the owner, follow the inputs and outputs,
+and make a routine change without tracing unrelated code. Explain any complexity the change adds
+and why it is needed. Flag broader cleanup separately when it falls outside the task's scope.
 
 ## Scripts
 

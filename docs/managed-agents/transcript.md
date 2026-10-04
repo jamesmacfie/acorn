@@ -38,6 +38,7 @@ Its rules:
   card holding the selection or focus, or while you're away from the live end. The trim runs in the
   frame after the list grows.
 - Switching session or subagent starts on the newest page.
+- **Chats only** is remembered per session until the app quits.
 - Each card carries `aria-posinset` and `aria-setsize` for its place in the whole session.
 
 The terminal client draws the same window and control, and doesn't trim.
