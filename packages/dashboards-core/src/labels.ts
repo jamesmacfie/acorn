@@ -77,11 +77,40 @@ export const AGGREGATE_LABELS: Record<NonNullable<PanelPlan['view']['aggregate']
 
 export const CHART_SHAPE_LABELS: Record<NonNullable<PanelPlan['view']['shape']>, string> = { bar: 'Bars', line: 'Line' }
 
-/** Relative date offsets a filter offers, as the ISO 8601 durations the schema stores. */
+/** Relative date offsets a filter offers, as the signed ISO 8601 durations the schema stores. */
 export const RELATIVE_OFFSET_LABELS: Record<string, string> = {
   '-P1D': '1 day ago', '-P7D': '7 days ago', '-P14D': '14 days ago', '-P30D': '30 days ago', '-P90D': '90 days ago',
-  P1D: '1 day from now', P7D: '7 days from now',
+  '+P1D': '1 day from now', '+P7D': '7 days from now',
 }
+
+/** "7 days ago" or "1 week from now" for any offset a filter stores, not only the ones it offers. */
+export function offsetLabel(offset: string): string {
+  const match = /^([+-])P(\d+)([DWM])$/.exec(offset)
+  if (!match) return offset
+  const [, sign, count, unit] = match
+  const amount = `${count} ${{ D: 'day', W: 'week', M: 'month' }[unit!]}${count === '1' ? '' : 's'}`
+  return sign === '-' ? `${amount} ago` : `${amount} from now`
+}
+
+const CALENDAR_UNITS = { startOfDay: 'day', startOfWeek: 'week', startOfMonth: 'month' } as const
+
+/** "the start of this week", or "the start of the week 1 week ago" with an offset. */
+export const calendarLabel = (boundary: keyof typeof CALENDAR_UNITS, offset?: string): string => offset
+  ? `the start of the ${CALENDAR_UNITS[boundary]} ${offsetLabel(offset)}`
+  : `the start of this ${CALENDAR_UNITS[boundary]}`
+
+type Press = NonNullable<NonNullable<PanelPlan['actions']>['press']>
+
+/** Where an opened row lands, read as "opens it in …". */
+export const PRESENTATION_LABELS: Record<Press['prefer'], string> = {
+  route: 'a full page', refPanel: 'a side panel', pane: 'a task pane', overlay: 'an overlay', external: 'the browser',
+}
+
+/** A sort direction's words, which read differently on a date or a number column. */
+export const sortDirectionLabel = (direction: NonNullable<PanelPlan['sort']>[number]['direction'], type?: Column['type']): string =>
+  type === 'datetime' ? direction === 'desc' ? 'newest first' : 'oldest first'
+    : type === 'number' ? direction === 'desc' ? 'highest first' : 'lowest first'
+      : SORT_DIRECTION_LABELS[direction].toLowerCase()
 
 /** A label map as `Select` options, in the map's order. */
 export const labelOptions = (labels: Record<string, string>): { value: string; label: string }[] =>

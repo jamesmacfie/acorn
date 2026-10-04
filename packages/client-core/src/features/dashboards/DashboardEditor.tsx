@@ -10,6 +10,7 @@ import {
   AGGREGATE_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, OPERATOR_LABELS, RELATIVE_OFFSET_LABELS, SORT_DIRECTION_LABELS,
   SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, VIEW_LABELS, WEEK_START_LABELS, labelOptions, operationLabel, operatorLabel, planPartLabel,
 } from '@acorn/dashboards-core/labels.ts'
+import { availableOperations } from '@acorn/dashboards-core/outline.ts'
 import { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../dataSources/SourceQueryEditor'
@@ -525,10 +526,7 @@ export default function DashboardEditor(props: {
             <Button size="sm" variant="bare" disabled={index() === 0} onPress={() => change(current => { const stages = [...current.stages]; [stages[index() - 1], stages[index()]] = [stages[index()]!, stages[index() - 1]!]; return { ...current, stages } })}>Move up</Button>
             <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, stages: current.stages.filter((_entry, at) => at !== index()) }))}>Remove step</Button>
           </Stack></Fold>}</For>
-          <For each={PANEL_CAPABILITIES.operations}>{operation => <Button size="sm" disabled={!plan().columns.length || plan().stages.length >= 8
-            || operation.id === 'summarize' && plan().stages.filter(stage => stage.op === 'summarize').length >= 3
-            || operation.id === 'overlap' && (plan().stages.some(stage => stage.op === 'overlap') || outputPlanColumns(plan()).filter(column => column.type === 'datetime').length < 2)
-            || operation.id === 'expand' && !outputPlanColumns(plan()).some(column => column.list)} onPress={() => addOperation(operation.id)}>Add step · {operation.label}</Button>}</For>
+          <For each={availableOperations(plan())}>{operation => <Button size="sm" disabled={!operation.available} tip={operation.reason} onPress={() => addOperation(operation.id)}>Add step · {operation.label}</Button>}</For>
           <Show when={!plan().columns.length}><Text emphasis="muted">Add a column before filtering rows.</Text></Show>
         </Stack></Fold>
         <Fold label="Arrange" level="group"><Stack gap="row">

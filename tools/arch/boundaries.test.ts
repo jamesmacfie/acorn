@@ -621,7 +621,7 @@ describe('architecture boundaries', () => {
       '@acorn/client-core': 167, // Includes the host-owned Datasets settings page.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 15, // Shared SQL/in-memory summary and time-bucket semantics, and the plan's labels.
+      '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
       '@acorn/diff-document': 2,
     }
     const problems: string[] = []
@@ -754,7 +754,7 @@ describe('architecture boundaries', () => {
       ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'context is a binding address and preview is a run mode'],
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
       ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
-      ['packages/dashboards-core/src/plan.ts', 'context is a binding address; github is a provider example in a description'],
+      ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],
       ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
       ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding; github names the core-owned project repository facet'],
       ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],

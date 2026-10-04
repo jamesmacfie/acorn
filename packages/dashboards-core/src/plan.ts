@@ -3,12 +3,13 @@ import { MISSING, canonicalDataEncoding, readDataPointer, type DataValue } from 
 import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 import type { DataRecord, DataSourceDescription, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { PANEL_CAPABILITIES } from './capabilities'
-import { outputPlanColumns } from './planColumns'
+import { outputPlanColumns, pointerColumn } from './planColumns'
 import { evaluateExpression, expandRows, overlapRows, summarizeRows } from './analysis'
 import { relatePanelRows } from './relations'
 import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { dashboardFields } from './typedProjection'
 import { bucketBounds } from './planBuckets'
+import { columnLabel, describePredicate, pressTarget, sourceReach } from './outline'
 
 export { PANEL_CAPABILITIES } from './capabilities'
 
@@ -40,7 +41,6 @@ export type DashboardRun = {
 const pathPart = (value: string): string => value.replaceAll('~', '~0').replaceAll('/', '~1')
 const columnAt = (plan: PanelPlan, id: string): PanelPlanColumn | undefined => plan.columns.find(column => column.id === id)
 export { outputPlanColumns } from './planColumns'
-const pointerColumn = (pointer: string): string | undefined => /^\/[A-Za-z0-9_-]{1,100}$/.test(pointer) ? pointer.slice(1) : undefined
 const bindingColumns = (binding: DataBinding): string[] => binding.address.from === 'item'
   ? [pointerColumn(binding.address.pointer) ?? ''] : []
 const fixesUnit = (predicate: DataPredicate, unit: string): boolean => predicate.kind === 'comparison'
@@ -425,53 +425,29 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     const scope = resolved?.query.scope
     return `${source.label}${scope?.connectionId ? ` through account ${resolved?.accountLabel ?? scope.connectionId}` : ''}`
   })
-  const describePredicate = (predicate: DataPredicate): string => {
-    if (predicate.kind !== 'comparison') return predicate.predicates.map(describePredicate).join(predicate.kind === 'all' ? ' and ' : ' or ')
-    const address = predicate.left.address
-    const id = address.from === 'item' ? pointerColumn(address.pointer) : undefined
-    const name = columnAt(plan, id ?? '')?.label ?? id ?? 'a value'
-    const right = predicate.right?.address
-    const value = right?.from === 'literal' ? JSON.stringify(right.value)
-      : right?.from === 'context' ? right.name === 'viewer' ? 'you'
-        : right.name === 'now' ? `${right.offset ?? 'P0D'} from now`
-          : right.name === 'calendar' ? `${right.boundary}${right.offset ? ` ${right.offset}` : ''}` : 'workspace links'
-        : 'another value'
-    return predicate.operator === 'missing' ? `${name} is missing`
-      : predicate.operator === 'present' ? `${name} is present`
-        : `${name} ${predicate.operator} ${value}`
-  }
-  const selectedPress = plan.actions?.press
-  const pressedSource = sources.filter(source => !selectedPress?.source || source.instanceId === selectedPress.source)
-  const pressedKinds = [...new Set(pressedSource.flatMap(source => source.description.targets?.map(target => target.kind) ?? []))]
-  const pressedRecord = pressedKinds.length === 1 ? `the ${pressedKinds[0]!.split('.').at(-1)!.replaceAll('-', ' ')}` : 'the source record'
+  const label = (id: string) => columnLabel(plan, id)
+  const sourceLabel = (id: string) => plan.sources.find(source => source.id === id)?.label ?? id
+  const press = pressTarget(plan, sources)
   const finalStage = [...plan.stages].reverse().find(stage => stage.op === 'summarize' || stage.op === 'expand' || stage.op === 'overlap')
-  const rowMeaning = finalStage?.op === 'summarize' ? `One row per ${finalStage.by.map(by => columnAt(plan, by.column)?.label ?? by.column).join(' and ') || 'whole selection'}.`
+  const rowMeaning = finalStage?.op === 'summarize' ? `One row per ${finalStage.by.map(by => label(by.column)).join(' and ') || 'whole selection'}.`
     : finalStage?.op === 'overlap' ? 'One row per pair of overlapping intervals.'
-      : finalStage?.op === 'expand' ? `One row per ${finalStage.column} element.` : `One row per record from ${labels.join(' and ')}.`
+      : finalStage?.op === 'expand' ? `One row per ${label(finalStage.column)} element.` : `One row per record from ${labels.join(' and ')}.`
   return [
     rowMeaning,
-    ...sources.map(source => {
-      const declared = source.description.reach
-      const selected = declared ? readDataPointer(source.query.scope.parameters, declared.parameter) : MISSING
-      const reach = declared ? Array.isArray(selected)
-        ? selected.length ? `${selected.length} chosen ${declared.itemPlural}: ${selected.join(', ')}` : declared.empty
-        : declared.default.replace('{account}', source.accountLabel ?? 'selected')
-        : source.description.consistency
-      return `${source.label} reaches ${reach}.`
-    }),
+    ...sources.map(source => `${source.label} reaches ${sourceReach(source)}.`),
     `Columns: ${plan.columns.map(column => column.label).join(', ') || 'none'}.`,
     ...plan.columns.flatMap(column => (column.choices ?? []).flatMap(choice => Object.entries(choice.writeValues ?? {}).map(([sourceId, value]) =>
       `Dropping a ${sources.find(source => source.instanceId === sourceId)?.label ?? sourceId} record on ${choice.label} sets ${column.label} to ${JSON.stringify(value)}.`))),
-    ...(plan.relations ?? []).map(relation => `${relation.kind === 'equivalence' ? 'Merge equivalent' : relation.cardinality === 'one-to-many' ? 'Attach children from' : 'Look up'} ${relation.to} through ${relation.id}${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`),
-    ...plan.stages.map(stage => stage.op === 'filter' ? `Keep rows where ${describePredicate(stage.where)}.`
+    ...(plan.relations ?? []).map(relation => `${relation.kind === 'equivalence' ? 'Merge equivalent' : relation.cardinality === 'one-to-many' ? 'Attach children from' : 'Look up'} ${sourceLabel(relation.to)} through ${relation.id}${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`),
+    ...plan.stages.map(stage => stage.op === 'filter' ? `Keep rows where ${describePredicate(plan, stage.where)}.`
       : stage.op === 'compute' ? `Compute ${stage.columns.map(column => column.label).join(', ')}.`
-      : stage.op === 'summarize' ? `One row per ${stage.by.map(by => columnAt(plan, by.column)?.label ?? by.column).join(' and ') || 'all rows'}; measure ${stage.measures.map(measure => measure.label).join(', ')}.`
-      : stage.op === 'expand' ? `Expand ${stage.column} into one row per element.` : `One row per overlapping pair from ${stage.start} and ${stage.end}.`),
+      : stage.op === 'summarize' ? `One row per ${stage.by.map(by => label(by.column)).join(' and ') || 'all rows'}; measure ${stage.measures.map(measure => measure.label).join(', ')}.`
+      : stage.op === 'expand' ? `Expand ${label(stage.column)} into one row per element.` : `One row per overlapping pair from ${label(stage.start)} and ${label(stage.end)}.`),
     ...(sources.some(source => source.query.take && plan.stages.length) ? ['A source limit applies before the panel filter.'] : []),
-    ...(plan.sort?.length ? [`Sort by ${plan.sort.map(item => `${columnAt(plan, item.column)?.label ?? item.column} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`).join(', ')}.`] : []),
-    ...(plan.group?.length ? [`Group by ${plan.group.map(item => columnAt(plan, item.column)?.label ?? item.column).join(' then ')}.`] : []),
+    ...(plan.sort?.length ? [`Sort by ${plan.sort.map(item => `${label(item.column)} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`).join(', ')}.`] : []),
+    ...(plan.group?.length ? [`Group by ${plan.group.map(item => label(item.column)).join(' then ')}.`] : []),
     ...(plan.limit ? [`Show at most ${plan.limit} rows after filtering and sorting.`] : []),
-    ...(plan.actions?.press ? [`Pressing a row opens ${plan.actions.press.kind === 'link' ? columnAt(plan, plan.actions.press.column ?? '')?.label ?? 'a link' : plan.actions.press.kind === 'task' ? 'its task' : pressedRecord} in ${plan.actions.press.prefer === 'refPanel' ? 'a side panel' : plan.actions.press.prefer === 'pane' ? 'a task pane' : plan.actions.press.prefer === 'route' ? 'a full page' : plan.actions.press.prefer === 'overlay' ? 'an overlay' : 'the browser'}.`] : []),
+    ...(press ? [`Pressing a row opens ${press.subject} in ${press.place}.`] : []),
   ]
 }
 

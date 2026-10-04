@@ -66,6 +66,15 @@ Problems show under the part they belong to, such as "Column Status", with the J
 hover title. **Publish** stays off while the plan fails its schema or the latest preview reports an
 error, and the reason shows beside it. Each change autosaves the draft and a device recovery copy.
 
+`packages/dashboards-core/src/outline.ts` owns the plan's parts in plain words. `planOutline` splits a
+plan into keyed parts: each source, relations, columns, each step by index, arrange, look, behaviour,
+and settings. `columnParts` adds one part per column. `partForPath`, `problemsByPart`, and
+`countsByPart` put a problem or a row count on its part. `availableOperations` and `availableViews`
+say which steps and views a plan can take, and why not. `diffOutline` compares two plans part by
+part. Steps have no ids, so it matches identical steps first, then the rest in order by operation.
+`describePanelPlan` reads the same filter, reach, and press wording, so a run's description and the
+outline say the same thing.
+
 `PanelPlan` version 2 permits primary, lookup, and children sources and up to eight ordered stages.
 The closed capability list in
 `packages/dashboards-core/src/capabilities.ts` defines the available operations and view options. Columns can

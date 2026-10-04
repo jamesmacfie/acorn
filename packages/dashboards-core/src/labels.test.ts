@@ -3,8 +3,8 @@ import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { DATA_OPERATORS } from '@acorn/protocol/dataBindings.ts'
 import {
   AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, DURATION_UNIT_LABELS, EXPRESSION_LABELS,
-  MEASURE_LABELS, OPERATOR_LABELS, SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, VIEW_LABELS, WEEK_START_LABELS,
-  operatorLabel, planPartLabel,
+  MEASURE_LABELS, OPERATOR_LABELS, PRESENTATION_LABELS, RELATIVE_OFFSET_LABELS, SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, VIEW_LABELS, WEEK_START_LABELS,
+  calendarLabel, offsetLabel, operatorLabel, planPartLabel,
 } from './labels'
 
 // Read straight from the zod schemas, so a value added there fails here until it has a label. The
@@ -46,6 +46,7 @@ describe('panel labels', () => {
     ['view', values(field(view, 'kind')), VIEW_LABELS],
     ['aggregate', values(field(view, 'aggregate')), AGGREGATE_LABELS],
     ['chart shape', values(field(view, 'shape')), CHART_SHAPE_LABELS],
+    ['presentation', values(field(field(field(plan, 'actions'), 'press'), 'prefer')), PRESENTATION_LABELS],
   ])('labels every %s', (_name, schemaValues, labels) => {
     expect(schemaValues.length).toBeGreaterThan(0)
     expect(Object.keys(labels).sort()).toEqual([...schemaValues].sort())
@@ -55,6 +56,14 @@ describe('panel labels', () => {
     expect(operatorLabel('lt', 'datetime')).toBe('is before')
     expect(operatorLabel('lte', 'datetime')).toBe('is at most')
     expect(operatorLabel('lt', 'number')).toBe('is less than')
+  })
+
+  it('reads every stored offset, and offers only offsets the schema accepts', () => {
+    expect(offsetLabel('-P7D')).toBe('7 days ago')
+    expect(offsetLabel('+P1W')).toBe('1 week from now')
+    expect(calendarLabel('startOfMonth')).toBe('the start of this month')
+    expect(calendarLabel('startOfWeek', '-P2W')).toBe('the start of the week 2 weeks ago')
+    for (const [offset, label] of Object.entries(RELATIVE_OFFSET_LABELS)) expect(offsetLabel(offset)).toBe(label)
   })
 
   it('names the part a problem path points at', () => {

@@ -1,5 +1,8 @@
 import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 
+/** The column a one-segment item pointer such as `/state` names, or undefined for any other pointer. */
+export const pointerColumn = (pointer: string): string | undefined => /^\/[A-Za-z0-9_-]{1,100}$/.test(pointer) ? pointer.slice(1) : undefined
+
 export function outputPlanColumns(plan: PanelPlan): PanelPlanColumn[] {
   let columns = [...plan.columns]
   for (const stage of plan.stages) {
