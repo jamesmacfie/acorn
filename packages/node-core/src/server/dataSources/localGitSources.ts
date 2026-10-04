@@ -1,11 +1,10 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
-import { and, eq } from 'drizzle-orm'
+import { eq } from 'drizzle-orm'
 import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import type { Env } from '../bindings'
 import { gitText } from '../core/git'
 import { getDb, schema } from '../db'
-import { getConnection } from '../integrations/connections'
 import { parseGithubRemote } from '../projects'
 import { worktreeCounts } from './localGitRead'
 import { createDataSelectionPager, selectDataRecords } from './selection'
@@ -13,38 +12,24 @@ import { createDataSelectionPager, selectDataRecords } from './selection'
 const branchDescription: DataSourceDescription = {
   revision: '2', schema: { type: 'object', additionalProperties: false, properties: {
     projectId: { type: 'string' }, name: { type: 'string' }, upstream: { type: ['string', 'null'] },
-    githubProvider: { type: 'string' }, githubConnectionId: { type: ['string', 'null'] },
     githubRepository: { type: ['string', 'null'] },
     aheadUpstream: { type: ['number', 'null'] }, behindUpstream: { type: ['number', 'null'] },
     aheadDefault: { type: ['number', 'null'] }, behindDefault: { type: ['number', 'null'] },
     lastCommitAt: { type: ['number', 'null'] }, observedAt: { type: 'number' },
-  }, required: ['projectId', 'name', 'upstream', 'githubProvider', 'githubConnectionId', 'githubRepository', 'aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault', 'lastCommitAt', 'observedAt'] },
+  }, required: ['projectId', 'name', 'upstream', 'githubRepository', 'aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault', 'lastCommitAt', 'observedAt'] },
   fields: [
     { pointer: '/name', label: 'Branch', origin: 'declared', display: { kind: 'text', role: 'title' } },
     { pointer: '/upstream', label: 'Upstream', origin: 'declared' },
-    { pointer: '/githubProvider', label: 'Provider', origin: 'declared' },
-    { pointer: '/githubConnectionId', label: 'GitHub account connection', origin: 'declared' },
     { pointer: '/githubRepository', label: 'GitHub remote repository', origin: 'declared' },
     ...(['aheadUpstream', 'behindUpstream', 'aheadDefault', 'behindDefault'] as const).map(key => ({ pointer: `/${key}`, label: key, origin: 'declared' as const, display: { kind: 'number' as const } })),
     { pointer: '/lastCommitAt', label: 'Last commit', origin: 'declared', display: { kind: 'datetime' } },
     { pointer: '/observedAt', label: 'Observed', origin: 'declared', display: { kind: 'datetime' } },
   ],
-  parameters: { type: 'object', additionalProperties: false, properties: { project: { type: 'string' }, githubAccount: { type: 'string' } } },
-  parameterFields: [
-    { pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } },
-    { pointer: '/githubAccount', label: 'GitHub account for pull requests', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } },
-  ],
+  parameters: { type: 'object', additionalProperties: false, properties: { project: { type: 'string' } } },
+  parameterFields: [{ pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
-  relations: [{ id: 'branch-pull-request', label: 'Pull request for this branch',
-    target: { pluginId: 'github', sourceId: 'pull-requests' }, kind: 'references', cardinality: 'many-to-one',
-    keys: [
-      { from: '/githubProvider', to: '/githubProvider', scope: 'provider' },
-      { from: '/githubConnectionId', to: '/githubConnectionId', scope: 'account' },
-      { from: '/githubRepository', to: '/headRepository', scope: 'container' },
-      { from: '/name', to: '/headBranch', scope: 'identity' },
-    ], requiredScopes: ['provider', 'account', 'container'] }],
-  consistency: 'Local refs as last observed. Ahead and behind use the last fetched refs; this read never fetches. Choose a GitHub account to relate branches to pull requests. A branch uses its tracked remote repository, or origin when it has no upstream; branches with no match remain.',
+  consistency: 'Local refs as last observed. Ahead and behind use the last fetched refs; this read never fetches. Repository identity comes from the tracked remote, or origin without an upstream.',
 }
 
 const worktreeDescription: DataSourceDescription = {
@@ -124,35 +109,6 @@ async function projectOptions(request: Extract<DataSourceRequest, { operation: '
     ...(next < matching.length ? { nextCursor: String(next) } : {}), exhausted: next >= matching.length }
 }
 
-async function branchOptions(request: Extract<DataSourceRequest, { operation: 'options' }>, env: Env) {
-  if (request.pointer === '/project') return projectOptions(request, env)
-  if (request.target !== 'parameter' || request.pointer !== '/githubAccount') throw new Error('unsupported_options')
-  const userId = env.ACTIVE_IDENTITY.get()
-  if (!userId) throw new Error('identity_required')
-  const accounts = await getDb(env).select({ id: schema.integrations.id, label: schema.integrations.label,
-    name: schema.integrations.name }).from(schema.integrations).where(and(
-    eq(schema.integrations.userId, userId), eq(schema.integrations.provider, 'github'), eq(schema.integrations.status, 'connected')))
-  const matching = accounts.filter(account => (account.name ?? account.label).toLowerCase().includes(request.search.toLowerCase()))
-    .sort((left, right) => (left.name ?? left.label).localeCompare(right.name ?? right.label))
-  const offset = Number(request.cursor ?? 0)
-  if (!Number.isInteger(offset) || offset < 0) throw new Error('invalid_cursor')
-  const page = matching.slice(offset, offset + request.pageSize)
-  const next = offset + page.length
-  return { options: page.map(account => ({ id: account.id, label: (account.name ?? account.label).slice(0, 80) })),
-    ...(next < matching.length ? { nextCursor: String(next) } : {}), exhausted: next >= matching.length }
-}
-
-async function selectedGithubAccount(request: Extract<DataSourceRequest, { operation: 'query' }>, env: Env): Promise<string | null> {
-  const selected = request.query.scope.parameters.githubAccount
-  if (selected === undefined) return null
-  if (typeof selected !== 'string' || !selected) throw new Error('invalid_github_account')
-  const userId = env.ACTIVE_IDENTITY.get()
-  if (!userId) throw new Error('identity_required')
-  const account = await getConnection(getDb(env), userId, selected)
-  if (!account || account.provider !== 'github' || account.status !== 'connected') throw new Error('github_account_unavailable')
-  return account.id
-}
-
 async function remoteGithubRepository(path: string, remote: string): Promise<string | null> {
   try {
     const repository = parseGithubRemote(await gitText(['remote', 'get-url', remote], { cwd: path, timeoutMs: 5_000 }))
@@ -162,12 +118,11 @@ async function remoteGithubRepository(path: string, remote: string): Promise<str
 
 export async function localBranches(request: DataSourceRequest, env: Env) {
   if (request.operation === 'describe') return branchDescription
-  if (request.operation === 'options') return branchOptions(request, env)
+  if (request.operation === 'options') return projectOptions(request, env)
   if (request.operation !== 'query') throw new Error('unsupported_operation')
   return pager(env.ACTIVE_IDENTITY.get() ?? '', request, async () => {
     const project = await projectPath(request, env)
     const path = project.path!
-    const githubConnectionId = await selectedGithubAccount(request, env)
     const observedAt = Date.now()
     const refs = await gitText(['for-each-ref', '--format=%(refname:short)%00%(upstream:short)%00%(upstream:remotename)%00%(committerdate:unix)', 'refs/heads'], { cwd: path, timeoutMs: 10_000 })
     const rows = refs.split('\n').filter(Boolean)
@@ -184,7 +139,7 @@ export async function localBranches(request: DataSourceRequest, env: Env) {
           divergence(path, branch, project.defaultBranch ? `refs/heads/${project.defaultBranch}` : null),
         ])
         return { recordId: key(project.id, name), data: { projectId: project.id, name, upstream: upstream || null,
-          githubProvider: 'github', githubConnectionId, githubRepository: repositories.get(upstreamRemote || 'origin') ?? null,
+          githubRepository: repositories.get(upstreamRemote || 'origin') ?? null,
           aheadUpstream: againstUpstream?.ahead ?? null, behindUpstream: againstUpstream?.behind ?? null,
           aheadDefault: againstDefault?.ahead ?? null, behindDefault: againstDefault?.behind ?? null,
           lastCommitAt: stamp ? Number(stamp) * 1000 : null, observedAt }, display: { title: name } }

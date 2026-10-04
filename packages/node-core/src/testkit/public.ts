@@ -9,6 +9,7 @@ export { resetTelemetryForTest } from '../server/telemetry/collector.ts'
 export { makeTestNodeContext, makeTestRequestContext } from './pluginContext.ts'
 export type { TestNodeContext } from './pluginContext.ts'
 export { testAgentToolDescriptor, testContextSectionDescriptor, testCliCommandDescriptor } from './runtimeContributions.ts'
+export { runDashboard } from '../server/dashboards/run.ts'
 
 // Seed authenticated legacy proposal records in migration fixtures.
 export { issueAgentToolProvenance } from '../server/agentTools/provenance'

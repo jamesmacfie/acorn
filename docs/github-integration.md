@@ -84,10 +84,11 @@ filter uses GitHub's native `review-requested:@me` search, including team reques
 team requests as well as user requests. GitHub search and nested connections have provider caps; an
 exceeded cap yields an incomplete selection.
 
-The core local-branches source can look up a pull request for each branch. Choose the same GitHub
-connection in its **GitHub account for pull requests** parameter and in the pull-request source.
-The local source reads each branch's tracked GitHub remote, or origin when the branch has no upstream,
-using the project repository-facet parser. The lookup matches provider, connection, head repository,
+Choose **Local branches with pull requests** and the same GitHub account as the pull-request source
+to look up a PR for each branch. This GitHub source delegates workspace and project scoped reads to
+the core local-branches source. Core reads each branch's tracked GitHub remote, or origin when the
+branch has no upstream, using the project repository-facet parser.
+The lookup matches provider, connection, head repository,
 and exact branch name; it never equates a
 fork's branch with a same-named branch in the base repository. A branch without a PR stays in the
 panel. Two PRs with the same head repository and branch trigger a cardinality warning and leave the

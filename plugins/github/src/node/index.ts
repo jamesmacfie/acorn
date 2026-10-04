@@ -27,6 +27,7 @@ import { githubEmitter } from '../server/events'
 import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 import { pullSource } from '../shared/pullSource'
 import { actionsSource } from '../shared/actionsRegistration'
+import { branchSource } from '../shared/branchSource'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
@@ -82,6 +83,12 @@ export const githubPlugin = (): NodePlugin => {
         return pullHandler(request, context)
       }, { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
+      let branchHandler: PluginFetchHandler | undefined
+      ctx.routes.fetch(async (request, context) => {
+        branchHandler ??= (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke)
+        return branchHandler(request, context)
+      }, { prefix: '/data/branches' })
+      ctx.dataSources.register(branchSource)
       let actionsHandler: PluginFetchHandler | undefined
       ctx.routes.fetch(async (request, context) => {
         actionsHandler ??= (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()
