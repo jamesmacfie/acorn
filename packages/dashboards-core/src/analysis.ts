@@ -100,6 +100,11 @@ export function summarizeRows(plan: PanelPlan, stage: Summary, rows: readonly Pl
     output.push({ id: `summary:${id}`, values, records: [...new Map(group.rows.flatMap(row => row.records).map(ref => [key([ref]), ref])).values()],
       recordItems: group.rows.flatMap(row => row.recordItems ?? []), measureRows, partial, representedRows: group.rows })
   }
+  return { rows: finishSummaryRows(plan, stage, output), errors }
+}
+
+/** Shared final shaping after either in-memory or SQLite grouped reductions. */
+export function finishSummaryRows(plan: PanelPlan, stage: Summary, output: PlanRow[]): PlanRow[] {
   if (stage.fill && stage.by.length === 1 && stage.by[0]?.bucket && stage.by[0].bucket !== 'value' && output.length) {
     const bucket = stage.by[0]
     const byDay = new Map(output.map(row => [String(row.values[bucket.column]), row]))
@@ -136,6 +141,10 @@ export function summarizeRows(plan: PanelPlan, stage: Summary, rows: readonly Pl
       base.records.push(...row.records)
       base.representedRows!.push(...row.representedRows ?? [])
       base.measureRows![column] = row.measureRows?.[stage.pivot.measure] ?? []
+      if (row.datasetGroups?.[stage.pivot.measure]) {
+        base.datasetGroups ??= {}
+        base.datasetGroups[column] = row.datasetGroups[stage.pivot.measure]
+      }
       if (row.partial?.[stage.pivot.measure]) base.partial![column] = row.partial[stage.pivot.measure]
       grouped.set(identity, base)
     }
@@ -151,7 +160,7 @@ export function summarizeRows(plan: PanelPlan, stage: Summary, rows: readonly Pl
         : measure.previous === 'amount' ? current - previous : previous ? 100 * (current - previous) / previous : null
     })
   }
-  return { rows: output, errors }
+  return output
 }
 
 export function expandRows(plan: PanelPlan, rows: readonly PlanRow[], stage: Extract<Stage, { op: 'expand' }>, maxRows = 25000): PlanRow[] {

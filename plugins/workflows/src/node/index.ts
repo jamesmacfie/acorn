@@ -135,6 +135,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
               assertWorkflowDataScope(scope, request.operation === 'query' ? request.query.scope : request.scope)
               return ctx.dataSources.invoke(request, invocation)
             },
+            writeDataset: input => ctx.datasets.writeForTask(taskId, input),
           }
         },
         hooks: ctx.hooks,

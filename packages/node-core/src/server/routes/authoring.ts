@@ -28,7 +28,7 @@ const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
   query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
-  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
+  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
 } as const
 
 function message(error: unknown): string {
@@ -54,6 +54,8 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
   })) : []
   const projects = request.target === 'dashboard' ? await getDb(c.env).select({ id: schema.projects.id, name: schema.projects.name, githubOwner: schema.projects.githubOwner, githubName: schema.projects.githubName }).from(schema.projects).where(eq(schema.projects.workspaceId, request.scope.workspaceId)) : []
   const links = request.target === 'dashboard' ? await getDb(c.env).select({ projectId: schema.workspaceExternalProjects.projectId, integrationId: schema.workspaceExternalProjects.integrationId, externalId: schema.workspaceExternalProjects.externalId }).from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, request.scope.workspaceId)) : []
+  const datasets = request.target === 'dashboard' ? (await import('../datasets/store')).listDatasets(getDb(c.env), request.scope.workspaceId, request.scope.projectId)
+    .map(dataset => ({ id: dataset.id, name: dataset.name, mode: dataset.mode, feeder: dataset.feeder, coverage: dataset.coverage })) : []
   const validate = async (candidate: unknown): Promise<{ candidate?: unknown; problems: string[] }> => {
     try {
       if (request.target === 'query') {
@@ -93,7 +95,7 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
       ...(request.target === 'dashboard' ? { facts: {
         evaluationTime: Date.now(), time: basePlan?.success ? basePlan.data.time : undefined,
         sources: sourceCatalog?.sources, accounts: accounts.map(account => ({ id: account.id, providerId: account.provider, name: account.name ?? account.label })),
-        descriptions, projects, links, capabilities: PANEL_CAPABILITIES,
+        descriptions, projects, links, datasets, capabilities: PANEL_CAPABILITIES,
       } } : {}),
       signal: c.req.raw.signal,
       generate: async input => {

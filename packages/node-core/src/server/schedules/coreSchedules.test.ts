@@ -29,6 +29,7 @@ describe('what core declares', () => {
     const scheduler = createScheduler(test.db, { env: testEnv({ DB: test.db, ACTIVE_IDENTITY: memoryIdentityStore('owner-1') }) })
     expect(await keys(scheduler)).toEqual([
       'core:audit-prune',
+      'core:compact-datasets',
       'core:compact-history',
       'core:idempotency-sweep',
       'core:sample-measures',

@@ -9,11 +9,22 @@ export const instant = (value: DataValue | undefined): number | undefined => {
 /** UTC bucket retained for version 1 charts and trend history. */
 export const dayBucket = (at: number): number => Math.floor(at / 86_400_000) * 86_400_000
 
+const formatters = new Map<string, Intl.DateTimeFormat>()
+function dateFormatter(zone: string): Intl.DateTimeFormat {
+  let formatter = formatters.get(zone)
+  if (!formatter) {
+    formatter = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' })
+    if (formatters.size >= 32) formatters.delete(formatters.keys().next().value!)
+    formatters.set(zone, formatter)
+  }
+  return formatter
+}
+
 export function bucketValue(value: DataValue | undefined, bucket: 'value' | 'day' | 'week' | 'month', zone: string, weekStart: PanelPlan['time']['weekStart']): DataValue {
   if (bucket === 'value' || value == null) return value ?? null
   const date = instant(value)
   if (date === undefined) return null
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
+  const parts = dateFormatter(zone).formatToParts(date)
   const part = (name: string) => parts.find(item => item.type === name)?.value ?? ''
   const day = typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : `${part('year')}-${part('month')}-${part('day')}`
   if (bucket === 'day') return day

@@ -618,10 +618,10 @@ describe('architecture boundaries', () => {
       // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
       // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
       // `features/editor/documentCustody.ts`, merged in from perf.
-      '@acorn/client-core': 166, // PaneModelHost and QueryCacheProvider are renderer composition seams.
+      '@acorn/client-core': 167, // Includes the host-owned Datasets settings page.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 12, // Source-first plans added plan, capabilities, and projection seams.
+      '@acorn/dashboards-core': 14, // Shared SQL/in-memory summary and time-bucket semantics.
       '@acorn/diff-document': 2,
     }
     const problems: string[] = []

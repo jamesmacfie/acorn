@@ -15,7 +15,7 @@ import { descriptorPromotion } from '../../host/chrome/promotion'
 import { writeJson } from '../../infra/node/apiClient'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { Alert, Button, Card, EmptyState, Select } from '../../kit/components/primitives'
+import { Alert, Button, Card, EmptyState, Select, Textarea } from '../../kit/components/primitives'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
@@ -62,7 +62,9 @@ export default function PublishedDashboardPanel(props: {
   const [taskRow, setTaskRow] = createSignal<DashboardDisplayRow>()
   const [taskProject, setTaskProject] = createSignal('')
   const [outcome, setOutcome] = createSignal('')
-  const [drill, setDrill] = createSignal<{ plan: PanelPlan; snapshot: DashboardRun; result?: DashboardRun; loading: boolean; error?: string }>()
+  const [correcting, setCorrecting] = createSignal<DashboardDisplayRow>()
+  const [correction, setCorrection] = createSignal('null')
+  const [drill, setDrill] = createSignal<{ plan: PanelPlan; snapshot: DashboardRun; result?: DashboardRun; loading: boolean; error?: string; total?: number; truncated?: boolean }>()
   const rowTitle = (row: DashboardDisplayRow): string => {
     const titleColumn = run()?.plan.columns.find(column => column.id === 'title')
     const value = row.values[titleColumn?.id ?? 'title']
@@ -146,6 +148,11 @@ export default function PublishedDashboardPanel(props: {
     if (!current) return
     const ids = new Set(group.rows.map(row => row.id))
     const selected = current.rows.filter(row => ids.has(row.id))
+    if (selected.length === 1 && selected[0]?.summaryStage !== undefined &&
+      (!selected[0].representedRows || selected[0].datasetGroups)) {
+      void openStoredDrilldown(current, selected[0])
+      return
+    }
     const sourceRows = selected.flatMap(row => row.representedRows ?? [row])
     const stageIndex = selected.length && selected.every(row => row.summaryStage === selected[0]?.summaryStage) ? selected[0]?.summaryStage : undefined
     const plan = deriveDrilldownPlan(current.plan, sourceRows, { stageIndex })
@@ -158,7 +165,9 @@ export default function PublishedDashboardPanel(props: {
   const openMeasureDrilldown = (row: DashboardDisplayRow, measure: string): void => {
     const current = run()
     const source = current?.rows.find(item => item.id === row.id)
-    if (!current || !source?.measureRows?.[measure] || source.summaryStage === undefined) return
+    if (!current || !source || source.summaryStage === undefined) return
+    if (source.datasetGroups?.[measure]) { void openStoredDrilldown(current, source, measure); return }
+    if (!source.measureRows?.[measure]) return
     const stage = current.plan.stages[source.summaryStage]
     if (stage?.op !== 'summarize') return
     const rows = source.measureRows[measure]
@@ -170,6 +179,31 @@ export default function PublishedDashboardPanel(props: {
     void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
       .then(result => setDrill({ plan, snapshot, result, loading: false }))
       .catch(() => setDrill({ plan, snapshot, loading: false, error: 'Could not prepare this as a panel.' }))
+  }
+  const openStoredDrilldown = async (current: DashboardRun, source: DashboardRun['rows'][number], measureId?: string): Promise<void> => {
+    const stage = current.plan.stages[source.summaryStage ?? -1]
+    if (stage?.op !== 'summarize') return
+    const mapping = measureId ? source.datasetGroups?.[measureId] : undefined
+    const keys = mapping?.groupValues ?? Object.fromEntries(stage.by.map(by => [by.column, source.values[by.column] ?? null]))
+    const selectedMeasure = mapping?.measureId ?? measureId
+    const filter = stage.measures.find(item => item.id === selectedMeasure)?.where
+    const plan = deriveDrilldownPlan(current.plan, [], { stageIndex: source.summaryStage, measureFilter: filter,
+      summaryKeys: Object.fromEntries(stage.by.filter(by => !by.bucket || by.bucket === 'value').map(by => [by.column, source.values[by.column] ?? null])) })
+    setDrill({ plan, snapshot: { ...current, plan, rows: [], groups: [] }, loading: true })
+    try {
+      const result = await writeJson<{ rows: DashboardRun['rows']; total: number; truncated: boolean }>('/v1/core/datasets/drilldown', {
+        method: 'POST', headers: { 'content-type': 'application/json' }, nodeId,
+        body: JSON.stringify({ scope: scope(), plan: current.plan, groupValues: keys, measureId: selectedMeasure,
+          evaluationTime: current.diagnostics.evaluationTime }),
+      })
+      const snapshot = { ...current, plan, rows: result.rows, groups: [] }
+      const bucketed = stage.by.some(by => by.bucket && by.bucket !== 'value')
+      setDrill({ plan, snapshot, loading: false, total: result.total, truncated: result.truncated,
+        ...(bucketed ? { error: 'This bucket can be inspected here; Add as panel needs an exact date range.' } : {}) })
+      if (!bucketed) void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+        .then(prepared => setDrill(value => value?.plan === plan ? { ...value, result: prepared } : value))
+        .catch(() => {})
+    } catch { setDrill(value => value ? { ...value, loading: false, error: 'Could not load the stored rows.' } : value) }
   }
   const addDrilldownPanel = async (): Promise<void> => {
     const value = drill()
@@ -196,6 +230,21 @@ export default function PublishedDashboardPanel(props: {
       setOutcome('Task created.')
     } catch { setOutcome('Could not create the task.') }
   }
+  const saveCorrection = async (): Promise<void> => {
+    const row = correcting()
+    if (!row?.correctableDatasetId || !row.sourceRowId) return
+    let value: unknown
+    try { value = JSON.parse(correction()) }
+    catch { setOutcome('Correction must be valid JSON.'); return }
+    try {
+      await writeJson('/v1/core/datasets/correct', { method: 'POST', nodeId,
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ datasetId: row.correctableDatasetId, identity: row.sourceRowId, value }) })
+      setCorrecting(undefined)
+      setOutcome('Correction saved. Future feeder writes will preserve it.')
+      void loaded.refetch()
+    } catch (error) { setOutcome(error instanceof Error ? error.message : 'Could not save correction.') }
+  }
 
   return <Card>
     <div class="dash-panel-head" {...props.headProps}>
@@ -207,8 +256,18 @@ export default function PublishedDashboardPanel(props: {
       <Show when={!loaded.error || loaded.data} fallback={<EmptyState align="start" size="sm" title="Couldn't load this panel" action={<Button size="sm" onPress={() => void loaded.refetch()}>Try again</Button>}>Edit the panel to repair its source or column.</EmptyState>}>
         <Show when={loaded.error && loaded.data}><Alert tone="warn">Couldn't refresh. Showing the last data we got.</Alert></Show>
         <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(problem => `${problem.path}: ${problem.message}`).join(' ')}</Alert></Show>
+        <Show when={run()?.diagnostics.sources.some(source => source.coverage?.length)}><Alert tone="muted">
+          {run()!.diagnostics.sources.flatMap(source => (source.coverage ?? []).slice(0, 3).map(window =>
+            `${source.label}: ${window.kind === 'complete' ? 'events covered' : 'coverage gap'} ${new Date(window.fromTime).toLocaleDateString()}–${new Date(window.toTime).toLocaleDateString()}${window.reason ? ` (${window.reason})` : ''}`)).join(' · ')}
+        </Alert></Show>
         <Show when={run()?.rows.some(row => row.partial && Object.keys(row.partial).length)}><Alert tone="warn">{[...new Set(run()!.rows.flatMap(row => Object.values(row.partial ?? {})))].join(' ')} Measures marked partial may leave out unknown values.</Alert></Show>
         <Show when={outcome()}>{message => <Alert tone="muted">{message()}</Alert>}</Show>
+        <Show when={correcting()}>{row => <Alert tone="muted" actions={<>
+          <Button size="sm" variant="ghost" onPress={() => setCorrecting(undefined)}>Cancel</Button>
+          <Button size="sm" onPress={() => void saveCorrection()}>Save correction</Button>
+        </>}>Correct {rowTitle(row())}. Enter the corrected value as JSON; it remains attached to this record across later writes.
+          <Textarea label="Corrected value" rows={3} value={correction()} onChange={setCorrection} />
+        </Alert>}</Show>
         <Show when={taskRow()}>{row => <Alert tone="muted" actions={<>
           <Select label="Project" size="sm" value={taskProject()} options={allProjects().map(project => ({ value: project.id, label: project.name }))} onChange={setTaskProject} />
           <Button size="sm" variant="ghost" onPress={() => setTaskRow(undefined)}>Cancel</Button>
@@ -222,7 +281,8 @@ export default function PublishedDashboardPanel(props: {
           {value => <PanelBody view={run()!.plan.view} panelId={props.definition.id} schema={value().schema} fields={value().fields} rows={value().rows}
             groups={displayPlanGroups(run()!.groups, value().rows)}
             {...(run()!.plan.group?.[0] ? { groupBy: run()!.plan.group![0]!.column } : {})}
-            provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} onMeasureDrilldown={openMeasureDrilldown} buttons={run()!.plan.actions?.buttons ?? []} />}
+            provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} onMeasureDrilldown={openMeasureDrilldown}
+            onCorrect={row => { setCorrecting(row); setCorrection('null') }} buttons={run()!.plan.actions?.buttons ?? []} />}
         </Show>
       </Show>
     </div>
@@ -230,6 +290,7 @@ export default function PublishedDashboardPanel(props: {
       <div class="dash-panel-head"><Heading level={3}>{value().plan.title}</Heading><Button size="sm" variant="ghost" onPress={() => setDrill(undefined)}>Close</Button></div>
       <Show when={value().loading}><Alert tone="muted">Preparing the panel at the original evaluation instant…</Alert></Show>
       <Show when={value().error}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
+      <Show when={value().truncated}><Alert tone="muted">{`Showing the first ${value().snapshot.rows.length} of ${value().total} rows.`}</Alert></Show>
       <PanelBody view={value().plan.view} schema={displayPlanRun(value().plan, value().snapshot.rows).schema} fields={displayPlanRun(value().plan, value().snapshot.rows).fields} rows={displayPlanRun(value().plan, value().snapshot.rows).rows} />
       <Button size="sm" disabled={!value().result || value().result!.diagnostics.problems.some(problem => problem.severity === 'error')} onPress={() => void addDrilldownPanel()}>Add as panel</Button>
     </aside></Portal>}</Show>

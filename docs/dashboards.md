@@ -60,6 +60,24 @@ plain-language description, and diagnostics for sources, stages, and budgets. Da
 `list-accounts` metadata operation returns account IDs, provider IDs, and display names without
 reading provider records.
 
+## Datasets and history
+
+**Keep history** in the editor creates a workspace-scoped or project-scoped dataset from a query and
+asks the owner to approve a capture cadence. The owner chooses one immutable storage mode: **latest
+state** upserts an identity and marks missing records removed after a complete capture; **every
+event** retains stable event identities and arrival times; **daily snapshots** stores each identity
+at each capture time. A different mode needs a new dataset. The new dataset appears in Pick data as
+a core source. Settings → Datasets shows its feeder, size, 90-day default retention, caps, and
+coverage, and permits deletion.
+
+An event archive claims completeness only for source-proved or checkpoint-proved windows. Capture
+failures, schema mismatches, and uncovered windows remain visible as gaps. Dataset panels carry
+coverage labels and mark affected summaries partial. A dataset summary applies preceding filters and
+groups in Node SQLite, returning at most 5,000 summary rows; the panel asks separately for up to
+1,000 underlying rows when a person drills into a measure. Live provider summaries continue through
+the in-memory runner. Stat measure history remains in its existing table and keeps its sampling and
+retention behavior.
+
 ## Persistence
 
 Dashboard composition is the `dashboards` Node preference. Its envelope is version 1:

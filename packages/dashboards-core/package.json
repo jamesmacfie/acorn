@@ -12,6 +12,8 @@
     "./mapping.ts": "./src/mapping.ts",
     "./model.ts": "./src/model.ts",
     "./plan.ts": "./src/plan.ts",
+    "./planBuckets.ts": "./src/planBuckets.ts",
+    "./analysis.ts": "./src/analysis.ts",
     "./capabilities.ts": "./src/capabilities.ts",
     "./projection": "./src/projection/public.ts",
     "./relativeTime.ts": "./src/relativeTime.ts",

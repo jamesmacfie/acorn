@@ -4,7 +4,7 @@ import type { StepValidationContext, WorkflowStepDef } from '../../shared/workfl
 import { stepIdentity } from '../../shared/workflowIdentity'
 
 export function workflowDataProblems(step: WorkflowStepDef, context: StepValidationContext, inputs: ReadonlySet<string>): string[] {
-  if (!['find-records', 'get-record-details', 'if'].includes(step.kind ?? '')) return []
+  if (!['find-records', 'get-record-details', 'write-dataset', 'if'].includes(step.kind ?? '')) return []
   const errors: string[] = []
   const binding = (input: DataBinding) => {
     const { address } = dataBindingSchema.parse(input)
@@ -19,6 +19,10 @@ export function workflowDataProblems(step: WorkflowStepDef, context: StepValidat
   try {
     if (step.kind === 'find-records') Object.values(queryReferenceSchema.parse(step.query).bindings).forEach(binding)
     if (step.kind === 'get-record-details') binding(dataBindingSchema.parse(step.record))
+    if (step.kind === 'write-dataset') {
+      if (!step.dataset?.id || !Number.isSafeInteger(step.dataset.version) || step.dataset.version < 1) errors.push('Dataset id and schema version are required')
+      else binding(dataBindingSchema.parse(step.dataset.rows))
+    }
     if (step.kind === 'if') {
       predicate(parseDataPredicate(step.condition))
       if (!step.branches?.true || !step.branches.otherwise || Object.keys(step.branches).some(key => !['true', 'otherwise'].includes(key))) errors.push('If requires true and otherwise branches')

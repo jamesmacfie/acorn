@@ -241,6 +241,13 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         return invokeDataSource(options.env, request, invocation)
       },
     },
+    datasets: permissions ? (undefined as never) : {
+      writeForTask: async (taskId, input) => {
+        if (!options.env) throw new Error('Dataset writes require host bindings')
+        const { writeWorkflowDataset } = await import('../datasets/workflow')
+        return writeWorkflowDataset(options.env.DB, taskId, input)
+      },
+    },
     // Owner-bound. This is the list anything unattended picks an action from — a person arming a
     // schedule today, and whatever asks next — and the tier beside each entry drives the confirmation
     // accepted at that moment. Filing one under a stranger's name borrows that plugin's reputation for

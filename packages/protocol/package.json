@@ -27,6 +27,7 @@
     "./dataQueryTime.ts": "./src/data/queries/dataQueryTime.ts",
     "./dataSchemas.ts": "./src/data/values/dataSchemas.ts",
     "./dataSources.ts": "./src/data/dataSources.ts",
+    "./datasets.ts": "./src/data/datasets.ts",
     "./dataValues.ts": "./src/data/values/dataValues.ts",
     "./deviceConfig.ts": "./src/device/deviceConfig.ts",
     "./documentSurface.ts": "./src/content/documentSurface.ts",

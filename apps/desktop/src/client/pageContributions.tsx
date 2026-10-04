@@ -19,6 +19,7 @@ const RailSurfacesSettings = lazy(() => import('@acorn/client-core/features/sett
 const SecuritySettings = lazy(() => import('@acorn/client-core/features/settings/SecuritySettings.tsx'))
 const AuditLogSettings = lazy(() => import('@acorn/client-core/features/settings/AuditLogSettings.tsx'))
 const SchedulesSettings = lazy(() => import('@acorn/client-core/features/settings/SchedulesSettings.tsx'))
+const DatasetsSettings = lazy(() => import('@acorn/client-core/features/settings/DatasetsSettings.tsx'))
 const RunsSettings = lazy(() => import('@acorn/client-core/features/settings/RunsSettings.tsx'))
 const StorageSettings = lazy(() => import('@acorn/client-core/features/settings/StorageSettings.tsx'))
 const StyleGallery = lazy(() => import('@acorn/client-core/features/settings/StyleGallery.tsx'))
@@ -48,6 +49,7 @@ const components: Record<CoreSettingsPageId, SettingsContribution['component']> 
   integrations: (props) => <ServicesSettings context={props.context} />,
   'ai-models': (props) => <AiModelsSettings context={props.context} />,
   schedules: (props) => <SchedulesSettings nodeId={props.context.scope.nodeId} />,
+  datasets: (props) => <DatasetsSettings nodeId={props.context.scope.nodeId} />,
   runs: (props) => <RunsSettings nodeId={props.context.scope.nodeId} />,
   nodes: () => <NodesSettings />,
   security: (props) => <SecuritySettings nodeId={props.context.scope.nodeId} />,

@@ -68,6 +68,10 @@ export const dataSourceDescriptionSchema = z.object({
   }).strict().optional(),
   revision: id,
   consistency: z.string().min(1).max(2048),
+  /** Host-owned dataset metadata; only core dataset sources set this. */
+  dataset: z.object({ mode: z.enum(['current-mirror', 'event-archive', 'snapshot-history']),
+    feeder: z.enum(['capture', 'workflow', 'agent']) }).strict().optional(),
+  coverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite(), kind: z.enum(['complete', 'gap']), reason: z.string().max(512).nullable() }).strict()).max(100).optional(),
   /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
   starterPlans: z.array(z.unknown()).max(10).optional(),
   /** Action and target metadata is structural; current eligibility is checked per record. */
@@ -160,7 +164,7 @@ export const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bounded') }).strict(),
   z.object({
     kind: z.literal('incomplete'),
-    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget']),
+    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget', 'coverage-gap']),
   }).strict(),
 ])
 export const dataSourcePageSchema = z.object({
@@ -180,6 +184,8 @@ export const dataSourcePageSchema = z.object({
   readTime: z.number().finite(),
   completeness: dataSourceCompletenessSchema,
   incrementalBoundary: value.optional(),
+  /** Source-proved windows, independent of the time a capture happened. */
+  eventCoverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite() }).strict()).max(32).optional(),
 }).strict()
 export const dataSourceDetailsSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('found'), data: z.unknown().transform(input => parseDataValue(input, DATA_LIMITS.detailBytes)), fetchedTime: z.number().finite(), schema: structure.optional() }).strict(),

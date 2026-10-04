@@ -92,7 +92,7 @@ export async function runDashboard(env: Env, args: {
       sources.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description })
       sourceDiagnostics.push({ id: entry.id, label: entry.label, revision: description.revision,
         queryDigest: resolved.published?.digest ?? digest(entry.reference.kind === 'inline' ? entry.reference.content : null),
-        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null })
+        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverage: description.coverage })
     } catch (error) {
       problems.push({ path: `/sources/${plan.sources.indexOf(entry)}`, message: runInvocation.signal.reason?.name === 'TimeoutError' ? 'Run time budget exceeded.' : `${entry.label}: ${describeError(error).message}`, severity: 'error' })
       sourceDiagnostics.push({ id: entry.id, label: entry.label })
@@ -107,6 +107,51 @@ export async function runDashboard(env: Env, args: {
       unavailableColumns.add(Number(binding[1]))
       problems.push({ ...problem, severity: 'warning' })
     } else problems.push(problem)
+  }
+  const datasetSources = sources.filter(source => source.query.source.pluginId === 'core' && source.query.source.sourceId.startsWith('dataset:'))
+  if (datasetSources.length && plan.stages.some(stage => stage.op === 'summarize')) {
+    if (sources.length !== 1 || datasetSources.length !== 1) {
+      problems.push({ path: '/sources', message: 'A dataset summary needs one dataset source and a summarize stage.', severity: 'error' })
+    }
+    let rows: DashboardRun['rows'] = []
+    let counts: DashboardRun['diagnostics']['stages'] = []
+    if (!problems.some(problem => problem.severity === 'error')) try {
+      const source = datasetSources[0]!
+      const [{ datasetIdFromSource, predicateTimeWindow }, { getDataset, datasetCoveragePartial }] = await Promise.all([
+        import('../datasets/source'), import('../datasets/store'),
+      ])
+      const id = datasetIdFromSource(source.query.source.sourceId)!
+      const dataset = getDataset(getDb(env), id)
+      const timeField = dataset.eventTimeField ?? '/_observationTime'
+      const sourceWindow = predicateTimeWindow(source.query.predicate, new Set([timeField]))
+      const mapped = new Set(plan.columns.filter(column => {
+        const binding = column.bind[source.instanceId]
+        return binding && 'field' in binding && binding.field === timeField
+      })
+        .map(column => `/${column.id}`))
+      const stageWindows = plan.stages.slice(0, plan.stages.findIndex(stage => stage.op === 'summarize'))
+        .filter(stage => stage.op === 'filter').map(stage => predicateTimeWindow(stage.where, mapped))
+      const window = stageWindows.reduce<{ from: number; to: number }>((current, part) => ({ from: Math.max(current.from, part.from ?? -Infinity),
+        to: Math.min(current.to, part.to ?? Infinity) }),
+      { from: sourceWindow.from ?? -Infinity, to: sourceWindow.to ?? Infinity })
+      const gaps = datasetCoveragePartial(getDb(env), dataset, window)
+      const { summarizeDataset } = await import('../datasets/summarySql')
+      const summary = summarizeDataset(getDb(env), dataset, plan, source.query, source.description, gaps)
+      const staged = runPlanStages({ ...plan, stages: plan.stages.slice(summary.stageIndex + 1) }, summary.rows, evaluationTime, gaps)
+      rows = sortPlanRows(plan, staged.rows).slice(0, plan.limit ?? 5000)
+      counts = [{ path: `/stages/${summary.stageIndex}`, input: summary.inputCount, output: summary.rows.length,
+        meaning: 'one row per summary group' }, ...staged.counts]
+      problems.push(...staged.problems)
+      sourceDiagnostics[0]!.completeness = gaps ? { kind: 'incomplete', cause: 'coverage-gap' } : { kind: 'complete' }
+      sourceDiagnostics[0]!.readTime = evaluationTime
+    } catch (error) {
+      problems.push({ path: '/stages', message: error instanceof Error ? error.message : 'Database summary failed.', severity: 'error' })
+    }
+    const effectivePlan = plan.time.mode === 'viewer' && args.viewerZone ? { ...plan, time: { ...plan.time, zone: args.viewerZone } } : plan
+    return { plan, rows: problems.some(problem => problem.severity === 'error') ? [] : rows,
+      groups: problems.some(problem => problem.severity === 'error') ? [] : groupPlanRows(effectivePlan, rows, evaluationTime),
+      description: describePanelPlan(plan, sources), diagnostics: { problems, sources: sourceDiagnostics, stages: counts,
+        evaluationTime, plugins: ['core'], accounts: [], complete: !problems.length && sourceDiagnostics[0]?.completeness?.kind === 'complete' } }
   }
   if (!problems.some(problem => problem.severity === 'error')) {
     for (const source of sources) {

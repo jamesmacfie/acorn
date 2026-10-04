@@ -337,8 +337,9 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
   const [cadenceId, setCadenceId] = createSignal(DEFAULT_CADENCE)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const optionKey = (option: ScheduleTargetOption) => `${option.pluginId}:${option.actionId}`
+  const optionKey = (option: ScheduleTargetOption) => option.kind === 'dataset-capture' ? `dataset:${option.datasetId}` : `${option.pluginId}:${option.actionId}`
   const selected = () => props.options.find((option) => optionKey(option) === chosen())
+  const providerLabel = (option: ScheduleTargetOption) => option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)
 
   const dirty = () => chosen() !== '' || newName() !== '' || cadenceId() !== DEFAULT_CADENCE
   useUnsavedChanges(dirty)
@@ -364,7 +365,7 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
         body: JSON.stringify({
           name: newName().trim() || option.name,
           kind: option.kind,
-          target: { pluginId: option.pluginId, actionId: option.actionId },
+          target: option.kind === 'dataset-capture' ? { datasetId: option.datasetId } : { pluginId: option.pluginId, actionId: option.actionId },
           cadence: cadenceFor(cadenceId()),
         }),
         nodeId: props.nodeId ?? undefined,
@@ -386,7 +387,7 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
           value={chosen()}
           options={[
             { value: '', label: 'Pick something to run…' },
-            ...props.options.map((option) => ({ value: optionKey(option), label: `${option.name} · ${pluginLabel(option.pluginId)}` })),
+            ...props.options.map((option) => ({ value: optionKey(option), label: `${option.name} · ${option.kind === 'dataset-capture' ? 'acorn' : pluginLabel(option.pluginId)}` })),
           ]}
           onChange={(value) => setChosen(value)}
         />
@@ -398,7 +399,7 @@ function NewScheduleForm(props: { nodeId: string | null; options: ScheduleTarget
         {(option) => (
           <>
             <Alert tone="warn">
-              <Text emphasis="strong">{pluginLabel(option().pluginId)}</Text>’s “{option().name}” {RISK_COPY[option().risk]}{' '}
+              <Text emphasis="strong">{providerLabel(option())}</Text>’s “{option().name}” {RISK_COPY[option().risk]}{' '}
               Once you schedule it, it runs on its own and never asks again.
             </Alert>
             <SettingRow label="Name">

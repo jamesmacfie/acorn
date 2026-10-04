@@ -18,6 +18,7 @@ import { DataSourceError, validateDescription, validateSourceQuery } from './val
 import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
+import { getDb } from '../db'
 
 function parse<T>(schema: { parse(value: unknown): T }, input: unknown, response = true): T {
   try { return schema.parse(input) } catch { throw new DataSourceError(response ? 'invalid-response' : 'invalid-request') }
@@ -64,8 +65,11 @@ const dispatchRegistered = async (
 export async function listDataSources(env: Env, input: unknown, invocation: DataSourceInvocation) {
   const scope = parse(dataSourceScopeSchema, input, false)
   await authorizeDataSource(env, invocation, scope)
+  const { datasetIdFromSource, datasetSourcesInScope } = await import('../datasets/source')
+  const visibleDatasets = datasetSourcesInScope(getDb(env), scope)
   const sources = []
   for (const source of registeredDataSources()) {
+    if (datasetIdFromSource(source.sourceId) && source.pluginId === 'core' && !visibleDatasets.has(source.sourceId)) continue
     if (!dataSourceAvailableInScope(source, scope)) continue
     // Metadata is available before choosing a connection; an explicit connection filters to its owner.
     if (scope.connectionId) {
@@ -121,6 +125,12 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   const request = parse(dataSourceRequestSchema, input, false)
   const ref = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
   const scope = request.operation === 'query' ? request.query.scope : request.scope
+  const datasetId = ref.pluginId === 'core' && ref.sourceId.startsWith('dataset:') ? ref.sourceId.slice(8) : null
+  if (datasetId) {
+    await authorizeDataSource(env, invocation, scope)
+    const { ensureDatasetSource } = await import('../datasets/source')
+    ensureDatasetSource(getDb(env), datasetId, scope)
+  }
   const source = registeredDataSource(ref)
   if (!source || !dataSourceAvailableInScope(source, scope)) throw new DataSourceError('unavailable')
   invocation = bounded(invocation, request.operation === 'query' ? request.timeoutMs : undefined)
@@ -257,6 +267,7 @@ async function querySource(
       })
     }
     result.readTime = page.readTime
+    if (page.eventCoverage?.length) result.eventCoverage = [...result.eventCoverage ?? [], ...page.eventCoverage].slice(0, 32)
     if (page.completeness.kind === 'more' && cursors.has(page.completeness.cursor)) throw new DataSourceError('cursor-loop')
     if (page.incrementalBoundary !== undefined && (!description.operations.incremental
       || !request.query.incremental || request.mode !== 'execution' || page.completeness.kind !== 'complete')) {

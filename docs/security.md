@@ -12,6 +12,12 @@ authority, current eligibility, and confined route ownership before dispatch. Th
 and execute risk before sending anything, and a device-scoped idempotency key replays a completed
 press. [Plugin routes](./security/plugin-secrets-and-routes.md) owns the dispatch boundary.
 
+Datasets store copies of provider and workflow data at rest in core SQLite. Definition, version,
+correction, and deletion routes require a device principal and are absent from plugin frame
+bridges. Capture schedules also require device consent. Dataset sources enforce workspace and
+optional project scope; task-scoped workflow and agent writes derive that scope from the task.
+Deleting a workspace removes its datasets. Row and byte caps plus retention bound local storage.
+
 ## Trust boundaries
 
 - **The renderer** runs UI code and third-party preview content. It holds no device token,

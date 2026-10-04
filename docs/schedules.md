@@ -60,6 +60,7 @@ disabling a plugin doesn't delete the owner's pause or run history.
 - `core:sample-measures`, hourly with jitter: one pass over every dashboard panel that asked for a
   history trend, recording one number each ([sampling a published dashboard](#sampling-a-published-dashboard)).
 - `core:compact-history`, daily at 03:40: measure history's own retention.
+- `core:compact-datasets`, daily: removes dataset rows and coverage beyond each dataset's retention.
 - `agents:usage-refresh`, every 30 minutes, off by default. It probes the agent CLIs for plan usage so
   the numbers are fresh when you open the panel. It spawns those CLIs to fill a cache nothing reads
   while no client is open, so turning it on is the owner's call, with the toggle on its row.
@@ -72,6 +73,12 @@ disabling a plugin doesn't delete the owner's pause or run history.
 Core declares all but the audit prune only when the composition root passes `env` to
 `createScheduler`, which both Node hosts do. A scheduler built without it, as in a test, declares only
 the prune.
+
+The user-owned `dataset-capture` target stores a source query in a dataset and runs it under the
+Node service principal. Creating it requires the same device authority and risk confirmation as
+other user schedules. Each run records capture success or failure; event completeness has its own
+coverage windows and is never inferred merely from a successful timer run. Deleting a dataset
+removes its stored rows and coverage; remove its schedule separately in Settings → Schedules.
 
 ## Cadence
 

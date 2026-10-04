@@ -30,7 +30,7 @@ The registry is the authority on this list. These tools ship:
 
 | Owner | Tools |
 | --- | --- |
-| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request` |
+| Core | `task_current`, `task_context`, `repo_info`, `linked_issues`, `issue_detail`, `issue_comment`, `issue_image`, `pr_current`, `pr_changed_files`, `data_sources_list`, `data_sources_discover`, `data_source_describe`, `data_source_options`, `dataset_write`, `task_scripts_status`, `task_scripts_wait`, `task_scripts_logs`, `plugin_authoring`, `plugin_request` |
 | `github` | `github_pull_create`, `pr_review_comments`, `pr_checks` |
 | `changes` | `local_changes`, `local_diff`, `git_log` |
 | `notes` | `notes_list`, `notes_read`, `notes_write`, `notes_append` |
@@ -47,6 +47,11 @@ The four data source tools are read-only. The Node derives their workspace and p
 task, and inputs can narrow the connection and source parameters but not substitute another task.
 They return descriptors, schemas, or bounded option pages, and don't query records, return
 credentials, or change provider state.
+
+`dataset_write` is a write-risk core tool for agent-fed datasets. Its rows need evidence and a
+reason. The Node derives workspace and project from the authenticated task and rejects other
+datasets, stale schema versions, and malformed rows. A person can correct an agent row from a
+published panel; that correction is stored separately and survives later feeder writes.
 
 ## Projections
 

@@ -8,6 +8,13 @@ The Node is the only owner of authoritative application data. SQLite runs on the
 `node:sqlite` with Drizzle. The package that owns a schema owns its migration chain. Plugin databases
 are independent: no cross-database foreign keys, `ATTACH`, or transactions spanning files.
 
+The core migration chain also owns `datasets`, immutable `dataset_versions`, `dataset_rows`,
+`dataset_corrections`, `dataset_captures`, and `dataset_coverage`. A dataset has one storage mode,
+feeder, scope, and retention policy. Corrections are separate from feeder rows so a later capture
+or agent write cannot erase them; they count toward the byte cap and remain until dataset deletion.
+The daily dataset compactor applies per-dataset row and coverage retention;
+current stat measure history remains in its existing tables and compactor.
+
 ## Pages
 
 <a id="data-root"></a>

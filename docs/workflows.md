@@ -48,6 +48,12 @@ contract.
 An unversioned definition, a missing stable ID, an old binding table, or an unknown version is refused
 with a diagnostic that names the file. There's no read-time normalization or execution adapter.
 
+The built-in `write-dataset` step binds an array from a completed predecessor to
+`dataset: { id, version, rows }`. The Node derives workspace and project from the running task,
+requires a workflow-fed dataset there, validates the current schema version and every row, and
+writes them transactionally. A scheduled workflow can use the same step; the step does not create or
+change dataset definitions.
+
 ## Limits and capabilities
 
 The runtime enforces workspace and provider concurrency ceilings, per-step tool ceilings, time

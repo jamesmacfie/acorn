@@ -5,6 +5,7 @@ import { compactHistory } from '../dashboards/history'
 import { definedPanelIds, describeSamplePass, readDashboardPrefs, runSamplePass } from '../dashboards/sampler'
 import type { AppDatabase } from '../db'
 import { registerNodeActionTarget } from './nodeAction'
+import { registerDatasetCaptureTarget } from '../datasets/schedule'
 import { type Clock, Scheduler } from './scheduler'
 
 export { keyOwner, Scheduler } from './scheduler'
@@ -85,6 +86,12 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
     // here rather than through the bridge because the target is core's: it dispatches a plugin's own
     // route the way a click does, and no plugin should register that dispatch on its own behalf.
     registerNodeActionTarget(scheduler, env)
+    registerDatasetCaptureTarget(scheduler, db, env)
+    scheduler.register({ key: 'core:compact-datasets', name: 'Prune dataset retention', cadence: { daily: '03:50' },
+      run: async () => {
+        const { pruneDatasetRows } = await import('../datasets/store')
+        return `${pruneDatasetRows(db)} expired dataset rows removed`
+      } })
   }
 
   return scheduler

@@ -36,4 +36,5 @@ export type DashboardDisplayRow = {
   target?: { kind: string; item: string }
   partial?: Record<string, string>
   summaryStage?: number
+  correctableDatasetId?: string
 }

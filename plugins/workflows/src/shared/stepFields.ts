@@ -17,6 +17,12 @@ const PROMPT_FIELD: StepField = { id: 'prompt', label: 'Prompt', type: 'prompt',
 const OPTIONAL_PROMPT_FIELD: StepField = { ...PROMPT_FIELD, required: false, hint: 'Optional when the step appends its upstream outputs.' }
 
 export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescription>> = {
+  'write-dataset': {
+    label: 'Write dataset', description: 'Validate rows from an earlier step and write them to a workflow-fed dataset in this task project.', icon: 'database',
+    fields: [{ id: 'dataset', label: 'Dataset and rows', type: 'textarea', required: true,
+      hint: 'Dataset ID, current schema version, and a typed rows binding to an earlier step output.' }],
+    output: { description: 'Number of dataset rows written.', schema: { type: 'object', properties: { written: { type: 'number' } }, required: ['written'] } },
+  },
   'find-records': {
     label: 'Find records', description: 'Run an inline or published query and store its complete selection.', icon: 'search',
     fields: [{ id: 'query', label: 'Query', type: 'textarea', required: true, hint: 'A typed inline or saved query reference.' }],

@@ -12,7 +12,7 @@ import { dashboardFields } from './typedProjection'
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
 export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; result?: DataSourceResult }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
-export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>> }
+export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>; correctableDatasetId?: string; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>> }
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
 export type PlanStageCount = { path: string; input: number; output: number; meaning?: string }
 export type DashboardRun = {
@@ -21,7 +21,7 @@ export type DashboardRun = {
   groups: PlanGroup[]
   diagnostics: {
     problems: PlanProblem[]
-    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null; completeness?: DataSourceResult['completeness']; readTime?: number }[]
+    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null; completeness?: DataSourceResult['completeness']; readTime?: number; coverage?: DataSourceDescription['coverage'] }[]
     stages: PlanStageCount[]
     evaluationTime: number
     plugins: string[]
@@ -296,6 +296,9 @@ export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): 
     sourceValues: { [source.instanceId]: values },
     values,
     records: [record.ref],
+    ...(source.query.source.pluginId === 'core' && source.query.source.sourceId.startsWith('dataset:')
+      && source.description.dataset?.feeder === 'agent'
+      ? { correctableDatasetId: source.query.source.sourceId.slice(8) } : {}),
     recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
@@ -462,6 +465,7 @@ export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { sch
       ...(row.target ? { target: row.target } : {}),
       ...(row.partial ? { partial: row.partial } : {}),
       ...(row.summaryStage !== undefined ? { summaryStage: row.summaryStage } : {}),
+      ...(row.correctableDatasetId ? { correctableDatasetId: row.correctableDatasetId } : {}),
     })),
   }
 }

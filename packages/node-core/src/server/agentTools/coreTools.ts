@@ -13,6 +13,7 @@ import type { Env } from '../bindings.ts'
 import { discoverDataSources, invokeDataSource, listDataSources } from '../dataSources/runtime.ts'
 import { broadcastPluginApprovalNotice } from '../notify.ts'
 import { loadTask, projectForTask } from '../worktrees/taskWorktree.ts'
+import { datasetWriteSchema } from '@acorn/protocol/datasets.ts'
 
 // The owner id for the core-owned contributions. Registration is idempotent across service boots.
 const OWNER = 'core'
@@ -47,6 +48,21 @@ const sourceTools = (deps: AgentToolsDeps): AgentToolContribution[] => {
   const principal = (ctx: ToolContext) => ({ kind: 'internal' as const, scope: 'service' as const, userId: ctx.userLogin })
   const scopeInput = { connectionId: z.string().min(1).optional(), parameters: z.record(z.string(), z.unknown()).optional() }
   return [
+    {
+      name: 'dataset_write',
+      description: 'Write evidence-backed rows to an agent-fed dataset in this task project. The dataset schema and scope are fixed by its owner; corrections remain separate.',
+      input: datasetWriteSchema, scope: 'task', risk: 'write',
+      handler: async (input, ctx) => {
+        const parsed = datasetWriteSchema.parse(input)
+        const scope = await sourceScope(deps, ctx, {})
+        const { assertDatasetWriteScope, getDataset, writeDatasetRows } = await import('../datasets/store.ts')
+        const dataset = getDataset(deps.db, parsed.datasetId)
+        if (!scope.projectId) throw new ToolError('bad_request', 'Dataset write needs a task project.')
+        assertDatasetWriteScope(dataset, scope.workspaceId, scope.projectId)
+        if (dataset.feeder !== 'agent') throw new ToolError('bad_request', 'Dataset does not accept agent rows.')
+        return { written: writeDatasetRows(deps.db, dataset, parsed) }
+      },
+    },
     {
       name: 'data_sources_list',
       description: 'List typed data sources available to the current task project. Read-only; returns descriptors, never credentials.',

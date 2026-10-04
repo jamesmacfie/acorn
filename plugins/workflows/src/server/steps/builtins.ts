@@ -11,7 +11,7 @@ export const MAX_STEP_TURNS = 8
 
 // The single source of truth for what ships built in. Registration below is keyed off these, and
 // workflowFiles' default validation catalog reuses them.
-export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'decide', 'find-records', 'get-record-details', 'if'] as const
+export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'decide', 'find-records', 'get-record-details', 'write-dataset', 'if'] as const
 export const BUILTIN_POLICIES = ['checks-green'] as const
 
 export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)[number], StepValidator>> = {

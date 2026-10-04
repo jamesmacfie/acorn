@@ -10,6 +10,7 @@ import ConditionEditor from './ConditionEditor'
 import FieldControl from './FieldControl'
 import PromptField from './PromptField'
 import SchemaFieldEditor from './SchemaFieldEditor'
+import WriteDatasetEditor from './WriteDatasetEditor'
 
 const kindOf = (step: WorkflowStepDef): string => step.kind ?? 'agent'
 
@@ -55,6 +56,8 @@ export default function StepConfigurationFields(props: {
       </Field>
     )}>
       {(description) => (
+        <Show when={kind() !== 'write-dataset'} fallback={<WriteDatasetEditor step={props.step} def={props.def}
+          catalog={props.catalog} disabled={props.disabled} onChange={value => props.onFieldChange('dataset', value)} />}>
         <For each={description().fields}>
           {(field) => (
             <Show when={!field.type.startsWith('workflow-') && field.type !== 'child-workflow' && field.type !== 'gate-form'}>
@@ -93,6 +96,7 @@ export default function StepConfigurationFields(props: {
             </Show>
           )}
         </For>
+        </Show>
       )}
     </Show>
   )

@@ -190,7 +190,7 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
   if (o.repeat && typeof o.repeat === 'object') dataFields.repeat = o.repeat as WorkflowStepDef['repeat']
   if (typeof o.incremental === 'boolean') dataFields.incremental = o.incremental
   try {
-    for (const key of ['query', 'record', 'condition'] as const) {
+    for (const key of ['query', 'record', 'condition', 'dataset'] as const) {
       if (typeof o[`${key}_json`] === 'string') Object.assign(dataFields, { [key]: JSON.parse(o[`${key}_json`] as string) })
     }
   } catch {

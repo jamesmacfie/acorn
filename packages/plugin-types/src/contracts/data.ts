@@ -20,6 +20,8 @@ export type DataSourceDescription = {
   schema: DataSchema; fields: DataField[]; parameters: DataSchema; parameterFields: DataField[]
   operations: { query: true; options: boolean; details: boolean; incremental: boolean; groups: ('all' | 'any')[] }
   detailSchema?: DataSchema; incremental?: { semantics: string }; revision: string; consistency: string
+  dataset?: { mode: 'current-mirror' | 'event-archive' | 'snapshot-history'; feeder: 'capture' | 'workflow' | 'agent' }
+  coverage?: { fromTime: number; toTime: number; kind: 'complete' | 'gap'; reason: string | null }[]
   starterPlans?: unknown[]
   actions?: { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute' }[]
   targets?: { kind: string }[]
@@ -36,10 +38,11 @@ export type DataSourceRequest =
   | { operation: 'query'; query: DataSourceQuery; mode: 'preview' | 'execution'; evaluationTime: number; cursor?: string; pageSize: number; timeoutMs?: number }
   | { operation: 'details'; ref: DataRecordRef; scope: DataSourceScope; projection: string[] }
   | { operation: 'actions'; ref: DataRecordRef; scope: DataSourceScope }
-export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' }
+export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' | 'coverage-gap' }
 export type DataSourcePage = {
   records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction; actions?: NamedDataRecordAction[]; target?: { kind: string; item: string } }[]
   revision: string; readTime: number; completeness: DataSourceCompleteness; incrementalBoundary?: DataValue
+  eventCoverage?: { fromTime: number; toTime: number }[]
 }
 export type DataRecordAction = ({ verb: 'openPane'; pane: string } | { verb: 'openTask' }
   | { verb: 'runNodeAction'; path: string } | { verb: 'openUrl'; url: string }

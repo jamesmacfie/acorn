@@ -397,6 +397,10 @@ acorn-plugin-types: member DataSourceCompleteness.cursor
 acorn-plugin-types: member DataSourceCompleteness.kind
 acorn-plugin-types: member DataSourceDescription.actions
 acorn-plugin-types: member DataSourceDescription.consistency
+acorn-plugin-types: member DataSourceDescription.coverage
+acorn-plugin-types: member DataSourceDescription.dataset
+acorn-plugin-types: member DataSourceDescription.dataset.feeder
+acorn-plugin-types: member DataSourceDescription.dataset.mode
 acorn-plugin-types: member DataSourceDescription.detailSchema
 acorn-plugin-types: member DataSourceDescription.fields
 acorn-plugin-types: member DataSourceDescription.incremental
@@ -431,6 +435,7 @@ acorn-plugin-types: member DataSourceDiscoveryRequest.pageSize
 acorn-plugin-types: member DataSourceDiscoveryRequest.pluginId
 acorn-plugin-types: member DataSourceDiscoveryRequest.scope
 acorn-plugin-types: member DataSourcePage.completeness
+acorn-plugin-types: member DataSourcePage.eventCoverage
 acorn-plugin-types: member DataSourcePage.incrementalBoundary
 acorn-plugin-types: member DataSourcePage.readTime
 acorn-plugin-types: member DataSourcePage.records

@@ -25,6 +25,7 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import PanelBody from './views/PanelBody'
 import CompositionStageForm from './CompositionStageForm'
 import EquivalenceForm from './EquivalenceForm'
+import KeepHistory from './KeepHistory'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { availableContentPresentations } from '../../host/registries/panes/contentLinks'
@@ -305,6 +306,10 @@ export default function DashboardEditor(props: {
             <Select label="Row role" size="sm" value={source.role} options={['primary', 'lookup', 'children'].map(value => ({ value, label: value }))}
               onChange={role => change(current => ({ ...current, sources: current.sources.map(entry => entry.id === source.id ? { ...entry, role: role as typeof source.role } : entry) }))} />
             <For each={starters()[source.id] ?? []}>{starter => <Button size="sm" variant="ghost" onPress={() => change(() => starter)}>{`Start with ${starter.title} · ${describePanelPlan(starter)[0]}`}</Button>}</For>
+            <Show when={states()[source.id]?.query && states()[source.id]?.description && states()[source.id]?.source}>
+              <KeepHistory query={states()[source.id]!.query!} description={states()[source.id]!.description!}
+                sourceName={states()[source.id]!.source!.name} onCreated={() => void queryClient.invalidateQueries()} />
+            </Show>
             <Button size="sm" variant="ghost" onPress={() => setSource(source.id, undefined)}>Remove source</Button>
           </Fold>}</For>
           <Button size="sm" disabled={plan().sources.length >= 8} onPress={addSource}>Add another source</Button>

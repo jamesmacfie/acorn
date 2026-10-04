@@ -106,6 +106,7 @@ const tomlStep = (step: WorkflowStepDef): Record<string, unknown> =>
     query_json: step.query ? JSON.stringify(step.query) : undefined,
     record_json: step.record ? JSON.stringify(step.record) : undefined,
     condition_json: step.condition ? JSON.stringify(step.condition) : undefined,
+    dataset_json: step.dataset ? JSON.stringify(step.dataset) : undefined,
     projection: step.projection,
     repeat: step.repeat,
     incremental: step.incremental,

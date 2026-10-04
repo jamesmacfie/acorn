@@ -24,7 +24,7 @@ export default function TableView(props: PanelViewProps) {
       <Table size="sm" stickyHead>
         <TableRow head>
           <For each={props.fields}>{(field) => <TableHead>{field.name}</TableHead>}</For>
-          <Show when={props.onButton}><TableHead>Actions</TableHead></Show>
+          <Show when={props.onButton || props.onCorrect}><TableHead>Actions</TableHead></Show>
         </TableRow>
         <For each={rows}>
           {(row) => (
@@ -34,7 +34,10 @@ export default function TableView(props: PanelViewProps) {
                   <Button size="sm" variant="bare" onPress={() => props.onMeasureDrilldown?.(row, field.id)}><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></Button>
                 </Show><Show when={row.partial?.[field.id]}>{reason => <span title={reason()} aria-label={`Partial: ${reason()}`}> · partial</span>}</Show></TableCell>}
               </For>
-              <Show when={props.onButton}><TableCell><RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /></TableCell></Show>
+              <Show when={props.onButton || props.onCorrect}><TableCell>
+                <Show when={props.onButton}><RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /></Show>
+                <Show when={row.correctableDatasetId && props.onCorrect}><Button size="sm" variant="ghost" onPress={() => props.onCorrect?.(row)}>Correct</Button></Show>
+              </TableCell></Show>
             </TableRow>
           )}
         </For>
