@@ -1,5 +1,5 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
-import { Card, EmptyState, StatusDot } from '../../../kit/components/primitives'
+import { Button, Card, EmptyState, StatusDot } from '../../../kit/components/primitives'
 import { PANEL_SOURCE_FIELD_ID } from '../mapping'
 import { boardColumns, groupField, titleField } from '../shaping'
 import Cell from './Cell'
@@ -58,7 +58,9 @@ export default function BoardView(props: PanelViewProps) {
             }}>
               <header class="dash-board-column-head">
                 <StatusDot tone={panelDotTone(column.tone)} />
-                <span class="dash-board-column-label">{column.label}</span>
+                <span class="dash-board-column-label"><Show when={props.onSelectPart} fallback={column.label}>
+                  {select => <Button size="sm" variant="bare" onPress={() => select()('arrange')}>{column.label}</Button>}
+                </Show></span>
                 <span class="dash-board-column-count">{column.rows.length}</span>
               </header>
               <Show when={dragged() && refusal()}><span class="dash-board-refusal" role="status">{refusal()}</span></Show>

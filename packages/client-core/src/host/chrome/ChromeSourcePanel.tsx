@@ -428,6 +428,7 @@ export function ChromeSourceDetail(props: ChromeSourcePanelProps) {
         <PanelGrid
           scope={regionScope(sourceRegionOwner(props.pluginId, props.descriptor.id))}
           region={panelRegion(props.pluginId, declared())}
+          returnLabel={props.descriptor.label}
         />
       )}
     </Show>

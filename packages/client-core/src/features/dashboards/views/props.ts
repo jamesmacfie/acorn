@@ -7,6 +7,7 @@ import type { PanelTone, PanelView } from '../model'
 import type { DisplayPlanGroup } from '@acorn/dashboards-core/plan.ts'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
+import type { PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
    *  layer runs once per panel, not once per view, which is what lets a person flip between views
@@ -44,6 +45,9 @@ export type PanelViewProps = {
   boardChoices?: { id: string; label: string }[]
   boardMoveReason?: (row: DashboardDisplayRow, choiceId: string) => string | undefined
   onBoardMove?: (row: DashboardDisplayRow, choiceId: string) => void
+  /** The panel studio's preview only: a column header selects its column, and a group header selects
+   *  the arrange part. A placed panel leaves it off, so its headers keep their own behaviour. */
+  onSelectPart?: (key: PlanPartKey) => void
 }
 
 /** A row's press handler: only when the row declares a verb and the host can run it. */

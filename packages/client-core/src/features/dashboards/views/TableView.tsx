@@ -23,7 +23,9 @@ export default function TableView(props: PanelViewProps) {
     >
       <Table size="sm" stickyHead>
         <TableRow head>
-          <For each={props.fields}>{(field) => <TableHead>{field.name}</TableHead>}</For>
+          <For each={props.fields}>{(field) => <TableHead><Show when={props.onSelectPart} fallback={field.name}>
+            {select => <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>{field.name}</Button>}
+          </Show></TableHead>}</For>
           <Show when={props.onButton || props.onCorrect}><TableHead>Actions</TableHead></Show>
         </TableRow>
         <For each={rows}>
@@ -44,6 +46,6 @@ export default function TableView(props: PanelViewProps) {
       </Table>
     </Show>
   )
-  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown} onPress={() => props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : table(group.rows)}</section>}</For>
+  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown && !props.onSelectPart} onPress={() => props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : table(group.rows)}</section>}</For>
   return props.groups?.length ? sections(props.groups) : table(props.rows)
 }

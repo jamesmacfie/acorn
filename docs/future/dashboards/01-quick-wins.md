@@ -13,7 +13,7 @@ deleted with the modal. None of it is throwaway structure.
 
 ## Starting point
 
-The editor is `packages/client-core/src/features/dashboards/DashboardEditor.tsx`. It is one
+The editor was `packages/client-core/src/features/dashboards/DashboardEditor.tsx`, deleted in phase 3. It was one
 component of about 536 lines. Its state is a `PanelPlan` signal changed through
 `change(update)`, which autosaves a device copy right away and a Node draft after 750 ms.
 

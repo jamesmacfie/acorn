@@ -1,6 +1,7 @@
 import { Show } from 'solid-js'
 import PanelGrid from '../../features/dashboards/PanelGrid'
 import { regionScope } from '../../features/dashboards/region'
+import { taskById } from '../../features/tasks/taskLookup'
 import ExtensionPointHost from './ExtensionPointHost'
 import { InlineSlot } from '../frames/InlineSlot'
 import type { ExtendedPaneProps } from './extendedPane'
@@ -40,7 +41,8 @@ export default function ExtendedPane(props: ExtendedPaneProps) {
       <Show when={props.aside}>
         {(aside) => (
           <aside class="extended-pane-aside">
-            <PanelGrid scope={regionScope(aside().pointId)} region={aside().region} />
+            <PanelGrid scope={regionScope(aside().pointId)} region={aside().region}
+              returnLabel={(props.taskId && taskById(props.taskId)?.title) || 'Task'} />
           </aside>
         )}
       </Show>

@@ -54,6 +54,6 @@ export default function ListView(props: PanelViewProps) {
         </Row>
       )}
     </For>
-  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown} onPress={() => props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
+  const sections = (groups: NonNullable<typeof props.groups>) => <For each={groups}>{group => <section class="dash-row-group"><h4><Button size="sm" variant="bare" disabled={!props.onDrilldown && !props.onSelectPart} onPress={() => props.onSelectPart ? props.onSelectPart('arrange') : props.onDrilldown?.(group)}>{`${group.label} · ${group.count}`}</Button></h4>{group.children?.length ? sections(group.children) : list(group.rows)}</section>}</For>
   return props.groups?.length ? sections(props.groups) : list(props.rows)
 }

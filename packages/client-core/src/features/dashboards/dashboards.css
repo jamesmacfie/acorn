@@ -8,30 +8,78 @@
    The two `--dash-*` properties below are a measurement PanelGrid writes in, not a design decision.
    The shape stays here, where a pack can reach it. */
 
-.dash-v2-editor {
-  display: grid;
-  grid-template-columns: minmax(18rem, 1fr) minmax(18rem, 1fr);
-  gap: var(--gap-stack);
-  align-items: start;
-}
+/* ── Panel studio ─────────────────────────────────────────────────────────────────────────── */
 
-.dash-v2-preview {
-  position: sticky;
-  top: 0;
+/* The panel studio (studio/PanelStudio.tsx): a full-window layer over the shell, like Settings, at
+   the modal's z-level so a menu or a select's list it opens still paints above it. A column of
+   toolbar, tabs, body and status bar; the body is the outline beside the preview and inspector. */
+.dash-studio {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
   display: flex;
-  min-height: 22rem;
+  flex-direction: column;
+  background: var(--bg);
 }
-/* The preview is the placed panel's `Card`, so it draws at the panel's pad and edge. */
-.dash-v2-preview > .ui-card {
+.dash-studio:focus { outline: none; }
+.dash-studio-title { min-width: 0; }
+.dash-studio-body {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.dash-studio-code {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: var(--space-4);
+}
+/* The detail column: the preview, and a 320 px inspector on its right. */
+.dash-studio-detail {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 320px;
+  height: 100%;
+  min-height: 0;
+}
+.dash-studio-preview {
   display: flex;
   flex-direction: column;
   gap: var(--gap-stack);
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-4);
   overflow: auto;
 }
+.dash-studio-stage { min-width: 0; }
+/* The size PanelStudio measures in from the S, M and L presets. */
+.dash-studio-frame {
+  display: flex;
+  max-width: 100%;
+  min-height: 12rem;
+}
+/* The preview is the placed panel's `Card`, so it draws at the panel's pad and edge. */
+.dash-studio-frame > .ui-card {
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-stack);
+}
+.dash-studio-inspector {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-4);
+  border-left: var(--chrome-divider);
+  overflow-y: auto;
+}
+.dash-studio-source[hidden] { display: none; }
 
-@media (max-width: 760px) {
-  .dash-v2-editor { grid-template-columns: minmax(0, 1fr); }
-  .dash-v2-preview { position: static; min-height: 16rem; }
+@media (max-width: 1100px) {
+  .dash-studio-detail { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
+  .dash-studio-preview, .dash-studio-inspector { overflow: visible; }
+  .dash-studio-inspector { border-left: 0; border-top: var(--chrome-divider); }
 }
 
 /* ── Placement ───────────────────────────────────────────────────────────────────────────── */
@@ -766,12 +814,3 @@
   gap: var(--space-1);
 }
 
-/* The editor's description lines and problems: one line each, rather than spans run together. */
-.dash-v2-lines {
-  display: flex;
-  flex-direction: column;
-  gap: var(--gap-row);
-  margin: 0;
-  padding: 0;
-  list-style: none;
-}

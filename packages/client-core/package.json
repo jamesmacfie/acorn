@@ -11,6 +11,7 @@
     "./features/dataSources/SourceQueryEditor.tsx": "./src/features/dataSources/SourceQueryEditor.tsx",
     "./features/dataSources/TypedBindingPicker.tsx": "./src/features/dataSources/TypedBindingPicker.tsx",
     "./features/dataSources/fieldPickerModel.ts": "./src/features/dataSources/fieldPickerModel.ts",
+    "./features/dashboards/studio/studioOpen.ts": "./src/features/dashboards/studio/studioOpen.ts",
     "./features/diff": "./src/features/diff/public.ts",
     "./features/diff/DiffPane.tsx": "./src/features/diff/DiffPane.tsx",
     "./features/diff/lineContext.ts": "./src/features/diff/lineContext.ts",

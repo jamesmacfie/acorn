@@ -618,7 +618,7 @@ describe('architecture boundaries', () => {
       // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
       // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
       // `features/editor/documentCustody.ts`, merged in from perf.
-      '@acorn/client-core': 167, // Includes the host-owned Datasets settings page.
+      '@acorn/client-core': 168, // Includes the host-owned Datasets settings page and the panel studio's open flag.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
@@ -751,7 +751,8 @@ describe('architecture boundaries', () => {
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
-      ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'context is a binding address and preview is a run mode'],
+      ['packages/client-core/src/features/dashboards/studio/PanelStudio.tsx', 'preview is a dashboard run mode'],
+      ['packages/client-core/src/features/dashboards/studio/inspectors.tsx', 'context is a binding address'],
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
       ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],

@@ -1,8 +1,8 @@
 # Mapping and the editor
 
 This page covers how one panel combines rows from several sources, and how the editor builds a panel.
-The mapping rules are in `packages/dashboards-core/src/mapping.ts`, and the editor is
-`packages/client-core/src/features/dashboards/DashboardEditor.tsx`.
+The mapping rules are in `packages/dashboards-core/src/mapping.ts`, and the editor is the panel
+studio in `packages/client-core/src/features/dashboards/studio/`.
 
 ## The mapping layer, and cross-source panels
 
@@ -43,28 +43,55 @@ that type can answer, a value drawn by the field's type, and a tone. Selectors m
 unofferable. `normalizePanel` drops stale choices no selector catches, such as a filter on a field that
 disappeared when you swapped the source.
 
-**Add panel** always opens a blank plan with **Pick data** or **Describe it**. If an unpublished draft
-exists, one line above them names the newest, with **Continue** to reopen it and **Discard** to delete
-it. The source picker shows source and account pairs, and a source joins the plan only once it's
-picked, so nothing is reported before then. The AI conversation asks for missing choices and
-proposes the same plan used by the forms.
+**Add panel** and a panel's **Edit** open the panel studio (`studio/PanelStudio.tsx`), a
+full-window layer like Settings. It isn't a route, because a route would unmount the task's panes,
+plugin frames, and terminal drawer behind it. Task keybindings stand down while it's open
+(`isPanelStudioOpen` in `studio/studioOpen.ts`), **Escape** closes it, and focus returns to the
+control that opened it. Closing never loses work, because each change autosaves.
 
-The editor shows the title, then data, relations (with two or more sources), columns, steps, and
-**Arrange**, **Look**, row actions, and **Settings**. Every control has a visible caption, and every
-option reads as words from `packages/dashboards-core/src/labels.ts` rather than a schema value. **Look**
-offers only the options the chosen view takes. Each step's fold shows its row count, such as "Keep
-matching rows · 312 → 41". Source descriptions may offer starter plans, which the host validates and
+The studio is laid out like the Workflows editor. The toolbar has a back button named for where the
+studio was opened from, the panel title (click it to rename in place), the save state, whether the
+panel is published or has unpublished changes, **Ask AI**, **Undo**, **Redo**, **Publish…**, and a
+menu with **Discard changes** and **Delete panel**. The **Plan** tab shows the plan as read-only
+JSON. The **Outline** tab shows the outline, the live preview, and an inspector. A status bar names
+the first problem as a link to its part, and the changes since the last publish.
+
+A blank panel shows **Pick data** and **Describe it**. If an unpublished draft exists, one line above
+them names the newest, with **Continue** to reopen it and **Discard** to delete it. The source picker
+shows source and account pairs, and a source joins the plan only once it's picked, so nothing is
+reported before then. The AI conversation opens in a dialog, asks for missing choices, and proposes
+the same plan used by the forms. Applying a proposal is one undoable step.
+
+The outline draws `planOutline` in the sections Data, Columns, Steps, Arrange, Look, and Settings.
+Each row shows its row count, such as "312 → 41" for a step, and a warning mark when the part has a
+problem. **Add** adds a source, a column, or a step, and disables a step the plan can't take yet with
+the reason. A row's menu moves a step, removes a source or step, or asks the AI about the part.
+Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part).
+Every control has a visible caption, and every option reads as words from
+`packages/dashboards-core/src/labels.ts` rather than a schema value. **Look** offers only the options
+the chosen view takes. Source descriptions may offer starter plans, which the host validates and
 lists under **Start from**. **Keep history** can create a dataset from the chosen query.
 
-The first source described creates one column per field with a display role (title, status,
-assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`).
-Rows are filtered by the panel's own filter step, which the Node pushes down to the source, so the
-source picker hides **Add condition** and its own preview. Conditions a query already has show
-read-only, because they change which records come back.
+The preview is the panel's own body in a placed panel's card, at the small, medium, or large size it
+would take on the dashboard. A placed panel starts at the size nearest its placed rectangle. Clicking
+a table's column header selects that column, and clicking a group header selects **Arrange**.
 
-Problems show under the part they belong to, such as "Column Status", with the JSON Pointer in the
-hover title. **Publish** stays off while the plan fails its schema or the latest preview reports an
-error, and the reason shows beside it. Each change autosaves the draft and a device recovery copy.
+`studio/studioStore.ts` owns the plan, the selection, undo, redo, and autosave. Each change is one
+undo step, typing within 600 ms is one step, and the stack holds 60 steps. Each change writes a
+device recovery copy, and a plan that passes its schema saves to the Node 750 ms after the last
+change.
+
+The first source described creates one column per field with a display role (title, status,
+assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`). That
+change joins the undo step that picked the source. Rows are filtered by the panel's own filter step,
+which the Node pushes down to the source, so the source picker hides **Add condition** and its own
+preview. Conditions a query already has show read-only, because they change which records come back.
+
+**Publish…** opens a review that lists what changes since the last publish, where the panel goes (a
+Home tab for a new Home panel), the requirements to confirm, and anything blocking: a schema
+failure, a run error, or a region that wouldn't show the panel. `publishPanelPlan` in
+`panelPublish.ts` saves the draft, describes each source to find its `plugin:source` keys and field
+roles, checks them against the region, publishes, and refreshes every panel showing it.
 
 `packages/dashboards-core/src/outline.ts` owns the plan's parts in plain words. `planOutline` splits a
 plan into keyed parts: each source, relations, columns, each step by index, arrange, look, behaviour,

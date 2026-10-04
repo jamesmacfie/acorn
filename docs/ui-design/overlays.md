@@ -22,6 +22,18 @@ the iframe inside is 100% of its container, and a container sized by its content
 nothing. A `refPanel` frame takes the drawer column's remaining space, not `height: 100%`, which would
 overflow past the header.
 
+### Full-window layers
+
+Settings (`features/settings/SettingsView.tsx`) and the panel studio
+(`features/dashboards/studio/PanelStudio.tsx`) are full-window layers, not routes. Each renders in a
+body portal at `--z-modal` with `position: fixed; inset: 0`, and is `role="dialog"` and
+`aria-modal="true"`. A route would unmount the task's panes, plugin frames, and terminal drawer
+behind it, so the layer covers them instead. While either is open, the shell stands the task's
+keybindings down through `taskActive` in `apps/desktop/src/client/App.tsx`. Focus that lands behind
+the layer returns into it, **Escape** closes it when nothing inside is open, and focus goes back to
+the control that opened it. Menus, select lists, and dialogs opened inside it portal to the body and
+paint above it.
+
 ### The drawer
 
 `Drawer` is the app's one bottom dock. It's a host component, not a kit node, because where the rails

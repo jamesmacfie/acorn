@@ -49,6 +49,8 @@ export type AuthoringConversationProps = {
   /** Whether the fold starts open, without `onClose`. Default true. A second conversation inside a
    *  form that already has one starts closed. */
   defaultOpen?: boolean
+  /** What the request box starts with, such as the part of a plan the person asked about. */
+  instruction?: string
   /** How a proposal names what a change touches, such as a workflow step by its name rather than
    *  its id. `candidate` is the proposed value, which holds anything the change adds. The path is
    *  the default. */
@@ -69,7 +71,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const storageKey = createMemo(() => `acorn:ai-authoring:v1:${cacheId}:${props.target}:${props.targetId}`)
   const [context, setContext] = createSignal<AuthoringContextEntry[]>([])
   const [pending, setPending] = createSignal<AuthoringTurnResult>()
-  const [instruction, setInstruction] = createSignal('')
+  const [instruction, setInstruction] = createSignal(props.instruction ?? '')
   const [samplesEnabled, setSamplesEnabled] = createSignal(false)
   const [choice, setChoice] = createSignal<ModelPick | null>(null)
   const [busy, setBusy] = createSignal(false)

@@ -1,4 +1,5 @@
 import { dashboardViewKinds } from '@acorn/protocol/dashboardViews.ts'
+import { VIEW_LABELS } from '@acorn/dashboards-core/labels.ts'
 import type { PluginPanelRegion } from '@acorn/protocol/plugin/contract.ts'
 import type { PanelDefinition, PanelViewKind } from './model'
 import type { PlacementScope } from './persist'
@@ -35,19 +36,28 @@ export const regionScope = (ownerId: string): PlacementScope => ({ surface: 'plu
 export const sourceRegionOwner = (pluginId: string, sourceId: string): string => `${pluginId}:${sourceId}`
 export const regionViews = (region: PanelRegion): readonly PanelViewKind[] => region.views ?? dashboardViewKinds
 
-/** Published metadata is advisory only when its source is unavailable, so an empty source list remains
- * visible and inert. A known source set must satisfy the region's entire constraint. */
-export const regionAllows = (region: PanelRegion, panel: PanelDefinition): boolean => {
-  if (!regionViews(region).includes(panel.view.kind as PanelViewKind)) return false
-  const publication = panel.publication
-  if (!publication) return false
+/** Why a region refuses a panel with this view and published metadata, or undefined when it allows it.
+ * Metadata is advisory only when its source is unavailable, so an empty source list stays allowed. A
+ * known source set must satisfy the region's entire constraint. */
+export function regionRefusal(region: PanelRegion, view: string, publication: { sources?: readonly string[]; fieldRoles?: readonly string[] }): string | undefined {
+  const views = regionViews(region)
+  if (!views.includes(view as PanelViewKind)) return `This area only shows ${listWords(views.map(kind => VIEW_LABELS[kind]))} panels.`
   const sources = publication.sources ?? []
-  if (region.sources && sources.length) return sources.every(source => region.sources!.includes(source))
-  if (region.fieldRole && publication.fieldRoles?.length) return publication.fieldRoles.includes(region.fieldRole)
-  if (!region.sources && !region.fieldRole && sources.length) {
-    return sources.every(source => source.startsWith(`${region.pluginId}:`))
+  if (region.sources && sources.length) {
+    return sources.every(source => region.sources!.includes(source)) ? undefined : 'This area only shows panels built from its own sources.'
   }
-  return true
+  if (region.fieldRole && publication.fieldRoles?.length) {
+    return publication.fieldRoles.includes(region.fieldRole) ? undefined : `This area only shows panels with a ${region.fieldRole} field.`
+  }
+  if (!region.sources && !region.fieldRole && sources.length && !sources.every(source => source.startsWith(`${region.pluginId}:`))) {
+    return "This area only shows panels built from its plugin's sources."
+  }
+  return undefined
 }
+
+export const regionAllows = (region: PanelRegion, panel: PanelDefinition): boolean =>
+  !!panel.publication && !regionRefusal(region, panel.view.kind, panel.publication)
+
+const listWords = (words: readonly string[]): string => words.length < 2 ? words.join('') : `${words.slice(0, -1).join(', ')} and ${words.at(-1)}`
 
 export const regionHasRoom = (region: PanelRegion, placed: number): boolean => placed < region.max

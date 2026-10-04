@@ -82,6 +82,8 @@ export default function PanelGrid(props: {
   /** Home's. The host draws its own Add panel, so the grid draws no "Panels" header and no add
    *  button, and draws this in place of an empty grid. A `heading` still draws. */
   empty?: () => JSX.Element
+  /** Where this grid is, named on the panel studio's back button: a Home tab, a source, or a task. */
+  returnLabel: string
 }) {
   const [typedEditing, setTypedEditing] = createSignal<DashboardEditorSession>()
   const [gesture, setGesture] = createSignal<Gesture | undefined>()
@@ -434,6 +436,8 @@ export default function PanelGrid(props: {
         <DashboardPanelHost
           session={typedEditing()}
           scope={props.scope}
+          {...(props.region ? { region: props.region } : {})}
+          returnLabel={props.returnLabel}
           onClose={() => setTypedEditing(undefined)}
         />
 

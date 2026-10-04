@@ -48,8 +48,10 @@ with the cooperative kinds, but you fill it, not another plugin
 A region's constraints are one small vocabulary (`region.ts`): which sources, a required field role,
 which views, and a maximum panel count, four by default. The constraints check only publication
 metadata, without fetching records. A region with no constraint accepts any panel. They're enforced
-twice: the editor doesn't offer a disallowed option, and the host checks again at render, because a
-plugin can narrow its region in an update. A refused panel isn't drawn there and nothing is deleted.
+twice. The panel studio checks them at publish: the review describes each source and refuses a panel
+the region wouldn't show, with the reason, such as "This area only shows Board and List panels"
+(`regionRefusal`). The host checks again at render, because a plugin can narrow its region in an
+update. A refused panel isn't drawn there and nothing is deleted.
 
 **Remove from this dashboard** unplaces a panel. **Delete panel** destroys the definition and asks first. A
 region whose plugin is disabled disappears, and its panels survive to return with it.

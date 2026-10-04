@@ -58,6 +58,7 @@ import { registerCoreExclusiveSlot } from '@acorn/client-core/host/registries/ex
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
 import type { SettingsRequest } from '@acorn/client-core/features/settings/SettingsView.tsx'
+import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio/studioOpen.ts'
 
 // The shell and PR list are the startup path. Heavy/conditional surfaces stay behind their actual
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
@@ -567,9 +568,10 @@ export default function App() {
           </Show>
         </Match>
       </Switch>
-      {/* Settings covers the task, so the task's own chords stand down while it is open: a pane chord
-          would act on a surface nobody can see, and could move focus into a terminal under the layer. */}
-      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest()} focusedPane={focusedPane(activeTaskId())} />
+      {/* Settings and the panel studio cover the task, so the task's own chords stand down while either
+          is open: a pane chord would act on a surface nobody can see, and could move focus into a
+          terminal under the layer. */}
+      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest() && !isPanelStudioOpen()} focusedPane={focusedPane(activeTaskId())} />
       {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
           from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
           hold markup. */}

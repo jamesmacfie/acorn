@@ -63,13 +63,14 @@ export default function Home() {
         scope={scope()}
         heading={bar}
         panelAria={{ id: HOME_TAB_PANEL_ID, labelledBy: homeTabDomId(activeTab()) }}
+        returnLabel={tabName()}
         empty={() => (
           <EmptyState title={`Nothing on ${tabName()} yet`} action={addButton('md')}>
             Add a panel to see tasks, pull requests, issues, or anything else in view.
           </EmptyState>
         )}
       />
-      <DashboardPanelHost session={adding() ? {} : undefined} scope={scope()} onClose={() => setAdding(false)} />
+      <DashboardPanelHost session={adding() ? {} : undefined} scope={scope()} returnLabel={tabName()} onClose={() => setAdding(false)} />
     </main>
   )
 }
