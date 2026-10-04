@@ -6,8 +6,6 @@ import { readSeries, type MeasureSeries } from '../dashboards/history'
 import { respondError } from '../respond'
 import { authorizeQueryScope } from '../queries/runtime'
 import { dashboardStore, DashboardLibraryError } from '../dashboards/store'
-import { dashboardContentProblems, deleteDashboard, publishDashboard } from '../dashboards/publication'
-import { runDashboard } from '../dashboards/run'
 import { describeDashboardProblem } from '@acorn/dashboards-core/projection'
 
 // The measure-history read route (docs/dashboards/views.md § Trends).
@@ -48,11 +46,11 @@ export const dashboards = new Hono<AppEnv>().get('/history', async (c) => {
       case 'get': return c.json(store.get(input.scope, input.id))
       case 'create': return c.json(store.create(input.scope, input.content))
       case 'save': return c.json(store.save(input.scope, input.id, input.expectedRevision, input.content))
-      case 'validate': return c.json({ problems: (await dashboardContentProblems(c.env, input.scope, input.content, invocation)).map(describeDashboardProblem) })
-      case 'run': return c.json(await runDashboard(c.env, input, invocation))
-      case 'publish': return c.json(await publishDashboard(c.env, input.scope, input.id, input.expectedRevision, invocation))
+      case 'validate': return c.json({ problems: (await (await import('../dashboards/publication')).dashboardContentProblems(c.env, input.scope, input.content, invocation)).map(describeDashboardProblem) })
+      case 'run': return c.json(await (await import('../dashboards/run')).runDashboard(c.env, input, invocation))
+      case 'publish': return c.json(await (await import('../dashboards/publication')).publishDashboard(c.env, input.scope, input.id, input.expectedRevision, invocation))
       case 'published': return c.json(store.published(input.scope, input.id, input.revision))
-      case 'delete': deleteDashboard(c.env, input.scope, input.id, input.expectedRevision); return c.json({ ok: true })
+      case 'delete': (await import('../dashboards/publication')).deleteDashboard(c.env, input.scope, input.id, input.expectedRevision); return c.json({ ok: true })
     }
   } catch (error) {
     if (error instanceof DashboardLibraryError) {

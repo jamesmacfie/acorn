@@ -5,6 +5,7 @@
       "agents",
       "agents",
       "agents/data/sessions",
+      "agents/data/usage",
       "browser/captures",
       "changes/tasks",
       "changes/tasks",
@@ -13,6 +14,7 @@
       "editor/tasks",
       "github",
       "github",
+      "github/data/actions",
       "github/data/pulls",
       "github/pins",
       "github/repos",
@@ -194,6 +196,7 @@
       "routes": [
         "github",
         "github",
+        "github/data/actions",
         "github/data/pulls",
         "github/pins",
         "github/repos",

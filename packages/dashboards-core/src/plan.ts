@@ -8,9 +8,12 @@ import { evaluateExpression, expandRows, overlapRows, summarizeRows } from './an
 import { relatePanelRows } from './relations'
 import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { dashboardFields } from './typedProjection'
+import { bucketBounds } from './planBuckets'
+
+export { PANEL_CAPABILITIES } from './capabilities'
 
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
-export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; result?: DataSourceResult }
+export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; accountLabel?: string; result?: DataSourceResult }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
 export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>; correctableDatasetId?: string; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>>; sourceFieldValues?: Record<string, Record<string, DataValue>>; sourceWritableFields?: Record<string, string[]> }
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
@@ -21,9 +24,12 @@ export type DashboardRun = {
   groups: PlanGroup[]
   diagnostics: {
     problems: PlanProblem[]
-    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null; completeness?: DataSourceResult['completeness']; readTime?: number; coverage?: DataSourceDescription['coverage']; writable?: DataSourceDescription['writable'] }[]
+    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null;
+      completeness?: DataSourceResult['completeness']; readTime?: number; coverageWindows?: DataSourceDescription['coverageWindows'];
+      coveredRange?: DataSourceResult['coveredRange']; observedAt?: number; writable?: DataSourceDescription['writable'] }[]
     stages: PlanStageCount[]
     evaluationTime: number
+    asOf?: number
     plugins: string[]
     accounts: string[]
     complete: boolean
@@ -382,6 +388,8 @@ export function deriveDrilldownPlan(plan: PanelPlan, rows: readonly Pick<PlanRow
   stageIndex?: number
   measureFilter?: DataPredicate
   summaryKeys?: Record<string, DataValue>
+  summaryBuckets?: { column: string; bucket: 'day' | 'week' | 'month'; value: DataValue }[]
+  zone?: string
 } = {}): PanelPlan {
   const stages = plan.stages.slice(0, options.stageIndex ?? plan.stages.length)
   const predicates: DataPredicate[] = []
@@ -392,6 +400,19 @@ export function deriveDrilldownPlan(plan: PanelPlan, rows: readonly Pick<PlanRow
   }
   for (const [column, value] of Object.entries(options.summaryKeys ?? {})) predicates.push({ kind: 'comparison',
     left: { address: { from: 'item', pointer: `/${column}` } }, operator: 'eq', right: { address: { from: 'literal', value } } })
+  for (const item of options.summaryBuckets ?? []) {
+    if (item.value === null) {
+      predicates.push({ kind: 'comparison', left: { address: { from: 'item', pointer: `/${item.column}` } },
+        operator: 'eq', right: { address: { from: 'literal', value: null } } })
+      continue
+    }
+    const precision = plan.columns.find(column => column.id === item.column)?.precision ?? 'instant'
+    const bounds = bucketBounds(item.value, item.bucket, options.zone ?? plan.time.zone, precision)
+    if (!bounds) throw new Error(`Invalid ${item.bucket} bucket for ${item.column}`)
+    for (const [operator, value] of [['gte', bounds.start], ['lt', bounds.end]] as const) predicates.push({ kind: 'comparison',
+      left: { address: { from: 'item', pointer: `/${item.column}` } }, operator,
+      right: { address: { from: 'literal', value } } })
+  }
   if (options.measureFilter) predicates.push(options.measureFilter)
   const where: DataPredicate = predicates.length === 1 ? predicates[0]! : { kind: 'all', predicates }
   const filtered = !predicates.length ? stages : [...stages, { op: 'filter' as const, where }]
@@ -402,7 +423,7 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   const labels = plan.sources.map(source => {
     const resolved = sources.find(candidate => candidate.instanceId === source.id)
     const scope = resolved?.query.scope
-    return `${source.label}${scope?.connectionId ? ` through account ${scope.connectionId}` : ''}`
+    return `${source.label}${scope?.connectionId ? ` through account ${resolved?.accountLabel ?? scope.connectionId}` : ''}`
   })
   const describePredicate = (predicate: DataPredicate): string => {
     if (predicate.kind !== 'comparison') return predicate.predicates.map(describePredicate).join(predicate.kind === 'all' ? ' and ' : ' or ')
@@ -410,7 +431,11 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     const id = address.from === 'item' ? pointerColumn(address.pointer) : undefined
     const name = columnAt(plan, id ?? '')?.label ?? id ?? 'a value'
     const right = predicate.right?.address
-    const value = right?.from === 'literal' ? JSON.stringify(right.value) : 'another value'
+    const value = right?.from === 'literal' ? JSON.stringify(right.value)
+      : right?.from === 'context' ? right.name === 'viewer' ? 'you'
+        : right.name === 'now' ? `${right.offset ?? 'P0D'} from now`
+          : right.name === 'calendar' ? `${right.boundary}${right.offset ? ` ${right.offset}` : ''}` : 'workspace links'
+        : 'another value'
     return predicate.operator === 'missing' ? `${name} is missing`
       : predicate.operator === 'present' ? `${name} is present`
         : `${name} ${predicate.operator} ${value}`
@@ -425,7 +450,15 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
       : finalStage?.op === 'expand' ? `One row per ${finalStage.column} element.` : `One row per record from ${labels.join(' and ')}.`
   return [
     rowMeaning,
-    ...sources.map(source => `${source.label} reaches ${source.description.consistency}; scope ${JSON.stringify(source.query.scope.parameters)}.`),
+    ...sources.map(source => {
+      const declared = source.description.reach
+      const selected = declared ? readDataPointer(source.query.scope.parameters, declared.parameter) : MISSING
+      const reach = declared ? Array.isArray(selected)
+        ? selected.length ? `${selected.length} chosen ${declared.itemPlural}: ${selected.join(', ')}` : declared.empty
+        : declared.default.replace('{account}', source.accountLabel ?? 'selected')
+        : source.description.consistency
+      return `${source.label} reaches ${reach}.`
+    }),
     `Columns: ${plan.columns.map(column => column.label).join(', ') || 'none'}.`,
     ...plan.columns.flatMap(column => (column.choices ?? []).flatMap(choice => Object.entries(choice.writeValues ?? {}).map(([sourceId, value]) =>
       `Dropping a ${sources.find(source => source.instanceId === sourceId)?.label ?? sourceId} record on ${choice.label} sets ${column.label} to ${JSON.stringify(value)}.`))),

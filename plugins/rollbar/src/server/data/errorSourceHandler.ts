@@ -12,7 +12,9 @@ export function createErrorSourceHandler(): PluginFetchHandler {
       const input = dataSourceRequestSchema.parse(await request.json())
       request.signal.throwIfAborted()
       if (input.operation === 'describe') return Response.json(errorSourceDescription)
-      if (input.operation === 'options' || input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      if (input.operation === 'options' || input.operation === 'actions' || input.operation === 'identity') {
+        return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      }
       const scope = input.operation === 'query' ? input.query.scope : input.scope
       const connectionId = scope.connectionId
       if (!connectionId || !(await context.providers.connections('rollbar')).some(connection => connection.id === connectionId && connection.status === 'connected')) throw new Error('connection_unavailable')

@@ -4,7 +4,7 @@ import { dataSourceRequestSchema, type DataSourcePage } from '@acorn/protocol/da
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import { pullSourceDescription } from '../../shared/pullSource'
 import { pullSearch, selectPulls } from './pullQuery'
-import { readPullSelection, readRepositoryOptions } from './pullRead'
+import { readPullSelection, readRepositoryOptions, readViewerIdentity } from './pullRead'
 import { pullStateDetails, writePullState } from './pullWrite'
 
 type Selection = { key: string; page: DataSourcePage; expires: number; bytes: number }
@@ -31,7 +31,16 @@ export function createPullSourceHandler(): PluginFetchHandler {
         throw new Error('connection_unavailable')
       }
       if (input.operation === 'details') return pullStateDetails(input.ref, context)
-      if (input.operation === 'options' && (input.target !== 'parameter' || input.pointer !== '/repository')) throw new Error('unsupported_options')
+      if (input.operation === 'identity') {
+        const answers = await context.providers.withConnections('github', async (connection, token) =>
+          connection.id === scope.connectionId ? readViewerIdentity(token, request.signal) : undefined)
+        if (!answers[0]) throw new Error('connection_unavailable')
+        return Response.json(answers[0])
+      }
+      if (input.operation === 'query' && Array.isArray(input.query.scope.parameters.repositories) && input.query.scope.parameters.repositories.length === 0) {
+        return Response.json({ records: [], revision: pullSourceDescription.revision, readTime: Date.now(), completeness: { kind: 'complete' } })
+      }
+      if (input.operation === 'options' && (input.target !== 'parameter' || input.pointer !== '/repositories')) throw new Error('unsupported_options')
       sweep()
       const key = createHash('sha256').update(JSON.stringify({ owner: context.userId, scope,
         ...(input.operation === 'query' ? { query: input.query, evaluationTime: input.evaluationTime, mode: input.mode } : {}),

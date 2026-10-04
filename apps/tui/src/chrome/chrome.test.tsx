@@ -335,7 +335,7 @@ describe('the shell', () => {
     expect(searching).toContain('magenta')
 
     for (const letter of 'mag') await screen.press(letter)
-    const narrowed = await screen.frame()
+    const narrowed = await screen.until('magenta')
     expect(narrowed).toContain('magenta')
     expect(narrowed).not.toContain('amber')
 

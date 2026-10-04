@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { runAuthoringTurn, type AuthoringTurnRequest } from '@acorn/protocol/authoring.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
+import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { bindPanelRows, describePanelPlan, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
 
 // Scripted cases exercise the actual model-response loop and plan validator. These are fixture
@@ -16,6 +17,16 @@ const description = dataSourceDescriptionSchema.parse({
   parameters: { type: 'object' }, parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all', 'any'] },
   revision: 'fixture', consistency: 'fixture records',
+})
+const worktreeDescription = dataSourceDescriptionSchema.parse({
+  schema: { type: 'object', properties: { path: { type: 'string' }, modifiedCount: { type: 'number' }, untrackedCount: { type: 'number' } } },
+  fields: [
+    { pointer: '/path', label: 'Worktree path', origin: 'declared', display: { kind: 'text', role: 'title' } },
+    { pointer: '/modifiedCount', label: 'Modified files', origin: 'declared', display: { kind: 'number' } },
+    { pointer: '/untrackedCount', label: 'Untracked files', origin: 'declared', display: { kind: 'number' } },
+  ], parameters: { type: 'object' }, parameterFields: [],
+  operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
+  revision: 'fixture-worktrees', consistency: 'All local worktrees in the selected project', coverage: { kind: 'snapshot' },
 })
 const reference = (sourceId: string, connectionId: string) => ({
   kind: 'inline' as const, bindings: {}, content: {
@@ -33,10 +44,12 @@ const plan = (sourceId = 'pulls', connectionId = 'github-acme'): PanelPlan => pa
   ], stages: [], view: { kind: 'table' },
 })
 const fixture = (candidate: PanelPlan): PlanSource[] => [{
-  instanceId: 'work', label: 'Work', description,
+  instanceId: 'work', label: 'Work', description: candidate.sources[0]?.reference.kind === 'inline'
+    && candidate.sources[0].reference.content.query.source.sourceId === 'local-worktrees' ? worktreeDescription : description,
   query: candidate.sources[0]!.reference.kind === 'inline' ? candidate.sources[0]!.reference.content.query : reference('pulls', 'github-acme').content.query,
   result: {
-    records: [
+    records: candidate.sources[0]?.reference.kind === 'inline' && candidate.sources[0].reference.content.query.source.sourceId === 'local-worktrees'
+      ? [{ ref: { pluginId: 'fixture', sourceId: 'local-worktrees', recordId: 'tree' }, data: { path: '/repo/task', modifiedCount: 2, untrackedCount: 1 } }] : [
       { ref: { pluginId: 'fixture', sourceId: 'pulls', recordId: '1' }, data: { title: 'Review API', state: 'open', updated: '2026-10-01' } },
       { ref: { pluginId: 'fixture', sourceId: 'pulls', recordId: '2' }, data: { title: 'Fix auth', state: 'closed', updated: '2026-10-02' } },
     ], revision: 'fixture', mode: 'execution', readTime: 0, evaluationTime: 0, completeness: { kind: 'complete' },
@@ -51,10 +64,7 @@ const cases: Case[] = [
   { id: '3-ready', request: 'Open pull requests ready to merge', result: 'proposal', requiredColumns: ['state'], requiredStages: ['filter'], expectedRows: ['Review API'], reach: 'github-acme' },
   { id: '4-inactive', request: 'Pull requests with no recent activity', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'last activity source absent' },
   { id: '5-summary', request: 'Pull request summary by repository', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'summary operation unavailable' },
-  { id: '7-ci-history', request: 'CI runs over eight weeks', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'event archive with proved coverage and Actions runs source absent' },
-  { id: '8-open-history', request: 'Open issues on each day', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'snapshot history of issue state absent' },
-  { id: '9-release-checklist', request: 'Release checklist across systems', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'workflow-fed release dataset absent' },
-  { id: '12-worktrees', request: 'Worktrees and unfinished changes', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'worktree source absent' },
+  { id: '12-worktrees', request: 'Worktrees and unfinished changes', result: 'proposal', requiredColumns: ['path', 'modifiedCount', 'untrackedCount'], requiredStages: [], expectedRows: ['/repo/task'], reach: 'all local worktrees for this project' },
   { id: '13-assigned', request: 'My assigned work across trackers', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'identity and tracker sources absent' },
   { id: '18-usage', request: 'AI usage and cost by task', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'usage source and summary absent' },
   { id: '26-awaiting-reply', request: 'Messages awaiting a direct reply', result: 'unavailable', requiredColumns: [], requiredStages: [], expectedRows: [], reach: 'evidence-backed classification and complete thread coverage absent' },
@@ -81,7 +91,11 @@ describe('scripted dashboard authoring evaluation', () => {
     expect(validatePanelPlan(candidate, [writable]).some(problem => problem.path.includes('/writeValues/'))).toBe(true)
   })
   it.each(cases)('$id', async testCase => {
-    const candidate = plan()
+    const candidate = testCase.id === '12-worktrees' ? panelPlanSchema.parse({ ...plan('local-worktrees'), columns: [
+      { id: 'path', label: 'Worktree path', type: 'text', bind: { work: { field: '/path' } } },
+      { id: 'modifiedCount', label: 'Modified', type: 'number', bind: { work: { field: '/modifiedCount' } } },
+      { id: 'untrackedCount', label: 'Untracked', type: 'number', bind: { work: { field: '/untrackedCount' } } },
+    ] }) : plan()
     if (testCase.requiredStages.includes('filter')) candidate.stages = [{ op: 'filter', where: {
       kind: 'comparison', left: { address: { from: 'item', pointer: '/state' } }, operator: 'eq', right: { address: { from: 'literal', value: 'open' } },
     } }]
@@ -110,7 +124,57 @@ describe('scripted dashboard authoring evaluation', () => {
       for (const id of testCase.requiredColumns) expect(authored.columns.some(column => column.id === id)).toBe(true)
       for (const op of testCase.requiredStages) expect(authored.stages.some(stage => stage.op === op)).toBe(true)
       const rows = sortPlanRows(authored, runPlanStages(authored, bindPanelRows(authored, fixture(authored))).rows)
-      expect(rows.map(row => row.values.title)).toEqual(testCase.expectedRows)
+      expect(rows.map(row => row.values[testCase.id === '12-worktrees' ? 'path' : 'title'])).toEqual(testCase.expectedRows)
     }
+  })
+
+  it.each([
+    { id: 'local branches', sourceId: 'local-branches', reach: 'selected local project',
+      fields: [{ id: 'name', type: 'text' }, { id: 'aheadDefault', type: 'number' }],
+      data: { name: 'topic', aheadDefault: 2 }, expected: ['topic', 2] },
+    { id: 'usage events', sourceId: 'usage-records', reach: 'ledger events inside the requested time window',
+      fields: [{ id: 'model', type: 'text' }, { id: 'costUsd', type: 'number' }, { id: 'costSource', type: 'text' }],
+      data: { model: 'model-a', costUsd: null, costSource: 'unknown' }, expected: ['model-a', null, 'unknown'] },
+    { id: 'Actions jobs', sourceId: 'actions-jobs', reach: 'chosen repositories with bounded event coverage',
+      fields: [{ id: 'job', type: 'text' }, { id: 'conclusion', type: 'enum' }, { id: 'attempt', type: 'number' }],
+      data: { job: 'build', conclusion: 'failure', attempt: 2 }, expected: ['build', 'failure', 2] },
+  ] as const)('accepts a $id source proposal', async testCase => {
+    const columns = testCase.fields.map(field => ({ id: field.id, label: field.id, type: field.type,
+      bind: { work: { field: `/${field.id}` } } }))
+    const candidate = panelPlanSchema.parse({ ...plan(testCase.sourceId), columns,
+      requirements: [{ id: 'reach', text: testCase.reach, status: 'covered', paths: ['/sources/work'] }] })
+    const sourceDescription = dataSourceDescriptionSchema.parse({
+      revision: 'phase03-fixture', consistency: testCase.reach,
+      schema: { type: 'object', properties: Object.fromEntries(testCase.fields.map(field => [field.id,
+        { type: field.type === 'number' && testCase.sourceId === 'usage-records' ? ['number', 'null']
+          : field.type === 'number' ? 'number' : 'string' }])) },
+      fields: testCase.fields.map(field => ({ pointer: `/${field.id}`, label: field.id, origin: 'declared',
+        display: { kind: field.type === 'enum' ? 'status' : field.type } })),
+      parameters: { type: 'object' }, parameterFields: [],
+      operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
+      coverage: testCase.sourceId === 'local-branches' ? { kind: 'snapshot' } : { kind: 'events', complete: false },
+    })
+    const source: PlanSource = { instanceId: 'work', label: 'Work', description: sourceDescription,
+      query: candidate.sources[0]!.reference.kind === 'inline' ? candidate.sources[0]!.reference.content.query : reference(testCase.sourceId, 'account').content.query,
+      result: { records: [{ ref: { pluginId: 'fixture', sourceId: testCase.sourceId, recordId: 'record' }, data: parseDataValue(testCase.data) }],
+        revision: 'phase03-fixture', mode: 'execution', readTime: 0, evaluationTime: 0, completeness: { kind: 'complete' } } }
+    const request: AuthoringTurnRequest = { target: 'dashboard', scope: { workspaceId: 'w' }, targetId: testCase.sourceId,
+      baseRevision: 0, base: plan(), backendId: 'scripted:fixture', instruction: `Show ${testCase.id}`, context: [], samplesEnabled: false }
+    const result = await runAuthoringTurn({ request, system: 'Only described capabilities.', facts: {},
+      generate: async () => ({ text: JSON.stringify({ kind: 'proposal', candidate, summary: 'Fixture proposal.' }), providerId: 'scripted', modelId: 'fixture' }),
+      metadata: async () => ({ sources: [testCase.sourceId] }),
+      validate: async value => {
+        const parsed = panelPlanSchema.safeParse(value)
+        if (!parsed.success) return { problems: ['Invalid plan schema.'] }
+        return { candidate: parsed.data, problems: validatePanelPlan(parsed.data, [source]).filter(item => item.severity === 'error').map(item => item.message) }
+      },
+    })
+    expect(result.state).toBe('proposal')
+    if (result.state !== 'proposal') return
+    expect(result.problems).toEqual([])
+    const authored = panelPlanSchema.parse(result.candidate)
+    const rows = bindPanelRows(authored, [source])
+    expect(rows).toHaveLength(1)
+    expect(testCase.fields.map(field => rows[0]!.values[field.id])).toEqual(testCase.expected)
   })
 })

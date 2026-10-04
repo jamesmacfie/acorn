@@ -210,7 +210,10 @@ export default function PublishedDashboardPanel(props: {
     const rows = source.measureRows[measure]
     const filter = stage.measures.find(item => item.id === measure)?.where
     const keys = Object.fromEntries(stage.by.filter(by => !by.bucket || by.bucket === 'value').map(by => [by.column, source.values[by.column] ?? null]))
-    const plan = deriveDrilldownPlan(current.plan, rows, { stageIndex: source.summaryStage, measureFilter: filter, summaryKeys: keys })
+    const buckets = stage.by.flatMap(by => by.bucket && by.bucket !== 'value'
+      ? [{ column: by.column, bucket: by.bucket, value: source.values[by.column] ?? null }] : [])
+    const plan = deriveDrilldownPlan(current.plan, rows, { stageIndex: source.summaryStage, measureFilter: filter,
+      summaryKeys: keys, summaryBuckets: buckets, zone })
     const snapshot = { ...current, plan, rows, groups: [] }
     setDrill({ plan, snapshot, loading: true })
     void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
@@ -225,7 +228,9 @@ export default function PublishedDashboardPanel(props: {
     const selectedMeasure = mapping?.measureId ?? measureId
     const filter = stage.measures.find(item => item.id === selectedMeasure)?.where
     const plan = deriveDrilldownPlan(current.plan, [], { stageIndex: source.summaryStage, measureFilter: filter,
-      summaryKeys: Object.fromEntries(stage.by.filter(by => !by.bucket || by.bucket === 'value').map(by => [by.column, source.values[by.column] ?? null])) })
+      summaryKeys: Object.fromEntries(stage.by.filter(by => !by.bucket || by.bucket === 'value').map(by => [by.column, source.values[by.column] ?? null])),
+      summaryBuckets: stage.by.flatMap(by => by.bucket && by.bucket !== 'value'
+        ? [{ column: by.column, bucket: by.bucket, value: source.values[by.column] ?? null }] : []), zone })
     setDrill({ plan, snapshot: { ...current, plan, rows: [], groups: [] }, loading: true })
     try {
       const result = await writeJson<{ rows: DashboardRun['rows']; total: number; truncated: boolean }>('/v1/core/datasets/drilldown', {
@@ -234,10 +239,8 @@ export default function PublishedDashboardPanel(props: {
           evaluationTime: current.diagnostics.evaluationTime }),
       })
       const snapshot = { ...current, plan, rows: result.rows, groups: [] }
-      const bucketed = stage.by.some(by => by.bucket && by.bucket !== 'value')
-      setDrill({ plan, snapshot, loading: false, total: result.total, truncated: result.truncated,
-        ...(bucketed ? { error: 'This bucket can be inspected here; Add as panel needs an exact date range.' } : {}) })
-      if (!bucketed) void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+      setDrill({ plan, snapshot, loading: false, total: result.total, truncated: result.truncated })
+      void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
         .then(prepared => setDrill(value => value?.plan === plan ? { ...value, result: prepared } : value))
         .catch(() => {})
     } catch { setDrill(value => value ? { ...value, loading: false, error: 'Could not load the stored rows.' } : value) }
@@ -293,8 +296,9 @@ export default function PublishedDashboardPanel(props: {
       <Show when={!loaded.error || loaded.data} fallback={<EmptyState align="start" size="sm" title="Couldn't load this panel" action={<Button size="sm" onPress={() => void loaded.refetch()}>Try again</Button>}>Edit the panel to repair its source or column.</EmptyState>}>
         <Show when={loaded.error && loaded.data}><Alert tone="warn">Couldn't refresh. Showing the last data we got.</Alert></Show>
         <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(problem => `${problem.path}: ${problem.message}`).join(' ')}</Alert></Show>
-        <Show when={run()?.diagnostics.sources.some(source => source.coverage?.length)}><Alert tone="muted">
-          {run()!.diagnostics.sources.flatMap(source => (source.coverage ?? []).slice(0, 3).map(window =>
+        <Show when={run()?.diagnostics.asOf}>{time => <span>{`As of ${new Date(time()).toLocaleString()}`}</span>}</Show>
+        <Show when={run()?.diagnostics.sources.some(source => source.coverageWindows?.length)}><Alert tone="muted">
+          {run()!.diagnostics.sources.flatMap(source => (source.coverageWindows ?? []).slice(0, 3).map(window =>
             `${source.label}: ${window.kind === 'complete' ? 'events covered' : 'coverage gap'} ${new Date(window.fromTime).toLocaleDateString()}–${new Date(window.toTime).toLocaleDateString()}${window.reason ? ` (${window.reason})` : ''}`)).join(' · ')}
         </Alert></Show>
         <Show when={run()?.rows.some(row => row.partial && Object.keys(row.partial).length)}><Alert tone="warn">{[...new Set(run()!.rows.flatMap(row => Object.values(row.partial ?? {})))].join(' ')} Measures marked partial may leave out unknown values.</Alert></Show>

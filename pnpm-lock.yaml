@@ -883,6 +883,9 @@ importers:
 
   plugins/agent-cost:
     dependencies:
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../../packages/protocol
       acorn-plugin-sdk:
         specifier: workspace:*
         version: link:../../packages/plugin-sdk
@@ -893,9 +896,6 @@ importers:
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../../packages/plugin-api
-      '@acorn/protocol':
-        specifier: workspace:*
-        version: link:../../packages/protocol
       '@types/node':
         specifier: ^26.0.0
         version: 26.0.0

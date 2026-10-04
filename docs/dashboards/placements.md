@@ -19,15 +19,15 @@ workspace to open Home (`adoptLegacyHome` in `persist.ts`). Adoption doesn't ove
 
 ## Home tabs
 
-Home can hold up to eight dashboards per workspace, as tabs, and the tab bar appears only past one.
+Home can hold up to eight dashboards per workspace. The tab bar is present from the default Home tab,
+so its **+** is available before a second dashboard exists.
 It's an ARIA tablist: arrows move and activate, Home and End jump, and the grid is the `tabpanel`.
 The bar's **+** creates a tab and drops into an inline rename. Names are made unique as
 `New dashboard`, `New dashboard 2`, and so on. Rename, move, and delete live in the active tab's
 overflow and each tab's context menu. Deleting asks first, and panels stay in the library and on other
 tabs. A panel moves between tabs through **Move to…**, keeping its definition and taking a fresh rect.
 
-Creating the first extra dashboard also names the original tab `Home`. The bar's **+** isn't the only
-door, because the bar doesn't exist with one dashboard.
+Creating the first extra dashboard also names the original tab `Home`.
 
 Which tab you're reading is device view state, the `core.home-tab` slice, not part of the Node
 preference, because syncing it would move another client's view. A remembered tab that was deleted,

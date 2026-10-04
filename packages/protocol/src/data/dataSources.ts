@@ -50,6 +50,16 @@ export const dataSourceScopeSchema = z.object({
   connectionId: id.optional(),
   parameters: z.record(z.string(), value).default({}),
 }).strict()
+export const dataSourceIdentitySchema = z.object({
+  id: id.optional(), login: id.optional(), name: z.string().max(200).optional(),
+  email: z.email().optional(), teamIds: z.array(id).max(200).optional(),
+  teams: z.array(z.object({ id, name: z.string().max(200) }).strict()).max(200).optional(),
+}).strict()
+const coverageRangeSchema = z.object({ start: z.number().finite(), end: z.number().finite() }).strict()
+export const dataSourceCoverageSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('snapshot') }).strict(),
+  z.object({ kind: z.literal('events'), retention: z.string().max(200).optional(), earliestTime: z.number().finite().optional(), complete: z.boolean() }).strict(),
+])
 export const dataSourceDescriptionSchema = z.object({
   schema: structure,
   fields: dataFieldsSchema,
@@ -61,6 +71,7 @@ export const dataSourceDescriptionSchema = z.object({
     details: z.boolean(),
     incremental: z.boolean(),
     groups: z.array(z.enum(['all', 'any'])).max(2),
+    identity: z.boolean().optional(),
   }).strict(),
   detailSchema: structure.optional(),
   incremental: z.object({
@@ -71,7 +82,10 @@ export const dataSourceDescriptionSchema = z.object({
   /** Host-owned dataset metadata; only core dataset sources set this. */
   dataset: z.object({ mode: z.enum(['current-mirror', 'event-archive', 'snapshot-history']),
     feeder: z.enum(['capture', 'workflow', 'agent']) }).strict().optional(),
-  coverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite(), kind: z.enum(['complete', 'gap']), reason: z.string().max(512).nullable() }).strict()).max(100).optional(),
+  coverageWindows: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite(), kind: z.enum(['complete', 'gap']), reason: z.string().max(512).nullable() }).strict()).max(100).optional(),
+  reach: z.object({ parameter: dataPointerSchema, itemPlural: z.string().min(1).max(80),
+    default: z.string().min(1).max(300), empty: z.string().min(1).max(300) }).strict().optional(),
+  coverage: dataSourceCoverageSchema.optional(),
   /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
   starterPlans: z.array(z.unknown()).max(10).optional(),
   /** Action and target metadata is structural; current eligibility is checked per record. */
@@ -105,6 +119,7 @@ export const dataSourceQuerySchema = z.object({
   .refine(query => !(query.take && query.incremental), 'Incremental queries cannot use take')
 export const dataRecordRefSchema = dataSourceRefSchema.extend({ connectionId: id.optional(), recordId: id, scope: dataSourceScopeSchema.optional() })
 export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('identity'), source: dataSourceRefSchema, scope: dataSourceScopeSchema }).strict(),
   z.object({
     operation: z.literal('describe'),
     source: dataSourceRefSchema,
@@ -190,6 +205,8 @@ export const dataSourcePageSchema = z.object({
   revision: id,
   readTime: z.number().finite(),
   completeness: dataSourceCompletenessSchema,
+  coveredRange: coverageRangeSchema.optional(),
+  observedAt: z.number().finite().optional(),
   incrementalBoundary: value.optional(),
   /** Source-proved windows, independent of the time a capture happened. */
   eventCoverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite() }).strict()).max(32).optional(),
@@ -201,6 +218,7 @@ export const dataSourceDetailsSchema = z.discriminatedUnion('kind', [
 export type DataSourceRef = z.infer<typeof dataSourceRefSchema>
 export type DataSourceScope = z.infer<typeof dataSourceScopeSchema>
 export type DataSourceDescription = z.infer<typeof dataSourceDescriptionSchema>
+export type DataSourceIdentity = z.infer<typeof dataSourceIdentitySchema>
 export type DataSourceQuery = z.infer<typeof dataSourceQuerySchema>
 export type DataSourceRequest = z.infer<typeof dataSourceRequestSchema>
 export type DataRecordRef = z.infer<typeof dataRecordRefSchema>
@@ -214,5 +232,6 @@ export type DataSourceDiscoveryRequest = z.infer<typeof dataSourceDiscoveryReque
 export type DataSourceDiscoveryPage = Omit<z.infer<typeof dataSourceDiscoveryPageSchema>, 'sources'> & { sources: (DataSourceDescriptor & DataSourceRef)[] }
 export type DataSourceCatalog = z.infer<typeof dataSourceCatalogSchema>
 export type DataSourceResponse<R extends DataSourceRequest> = R extends { operation: 'describe' } ? DataSourceDescription
+  : R extends { operation: 'identity' } ? DataSourceIdentity
   : R extends { operation: 'options' } ? DataSourceOptions
     : R extends { operation: 'query' } ? DataSourceResult : R extends { operation: 'actions' } ? DataSourceActions : DataSourceDetails

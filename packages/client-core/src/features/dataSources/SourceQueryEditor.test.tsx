@@ -31,6 +31,7 @@ beforeEach(() => {
     const body = options?.body ? JSON.parse(options.body) as { operation?: string } : undefined
     if (path.endsWith('/data-sources/list')) return { sources: [{ pluginId: 'fixture', sourceId: 'records', name: 'Fixture records', singular: 'Record', plural: 'Records', identityScope: 'fixture' }], discoveries: [] }
     if (path.endsWith('/queries/list')) return []
+    if (path.endsWith('/queries/resolve')) return { query: initial.content.query, parameters: {} }
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
     if (body?.operation === 'describe') return {
       revision: '1', consistency: 'fixture', schema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'], additionalProperties: true },
@@ -57,6 +58,41 @@ afterEach(() => {
 })
 
 describe('SourceQueryEditor', () => {
+  it('keeps the initial source placeholder neutral until records are chosen', async () => {
+    const placeholder: QueryReference = {
+      ...initial,
+      content: {
+        ...initial.content,
+        query: {
+          ...initial.content.query,
+          source: { pluginId: 'core', sourceId: 'choose' },
+        },
+      },
+    }
+    dispose = render(() => <QueryClientProvider client={client}>
+      <SourceQueryEditor workspaceId="w" projectId="p" value={placeholder} onChange={() => {}} pickSourceAccount />
+    </QueryClientProvider>, host)
+    await settle()
+    await settle()
+
+    expect(requests.mock.calls.filter(([, options]) => options?.body && JSON.parse(options.body).operation === 'describe')).toHaveLength(0)
+    expect(host.textContent).not.toContain('This source is unavailable')
+  })
+
+  it('reports state to a parent that stores it without recursively observing that parent state', async () => {
+    let updates = 0
+    const Harness = () => {
+      const [parentState, setParentState] = createSignal(0)
+      return <SourceQueryEditor workspaceId="w" projectId="p" value={initial} onChange={() => {}}
+        onStateChange={() => { updates += 1; setParentState(parentState() + 1) }} />
+    }
+    dispose = render(() => <QueryClientProvider client={client}><Harness /></QueryClientProvider>, host)
+    await settle()
+    await settle()
+    expect(updates).toBeGreaterThan(0)
+    expect(updates).toBeLessThan(10)
+  })
+
   it('fetches metadata while typing but records only after explicit refresh, and renders record text safely', async () => {
     const Harness = () => {
       const [value, setValue] = createSignal<QueryReference | undefined>(initial)

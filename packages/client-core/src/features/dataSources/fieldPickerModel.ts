@@ -90,7 +90,7 @@ export function bindingForCandidate(candidate: BindingCandidate, fallback?: Data
 export function candidateForBinding(candidates: readonly BindingCandidate[], binding: DataBinding | undefined): BindingCandidate | undefined {
   if (!binding) return undefined
   const address = binding.address
-  if (address.from === 'literal') return undefined
+  if (address.from === 'literal' || address.from === 'context') return undefined
   return candidates.find(candidate => {
     if (candidate.pointer !== address.pointer || candidate.origin.kind !== address.from) return false
     if (address.from === 'input' && candidate.origin.kind === 'input') return candidate.origin.name === address.name

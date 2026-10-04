@@ -1,6 +1,7 @@
 import {
   dataSourceCatalogSchema, dataSourceDescriptionSchema, dataSourceDetailsSchema, dataSourceDiscoveryPageSchema, dataSourceDiscoveryRequestSchema,
   dataSourceOptionsSchema, dataSourcePageSchema, dataSourceRequestSchema, dataSourceScopeSchema, dataSourceActionsSchema, dataSourceActSchema,
+  dataSourceIdentitySchema,
   type DataSourceDescription, type DataSourceDiscoveryPage, type DataSourceRequest, type DataSourceResult, type DataSourceScope, type DataSourceResponse,
 } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
@@ -19,6 +20,8 @@ import { ProviderRequestScheduler } from '../integrations/budgetRuntime'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
 import { getDb } from '../db'
+import { getConnection } from '../integrations/connections'
+import { cachedSourceIdentity, rememberSourceIdentity } from './identityCache'
 
 function parse<T>(schema: { parse(value: unknown): T }, input: unknown, response = true): T {
   try { return schema.parse(input) } catch { throw new DataSourceError(response ? 'invalid-response' : 'invalid-request') }
@@ -139,6 +142,16 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   const description = await describe(env, source, scope, invocation)
   if (registeredDataSource(ref) !== source) throw new DataSourceError('unavailable')
   if (request.operation === 'describe') return description
+  if (request.operation === 'identity') {
+    if (!description.operations.identity || !scope.connectionId) throw new DataSourceError('unsupported-query')
+    const connection = await getConnection(getDb(env), invocation.principal.userId, scope.connectionId)
+    if (!connection) throw new DataSourceError('forbidden')
+    const cached = cachedSourceIdentity(source.pluginId, scope.connectionId, connection.updatedAt)
+    if (cached) return cached
+    const answer = parse(dataSourceIdentitySchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes))
+    rememberSourceIdentity(source.pluginId, scope.connectionId, connection.updatedAt, answer)
+    return answer
+  }
   if (request.operation === 'query') return querySource(env, source, request, description, invocation)
   if (request.operation === 'options') {
     const fields = request.target === 'field' ? description.fields : description.parameterFields
@@ -273,6 +286,8 @@ async function querySource(
     }
     result.readTime = page.readTime
     if (page.eventCoverage?.length) result.eventCoverage = [...result.eventCoverage ?? [], ...page.eventCoverage].slice(0, 32)
+    if (page.coveredRange) result.coveredRange = page.coveredRange
+    if (page.observedAt !== undefined) result.observedAt = page.observedAt
     if (page.completeness.kind === 'more' && cursors.has(page.completeness.cursor)) throw new DataSourceError('cursor-loop')
     if (page.incrementalBoundary !== undefined && (!description.operations.incremental
       || !request.query.incremental || request.mode !== 'execution' || page.completeness.kind !== 'complete')) {

@@ -28,21 +28,25 @@ it('executes the GitHub source with exact connection provenance and a stable bou
         nodes: ['z', 'b', 'a'].map(id => ({ id, number: 1, title: 'Change', url: 'https://github.com/org/repo/pull/1',
           state: 'OPEN', isDraft: true, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' },
           createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z', closedAt: null, mergedAt: null,
-          mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null })),
+          mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null,
+          reviewDecision: 'REVIEW_REQUIRED', latestCommit: { nodes: [] }, latestComment: { nodes: [] }, latestReview: { nodes: [] },
+          statusCheckRollup: null, labels: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+          reviewRequests: { nodes: [], pageInfo: { hasNextPage: false, endCursor: null } },
+          reviewRequestEvents: { nodes: [], pageInfo: { hasPreviousPage: false } } })),
       } } })
     })
     vi.stubGlobal('fetch', fetch)
     const result = await invokeDataSource(env, {
       operation: 'query', mode: 'execution', evaluationTime: 1, pageSize: 1,
-      query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { connectionId: 'selected', parameters: { repository: 'org/repo' } },
+      query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { connectionId: 'selected', parameters: { repositories: ['org/repo'] } },
         sort: [{ pointer: '/updatedAt', direction: 'desc' }], take: 2 },
     }, { principal: { kind: 'internal', scope: 'service', userId: 'owner' }, signal: new AbortController().signal })
     expect(result.completeness).toEqual({ kind: 'bounded' })
-    expect(result.records.map(record => record.ref)).toEqual(['a', 'b'].map(recordId => ({ pluginId: 'github', sourceId: 'pull-requests', connectionId: 'selected', recordId, scope: { connectionId: 'selected', parameters: { repository: 'org/repo' } } })))
+    expect(result.records.map(record => record.ref)).toEqual(['a', 'b'].map(recordId => ({ pluginId: 'github', sourceId: 'pull-requests', connectionId: 'selected', recordId, scope: { connectionId: 'selected', parameters: { repositories: ['org/repo'] } } })))
     expect(fetch).toHaveBeenCalledTimes(1)
     const previewRequest = {
       operation: 'query' as const, mode: 'preview' as const, evaluationTime: 2, pageSize: 1,
-      query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { connectionId: 'selected', parameters: { repository: 'org/repo' } },
+      query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { connectionId: 'selected', parameters: { repositories: ['org/repo'] } },
         sort: [{ pointer: '/updatedAt', direction: 'desc' as const }], take: 2 },
     }
     const invocation = { principal: { kind: 'internal' as const, scope: 'service' as const, userId: 'owner' }, signal: new AbortController().signal }

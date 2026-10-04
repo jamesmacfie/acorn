@@ -61,6 +61,8 @@ export function dashboardFields(description: DataSourceDescription): DashboardDi
       type,
       ...(field.display?.role ? { role: field.display.role } : {}),
       ...(field.display?.unit && type === 'number' ? { unit: field.display.unit } : {}),
+      ...(field.display?.precision ? { precision: field.display.precision } : {}),
+      ...(field.display?.list ? { list: true } : {}),
       ...(values?.length ? { values } : {}),
     }]
   })

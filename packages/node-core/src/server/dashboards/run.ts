@@ -2,6 +2,8 @@ import { createHash } from 'node:crypto'
 import { canonicalDataEncoding, DATA_LIMITS, MISSING, parseDataValue, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { DashboardContent, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
+import { resolveDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import { bindPanelRows, describePanelPlan, groupPlanRows, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type DashboardRun, type PlanProblem, type PlanSource } from '@acorn/dashboards-core/plan.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInvocation } from '../dataSources/authority'
@@ -11,6 +13,8 @@ import { dashboardStore } from './store'
 import { getDb } from '../db'
 import { describeError } from '../telemetry/logger'
 import { dashboardSharedRead } from './readCache'
+import { sourceCoverageProblem } from './coverage'
+import { getConnection } from '../integrations/connections'
 
 const MAX_TOTAL_RECORDS = 20_000
 const MAX_STAGE_ROWS = 25_000
@@ -59,6 +63,30 @@ function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSourc
 
 const digest = (value: unknown): string => createHash('sha256').update(canonicalDataEncoding(parseDataValue(value))).digest('hex')
 
+async function resolvePlanContexts(env: Env, plan: PanelPlan, sources: PlanSource[], evaluationTime: number,
+  zone: string, invocation: DataSourceInvocation): Promise<PanelPlan> {
+  const usesViewerBinding = (predicate: DataPredicate): boolean => predicate.kind === 'comparison'
+    ? predicate.right?.address.from === 'context' && predicate.right.address.name === 'viewer'
+    : predicate.predicates.some(usesViewerBinding)
+  const usesViewer = plan.stages.some(stage => stage.op === 'filter' && usesViewerBinding(stage.where))
+  if (usesViewer && sources.length !== 1) throw new Error('You in a panel filter requires one account source')
+  const viewer = usesViewer ? await invokeDataSource(env, { operation: 'identity', source: sources[0]!.query.source,
+    scope: sources[0]!.query.scope }, invocation) : undefined
+  const context = { evaluationTime, timePolicy: { zone, weekStart: plan.time.weekStart }, viewer }
+  const resolve = (predicate: DataPredicate): DataPredicate => {
+    if (predicate.kind !== 'comparison') return { ...predicate, predicates: predicate.predicates.map(resolve) }
+    if (predicate.right?.address.from !== 'context') return predicate
+    let value = resolveDataBinding(predicate.right, context)
+    const left = predicate.left.address
+    const column = left.from === 'item' ? plan.columns.find(item => `/${item.id}` === left.pointer) : undefined
+    if (column?.precision === 'day' && typeof value === 'number') {
+      value = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).format(value)
+    }
+    return { ...predicate, right: { address: { from: 'literal', value } } }
+  }
+  return { ...plan, stages: plan.stages.map(stage => stage.op === 'filter' ? { ...stage, where: resolve(stage.where) } : stage) }
+}
+
 async function sharedRead(env: Env, source: PlanSource, mode: 'preview' | 'execution', evaluationTime: number, invocation: DataSourceInvocation): Promise<DataSourceResult> {
   const window = Math.floor(evaluationTime / SHARED_READ_MS)
   const key = digest({ principal: invocation.principal.userId, query: source.query, revision: source.description.revision, mode, window })
@@ -84,15 +112,19 @@ export async function runDashboard(env: Env, args: {
   const problems: PlanProblem[] = []
   const sources: PlanSource[] = []
   const sourceDiagnostics: DashboardRun['diagnostics']['sources'] = []
+  let uncoveredWindow = false
   const started = Date.now()
   for (const entry of plan.sources) {
     try {
-      const resolved = await resolveQuery(env, args.scope, entry.reference, {}, runInvocation)
+      const resolved = await resolveQuery(env, args.scope, entry.reference, { evaluationTime,
+        timePolicy: { zone: plan.time.mode === 'viewer' && args.viewerZone ? args.viewerZone : plan.time.zone, weekStart: plan.time.weekStart } }, runInvocation)
       const description = await invokeDataSource(env, { operation: 'describe', source: resolved.query.source, scope: resolved.query.scope }, runInvocation)
-      sources.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description })
+      const account = resolved.query.scope.connectionId ? await getConnection(getDb(env), invocation.principal.userId, resolved.query.scope.connectionId) : null
+      sources.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description,
+        ...(account ? { accountLabel: account.name ?? account.label } : {}) })
       sourceDiagnostics.push({ id: entry.id, label: entry.label, revision: description.revision,
         queryDigest: resolved.published?.digest ?? digest(entry.reference.kind === 'inline' ? entry.reference.content : null),
-        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverage: description.coverage,
+        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverageWindows: description.coverageWindows,
         writable: description.writable })
     } catch (error) {
       problems.push({ path: `/sources/${plan.sources.indexOf(entry)}`, message: runInvocation.signal.reason?.name === 'TimeoutError' ? 'Run time budget exceeded.' : `${entry.label}: ${describeError(error).message}`, severity: 'error' })
@@ -100,6 +132,10 @@ export async function runDashboard(env: Env, args: {
     }
   }
   plan = resolvePlanColumns(plan, sources)
+  const describedPlan = plan
+  try { plan = await resolvePlanContexts(env, plan, sources, evaluationTime,
+    plan.time.mode === 'viewer' && args.viewerZone ? args.viewerZone : plan.time.zone, runInvocation) }
+  catch (error) { problems.push({ path: '/stages', message: describeError(error).message, severity: 'error' }) }
   const validation = validatePanelPlan(plan, sources)
   const unavailableColumns = new Set<number>()
   for (const problem of validation) {
@@ -163,6 +199,13 @@ export async function runDashboard(env: Env, args: {
         const diagnostic = sourceDiagnostics.find(entry => entry.id === source.instanceId)!
         diagnostic.completeness = source.result.completeness
         diagnostic.readTime = source.result.readTime
+        diagnostic.coveredRange = source.result.coveredRange
+        diagnostic.observedAt = source.result.observedAt
+        const coverageProblem = sourceCoverageProblem(plan, source, evaluationTime)
+        if (coverageProblem) {
+          uncoveredWindow = true
+          problems.push({ path: `/sources/${plan.sources.findIndex(entry => entry.id === source.instanceId)}`, message: coverageProblem, severity: 'warning' })
+        }
         if (source.result.completeness.kind === 'incomplete') problems.push({ path: `/sources/${plan.sources.findIndex(entry => entry.id === source.instanceId)}`, message: `${source.label} returned incomplete data (${source.result.completeness.cause}).`, severity: 'warning' })
         if (sources.reduce((sum, entry) => sum + (entry.result?.records.length ?? 0), 0) > MAX_TOTAL_RECORDS) { problems.push({ path: '/sources', message: 'Total record budget exceeded.', severity: 'error' }); break }
       } catch (error) {
@@ -193,21 +236,23 @@ export async function runDashboard(env: Env, args: {
   }
   const related = relatePanelRows(plan, sources, initial)
   problems.push(...related.problems)
-  const staged = runPlanStages(plan, related.rows, evaluationTime, sourceDiagnostics.some(source => source.completeness?.kind === 'incomplete'))
+  const staged = runPlanStages(plan, related.rows, evaluationTime, uncoveredWindow || sourceDiagnostics.some(source => source.completeness?.kind === 'incomplete'))
   problems.push(...staged.problems)
   if (staged.counts.some(count => count.input > MAX_STAGE_ROWS || count.output > MAX_STAGE_ROWS)) problems.push({ path: '/stages', message: 'Intermediate row budget exceeded.', severity: 'error' })
   const rows = sortPlanRows(plan, staged.rows).slice(0, plan.limit ?? 5000)
   if (new TextEncoder().encode(JSON.stringify(rows)).byteLength > MAX_OUTPUT_BYTES) problems.push({ path: '/rows', message: 'Output byte budget exceeded.', severity: 'error' })
   const effectivePlan = plan.time.mode === 'viewer' && args.viewerZone ? { ...plan, time: { ...plan.time, zone: args.viewerZone } } : plan
   return {
-    plan, rows: problems.some(problem => problem.severity === 'error') ? [] : rows,
+    plan: describedPlan, rows: problems.some(problem => problem.severity === 'error') ? [] : rows,
     groups: problems.some(problem => problem.severity === 'error') ? [] : groupPlanRows(effectivePlan, rows, evaluationTime),
-    description: describePanelPlan(plan, sources),
+    description: describePanelPlan(describedPlan, sources),
     diagnostics: {
       problems, sources: sourceDiagnostics, stages: staged.counts, evaluationTime,
+      asOf: sourceDiagnostics.reduce<number | undefined>((oldest, source) => source.observedAt !== undefined && source.readTime !== undefined && source.observedAt < source.readTime
+        ? Math.min(oldest ?? source.observedAt, source.observedAt) : oldest, undefined),
       plugins: [...new Set(sources.map(source => source.query.source.pluginId))],
       accounts: [...new Set(sources.flatMap(source => source.query.scope.connectionId ? [source.query.scope.connectionId] : []))],
-      complete: !problems.some(problem => problem.severity === 'error') && !related.problems.length
+      complete: !uncoveredWindow && !problems.some(problem => problem.severity === 'error') && !related.problems.length
         && !rows.some(row => row.partial && Object.keys(row.partial).length)
         && sources.every(source => source.result?.completeness.kind === 'complete' || source.result?.completeness.kind === 'bounded'),
     },

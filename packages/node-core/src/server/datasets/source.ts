@@ -93,7 +93,7 @@ export function datasetSourceDescription(db: AppDatabase, dataset: DatasetDefini
     operations: { query: true, options: false, details: false, incremental: false, groups: ['all', 'any'] },
     consistency: `${dataset.mode}; ${dataset.feeder} feeder; ${dataset.retentionDays} day retention. Coverage is tracked separately from captures.`,
     dataset: { mode: dataset.mode, feeder: dataset.feeder },
-    coverage: coverageForDataset(db, dataset.id).map(item => ({ ...item, kind: item.kind === 'complete' ? 'complete' as const : 'gap' as const })),
+    coverageWindows: coverageForDataset(db, dataset.id).map(item => ({ ...item, kind: item.kind === 'complete' ? 'complete' as const : 'gap' as const })),
   }
 }
 

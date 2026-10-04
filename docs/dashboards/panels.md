@@ -16,9 +16,10 @@ A panel definition has four layers, each owned by a different party:
 | `view` | Host | Which view, its measure, and for a chart its shape and axes |
 
 The layers let you flip a table to a board without losing filters, and swap a source without losing
-the layout. Shaping is generic and runs over the projected rows (`shaping.ts`). Filters are all-AND
-with seven operators, because an OR tree is a query language, and a panel that needs one belongs in
-the source's query. Group-by is shaping, not a view option, so it survives a view switch.
+the layout. Version 2 plans also declare exact relations and ordered filter, compute, summarize,
+expand, and overlap stages. The Node applies these to mapped rows and preserves coverage and
+provenance through summaries. The older generic shaping helpers (`shaping.ts`) still serve legacy
+panels.
 
 Where a panel is placed isn't a layer. A definition is free of any surface, and a placement refers to
 it by ID and owns its geometry ([placements](./placements.md)).
@@ -72,8 +73,8 @@ preview remain noninteractive.
 
 Pressing a group header or stat measure builds a detail plan from the group values, removes grouping,
 and opens a read-only side panel at the original evaluation instant. **Add as panel** publishes that
-detail plan. The summary-stage and measure-filter parameters on `deriveDrilldownPlan` are the seam for
-future summary operations.
+detail plan. Summary-stage and measure-filter arguments to `deriveDrilldownPlan` narrow the
+underlying records to the selected measure at the run's evaluation instant.
 
 `openUrl` isn't automatically a trip to the browser. The dispatcher first asks the content-link
 registry whether acorn has its own surface for the URL (`openInAppUrl` in

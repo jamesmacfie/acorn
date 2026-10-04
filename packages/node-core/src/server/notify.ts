@@ -4,6 +4,7 @@ import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 import { clearDashboardReadCache } from './dashboards/readCache'
+import { clearSourceIdentity } from './dataSources/identityCache'
 
 // "Re-read this plugin's chrome descriptors": rail rows, badges, sources, agent context. One
 // client-side consumer, `client-core/host/chrome/chromeData.ts`, and nothing else hears it.
@@ -133,6 +134,7 @@ export function broadcastWorkspaceProjectsChanged(event: WorkspaceProjectsChange
 // left holding a gap. Everything else about the connection stays a fetchable route.
 export function broadcastConnectionChanged(connection: ConnectionChangedEvent): void {
   clearDashboardReadCache()
+  clearSourceIdentity(connection.integrationId)
   wsBroadcast({ channel: 'connection:changed', ...connection })
 }
 

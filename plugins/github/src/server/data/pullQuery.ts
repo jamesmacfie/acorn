@@ -17,7 +17,9 @@ function comparisons(predicate?: DataPredicate): Extract<DataPredicate, { kind: 
 
 /** Qualifiers only narrow candidates. Exact typed predicates are checked after full exhaustion. */
 export function pullSearch(query: DataSourceQuery): string {
-  const parts = ['is:pr', `repo:${repositoryName(query.scope.parameters.repository)}`]
+  const repositories = query.scope.parameters.repositories
+  if (repositories !== undefined && (!Array.isArray(repositories) || repositories.length > 50)) throw new Error('invalid_repositories')
+  const parts = ['is:pr', ...(repositories ?? []).map(value => `repo:${repositoryName(value)}`)]
   for (const filter of comparisons(query.predicate)) {
     const left = filter.left.address
     const right = filter.right?.address
@@ -37,6 +39,10 @@ export function pullSearch(query: DataSourceQuery): string {
       case '/draft':
         if (typeof value !== 'boolean') throw new Error('invalid_draft')
         parts.push(`draft:${value}`)
+        break
+      case '/reviewRequestedFromViewer':
+        if (typeof value !== 'boolean') throw new Error('invalid_review_filter')
+        parts.push(value ? 'review-requested:@me' : '-review-requested:@me')
         break
       default: {
         if (typeof value !== 'number' || !Number.isFinite(value)) throw new Error('invalid_date')

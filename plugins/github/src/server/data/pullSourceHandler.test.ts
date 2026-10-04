@@ -9,10 +9,18 @@ vi.mock('../githubApi', async original => ({ ...await original<typeof import('..
 const node = (id: string, overrides = {}) => ({ id, number: 1, title: 'A change', url: 'https://github.com/org/repo/pull/1',
   state: 'OPEN', isDraft: false, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' },
   createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z', closedAt: null, mergedAt: null,
-  mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null, ...overrides })
+  mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null,
+  reviewDecision: 'REVIEW_REQUIRED',
+  labels: { nodes: [{ name: 'bug' }], pageInfo: { hasNextPage: false, endCursor: null } },
+  reviewRequests: { nodes: [{ requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }], pageInfo: { hasNextPage: false, endCursor: null } },
+  latestCommit: { nodes: [{ commit: { committedDate: '2026-09-02T00:00:00Z', statusCheckRollup: { state: 'FAILURE', contexts: {
+    pageInfo: { hasNextPage: false }, nodes: [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }],
+  } } } }] }, latestComment: { nodes: [] }, latestReview: { nodes: [] },
+  reviewRequestEvents: { pageInfo: { hasPreviousPage: false }, nodes: [{ createdAt: '2026-09-02T12:00:00Z',
+    requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }] }, ...overrides })
 const upstream = (nodes: ReturnType<typeof node>[], next: string | null = null, count = nodes.length) =>
   Response.json({ data: { search: { nodes, issueCount: count, pageInfo: { hasNextPage: next !== null, endCursor: next } } } })
-const scope = { connectionId: 'selected', parameters: { repository: 'org/repo' } }
+const scope = { connectionId: 'selected', parameters: { repositories: ['org/repo'] } }
 const source = { pluginId: 'github', sourceId: 'pull-requests' }
 const query = (): Extract<DataSourceRequest, { operation: 'query' }> => ({ operation: 'query',
   query: { source, scope, sort: [{ pointer: '/updatedAt', direction: 'desc' }] }, mode: 'execution', evaluationTime: 100, pageSize: 1 })
@@ -77,6 +85,7 @@ describe('GitHub typed pull source', () => {
     expect(page.records).toHaveLength(1)
     expect(page.records[0]).toMatchObject({ recordId: 'open', data: { state: 'open', draft: true, mergeStateStatus: 'UNSTABLE', author: 'alice' }, action: { verb: 'openUrl' } })
     expect(page.records[0]?.writableFields).toEqual(['/state'])
+    expect(page.records[0]?.data).toMatchObject({ checkStatuses: ['FAILURE'], reviewRequests: [{ kind: 'team', name: 'reviewers', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
     expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo is:open author:alice' })
   })
 
@@ -120,8 +129,16 @@ describe('GitHub typed pull source', () => {
     expect(page.records.map(row => row.recordId)).toEqual(['new'])
   })
 
+  it('uses GitHub viewer review search for negative as well as positive matches', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('not-requested')]))
+    const input = query(); input.query.predicate = filter('/reviewRequestedFromViewer', false)
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
+    expect(page.records[0]?.data).toMatchObject({ reviewRequestedFromViewer: false })
+    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo -review-requested:@me' })
+  })
+
   it.each(['org/repo is:closed', '', 'org'])('rejects invalid repository %j before a network call', async repository => {
-    const input = query(); input.query.scope = { ...scope, parameters: { repository } }
+    const input = query(); input.query.scope = { ...scope, parameters: { repositories: [repository] } }
     expect((await call(createPullSourceHandler(), input)).ok).toBe(false)
     expect(ghGraphQL).not.toHaveBeenCalled()
   })
@@ -179,7 +196,7 @@ describe('GitHub typed pull source', () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
       nodes: [{ nameWithOwner: 'org/repo' }], pageInfo: { hasNextPage: true, endCursor: 'repo-next' },
     } } } }))
-    const res = await call(handler, { operation: 'options', source, scope, target: 'parameter', pointer: '/repository', search: 'repo', pageSize: 25 })
+    const res = await call(handler, { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: 'repo', pageSize: 25 })
     expect(await res.json()).toEqual({ options: [{ id: 'org/repo', label: 'org/repo' }], exhausted: false, nextCursor: 'repo-next' })
   })
 })

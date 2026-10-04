@@ -720,7 +720,7 @@ describe('architecture boundaries', () => {
     // name collisions rather than dependencies: two with core vocabulary, and `browserRules.ts` with
     // the `browser` plugin. Those rules are the preview pane's page-fill rules and belong to
     // `preview`. Nothing in `plugins/browser` reads them.
-    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts']
+    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts', 'contextTime.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
@@ -751,10 +751,17 @@ describe('architecture boundaries', () => {
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
-      ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'preview is a dashboard run mode'],
+      ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'context is a binding address and preview is a run mode'],
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
-      ['packages/node-core/src/server/dashboards/run.ts', 'preview is a dashboard run mode'],
+      ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
+      ['packages/dashboards-core/src/plan.ts', 'context is a binding address; github is a provider example in a description'],
+      ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
+      ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding; github names the core-owned project repository facet'],
+      ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],
       ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
+      ['packages/protocol/src/data/queries/contextTime.ts', 'context is a binding address'],
+      ['packages/protocol/src/data/queries/dataQueryResolution.ts', 'context is a binding address'],
+      ['packages/protocol/src/data/values/dataBindings.ts', 'context is a binding address'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],

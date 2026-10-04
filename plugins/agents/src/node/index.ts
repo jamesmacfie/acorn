@@ -35,6 +35,7 @@ import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
+import { usageSource } from '../shared/usageRegistration'
 import { removeExpiredHistory } from '../server/sessions/historyRetention'
 
 let builtInProfileDisposables: (() => void)[] | null = null
@@ -225,6 +226,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       ctx.routes.fetch(createSessionSourceHandler(runtime), { prefix: '/data/sessions' })
       ctx.dataSources.register(sessionSource)
+      ctx.routes.fetch(async (request, context) =>
+        (await import('../server/data/usageSourceHandler')).createUsageSourceHandler(store, core)(request, context),
+      { prefix: '/data/usage' })
+      ctx.dataSources.register(usageSource)
 
       delegation = new AgentDelegationService(
         runtime,

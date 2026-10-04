@@ -79,6 +79,7 @@ export default function DashboardEditor(props: {
   const [confirmedRequirements, setConfirmedRequirements] = createSignal<string[]>([])
   const [placement, setPlacement] = createSignal(props.scope.ownerId ?? '')
   let saveTimer: ReturnType<typeof setTimeout> | undefined
+  let edited = false
   onCleanup(() => saveTimer && clearTimeout(saveTimer))
 
   const tabs = () => props.scope.surface === 'home' ? homeTabs(dashboards(), props.scope.workspaceId) : []
@@ -93,11 +94,14 @@ export default function DashboardEditor(props: {
     if (!panelPlanSchema.safeParse(next).success) return
     saveTimer = setTimeout(() => void flush(next).catch(() => {}), AUTOSAVE_MS)
   }
-  const change = (update: (current: PanelPlan) => PanelPlan): void => { setPlan(current => {
+  const change = (update: (current: PanelPlan) => PanelPlan): void => {
+    const current = plan()
     const next = update(current)
-    if (next !== current) persist(next)
-    return next
-  }) }
+    if (next === current) return
+    edited = true
+    setPlan(next)
+    persist(next)
+  }
   async function flush(next = plan()): Promise<DashboardDraft> {
     setSaveState('Saving…')
     try {
@@ -118,6 +122,7 @@ export default function DashboardEditor(props: {
     try {
       const loaded = props.dashboardId ? await client.get(props.dashboardId) : latestUnpublishedDashboard(await client.list())
       if (loaded) {
+        if (edited) return
         setDraft(loaded)
         const restored = recovery.read(nodeId, loaded.id)?.content
         setPlan(restored && 'version' in restored ? restored : loaded.content)
@@ -127,12 +132,12 @@ export default function DashboardEditor(props: {
       }
     } catch { /* A local draft can begin while the Node reconnects. */ }
     const local = recovery.read(nodeId, recoveryId)?.content
-    if (local && 'version' in local) { setPlan(local); setEntrance('pick'); setSaveState('Saved on this computer') }
+    if (!edited && local && 'version' in local) { setPlan(local); setEntrance('pick'); setSaveState('Saved on this computer') }
   })
 
   const addSource = (): void => change(current => ({ ...current, sources: [...current.sources, {
     id: crypto.randomUUID(), label: `Source ${current.sources.length + 1}`, role: 'primary',
-    reference: { kind: 'inline', content: { name: 'Choose data', parameters: { type: 'object' }, query: { source: { pluginId: 'core', sourceId: 'choose' }, scope: { ...scope, parameters: {} }, sort: [] }, sourceParameters: {} }, bindings: {} },
+    reference: { kind: 'inline', content: { name: 'Choose data', parameters: { type: 'object', properties: {}, additionalProperties: false }, query: { source: { pluginId: 'core', sourceId: 'choose' }, scope: { ...scope, parameters: {} }, sort: [] }, sourceParameters: {} }, bindings: {} },
   }] }))
   const setSource = (id: string, reference: QueryReference | undefined): void => change(current => ({
     ...current, sources: reference
@@ -156,7 +161,7 @@ export default function DashboardEditor(props: {
       const label = state.source?.name ?? source.label
       const sources = current.sources.map(entry => entry.id === id ? { ...entry, label } : entry)
       if (current.sources.length !== 1 || current.columns.length) return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
-      const columns = available.slice(0, 30).map(field => ({ id: safeId(field.id), label: field.name, type: field.type, bind: { [id]: { field: field.id } }, ...(field.unit ? { unit: field.unit } : {}), ...(field.values ? { choices: field.values } : {}) }))
+      const columns = available.slice(0, 30).map(field => ({ id: safeId(field.id), label: field.name, type: field.type, bind: { [id]: { field: field.id } }, ...(field.unit ? { unit: field.unit } : {}), ...(field.precision ? { precision: field.precision } : {}), ...(field.list ? { list: true } : {}), ...(field.values ? { choices: field.values } : {}) }))
       return { ...current, sources, columns }
     })
   }
@@ -225,6 +230,38 @@ export default function DashboardEditor(props: {
       return { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator,
         ...(['missing', 'present'].includes(operator) ? {} : { right: { address: { from: 'literal', value } } }),
       } }
+    }),
+  }))
+  const filterValueMode = (predicate: DataPredicate): string => {
+    const address = comparison(predicate)?.right?.address
+    return address?.from === 'context' ? address.name === 'calendar' ? address.boundary : address.name : 'literal'
+  }
+  const filterOffset = (predicate: DataPredicate): string => {
+    const address = comparison(predicate)?.right?.address
+    return address?.from === 'context' && (address.name === 'now' || address.name === 'calendar') ? address.offset ?? '' : ''
+  }
+  const viewerPointer = (columnId: string): string | undefined => {
+    if (plan().sources.length !== 1) return undefined
+    const source = plan().sources[0]!
+    const binding = plan().columns.find(column => column.id === columnId)?.bind[source.id]
+    return binding && 'field' in binding ? states()[source.id]?.description?.fields.find(field => field.pointer === binding.field)?.viewerMatch : undefined
+  }
+  const editFilterContext = (index: number, mode: string): void => change(current => ({
+    ...current, stages: current.stages.map((stage, at) => {
+      if (at !== index || stage.op !== 'filter' || stage.where.kind !== 'comparison') return stage
+      const address = mode === 'viewer' ? { from: 'context' as const, name: 'viewer' as const, pointer: viewerPointer(filterColumn(stage.where)) ?? '/login' }
+        : mode === 'now' ? { from: 'context' as const, name: 'now' as const, offset: '-P7D' }
+          : mode === 'literal' ? { from: 'literal' as const, value: '' }
+            : { from: 'context' as const, name: 'calendar' as const, boundary: mode as 'startOfDay' | 'startOfWeek' | 'startOfMonth' }
+      return { ...stage, where: { ...stage.where, right: { address } } }
+    }),
+  }))
+  const editFilterOffset = (index: number, offset: string): void => change(current => ({
+    ...current, stages: current.stages.map((stage, at) => {
+      if (at !== index || stage.op !== 'filter' || stage.where.kind !== 'comparison' || stage.where.right?.address.from !== 'context') return stage
+      const address = stage.where.right.address
+      return address.name === 'now' || address.name === 'calendar'
+        ? { ...stage, where: { ...stage.where, right: { address: { ...address, ...(offset ? { offset } : {}) } } } } : stage
     }),
   }))
 
@@ -382,7 +419,21 @@ export default function DashboardEditor(props: {
             <Select label="Comparison" size="sm" value={comparison(filter().where)?.operator ?? 'eq'}
               options={['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'contains', 'in', 'missing', 'present'].map(value => ({ value, label: value }))}
               onChange={operator => editFilter(index(), { operator: operator as Comparison['operator'] })} />
-            <Show when={!['missing', 'present'].includes(comparison(filter().where)?.operator ?? '')}><Input label="Value" assist={false} value={operand(filter().where)} onInput={value => editFilter(index(), { value })} /></Show>
+            <Show when={!['missing', 'present'].includes(comparison(filter().where)?.operator ?? '')}>
+              <Show when={plan().columns.find(column => column.id === filterColumn(filter().where))?.type === 'datetime' || plan().columns.find(column => column.id === filterColumn(filter().where))?.type === 'person'}>
+                <Select label="Value" size="sm" value={filterValueMode(filter().where)} options={[
+                  { value: 'literal', label: 'Fixed value' },
+                  ...(viewerPointer(filterColumn(filter().where)) ? [{ value: 'viewer', label: 'You' }] : plan().columns.find(column => column.id === filterColumn(filter().where))?.type === 'person' ? [] : [
+                    { value: 'now', label: 'Relative to now' }, { value: 'startOfDay', label: 'Start of today' },
+                    { value: 'startOfWeek', label: 'Start of this week' }, { value: 'startOfMonth', label: 'Start of this month' },
+                  ]),
+                ]} onChange={mode => editFilterContext(index(), mode)} />
+              </Show>
+              <Show when={filterValueMode(filter().where) === 'literal'}><Input label="Value" assist={false} value={operand(filter().where)} onInput={value => editFilter(index(), { value })} /></Show>
+              <Show when={['now', 'startOfDay', 'startOfWeek', 'startOfMonth'].includes(filterValueMode(filter().where))}>
+                <Input label="Offset (for example -P7D or -P1W)" assist={false} value={filterOffset(filter().where)} onInput={value => editFilterOffset(index(), value)} />
+              </Show>
+            </Show>
             </>}</Show>
             <Show when={stage.op !== 'filter'}><CompositionStageForm stage={stage} columns={plan().columns} onChange={next => editStage(index(), next)} /></Show>
             <Button size="sm" variant="bare" disabled={index() === 0} onPress={() => change(current => { const stages = [...current.stages]; [stages[index() - 1], stages[index()]] = [stages[index()]!, stages[index() - 1]!]; return { ...current, stages } })}>Move up</Button>

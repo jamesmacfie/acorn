@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import { queryLibraryRequestSchema } from '@acorn/protocol/dataQueries.ts'
 import type { AppEnv } from '../middleware/auth'
 import { requireProviderAccess } from '../middleware/requireUser'
@@ -10,7 +10,9 @@ import { authorizeQueryScope, publishQuery, queryInScope, resolveQuery } from '.
 
 export const queries = new Hono<AppEnv>()
   .use('*', requireProviderAccess)
-  .post('/:operation', async c => {
+  .post('/:operation', handleQuery)
+
+export async function handleQuery(c: Context<AppEnv>) {
     try {
       const parsed = queryLibraryRequestSchema.safeParse(await c.req.json())
       if (!parsed.success) return respondError(c, 400, 'invalid-request')
@@ -45,4 +47,4 @@ export const queries = new Hono<AppEnv>()
       if (error instanceof DataSourceError) return respondError(c, error.code === 'forbidden' ? 403 : error.code === 'unavailable' ? 404 : 400, error.code)
       return respondError(c, 400, 'invalid-query')
     }
-  })
+}

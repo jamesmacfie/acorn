@@ -33,6 +33,9 @@ Bindings use the shared data address vocabulary:
 An empty pointer selects the whole value. `fallback` applies only to missing values. The explicit
 conversions are `scalar-to-text` and `json-to-text`. Only completed transitive predecessors reach a
 handler's `predecessorValues`, so a completed sibling can't supply a binding.
+Workflow query bindings can also use Node-resolved `context` addresses for the selected account's
+`viewer`, the workspace's linked external IDs, and `now` or a local `calendar` boundary with ISO 8601
+offsets. The Node resolves these at the frozen query evaluation time before calling the source.
 
 Named definition `outputs` declare `{ name, schema, binding, required? }`, binding completed step
 values. A child step exposes them as `outputs` beside its task, run, and status, so a consumer doesn't

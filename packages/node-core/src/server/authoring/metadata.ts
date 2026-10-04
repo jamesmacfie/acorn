@@ -35,8 +35,18 @@ export async function authoringMetadata(args: {
   }
   if (request.operation === 'list-accounts') {
     const accounts = await listConnections(getDb(args.env), args.invocation.principal.userId)
-    return accounts.filter(account => !['disabled', 'needs-auth'].includes(account.status))
-      .map(account => ({ id: account.id, providerId: account.provider, name: account.name ?? account.label }))
+    const catalog = await listDataSources(args.env, { ...args.turn.scope, parameters: {} }, args.invocation)
+    return Promise.all(accounts.filter(account => !['disabled', 'needs-auth'].includes(account.status)).slice(0, 50)
+      .map(async account => {
+        const source = catalog.sources.find(entry => entry.providerId === account.provider)
+        const basic = { id: account.id, providerId: account.provider, name: account.name ?? account.label }
+        if (!source) return basic
+        const scope = { ...args.turn.scope, connectionId: account.id, parameters: {} }
+        try {
+          const description = await invokeDataSource(args.env, { operation: 'describe', source, scope }, args.invocation)
+          return description.operations.identity ? { ...basic, identity: await invokeDataSource(args.env, { operation: 'identity', source, scope }, args.invocation) } : basic
+        } catch { return basic }
+      }))
   }
   if (request.operation === 'discover-sources') {
     assertScope(args.turn.scope, request.scope)

@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { parsePanels } from '@acorn/dashboards-core/contract'
-import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
+import type { PanelDefinition } from '@acorn/dashboards-core/contract'
 import { measureSignature, type MeasureQueryIdentity } from '@acorn/dashboards-core/contract'
 import { displayPlanRun } from '@acorn/dashboards-core/plan.ts'
 import { aggregateRows } from '@acorn/dashboards-core/shaping.ts'

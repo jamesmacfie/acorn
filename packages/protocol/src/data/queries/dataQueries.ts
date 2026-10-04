@@ -65,6 +65,9 @@ export type ResolvedQuery = {
 }
 export type QueryBindingContext = {
   evaluationTime?: number
+  timePolicy?: { zone: string; weekStart: 'monday' | 'sunday' | 'saturday' }
+  viewer?: import('../dataSources').DataSourceIdentity
+  workspaceLinks?: string[]
   inputs?: Record<string, DataValue>
   steps?: Record<string, DataValue>
   item?: DataValue

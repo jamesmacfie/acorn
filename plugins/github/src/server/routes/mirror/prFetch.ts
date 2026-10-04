@@ -27,7 +27,7 @@ export type Connection<T> = { pageInfo: PageInfo; nodes: T[] }
 type GqlActor = { login: string } | null
 export type GqlLabel = { name: string; color: string | null }
 export type GqlReview = { id: string; author: GqlActor; state: string; bodyHTML: string | null; submittedAt: string | null }
-export type GqlReviewRequest = { id: string; requestedReviewer: { login?: string } | null }
+export type GqlReviewRequest = { id: string; requestedReviewer: { login?: string; name?: string; slug?: string } | null }
 export type GqlComment = { id: string; author: GqlActor; bodyHTML: string | null; createdAt: string | null }
 export type GqlCommit = {
   commit: {
@@ -83,7 +83,7 @@ export type PullComposite = PullScalars & {
 const PAGE_INFO = 'pageInfo { endCursor hasNextPage }'
 const LABEL_NODES = 'name color'
 const REVIEW_NODES = 'id author { login } state bodyHTML submittedAt'
-const REVIEW_REQUEST_NODES = 'id requestedReviewer { ... on User { login } }'
+const REVIEW_REQUEST_NODES = 'id requestedReviewer { ... on User { login } ... on Team { name slug } }'
 const COMMENT_NODES = 'id author { login } bodyHTML createdAt'
 const COMMIT_NODES = 'commit { oid messageHeadline committedDate author { name user { login } } }'
 const THREAD_COMMENT_NODES = 'id databaseId author { login } bodyHTML createdAt'

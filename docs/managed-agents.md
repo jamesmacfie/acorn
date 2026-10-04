@@ -18,6 +18,16 @@ drive raw terminals or resolve approvals.
 - `plugins/agents/src/client/` holds the pane, Agent Center, composer, and settings.
 - Core receives only the attention snapshot in `packages/protocol/src/agents/attention.ts`.
 
+## Usage records
+
+The `usage-records` data source exposes one ledger usage event per record, including session, turn,
+task, provider, model recorded on that turn, token deltas, USD cost, and whether cost was reported,
+estimated from the named model price, or unknown. Deltas are computed before a dashboard time filter,
+so a session crossing a window boundary contributes only usage inside it. Historical deletion or a
+bounded ledger scan is reported as incomplete event coverage. Session totals are sums of these
+records; any convenience total must use the same pricing and delta policy. The pure per-event token
+pricing formula lives in `@acorn/protocol/usageCost.ts` and is shared with the `agent-cost` badge.
+
 ## Pages
 
 These pages cover sessions:

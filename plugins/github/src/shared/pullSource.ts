@@ -7,7 +7,7 @@ export const pullSource: DataSourceRegistration = {
 }
 
 export const pullSourceDescription: DataSourceDescription = {
-  revision: '1',
+  revision: '5',
   schema: {
     type: 'object', additionalProperties: false,
     properties: {
@@ -18,8 +18,18 @@ export const pullSourceDescription: DataSourceDescription = {
       createdAt: { type: 'number' }, updatedAt: { type: 'number' },
       closedAt: { type: ['number', 'null'] }, mergedAt: { type: ['number', 'null'] },
       mergeable: { type: 'string' }, mergeStateStatus: { type: 'string' }, autoMergeEnabled: { type: 'boolean' },
+      reviewDecision: { type: ['string', 'null'] }, checks: { type: 'string' },
+      checkStatuses: { type: 'array', items: { type: 'string' } },
+      labels: { type: 'array', items: { type: 'string' } },
+      requestedReviewers: { type: 'array', items: { type: 'string' } },
+      requestedTeams: { type: 'array', items: { type: 'string' } },
+      reviewRequests: { type: 'array', items: { type: 'object', additionalProperties: false, properties: {
+        kind: { type: 'string' }, name: { type: 'string' }, requestedAt: { type: ['number', 'null'] },
+      }, required: ['kind', 'name', 'requestedAt'] } },
+      reviewRequestedFromViewer: { type: ['boolean', 'null'] },
+      lastActivityAt: { type: 'number' },
     },
-    required: ['id', 'number', 'title', 'repository', 'url', 'state', 'author', 'draft', 'createdAt', 'updatedAt', 'closedAt', 'mergedAt', 'mergeable', 'mergeStateStatus', 'autoMergeEnabled'],
+    required: ['id', 'number', 'title', 'repository', 'url', 'state', 'author', 'draft', 'createdAt', 'updatedAt', 'closedAt', 'mergedAt', 'mergeable', 'mergeStateStatus', 'autoMergeEnabled', 'reviewDecision', 'checks', 'checkStatuses', 'labels', 'requestedReviewers', 'requestedTeams', 'reviewRequests', 'reviewRequestedFromViewer', 'lastActivityAt'],
   },
   fields: [
     { pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' } },
@@ -30,7 +40,23 @@ export const pullSourceDescription: DataSourceDescription = {
       query: { operators: ['eq'], sortable: false }, choices: { kind: 'static', values: [
         { id: 'open', label: 'Open' }, { id: 'closed', label: 'Closed without merge' }, { id: 'merged', label: 'Merged' },
       ] } },
-    { pointer: '/author', label: 'Author login', origin: 'declared', display: { kind: 'person' }, query: { operators: ['eq'], sortable: false } },
+    { pointer: '/author', label: 'Author login', origin: 'declared', display: { kind: 'person' }, viewerMatch: '/login', query: { operators: ['eq'], sortable: false } },
+    { pointer: '/reviewRequestedFromViewer', label: 'Review requested from you', origin: 'declared', display: { kind: 'boolean' }, query: { operators: ['eq'], sortable: false } },
+    { pointer: '/requestedReviewers', label: 'Requested reviewers', origin: 'declared', display: { kind: 'person', list: true } },
+    { pointer: '/requestedTeams', label: 'Requested teams', origin: 'declared', display: { kind: 'text', list: true } },
+    { pointer: '/reviewRequests', label: 'Review requests with times', origin: 'declared' },
+    { pointer: '/reviewDecision', label: 'Review decision', origin: 'declared', display: { kind: 'status' }, choices: { kind: 'static', values: [
+      { id: 'APPROVED', label: 'Approved', tone: 'ok' }, { id: 'CHANGES_REQUESTED', label: 'Changes requested', tone: 'bad' }, { id: 'REVIEW_REQUIRED', label: 'Review required', tone: 'warn' },
+    ] } },
+    { pointer: '/checks', label: 'Head checks', origin: 'declared', display: { kind: 'status' }, choices: { kind: 'static', values: [
+      { id: 'SUCCESS', label: 'Passed', tone: 'ok' }, { id: 'FAILURE', label: 'Failed', tone: 'bad' }, { id: 'PENDING', label: 'Pending', tone: 'warn' },
+      { id: 'EXPECTED', label: 'Missing', tone: 'muted' }, { id: 'CANCELLED', label: 'Cancelled', tone: 'muted' },
+      { id: 'SKIPPED', label: 'Skipped', tone: 'muted' }, { id: 'NEUTRAL', label: 'Neutral', tone: 'muted' },
+      { id: 'UNKNOWN', label: 'Unknown', tone: 'muted' },
+    ] } },
+    { pointer: '/checkStatuses', label: 'Individual head check states', origin: 'declared', display: { kind: 'text', list: true } },
+    { pointer: '/labels', label: 'Labels', origin: 'declared', display: { kind: 'text', list: true } },
+    { pointer: '/lastActivityAt', label: 'Last activity', origin: 'declared', display: { kind: 'datetime' }, query: { operators: ['gt', 'gte', 'lt', 'lte'], sortable: true } },
     { pointer: '/draft', label: 'Draft', origin: 'declared', display: { kind: 'boolean' }, query: { operators: ['eq'], sortable: false } },
     ...(['createdAt', 'updatedAt'] as const).map(key => ({
       pointer: `/${key}`, label: key === 'createdAt' ? 'Created' : 'Updated', origin: 'declared' as const,
@@ -39,14 +65,23 @@ export const pullSourceDescription: DataSourceDescription = {
     { pointer: '/closedAt', label: 'Closed', origin: 'declared', display: { kind: 'datetime' } },
     { pointer: '/mergedAt', label: 'Merged', origin: 'declared', display: { kind: 'datetime' } },
     { pointer: '/mergeable', label: 'Mergeability', origin: 'declared' },
-    { pointer: '/mergeStateStatus', label: 'Merge readiness', origin: 'declared' },
+    { pointer: '/mergeStateStatus', label: 'Merge readiness', origin: 'declared', display: { kind: 'status' },
+      choices: { kind: 'static', values: [
+        { id: 'CLEAN', label: 'Ready', tone: 'ok' }, { id: 'BEHIND', label: 'Behind base', tone: 'warn' },
+        { id: 'BLOCKED', label: 'Blocked', tone: 'bad' }, { id: 'DIRTY', label: 'Conflicts', tone: 'bad' },
+        { id: 'DRAFT', label: 'Draft', tone: 'muted' }, { id: 'HAS_HOOKS', label: 'Merge hooks', tone: 'warn' },
+        { id: 'UNSTABLE', label: 'Unstable', tone: 'warn' }, { id: 'UNKNOWN', label: 'Unknown', tone: 'muted' },
+      ] } },
     { pointer: '/autoMergeEnabled', label: 'Auto-merge enabled', origin: 'declared', display: { kind: 'boolean' } },
   ],
-  parameters: { type: 'object', properties: { repository: { type: 'string' } }, required: ['repository'], additionalProperties: false },
-  parameterFields: [{ pointer: '/repository', label: 'Repository', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
-  operations: { query: true, options: true, details: true, incremental: false, groups: ['all'] },
+  parameters: { type: 'object', properties: { repositories: { type: 'array', items: { type: 'string' } } }, additionalProperties: false },
+  parameterFields: [{ pointer: '/repositories', label: 'Repositories', origin: 'declared', display: { kind: 'text', list: true }, choices: { kind: 'dynamic', dependsOn: [] } }],
+  operations: { query: true, options: true, details: true, incremental: false, groups: ['all'], identity: true },
   detailSchema: { type: 'object', additionalProperties: false, properties: { state: { type: 'string' } }, required: ['state'] },
   writable: [{ field: '/state', path: '/v1/p/github/data/pulls/write', risk: 'write', values: ['open', 'closed'] }],
   targets: [{ kind: 'github.pull-request' }],
-  consistency: 'GitHub search is eventually consistent, with no snapshot isolation during upstream pagination. Up to 1,000 matches are fully read before local exact filtering and stable sorting. Larger searches are incomplete. Continuations retain that selection for 60 seconds; expired selections must be refreshed.',
+  coverage: { kind: 'snapshot' },
+  reach: { parameter: '/repositories', itemPlural: 'repositories',
+    default: 'every repository the {account} account can see', empty: 'no linked repositories' },
+  consistency: 'With no repository selection, GitHub search reaches every repository visible to the account. An explicit list restricts that reach. Search is eventually consistent, with no snapshot isolation during pagination. Up to 1,000 matches are fully read; larger searches are incomplete.',
 }

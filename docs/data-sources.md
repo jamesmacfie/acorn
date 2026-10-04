@@ -13,14 +13,45 @@ has inspected its worktree. The agent sessions source reads every unarchived ses
 store's cursor, up to the host's 5,000-record budget, and reports `incomplete` with `host-budget`
 when more remain. No client registers a source or discovers a schema on its own.
 
+## Identity, reach, time, and coverage
+
+A source can declare an `identity` operation. The Node requests its optional account facts (`id`,
+`login`, `name`, `email`, `teamIds`, `teams`) for the selected connection, caches them by plugin and
+account, and clears the cache when that connection changes. Identity remains on the Node. A field's
+`viewerMatch` pointer names the identity member used by the editor's **You** value; the host resolves
+that context binding to a literal before calling the provider. Sources should also expose native
+viewer relationships as ordinary fields when the provider can compute them.
+
+Scope parameters can be lists with dynamic choices. An omitted optional scope means the reach stated
+in `consistency`; a chosen list limits it. `workspaceLinks` resolves to external IDs linked to the
+query's selected workspace and account, including GitHub repository facets on local projects. Record
+identities must include their distinguishing scope (a repository with a repository-local number, for
+example). An account-wide source says so in its description rather than implying one project.
+
+`context` bindings include `viewer`, `workspaceLinks`, `now`, and `calendar`. The Node resolves them
+once at the run's evaluation instant and time policy. `now` accepts ISO 8601 day or week offsets;
+`calendar` accepts day, week, or month offsets from a local boundary. Fields with `precision: 'day'`
+carry `YYYY-MM-DD`, and comparisons to context instants use the plan's local date.
+
+Descriptions declare snapshot or event coverage. Event coverage can state retention, earliest time,
+and whether the history is complete. A read can report its covered range and observation time. A
+dashboard warns when a requested lower time bound precedes verified coverage, marks the run
+incomplete, and gives the oldest observation time as its **as of** label. Coverage diagnostics remain
+available to later summary operations; they must keep partial results partial.
+
+The source's `coverage` declaration describes snapshot versus event semantics. A dataset description
+also carries `coverageWindows`, its stored complete and gap windows. The two fields are distinct:
+a successful capture time does not prove the provider's event window was complete.
+
+Query content can carry a structured `timeWindow` with a field pointer and an `absolute`,
+`last-duration`, or `since-local-midnight` window. Calendar windows require a valid IANA timezone.
+Resolution creates ordinary half-open timestamp comparisons at one evaluation instant. Workflow
+execution freezes that instant and the resolved query across retries. Incremental queries use a
+source-declared continuation contract and the workflow processing ledger described below.
+
 The host stamps each returned record reference with its retrieval `scope`, including dynamic source
 parameters. Scope is context, not record identity. Details keep that scope and connection, and return
 the validated detail schema beside the data and fetch time.
-
-A query can carry a structured `timeWindow` with a field pointer and an `absolute`, `last-duration`,
-or `since-local-midnight` window. Calendar windows need a valid IANA timezone. Resolution produces
-half-open timestamp comparisons at one evaluation instant. Workflow execution freezes that instant and
-the resolved query across retries.
 
 ## Register a source
 

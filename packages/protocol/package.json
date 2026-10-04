@@ -9,6 +9,7 @@
     "./agentContext.ts": "./src/agents/agentContext.ts",
     "./api.ts": "./src/transport/api.ts",
     "./attention.ts": "./src/agents/attention.ts",
+    "./usageCost.ts": "./src/agents/usageCost.ts",
     "./authoring.ts": "./src/data/authoring.ts",
     "./baseline.ts": "./src/baseline.ts",
     "./branch.ts": "./src/projects/branch.ts",

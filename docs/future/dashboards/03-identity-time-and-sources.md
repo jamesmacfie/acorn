@@ -1,3 +1,11 @@
+> **Completed 2026-10-04** by the "Phase 03 identity, time, and sources" task, with integration into workstreams 04–07.
+>
+> **What landed:** Data-source identity, viewer, workspace-link, reach, list-scope, and relative/calendar time contracts resolve through the Node query path and work in dashboard and workflow authoring. Enriched GitHub pulls and Actions jobs, local Git branches and worktrees, core task counts, and agent usage records are integrated with later composition, datasets, row actions, and write-back. The integration also added a confined, fresh-checked **Re-run job** action and restored creation of a second Home dashboard from a single tab.
+>
+> **Deviations:** Local Git sources accept a workspace-selectable project parameter for Home; core worktree counts use the existing coalesced Git status read. GitHub Actions uses a bounded REST scan with explicit incomplete coverage instead of a provider cursor. The source picker now leaves an unchosen placeholder neutral. Provider handlers and authoring/query work load on request to keep the existing Node service size ceiling; its integrated build is 3,243,662 bytes against 3,245,000. The owner authorized Phase 07 before usage measurements, with no numbers invented.
+>
+> **For later phases:** The acceptance inventory and verification matrix are in `integration-audit.md`; `actionsSourceHandler.ts` owns job eligibility and dispatch, while `sourceContext.ts`, `contextTime.ts`, `coverage.ts`, and shared `usageCost.ts` remain the identity/time/coverage seams. The by-demand Linear expansion, further GitHub sources, activity events, package manifests, and saved SQL sources remain deferred. Migration checks, repo lint, Node size build, and full `pnpm test` passed with Node 24.21 and Rust on PATH. Isolated desktop checks selected Workspace tasks, published a panel, created a disposable snapshot dataset, and created a second Home tab; live-provider mutations, graphical board drag with records, live-model evaluation, and 20 unseen human requests were not performed.
+
 # Workstream 3: identity, time, and richer sources
 
 Status: proposed, 2026-10-02, revised the same day. Depends on

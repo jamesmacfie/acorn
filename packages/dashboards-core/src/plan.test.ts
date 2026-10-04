@@ -5,6 +5,7 @@ import { bindPanelRows, deriveDrilldownPlan, describePanelPlan, displayPlanRun, 
 import { PANEL_CAPABILITIES } from './capabilities'
 import { aggregateRows } from './shaping'
 import { buildChart } from './chart'
+import { bucketBounds } from './planBuckets'
 
 const description = dataSourceDescriptionSchema.parse({
   schema: { type: 'object', properties: { title: { type: 'string' }, amount: { type: 'number' }, currency: { type: 'string' }, due: { type: 'string' } }, additionalProperties: false },
@@ -39,6 +40,18 @@ const base = () => panelPlanSchema.parse({
 })
 
 describe('panel plan', () => {
+  it('turns a summary calendar bucket into an exact reusable drill-down range', () => {
+    const plan = base()
+    const derived = panelPlanSchema.parse(deriveDrilldownPlan(plan, [], { stageIndex: 0,
+      summaryBuckets: [{ column: 'due', bucket: 'month', value: '2026-03' }] }))
+    expect(derived.stages).toEqual([{ op: 'filter', where: { kind: 'all', predicates: [
+      { kind: 'comparison', left: { address: { from: 'item', pointer: '/due' } }, operator: 'gte', right: { address: { from: 'literal', value: '2026-03-01' } } },
+      { kind: 'comparison', left: { address: { from: 'item', pointer: '/due' } }, operator: 'lt', right: { address: { from: 'literal', value: '2026-04-01' } } },
+    ] } }])
+    expect(bucketBounds('2026-03-08', 'day', 'America/New_York', 'instant')).toEqual({
+      start: Date.parse('2026-03-08T05:00:00Z'), end: Date.parse('2026-03-09T04:00:00Z'),
+    })
+  })
   it('example 5: counts filtered pull request measures independently and retains exact rows for each cell', () => {
     const plan = base()
     const where = (currency: string) => ({ kind: 'comparison' as const, left: { address: { from: 'item' as const, pointer: '/currency' } }, operator: 'eq' as const, right: { address: { from: 'literal' as const, value: currency } } })

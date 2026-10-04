@@ -5,6 +5,7 @@
    accent colour, which means focus or selection everywhere else. Between the page header and the scrolling body on a plugin's
    own page, and at the top of the tab on a workspace's or project's page. */
 .settings-plugin-strip {
+  --settings-measure: 960px;
   flex: none;
   display: flex;
   flex-direction: column;
@@ -28,4 +29,3 @@
 .plugin-emits { display: grid; gap: var(--space-1); margin: 0; padding-inline-start: var(--space-5); font-size: var(--fs-xs); }
 .plugin-emits li { display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: var(--space-2); }
 .plugin-emits li span { color: var(--text-muted); }
-

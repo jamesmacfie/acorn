@@ -30,9 +30,10 @@ These are decisions, not implementation details:
 - **The role is the default at run time, not a copy.** A panel that never opened the mapping step
   still unions correctly. An explicit `''` means "this source has nothing here", unlike an absent key.
 
-`PanelMappingColumn` is a record per column, with a reserved `writeValue`, because value mappings are
-many-to-one and a future drag-to-update would need a designated value per column. Nothing reads it.
-None of this layer is reachable from a manifest, and none of it grew the wire format.
+The older `PanelMappingColumn.writeValue` remains part of the legacy mapping model. Published version
+2 plans use explicit `writeValues` on each enum choice, keyed by source instance. A choice with no
+declared value for that source cannot be a write target. None of this layer is reachable from a
+manifest.
 
 ## The generated editor
 
@@ -44,11 +45,14 @@ disappeared when you swapped the source.
 
 **Add panel** starts with **Pick data** or **Describe it**. The source picker shows source and account
 pairs; the AI conversation asks for missing choices and proposes the same plan used by the forms.
-The editor shows columns, filter stages, view options, the host's plan description, and a live Node
-preview. Source descriptions may offer starter plans, which the host validates before showing them.
+The editor shows columns, relation choices, filter, compute, summarize, expand, and overlap stages,
+view options, the host's plan description, and a live Node preview. Source descriptions may offer
+starter plans, which the host validates before showing them. **Keep history** can create a dataset
+from the chosen query.
 Each change autosaves the draft and a device recovery copy.
 
-`PanelPlan` version 2 permits primary sources and `filter` stages. The closed capability list in
+`PanelPlan` version 2 permits primary, lookup, and children sources and up to eight ordered stages.
+The closed capability list in
 `packages/dashboards-core/src/capabilities.ts` defines the available operations and view options. Columns can
 inherit choice tones and ranks, display lists as chips, and carry fixed or per-row units. The time
 policy stores an IANA zone, fixed or viewer display mode, and week start. Calendar days stay calendar

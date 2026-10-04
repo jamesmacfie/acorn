@@ -39,7 +39,8 @@ diagnostics report both row counts and what one row means after each step. An in
 unknown measure input marks the affected measure partial, with a reason; mixed per-row units fail
 the measure rather than making an invented total. The history sampler skips a run with partial
 measures or a failed relation. Summary cells retain the exact contributing rows
-for read-only drill-down at the original evaluation instant.
+for read-only drill-down at the original evaluation instant. Adding a bucket drill-down as a panel
+stores its exact calendar range, including the selected time zone's offset changes.
 
 Missing plugins, connections, publications, or fields are unavailable states. They are never
 silently replaced with an empty result or a guessed schema. Source identity is

@@ -12,7 +12,9 @@ export function createIssueSourceHandler(): PluginFetchHandler {
       const input = dataSourceRequestSchema.parse(await request.json())
       request.signal.throwIfAborted()
       if (input.operation === 'describe') return Response.json(issueSourceDescription)
-      if (input.operation === 'details' || input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      if (input.operation === 'details' || input.operation === 'actions' || input.operation === 'identity') {
+        return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      }
       const scope = input.operation === 'query' ? input.query.scope : input.scope
       if (!scope.connectionId || !(await context.providers.connections('linear')).some(connection => connection.id === scope.connectionId && connection.status === 'connected')) throw new Error('connection_unavailable')
       const read = async () => {

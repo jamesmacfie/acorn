@@ -63,8 +63,9 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 
 ## Typed pull-request source
 
-The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection
-and `parameters.repository` in `owner/name` form. Repository options enumerate repositories available
+The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection.
+Its optional `parameters.repositories` list contains `owner/name` values; omitting it searches every
+repository visible to that account. Repository options enumerate repositories available
 through that connection, with continuation cursors. Option search filters each returned page; an empty
 page with a cursor is not exhaustion.
 
@@ -72,6 +73,24 @@ Records use GitHub node IDs for identity. Actual `state` is `open`, `closed`, or
 means closed without merging. Draft, mergeability, merge readiness, and auto-merge remain separate
 fields. Author login is nullable, and timestamps use epoch milliseconds. Row URLs retain the
 content-link action that opens a tracked pull request inside Acorn.
+
+The source also reports review decision, head-check rollup and individual outcomes, requested users
+and teams with request times, labels, last commit/comment/review activity, and GitHub merge readiness.
+Its identity operation supplies the selected account's login for **You**. A review-requested-from-you
+filter uses GitHub's native `review-requested:@me` search, including team requests. The mirror stores
+team requests as well as user requests. GitHub search and nested connections have provider caps; an
+exceeded cap yields an incomplete selection.
+
+`github/actions-jobs` reads workflow jobs across a selected repository list. Each record carries its
+repository, run, attempt, start and finish, duration, conclusion, and linked pull-request numbers.
+The source declares event coverage matching GitHub's Actions retention and reports the actual lower
+bound of a read. Its bounded REST scan reports incomplete when a page, run, or attempt cap is hit;
+GitHub supplies no durable cursor suitable for incremental source continuation.
+Completed job rows offer **Re-run job**. The Node rechecks named-action eligibility at press time;
+the GitHub source route then reads the current job, verifies the selected connection and repository,
+and calls GitHub's job rerun endpoint. A job that disappeared or resumed is refused, and the host
+requires confirmation for the execute risk. The action runs through the same device-scoped
+idempotency middleware as other dashboard actions.
 
 Queries support equality on state, author login, and draft, ordered comparisons on created/updated
 time, and `all` groups. Number, created time, and updated time support sorting. The provider search

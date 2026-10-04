@@ -77,4 +77,3 @@ export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluat
   }
   return group(rows, 0)
 }
-

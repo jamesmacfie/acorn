@@ -1,4 +1,4 @@
-import { Hono } from 'hono'
+import { Hono, type Context } from 'hono'
 import {
   authoringSystemPrompt,
   authoringTurnRequestSchema,
@@ -18,7 +18,7 @@ import { ProviderOperationError } from '../integrations/types'
 import { resolveQuery } from '../queries/runtime'
 import { respondError } from '../respond'
 import { createLogger } from '../telemetry/logger'
-import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
+import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/plan.ts'
 import { listConnections } from '../integrations/connections'
 import { invokeDataSource, listDataSources } from '../dataSources/runtime'
 import { eq } from 'drizzle-orm'
@@ -35,7 +35,9 @@ function message(error: unknown): string {
   return error instanceof Error ? error.message : 'Candidate validation failed.'
 }
 
-export const authoring = new Hono<AppEnv>().post('/turn', async c => {
+export const authoring = new Hono<AppEnv>().post('/turn', handleAuthoringTurn)
+
+export async function handleAuthoringTurn(c: Context<AppEnv>) {
   const parsed = authoringTurnRequestSchema.safeParse(await c.req.json().catch(() => null))
   if (!parsed.success || parsed.data.target === 'workflow') return respondError(c, 400, 'invalid-request')
   const request = parsed.data as AuthoringTurnRequest & { target: 'query' | 'dashboard' }
@@ -56,6 +58,16 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
   const links = request.target === 'dashboard' ? await getDb(c.env).select({ projectId: schema.workspaceExternalProjects.projectId, integrationId: schema.workspaceExternalProjects.integrationId, externalId: schema.workspaceExternalProjects.externalId }).from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, request.scope.workspaceId)) : []
   const datasets = request.target === 'dashboard' ? (await import('../datasets/store')).listDatasets(getDb(c.env), request.scope.workspaceId, request.scope.projectId)
     .map(dataset => ({ id: dataset.id, name: dataset.name, mode: dataset.mode, feeder: dataset.feeder, coverage: dataset.coverage })) : []
+  const accountFacts = request.target === 'dashboard' ? await Promise.all(accounts.slice(0, 20).map(async account => {
+    const source = sourceCatalog?.sources.find(entry => entry.providerId === account.provider)
+    if (!source) return { id: account.id, providerId: account.provider, name: account.name ?? account.label }
+    const scope = { ...request.scope, connectionId: account.id, parameters: {} }
+    try {
+      const description = await invokeDataSource(c.env, { operation: 'describe', source, scope }, invocation)
+      const identity = description.operations.identity ? await invokeDataSource(c.env, { operation: 'identity', source, scope }, invocation) : undefined
+      return { id: account.id, providerId: account.provider, name: account.name ?? account.label, identity }
+    } catch { return { id: account.id, providerId: account.provider, name: account.name ?? account.label } }
+  })) : []
   const validate = async (candidate: unknown): Promise<{ candidate?: unknown; problems: string[] }> => {
     try {
       if (request.target === 'query') {
@@ -94,7 +106,7 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
       system: authoringSystemPrompt(request.target, TARGET_PROMPTS[request.target]),
       ...(request.target === 'dashboard' ? { facts: {
         evaluationTime: Date.now(), time: basePlan?.success ? basePlan.data.time : undefined,
-        sources: sourceCatalog?.sources, accounts: accounts.map(account => ({ id: account.id, providerId: account.provider, name: account.name ?? account.label })),
+        sources: sourceCatalog?.sources, accounts: accountFacts,
         descriptions, projects, links, datasets, capabilities: PANEL_CAPABILITIES,
       } } : {}),
       signal: c.req.raw.signal,
@@ -144,7 +156,7 @@ export const authoring = new Hono<AppEnv>().post('/turn', async c => {
     if (c.req.raw.signal.aborted) return respondError(c, 408, 'cancelled')
     return respondError(c, 400, 'authoring_failed', [message(error)])
   }
-})
+}
 
 function checkRequirements(content: PanelPlan, previous: PanelPlan | undefined, instruction: string): string[] {
   const problems: string[] = []

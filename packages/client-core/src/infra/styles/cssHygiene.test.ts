@@ -46,6 +46,7 @@ describe('no phantom tokens', () => {
       '--kit-grid-col',
       '--tab-strip-h',
       '--pane-actions-w',
+      '--settings-measure',
     ])
 
     const phantom = [...new Set(sheets.flatMap((f) => [...referenced(f.text)]))]

@@ -34,3 +34,30 @@ export function bucketValue(value: DataValue | undefined, bucket: 'value' | 'day
   week.setUTCDate(week.getUTCDate() - (week.getUTCDay() - first + 7) % 7)
   return week.toISOString().slice(0, 10)
 }
+
+/** Exact half-open bounds for a displayed calendar bucket, including zone offset changes. */
+export function bucketBounds(value: DataValue, bucket: 'day' | 'week' | 'month', zone: string,
+  precision: 'day' | 'instant'): { start: number | string; end: number | string } | undefined {
+  if (typeof value !== 'string') return undefined
+  const firstDay = bucket === 'month' ? `${value}-01` : value
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(firstDay)) return undefined
+  const first = new Date(`${firstDay}T00:00:00Z`)
+  if (!Number.isFinite(first.getTime()) || first.toISOString().slice(0, 10) !== firstDay) return undefined
+  const next = new Date(first)
+  if (bucket === 'month') next.setUTCMonth(next.getUTCMonth() + 1)
+  else next.setUTCDate(next.getUTCDate() + (bucket === 'week' ? 7 : 1))
+  const lastDay = next.toISOString().slice(0, 10)
+  if (precision === 'day') return { start: firstDay, end: lastDay }
+  const midnight = (day: string): number => {
+    const target = Date.parse(`${day}T00:00:00Z`)
+    let low = target - 48 * 60 * 60 * 1000
+    let high = target + 48 * 60 * 60 * 1000
+    while (high - low > 1) {
+      const middle = Math.floor((low + high) / 2)
+      if (String(bucketValue(middle, 'day', zone, 'monday')) >= day) high = middle
+      else low = middle
+    }
+    return high
+  }
+  return { start: midnight(firstDay), end: midnight(lastDay) }
+}

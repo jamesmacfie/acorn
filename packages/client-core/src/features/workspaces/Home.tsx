@@ -61,8 +61,8 @@ export default function Home() {
       </Inline>
       <PanelGrid
         scope={scope()}
-        heading={tabs().length > 1 ? bar : undefined}
-        panelAria={tabs().length > 1 ? { id: HOME_TAB_PANEL_ID, labelledBy: homeTabDomId(activeTab()) } : undefined}
+        heading={bar}
+        panelAria={{ id: HOME_TAB_PANEL_ID, labelledBy: homeTabDomId(activeTab()) }}
         empty={() => (
           <EmptyState title={`Nothing on ${tabName()} yet`} action={addButton('md')}>
             Add a panel to see tasks, pull requests, issues, or anything else in view.
