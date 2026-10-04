@@ -83,5 +83,5 @@ export const pullSourceDescription: DataSourceDescription = {
   coverage: { kind: 'snapshot' },
   reach: { parameter: '/repositories', itemPlural: 'repositories',
     default: 'every repository the {account} account can see', empty: 'no linked repositories' },
-  consistency: 'With no repository selection, GitHub search reaches every repository visible to the account. An explicit list restricts that reach. Search is eventually consistent, with no snapshot isolation during pagination. Up to 1,000 matches are fully read; larger searches are incomplete.',
+  consistency: 'With no repository selection, GitHub search reaches every repository visible to the account. An explicit list restricts that reach. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
 }

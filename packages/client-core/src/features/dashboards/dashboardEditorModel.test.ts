@@ -1,9 +1,9 @@
 import { describe, expect, it } from 'vitest'
-import { dashboardPanelContentSchema, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
+import { dashboardPanelContentSchema, type DashboardPanelContent, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import {
   addStatusColumns, applyCategoryColumns, availableDashboardViews, displaySchema, emptyDashboardContent, exactStatusOptions,
-  latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason,
+  latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason, unbindMissingFields,
 } from './dashboardEditorModel'
 
 const query = { kind: 'inline' as const, bindings: {}, content: {
@@ -152,5 +152,25 @@ describe('dashboard editor model', () => {
       // A source pointer on a mapped panel names nothing in its projected schema.
       expect(dashboardPanelContentSchema.safeParse({ ...combined, display: { ...combined.display, groupBy: '/state' } }).success).toBe(false)
     })
+  })
+})
+
+describe('unbindMissingFields', () => {
+  it('drops bindings a switched source cannot fill and keeps the rest', () => {
+    const columns: PanelPlan['columns'] = [
+      { id: 'title', label: 'Title', type: 'text', bind: { tasks: { field: '/title' } } },
+      { id: 'status', label: 'Status', type: 'enum', bind: { tasks: { field: '/status' }, linear: { field: '/state' } } },
+      { id: 'updated', label: 'Updated', type: 'text', bind: { tasks: { field: '/updatedAt' } } },
+      { id: 'url', label: 'Url', bind: { tasks: { field: '/url' } } },
+      { id: 'source', label: 'Source', type: 'text', bind: { tasks: { value: 'Tasks' } } },
+    ]
+    const github = [{ id: '/title', type: 'text' }, { id: '/state', type: 'enum' }, { id: '/updatedAt', type: 'datetime' }, { id: '/url', type: 'link' }]
+    expect(unbindMissingFields(columns, 'tasks', github).map(column => column.bind)).toEqual([
+      { tasks: { field: '/title' } },
+      { linear: { field: '/state' } },
+      {},
+      { tasks: { field: '/url' } },
+      { tasks: { value: 'Tasks' } },
+    ])
   })
 })

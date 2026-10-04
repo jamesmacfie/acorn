@@ -35,9 +35,14 @@ const pull = z.object({
     ]).nullable(),
   })) }),
 })
+// GitHub gives a search query about 10 seconds. These nested fields make each match expensive, so
+// 100 matches per page times out on any broad search. 25 takes about 5 seconds, and 10 of those
+// pages fit inside a dashboard run's 60-second budget.
+const SEARCH_PAGE_SIZE = 25
+const SEARCH_PAGES = 10
 const searchPage = z.object({ search: z.object({ issueCount: z.number().int().nonnegative(), nodes: z.array(pull), pageInfo }) })
-const SEARCH = `query AcornPullSource($q: String!, $after: String) {
-  search(query: $q, type: ISSUE, first: 100, after: $after) {
+const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String) {
+  search(query: $q, type: ISSUE, first: $first, after: $after) {
     issueCount pageInfo { hasNextPage endCursor }
     nodes { ... on PullRequest {
       id number title url state isDraft createdAt updatedAt closedAt mergedAt
@@ -76,10 +81,10 @@ export async function readPullSelection(token: string, q: string, connectionId: 
   let after: string | null = null
   let bytes = 0
   const result = (completeness: DataSourcePage['completeness']): DataSourcePage => ({ records, completeness, revision: pullSourceDescription.revision, readTime: Date.now() })
-  for (let page = 0; page < 10; page++) {
-    const response: z.infer<typeof searchPage> = await githubData(token, SEARCH, { q, after }, searchPage, signal)
+  for (let page = 0; page < SEARCH_PAGES; page++) {
+    const response: z.infer<typeof searchPage> = await githubData(token, SEARCH, { q, first: SEARCH_PAGE_SIZE, after }, searchPage, signal)
     const search: z.infer<typeof searchPage>['search'] = response.search
-    if (search.issueCount > 1000) return result({ kind: 'incomplete', cause: 'upstream-cap' })
+    if (search.issueCount > SEARCH_PAGE_SIZE * SEARCH_PAGES) return result({ kind: 'incomplete', cause: 'upstream-cap' })
     for (const node of search.nodes) {
       if (seen.has(node.id)) throw new Error('github_duplicate_record')
       seen.add(node.id)
@@ -139,16 +144,25 @@ const REPOSITORIES = `query AcornSourceRepositories($first: Int!, $after: String
 }`
 const repositoriesPage = z.object({ viewer: z.object({ repositories: z.object({ nodes: z.array(z.object({ nameWithOwner: z.string() })), pageInfo }) }) })
 
+// The viewer's repository list can't be filtered by name, so a search walks pages until it fills
+// one page of matches. Without this, a repository past the first page can never be found.
+const REPOSITORY_SEARCH_PAGES = 10
+
 export async function readRepositoryOptions(token: string, input: { pageSize: number; cursor?: string; search: string }, signal: AbortSignal) {
-  const { viewer: { repositories } } = await githubData(token, REPOSITORIES,
-    { first: input.pageSize, after: input.cursor ?? null }, repositoriesPage, signal)
-  if (repositories.pageInfo.hasNextPage && !repositories.pageInfo.endCursor) throw new Error('github_invalid_cursor')
-  return {
-    options: repositories.nodes.filter(repo => repo.nameWithOwner.toLowerCase().includes(input.search.toLowerCase()))
-      .map(repo => ({ id: repo.nameWithOwner, label: repo.nameWithOwner.slice(0, 80) })),
-    exhausted: !repositories.pageInfo.hasNextPage,
-    ...(repositories.pageInfo.hasNextPage ? { nextCursor: repositories.pageInfo.endCursor! } : {}),
+  const search = input.search.toLowerCase()
+  const options: { id: string; label: string }[] = []
+  let after = input.cursor ?? null
+  for (let page = 0; page < REPOSITORY_SEARCH_PAGES; page++) {
+    // Ask only for the slots left, so the matches never pass the page size and the cursor stays exact.
+    const { viewer: { repositories } } = await githubData(token, REPOSITORIES,
+      { first: input.pageSize - options.length, after }, repositoriesPage, signal)
+    if (repositories.pageInfo.hasNextPage && !repositories.pageInfo.endCursor) throw new Error('github_invalid_cursor')
+    options.push(...repositories.nodes.filter(repo => repo.nameWithOwner.toLowerCase().includes(search))
+      .map(repo => ({ id: repo.nameWithOwner, label: repo.nameWithOwner.slice(0, 80) })))
+    after = repositories.pageInfo.hasNextPage ? repositories.pageInfo.endCursor : null
+    if (!after || !search || options.length >= input.pageSize) break
   }
+  return { options, exhausted: !after, ...(after ? { nextCursor: after } : {}) }
 }
 
 const VIEWER = 'query AcornSourceViewer { viewer { id login name email } }'

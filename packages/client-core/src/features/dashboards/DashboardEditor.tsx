@@ -30,7 +30,7 @@ import WriteValueControls from './WriteValueControls'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { availableContentPresentations } from '../../host/registries/panes/contentLinks'
-import { latestUnpublishedDashboard } from './dashboardEditorModel'
+import { latestUnpublishedDashboard, unbindMissingFields } from './dashboardEditorModel'
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from './persist'
 import './dashboards.css'
 
@@ -146,21 +146,30 @@ export default function DashboardEditor(props: {
     relations: reference ? current.relations : current.relations?.filter(relation => relation.from !== id && relation.to !== id),
     columns: reference ? current.columns : current.columns.map(column => { const { [id]: _removed, ...bind } = column.bind; return { ...column, bind } }),
   }))
+  // The source each slot last described. A switch passes through a report with no description,
+  // so the previous report can't tell us what the columns were built from.
+  const describedSources = new Map<string, string>()
   const updateState = (id: string, state: SourceQueryEditorState): void => {
     const priorRevision = states()[id]?.description?.revision
     setStates(current => ({ ...current, [id]: state }))
     if (!state.description || !state.query) return
+    const describedSource = `${state.query.source.pluginId}/${state.query.source.sourceId}`
+    const priorSource = describedSources.get(id)
+    describedSources.set(id, describedSource)
     if (priorRevision !== state.description.revision) void Promise.all((state.description.starterPlans ?? []).flatMap(candidate => {
       const parsed = panelPlanSchema.safeParse(candidate)
       return parsed.success ? [client.validate(parsed.data).then(result => result.problems.length ? undefined : parsed.data).catch(() => undefined)] : []
     })).then(values => setStarters(current => ({ ...current, [id]: values.filter((value): value is PanelPlan => !!value) })))
     const available = dashboardFields(state.description)
+    // Columns bound to the old source's fields would point at fields the new source doesn't have.
+    const switched = priorSource !== undefined && priorSource !== describedSource
     change(current => {
       const source = current.sources.find(entry => entry.id === id)
       if (!source) return current
       const label = state.source?.name ?? source.label
       const sources = current.sources.map(entry => entry.id === id ? { ...entry, label } : entry)
-      if (current.sources.length !== 1 || current.columns.length) return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
+      if (switched && current.sources.length > 1) return { ...current, sources, columns: unbindMissingFields(current.columns, id, available) }
+      if (current.sources.length !== 1 || (current.columns.length && !switched)) return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
       const columns = available.slice(0, 30).map(field => ({ id: safeId(field.id), label: field.name, type: field.type, bind: { [id]: { field: field.id } }, ...(field.unit ? { unit: field.unit } : {}), ...(field.precision ? { precision: field.precision } : {}), ...(field.list ? { list: true } : {}), ...(field.values ? { choices: field.values } : {}) }))
       return { ...current, sources, columns }
     })

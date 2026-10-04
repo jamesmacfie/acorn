@@ -74,8 +74,11 @@ export async function validateQueryChoices(env: Env, query: DataSourceQuery, des
   for (const field of description.parameterFields) {
     const value = readDataPointer(query.scope.parameters, field.pointer)
     if (value === MISSING) continue
-    if (field.choices?.kind === 'static' && !field.choices.values.some(choice => choice.id === value)) throw new Error('Unavailable parameter choice')
-    if (field.choices?.kind === 'dynamic') selections.push({ target: 'parameter', pointer: field.pointer, values: [value] })
+    // A list parameter holds several choices. Each one is checked, not the array as a whole.
+    const values = Array.isArray(value) ? value : [value]
+    const choices = field.choices
+    if (choices?.kind === 'static' && values.some(entry => !choices.values.some(choice => choice.id === entry))) throw new Error('Unavailable parameter choice')
+    if (choices?.kind === 'dynamic') selections.push({ target: 'parameter', pointer: field.pointer, values })
   }
   function predicate(value: DataPredicate): void {
     if (value.kind !== 'comparison') { value.predicates.forEach(predicate); return }

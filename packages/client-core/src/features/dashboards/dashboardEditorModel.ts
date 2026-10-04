@@ -1,4 +1,4 @@
-import { isMappedDashboard, type DashboardMapping, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
+import { isMappedDashboard, type DashboardMapping, type DashboardPanelContent, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import { DATA_SOURCE_PREVIEW_MODE } from '@acorn/protocol/dataSources.ts'
@@ -16,6 +16,21 @@ export const emptyDashboardContent = (): DashboardPanelContent => ({
 
 export const latestUnpublishedDashboard = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T | undefined =>
   drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)[0]
+
+/** After a source switches, drops the column bindings the new source can't fill: a field it doesn't
+ *  describe, or one of another type. A column with no type keeps any field the source still has. */
+export function unbindMissingFields(
+  columns: PanelPlan['columns'],
+  sourceId: string,
+  fields: readonly { id: string; type: string }[],
+): PanelPlan['columns'] {
+  return columns.map(column => {
+    const binding = column.bind[sourceId]
+    if (!binding || !('field' in binding) || fields.some(field => field.id === binding.field && (!column.type || field.type === column.type))) return column
+    const { [sourceId]: _missing, ...bind } = column.bind
+    return { ...column, bind }
+  })
+}
 
 export function setDashboardQuery(
   content: DashboardPanelContent,

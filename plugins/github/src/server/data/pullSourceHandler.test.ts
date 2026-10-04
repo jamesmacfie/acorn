@@ -138,7 +138,7 @@ describe('GitHub typed pull source', () => {
   })
 
   it('does not accept a sorted take through an upstream ceiling', async () => {
-    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('one')], null, 1001))
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('one')], null, 251))
     const input = query(); input.query.take = 1
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
     expect(page).toMatchObject({ records: [], completeness: { kind: 'incomplete', cause: 'upstream-cap' } })
@@ -168,7 +168,7 @@ describe('GitHub typed pull source', () => {
     const input = query(); input.query.predicate = filter('/reviewRequestedFromViewer', false)
     const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
     expect(page.records[0]?.data).toMatchObject({ reviewRequestedFromViewer: false })
-    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo -review-requested:@me' })
+    expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo -review-requested:@me', first: 25 })
   })
 
   it.each(['org/repo is:closed', '', 'org'])('rejects invalid repository %j before a network call', async repository => {
@@ -230,7 +230,18 @@ describe('GitHub typed pull source', () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
       nodes: [{ nameWithOwner: 'org/repo' }], pageInfo: { hasNextPage: true, endCursor: 'repo-next' },
     } } } }))
-    const res = await call(handler, { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: 'repo', pageSize: 25 })
+    const res = await call(handler, { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: '', pageSize: 25 })
     expect(await res.json()).toEqual({ options: [{ id: 'org/repo', label: 'org/repo' }], exhausted: false, nextCursor: 'repo-next' })
+  })
+
+  it('walks repository pages until a search finds its match', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
+      nodes: [{ nameWithOwner: 'acme/api' }, { nameWithOwner: 'acme/web' }], pageInfo: { hasNextPage: true, endCursor: 'page-2' },
+    } } } })).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
+      nodes: [{ nameWithOwner: 'Runn-Fast/runn' }], pageInfo: { hasNextPage: false, endCursor: null },
+    } } } }))
+    const res = await call(createPullSourceHandler(), { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: 'runn-fast/runn', pageSize: 25 })
+    expect(await res.json()).toEqual({ options: [{ id: 'Runn-Fast/runn', label: 'Runn-Fast/runn' }], exhausted: true })
+    expect(vi.mocked(ghGraphQL).mock.calls[1]?.[2]).toMatchObject({ first: 25, after: 'page-2' })
   })
 })

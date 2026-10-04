@@ -61,8 +61,8 @@ async function world() {
               { pointer: '/score', label: 'Score', origin: 'declared', query: { operators: ['gt'], sortable: true } },
               { pointer: '/state', label: 'State', origin: 'declared', query: { operators: ['eq'], sortable: false }, choices: { kind: 'dynamic', dependsOn: [] } },
             ],
-            parameters: { type: 'object', properties: { includeArchived: { type: 'boolean' } }, additionalProperties: false },
-            parameterFields: [],
+            parameters: { type: 'object', properties: { includeArchived: { type: 'boolean' }, labels: { type: 'array', items: { type: 'string' } } }, additionalProperties: false },
+            parameterFields: [{ pointer: '/labels', label: 'Labels', origin: 'declared', display: { kind: 'text', list: true }, choices: { kind: 'dynamic', dependsOn: [] } }],
             operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
             revision: 'source-1', consistency: 'Live',
           })
@@ -196,6 +196,15 @@ describe('workspace query library', () => {
     removeChoice()
     await expect(publishQuery(env, scope, draft.id, 2, { threshold: 1 }, invocation())).rejects.toThrow('choice')
     expect(store.published(scope, draft.id).revision).toBe(1)
+  })
+  it('checks each choice of a list parameter', async () => {
+    const { store, env, removeChoice } = await world()
+    const value = content()
+    value.query.scope.parameters = { labels: ['open'] }
+    const draft = store.create(scope, value)
+    await publishQuery(env, scope, draft.id, 1, { threshold: 1 }, invocation())
+    removeChoice()
+    await expect(publishQuery(env, scope, draft.id, 2, { threshold: 1 }, invocation())).rejects.toThrow('choice')
   })
   it('enforces workspace/project scope and task principal restrictions through routes', async () => {
     const { post, store } = await world()

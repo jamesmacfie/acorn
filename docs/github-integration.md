@@ -66,8 +66,9 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection.
 Its optional `parameters.repositories` list contains `owner/name` values; omitting it searches every
 repository visible to that account. Repository options enumerate repositories available
-through that connection, with continuation cursors. Option search filters each returned page; an empty
-page with a cursor is not exhaustion.
+through that connection, with continuation cursors. GitHub can't filter that list by name, so a
+search reads up to 10 pages until it fills one page of matches. A search that ends with a cursor
+and too few matches isn't exhaustive.
 
 Records use GitHub node IDs for identity. Actual `state` is `open`, `closed`, or `merged`; `closed`
 means closed without merging. Draft, mergeability, merge readiness, and auto-merge remain separate
@@ -111,8 +112,10 @@ time, and `all` groups. Number, created time, and updated time support sorting. 
 narrows candidates, then exact typed comparisons run over the exhausted selection. Author equality
 uses the returned login's case. Repository and author values cannot inject search qualifiers.
 
-The adapter reads at most 10 pages of 100 search matches. A provider count above 1,000 or continuation
-past that limit returns `incomplete`, including when the query requests a smaller `take`. Stable
+The adapter reads at most 10 pages of 25 search matches. Each match carries checks, reviews, and
+timeline events, so GitHub times out on a page of 100. A provider count above 250 or continuation
+past that limit returns `incomplete`, including when the query requests a smaller `take`. The first
+page carries the count, so a search that's too broad fails in one round trip. Stable
 sorting uses node ID to break ties before applying `take`. This source advertises fresh state details
 for write eligibility, but no incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
 changes during pagination.
