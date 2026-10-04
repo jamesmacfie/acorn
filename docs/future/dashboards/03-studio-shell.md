@@ -1,7 +1,8 @@
 # Phase 3: the studio shell
 
-Status: proposed, October 5, 2026. Depends on [phase 2](./02-plan-outline-model.md). Read the
-[programme README](./README.md) first, especially
+Status: shipped, October 5, 2026, in commit `326ae2813`. [What shipped](#what-shipped) records the
+choices made while building it and what it left for later phases. Depends on
+[phase 2](./02-plan-outline-model.md). Read the [programme README](./README.md) first, especially
 [the decisions](./README.md#decisions-already-made). The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows the target in "The
 studio".
@@ -231,3 +232,55 @@ and closing it leaves the task's panes and terminal as they were.
 - `PanelBody`'s props and every view under `views/`, so the optional `onSelectPart` reaches
   `TableView` and the group headers.
 - That no plugin imports `DashboardEditor`. It is in client-core, not in `@acorn/plugin-api`.
+
+## What shipped
+
+All 30 requirements shipped, with the tests listed above. `docs/dashboards/mapping-and-editor.md`
+§ The generated editor describes the shipped behaviour and wins over this page.
+
+Where the code lives, in `packages/client-core/src/features/dashboards/`:
+
+- `studio/PanelStudio.tsx` is the layer, toolbar, tabs, status bar, AI dialog, and publish review.
+  `studio/StudioOutline.tsx` draws the outline and `studio/StudioPreview.tsx` the preview.
+- `studio/inspectors.tsx` holds `INSPECTORS`, one form per part kind, and the plan edits the
+  outline's **Add** menu and row menu share (`addColumnTo`, `addStageTo`, `moveStageIn`, and others).
+- `studio/studioStore.ts` owns the plan, selection, undo, redo, and autosave.
+- `studio/studioOpen.ts` holds `isPanelStudioOpen`. It's a module of its own, with an entry in the
+  client-core `exports` map, so `App.tsx` doesn't load the studio to read one flag. That raised
+  client-core's entrypoint cap in `tools/arch/boundaries.test.ts` from 167 to 168.
+- `panelPublish.ts` holds `publishPanelPlan` and `describePanelSources`. `region.ts` gains
+  `regionRefusal`, which returns the reason, and `regionAllows` calls it.
+
+Choices made while building it:
+
+- Every source's picker stays mounted and hidden unless its part is selected. The column, relation,
+  and step forms read each source's described fields from what its picker reports, and the old
+  editor mounted them all at once too. Phase 4 could move describing into the store instead.
+- Default columns and source labels that follow a source's description are `derived` changes. They
+  join the undo step that picked the source and don't clear redo.
+- The outline is one `Rows` list per section, so the arrow keys move within a section and **Tab**
+  moves between sections.
+- **Remove** is offered on sources and steps only. Columns are removed from their card.
+- **Ask AI about this** fills the AI request with the part's title. `AuthoringConversation` gained
+  an optional `instruction` prop for it.
+- The toolbar's **Publish…** is enabled once the plan has a source, and the review's **Publish**
+  carries the gate, listing each blocker.
+- The preview's cell is a twelfth of the preview area, without the grid's gaps, so a wide panel
+  previews a little larger than it places.
+- Undo and redo answer both ⌘ and Ctrl on every platform.
+- `planPartLabel` stays: problem lines read "Title is incomplete." and outline titles are too long
+  for that.
+
+Checked in a `dev:agent` session: **Add panel** on Home, **Pick data**, **Workspace tasks**, a
+filter step from **Add**, undo, redo, the publish review, and **Publish**, which placed the panel on
+Home. The driver has no hover or key press, so **Edit** from the panel menu, ⌘Z, and **Escape**
+were checked only in `PanelStudio.test.tsx`. The session had no plugin with a pane aside, so the
+studio over a task wasn't checked.
+
+Left for later phases:
+
+- The inspectors are the old forms. [Phase 4](./04-inspectors.md) rewrites them.
+- The blank studio's **Pick data** and **Describe it** stand in for [phase 5](./05-launcher.md)'s
+  launcher.
+- The AI is a dialog. [Phase 6](./06-docked-ai.md) docks it and removes the requirements gate.
+
