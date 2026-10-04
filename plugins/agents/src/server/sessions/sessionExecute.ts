@@ -83,6 +83,7 @@ function resultFromSnapshot(
           inputTokens: turn.usage.inputTokens,
           outputTokens: turn.usage.outputTokens,
           cachedInputTokens: turn.usage.cachedInputTokens,
+          cacheWriteInputTokens: turn.usage.cacheWriteInputTokens,
         }
       : undefined,
     events,

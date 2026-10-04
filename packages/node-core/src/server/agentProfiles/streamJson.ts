@@ -112,17 +112,19 @@ export function parseCodexStreamJson(stdout: string): HeadlessCapture {
   const inputTokens = usage ? codexNumber(usage, 'input_tokens') : undefined
   const outputTokens = usage ? codexNumber(usage, 'output_tokens') : undefined
   const cachedInputTokens = usage ? codexNumber(usage, 'cached_input_tokens') : undefined
+  const cacheWriteInputTokens = usage ? codexNumber(usage, 'cache_write_input_tokens') : undefined
   return {
     result,
     structuredOutput: codexStructured(result),
     sessionId: typeof threadId === 'string' ? threadId : null,
     costUsd: null,
-    ...(inputTokens !== undefined || outputTokens !== undefined || cachedInputTokens !== undefined
+    ...(inputTokens !== undefined || outputTokens !== undefined || cachedInputTokens !== undefined || cacheWriteInputTokens !== undefined
       ? {
           usage: {
             ...(inputTokens !== undefined ? { inputTokens } : {}),
             ...(outputTokens !== undefined ? { outputTokens } : {}),
             ...(cachedInputTokens !== undefined ? { cachedInputTokens } : {}),
+            ...(cacheWriteInputTokens !== undefined ? { cacheWriteInputTokens } : {}),
           },
         }
       : {}),

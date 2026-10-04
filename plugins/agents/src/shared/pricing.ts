@@ -139,64 +139,66 @@ export const claudePriceCatalog: readonly AgentPriceCatalogEntry[] = [
 
 // Standard OpenAI API prices per million tokens. A managed Codex session may be covered by a plan,
 // credits or an enterprise agreement instead, so these values produce an API-equivalent estimate,
-// never a claim about the user's invoice. Cache writes use the documented 1.25x input rate.
+// never a claim about the user's invoice. GPT-5.6 and later charge 1.25x input for cache writes;
+// earlier models charge the ordinary input rate. These are standard short-context rates.
+// https://developers.openai.com/api/docs/guides/prompt-caching
+// Match only base ids and dated snapshots: suffixes such as -pro and -cyber have distinct prices.
 export const codexPriceCatalog: readonly AgentPriceCatalogEntry[] = [
   {
     id: 'gpt-6-astra',
     label: 'GPT-6 Astra',
     models: 'gpt-6-astra',
-    matches: matches(/^gpt-6-astra(?:-|$)/i),
+    matches: matches(/^gpt-6-astra(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }),
   },
   {
     id: 'gpt-6-1-sol',
     label: 'GPT-6.1 Sol',
     models: 'gpt-6.1-sol',
-    matches: matches(/^gpt-6\.1-sol(?:-|$)/i),
+    matches: matches(/^gpt-6\.1-sol(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.1 }),
   },
   {
     id: 'gpt-6-sol',
     label: 'GPT-6 Sol',
     models: 'gpt-6-sol',
-    matches: matches(/^gpt-6-sol(?:-|$)/i),
+    matches: matches(/^gpt-6-sol(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 2, output: 10, cacheWrite: 2.5, cacheRead: 0.2 }),
   },
   {
     id: 'gpt-6-luna',
     label: 'GPT-6 Luna',
     models: 'gpt-6-luna',
-    matches: matches(/^gpt-6-luna(?:-|$)/i),
+    matches: matches(/^gpt-6-luna(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 0.1, output: 0.5, cacheWrite: 0.125, cacheRead: 0.01 }),
   },
   {
     id: 'gpt-5-6-terra',
     label: 'GPT-5.6 Terra',
     models: 'gpt-5.6-terra',
-    matches: matches(/^gpt-5\.6-terra(?:-|$)/i),
+    matches: matches(/^gpt-5\.6-terra(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 }),
   },
   {
     id: 'gpt-5-6-luna',
     label: 'GPT-5.6 Luna',
     models: 'gpt-5.6-luna',
-    matches: matches(/^gpt-5\.6-luna(?:-|$)/i),
+    matches: matches(/^gpt-5\.6-luna(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 0.2, output: 1.2, cacheWrite: 0.25, cacheRead: 0.02 }),
   },
   {
     id: 'gpt-5-6-sol',
     label: 'GPT-5.6 Sol',
     models: 'gpt-5.6, gpt-5.6-sol',
-    matches: matches(/^gpt-5\.6(?:-sol)?(?:-|$)/i),
+    matches: matches(/^gpt-5\.6(?:-sol)?(?:-\d{4}-\d{2}-\d{2})?$/i),
     defaultPrice: fixedPrice({ input: 4, output: 20, cacheWrite: 5, cacheRead: 0.4 }),
   },
-  // Exact match: gpt-5.5-pro and gpt-5.5-cyber are separate models with their own prices.
   {
     id: 'gpt-5-5',
     label: 'GPT-5.5',
     models: 'gpt-5.5',
-    matches: matches(/^gpt-5\.5$/i),
-    defaultPrice: fixedPrice({ input: 5, output: 30, cacheWrite: 6.25, cacheRead: 0.5 }),
+    matches: matches(/^gpt-5\.5(?:-\d{4}-\d{2}-\d{2})?$/i),
+    defaultPrice: fixedPrice({ input: 5, output: 30, cacheWrite: 5, cacheRead: 0.5 }),
   },
 ]
 

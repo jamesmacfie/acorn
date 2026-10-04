@@ -94,7 +94,7 @@ describe('the codex stream adapter', () => {
     expect(capture.result).toBe('Blue')
     // `thread_id`, which is what `codex resume <ref>` takes.
     expect(capture.sessionId).toBe('01a0847a-0000-0000-0000-000000000000')
-    expect(capture.usage).toEqual({ inputTokens: 20142, outputTokens: 5, cachedInputTokens: 12160 })
+    expect(capture.usage).toEqual({ inputTokens: 20142, outputTokens: 5, cachedInputTokens: 12160, cacheWriteInputTokens: 0 })
     // The stream carries no price, and we would rather report nothing than a number from a price
     // table nobody maintains.
     expect(capture.costUsd).toBeNull()

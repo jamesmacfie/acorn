@@ -26,6 +26,7 @@ export type HeadlessCapture = {
     inputTokens?: number
     outputTokens?: number
     cachedInputTokens?: number
+    cacheWriteInputTokens?: number
   }
   events: StreamEvent[]
 }

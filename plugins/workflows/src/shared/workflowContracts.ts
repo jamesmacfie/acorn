@@ -179,7 +179,7 @@ type StepHandlerData = {
   sessionId?: string | null
   agentSessionId?: string | null
   costUsd?: number | null
-  usage?: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number }
+  usage?: { inputTokens?: number; outputTokens?: number; cachedInputTokens?: number; cacheWriteInputTokens?: number }
   events?: Record<string, unknown>[]
   handoff?: string
 }

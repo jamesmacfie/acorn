@@ -8,12 +8,15 @@ describe('Codex stream JSON', () => {
       JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'draft' } }),
       JSON.stringify({ type: 'item.completed', item: { type: 'reasoning', text: 'private' } }),
       JSON.stringify({ type: 'item.completed', item: { type: 'agent_message', text: 'final title' } }),
-      JSON.stringify({ type: 'turn.completed', usage: { input_tokens: 9, output_tokens: 3, cached_input_tokens: 2 } }),
+      JSON.stringify({ type: 'turn.completed', usage: {
+        input_tokens: 9, output_tokens: 3, cached_input_tokens: 2,
+        cache_write_input_tokens: 4, reasoning_output_tokens: 2,
+      } }),
     ].join('\n'))
     expect(capture).toMatchObject({
       result: 'final title',
       sessionId: 'thread-1',
-      usage: { inputTokens: 9, outputTokens: 3, cachedInputTokens: 2 },
+      usage: { inputTokens: 9, outputTokens: 3, cachedInputTokens: 2, cacheWriteInputTokens: 4 },
     })
   })
 })

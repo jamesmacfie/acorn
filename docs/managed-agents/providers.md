@@ -54,3 +54,26 @@ Usage and pricing show in the Agent pane. Settings > Limits and cost holds the b
 Codex price catalogs and exact-model overrides, under the concurrency ceilings. Overrides are local
 preferences. The cost badge in the session header comes from the bundled `agent-cost` plugin
 ([client surfaces](./client-surfaces.md#the-agent-pane)).
+
+Codex's token counters are cumulative for each thread. Input includes cache reads and cache writes;
+output includes reasoning tokens. The estimate subtracts consecutive turn snapshots, then prices
+ordinary input, cache reads, cache writes, and output separately. Repeated snapshots add no cost.
+The one-shot `codex exec --json` capture preserves the same cache-write count.
+
+The catalog uses standard short-context API rates. GPT-5.6 and later charge cache writes at 1.25
+times the input rate; GPT-5.5 uses the input rate. See [OpenAI's prompt caching
+guide](https://developers.openai.com/api/docs/guides/prompt-caching). Catalog matches accept base
+model IDs and dated snapshots. Other variants need an exact-model override.
+
+The badge is an API-equivalent estimate of the root thread's tokens. It excludes subagent threads,
+tool fees, service-tier premiums, regional premiums, and long-context premiums. A turn's captured
+model sets its price, so model changes within that turn cannot be priced separately. Codex's
+`last.totalTokens` describes the latest context, which can be recomputed after compaction; it is not
+a billing delta. The per-turn snapshot also cannot reveal whether every request exceeded a pricing
+threshold. For example, [GPT-6.1 Sol's pricing](https://developers.openai.com/api/docs/models/gpt-6.1-sol)
+doubles input and cache rates and multiplies output by 1.5 when a request exceeds 272,000 input tokens.
+Plan usage, credits, and negotiated billing can differ from the API-equivalent estimate.
+
+Native Codex forks inherit their source thread's usage snapshot. Acorn creates an empty turn ledger
+for the fork, so its estimate includes inherited tokens when the first turn reports cumulative usage.
+Summing the source and fork badges can therefore count the source tokens twice.

@@ -33,6 +33,20 @@ describe('session cost estimate', () => {
     expect(result?.amountUsd).toBeCloseTo(0.22)
   })
 
+  it('charges cache writes once and applies a changed model price only to subsequent tokens', () => {
+    const result = estimateSessionCost(context([
+      turn('turn-1', { inputTokens: 100_000, outputTokens: 10_000,
+        cachedInputTokens: 40_000, cacheWriteInputTokens: 20_000 }),
+      turn('turn-2', { inputTokens: 160_000, outputTokens: 16_000,
+        cachedInputTokens: 70_000, cacheWriteInputTokens: 30_000 },
+      { input: 10, output: 50, cacheWrite: 12.5, cacheRead: 1 }),
+    ]))
+    // First turn $0.258. The second adds 20K ordinary input, 30K cache reads,
+    // 10K cache writes, and 6K output at the second model's prices: $0.655.
+    expect(result?.amountUsd).toBeCloseTo(0.913)
+    expect(result?.source).toBe('estimated')
+  })
+
   it('prefers provider-reported USD and observes its accounting mode', () => {
     const turns = [
       turn('turn-1', { cost: { amount: 0.2, currency: 'USD' } }, null),
