@@ -10,6 +10,10 @@ You add folders from Settings → Projects, import repositories through the GitH
 in the first-run wizard. The `Default` workspace doesn't exist until the first project needs it:
 `createProject` and `createProjectRef` fall back to it when no workspace is named.
 
+The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
+and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an
+optional `.git` suffix. HTTPS and SSH URLs require a single slash after the host.
+
 The CLI registers a local folder only with an explicit workspace and an absolute path on the Node's
 machine. Core compares the resolved path with registered project paths, so a symlink or `..` alias
 reuses the project ID it finds. The row keeps the path as first registered.
