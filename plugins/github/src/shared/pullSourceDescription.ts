@@ -1,4 +1,33 @@
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { DataBindingAddress } from '@acorn/protocol/dataBindings.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+
+// Starter panels for the Add panel launcher (docs/data-sources.md). Their scope names no account: the
+// launcher moves each one onto the account and repositories the person picked. Each filter is a step
+// of its own, so the Node can hand it to GitHub's search.
+type Column = PanelPlan['columns'][number]
+const pullColumn = (id: string, label: string, type: Column['type']): Column => ({ id, label, type, bind: { pulls: { field: `/${id}` } } })
+const keep = (column: string, right: DataBindingAddress): PanelPlan['stages'][number] =>
+  ({ op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator: 'eq', right: { address: right } } })
+const openPulls = keep('state', { from: 'literal', value: 'open' })
+const mine = keep('author', { from: 'context', name: 'viewer', pointer: '/login' })
+const pullStarter = (title: string, columns: Column[], stages: PanelPlan['stages']): PanelPlan => ({
+  version: 2, title, time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' },
+  sources: [{ id: 'pulls', label: 'Pull requests', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+    name: 'Pull requests', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+    query: { source: { pluginId: 'github', sourceId: 'pull-requests' }, scope: { parameters: {} }, sort: [] },
+  } } }],
+  columns: [pullColumn('title', 'Title', 'text'), pullColumn('repository', 'Repository', 'text'), pullColumn('state', 'State', 'enum'),
+    pullColumn('author', 'Author', 'person'), ...columns, pullColumn('updatedAt', 'Updated', 'datetime'), pullColumn('url', 'Link', 'link')],
+  stages, sort: [{ column: 'updatedAt', direction: 'desc' }], view: { kind: 'list' },
+})
+const pullStarterPlans: PanelPlan[] = [
+  pullStarter('My open pull requests', [], [openPulls, mine]),
+  pullStarter('Waiting for my review', [pullColumn('reviewRequestedFromViewer', 'Review requested from you', 'boolean')],
+    [openPulls, keep('reviewRequestedFromViewer', { from: 'literal', value: true })]),
+  pullStarter('Ready to merge', [pullColumn('mergeStateStatus', 'Merge readiness', 'enum')],
+    [openPulls, mine, keep('mergeStateStatus', { from: 'literal', value: 'CLEAN' })]),
+]
 
 export const pullSourceDescription: DataSourceDescription = {
   revision: '6',
@@ -81,6 +110,7 @@ export const pullSourceDescription: DataSourceDescription = {
   writable: [{ field: '/state', path: '/v1/p/github/data/pulls/write', risk: 'write', values: ['open', 'closed'] }],
   targets: [{ kind: 'github.pull-request' }],
   coverage: { kind: 'snapshot' },
+  starterPlans: pullStarterPlans,
   reach: { parameter: '/repositories', itemPlural: 'repositories',
     default: 'every repository the {account} account can see', empty: 'no linked repositories' },
   consistency: 'With no repository selection, GitHub search reaches every repository visible to the account. An explicit list restricts that reach. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',

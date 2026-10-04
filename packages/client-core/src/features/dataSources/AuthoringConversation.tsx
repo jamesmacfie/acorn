@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, ErrorBoundary, For, onCleanup, Show, untrack } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { AuthoringContextEntry, AuthoringTurnRequest, AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { QueryScope } from '@acorn/protocol/dataQueries.ts'
@@ -51,6 +51,9 @@ export type AuthoringConversationProps = {
   defaultOpen?: boolean
   /** What the request box starts with, such as the part of a plan the person asked about. */
   instruction?: string
+  /** Starts a new conversation with `instruction` as its first turn, sent as soon as a model is
+   *  available, for a host that already asked the person what they want. */
+  sendOnOpen?: boolean
   /** How a proposal names what a change touches, such as a workflow step by its name rather than
    *  its id. `candidate` is the proposed value, which holds anything the change adds. The path is
    *  the default. */
@@ -113,6 +116,19 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     } catch { localStorage.removeItem(key) }
   })
   createEffect(() => { context(); pending(); samplesEnabled(); choice(); save() })
+  // After the restore above, so the new conversation replaces a saved one rather than continuing it,
+  // and asks the model the person last picked rather than the one this target last used.
+  let sentOnOpen = false
+  createEffect(() => {
+    if (!props.sendOnOpen || sentOnOpen || !backendId()) return
+    sentOnOpen = true
+    untrack(() => {
+      setContext([])
+      showReply(undefined)
+      setChoice(null)
+      void submit()
+    })
+  })
   onCleanup(() => { controller?.abort(); controller = undefined })
 
   const submit = async (answer = instruction().trim()): Promise<void> => {

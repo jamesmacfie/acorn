@@ -963,6 +963,9 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@acorn/dashboards-core':
+        specifier: workspace:*
+        version: link:../../packages/dashboards-core
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core
@@ -1315,6 +1318,9 @@ importers:
       '@acorn/client-core':
         specifier: workspace:*
         version: link:../../packages/client-core
+      '@acorn/dashboards-core':
+        specifier: workspace:*
+        version: link:../../packages/dashboards-core
       '@acorn/node-core':
         specifier: workspace:*
         version: link:../../packages/node-core

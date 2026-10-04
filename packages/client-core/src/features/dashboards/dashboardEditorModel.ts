@@ -14,8 +14,9 @@ export const emptyDashboardContent = (): DashboardPanelContent => ({
   display: { view: { kind: 'list' }, fields: [] },
 })
 
-export const latestUnpublishedDashboard = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T | undefined =>
-  drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)[0]
+/** Drafts never published, newest first. A published panel's draft is its own, not an unfinished one. */
+export const unpublishedDashboards = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T[] =>
+  drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)
 
 const safeColumnId = (value: string): string => value.replace(/^\//, '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100) || crypto.randomUUID()
 

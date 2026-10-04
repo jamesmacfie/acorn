@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
+    "@acorn/dashboards-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
     "@types/node": "^26.0.0",
     "drizzle-kit": "^0.31.10",

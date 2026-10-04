@@ -8,7 +8,9 @@ import { memoryIdentityStore } from '../activeIdentity'
 import { schema } from '../db'
 import { makeTestDb, testEnv, type TestDb } from '../../testkit/db'
 import { invokeDataSource } from './runtime'
-import { parseLocalWorktrees } from './localGitSources'
+import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
+import { validatePanelPlan } from '@acorn/dashboards-core/plan.ts'
+import { parseLocalWorktrees, worktreeDescription } from './localGitSources'
 import './localGitRegistration'
 
 const worlds: TestDb[] = []
@@ -20,6 +22,18 @@ afterEach(() => {
 const git = (path: string, ...args: string[]) => execFileSync('git', args, { cwd: path, encoding: 'utf8' }).trim()
 
 describe('local Git worktree roster', () => {
+  it('offers starter plans that fit its own description', () => {
+    expect(worktreeDescription.starterPlans?.length).toBeGreaterThan(0)
+    for (const starter of worktreeDescription.starterPlans ?? []) {
+      const plan = panelPlanSchema.parse(starter)
+      const sources = plan.sources.map(source => {
+        if (source.reference.kind !== 'inline') throw new Error('A starter reads its source inline.')
+        return { instanceId: source.id, label: source.label, query: source.reference.content.query, description: worktreeDescription }
+      })
+      expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
+    }
+  })
+
   it('keeps managed and unmanaged trees and detached heads', () => {
     const roster = [
       'worktree /repo', 'HEAD abc', 'branch refs/heads/main', '',

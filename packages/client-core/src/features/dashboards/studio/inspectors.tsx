@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Index, Show, type Component } from 'soli
 import { Dynamic } from 'solid-js/web'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
-import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+import type { DataSourceDescription, DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
 import { describePanelPlan, newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
@@ -130,6 +130,31 @@ export const moveColumnIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelP
 
 export type SourceTracking = ReturnType<typeof createSourceTracking>
 
+/** The starter with every source that reads the same source as `picked` moved onto its scope: the
+ *  workspace, account, and reach the person chose. A starter carries no account of its own. */
+export function starterForPick(starter: PanelPlan, picked: Pick<DataSourceQuery, 'source' | 'scope'>): PanelPlan {
+  const same = (query: DataSourceQuery) => query.source.pluginId === picked.source.pluginId && query.source.sourceId === picked.source.sourceId
+  return { ...starter, sources: starter.sources.map(entry => entry.reference.kind !== 'inline' || !same(entry.reference.content.query) ? entry
+    : { ...entry, reference: { ...entry.reference, content: { ...entry.reference.content, query: { ...entry.reference.content.query, scope: picked.scope } } } }) }
+}
+
+/** A description's starter plans that parse, moved onto the picked scope, and that the Node accepts. */
+export async function checkedStarters(
+  description: DataSourceDescription,
+  picked: Pick<DataSourceQuery, 'source' | 'scope'>,
+  validate: (plan: PanelPlan) => Promise<{ problems: string[] }>,
+): Promise<PanelPlan[]> {
+  // A plain copy, because a description read from the query cache is a reactive proxy that the strict
+  // data parsers refuse.
+  const plain = JSON.parse(JSON.stringify(description.starterPlans ?? [])) as unknown[]
+  const candidates = plain.flatMap(candidate => {
+    const parsed = panelPlanSchema.safeParse(candidate)
+    return parsed.success ? [starterForPick(parsed.data, picked)] : []
+  })
+  const checked = await Promise.all(candidates.map(plan => validate(plan).then(result => result.problems.length ? undefined : plan, () => undefined)))
+  return checked.filter((plan): plan is PanelPlan => !!plan)
+}
+
 /** What each source's picker last reported, and the starter plans its description offers. The column
  *  forms read field lists from here, so every source's picker stays mounted while the studio is open. */
 export function createSourceTracking(input: {
@@ -148,10 +173,8 @@ export function createSourceTracking(input: {
     const describedSource = `${state.query.source.pluginId}/${state.query.source.sourceId}`
     const priorSource = describedSources.get(id)
     describedSources.set(id, describedSource)
-    if (priorRevision !== state.description.revision) void Promise.all((state.description.starterPlans ?? []).flatMap(candidate => {
-      const parsed = panelPlanSchema.safeParse(candidate)
-      return parsed.success ? [input.validate(parsed.data).then(result => result.problems.length ? undefined : parsed.data).catch(() => undefined)] : []
-    })).then(values => setStarters(current => ({ ...current, [id]: values.filter((value): value is PanelPlan => !!value) })))
+    if (priorRevision !== state.description.revision) void checkedStarters(state.description, state.query, input.validate)
+      .then(plans => setStarters(current => ({ ...current, [id]: plans })))
     const available = dashboardFields(state.description)
     // Columns bound to the old source's fields would point at fields the new source doesn't have.
     const switched = priorSource !== undefined && priorSource !== describedSource

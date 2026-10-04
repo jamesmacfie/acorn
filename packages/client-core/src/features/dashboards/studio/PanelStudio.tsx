@@ -1,13 +1,12 @@
 import { createMemo, createResource, createSignal, createUniqueId, For, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { panelPlanSchema, type DashboardDraft, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
+import { panelPlanSchema, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import type { PlanProblem } from '@acorn/dashboards-core/plan.ts'
 import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import { planPartLabel } from '@acorn/dashboards-core/labels.ts'
-import { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
 import { ApiError } from '../../../infra/node/apiClient'
 import AuthoringConversation from '../../dataSources/AuthoringConversation'
@@ -28,7 +27,6 @@ import { Modal } from '../../../kit/components/overlays/Modal'
 import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { restoreFocusOnCleanup } from '../../../kit/keys/trap'
 import { dashboardClient } from '../dashboardClient'
-import { latestUnpublishedDashboard } from '../dashboardEditorModel'
 import { dashboardRecoveryStore } from '../dashboardRecovery'
 import { LabeledSelect } from '../fields'
 import type { Rect } from '../layout'
@@ -39,6 +37,7 @@ import {
   addColumnTo, addSourceTo, addStageTo, createSourceTracking, INSPECTORS, moveStageIn, NewSourceInspector, partKind, removeSourceFrom,
   removeStageFrom, SourceInspector, type InspectorContext,
 } from './inspectors'
+import type { LaunchResult } from './PanelLauncher'
 import { createStudioStore } from './studioStore'
 import { markPanelStudioOpen } from './studioOpen'
 import StudioOutline, { type OutlineAddition } from './StudioOutline'
@@ -80,6 +79,8 @@ export default function PanelStudio(props: {
   returnLabel: string
   /** Where the panel is placed now, so the preview starts at that size. */
   placed?: Rect
+  /** What the launcher chose for a new panel: a request for the AI, or a source and maybe a starter. */
+  start?: Exclude<LaunchResult, { kind: 'draft' }>
   onPublished(id: string, title: string, scope: PlacementScope, view: DashboardView, sources: string[], fieldRoles: string[]): void
   onDeleted(id: string): void
   onClose(): void
@@ -98,32 +99,21 @@ export default function PanelStudio(props: {
   const [tab, setTab] = createSignal<'outline' | 'plan'>('outline')
   const [addingSource, setAddingSource] = createSignal(false)
   const [editingTitle, setEditingTitle] = createSignal(false)
-  const [ai, setAi] = createSignal<{ instruction?: string }>()
+  const [ai, setAi] = createSignal<{ instruction?: string; send?: boolean }>()
   const [reviewing, setReviewing] = createSignal(false)
   const [publishing, setPublishing] = createSignal(false)
   const [confirmedRequirements, setConfirmedRequirements] = createSignal<string[]>([])
   const [placement, setPlacement] = createSignal(props.scope.ownerId ?? '')
-  // The newest draft never published, offered rather than reopened, so Add panel always starts blank.
-  const [unfinished, setUnfinished] = createSignal<DashboardDraft>()
 
   onMount(async () => {
+    if (!props.dashboardId) return
     try {
-      if (props.dashboardId) {
-        const loaded = await client.get(props.dashboardId)
-        if (!store.edited()) store.open(loaded)
-        return
-      }
-      setUnfinished(latestUnpublishedDashboard(await client.list()))
-    } catch { /* A local draft can begin while the Node reconnects. */ }
+      const loaded = await client.get(props.dashboardId)
+      if (!store.edited()) store.open(loaded)
+      return
+    } catch { /* This computer's copy stands in while the Node reconnects. */ }
     store.restoreLocal()
   })
-  const discardUnfinished = async (abandoned: DashboardDraft): Promise<void> => {
-    try {
-      await client.delete(abandoned.id, abandoned.draftRevision)
-      recovery.discard(nodeId, abandoned.id)
-      setUnfinished(undefined)
-    } catch { store.setProblem("Couldn't discard the unfinished panel.") }
-  }
 
   // ── Runs and problems ────────────────────────────────────────────────────────────────────────
   const parsed = createMemo(() => panelPlanSchema.safeParse(plan()))
@@ -193,6 +183,17 @@ export default function PanelStudio(props: {
   const moveStage = (index: number, by: -1 | 1): void => {
     store.apply(current => moveStageIn(current, index, by))
     select(`stage:${index + by}`)
+  }
+  // The launcher's choice is where editing starts, so it isn't an undo step.
+  const start = props.start
+  if (start?.kind === 'describe') {
+    store.apply(current => ({ ...current, request: start.request }), { derived: true })
+    setAi({ instruction: start.request, send: true })
+  } else if (start?.starter) store.apply(() => start.starter!, { derived: true })
+  else if (start) {
+    // The source's default columns arrive once it is described, so the Columns part shows what they are.
+    store.apply(current => addSourceTo(current, start.reference), { derived: true })
+    select('columns')
   }
   const inspectorContext: InspectorContext = {
     plan, change: store.apply, select, workspaceId: scope.workspaceId, run, problems, sources,
@@ -360,19 +361,7 @@ export default function PanelStudio(props: {
     </aside>
   )
 
-  const entrances = (
-    <Stack gap="stack">
-      <Show when={unfinished()}>{abandoned => <Inline gap="inline" wrap>
-        <Text wrap>{`You have an unfinished panel, ${abandoned().content.title}, edited ${formatRelativeTime(abandoned().updatedAt)}.`}</Text>
-        <Button size="sm" onPress={() => { store.open(abandoned()); setUnfinished(undefined) }}>Continue</Button>
-        <Button size="sm" variant="ghost" onPress={() => void discardUnfinished(abandoned())}>Discard</Button>
-      </Inline>}</Show>
-      <EmptyState title="Choose what this panel shows" action={<Inline gap="row">
-        <Button variant="solid" onPress={() => { store.select(undefined); setAddingSource(true) }}>Pick data</Button>
-        <Button opens="dialog" onPress={() => setAi({})}>Describe it</Button>
-      </Inline>}>Pick a source and account, or describe the panel and let AI build it.</EmptyState>
-    </Stack>
-  )
+  const empty = <EmptyState title="Choose what this panel shows">Add a source from the outline, or ask AI to build the panel.</EmptyState>
 
   return (
     <div ref={root} class="dash-studio" role="dialog" aria-modal="true" aria-labelledby={titleId} tabindex="-1" onKeyDown={onKeyDown}>
@@ -390,7 +379,7 @@ export default function PanelStudio(props: {
             </ListColumn>
             <DetailColumn>
               <div class="dash-studio-detail">
-                <Show when={plan().sources.length} fallback={<div class="dash-studio-preview">{entrances}</div>}>
+                <Show when={plan().sources.length} fallback={<div class="dash-studio-preview">{empty}</div>}>
                   <StudioPreview plan={plan()} run={run()} loading={preview.isFetching} {...(props.placed ? { placed: props.placed } : {})}
                     onRefresh={() => void preview.refetch()} onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
                     onEditTitle={() => setEditingTitle(true)} />
@@ -407,7 +396,7 @@ export default function PanelStudio(props: {
         <Modal title={`Edit ${plan().title} with AI`} size="lg" onDismiss={() => setAi(undefined)}>
           <AuthoringConversation onClose={() => setAi(undefined)} endpoint="/v1/core/authoring/turn" target="dashboard" targetId={store.draft()?.id ?? recoveryId}
             scope={scope} baseRevision={store.draft()?.draftRevision ?? 0} base={plan()} label={plan().title}
-            {...(request().instruction ? { instruction: request().instruction } : {})} onApply={applyAiProposal} />
+            {...(request().instruction ? { instruction: request().instruction } : {})} sendOnOpen={request().send} onApply={applyAiProposal} />
         </Modal>
       )}</Show>
 
@@ -423,7 +412,7 @@ export default function PanelStudio(props: {
                 <Show when={!unpublished().length}><Text emphasis="muted">Nothing has changed since the last publish.</Text></Show>
               </Stack>}</Show>
             </Field>
-            <Show when={props.scope.surface === 'home' && !props.dashboardId && tabs().length > 1}
+            <Show when={props.scope.surface === 'home' && store.draft()?.publishedRevision == null && tabs().length > 1}
               fallback={<Field label="Where it goes"><Text>{props.returnLabel}</Text></Field>}>
               <LabeledSelect label="Where it goes" value={placement()} options={tabs().map(entry => ({ value: entry.id, label: entry.name }))} onChange={setPlacement} />
             </Show>

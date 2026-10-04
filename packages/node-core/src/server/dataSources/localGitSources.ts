@@ -1,6 +1,7 @@
 import { createHash } from 'node:crypto'
 import { resolve } from 'node:path'
 import { eq } from 'drizzle-orm'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import type { Env } from '../bindings'
 import { gitText } from '../core/git'
@@ -32,7 +33,26 @@ const branchDescription: DataSourceDescription = {
   consistency: 'Local refs as last observed. Ahead and behind use the last fetched refs; this read never fetches. Repository identity comes from the tracked remote, or origin without an upstream.',
 }
 
-const worktreeDescription: DataSourceDescription = {
+// A starter panel for the Add panel launcher (docs/data-sources.md). Its scope names no workspace or
+// project: the launcher moves it onto the scope the person picked, and the source inspector asks for
+// the project.
+const worktreeColumn = (id: string, label: string, type: PanelPlan['columns'][number]['type']): PanelPlan['columns'][number] =>
+  ({ id, label, type, bind: { worktrees: { field: `/${id}` } } })
+const hasCount = (id: string): Extract<PanelPlan['stages'][number], { op: 'filter' }>['where'] =>
+  ({ kind: 'comparison', left: { address: { from: 'item', pointer: `/${id}` } }, operator: 'gt', right: { address: { from: 'literal', value: 0 } } })
+export const worktreeStarterPlans: PanelPlan[] = [{
+  version: 2, title: 'Worktrees with uncommitted changes', time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' },
+  sources: [{ id: 'worktrees', label: 'Local worktrees', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+    name: 'Local worktrees', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+    query: { source: { pluginId: 'core', sourceId: 'local-worktrees' }, scope: { parameters: {} }, sort: [] },
+  } } }],
+  columns: [worktreeColumn('path', 'Worktree', 'text'), worktreeColumn('branch', 'Branch', 'text'), worktreeColumn('modifiedCount', 'Modified files', 'number'),
+    worktreeColumn('untrackedCount', 'Untracked files', 'number'), worktreeColumn('lastCommitAt', 'Last commit', 'datetime')],
+  stages: [{ op: 'filter', where: { kind: 'any', predicates: [hasCount('modifiedCount'), hasCount('untrackedCount')] } }],
+  sort: [{ column: 'lastCommitAt', direction: 'desc' }], view: { kind: 'list' },
+}]
+
+export const worktreeDescription: DataSourceDescription = {
   revision: '1', schema: { type: 'object', additionalProperties: false, properties: {
     projectId: { type: 'string' }, path: { type: 'string' }, branch: { type: ['string', 'null'] },
     detachedHead: { type: ['string', 'null'] }, modifiedCount: { type: ['number', 'null'] },
@@ -53,6 +73,7 @@ const worktreeDescription: DataSourceDescription = {
   parameterFields: [{ pointer: '/project', label: 'Local project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'snapshot' },
+  starterPlans: worktreeStarterPlans,
   consistency: 'All live Git worktrees for the selected local project, including unmanaged and detached worktrees. Status is observed without fetching.',
 }
 

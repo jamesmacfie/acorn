@@ -33,9 +33,9 @@ const onClose = vi.fn()
 const settle = async (times = 3) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
 const row = (text: string) => [...document.querySelectorAll<HTMLElement>('.ui-row')].find(entry => entry.textContent?.includes(text))
-const mount = (dashboardId?: string) => {
+const mount = (dashboardId?: string, start?: Parameters<typeof PanelStudio>[0]['start']) => {
   dispose = render(() => <QueryClientProvider client={client}>
-    <PanelStudio scope={{ surface: 'home', workspaceId: 'w' } as never} dashboardId={dashboardId} returnLabel="Home"
+    <PanelStudio scope={{ surface: 'home', workspaceId: 'w' } as never} dashboardId={dashboardId} start={start} returnLabel="Home"
       onPublished={() => {}} onDeleted={() => {}} onClose={onClose} />
   </QueryClientProvider>, host)
 }
@@ -48,13 +48,17 @@ beforeEach(() => {
     const body = options?.body ? JSON.parse(options.body) as { operation?: string } : undefined
     if (path.endsWith('/dashboards/list')) return [draft({ ...invalid, title: 'Old idea' })]
     if (path.endsWith('/dashboards/get')) return draft(opened)
+    // A copy, as from the wire: the query cache wraps what it's given, which would mark the fixtures.
     if (path.endsWith('/dashboards/run')) return {
-      plan: opened, rows: [], groups: [],
+      plan: structuredClone(opened), rows: [], groups: [],
       diagnostics: { problems: [{ path: '/stages/0', message: 'Filter names an unavailable column: title.', severity: 'error' }], sources: [], stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
     }
     if (path.endsWith('/data-sources/list')) return { sources: [], discoveries: [] }
     if (path.endsWith('/queries/list')) return []
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
+    if (path.endsWith('/models/backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
+    if (path.endsWith('/core/prefs')) return {}
+    if (path.endsWith('/authoring/turn')) return new Promise(() => {})
     if (body?.operation === 'describe') return new Promise(() => {})
     throw new Error(`Unexpected ${path}`)
   })
@@ -69,16 +73,21 @@ afterEach(() => {
 })
 
 describe('PanelStudio', () => {
-  it('opens blank, offers the unfinished draft, and shows no problem before a source is picked', async () => {
-    mount()
+  it('opens a blank source with its Columns selected, without offering an old draft', async () => {
+    mount(undefined, { kind: 'source', reference: tasks.reference })
     await settle()
-    expect(document.body.textContent).toContain('You have an unfinished panel, Old idea')
-    button('Pick data')!.click()
-    await settle()
-    expect(document.querySelector('.ui-alert')).toBeNull()
-    expect(document.body.textContent).not.toContain('unavailable')
+    // The Columns part, titled for what it holds until the source is described.
+    expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('No columns yet')
+    expect(requests.mock.calls.some(([path]) => path.endsWith('/dashboards/list'))).toBe(false)
+  })
+
+  it('opens a request with the AI already asked', async () => {
+    mount(undefined, { kind: 'describe', request: 'Tasks I touched today' })
+    await settle(6)
+    const turn = requests.mock.calls.find(([path]) => path.endsWith('/authoring/turn'))
+    expect(turn && JSON.parse(turn[1]!.body!)).toMatchObject({ instruction: 'Tasks I touched today', context: [] })
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Tasks I touched today')
     expect(button('Publish…')!.disabled).toBe(true)
-    expect(requests.mock.calls.some(([path]) => path.endsWith('/dashboards/run'))).toBe(false)
   })
 
   it('says why an invalid plan is incomplete and keeps Publish off in the review', async () => {

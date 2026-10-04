@@ -1,4 +1,5 @@
 import { eq } from 'drizzle-orm'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceDescription, DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import type { Env } from '../bindings'
 import { getDb, schema } from '../db'
@@ -7,6 +8,27 @@ import { registerCoreDataSource } from './registry'
 import type { WorktreeCounts } from './localGitRead'
 
 export const CORE_TASK_SOURCE_ID = 'tasks'
+
+// Starter panels for the Add panel launcher (docs/data-sources.md). Their scope names no workspace or
+// account: the launcher moves each one onto the scope the person picked.
+const taskSource: PanelPlan['sources'][number] = { id: 'tasks', label: 'Workspace tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+  name: 'Workspace tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+  query: { source: { pluginId: 'core', sourceId: CORE_TASK_SOURCE_ID }, scope: { parameters: {} }, sort: [] },
+} } }
+const taskColumn = (id: string, label: string, type: PanelPlan['columns'][number]['type']): PanelPlan['columns'][number] =>
+  ({ id, label, type, bind: { tasks: { field: `/${id}` } } })
+const taskStarter = (title: string, columns: PanelPlan['columns'], where: PanelPlan['stages'][number]): PanelPlan => ({
+  version: 2, title, time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' }, sources: [taskSource],
+  columns: [taskColumn('title', 'Task', 'text'), taskColumn('status', 'Status', 'enum'), ...columns, taskColumn('updatedAt', 'Updated', 'datetime')],
+  stages: [where], sort: [{ column: 'updatedAt', direction: 'desc' }], view: { kind: 'list' },
+})
+export const coreTaskStarterPlans: PanelPlan[] = [
+  taskStarter('Tasks updated this week', [], { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/updatedAt' } },
+    operator: 'gt', right: { address: { from: 'context', name: 'calendar', boundary: 'startOfWeek' } } } }),
+  taskStarter('Tasks with uncommitted changes', [taskColumn('worktreeChanged', 'Uncommitted changes', 'boolean'),
+    taskColumn('modifiedCount', 'Modified files', 'number'), taskColumn('untrackedCount', 'Untracked files', 'number')],
+  { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/worktreeChanged' } }, operator: 'eq', right: { address: { from: 'literal', value: true } } } }),
+]
 
 export const coreTaskSourceDescription: DataSourceDescription = {
   revision: '2',
@@ -41,6 +63,7 @@ export const coreTaskSourceDescription: DataSourceDescription = {
   parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
   targets: [{ kind: 'core.task' }],
+  starterPlans: coreTaskStarterPlans,
   consistency: 'Task metadata is read from core storage; worktree counts are observed from local Git and remain null if the worktree is unavailable.',
 }
 

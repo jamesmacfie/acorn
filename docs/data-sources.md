@@ -73,8 +73,12 @@ Discovery returns at most 100 descriptors per page. The host binds their plugin,
 each discovered ID is available only in the exact workspace, project, connection, and parameter scope
 that discovered it. Refreshing discovery cannot replace a static descriptor.
 
-A source description may include `starterPlans` for dashboard authoring. The host parses and
-validates each version 2 plan before offering it. Static field choices may declare a `tone` and
+A source description may include up to 10 `starterPlans` for dashboard authoring, each a version 2
+panel plan. A starter's scope names no workspace or account. The panel launcher and the source
+inspector move it onto the scope the person picked, then the Node validates it before it's offered.
+Workspace tasks, Local worktrees, Agent usage records, and GitHub pull requests ship starters. Each
+sits next to its source's description, with a test that validates it against that description.
+Static field choices may declare a `tone` and
 numeric `rank`; panel columns inherit these until the author overrides them. The source query
 contract does not yet offer projection lists; source-side projection belongs to the later report
 volume milestone.

@@ -1,4 +1,24 @@
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
+
+// A starter panel for the Add panel launcher (docs/data-sources.md). Its scope names no workspace:
+// the launcher moves it onto the scope the person picked.
+const usageColumn = (id: string, label: string, type: PanelPlan['columns'][number]['type']): PanelPlan['columns'][number] =>
+  ({ id, label, type, bind: { usage: { field: `/${id}` } } })
+export const usageStarterPlans: PanelPlan[] = [{
+  version: 2, title: 'AI cost this month by task', time: { zone: 'UTC', mode: 'viewer', weekStart: 'monday' },
+  sources: [{ id: 'usage', label: 'Agent usage records', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+    name: 'Agent usage records', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+    query: { source: { pluginId: 'agents', sourceId: 'usage-records' }, scope: { parameters: {} }, sort: [] },
+  } } }],
+  columns: [usageColumn('at', 'Usage time', 'datetime'), usageColumn('taskId', 'Task', 'text'), { ...usageColumn('costUsd', 'Cost', 'number'), unit: 'USD' }],
+  stages: [
+    { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/at' } }, operator: 'gt',
+      right: { address: { from: 'context', name: 'calendar', boundary: 'startOfMonth' } } } },
+    { op: 'summarize', by: [{ column: 'taskId' }], measures: [{ id: 'cost', label: 'Cost', kind: 'sum', column: 'costUsd' }] },
+  ],
+  sort: [{ column: 'cost', direction: 'desc' }], view: { kind: 'table' },
+}]
 
 export const usageSourceDescription: DataSourceDescription = {
   revision: '1',
@@ -26,5 +46,6 @@ export const usageSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', additionalProperties: false, properties: {} }, parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
   coverage: { kind: 'events', retention: 'Until the owning task history is removed', complete: false },
+  starterPlans: usageStarterPlans,
   consistency: 'One row per durable usage event. Cumulative provider counters are converted to event deltas before filtering. Removed task history is outside coverage.',
 }

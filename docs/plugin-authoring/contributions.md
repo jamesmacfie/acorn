@@ -110,7 +110,10 @@ trust prompt ([task checks](../plugins/task-checks.md)).
 
 ## Dashboard source hints
 
-Dashboard-capable sources can return `starterPlans` from `describe`. Each card must be a valid
-version 2 panel plan for the chosen source and account; the host validates it before display.
+Dashboard-capable sources can return up to 10 `starterPlans` from `describe`. Each is a version 2
+panel plan that reads your source, with no workspace or account in its scope. The host moves it onto
+the account and reach the person picked, then validates it before offering it. The **Add panel**
+launcher lists your starters when someone picks your source, and the source's inspector lists them
+under **Start from**. Picking one replaces the panel's plan.
 Static field choices can set `tone` (`ok`, `warn`, `bad`, `muted`, or `accent`) and numeric `rank`.
 Those hints flow to panel enum columns unless the author overrides them.

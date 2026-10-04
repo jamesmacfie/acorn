@@ -10,7 +10,7 @@ import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataVa
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { ApiError } from '../../infra/node/apiClient'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, SegmentedControl, Select, Stack, Text } from './kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, SegmentedControl, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -23,11 +23,8 @@ import {
 } from './queries'
 import AuthoringConversation from './AuthoringConversation'
 import { mergeAuthoringCandidate } from './authoringMerge'
+import { blankContent, sourceEntries, sourceKey, sourceReference, usableConnections, type CatalogSource } from './sourceEntries'
 
-type Source = DataSourceDescriptor & DataSourceRef
-
-const emptyParameters: DataSchema = { type: 'object', properties: {}, additionalProperties: false }
-const sourceKey = (source: DataSourceRef) => `${source.pluginId}:${source.sourceId}`
 const plainContent = (content: QueryContent): QueryContent => queryContentSchema.parse(JSON.parse(JSON.stringify(content)))
 const errorMessage = (error: unknown): string => {
   if (error instanceof ApiError) {
@@ -38,10 +35,6 @@ const errorMessage = (error: unknown): string => {
   }
   return error instanceof Error ? error.message : 'The source could not be read.'
 }
-
-const blankContent = (query: DataSourceQuery): QueryContent => ({
-  name: 'Inline query', parameters: emptyParameters, query, sourceParameters: {},
-})
 
 function TypedOperand(props: {
   label: string
@@ -281,10 +274,7 @@ export default function SourceQueryEditor(props: {
   const query = () => content()?.query
   const sources = () => catalog.data?.sources ?? []
   const source = () => query() ? sources().find(entry => sourceKey(entry) === sourceKey(query()!.source)) : undefined
-  const connections = () => {
-    const providerId = source()?.providerId
-    return providerId ? (integrations.data?.integrations ?? []).filter(connection => connection.providerId === providerId && connection.status !== 'disabled') : []
-  }
+  const connections = () => usableConnections(integrations.data?.integrations ?? [], source()?.providerId)
   const canDescribe = () => !!query() && !(query()!.source.pluginId === 'core' && query()!.source.sourceId === 'choose')
     && (!source()?.providerId || !!query()!.scope.connectionId)
   const describeRequest = () => ({
@@ -343,16 +333,12 @@ export default function SourceQueryEditor(props: {
     return undefined
   }
 
-  const selectSource = (next: Source, chosenConnectionId?: string): void => {
-    const matches = (integrations.data?.integrations ?? []).filter(connection => connection.providerId === next.providerId && connection.status !== 'disabled')
-    const connectionId = chosenConnectionId ?? (next.providerId && matches.length === 1 ? matches[0]!.id : undefined)
-    const nextQuery: DataSourceQuery = {
-      source: { pluginId: next.pluginId, sourceId: next.sourceId },
-      scope: { ...baseScope(), ...(connectionId ? { connectionId } : {}) }, sort: [],
-    }
+  const selectSource = (next: CatalogSource, chosenConnectionId?: string): void => {
+    const matches = usableConnections(integrations.data?.integrations ?? [], next.providerId)
+    const connectionId = chosenConnectionId ?? (matches.length === 1 ? matches[0]!.id : undefined)
     setEditingShared(undefined)
     setSharedContent(undefined)
-    props.onChange({ kind: 'inline', content: blankContent(nextQuery), bindings: {} })
+    props.onChange(sourceReference(next, { ...baseScope(), ...(connectionId ? { connectionId } : {}) }))
   }
   const selectSaved = (id: string): void => {
     setEditingShared(undefined)
@@ -454,6 +440,13 @@ export default function SourceQueryEditor(props: {
     props.onChange({ kind: 'inline', content: plainContent(selected), bindings: props.value?.bindings ?? {} })
   }
 
+  const entries = createMemo(() => sourceEntries({
+    sources: sources(), connections: integrations.data?.integrations ?? [], saved: library.data ?? [], byAccount: props.pickSourceAccount,
+  }))
+  const isActive = (entry: ReturnType<typeof entries>[number]): boolean => entry.kind === 'saved'
+    ? props.value?.kind === 'saved' && props.value.queryId === entry.query.id
+    : !!source() && sourceKey(entry.source) === sourceKey(source()!) && (!entry.connectionId || query()?.scope.connectionId === entry.connectionId)
+
   return <Stack gap="stack">
     <Field label="Source or saved query" group>
       <Picker
@@ -462,19 +455,11 @@ export default function SourceQueryEditor(props: {
         placeholder="Search sources and saved queries"
         emptyText={catalog.isPending || library.isPending ? 'Loading sources…' : 'No sources are available.'}
         disabled={props.disabled}
-        items={[
-          ...(library.data ?? []).map(saved => ({ id: `saved:${saved.id}`, label: saved.content.name, note: 'Saved query', active: props.value?.kind === 'saved' && props.value.queryId === saved.id })),
-          ...sources().flatMap(entry => props.pickSourceAccount && entry.providerId
-            ? (integrations.data?.integrations ?? []).filter(connection => connection.providerId === entry.providerId && connection.status !== 'disabled').map(connection => ({
-              id: `source:${sourceKey(entry)}|${connection.id}`, label: `${entry.name} · ${connection.name ?? connection.label}`,
-              note: pluginLabel(entry.pluginId), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') && query()?.scope.connectionId === connection.id,
-            }))
-            : [{ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') }]),
-        ]}
+        items={entries().map(entry => ({ id: entry.id, label: entry.label, ...(entry.note ? { note: entry.note } : {}), active: isActive(entry) }))}
         onPick={id => {
-          if (id.startsWith('saved:')) return selectSaved(id.slice(6))
-          const [key, connectionId] = id.slice(7).split('|')
-          selectSource(sources().find(entry => sourceKey(entry) === key)!, connectionId)
+          const entry = entries().find(candidate => candidate.id === id)
+          if (entry?.kind === 'saved') selectSaved(entry.query.id)
+          else if (entry) selectSource(entry.source, entry.connectionId)
         }}
       />
     </Field>

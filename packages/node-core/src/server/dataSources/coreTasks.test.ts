@@ -2,8 +2,10 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { memoryIdentityStore } from '../activeIdentity'
 import { schema } from '../db'
 import { makeTestDb, testEnv, type TestDb } from '../../testkit/db'
+import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
+import { validatePanelPlan } from '@acorn/dashboards-core/plan.ts'
 import { invokeDataSource } from './runtime'
-import './coreTasks'
+import { coreTaskSourceDescription } from './coreTasks'
 
 const worlds: TestDb[] = []
 afterEach(() => { for (const world of worlds.splice(0)) world.cleanup() })
@@ -35,5 +37,17 @@ describe('core task data source', () => {
       data: expect.objectContaining({ title: 'Implement transition', worktreeChanged: null }),
       taskId: '11111111-1111-4111-8111-111111111111', action: { verb: 'openTask' },
     })])
+  })
+
+  it('offers starter plans that fit its own description', () => {
+    expect(coreTaskSourceDescription.starterPlans?.length).toBeGreaterThan(0)
+    for (const starter of coreTaskSourceDescription.starterPlans ?? []) {
+      const plan = panelPlanSchema.parse(starter)
+      const sources = plan.sources.map(source => {
+        if (source.reference.kind !== 'inline') throw new Error('A starter reads its source inline.')
+        return { instanceId: source.id, label: source.label, query: source.reference.content.query, description: coreTaskSourceDescription }
+      })
+      expect(validatePanelPlan(plan, sources), plan.title).toEqual([])
+    }
   })
 })

@@ -43,8 +43,8 @@ that type can answer, a value drawn by the field's type, and a tone. Selectors m
 unofferable. `normalizePanel` drops stale choices no selector catches, such as a filter on a field that
 disappeared when you swapped the source.
 
-**Add panel** and a panel's **Edit** open the panel studio (`studio/PanelStudio.tsx`), a
-full-window layer like Settings. It isn't a route, because a route would unmount the task's panes,
+**Add panel**, through the launcher below, and a panel's **Edit** open the panel studio
+(`studio/PanelStudio.tsx`), a full-window layer like Settings. It isn't a route, because a route would unmount the task's panes,
 plugin frames, and terminal drawer behind it. Task keybindings stand down while it's open
 (`isPanelStudioOpen` in `studio/studioOpen.ts`), **Escape** closes it, and focus returns to the
 control that opened it. Closing never loses work, because each change autosaves.
@@ -56,11 +56,27 @@ menu with **Discard changes** and **Delete panel**. The **Plan** tab shows the p
 JSON. The **Outline** tab shows the outline, the live preview, and an inspector. A status bar names
 the first problem as a link to its part, and the changes since the last publish.
 
-A blank panel shows **Pick data** and **Describe it**. If an unpublished draft exists, one line above
-them names the newest, with **Continue** to reopen it and **Discard** to delete it. The source picker
-shows source and account pairs, and a source joins the plan only once it's picked, so nothing is
-reported before then. The AI conversation opens in a dialog, asks for missing choices, and proposes
-the same plan used by the forms. Applying a proposal is one undoable step.
+**Add panel** first opens the launcher (`studio/PanelLauncher.tsx`), a dialog that asks what the
+panel should show. **Edit** skips it. The launcher has three paths:
+
+- **Describe it.** Type a request and choose **Draft it**. The studio opens with the request as the
+  plan's `request` and the AI already asked. Up to four suggestions under the box are titles of
+  starter plans from sources described earlier in the session, because the source catalog carries no
+  starters. A suggestion fills the box and doesn't send it.
+- **Start from data.** Pick a source and account, such as "Pull requests · GitHub · Work", or a
+  saved query. A plugin region lists only the sources it accepts (`regionAllowsSource` in
+  `region.ts`). Picking a source lists its starter plans and **Blank**. Before listing a starter, the
+  launcher moves each of its sources that reads the picked source onto the picked workspace, account,
+  and reach, and the Node validates the result. **Blank** adds the source and selects **Columns**, so
+  you see the default columns it gets. A saved query has no starters and opens straight away.
+- **Unfinished.** The workspace's unpublished drafts, newest first and three at a time, each with
+  **Continue** and **Discard**.
+
+The launcher's choice is where editing starts, so undo never goes back past it. The source and
+account list is `sourceEntries` in `features/dataSources/sourceEntries.ts`, which the source picker
+uses too. In the studio, a source joins the plan only once it's picked, so nothing is reported before
+then. The AI conversation opens in a dialog, asks for missing choices, and proposes the same plan
+used by the forms. Applying a proposal is one undoable step.
 
 The outline draws `planOutline` in the sections Data, Columns, Steps, Arrange, Look, and Settings.
 Each row shows its row count, such as "312 → 41" for a step, and a warning mark when the part has a
@@ -71,8 +87,9 @@ Every control has a visible caption, and every option reads as words from
 `packages/dashboards-core/src/labels.ts` rather than a schema value. Each form shows only what applies
 to its part. A column shows the settings for its type only. **Look** offers only the options the
 chosen view takes, and disables a view the plan or the region refuses, with the reason as its
-tooltip. Source descriptions may offer starter plans, which the host validates and lists under
-**Start from**. **Keep history** can create a dataset from the chosen query.
+tooltip. A source's inspector lists its starter plans under **Start from**, moved onto the source's
+account and validated as in the launcher. **Keep history** can create a dataset from the chosen
+query.
 
 Each step operation has its own form, registered in `studio/operationForms.ts`. The registry's type
 requires a form for every operation, and `operationForms.test.tsx` checks that each operation also

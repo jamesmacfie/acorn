@@ -3,7 +3,7 @@ import { dashboardPanelContentSchema, type DashboardPanelContent, type PanelPlan
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import {
   addStatusColumns, applyCategoryColumns, availableDashboardViews, defaultPlanColumns, displaySchema, emptyDashboardContent, exactStatusOptions,
-  latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason, unbindMissingFields,
+  mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason, unbindMissingFields, unpublishedDashboards,
 } from './dashboardEditorModel'
 
 const query = { kind: 'inline' as const, bindings: {}, content: {
@@ -92,14 +92,14 @@ describe('dashboard editor model', () => {
     expect(unavailableViewReason('chart')).toContain('date field')
   })
 
-  it('resumes the newest unpublished draft without replacing a placed publication', () => {
+  it('lists unpublished drafts newest first, leaving out published panels', () => {
     const draft = (id: string, updatedAt: number, publishedRevision: number | null) => ({
       id, workspaceId: 'workspace', content, draftRevision: 1, basePublishedRevision: publishedRevision,
       publishedRevision, createdAt: 1, updatedAt,
     })
-    expect(latestUnpublishedDashboard([
+    expect(unpublishedDashboards([
       draft('published', 30, 1), draft('older', 10, null), draft('newer', 20, null),
-    ])?.id).toBe('newer')
+    ]).map(entry => entry.id)).toEqual(['newer', 'older'])
   })
 
   it('derives exact dynamic status ids and labels from retained records', () => {

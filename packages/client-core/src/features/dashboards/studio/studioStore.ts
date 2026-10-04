@@ -127,7 +127,7 @@ export function createStudioStore(input: {
     setFuture([])
     setSaveState(restored ? 'Saved on this computer' : 'Saved')
   }
-  /** Reopens a new panel's copy on this computer, unless editing has already begun. */
+  /** Reopens this computer's copy of the panel when the Node can't be read, unless editing has begun. */
   const restoreLocal = (): void => {
     const local = recovery.read(nodeId, input.recoveryId)?.content
     if (edited || !local || !('version' in local)) return

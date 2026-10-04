@@ -55,6 +55,12 @@ export function regionRefusal(region: PanelRegion, view: string, publication: { 
   return undefined
 }
 
+/** Whether a panel in this region may read the source, given as `pluginId:sourceId`. The same rule as
+ *  `regionRefusal`: the region's own list when it has one, any source when it asks only for a field
+ *  role, and its plugin's sources otherwise. */
+export const regionAllowsSource = (region: PanelRegion, source: string): boolean =>
+  region.sources ? region.sources.includes(source) : !!region.fieldRole || source.startsWith(`${region.pluginId}:`)
+
 export const regionAllows = (region: PanelRegion, panel: PanelDefinition): boolean =>
   !!panel.publication && !regionRefusal(region, panel.view.kind, panel.publication)
 
