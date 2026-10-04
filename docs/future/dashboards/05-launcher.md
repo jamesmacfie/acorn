@@ -1,6 +1,7 @@
 # Phase 5: the Add panel launcher
 
-Status: proposed, October 5, 2026. Depends on [phase 3](./03-studio-shell.md). Works without
+Status: shipped, October 5, 2026, in commit `9e10c4e7b`. [What shipped](#what-shipped) records the
+choices made while building it and what it left for later. Depends on [phase 3](./03-studio-shell.md). Works without
 [phase 6](./06-docked-ai.md), but the **Draft it** path is best with the docked AI. Read the
 [programme README](./README.md) first. The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows the launcher in
@@ -146,3 +147,67 @@ a request and check that the studio opens with the AI working on it.
 - The field names on the GitHub pull request source for requirement 13: author, review request,
   and merge readiness.
 - `docs/data-sources.md` exists and owns the source contract.
+
+## What shipped
+
+All 14 requirements shipped, with the tests listed above. `docs/dashboards/mapping-and-editor.md`
+§ The generated editor describes the shipped behaviour and wins over this page.
+
+Where the code lives:
+
+- `packages/client-core/src/features/dashboards/studio/PanelLauncher.tsx` is the launcher and owns
+  `LaunchResult`. `DashboardPanelHost.tsx` shows it for **Add panel** and opens the studio with the
+  result. **Edit** goes straight to the studio.
+- `PanelStudio.tsx` takes the result as `start`. The **Pick data** and **Describe it** buttons and the
+  unfinished-draft line are gone. An empty preview says to add a source from the outline or ask AI.
+- `packages/client-core/src/features/dataSources/sourceEntries.ts` builds the source and account
+  rows. `SourceQueryEditor` and the launcher both use it.
+- `starterForPick` and `checkedStarters` in `studio/inspectors.tsx` move a starter onto the picked
+  scope and validate it. The launcher and the source inspector's **Start from** share them.
+- `regionAllowsSource` in `region.ts` decides which sources a region lists.
+- `unpublishedDashboards` in `dashboardEditorModel.ts` replaces `latestUnpublishedDashboard`.
+- `AuthoringConversation` gained `sendOnOpen`. It starts a new conversation, with the model the person
+  last picked, and sends the instruction as its first turn.
+- Starters live beside each description: `coreTasks.ts` and `localGitSources.ts` in
+  `packages/node-core/src/server/dataSources/`, `plugins/agents/src/shared/usageSource.ts`, and
+  `plugins/github/src/shared/pullSourceDescription.ts`. Each has a test. The agents and GitHub
+  plugins gained `@acorn/dashboards-core` as a dev dependency for those tests.
+
+Choices made while building it:
+
+- The catalog carries no starters, so the suggestion chips read descriptions already in the query
+  cache. They're empty in a fresh session until a source is described.
+- The catalog query is cached for 60 seconds per Node, so opening the launcher repeatedly is cheap.
+- A starter is moved onto the picked scope before the Node validates it, because the Node resolves a
+  query's workspace and account. The original never validates.
+- The phase 4 inspector never showed starters. The query cache wraps a description in a reactive
+  proxy, and the strict plan parser refused it. `checkedStarters` copies the starters first.
+- A source's starters show in a list below the sources rather than inside the picked row, because a
+  row in a list box can't hold buttons.
+- A saved query has no starters, so picking one opens the studio straight away.
+- The kit `Composer` submits on ⌘Enter or Ctrl+Enter, not Enter. The launcher keeps the kit's
+  behaviour.
+- The launcher's choice isn't an undo step. A new panel no longer reopens this computer's copy of an
+  earlier new panel. An existing panel still falls back to its device copy when the Node can't be
+  read.
+- The publish review offers **Where it goes** for any panel never published, including a continued
+  draft, rather than only for a new one.
+- GitHub starters put each filter in its own step, so the Node pushes state, author, and review
+  requests down to GitHub search. **Ready to merge** keeps only your own pull requests, because
+  open pull requests across every repository an account can see can pass GitHub's 250-match cap.
+- **AI cost this month by task** groups by task ID. The usage source declares no relation to tasks,
+  so it can't show the title.
+
+Checked in a `dev:agent` session: **Add panel** on Home, **Workspace tasks**, **Tasks updated this
+week**, a studio that saved with no problems and a working preview, then **Add panel** again with the
+draft under "Unfinished", both starter titles as chips, and **Continue**. The session had no tasks,
+so the preview showed no rows. **Draft it** wasn't sent, because it would spend the owner's model.
+The tests cover it.
+
+Left for later:
+
+- Each starter's description is the first line of `describePanelPlan`, as requirement 8 asks. For
+  single-source starters that's "One row per record from *Source*." every time, which doesn't tell
+  them apart. Their filter line would.
+- In a starter with several sources, a source that doesn't read the picked source keeps its own
+  scope. No shipped starter has more than one source.
