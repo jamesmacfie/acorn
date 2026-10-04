@@ -195,7 +195,9 @@ export default function PanelStudio(props: {
     select(`stage:${index + by}`)
   }
   const inspectorContext: InspectorContext = {
-    plan, change: store.apply, select, workspaceId: scope.workspaceId, run, sources,
+    plan, change: store.apply, select, workspaceId: scope.workspaceId, run, problems, sources,
+    ...(props.region ? { region: props.region } : {}),
+    askAi: subject => setAi({ instruction: `About ${subject}: ` }),
     refreshQueries: () => void queryClient.invalidateQueries(),
   }
   // Keyed by id rather than by source object, so an edit to one source doesn't remount its picker.

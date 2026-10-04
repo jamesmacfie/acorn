@@ -96,7 +96,7 @@ describe('PanelStudio', () => {
     row('List')!.click()
     await settle()
     expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('List')
-    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('View')
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Show as')
   })
 
   it('marks a step that has a problem', async () => {

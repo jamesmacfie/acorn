@@ -77,6 +77,27 @@ export const AGGREGATE_LABELS: Record<NonNullable<PanelPlan['view']['aggregate']
 
 export const CHART_SHAPE_LABELS: Record<NonNullable<PanelPlan['view']['shape']>, string> = { bar: 'Bars', line: 'Line' }
 
+export const TREND_LABELS: Record<NonNullable<PanelPlan['view']['trend']>, string> = { history: 'Saved history', activity: 'Recent activity' }
+
+export const COMPARE_LABELS: Record<NonNullable<PanelPlan['view']['compare']>, string> = { day: 'Yesterday', week: 'Last week' }
+
+export const GOOD_DIRECTION_LABELS: Record<NonNullable<PanelPlan['view']['good']>, string> = { up: 'Up', down: 'Down' }
+
+export const GROUP_ORDER_LABELS: Record<NonNullable<NonNullable<PanelPlan['group']>[number]['order']>, string> = {
+  declared: "The column's order", label: 'Name', count: 'Size', explicit: 'A custom order',
+}
+
+export const EMPTY_SORT_LABELS: Record<NonNullable<NonNullable<PanelPlan['sort']>[number]['empty']>, string> = { first: 'First', last: 'Last' }
+
+export const PRECISION_LABELS: Record<NonNullable<Column['precision']>, string> = { instant: 'A date and time', day: 'A calendar day' }
+
+export const UNMATCHED_LABELS: Record<NonNullable<Column['unmatched']>, string> = { 'catch-all': 'Show them under Other', hidden: 'Hide them' }
+
+export const PREVIOUS_CHANGE_LABELS: Record<NonNullable<Measure['previous']>, string> = { amount: 'As an amount', ratio: 'As a percentage' }
+
+/** The fixed units a number column offers. Any other unit is a three-letter currency code. */
+export const UNIT_LABELS: Record<string, string> = { percent: 'Percent', ms: 'Milliseconds', s: 'Seconds', bytes: 'Bytes' }
+
 /** Relative date offsets a filter offers, as the signed ISO 8601 durations the schema stores. */
 export const RELATIVE_OFFSET_LABELS: Record<string, string> = {
   '-P1D': '1 day ago', '-P7D': '7 days ago', '-P14D': '14 days ago', '-P30D': '30 days ago', '-P90D': '90 days ago',

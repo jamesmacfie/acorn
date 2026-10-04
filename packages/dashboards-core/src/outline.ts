@@ -96,7 +96,8 @@ export function pressTarget(plan: PanelPlan, sources: readonly PlanSource[]): { 
 }
 
 const STAGE_ICONS: Record<Stage['op'], string> = { filter: 'list-filter', compute: 'calculator', summarize: 'sigma', expand: 'list-tree', overlap: 'calendar-range' }
-const VIEW_ICONS: Record<PanelPlan['view']['kind'], string> = { stat: 'hash', list: 'list', table: 'table', board: 'kanban', chart: 'chart-column' }
+/** The icon each view shows as, in the outline and the Look inspector. */
+export const VIEW_ICONS: Record<PanelPlan['view']['kind'], string> = { stat: 'hash', list: 'list', table: 'table', board: 'kanban', chart: 'chart-column' }
 const COLUMN_ICONS: Record<NonNullable<PanelPlanColumn['type']>, string> = {
   text: 'type', number: 'hash', boolean: 'toggle-left', datetime: 'calendar', enum: 'tag', person: 'user', link: 'link',
 }

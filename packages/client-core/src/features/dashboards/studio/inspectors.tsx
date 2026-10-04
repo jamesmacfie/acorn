@@ -1,34 +1,43 @@
-import { createMemo, createSignal, For, Show, type Component } from 'solid-js'
+import { createMemo, createSignal, For, Index, Show, type Component } from 'solid-js'
+import { Dynamic } from 'solid-js/web'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
-import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
-import { describePanelPlan, outputPlanColumns, type DashboardRun } from '@acorn/dashboards-core/plan.ts'
+import { describePanelPlan, newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import {
-  AGGREGATE_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, OPERATOR_LABELS, RELATIVE_OFFSET_LABELS, SORT_DIRECTION_LABELS,
-  SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, VIEW_LABELS, WEEK_START_LABELS, labelOptions, operatorLabel,
+  AGGREGATE_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, EMPTY_SORT_LABELS, GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS,
+  PRECISION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNIT_LABELS, UNMATCHED_LABELS, WEEK_START_LABELS,
+  labelOptions, sortDirectionLabel,
 } from '@acorn/dashboards-core/labels.ts'
-import type { PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import { availableViews, countsByPart, problemsByPart, VIEW_ICONS, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import type { SourceQueryEditorState } from '../../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../../dataSources/SourceQueryEditor'
-import { Button, Card, Checkbox, Field } from '../../../kit/components/primitives'
+import { Alert, Button, Card, Checkbox, Chip, Field, Row, SegmentedControl } from '../../../kit/components/primitives'
 import { Inline } from '../../../kit/components/layout/Inline'
+import { Rows } from '../../../kit/components/layout/Rows'
+import { RowActions } from '../../../kit/components/layout/RowActions'
 import { Stack } from '../../../kit/components/layout/Stack'
+import Icon from '../../../kit/components/content/Icon'
 import { Text } from '../../../kit/components/content/Text'
+import IconPicker from '../../../kit/components/inputs/IconPicker'
+import { Menu } from '../../../kit/components/overlays/Menu'
 import { availableContentPresentations } from '../../../host/registries/panes/contentLinks'
-import CompositionStageForm from '../CompositionStageForm'
 import EquivalenceForm from '../EquivalenceForm'
 import KeepHistory from '../KeepHistory'
 import WriteValueControls from '../WriteValueControls'
 import { defaultPlanColumns, unbindMissingFields } from '../dashboardEditorModel'
 import { LabeledInput, LabeledSelect } from '../fields'
+import { regionRefusal, type PanelRegion } from '../region'
+import { operationForms } from './operationForms'
+import { newComparison, wholeNumber, type Stage, type StageFormProps } from './stageFormParts'
 import type { StudioChangeOptions } from './studioStore'
 
-// The studio's inspector: one form per kind of plan part, keyed by the part's kind
-// (docs/dashboards/mapping-and-editor.md § The generated editor). Each form is the one the editor's
-// single long form drew for that part, moved here as it was.
+// The studio's inspector: one form per kind of plan part, keyed by the part's kind, and one form per
+// step operation through `operationForms` (docs/dashboards/mapping-and-editor.md § The generated
+// editor). Each form shows only what applies to the selected part, in the label map's words, and
+// never asks for an id: new ids come from labels when a part is created.
 
 /** What every inspector reads and writes. */
 export type InspectorContext = {
@@ -37,69 +46,58 @@ export type InspectorContext = {
   select: (key: PlanPartKey) => void
   workspaceId: string
   run: () => DashboardRun | undefined
+  /** The plan's problems, from the schema and the last run. */
+  problems: () => readonly PlanProblem[]
   sources: SourceTracking
+  /** The plugin area the panel will show in, which can refuse some views. */
+  region?: PanelRegion
+  /** Opens the AI with a part of the panel named in the request. */
+  askAi: (subject: string) => void
   /** Refetches every query after a source starts keeping history. */
   refreshQueries: () => void
 }
 
 type Column = PanelPlan['columns'][number]
-type Stage = PanelPlan['stages'][number]
-type Comparison = Extract<DataPredicate, { kind: 'comparison' }>
+type Choice = NonNullable<Column['choices']>[number]
 type Presentation = 'route' | 'refPanel' | 'pane' | 'overlay' | 'external'
+type RowButton = NonNullable<PanelPlan['actions']>['buttons'][number]
 type InspectorProps = { context: InspectorContext; part: PlanPartKey }
 
-const firstPredicate = (column: string): DataPredicate => ({
-  kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator: 'eq', right: { address: { from: 'literal', value: '' } },
-})
-const comparison = (predicate: DataPredicate): Comparison | undefined => predicate.kind === 'comparison' ? predicate : undefined
-const filterColumn = (predicate: DataPredicate): string => {
-  const address = comparison(predicate)?.left.address
-  return address?.from === 'item' ? address.pointer.slice(1) : ''
-}
-const operand = (predicate: DataPredicate): string => {
-  const right = comparison(predicate)?.right?.address
-  return right?.from === 'literal' ? String(right.value ?? '') : ''
-}
-const filterValueMode = (predicate: DataPredicate): string => {
-  const address = comparison(predicate)?.right?.address
-  return address?.from === 'context' ? address.name === 'calendar' ? address.boundary : address.name : 'literal'
-}
-const filterOffset = (predicate: DataPredicate): string => {
-  const address = comparison(predicate)?.right?.address
-  return address?.from === 'context' && (address.name === 'now' || address.name === 'calendar') ? address.offset ?? '' : ''
-}
+const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 /** Every zone this runtime knows, with the chosen one kept even when it does not. The same rule as
  *  the workflow schedule dialog's, which a plugin can't share with client-core. */
 const timezoneOptions = (current: string) => {
   const zones = Intl.supportedValuesOf('timeZone')
   return (current && !zones.includes(current) ? [current, ...zones] : zones).map(zone => ({ value: zone, label: zone.replaceAll('_', ' ') }))
 }
-/** The preset offsets, keeping a stored one that isn't a preset under its own value. */
-const offsetOptions = (current: string) => [
-  { value: '', label: 'No offset' },
-  ...(current && !(current in RELATIVE_OFFSET_LABELS) ? [{ value: current, label: current }] : []),
-  ...labelOptions(RELATIVE_OFFSET_LABELS),
-]
-const presentationOptions = [{ value: 'route', label: 'Full page' }, { value: 'refPanel', label: 'Side panel' }, { value: 'pane', label: 'Task pane' }, { value: 'overlay', label: 'Overlay' }, { value: 'external', label: 'Browser' }]
-const columnOptions = (plan: PanelPlan) => outputPlanColumns(plan).map(column => ({ value: column.id, label: column.label }))
+const presentationOptions = [{ value: 'refPanel', label: 'Side panel' }, { value: 'pane', label: 'Task pane' }, { value: 'route', label: 'Full page' }, { value: 'overlay', label: 'Overlay' }, { value: 'external', label: 'Browser' }]
+const columnOptions = (columns: readonly Column[]) => columns.map(column => ({ value: column.id, label: column.label }))
 const sourceLabel = (plan: PanelPlan, id: string): string => plan.sources.find(source => source.id === id)?.label ?? id
+/** Each source's description by source id, from what its picker last reported. */
+const sourceDescriptions = (tracking: SourceTracking): Record<string, DataSourceDescription | undefined> =>
+  Object.fromEntries(Object.entries(tracking.states()).map(([id, state]) => [id, state?.description]))
+/** Drops an optional key, because the plan schema is strict and refuses `undefined` values. */
+const without = <T extends object, K extends string>(value: T, key: K): T extends unknown ? Omit<T, K> : never => {
+  const { [key]: _dropped, ...rest } = value as Record<string, unknown>
+  return rest as T extends unknown ? Omit<T, K> : never
+}
 
 // ── Plan edits the outline's Add menu shares ─────────────────────────────────────────────────────
 
 export const addSourceTo = (plan: PanelPlan, reference: QueryReference): PanelPlan =>
   ({ ...plan, sources: [...plan.sources, { id: crypto.randomUUID(), label: `Source ${plan.sources.length + 1}`, role: 'primary', reference }] })
 export const addColumnTo = (plan: PanelPlan): PanelPlan =>
-  ({ ...plan, columns: [...plan.columns, { id: `column_${crypto.randomUUID().replaceAll('-', '')}`, label: 'New column', type: 'text', bind: {} }] })
-/** The plan with a new step for `op` at the end, or the plan unchanged when the step needs columns it lacks. */
+  ({ ...plan, columns: [...plan.columns, { id: newColumnId(plan, 'New column'), label: 'New column', type: 'text', bind: {} }] })
+/** The plan with a new step for `op` at the end, or the plan unchanged when the step needs columns it
+ *  lacks. Ids for the columns a step makes come from their labels. */
 export const addStageTo = (plan: PanelPlan, op: Stage['op']): PanelPlan => {
   const columns = outputPlanColumns(plan)
-  const first = columns[0]?.id ?? ''
   const dates = columns.filter(column => column.type === 'datetime')
   const list = columns.find(column => column.list)
-  const stage: Stage | undefined = op === 'filter' ? { op, where: firstPredicate(first) }
-    : op === 'compute' ? { op, columns: [{ id: `computed${plan.stages.length}`, label: 'Calculated value', type: 'number', expression: { kind: 'column', column: first } }] }
-    : op === 'summarize' ? { op, by: [], measures: [{ id: `count${plan.stages.length}`, label: 'Count', kind: 'count' }] }
-    : op === 'expand' && list ? { op, column: list.id, output: `element${plan.stages.length}`, perRow: 100 }
+  const stage: Stage | undefined = op === 'filter' ? { op, where: newComparison(columns[0]) }
+    : op === 'compute' ? { op, columns: [{ id: newColumnId(plan, 'Calculated value'), label: 'Calculated value', type: 'number', expression: { kind: 'column', column: columns.find(column => column.type === 'number')?.id ?? columns[0]?.id ?? '' } }] }
+    : op === 'summarize' ? { op, by: [], measures: [{ id: newColumnId(plan, 'Count'), label: 'Count', kind: 'count' }] }
+    : op === 'expand' && list ? { op, column: list.id, output: newColumnId(plan, `${list.label} item`), perRow: 100 }
     : op === 'overlap' && dates.length >= 2 ? { op, start: dates[0]!.id, end: dates[1]!.id, maxPairs: 5000 } : undefined
   return stage ? { ...plan, stages: [...plan.stages, stage] } : plan
 }
@@ -107,17 +105,25 @@ export const removeSourceFrom = (plan: PanelPlan, id: string): PanelPlan => ({
   ...plan,
   sources: plan.sources.filter(source => source.id !== id),
   relations: plan.relations?.filter(relation => relation.from !== id && relation.to !== id),
-  columns: plan.columns.map(column => { const { [id]: _removed, ...bind } = column.bind; return { ...column, bind } }),
+  columns: plan.columns.map(column => ({ ...column, bind: without(column.bind, id) })),
 })
 export const removeColumnFrom = (plan: PanelPlan, id: string): PanelPlan => ({ ...plan, columns: plan.columns.filter(column => column.id !== id) })
 export const removeStageFrom = (plan: PanelPlan, index: number): PanelPlan => ({ ...plan, stages: plan.stages.filter((_stage, at) => at !== index) })
-/** Swaps a step with its neighbour, `by` -1 for up and 1 for down. Unchanged at either end. */
-export const moveStageIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelPlan => {
+/** Swaps an item with its neighbour, `by` -1 for up and 1 for down. Unchanged at either end. */
+const swap = <T,>(items: readonly T[], index: number, by: -1 | 1): T[] | undefined => {
   const target = index + by
-  if (target < 0 || target >= plan.stages.length) return plan
-  const stages = [...plan.stages]
-  ;[stages[index], stages[target]] = [stages[target]!, stages[index]!]
-  return { ...plan, stages }
+  if (target < 0 || target >= items.length) return undefined
+  const moved = [...items]
+  ;[moved[index], moved[target]] = [moved[target]!, moved[index]!]
+  return moved
+}
+export const moveStageIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelPlan => {
+  const stages = swap(plan.stages, index, by)
+  return stages ? { ...plan, stages } : plan
+}
+export const moveColumnIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelPlan => {
+  const columns = swap(plan.columns, index, by)
+  return columns ? { ...plan, columns } : plan
 }
 
 // ── Sources ────────────────────────────────────────────────────────────────────────────────────
@@ -162,6 +168,8 @@ export function createSourceTracking(input: {
   return { states, starters, report }
 }
 
+/** Source, account, reach, and scope come from the picker. Then how a second source joins, the
+ *  source's starter plans, and the source-level actions. */
 export function SourceInspector(props: InspectorProps) {
   const context = props.context
   const id = () => props.part.slice('source:'.length)
@@ -174,15 +182,19 @@ export function SourceInspector(props: InspectorProps) {
   return <Show when={source()}>{current => <Stack gap="row">
     <SourceQueryEditor workspaceId={context.workspaceId} value={current().reference} hideAuthoring hideConditions hidePreview pickSourceAccount
       onChange={setReference} onStateChange={next => context.sources.report(id(), next)} />
-    <LabeledSelect label="What this source does" value={current().role} options={labelOptions(SOURCE_ROLE_LABELS)}
-      onChange={role => context.change(plan => ({ ...plan, sources: plan.sources.map(entry => entry.id === id() ? { ...entry, role: role as typeof entry.role } : entry) }))} />
-    <Show when={state()?.query && state()?.description && state()?.source}>
-      <KeepHistory query={state()!.query!} description={state()!.description!} sourceName={state()!.source!.name} onCreated={context.refreshQueries} />
+    <Show when={context.plan().sources.length > 1}>
+      <LabeledSelect label="How it joins" value={current().role} options={labelOptions(SOURCE_ROLE_LABELS)}
+        onChange={role => context.change(plan => ({ ...plan, sources: plan.sources.map(entry => entry.id === id() ? { ...entry, role: role as typeof entry.role } : entry) }))} />
     </Show>
     <Show when={starterPlans().length}><Field label="Start from" group><Inline gap="inline" wrap>
       <For each={starterPlans()}>{starter => <Button size="sm" tip={describePanelPlan(starter)[0]} onPress={() => context.change(() => starter)}>{starter.title}</Button>}</For>
     </Inline></Field></Show>
-    <Button size="sm" variant="ghost" onPress={() => setReference(undefined)}>Remove source</Button>
+    <Inline gap="inline" wrap>
+      <Show when={state()?.query && state()?.description && state()?.source}>
+        <KeepHistory query={state()!.query!} description={state()!.description!} sourceName={state()!.source!.name} onCreated={context.refreshQueries} />
+      </Show>
+      <Button size="sm" variant="ghost" onPress={() => setReference(undefined)}>Remove source</Button>
+    </Inline>
   </Stack>}</Show>
 }
 
@@ -201,12 +213,12 @@ function RelationsInspector(props: InspectorProps) {
   const plan = context.plan
   const states = context.sources.states
   const addDeclaredRelation = (from: string, to: string, declared: NonNullable<DataSourceDescription['relations']>[number]): void => {
-    const output = declared.cardinality === 'one-to-many' ? `${to}Children` : undefined
+    const label = declared.label
+    const output = declared.cardinality === 'one-to-many' ? newColumnId(plan(), label) : undefined
     context.change(current => ({ ...current,
       relations: [...current.relations ?? [], { id: declared.id, from, to, kind: declared.kind, cardinality: declared.cardinality,
         keys: declared.keys, unmatched: 'keep', maxMatches: 5000, ...(output ? { output } : {}) }],
-      columns: output && !current.columns.some(column => column.id === output)
-        ? [...current.columns, { id: output, label: declared.label, type: 'text', list: true, bind: {} }] : current.columns,
+      columns: output ? [...current.columns, { id: output, label, type: 'text', list: true, bind: {} }] : current.columns,
     }))
   }
   return <Stack gap="row">
@@ -223,95 +235,173 @@ function RelationsInspector(props: InspectorProps) {
 
 // ── Columns ────────────────────────────────────────────────────────────────────────────────────
 
-function ColumnCard(props: { context: InspectorContext; column: Column }) {
-  const context = props.context
-  const plan = context.plan
-  const states = context.sources.states
-  const column = () => props.column
-  const editColumn = (update: (column: Column) => Column, options?: StudioChangeOptions): void =>
-    context.change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column().id ? update(entry) : entry) }), options)
-  const editChoice = (index: number, update: (choice: NonNullable<Column['choices']>[number]) => NonNullable<Column['choices']>[number], options?: StudioChangeOptions): void =>
-    editColumn(entry => ({ ...entry, choices: entry.choices?.map((choice, at) => at === index ? update(choice) : choice) }), options)
-  const bindColumn = (sourceId: string, pointer: string): void => editColumn(entry => {
-    const bind = { ...entry.bind }
-    if (pointer) bind[sourceId] = { field: pointer }
-    else delete bind[sourceId]
-    return { ...entry, bind }
-  })
-  const suggestedBinding = (sourceId: string): { pointer: string; name: string } | undefined => {
-    if (column().bind[sourceId]) return undefined
-    const description = states()[sourceId]?.description
-    if (!description) return undefined
-    const fields = dashboardFields(description)
-    const match = fields.find(field => field.type === column().type && field.name.toLowerCase() === column().label.toLowerCase())
-      ?? fields.find(field => field.type === column().type && field.role === column().id)
-    return match ? { pointer: match.id, name: match.name } : undefined
-  }
-  const mapChoice = (sourceId: string, valueId: string, choiceId: string): void => editColumn(entry => {
-    const binding = entry.bind[sourceId]
-    if (!binding || !('field' in binding)) return entry
-    const values = Object.fromEntries(Object.entries(binding.values ?? {}).map(([id, sourceValues]) => [id, sourceValues.filter(value => value !== valueId)]))
-    if (choiceId) values[choiceId] = [...(values[choiceId] ?? []), valueId]
-    return { ...entry, bind: { ...entry.bind, [sourceId]: { ...binding, values } } }
-  })
-  return <Card><Stack gap="row">
-    <LabeledInput label="Column name" value={column().label} onInput={label => editColumn(entry => ({ ...entry, label }), { coalesce: true })} />
-    <LabeledSelect label="Type" value={column().type ?? 'text'} options={labelOptions(COLUMN_TYPE_LABELS)} onChange={type => editColumn(entry => ({ ...entry, type: type as NonNullable<Column['type']> }))} />
-    <Show when={plan().relations?.some(relation => relation.kind === 'equivalence')}><LabeledSelect label="Preferred source for equivalent records" value={column().precedence?.[0] ?? ''}
-      options={[{ value: '', label: 'First available' }, ...plan().sources.filter(source => source.role === 'primary').map(source => ({ value: source.id, label: source.label }))]}
-      onChange={sourceId => editColumn(entry => ({ ...entry, precedence: sourceId ? [sourceId] : undefined }))} /></Show>
-    <Checkbox label="List of values" checked={!!column().list} onChange={list => editColumn(entry => ({ ...entry, list }))} />
-    <Show when={column().type === 'number'}><LabeledInput label="Fixed unit (currency, percent, ms, s, bytes)" value={typeof column().unit === 'string' ? column().unit as string : ''} onInput={unit => editColumn(entry => ({ ...entry, unit: unit || undefined }), { coalesce: true })} />
-      <LabeledSelect label="Or unit from column" value={(() => { const unit = column().unit; return typeof unit === 'object' ? unit.column : '' })()} options={[{ value: '', label: 'Fixed unit' }, ...plan().columns.filter(entry => entry.id !== column().id).map(entry => ({ value: entry.id, label: entry.label }))]} onChange={unitColumn => editColumn(entry => ({ ...entry, unit: unitColumn ? { column: unitColumn } : undefined }))} /></Show>
-    <Show when={column().type === 'datetime'}><LabeledSelect label="Date precision" value={column().precision ?? 'instant'} options={[{ value: 'instant', label: 'Instant' }, { value: 'day', label: 'Calendar day' }]} onChange={precision => editColumn(entry => ({ ...entry, precision: precision as 'instant' | 'day' }))} /></Show>
-    <Show when={column().type === 'enum'}><LabeledSelect label="New values" value={column().unmatched ?? 'catch-all'} options={[{ value: 'catch-all', label: 'Show unmatched' }, { value: 'hidden', label: 'Hide unmatched' }]} onChange={unmatched => editColumn(entry => ({ ...entry, unmatched: unmatched as 'catch-all' | 'hidden' }))} />
-      <For each={column().choices ?? []}>{(choice, index) => <Inline gap="inline" wrap>
-        <LabeledInput label="Choice name" value={choice.label} onInput={label => editChoice(index(), value => ({ ...value, label }), { coalesce: true })} />
-        <LabeledSelect label="Colour" value={choice.tone ?? 'muted'} options={labelOptions(TONE_LABELS)} onChange={tone => editChoice(index(), value => ({ ...value, tone: tone as NonNullable<typeof choice.tone> }))} />
-        <LabeledInput label="Order" value={String(choice.rank ?? '')} onInput={rank => editChoice(index(), value => ({ ...value, rank: rank ? Number(rank) : undefined }), { coalesce: true })} />
-        <WriteValueControls column={column()} choice={choice} sources={plan().sources}
-          descriptions={Object.fromEntries(Object.entries(states()).map(([id, state]) => [id, state?.description]))}
-          onChange={(sourceId, value, present) => editChoice(index(), candidate => {
-            const writeValues = { ...candidate.writeValues }
-            if (present) writeValues[sourceId] = value!
-            else delete writeValues[sourceId]
-            return { ...candidate, writeValues }
-          })} />
-      </Inline>}</For>
-      <Button size="sm" onPress={() => editColumn(entry => ({ ...entry, choices: [...(entry.choices ?? []), { id: crypto.randomUUID(), label: 'New choice' }] }))}>Add choice</Button>
-    </Show>
-    <For each={plan().sources}>{source => <Stack gap="row">
-      <LabeledSelect label={`From ${source.label}`}
-        value={'field' in (column().bind[source.id] ?? {}) ? (column().bind[source.id] as { field: string }).field : ''}
-        options={[{ value: '', label: 'No binding' }, ...((() => { const binding = column().bind[source.id]; return binding && 'field' in binding && !states()[source.id]?.description?.fields.some(field => field.pointer === binding.field) ? [{ value: binding.field, label: `Missing field ${binding.field} · rebind` }] : [] })()), ...(states()[source.id]?.description?.fields ?? []).map(field => ({ value: field.pointer, label: field.label }))]}
-        onChange={pointer => bindColumn(source.id, pointer)} />
-      <Show when={suggestedBinding(source.id)}>{suggestion => <Button size="sm" variant="bare" onPress={() => bindColumn(source.id, suggestion().pointer)}>{`Bind suggested ${suggestion().name}`}</Button>}</Show>
-      <Show when={column().type === 'enum' && 'field' in (column().bind[source.id] ?? {})}>
-        <For each={(() => {
-          const binding = column().bind[source.id]
-          const field = binding && 'field' in binding ? states()[source.id]?.description?.fields.find(item => item.pointer === binding.field) : undefined
-          return field?.choices?.kind === 'static' ? field.choices.values : []
-        })()}>{value => <LabeledSelect label={`Map ${value.label}`}
-          value={(() => { const binding = column().bind[source.id]; return binding && 'field' in binding ? Object.entries(binding.values ?? {}).find(([, ids]) => ids.includes(value.id))?.[0] ?? '' : '' })()}
-          options={[{ value: '', label: 'Unmatched' }, ...(column().choices ?? []).map(choice => ({ value: choice.id, label: choice.label }))]}
-          onChange={choiceId => mapChoice(source.id, value.id, choiceId)} />}</For>
-      </Show>
-    </Stack>}</For>
-    <Button size="sm" variant="bare" onPress={() => context.change(current => removeColumnFrom(current, column().id))}>Remove column</Button>
-  </Stack></Card>
+/** The field type a column of each type reads, so compatible fields list first. */
+const fieldType = (field: DataSourceDescription['fields'][number]): Column['type'] => {
+  const kind = field.display?.kind
+  return kind === 'status' ? 'enum' : kind
+}
+/** The field a column reads from one source, by its pointer. */
+const boundField = (column: Column, sourceId: string): string | undefined => {
+  const binding = column.bind[sourceId]
+  return binding && 'field' in binding ? binding.field : undefined
 }
 
 function ColumnsInspector(props: InspectorProps) {
   const context = props.context
+  const plan = context.plan
+  const fieldLabel = (column: Column): string => {
+    for (const source of plan().sources) {
+      const pointer = boundField(column, source.id)
+      if (!pointer) continue
+      const field = context.sources.states()[source.id]?.description?.fields.find(entry => entry.pointer === pointer)
+      return field ? `From ${field.label}` : 'Its field is missing'
+    }
+    return 'Not read from a source'
+  }
+  const items = () => plan().columns.map((column, index) => ({ key: column.id, column, index }))
   return <Stack gap="row">
-    <For each={context.plan().columns}>{column => <ColumnCard context={context} column={column} />}</For>
-    <Button size="sm" onPress={() => context.change(addColumnTo)}>Add column</Button>
+    <Rows id="dashboards.studio.columns" ariaLabel="Columns" items={items()} selected={null}
+      onSelect={key => context.select(`column:${key}`)} onActivate={key => context.select(`column:${key}`)}>
+      {(item, itemProps, selected) => <Row item={itemProps} selected={selected()} density="compact" variant="stacked"
+        onPress={() => context.select(`column:${item.column.id}`)}
+        meta={<Text emphasis="muted">{item.column.list ? `List of ${COLUMN_TYPE_LABELS[item.column.type ?? 'text'].toLowerCase()}` : COLUMN_TYPE_LABELS[item.column.type ?? 'text']}</Text>}
+        trailing={<RowActions ariaLabel={`Actions for ${item.column.label}`}>{menu => <>
+          <Menu.Item context={menu} disabled={item.index === 0} onSelect={() => context.change(current => moveColumnIn(current, item.index, -1))}>Move up</Menu.Item>
+          <Menu.Item context={menu} disabled={item.index === plan().columns.length - 1} onSelect={() => context.change(current => moveColumnIn(current, item.index, 1))}>Move down</Menu.Item>
+          <Menu.Item context={menu} tone="danger" onSelect={() => context.change(current => removeColumnFrom(current, item.column.id))}>Remove</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => context.askAi(`the ${item.column.label} column`)}>Ask AI about this</Menu.Item>
+        </>}</RowActions>}>
+        <Stack gap="none"><Text>{item.column.label}</Text><Text emphasis="muted">{fieldLabel(item.column)}</Text></Stack>
+      </Row>}
+    </Rows>
+    <Inline><Button size="sm" onPress={() => { context.change(addColumnTo); context.select(`column:${plan().columns.at(-1)!.id}`) }}>Add column</Button></Inline>
   </Stack>
 }
 
+/** A number column's unit as one choice: a fixed unit, a currency, or another column. */
+const unitChoice = (unit: Column['unit']): string => unit === undefined ? '' : typeof unit === 'object' ? 'column' : unit in UNIT_LABELS ? unit : 'currency'
+
 function ColumnInspector(props: InspectorProps) {
-  const column = () => props.context.plan().columns.find(entry => `column:${entry.id}` === props.part)
-  return <Show when={column()}>{current => <ColumnCard context={props.context} column={current()} />}</Show>
+  const context = props.context
+  const plan = context.plan
+  const states = context.sources.states
+  const column = () => plan().columns.find(entry => `column:${entry.id}` === props.part)
+  const editColumn = (update: (column: Column) => Column, options?: StudioChangeOptions): void =>
+    context.change(current => ({ ...current, columns: current.columns.map(entry => `column:${entry.id}` === props.part ? update(entry) : entry) }), options)
+  const editChoice = (index: number, update: (choice: Choice) => Choice, options?: StudioChangeOptions): void =>
+    editColumn(entry => ({ ...entry, choices: entry.choices?.map((choice, at) => at === index ? update(choice) : choice) }), options)
+  const bindColumn = (sourceId: string, pointer: string): void => editColumn(entry => {
+    if (!pointer) return { ...entry, bind: without(entry.bind, sourceId) }
+    return { ...entry, bind: { ...entry.bind, [sourceId]: { field: pointer } } }
+  })
+  /** One source's fields, those of a compatible type first, each with its type. */
+  const fieldOptions = (sourceId: string) => {
+    const current = column()!
+    const fields = states()[sourceId]?.description?.fields ?? []
+    const fits = (field: typeof fields[number]) => !current.type || fieldType(field) === current.type
+    const pointer = boundField(current, sourceId)
+    const missing = pointer && !fields.some(field => field.pointer === pointer) ? [{ value: pointer, label: `${pointer.slice(1).split('/').at(-1)} is missing, choose another` }] : []
+    return [{ value: '', label: 'Not from this source' }, ...missing,
+      ...[...fields.filter(fits), ...fields.filter(field => !fits(field))].map(field => ({ value: field.pointer, label: field.label, description: COLUMN_TYPE_LABELS[fieldType(field) ?? 'text'] }))]
+  }
+  const suggestedBinding = (sourceId: string): { pointer: string; name: string } | undefined => {
+    const current = column()!
+    const description = states()[sourceId]?.description
+    if (current.bind[sourceId] || !description) return undefined
+    const fields = dashboardFields(description)
+    const match = fields.find(field => field.type === current.type && field.name.toLowerCase() === current.label.toLowerCase())
+      ?? fields.find(field => field.type === current.type && field.role === current.id)
+    return match ? { pointer: match.id, name: match.name } : undefined
+  }
+  /** The values a source's choice field declares, for mapping each to one of the column's choices. */
+  const sourceValues = (sourceId: string) => {
+    const pointer = boundField(column()!, sourceId)
+    const field = pointer ? states()[sourceId]?.description?.fields.find(item => item.pointer === pointer) : undefined
+    return field?.choices?.kind === 'static' ? field.choices.values : []
+  }
+  const mappedChoice = (sourceId: string, valueId: string): string => {
+    const binding = column()!.bind[sourceId]
+    return binding && 'field' in binding ? Object.entries(binding.values ?? {}).find(([, ids]) => ids.includes(valueId))?.[0] ?? '' : ''
+  }
+  const mapChoice = (sourceId: string, valueId: string, choiceId: string): void => editColumn(entry => {
+    const binding = entry.bind[sourceId]
+    if (!binding || !('field' in binding)) return entry
+    const values = Object.fromEntries(Object.entries(binding.values ?? {}).map(([id, ids]) => [id, ids.filter(value => value !== valueId)]))
+    if (choiceId) values[choiceId] = [...(values[choiceId] ?? []), valueId]
+    return { ...entry, bind: { ...entry.bind, [sourceId]: { ...binding, values } } }
+  })
+  const setUnit = (choice: string): void => editColumn(entry => {
+    const rest = without(entry, 'unit')
+    return choice === '' ? rest : choice === 'column' ? { ...rest, unit: { column: plan().columns.find(other => other.id !== entry.id)?.id ?? '' } }
+      : choice === 'currency' ? { ...rest, unit: 'USD' } : { ...rest, unit: choice }
+  })
+
+  return <Show when={column()}>{current => <Stack gap="row">
+    <LabeledInput label="Name" value={current().label} onInput={label => editColumn(entry => ({ ...entry, label }), { coalesce: true })} />
+    <Field label="From" group><Stack gap="row">
+      <For each={plan().sources}>{source => <>
+        <LabeledSelect label={plan().sources.length > 1 ? source.label : 'Field'} value={boundField(current(), source.id) ?? ''} options={fieldOptions(source.id)}
+          onChange={pointer => bindColumn(source.id, pointer)} />
+        <Show when={suggestedBinding(source.id)}>{suggestion => <Inline>
+          <Chip onPress={() => bindColumn(source.id, suggestion().pointer)} leading={<Icon name="sparkles" />}>{`Use ${suggestion().name}`}</Chip>
+        </Inline>}</Show>
+      </>}</For>
+    </Stack></Field>
+    <LabeledSelect label="Type" value={current().type ?? 'text'} options={labelOptions(COLUMN_TYPE_LABELS)}
+      onChange={type => editColumn(entry => {
+        // Settings for the old type don't apply to the new one, and the plan refuses some of them.
+        const rest = without(without(without(without(entry, 'unit'), 'precision'), 'choices'), 'unmatched')
+        return { ...rest, type: type as NonNullable<Column['type']>,
+          ...(type === entry.type ? { ...(entry.unit ? { unit: entry.unit } : {}), ...(entry.precision ? { precision: entry.precision } : {}), ...(entry.choices ? { choices: entry.choices } : {}), ...(entry.unmatched ? { unmatched: entry.unmatched } : {}) } : {}) }
+      })} />
+
+    <Show when={current().type === 'number'}>
+      <LabeledSelect label="Unit" value={unitChoice(current().unit)}
+        options={[{ value: '', label: 'None' }, ...labelOptions(UNIT_LABELS), { value: 'currency', label: 'Currency' }, { value: 'column', label: 'Read the unit from another column' }]} onChange={setUnit} />
+      <Show when={unitChoice(current().unit) === 'currency'}>
+        <LabeledInput label="Currency code" hint="Three letters, such as USD" maxLength={3} value={String(current().unit ?? '')}
+          onInput={code => editColumn(entry => code.trim() ? { ...entry, unit: code.trim().toUpperCase() } : without(entry, 'unit'), { coalesce: true })} />
+      </Show>
+      <Show when={typeof current().unit === 'object' ? current().unit as { column: string } : undefined}>{unit => (
+        <LabeledSelect label="Unit column" value={unit().column} options={columnOptions(plan().columns.filter(entry => entry.id !== current().id))}
+          onChange={unitColumn => editColumn(entry => ({ ...entry, unit: { column: unitColumn } }))} />
+      )}</Show>
+    </Show>
+    <Show when={current().type === 'datetime'}>
+      <LabeledSelect label="Show as" value={current().precision ?? 'instant'} options={labelOptions(PRECISION_LABELS)}
+        onChange={precision => editColumn(entry => precision === 'day' ? { ...entry, precision: 'day' } : without(entry, 'precision'))} />
+    </Show>
+    <Show when={current().type === 'enum'}>
+      <Field label="Choices" group><Stack gap="row">
+        <Index each={current().choices ?? []}>{(choice, index) => <div class="dash-studio-choice">
+          <LabeledInput label="Name" value={choice().label} onInput={label => editChoice(index, value => ({ ...value, label }), { coalesce: true })} />
+          <LabeledSelect label="Colour" value={choice().tone ?? 'muted'} options={labelOptions(TONE_LABELS)} onChange={tone => editChoice(index, value => ({ ...value, tone: tone as NonNullable<Choice['tone']> }))} />
+          <LabeledInput label="Order" type="number" value={String(choice().rank ?? '')}
+            onInput={rank => editChoice(index, value => { const rest = without(value, 'rank'); return rank.trim() && Number.isFinite(Number(rank)) ? { ...rest, rank: Number(rank) } : rest }, { coalesce: true })} />
+          <WriteValueControls column={current()} choice={choice()} sources={plan().sources} descriptions={sourceDescriptions(context.sources)}
+            onChange={(sourceId, value, present) => editChoice(index, candidate => {
+              const writeValues = without(candidate.writeValues ?? {}, sourceId)
+              return { ...candidate, writeValues: present ? { ...writeValues, [sourceId]: value! } : writeValues }
+            })} />
+          <Inline><Button size="sm" variant="bare" onPress={() => editColumn(entry => ({ ...entry, choices: entry.choices?.filter((_choice, at) => at !== index) }))}>Remove choice</Button></Inline>
+        </div>}</Index>
+        <Inline><Button size="sm" onPress={() => editColumn(entry => ({ ...entry, choices: [...entry.choices ?? [], { id: crypto.randomUUID(), label: 'New choice' }] }))}>Add choice</Button></Inline>
+      </Stack></Field>
+      <For each={plan().sources.filter(source => sourceValues(source.id).length)}>{source => <Field label={plan().sources.length > 1 ? `${source.label} values` : 'Source values'} group><Stack gap="row">
+        <For each={sourceValues(source.id)}>{value => <LabeledSelect label={value.label} value={mappedChoice(source.id, value.id)}
+          options={[{ value: '', label: 'Not listed' }, ...(current().choices ?? []).map(choice => ({ value: choice.id, label: choice.label }))]}
+          onChange={choiceId => mapChoice(source.id, value.id, choiceId)} />}</For>
+      </Stack></Field>}</For>
+      <LabeledSelect label="Values not listed" value={current().unmatched ?? 'catch-all'} options={labelOptions(UNMATCHED_LABELS)}
+        onChange={unmatched => editColumn(entry => ({ ...entry, unmatched: unmatched as NonNullable<Column['unmatched']> }))} />
+    </Show>
+    <Checkbox label="Holds a list of values" checked={!!current().list} onChange={list => editColumn(entry => list ? { ...entry, list } : without(entry, 'list'))} />
+    <Show when={plan().relations?.some(relation => relation.kind === 'equivalence')}>
+      <LabeledSelect label="Prefer the value from" value={current().precedence?.[0] ?? ''}
+        options={[{ value: '', label: 'Whichever has one' }, ...plan().sources.filter(source => source.role === 'primary').map(source => ({ value: source.id, label: source.label }))]}
+        onChange={sourceId => editColumn(entry => sourceId ? { ...entry, precedence: [sourceId] } : without(entry, 'precedence'))} />
+    </Show>
+  </Stack>}</Show>
 }
 
 // ── Steps ──────────────────────────────────────────────────────────────────────────────────────
@@ -321,112 +411,147 @@ function StageInspector(props: InspectorProps) {
   const plan = context.plan
   const index = () => Number(props.part.slice('stage:'.length))
   const stage = () => plan().stages[index()]
-  const editFilter = (changes: { column?: string; operator?: Comparison['operator']; value?: string }, options?: StudioChangeOptions): void => context.change(current => ({
-    ...current, stages: current.stages.map((entry, at) => {
-      if (at !== index() || entry.op !== 'filter') return entry
-      const old = comparison(entry.where)
-      const column = changes.column ?? (old?.left.address.from === 'item' ? old.left.address.pointer.slice(1) : current.columns[0]?.id ?? '')
-      const operator = changes.operator ?? old?.operator ?? 'eq'
-      const raw = changes.value ?? operand(entry.where)
-      const type = current.columns.find(item => item.id === column)?.type
-      const value = operator === 'in' ? raw.split(',').map(item => item.trim()).filter(Boolean)
-        : type === 'number' && raw.trim() && Number.isFinite(Number(raw)) ? Number(raw)
-          : type === 'boolean' && ['true', 'false'].includes(raw.toLowerCase()) ? raw.toLowerCase() === 'true' : raw
-      return { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: `/${column}` } }, operator,
-        ...(['missing', 'present'].includes(operator) ? {} : { right: { address: { from: 'literal', value } } }),
-      } }
-    }),
-  }), options)
-  const viewerPointer = (columnId: string): string | undefined => {
-    if (plan().sources.length !== 1) return undefined
-    const source = plan().sources[0]!
-    const binding = plan().columns.find(column => column.id === columnId)?.bind[source.id]
-    return binding && 'field' in binding ? context.sources.states()[source.id]?.description?.fields.find(field => field.pointer === binding.field)?.viewerMatch : undefined
-  }
-  const editFilterContext = (mode: string): void => context.change(current => ({
-    ...current, stages: current.stages.map((entry, at) => {
-      if (at !== index() || entry.op !== 'filter' || entry.where.kind !== 'comparison') return entry
-      const address = mode === 'viewer' ? { from: 'context' as const, name: 'viewer' as const, pointer: viewerPointer(filterColumn(entry.where)) ?? '/login' }
-        : mode === 'now' ? { from: 'context' as const, name: 'now' as const, offset: '-P7D' }
-          : mode === 'literal' ? { from: 'literal' as const, value: '' }
-            : { from: 'context' as const, name: 'calendar' as const, boundary: mode as 'startOfDay' | 'startOfWeek' | 'startOfMonth' }
-      return { ...entry, where: { ...entry.where, right: { address } } }
-    }),
-  }))
-  const editFilterOffset = (offset: string): void => context.change(current => ({
-    ...current, stages: current.stages.map((entry, at) => {
-      if (at !== index() || entry.op !== 'filter' || entry.where.kind !== 'comparison' || entry.where.right?.address.from !== 'context') return entry
-      const address = entry.where.right.address
-      if (address.name !== 'now' && address.name !== 'calendar') return entry
-      const { offset: _previous, ...withoutOffset } = address
-      return { ...entry, where: { ...entry.where, right: { address: offset ? { ...withoutOffset, offset } : withoutOffset } } }
-    }),
-  }))
+  // What the step reads: the plan's columns after the steps before it.
+  const columns = createMemo(() => outputPlanColumns({ ...plan(), stages: plan().stages.slice(0, index()) }))
+  const descriptions = createMemo(() => sourceDescriptions(context.sources))
+  const count = () => countsByPart(plan(), context.run()?.diagnostics.stages ?? []).stages[props.part]
+  const problems = () => problemsByPart(plan(), context.problems())[props.part] ?? []
+  const change = (next: Stage, options?: StudioChangeOptions) =>
+    context.change(current => ({ ...current, stages: current.stages.map((entry, at) => at === index() ? next : entry) }), options)
+  // Each form takes its own operation's step. The registry is typed per operation, which `Dynamic`
+  // can't follow, so the form is read here as one that takes any step.
+  const form = () => operationForms[stage()!.op] as unknown as Component<StageFormProps>
   return <Show when={stage()}>{current => <Stack gap="row">
-    <Show when={current().op === 'filter' ? current() as Extract<Stage, { op: 'filter' }> : undefined}>{filter => {
-      const columnType = () => plan().columns.find(column => column.id === filterColumn(filter().where))?.type
-      return <>
-        <LabeledSelect label="Column" value={filterColumn(filter().where)}
-          options={plan().columns.map(column => ({ value: column.id, label: column.label }))} onChange={column => editFilter({ column })} />
-        <LabeledSelect label="Comparison" value={comparison(filter().where)?.operator ?? 'eq'}
-          options={(Object.keys(OPERATOR_LABELS) as Comparison['operator'][]).map(value => ({ value, label: operatorLabel(value, columnType()) }))}
-          onChange={operator => editFilter({ operator: operator as Comparison['operator'] })} />
-        <Show when={!['missing', 'present'].includes(comparison(filter().where)?.operator ?? '')}>
-          <Show when={columnType() === 'datetime' || columnType() === 'person'}>
-            <LabeledSelect label="Compare with" value={filterValueMode(filter().where)} options={[
-              { value: 'literal', label: 'A fixed value' },
-              ...(viewerPointer(filterColumn(filter().where)) ? [{ value: 'viewer', label: 'You' }] : columnType() === 'person' ? [] : [
-                { value: 'now', label: 'Relative to now' }, { value: 'startOfDay', label: 'Start of today' },
-                { value: 'startOfWeek', label: 'Start of this week' }, { value: 'startOfMonth', label: 'Start of this month' },
-              ]),
-            ]} onChange={editFilterContext} />
-          </Show>
-          <Show when={filterValueMode(filter().where) === 'literal'}><LabeledInput label="Value" value={operand(filter().where)} onInput={value => editFilter({ value }, { coalesce: true })} /></Show>
-          <Show when={['now', 'startOfDay', 'startOfWeek', 'startOfMonth'].includes(filterValueMode(filter().where))}>
-            <LabeledSelect label="Offset" value={filterOffset(filter().where)} options={offsetOptions(filterOffset(filter().where))} onChange={editFilterOffset} />
-          </Show>
-        </Show>
-      </>
-    }}</Show>
-    <Show when={current().op !== 'filter'}><CompositionStageForm stage={current()} columns={plan().columns}
-      onChange={next => context.change(plan => ({ ...plan, stages: plan.stages.map((entry, at) => at === index() ? next : entry) }))} /></Show>
-    <Button size="sm" variant="bare" disabled={index() === 0} onPress={() => { context.change(plan => moveStageIn(plan, index(), -1)); context.select(`stage:${index() - 1}`) }}>Move up</Button>
-    <Button size="sm" variant="bare" onPress={() => context.change(plan => removeStageFrom(plan, index()))}>Remove step</Button>
+    <Dynamic component={form()} stage={current()} columns={columns()} plan={plan()} sources={descriptions()} onChange={change} />
+    <Show when={count()}>{counted => <Text emphasis="muted">{`${plural(counted().input, 'row')} in · ${plural(counted().output, 'row')} out`}</Text>}</Show>
+    <For each={problems()}>{problem => <Alert tone="warn">{problem.message}</Alert>}</For>
+    <Inline><Button size="sm" variant="bare" onPress={() => context.change(current => removeStageFrom(current, index()))}>Remove step</Button></Inline>
   </Stack>}</Show>
 }
 
 // ── Arrange, look, behaviour, settings ───────────────────────────────────────────────────────────
 
+type Sort = NonNullable<PanelPlan['sort']>[number]
+type Group = NonNullable<PanelPlan['group']>[number]
+
 function ArrangeInspector(props: InspectorProps) {
-  const { change, plan } = props.context
-  return <Stack gap="row">
-    <LabeledSelect label="Sort by" value={plan().sort?.[0]?.column ?? ''} options={[{ value: '', label: 'No sort' }, ...columnOptions(plan())]} onChange={column => change(current => ({ ...current, sort: column ? [{ column, direction: current.sort?.[0]?.direction ?? 'asc' }] : [] }))} />
-    <Show when={plan().sort?.[0]}><LabeledSelect label="Sort order" value={plan().sort?.[0]?.direction ?? 'asc'} options={labelOptions(SORT_DIRECTION_LABELS)} onChange={direction => change(current => ({ ...current, sort: current.sort?.[0] ? [{ ...current.sort[0], direction: direction as 'asc' | 'desc' }] : [] }))} /></Show>
-    <LabeledSelect label="Group by" value={plan().group?.[0]?.column ?? ''} options={[{ value: '', label: 'No grouping' }, ...columnOptions(plan())]} onChange={column => change(current => ({ ...current, group: column ? [{ column, bucket: 'value' }] : [] }))} />
-    <Show when={plan().group?.[0]}><LabeledSelect label="Group into" value={plan().group?.[0]?.bucket ?? 'value'} options={labelOptions(BUCKET_LABELS)} onChange={bucket => change(current => ({ ...current, group: current.group?.[0] ? [{ ...current.group[0], bucket: bucket as NonNullable<PanelPlan['group']>[number]['bucket'] }] : [] }))} /></Show>
-    <LabeledInput label="Show at most" value={String(plan().limit ?? '')} onInput={value => change(current => ({ ...current, limit: value ? Number(value) : undefined }), { coalesce: true })} />
+  const { change, plan, run } = props.context
+  const columns = createMemo(() => outputPlanColumns(plan()))
+  const typeOf = (id: string) => columns().find(column => column.id === id)?.type
+  const editSort = (index: number, update: (sort: Sort) => Sort) => change(current => ({ ...current, sort: current.sort?.map((entry, at) => at === index ? update(entry) : entry) }))
+  const editGroup = (index: number, update: (group: Group) => Group) => change(current => ({ ...current, group: current.group?.map((entry, at) => at === index ? update(entry) : entry) }))
+  /** The group keys a custom order lists: stored ones first, then the column's choices and the groups
+   *  the last run made at this level. A key is the raw value, so a choice shows by its label. */
+  const groupKeys = (group: Group, index: number): string[] => {
+    const groups = run()?.groups ?? []
+    const made = index === 0 ? groups : groups.flatMap(entry => entry.children ?? [])
+    return [...new Set([...group.values ?? [], ...columns().find(column => column.id === group.column)?.choices?.map(choice => choice.id) ?? [], ...made.map(entry => entry.key)])]
+  }
+  const keyLabel = (group: Group, key: string) => columns().find(column => column.id === group.column)?.choices?.find(choice => choice.id === key)?.label ?? key
+  const moveValue = (index: number, at: number, by: -1 | 1) => editGroup(index, group => ({ ...group, values: swap(groupKeys(group, index), at, by) ?? group.values }))
+  const pickGroupColumn = (index: number, column: string) => editGroup(index, group => {
+    const rest = without(without(group, 'bucket'), 'values')
+    return { ...rest, column, ...(typeOf(column) === 'datetime' && group.bucket ? { bucket: group.bucket } : {}) }
+  })
+  return <Stack gap="stack">
+    <Field label="Sort by" group><Stack gap="row">
+      <Index each={plan().sort ?? []}>{(sort, index) => <div class="dash-studio-condition">
+        <LabeledSelect label="Column" value={sort().column} options={columnOptions(columns())} onChange={column => editSort(index, entry => ({ ...entry, column }))} />
+        <LabeledSelect label="Order" value={sort().direction}
+          options={(['desc', 'asc'] as const).map(direction => { const words = sortDirectionLabel(direction, typeOf(sort().column)); return { value: direction, label: words[0]!.toUpperCase() + words.slice(1) } })}
+          onChange={direction => editSort(index, entry => ({ ...entry, direction: direction as Sort['direction'] }))} />
+        <LabeledSelect label="Empty values" value={sort().empty ?? 'last'} options={labelOptions(EMPTY_SORT_LABELS)}
+          onChange={empty => editSort(index, entry => ({ ...entry, empty: empty as NonNullable<Sort['empty']> }))} />
+        <Inline><Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, sort: current.sort?.filter((_entry, at) => at !== index) }))}>Remove</Button></Inline>
+      </div>}</Index>
+      <Inline><Button size="sm" disabled={(plan().sort?.length ?? 0) >= 8 || !columns().length}
+        onPress={() => change(current => ({ ...current, sort: [...current.sort ?? [], { column: columns()[0]!.id, direction: 'desc' }] }))}>Add sort</Button></Inline>
+    </Stack></Field>
+    <Field label="Group by" group><Stack gap="row">
+      <Index each={plan().group ?? []}>{(group, index) => <div class="dash-studio-condition">
+        <LabeledSelect label="Column" value={group().column} options={columnOptions(columns())} onChange={column => pickGroupColumn(index, column)} />
+        <Show when={typeOf(group().column) === 'datetime'}>
+          <LabeledSelect label="Group" value={group().bucket ?? 'value'} options={labelOptions(BUCKET_LABELS)}
+            onChange={bucket => editGroup(index, entry => bucket === 'value' ? without(entry, 'bucket') : { ...entry, bucket: bucket as Group['bucket'] })} />
+        </Show>
+        <LabeledSelect label="Order groups by" value={group().order ?? 'declared'} options={labelOptions(GROUP_ORDER_LABELS)}
+          onChange={order => editGroup(index, entry => order === 'explicit' ? { ...entry, order, values: groupKeys(entry, index) } : { ...without(entry, 'values'), order: order as Group['order'] })} />
+        <Show when={group().order === 'explicit'}>
+          <Stack gap="none"><Index each={group().values ?? []}>{(value, at) => <Inline gap="inline">
+            <Text>{keyLabel(group(), value())}</Text>
+            <Button size="xs" variant="bare" disabled={at === 0} onPress={() => moveValue(index, at, -1)}>Up</Button>
+            <Button size="xs" variant="bare" disabled={at === (group().values?.length ?? 0) - 1} onPress={() => moveValue(index, at, 1)}>Down</Button>
+          </Inline>}</Index></Stack>
+        </Show>
+        <Inline><Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, group: current.group?.filter((_entry, at) => at !== index) }))}>Remove</Button></Inline>
+      </div>}</Index>
+      <Inline><Button size="sm" disabled={(plan().group?.length ?? 0) >= 2 || !columns().length}
+        onPress={() => change(current => ({ ...current, group: [...current.group ?? [], { column: columns()[0]!.id }] }))}>Add grouping</Button></Inline>
+    </Stack></Field>
+    <LabeledInput label="Show at most" hint="Leave empty to show every row" type="number" min={1} max={5000} value={String(plan().limit ?? '')}
+      onInput={raw => change(current => { const limit = wholeNumber(raw); return limit ? { ...current, limit } : without(current, 'limit') }, { coalesce: true })} />
   </Stack>
 }
 
 function LookInspector(props: InspectorProps) {
-  const { change, plan } = props.context
-  const viewHas = (option: string): boolean => (PANEL_CAPABILITIES.views[plan().view.kind].options as readonly string[]).includes(option)
+  const { change, plan, region } = props.context
+  const view = () => plan().view
+  const viewHas = (option: string): boolean => (PANEL_CAPABILITIES.views[view().kind].options as readonly string[]).includes(option)
+  const columns = createMemo(() => outputPlanColumns(plan()))
+  const editView = (update: (view: PanelPlan['view']) => PanelPlan['view']) => change(current => ({ ...current, view: update(current.view) }))
+  const setOption = <K extends 'field' | 'x' | 'series' | 'trend' | 'compare' | 'good'>(key: K, value: string) =>
+    editView(current => value ? { ...current, [key]: value } : without(current, key) as PanelPlan['view'])
+  const views = () => availableViews(plan()).map(entry => {
+    const refused = region ? regionRefusal(region, entry.id, {}) : undefined
+    return { ...entry, available: entry.available && !refused, reason: entry.reason ?? refused }
+  })
+  // Options the new view also has carry over; the rest belong to the old view and go.
+  const pickView = (kind: PanelPlan['view']['kind']) => change(current => {
+    const summary = [...current.stages].reverse().find(stage => stage.op === 'summarize')
+    const options: readonly string[] = PANEL_CAPABILITIES.views[kind].options
+    const kept = Object.fromEntries(Object.entries(current.view).filter(([key]) => options.includes(key)))
+    return { ...current, view: { ...kept, kind, ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart')
+      ? { aggregate: 'sum' as const, ...(summary.measures[0] ? { field: summary.measures[0].id } : {}), ...(kind === 'chart' && summary.by[0] ? { x: summary.by[0].column } : {}) } : {}) } }
+  })
+  const numberColumns = () => columns().filter(column => column.type === 'number')
+  // The stat's number as one choice: a count of rows, or a calculation over a column.
+  const statNumber = () => view().aggregate && view().aggregate !== 'count' ? view().aggregate! : 'count'
   return <Stack gap="row">
-    <LabeledInput label="Panel title" value={plan().title} onInput={title => change(current => ({ ...current, title }), { coalesce: true })} />
-    <LabeledSelect label="View" value={plan().view.kind} options={labelOptions(VIEW_LABELS)} onChange={kind => change(current => { const summary = [...current.stages].reverse().find(stage => stage.op === 'summarize'); return { ...current, view: { ...current.view, kind: kind as PanelPlan['view']['kind'], ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart') ? { aggregate: 'sum' as const, field: summary.measures[0]?.id, ...(kind === 'chart' ? { x: summary.by[0]?.column } : {}) } : {}) } } })} />
-    <Show when={viewHas('aggregate')}><LabeledSelect label="Calculate" value={plan().view.aggregate ?? 'count'} options={labelOptions(AGGREGATE_LABELS)} onChange={aggregate => change(current => ({ ...current, view: { ...current.view, aggregate: aggregate as NonNullable<PanelPlan['view']['aggregate']> } }))} /></Show>
-    <For each={([['field', 'Value'], ['x', 'Across'], ['series', 'Split by']] as const).filter(([key]) => viewHas(key))}>{([key, label]) => <LabeledSelect label={label} value={plan().view[key] ?? ''} options={[{ value: '', label: 'None' }, ...columnOptions(plan())]} onChange={value => change(current => ({ ...current, view: { ...current.view, [key]: value || undefined } }))} />}</For>
-    <Show when={viewHas('shape')}><LabeledSelect label="Chart shape" value={plan().view.shape ?? 'bar'} options={labelOptions(CHART_SHAPE_LABELS)} onChange={shape => change(current => ({ ...current, view: { ...current.view, shape: shape as 'bar' | 'line' } }))} /></Show>
-    <Show when={viewHas('trend')}><LabeledSelect label="Trend" value={plan().view.trend ?? ''} options={[{ value: '', label: 'None' }, { value: 'history', label: 'History' }, { value: 'activity', label: 'Activity' }]} onChange={trend => change(current => ({ ...current, view: { ...current.view, trend: trend ? trend as 'history' | 'activity' : undefined } }))} /></Show>
-    <Show when={viewHas('compare')}><LabeledSelect label="Compare with" value={plan().view.compare ?? ''} options={[{ value: '', label: 'Nothing' }, { value: 'day', label: 'The day before' }, { value: 'week', label: 'The week before' }]} onChange={compare => change(current => ({ ...current, view: { ...current.view, compare: compare ? compare as 'day' | 'week' : undefined } }))} /></Show>
-    <Show when={viewHas('good')}><LabeledSelect label="Good direction" value={plan().view.good ?? ''} options={[{ value: '', label: 'Neutral' }, { value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }]} onChange={good => change(current => ({ ...current, view: { ...current.view, good: good ? good as 'up' | 'down' : undefined } }))} /></Show>
+    {/* Icons, with each view's name as its tooltip and for screen readers: five named segments don't
+        fit the inspector's 320 pixels, and the heading above names the chosen view. */}
+    <Field label="Show as" group>
+      <SegmentedControl ariaLabel="Show as" size="sm" value={view().kind} onChange={pickView}
+        options={views().map(entry => ({ value: entry.id, label: <><Icon name={VIEW_ICONS[entry.id]} /><span class="sr-only">{entry.label}</span></>,
+          disabled: !entry.available && entry.id !== view().kind, title: entry.reason ? `${entry.label}: ${entry.reason}` : entry.label }))} />
+    </Field>
+    <Show when={view().kind === 'stat'}>
+      <LabeledSelect label="Number" value={statNumber()}
+        options={[{ value: 'count', label: 'Count of rows' }, ...(['sum', 'avg', 'min', 'max'] as const).map(aggregate => ({ value: aggregate, label: `${AGGREGATE_LABELS[aggregate]} of a column` }))]}
+        onChange={aggregate => editView(current => aggregate === 'count' ? { ...without(current, 'field'), aggregate: 'count' }
+          : { ...current, aggregate: aggregate as NonNullable<PanelPlan['view']['aggregate']>, ...(current.field ? {} : numberColumns()[0] ? { field: numberColumns()[0]!.id } : {}) })} />
+      <Show when={statNumber() !== 'count'}>
+        <LabeledSelect label="Of" value={view().field ?? ''} options={[...view().field ? [] : [{ value: '', label: 'Choose a column' }], ...columnOptions(numberColumns())]} onChange={field => setOption('field', field)} />
+      </Show>
+      <LabeledSelect label="Trend" value={view().trend ?? ''} options={[{ value: '', label: 'None' }, ...labelOptions(TREND_LABELS)]} onChange={trend => setOption('trend', trend)} />
+      <LabeledSelect label="Compare with" value={view().compare ?? ''} options={[{ value: '', label: 'None' }, ...labelOptions(COMPARE_LABELS)]} onChange={compare => setOption('compare', compare)} />
+      <LabeledSelect label="Good direction" value={view().good ?? ''} options={[{ value: '', label: 'Neither' }, ...labelOptions(GOOD_DIRECTION_LABELS)]} onChange={good => setOption('good', good)} />
+    </Show>
+    <Show when={viewHas('shape')}>
+      <LabeledSelect label="Shape" value={view().shape ?? 'bar'} options={labelOptions(CHART_SHAPE_LABELS)} onChange={shape => editView(current => ({ ...current, shape: shape as 'bar' | 'line' }))} />
+      <LabeledSelect label="Across" value={view().x ?? ''} options={[...view().x ? [] : [{ value: '', label: 'Choose a column' }], ...columnOptions(columns().filter(column => column.type === 'datetime' || column.type === 'enum'))]} onChange={x => setOption('x', x)} />
+      <LabeledSelect label="Split by" value={view().series ?? ''} options={[{ value: '', label: 'Nothing' }, ...columnOptions(columns())]} onChange={series => setOption('series', series)} />
+    </Show>
+    <Show when={view().kind === 'board'}><Text emphasis="muted" wrap>Board columns come from the first grouping.</Text></Show>
   </Stack>
 }
 
 function BehaviourInspector(props: InspectorProps) {
   const { change, plan, run } = props.context
-  const editButtons = (update: (buttons: NonNullable<PanelPlan['actions']>['buttons']) => NonNullable<PanelPlan['actions']>['buttons'], options?: StudioChangeOptions): void =>
-    change(current => ({ ...current, actions: { press: current.actions?.press, buttons: update(current.actions?.buttons ?? []) } }), options)
+  const editButton = (index: number, update: (button: RowButton) => RowButton, options?: StudioChangeOptions): void =>
+    change(current => ({ ...current, actions: { ...current.actions, buttons: (current.actions?.buttons ?? []).map((entry, at) => at === index ? update(entry) : entry) } }), options)
+  const setPress = (press: NonNullable<PanelPlan['actions']>['press'] | undefined) =>
+    change(current => ({ ...current, actions: { buttons: current.actions?.buttons ?? [], ...(press ? { press } : {}) } }))
+  const links = () => plan().columns.filter(column => column.type === 'link')
   const pressPresentations = createMemo(() => {
     const selected = plan().actions?.press
     if (!selected) return []
@@ -437,56 +562,78 @@ function BehaviourInspector(props: InspectorProps) {
         : row.action?.verb === 'openUrl' ? availableContentPresentations({ href: row.action.url, taskId: row.taskId }) : [])
     return [...new Set(choices)]
   })
+  const pressChoice = () => { const press = plan().actions?.press; return !press ? '' : press.kind === 'link' ? `link:${press.column ?? ''}` : press.kind }
+  const pickPress = (choice: string) => setPress(!choice ? undefined : choice.startsWith('link:')
+    ? { kind: 'link', column: choice.slice('link:'.length), prefer: 'refPanel' }
+    : { kind: choice as 'record' | 'task', prefer: choice === 'task' ? 'pane' : 'refPanel' })
+  const sourceActions = () => (run()?.rows ?? []).flatMap(row => row.actions ?? []).filter((action, index, all) => all.findIndex(item => item.id === action.id) === index)
+  const does = (button: RowButton) => button.kind === 'action' ? `action:${button.actionId}` : button.kind
+  const pickDoes = (index: number, choice: string) => editButton(index, button => {
+    const shared = { label: button.label, ...(button.icon ? { icon: button.icon } : {}) }
+    return choice === 'open' ? { ...shared, kind: 'open', reference: { kind: 'record', prefer: 'refPanel' } }
+      : choice === 'createTask' ? { ...shared, kind: 'createTask' } : { ...shared, kind: 'action', actionId: choice.slice('action:'.length) }
+  })
+  const opens = (button: Extract<RowButton, { kind: 'open' }>) => button.reference.kind === 'link' ? `link:${button.reference.column ?? ''}` : button.reference.kind
   const full = () => (plan().actions?.buttons.length ?? 0) >= 3
   return <Stack gap="stack">
-    <Field label="When a row is pressed" group><Stack gap="row">
-      <LabeledSelect label="Open" value={plan().actions?.press?.kind ?? ''}
-        options={[{ value: '', label: 'Record default' },
-          ...(run()?.rows.some(row => !!row.action || !!row.target) ? [{ value: 'record', label: 'Source record' }] : []),
-          ...(run()?.rows.some(row => !!row.taskId) ? [{ value: 'task', label: 'Its task' }] : []),
-          ...(plan().columns.some(column => column.type === 'link') ? [{ value: 'link', label: 'Link column' }] : [])]}
-        onChange={kind => change(current => ({ ...current, actions: {
-          buttons: current.actions?.buttons ?? [],
-          ...(kind ? { press: { kind: kind as 'record' | 'task' | 'link', prefer: kind === 'task' ? 'pane' : 'refPanel',
-            ...(kind === 'link' ? { column: current.columns.find(column => column.type === 'link')?.id } : {}) } } : {}),
-        } }))} />
-      <Show when={plan().actions?.press} keyed>{press => <>
-        <Show when={press.kind === 'link'}><LabeledSelect label="Link column" value={press.column ?? ''}
-          options={plan().columns.filter(column => column.type === 'link').map(column => ({ value: column.id, label: column.label }))}
-          onChange={column => change(current => ({ ...current, actions: { buttons: current.actions?.buttons ?? [], press: { ...current.actions!.press!, column } } }))} /></Show>
-        <LabeledSelect label="Open in" value={press.prefer}
-          options={presentationOptions.filter(option => pressPresentations().includes(option.value))}
-          onChange={prefer => change(current => ({ ...current, actions: { buttons: current.actions?.buttons ?? [], press: { ...current.actions!.press!, prefer: prefer as Presentation } } }))} />
-      </>}</Show>
+    <Field label="When someone clicks a row" group><Stack gap="row">
+      <LabeledSelect label="Click" value={pressChoice()}
+        options={[{ value: '', label: "Do the source's default" },
+          ...(run()?.rows.some(row => !!row.action || !!row.target) ? [{ value: 'record', label: 'Open the record' }] : []),
+          ...(run()?.rows.some(row => !!row.taskId) ? [{ value: 'task', label: 'Open its task' }] : []),
+          ...links().map(column => ({ value: `link:${column.id}`, label: `Open a link from ${column.label}` }))]}
+        onChange={pickPress} />
+      <Show when={plan().actions?.press}>{press => <Show when={pressPresentations().length || press().prefer}>
+        <LabeledSelect label="Open in" value={press().prefer}
+          options={presentationOptions.filter(option => option.value === press().prefer || pressPresentations().includes(option.value))}
+          onChange={prefer => setPress({ ...press(), prefer: prefer as Presentation })} />
+      </Show>}</Show>
     </Stack></Field>
-    <Field label="Row buttons" group><Stack gap="row">
-      <For each={plan().actions?.buttons ?? []}>{(button, index) => <Card><Stack gap="row">
-        <LabeledInput label="Button label" value={button.label} onInput={label => editButtons(buttons => buttons.map((entry, at) => at === index() ? { ...entry, label } : entry), { coalesce: true })} />
-        <LabeledInput label="Icon (optional)" value={button.icon ?? ''} onInput={icon => editButtons(buttons => buttons.map((entry, at) => at === index() ? { ...entry, icon: icon || undefined } : entry), { coalesce: true })} />
-        <Show when={button.kind === 'open'}><>
-          <LabeledSelect label="Opens" value={button.kind === 'open' ? button.reference.kind === 'link' ? `link:${button.reference.column ?? ''}` : button.reference.kind : 'record'}
-            options={[{ value: 'record', label: 'Source record' }, { value: 'task', label: 'Its task' }, ...plan().columns.filter(column => column.type === 'link').map(column => ({ value: `link:${column.id}`, label: column.label }))]}
-            onChange={value => editButtons(buttons => buttons.map((entry, at) => at === index() && entry.kind === 'open' ? { ...entry, reference: value.startsWith('link:') ? { kind: 'link', column: value.slice(5), prefer: entry.reference.prefer } : { kind: value as 'record' | 'task', prefer: entry.reference.prefer } } : entry))} />
-          <LabeledSelect label="Open in" value={button.kind === 'open' ? button.reference.prefer : 'refPanel'} options={presentationOptions}
-            onChange={prefer => editButtons(buttons => buttons.map((entry, at) => at === index() && entry.kind === 'open' ? { ...entry, reference: { ...entry.reference, prefer: prefer as Presentation } } : entry))} />
-        </></Show>
-        <Button size="sm" variant="bare" onPress={() => editButtons(buttons => buttons.filter((_entry, at) => at !== index()))}>Remove button</Button>
-      </Stack></Card>}</For>
-      <Button size="sm" disabled={full()} onPress={() => editButtons(buttons => [...buttons, { kind: 'createTask', label: 'Start task' }])}>Add Start task button</Button>
-      <Button size="sm" disabled={full()} onPress={() => editButtons(buttons => [...buttons, { kind: 'open', label: 'Open', reference: { kind: 'record', prefer: 'refPanel' } }])}>Add Open button</Button>
-      <Show when={run()?.rows.some(row => row.action?.verb === 'openUrl')}><Button size="sm" disabled={full()} onPress={() => editButtons(buttons => [...buttons, { kind: 'open', label: 'Open in browser', reference: { kind: 'record', prefer: 'external' } }])}>Add Open in browser button</Button></Show>
-      <For each={run()?.rows.flatMap(row => row.actions ?? []).filter((action, index, all) => all.findIndex(item => item.id === action.id) === index)}>{action => <Button size="sm" disabled={full()} onPress={() => editButtons(buttons => [...buttons, { kind: 'action', label: action.label, actionId: action.id }])}>Add {action.label} button</Button>}</For>
+    <Field label="Buttons on each row" group><Stack gap="row">
+      <Index each={plan().actions?.buttons ?? []}>{(button, index) => <Card><Stack gap="row">
+        <LabeledInput label="Label" value={button().label} onInput={label => editButton(index, entry => ({ ...entry, label }), { coalesce: true })} />
+        <Field label="Icon" group><IconPicker ariaLabel="Icon" value={button().icon ?? null} fallback="mouse-pointer-click"
+          onSelect={icon => editButton(index, entry => icon ? { ...entry, icon } : without(entry, 'icon'))} /></Field>
+        <LabeledSelect label="Does" value={does(button())}
+          options={[{ value: 'open', label: 'Open' }, { value: 'createTask', label: 'Start a task' },
+            ...sourceActions().map(action => ({ value: `action:${action.id}`, label: action.label })),
+            ...(button().kind === 'action' && !sourceActions().some(action => `action:${action.id}` === does(button())) ? [{ value: does(button()), label: button().label }] : [])]}
+          onChange={choice => pickDoes(index, choice)} />
+        <Show when={button().kind === 'open' ? button() as Extract<RowButton, { kind: 'open' }> : undefined}>{open => <>
+          <LabeledSelect label="Opens" value={opens(open())}
+            options={[{ value: 'record', label: 'The record' }, { value: 'task', label: 'Its task' }, ...links().map(column => ({ value: `link:${column.id}`, label: `A link from ${column.label}` }))]}
+            onChange={value => editButton(index, entry => entry.kind !== 'open' ? entry : { ...entry, reference: value.startsWith('link:')
+              ? { kind: 'link', column: value.slice('link:'.length), prefer: entry.reference.prefer } : { kind: value as 'record' | 'task', prefer: entry.reference.prefer } })} />
+          <LabeledSelect label="Open in" value={open().reference.prefer} options={presentationOptions}
+            onChange={prefer => editButton(index, entry => entry.kind === 'open' ? { ...entry, reference: { ...entry.reference, prefer: prefer as Presentation } } : entry)} />
+        </>}</Show>
+        <Inline><Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, actions: { ...current.actions, buttons: (current.actions?.buttons ?? []).filter((_entry, at) => at !== index) } }))}>Remove button</Button></Inline>
+      </Stack></Card>}</Index>
+      <Inline><Button size="sm" disabled={full()}
+        onPress={() => change(current => ({ ...current, actions: { ...current.actions, buttons: [...current.actions?.buttons ?? [], { kind: 'open', label: 'Open', reference: { kind: 'record', prefer: 'refPanel' } }] } }))}>Add button</Button></Inline>
+      <Show when={full()}><Text emphasis="muted">A row has at most three buttons.</Text></Show>
     </Stack></Field>
   </Stack>
 }
 
+/** How often the panel reads its sources again. Automatic leaves `refresh` unset. */
+const REFRESH_OPTIONS = [
+  { value: '', label: 'Automatic' }, { value: '60', label: 'Every minute' }, { value: '300', label: 'Every 5 minutes' },
+  { value: '900', label: 'Every 15 minutes' }, { value: '3600', label: 'Every hour' }, { value: '86400', label: 'Every day' },
+]
+
 function SettingsInspector(props: InspectorProps) {
   const { change, plan } = props.context
+  const refreshOptions = () => {
+    const stored = plan().refresh === undefined ? '' : String(plan().refresh)
+    return REFRESH_OPTIONS.some(option => option.value === stored) ? REFRESH_OPTIONS : [...REFRESH_OPTIONS, { value: stored, label: `Every ${plural(Number(stored), 'second')}` }]
+  }
   return <Stack gap="row">
-    <LabeledInput label="Refresh every (seconds)" value={String(plan().refresh ?? '')} onInput={value => change(current => ({ ...current, refresh: value ? Number(value) : undefined }), { coalesce: true })} />
+    <LabeledSelect label="Refresh" value={plan().refresh === undefined ? '' : String(plan().refresh)} options={refreshOptions()}
+      onChange={value => change(current => value ? { ...current, refresh: Number(value) } : without(current, 'refresh'))} />
     <LabeledSelect label="Time zone" value={plan().time.zone} options={timezoneOptions(plan().time.zone)} onChange={zone => change(current => ({ ...current, time: { ...current.time, zone } }))} />
-    <LabeledSelect label="Show times in" value={plan().time.mode} options={labelOptions(TIME_MODE_LABELS)} onChange={mode => change(current => ({ ...current, time: { ...current.time, mode: mode as 'fixed' | 'viewer' } }))} />
-    <LabeledSelect label="Week starts on" value={plan().time.weekStart} options={labelOptions(WEEK_START_LABELS)} onChange={weekStart => change(current => ({ ...current, time: { ...current.time, weekStart: weekStart as PanelPlan['time']['weekStart'] } }))} />
+    <LabeledSelect label="Dates show in" value={plan().time.mode} options={labelOptions(TIME_MODE_LABELS)} onChange={mode => change(current => ({ ...current, time: { ...current.time, mode: mode as 'fixed' | 'viewer' } }))} />
+    <LabeledSelect label="Weeks start on" value={plan().time.weekStart} options={labelOptions(WEEK_START_LABELS)} onChange={weekStart => change(current => ({ ...current, time: { ...current.time, weekStart: weekStart as PanelPlan['time']['weekStart'] } }))} />
   </Stack>
 }
 
@@ -506,4 +653,3 @@ export const INSPECTORS: Record<PartKind, Component<InspectorProps>> = {
   behaviour: BehaviourInspector,
   settings: SettingsInspector,
 }
-

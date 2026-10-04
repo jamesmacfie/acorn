@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { dataSourceDescriptionSchema, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { dashboardPanelContentSchema, panelPlanSchema } from '@acorn/protocol/dashboards.ts'
-import { bindPanelRows, deriveDrilldownPlan, describePanelPlan, displayPlanRun, groupPlanRows, matchesPlanFilter, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type PlanRow, type PlanSource } from './plan'
+import { bindPanelRows, deriveDrilldownPlan, newColumnId, describePanelPlan, displayPlanRun, groupPlanRows, matchesPlanFilter, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type PlanRow, type PlanSource } from './plan'
 import { PANEL_CAPABILITIES } from './capabilities'
 import { aggregateRows } from './shaping'
 import { buildChart } from './chart'
@@ -321,5 +321,35 @@ describe('panel plan', () => {
     })
     const resolved = resolvePlanColumns(upgradePanelContent(legacy), [source('a', [])])
     expect(resolved.columns.map(column => column.id)).toContain('title')
+  })
+})
+
+describe('new column ids', () => {
+  it('makes a lower camel case id from the label, unique within the plan', () => {
+    const plan = base()
+    plan.columns.push({ id: 'timeToMerge', label: 'Time to merge', type: 'number', bind: {} })
+    plan.stages = [{ op: 'summarize', by: [], measures: [{ id: 'timeToMerge2', label: 'Count', kind: 'count' }] }]
+    expect(newColumnId(base(), 'Time to merge')).toBe('timeToMerge')
+    expect(newColumnId(plan, 'Time to merge!')).toBe('timeToMerge3')
+    expect(newColumnId(plan, '— ')).toBe('column')
+  })
+
+  it('keeps an id within 100 characters, suffix included', () => {
+    const long = 'word '.repeat(40)
+    const plan = base()
+    plan.columns.push({ id: newColumnId(plan, long), label: long.trim(), type: 'text', bind: {} })
+    const second = newColumnId(plan, long)
+    expect(plan.columns.at(-1)!.id).toHaveLength(100)
+    expect(second).toHaveLength(100)
+    expect(second.endsWith('2')).toBe(true)
+  })
+
+  it('keeps the id when the label changes, because later steps refer to it', () => {
+    const plan = base()
+    const id = newColumnId(plan, 'Age')
+    plan.stages = [{ op: 'compute', columns: [{ id, label: 'Age', expression: { kind: 'clock', name: 'now' } }] }]
+    const renamed = { ...plan, stages: [{ op: 'compute' as const, columns: [{ id, label: 'Age in days', expression: { kind: 'clock' as const, name: 'now' as const } }] }] }
+    expect(renamed.stages[0]!.columns[0]!.id).toBe('age')
+    expect(newColumnId(renamed, 'Age')).toBe('age2')
   })
 })

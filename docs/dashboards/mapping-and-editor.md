@@ -68,9 +68,27 @@ problem. **Add** adds a source, a column, or a step, and disables a step the pla
 the reason. A row's menu moves a step, removes a source or step, or asks the AI about the part.
 Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part).
 Every control has a visible caption, and every option reads as words from
-`packages/dashboards-core/src/labels.ts` rather than a schema value. **Look** offers only the options
-the chosen view takes. Source descriptions may offer starter plans, which the host validates and
-lists under **Start from**. **Keep history** can create a dataset from the chosen query.
+`packages/dashboards-core/src/labels.ts` rather than a schema value. Each form shows only what applies
+to its part. A column shows the settings for its type only. **Look** offers only the options the
+chosen view takes, and disables a view the plan or the region refuses, with the reason as its
+tooltip. Source descriptions may offer starter plans, which the host validates and lists under
+**Start from**. **Keep history** can create a dataset from the chosen query.
+
+Each step operation has its own form, registered in `studio/operationForms.ts`. The registry's type
+requires a form for every operation, and `operationForms.test.tsx` checks that each operation also
+has an outline title and an **Add** entry. `authoringEvaluation.test.ts` checks it has an evaluation
+case. A form receives the columns its step reads, which are the plan's columns after the steps before
+it. Conditions pick their value by the column's type: a choice from the column's choices, **You** for
+a person field whose source declares `viewerMatch`, and relative dates such as **Start of this week**
+or **30 days ago** for a date. The filter form edits one level of **Match all** or **Match any**, and
+a calculation nests two levels deep. A deeper predicate or calculation shows in words, to edit in the
+**Plan** tab or with the AI. Each step's form ends with its row counts and its problems.
+
+No form asks for an ID. A calculated column, a measure, an expanded item, or a new column gets one
+from its label when it's created (`newColumnId` in `packages/dashboards-core/src/planColumns.ts`).
+The ID is lower camel case, unique within the plan, and at most 100 characters. Renaming the label
+keeps the ID, because later steps refer to the column by it. The **Plan** tab is the only place IDs
+show.
 
 The preview is the panel's own body in a placed panel's card, at the small, medium, or large size it
 would take on the dashboard. A placed panel starts at the size nearest its placed rectangle. Clicking

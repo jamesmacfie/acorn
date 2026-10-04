@@ -752,7 +752,7 @@ describe('architecture boundaries', () => {
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
       ['packages/client-core/src/features/dashboards/studio/PanelStudio.tsx', 'preview is a dashboard run mode'],
-      ['packages/client-core/src/features/dashboards/studio/inspectors.tsx', 'context is a binding address'],
+      ['packages/client-core/src/features/dashboards/studio/stageFormParts.tsx', 'context is a binding address'],
       ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
       ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
       ['packages/dashboards-core/src/outline.ts', 'context is a binding address; database is a Lucide icon name'],

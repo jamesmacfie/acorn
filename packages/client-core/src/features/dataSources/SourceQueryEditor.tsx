@@ -10,7 +10,7 @@ import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataVa
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
 import { ApiError } from '../../infra/node/apiClient'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, Select, Stack, Text } from './kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, SegmentedControl, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -416,6 +416,15 @@ export default function SourceQueryEditor(props: {
     emitContent({ ...content()!, query: { ...query()!, scope: { ...query()!.scope, parameters } },
       sourceParameters: reach === 'workspace' ? { ...bindings, [key]: { address: { from: 'context', name: 'workspaceLinks' } } } : bindings })
   }
+  /** The panel picker draws a source's declared reach as one choice: everything, workspace links,
+   *  or chosen items, with the item picker only for the last. */
+  const isReachChoice = (described: DataSourceDescription, field: DataField): boolean =>
+    !!props.pickSourceAccount && described.reach?.parameter === field.pointer && field.choices?.kind === 'dynamic'
+  const reachMode = (field: DataField): 'account' | 'workspace' | 'chosen' => {
+    const binding = content()?.sourceParameters[field.pointer.slice(1)]
+    if (binding?.address.from === 'context' && binding.address.name === 'workspaceLinks') return 'workspace'
+    return Array.isArray(currentParameter(field)) ? 'chosen' : 'account'
+  }
   const currentParameter = (field: DataField) => query() ? readDataPointer(query()!.scope.parameters, field.pointer) : MISSING
   const parameterSchema = (field: DataField) => description.data ? schemaAtPointer(description.data.parameters, field.pointer) : undefined
   const queryFields = () => description.data?.fields.filter(field => field.query?.operators.length) ?? []
@@ -506,9 +515,10 @@ export default function SourceQueryEditor(props: {
         onApply={applyAiProposal}
       /></Show>
       <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { emitContent(previous()); setAiUndo(undefined) }}>Undo AI edit</Button>}</Show>
-      <Show when={source()?.providerId}>
-        <Field label="Connection" hint="The account scope is always explicit." group>
-          <Select size="sm" label="Connection" disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
+      {/* The combined picker already names the account, so a panel asks again only when there's a choice. */}
+      <Show when={source()?.providerId && (!props.pickSourceAccount || connections().length > 1)}>
+        <Field label={props.pickSourceAccount ? 'Account' : 'Connection'} hint={props.pickSourceAccount ? undefined : 'The account scope is always explicit.'} group>
+          <Select size="sm" label={props.pickSourceAccount ? 'Account' : 'Connection'} disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
             value={current().scope.connectionId ?? ''}
             options={[{ value: '', label: connections().length ? 'Choose an account…' : 'No connected account' }, ...connections().map((connection: Integration) => ({ value: connection.id, label: connection.name ?? connection.label }))]}
             onChange={updateConnection} />
@@ -517,8 +527,15 @@ export default function SourceQueryEditor(props: {
       <Show when={description.isPending && canDescribe()}><Text emphasis="muted">Loading source fields…</Text></Show>
       <Show when={description.isError}><Alert tone="danger">{errorMessage(description.error)}</Alert></Show>
       <Show when={description.data}>{described => <>
-        <Show when={props.pickSourceAccount}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
-        <For each={described().parameterFields}>{field => <Field label={field.label} hint={field.description} group>
+        <Show when={props.pickSourceAccount && !described().reach}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
+        <For each={described().parameterFields}>{field => <Show when={!isReachChoice(described(), field)} fallback={<Field label="Reach" group><Stack gap="row">
+          <SegmentedControl ariaLabel="Reach" size="sm" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field, mode)}
+            options={[{ value: 'account', label: 'Everything this account can see' }, { value: 'workspace', label: 'Workspace links' }, { value: 'chosen', label: `Chosen ${described().reach!.itemPlural}` }]} />
+          <Show when={reachMode(field) === 'chosen'}>
+            <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple
+              disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
+          </Show>
+        </Stack></Field>}><Field label={field.label} hint={field.description} group>
           <Show when={parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
             <Button size="sm" variant="bare" onPress={() => setListReach(field, 'account')}>Everywhere this account can see</Button>
             <Button size="sm" variant="bare" onPress={() => setListReach(field, 'workspace')}>Workspace links</Button>
@@ -530,7 +547,7 @@ export default function SourceQueryEditor(props: {
             <TypedOperand label={field.label} schema={schema()} field={field} value={currentParameter(field) === MISSING ? '' : currentParameter(field) as DataValue}
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           )}</Show>
-        </Field>}</For>
+        </Field></Show>}</For>
         <Show when={current().predicate} fallback={<Show when={!props.hideConditions}><Button size="sm" disabled={props.disabled || !queryFields().length || !!(props.value?.kind === 'saved' && !editingShared())} onPress={addFirstCondition}>Add condition</Button></Show>}>
           {predicate => <>
             <Show when={props.hideConditions}><Text emphasis="muted">These conditions run inside the source.</Text></Show>

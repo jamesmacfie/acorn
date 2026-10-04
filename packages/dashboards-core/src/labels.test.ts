@@ -2,8 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { DATA_OPERATORS } from '@acorn/protocol/dataBindings.ts'
 import {
-  AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, DURATION_UNIT_LABELS, EXPRESSION_LABELS,
-  MEASURE_LABELS, OPERATOR_LABELS, PRESENTATION_LABELS, RELATIVE_OFFSET_LABELS, SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, VIEW_LABELS, WEEK_START_LABELS,
+  AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, DURATION_UNIT_LABELS, EMPTY_SORT_LABELS, EXPRESSION_LABELS,
+  GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS, MEASURE_LABELS, OPERATOR_LABELS, PRECISION_LABELS, PRESENTATION_LABELS, PREVIOUS_CHANGE_LABELS, RELATIVE_OFFSET_LABELS,
+  SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNMATCHED_LABELS, VIEW_LABELS, WEEK_START_LABELS,
   calendarLabel, offsetLabel, operatorLabel, planPartLabel,
 } from './labels'
 
@@ -47,6 +48,14 @@ describe('panel labels', () => {
     ['aggregate', values(field(view, 'aggregate')), AGGREGATE_LABELS],
     ['chart shape', values(field(view, 'shape')), CHART_SHAPE_LABELS],
     ['presentation', values(field(field(field(plan, 'actions'), 'press'), 'prefer')), PRESENTATION_LABELS],
+    ['trend', values(field(view, 'trend')), TREND_LABELS],
+    ['compare', values(field(view, 'compare')), COMPARE_LABELS],
+    ['good direction', values(field(view, 'good')), GOOD_DIRECTION_LABELS],
+    ['group order', values(field(element(field(plan, 'group')), 'order')), GROUP_ORDER_LABELS],
+    ['empty sort', values(field(element(field(plan, 'sort')), 'empty')), EMPTY_SORT_LABELS],
+    ['precision', values(field(column, 'precision')), PRECISION_LABELS],
+    ['unmatched choice', values(field(column, 'unmatched')), UNMATCHED_LABELS],
+    ['previous change', values(field(element(field(summarize, 'measures')), 'previous')), PREVIOUS_CHANGE_LABELS],
   ])('labels every %s', (_name, schemaValues, labels) => {
     expect(schemaValues.length).toBeGreaterThan(0)
     expect(Object.keys(labels).sort()).toEqual([...schemaValues].sort())

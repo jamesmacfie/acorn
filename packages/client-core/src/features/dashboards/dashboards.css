@@ -75,6 +75,23 @@
   overflow-y: auto;
 }
 .dash-studio-source[hidden] { display: none; }
+/* One condition, sort key, grouping, or choice in an inspector: its fields stacked, and set apart from
+   the next one by a rule. */
+.dash-studio-condition, .dash-studio-choice {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  padding-bottom: var(--space-3);
+  border-bottom: var(--chrome-divider);
+}
+/* A calculation inside a calculation, drawn one step in. */
+.dash-studio-nested {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  padding-left: var(--space-3);
+  border-left: var(--chrome-divider);
+}
 
 @media (max-width: 1100px) {
   .dash-studio-detail { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }

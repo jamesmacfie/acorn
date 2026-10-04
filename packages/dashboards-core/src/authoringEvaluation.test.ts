@@ -4,6 +4,7 @@ import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { bindPanelRows, describePanelPlan, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
+import { PANEL_CAPABILITIES } from './capabilities'
 
 // Scripted cases exercise the actual model-response loop and plan validator. These are fixture
 // expectations; acceptance labels from people are collected separately.
@@ -176,5 +177,40 @@ describe('scripted dashboard authoring evaluation', () => {
     const rows = bindPanelRows(authored, [source])
     expect(rows).toHaveLength(1)
     expect(testCase.fields.map(field => rows[0]!.values[field.id])).toEqual(testCase.expected)
+  })
+})
+
+// One scripted proposal per operation, so a new operation can't ship without an evaluation case. The
+// extra columns hold constant values, which gives the list and second date the fixture source lacks.
+type Stage = PanelPlan['stages'][number]
+const OPERATION_CASES: { [Op in Stage['op']]: { stage: Extract<Stage, { op: Op }>; columns?: PanelPlan['columns'] } } = {
+  filter: { stage: { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/state' } }, operator: 'eq', right: { address: { from: 'literal', value: 'open' } } } } },
+  compute: { stage: { op: 'compute', columns: [{ id: 'age', label: 'Age', expression: { kind: 'duration', start: { kind: 'column', column: 'updated' }, end: { kind: 'clock', name: 'now' }, unit: 'days' } }] } },
+  summarize: { stage: { op: 'summarize', by: [{ column: 'state' }], measures: [{ id: 'count', label: 'Count', kind: 'count' }] } },
+  expand: { stage: { op: 'expand', column: 'tags', output: 'tag', perRow: 100 }, columns: [{ id: 'tags', label: 'Tags', type: 'text', list: true, bind: { work: { value: ['a', 'b'] } } }] },
+  overlap: { stage: { op: 'overlap', start: 'updated', end: 'due', maxPairs: 5000 }, columns: [{ id: 'due', label: 'Due', type: 'datetime', bind: { work: { value: '2026-10-09' } } }] },
+}
+
+describe('an evaluation case for every operation', () => {
+  it.each(PANEL_CAPABILITIES.operations.map(operation => operation.id))('accepts a proposal that uses %s', async op => {
+    const testCase = OPERATION_CASES[op]
+    expect(testCase).toBeDefined()
+    const base = plan()
+    const candidate = panelPlanSchema.parse({ ...base, columns: [...base.columns, ...testCase.columns ?? []], stages: [testCase.stage] })
+    const request: AuthoringTurnRequest = { target: 'dashboard', scope: { workspaceId: 'w' }, targetId: op, baseRevision: 0, base,
+      backendId: 'scripted:fixture', instruction: `Use ${op}`, context: [], samplesEnabled: false }
+    const result = await runAuthoringTurn({ request, system: 'Only described capabilities.', facts: {},
+      generate: async () => ({ text: JSON.stringify({ kind: 'proposal', candidate, summary: 'Fixture proposal.' }), providerId: 'scripted', modelId: 'fixture' }),
+      metadata: async () => ({ sources: ['pulls'] }),
+      validate: async value => {
+        const parsed = panelPlanSchema.safeParse(value)
+        if (!parsed.success) return { problems: ['Invalid plan schema.'] }
+        return { candidate: parsed.data, problems: validatePanelPlan(parsed.data, fixture(parsed.data)).filter(item => item.severity === 'error').map(item => item.message) }
+      },
+    })
+    expect(result.state).toBe('proposal')
+    if (result.state !== 'proposal') return
+    expect(result.problems).toEqual([])
+    expect(panelPlanSchema.parse(result.candidate).stages.map(stage => stage.op)).toEqual([op])
   })
 })

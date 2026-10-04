@@ -40,7 +40,7 @@ export type DashboardRun = {
 
 const pathPart = (value: string): string => value.replaceAll('~', '~0').replaceAll('/', '~1')
 const columnAt = (plan: PanelPlan, id: string): PanelPlanColumn | undefined => plan.columns.find(column => column.id === id)
-export { outputPlanColumns } from './planColumns'
+export { newColumnId, outputPlanColumns } from './planColumns'
 const bindingColumns = (binding: DataBinding): string[] => binding.address.from === 'item'
   ? [pointerColumn(binding.address.pointer) ?? ''] : []
 const fixesUnit = (predicate: DataPredicate, unit: string): boolean => predicate.kind === 'comparison'

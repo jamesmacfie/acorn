@@ -12,6 +12,8 @@ completion on the node context. [Contribution kinds](./contribution-kinds.md) sa
 loaded plugin can use.
 Dashboard-capable sources can return `starterPlans` from `describe`. Each card must be a valid
 version 2 panel plan for the chosen source and account; the host validates it before display.
+The panel editor lists valid plans under **Start from** in the source's inspector, and picking one
+replaces the panel's plan.
 Static field choices can set `tone` (`ok`, `warn`, `bad`, `muted`, or `accent`) and numeric `rank`.
 Those hints flow to panel enum columns unless the author overrides them.
 For each source, state its default and selectable reach, the scope in its record identity, whether
@@ -19,6 +21,9 @@ it can return an account identity, field `viewerMatch` pointers or native viewer
 date-only precision, snapshot or event coverage, freshness, and honest upstream caps. A source with
 partial history must give the dashboard enough information to distinguish an empty covered window
 from an empty uncovered one. See [Typed data sources](./data-sources.md#identity-reach-time-and-coverage).
+In the panel editor, a field with `viewerMatch` offers **You** as a filter value on a one-source
+panel, and a declared `reach` shows as one **Reach** choice: everything the account can see,
+workspace links, or chosen items.
 
 ## Start here
 
