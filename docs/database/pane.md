@@ -50,6 +50,27 @@ Once the reader starts SQL generation, the modal stays open until the request se
 while the model is working would let the response replace the host-owned editor after the reader had
 returned to it. A failed request leaves the prompt and error visible for another attempt.
 
+## Returning to the pane
+
+The database workspace is saved through the host plugin-state bridge, keyed by Node and task. Returning
+renders the table list, filter, result rows, table selection, selected record, unsaved record edits,
+and saved-query selection before the connection check finishes. Saved queries start from their cached
+list and refresh in the background. Model backends refresh from the Node. The host restores the SQL scratch document.
+
+Results stay as the last explicit read. Returning does not fetch table rows, write SQL into the editor,
+or execute a query. Choose a table or press **Run** to read fresh rows. Connection failures keep the
+cached content visible. Record writes stay disabled until the connection succeeds. A connection to a
+different database clears the previous results and record edits.
+
+The worker also holds the eight most recently visited Node/task workspaces for immediate restoration.
+Worker retirement falls back to the host snapshot. Results above the bridge's single-value limit are
+split into versioned chunks without truncating cells. A partial or incompatible snapshot is ignored.
+The restoration limit is 32 MiB of serialized workspace text. SQL scratch and saved queries keep their
+own durable storage.
+
+The selected record fills the result area with a scrolling, padded form. Closing it returns to the
+result grid. Field spacing and the form width use the shared kit's layout tokens.
+
 ## Scratch limits and recovery
 
 Scratch writes, completion requests, and generated SQL use the shared 2 MiB UTF-8 document limit.
