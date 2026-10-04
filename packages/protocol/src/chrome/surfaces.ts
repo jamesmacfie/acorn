@@ -48,7 +48,7 @@ export type TopbarData = {
   nodes: readonly { id: string; label: string; state: string }[]
   account: { label: string; avatar?: string } | null
   railCollapsed: boolean
-  /** Whether this host has a folder picker, which `addProject` needs. */
+  /** Whether the active Node is local and this host has a folder picker. */
   canAddProject: boolean
   slots: { right: SlotRef }
 }
