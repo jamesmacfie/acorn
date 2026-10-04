@@ -60,6 +60,11 @@ describe('memory page reads current scope files', () => {
     expect(await runtime.route.memorySearch('unique-BODY-term alpha', 'project-a')).toMatchObject([{ scope: 'project', name: 'shared-name' }])
     expect(await runtime.route.memorySearch('unique-body-term', undefined)).toMatchObject([{ scope: 'private' }])
     expect(await runtime.route.memorySearch('unique-body-term', 'project-a', 'architecture')).toMatchObject([{ scope: 'project', type: 'project' }])
+    expect(await runtime.route.memoryList('project-a', 'project')).toMatchObject([{ scope: 'project', projectId: 'project-a' }])
+    // Private name matches outrank the project's body match unless filtering precedes the result cap.
+    for (let i = 0; i < 11; i++) await writeFile(join(root, `unique-body-term-${i}.md`), file(`unique-body-term-${i}`, 'A private rule'))
+    expect(await runtime.route.memorySearch('unique-body-term', 'project-a', undefined, 'project')).toMatchObject([{ scope: 'project', name: 'shared-name' }])
+    for (let i = 0; i < 11; i++) await unlink(join(root, `unique-body-term-${i}.md`))
     await writeFile(projectPath, file('shared-name', 'Changed externally'))
     expect(await runtime.route.memorySearch('alpha', 'project-a')).toEqual([])
     expect(await runtime.route.memorySearch('changed externally', 'project-a')).toMatchObject([{ body: 'Changed externally' }])

@@ -1,14 +1,16 @@
-import { createSignal, For, Match, Show, Switch } from 'solid-js'
+import { createSignal, onCleanup, For, Match, Show, Switch } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { Alert, Button, CodeBlock, ConfirmButton, EmptyState, Facts, Field, Fold, Heading, IconButton, Inline, Input, Markdown, Only, Select, Stack, Text, Textarea, Toolbar } from '@acorn/plugin-api/ui'
 import { createMemoryResource } from './memoryResource'
-import { memoryApi, memoryAuthorLabel, memoryDate, memoryTypeLabel, MEMORY_SCOPE_LABEL, MEMORY_SCOPE_OPTIONS, MEMORY_TYPE_OPTIONS } from './memoryClient'
+import { memoryApi, memoryAuthorLabel, memoryDate, memoryTypeLabel, MEMORY_SCOPE_LABEL, MEMORY_TYPE_OPTIONS } from './memoryClient'
 import { memoriesChanged, memoryRevision, selectMemory } from './memorySelection'
 import type { MemoryAddress } from '../shared/api'
 import MemoryTerminal from './MemoryTerminal'
 
 // Mounted per memory (MemoryCenter.tsx keys it on the address), so a draft never outlives its memory.
-export default function MemoryDetail(props: { address: MemoryAddress; projectId?: string }) {
+export default function MemoryDetail(props: { address: MemoryAddress; projectId: string }) {
+  let active = true
+  onCleanup(() => { active = false })
   const navigate = useNavigate()
   const { value: document, error: documentError, loaded } = createMemoryResource(memoryRevision, () => memoryApi().get(props.address, props.projectId), null)
   const { value: history, error: historyError, loaded: historyLoaded } = createMemoryResource(memoryRevision, () => memoryApi().history(props.address, props.projectId), [])
@@ -17,7 +19,6 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId?
   const [name, setName] = createSignal('')
   const [description, setDescription] = createSignal('')
   const [type, setType] = createSignal('project')
-  const [scope, setScope] = createSignal<'project' | 'private'>('project')
   const [body, setBody] = createSignal('')
   const [hash, setHash] = createSignal('')
   const [error, setError] = createSignal('')
@@ -26,18 +27,18 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId?
   function begin() {
     const current = document()
     if (!current) return
-    setName(current.name); setDescription(current.description); setType(current.type); setScope(current.scope)
+    setName(current.name); setDescription(current.description); setType(current.type)
     setBody(current.body); setHash(current.hash); setError(''); setEditing(true)
   }
   async function run(operation: () => Promise<unknown>, next?: MemoryAddress) {
     setBusy(true); setError('')
-    try { await operation(); setEditing(false); if (next) selectMemory(next) }
+    try { await operation(); setEditing(false); if (active && next) selectMemory(next) }
     catch (e) { setError(e instanceof Error ? e.message : "Couldn't change this memory.") }
     finally { setBusy(false); memoriesChanged() }
   }
   const save = () => run(
-    () => memoryApi().edit(props.address, { name: name(), description: description(), type: type(), body: body(), hash: hash() }, scope(), props.projectId),
-    { name: name(), scope: scope(), projectId: scope() === 'project' ? props.projectId! : null },
+    () => memoryApi().edit(props.address, { name: name(), description: description(), type: type(), body: body(), hash: hash() }, 'project', props.projectId),
+    { name: name(), scope: 'project', projectId: props.projectId },
   )
   const sessionPath = () => {
     const current = document()
@@ -64,10 +65,7 @@ export default function MemoryDetail(props: { address: MemoryAddress; projectId?
           <Stack gap="stack">
             <Field label="Name"><Input value={name()} onInput={setName} /></Field>
             <Field label="Description"><Input value={description()} onInput={setDescription} /></Field>
-            <Inline even>
-              <Field label="Type"><Select value={type()} onChange={setType} options={MEMORY_TYPE_OPTIONS} /></Field>
-              <Field label="Scope"><Select value={scope()} onChange={(scope) => setScope(scope as 'project' | 'private')} options={MEMORY_SCOPE_OPTIONS.filter((option) => option.value === 'private' || props.projectId)} /></Field>
-            </Inline>
+            <Field label="Type"><Select value={type()} onChange={setType} options={MEMORY_TYPE_OPTIONS} /></Field>
             <Only hosts={['dom']}><Field label="Body"><Textarea mono rows={12} value={body()} onInput={setBody} /></Field></Only>
             <Only hosts={['tui']}><CodeBlock wrap maxHeight="block">{body()}</CodeBlock><Button onPress={() => setTerminal(true)}>Edit body in $EDITOR</Button></Only>
             <Show when={terminal()}><MemoryTerminal body={body()} onExit={(body) => { setTerminal(false); if (body !== undefined) setBody(body); else setError("The editor closed without a body, so the draft didn't change.") }} /></Show>

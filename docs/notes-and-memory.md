@@ -151,7 +151,8 @@ same `name-2` collision rule the pane's own button gets. Both rows are task-scop
 note is a pane intent addressed at a task even when the note is a global one.
 
 Memory contributes **Search memory** (`plugins/memory/src/client/commands.ts`). The Node scans the
-private folder and the captured task's project folder. Search matches every query term literally,
+captured task's project folder for the project-scoped palette command. Agent searches can also include
+private memory. Search matches every query term literally,
 ignoring case, across names, descriptions, and bodies. Name matches rank above description matches,
 then body matches; update time breaks ties. Results are capped at 10. Selecting a row opens its scope
 and filename on the Memory page. Listing and searching reflect external edits on the next read.

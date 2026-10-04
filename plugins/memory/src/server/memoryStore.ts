@@ -195,8 +195,8 @@ export class MemoryStore {
     })
   }
 
-  async feed(projectId: string | null) {
-    const changes = (await this.changes()).filter((change) => change.scope === 'private' || change.projectId === projectId)
+  async feed(projectId: string | null, scope?: MemoryScope) {
+    const changes = (await this.changes()).filter((change) => (change.scope === 'private' || change.projectId === projectId) && (!scope || change.scope === scope))
     const latest = new Map<string, string>()
     for (const change of changes) latest.set(`${change.scope}:${change.projectId}:${change.name}`, change.id)
     return Promise.all(changes.slice(-50).reverse().map(async (change) => ({ ...change,
