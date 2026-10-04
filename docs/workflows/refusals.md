@@ -61,4 +61,4 @@ reopening a settled decision, each with what would reopen it.
 - **Implicit triggers from a draft.** Only a published workflow can be scheduled, through an explicit
   approval that freezes its graph and limits.
 - **A generic provider write-back contract.** Writes go through workflow actions. Dashboard write-back
-  is a separate proposal in [docs/future/dashboards/07-write-back.md](../future/dashboards/07-write-back.md).
+  shipped in the dashboards programme. See [dashboards](../dashboards.md#published-panels).

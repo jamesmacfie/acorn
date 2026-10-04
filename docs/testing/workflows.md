@@ -151,7 +151,7 @@ bindings rather than the prose.
 ## Dashboard checks
 
 The dashboards programme keeps its own once-only check of the surfaces that shipped before workflow
-v2 in [workstream 1](../future/dashboards/01-trustworthy-results.md#verify-what-shipped), because its items
+v2 in workstream 1 (`docs/future/dashboards/01-trustworthy-results.md`, removed October 5, 2026; see git history), because its items
 gate that programme's work rather than a release.
 
 Result, 2026-10-03, in `pnpm dev:agent` on macOS with 18 seeded tasks (six each active, archived, and
@@ -206,4 +206,4 @@ Dashboard authoring evaluation has scripted cases in
 `ACORN_EVAL_MODEL_ID`. The report records outcomes per model without provider rows. The scripted
 cases are implementation fixtures, not acceptance labels collected from people. Product acceptance
 also requires at least 20 previously unseen requests collected from people and reviewed against
-[dashboard acceptance](../future/dashboards/design.md#acceptance). Record failures as evaluation cases.
+dashboard acceptance (`docs/future/dashboards/design.md`, removed October 5, 2026; see git history). Record failures as evaluation cases.
