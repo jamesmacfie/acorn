@@ -36,6 +36,10 @@ Some panes appear only when the task has something to show:
   and no `DATABASE_URL` in its worktree `.env` or the Node's environment gets no button
   ([database](./database.md) § Connection resolution).
 
+On desktop, right-click the Preview rail button and select **Copy URL** to copy the task's resolved
+preview start URL. This works while the pane is closed. The action reports a failure if the URL is
+unavailable or the clipboard write fails.
+
 Compiled provider panes appear when their provider is connected and the task has relevant data. The
 four loaded panes, `database`, `http`, `linear`, and `rollbar`, come from manifests and appear
 whenever the plugin runs on the Node the window is talking to. All four draw **trees**: their code

@@ -15,7 +15,7 @@ it('retires hidden previews on Node switches and owner removal, and one preview 
   const { previewClientPlugin } = await import('./index')
   const register = vi.fn()
   previewClientPlugin.init({
-    capabilities: { provide: vi.fn() }, panes: { register }, schedules: { register }, commands: { register },
+    capabilities: { provide: vi.fn() }, panes: { register }, contextMenus: { register }, schedules: { register }, commands: { register },
   } as unknown as Parameters<typeof previewClientPlugin.init>[0])
   const listener = (event: string) => host.on.mock.calls.find(([kind]) => kind === event)![1]
   listener('runtime:node-switched')({ from: 'local', to: 'remote' })
