@@ -86,6 +86,11 @@ checks the declaration and reads the target through the same data-source runtime
 authority. Lookup and children relations attach data to primary rows; an equivalence states that
 two primary records are the same item. It is the only relation that merges rows. No relation guesses
 from labels or names, and a cardinality violation does not duplicate a row.
+For example, core local branches declare a many-to-one lookup into GitHub pull requests using the
+selected GitHub connection, tracked remote repository (or origin without upstream), and exact head
+branch. The pull source exposes the head repository separately from its base repository. Local
+branches without a matching PR remain,
+and multiple matching PRs produce a warning with no arbitrary attachment.
 
 ## Operations and transport
 

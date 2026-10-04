@@ -1,7 +1,7 @@
 import { compareDataValues, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { DataSourceQuery, DataSourcePage } from '@acorn/protocol/dataSources.ts'
 import { readDataPointer } from '@acorn/protocol/dataValues.ts'
-import { pullSourceDescription } from '../../shared/pullSource'
+import { pullSourceDescription } from '../../shared/pullSourceDescription'
 
 export const repositoryName = (value: unknown): string => {
   if (typeof value !== 'string' || !/^[\w.-]+\/[\w.-]+$/.test(value) || value.length > 200) throw new Error('invalid_repository')

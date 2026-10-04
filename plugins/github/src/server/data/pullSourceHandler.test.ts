@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { PluginRequestContext } from '@acorn/plugin-api/node'
 import { dataSourceDescriptionSchema, dataSourcePageSchema, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import { readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { createPullSourceHandler } from './pullSourceHandler'
 import { gh, ghGraphQL } from '../githubApi'
@@ -8,6 +9,7 @@ import { gh, ghGraphQL } from '../githubApi'
 vi.mock('../githubApi', async original => ({ ...await original<typeof import('../githubApi')>(), ghGraphQL: vi.fn(), gh: vi.fn() }))
 const node = (id: string, overrides = {}) => ({ id, number: 1, title: 'A change', url: 'https://github.com/org/repo/pull/1',
   state: 'OPEN', isDraft: false, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' },
+  headRepository: { nameWithOwner: 'Alice/Fork' }, headRefName: 'feature',
   createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z', closedAt: null, mergedAt: null,
   mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null,
   reviewDecision: 'REVIEW_REQUIRED',
@@ -69,7 +71,37 @@ describe('GitHub typed pull source', () => {
     expect(description.operations).toMatchObject({ details: true, incremental: false })
     expect(description.writable).toEqual([{ field: '/state', path: '/v1/p/github/data/pulls/write', risk: 'write', values: ['open', 'closed'] }])
     expect(description.fields.find(field => field.pointer === '/state')?.choices).toMatchObject({ kind: 'static' })
+    expect(['/githubProvider', '/githubConnectionId', '/headRepository', '/headBranch'].every(pointer =>
+      description.fields.some(field => field.pointer === pointer))).toBe(true)
     expect(ghGraphQL).not.toHaveBeenCalled()
+  })
+
+  it('uses the head repository and selected account for branch lookup, including forks and deleted heads', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([
+      node('fork', { headRepository: { nameWithOwner: 'Alice/Fork' }, headRefName: 'feature' }),
+      node('base', { headRepository: { nameWithOwner: 'ORG/Repo' }, headRefName: 'feature' }),
+      node('deleted', { headRepository: null, headRefName: 'feature' }),
+    ]))
+    const input = query(); input.pageSize = 25
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), input)).json())
+    expect(page.records.map(record => ({ id: record.recordId, provider: readDataPointer(record.data, '/githubProvider'),
+      account: readDataPointer(record.data, '/githubConnectionId'), repository: readDataPointer(record.data, '/headRepository'),
+      branch: readDataPointer(record.data, '/headBranch') }))).toEqual([
+      { id: 'base', provider: 'github', account: 'selected', repository: 'org/repo', branch: 'feature' },
+      { id: 'deleted', provider: 'github', account: 'selected', repository: null, branch: 'feature' },
+      { id: 'fork', provider: 'github', account: 'selected', repository: 'alice/fork', branch: 'feature' },
+    ])
+  })
+
+  it('does not count a label-only update as pull-request activity', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('label-edit', {
+      updatedAt: '2026-10-01T00:00:00Z',
+    })]))
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
+    expect(page.records[0]?.data).toMatchObject({
+      updatedAt: Date.parse('2026-10-01T00:00:00Z'),
+      lastActivityAt: Date.parse('2026-09-02T00:00:00Z'),
+    })
   })
 
   it('selects open drafts and failing checks by arbitrary author, excluding closed and merged PRs', async () => {
@@ -85,7 +117,9 @@ describe('GitHub typed pull source', () => {
     expect(page.records).toHaveLength(1)
     expect(page.records[0]).toMatchObject({ recordId: 'open', data: { state: 'open', draft: true, mergeStateStatus: 'UNSTABLE', author: 'alice' }, action: { verb: 'openUrl' } })
     expect(page.records[0]?.writableFields).toEqual(['/state'])
-    expect(page.records[0]?.data).toMatchObject({ checkStatuses: ['FAILURE'], reviewRequests: [{ kind: 'team', name: 'reviewers', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
+    expect(page.records[0]?.data).toMatchObject({ githubProvider: 'github', githubConnectionId: 'selected',
+      headRepository: 'alice/fork', headBranch: 'feature', checkStatuses: ['FAILURE'],
+      reviewRequests: [{ kind: 'team', name: 'reviewers', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
     expect(vi.mocked(ghGraphQL).mock.calls[0]?.[2]).toMatchObject({ q: 'is:pr repo:org/repo is:open author:alice' })
   })
 

@@ -27,6 +27,7 @@ it('executes the GitHub source with exact connection provenance and a stable bou
       return Response.json({ data: { search: { issueCount: 3, pageInfo: { hasNextPage: false, endCursor: null },
         nodes: ['z', 'b', 'a'].map(id => ({ id, number: 1, title: 'Change', url: 'https://github.com/org/repo/pull/1',
           state: 'OPEN', isDraft: true, author: { login: 'alice' }, repository: { nameWithOwner: 'org/repo' },
+          headRepository: { nameWithOwner: 'org/repo' }, headRefName: 'feature',
           createdAt: '2026-09-01T00:00:00Z', updatedAt: '2026-09-02T00:00:00Z', closedAt: null, mergedAt: null,
           mergeable: 'UNKNOWN', mergeStateStatus: 'UNSTABLE', autoMergeRequest: null,
           reviewDecision: 'REVIEW_REQUIRED', latestCommit: { nodes: [] }, latestComment: { nodes: [] }, latestReview: { nodes: [] },
@@ -42,6 +43,8 @@ it('executes the GitHub source with exact connection provenance and a stable bou
         sort: [{ pointer: '/updatedAt', direction: 'desc' }], take: 2 },
     }, { principal: { kind: 'internal', scope: 'service', userId: 'owner' }, signal: new AbortController().signal })
     expect(result.completeness).toEqual({ kind: 'bounded' })
+    expect(result.records[0]?.data).toMatchObject({ githubProvider: 'github', githubConnectionId: 'selected',
+      headRepository: 'org/repo', headBranch: 'feature' })
     expect(result.records.map(record => record.ref)).toEqual(['a', 'b'].map(recordId => ({ pluginId: 'github', sourceId: 'pull-requests', connectionId: 'selected', recordId, scope: { connectionId: 'selected', parameters: { repositories: ['org/repo'] } } })))
     expect(fetch).toHaveBeenCalledTimes(1)
     const previewRequest = {

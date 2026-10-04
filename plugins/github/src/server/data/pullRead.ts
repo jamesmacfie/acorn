@@ -1,7 +1,7 @@
 import { z } from 'zod'
 import type { DataSourcePage } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, parseDataValue } from '@acorn/protocol/dataValues.ts'
-import { pullSourceDescription } from '../../shared/pullSource'
+import { pullSourceDescription } from '../../shared/pullSourceDescription'
 import { ghGraphQL, ghGraphQLResult } from '../githubApi'
 
 const pageInfo = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
@@ -10,6 +10,7 @@ const pull = z.object({
   id: z.string().min(1), number: z.number().int().positive(), title: z.string(), url: z.string().url(),
   state: z.enum(['OPEN', 'CLOSED', 'MERGED']), isDraft: z.boolean(),
   author: z.object({ login: z.string() }).nullable(), repository: z.object({ nameWithOwner: z.string() }),
+  headRepository: z.object({ nameWithOwner: z.string() }).nullable(), headRefName: z.string().nullable(),
   createdAt: timestamp, updatedAt: timestamp, closedAt: timestamp.nullable(), mergedAt: timestamp.nullable(),
   mergeable: z.string(), mergeStateStatus: z.string(), autoMergeRequest: z.object({ mergeMethod: z.string() }).nullable(),
   reviewDecision: z.string().nullable(),
@@ -40,7 +41,7 @@ const SEARCH = `query AcornPullSource($q: String!, $after: String) {
     issueCount pageInfo { hasNextPage endCursor }
     nodes { ... on PullRequest {
       id number title url state isDraft createdAt updatedAt closedAt mergedAt
-      author { login } repository { nameWithOwner }
+      author { login } repository { nameWithOwner } headRepository { nameWithOwner } headRefName
       mergeable mergeStateStatus autoMergeRequest { mergeMethod }
       reviewDecision
       labels(first: 100) { pageInfo { hasNextPage endCursor } nodes { name } }
@@ -68,7 +69,7 @@ export async function githubData<T>(token: string, query: string, variables: Rec
   return schema.parse(result.data)
 }
 
-export async function readPullSelection(token: string, q: string, signal: AbortSignal): Promise<DataSourcePage> {
+export async function readPullSelection(token: string, q: string, connectionId: string, signal: AbortSignal): Promise<DataSourcePage> {
   const records: DataSourcePage['records'] = []
   const seen = new Set<string>()
   const cursors = new Set<string>()
@@ -87,9 +88,9 @@ export async function readPullSelection(token: string, q: string, signal: AbortS
         || node.reviewRequestEvents.pageInfo.hasPreviousPage || statusCheckRollup?.contexts.pageInfo.hasNextPage) {
         return result({ kind: 'incomplete', cause: 'upstream-cap' })
       }
-      const { author, repository, isDraft, state, autoMergeRequest, labels, reviewRequests,
+      const { author, repository, headRepository, headRefName, isDraft, state, autoMergeRequest, labels, reviewRequests,
         latestCommit, latestComment, latestReview, reviewRequestEvents, ...fields } = node
-      const activity = [node.updatedAt, ...latestCommit.nodes.map(item => item.commit.committedDate),
+      const activity = [node.createdAt, ...latestCommit.nodes.map(item => item.commit.committedDate),
         ...latestComment.nodes.map(item => item.createdAt), ...latestReview.nodes.flatMap(item => item.submittedAt === null ? [] : [item.submittedAt])]
       const requestTimes = new Map<string, number>()
       for (const event of reviewRequestEvents.nodes) {
@@ -99,6 +100,8 @@ export async function readPullSelection(token: string, q: string, signal: AbortS
       const checkStatuses = statusCheckRollup?.contexts.nodes.map(context => context.__typename === 'StatusContext'
         ? context.state : context.status !== 'COMPLETED' ? 'PENDING' : context.conclusion ?? 'UNKNOWN') ?? []
       const data = { ...fields, author: author?.login ?? null, repository: repository.nameWithOwner,
+        githubProvider: 'github', githubConnectionId: connectionId,
+        headRepository: headRepository?.nameWithOwner.toLowerCase() ?? null, headBranch: headRefName,
         draft: isDraft, state: state.toLowerCase(), autoMergeEnabled: autoMergeRequest !== null,
         checks: statusCheckRollup?.state ?? 'EXPECTED',
         checkStatuses,

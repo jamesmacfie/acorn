@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { dataSourceRequestSchema, type DataSourcePage } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
-import { pullSourceDescription } from '../../shared/pullSource'
+import { pullSourceDescription } from '../../shared/pullSourceDescription'
 import { pullSearch, selectPulls } from './pullQuery'
 import { readPullSelection, readRepositoryOptions, readViewerIdentity } from './pullRead'
 import { pullStateDetails, writePullState } from './pullWrite'
@@ -63,7 +63,7 @@ export function createPullSourceHandler(): PluginFetchHandler {
           if (connection.id !== scope.connectionId) return undefined
           if (input.operation === 'options') return { options: await readRepositoryOptions(token, input, request.signal) }
           const q = pullSearch(input.query)
-          const page = await readPullSelection(token, q, request.signal)
+          const page = await readPullSelection(token, q, scope.connectionId!, request.signal)
           if (page.completeness.kind === 'incomplete') return { page: { ...page, records: [] } }
           const records = selectPulls(page.records, input.query)
           const take = input.query.take

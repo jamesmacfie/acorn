@@ -76,10 +76,23 @@ content-link action that opens a tracked pull request inside Acorn.
 
 The source also reports review decision, head-check rollup and individual outcomes, requested users
 and teams with request times, labels, last commit/comment/review activity, and GitHub merge readiness.
+`lastActivityAt` starts at PR creation and advances on commits, comments, or reviews; a label-only
+`updatedAt` change does not advance it. Each record also identifies the head repository and head
+branch separately from the base `repository`. A deleted fork has an unknown head repository.
 Its identity operation supplies the selected account's login for **You**. A review-requested-from-you
 filter uses GitHub's native `review-requested:@me` search, including team requests. The mirror stores
 team requests as well as user requests. GitHub search and nested connections have provider caps; an
 exceeded cap yields an incomplete selection.
+
+The core local-branches source can look up a pull request for each branch. Choose the same GitHub
+connection in its **GitHub account for pull requests** parameter and in the pull-request source.
+The local source reads each branch's tracked GitHub remote, or origin when the branch has no upstream,
+using the project repository-facet parser. The lookup matches provider, connection, head repository,
+and exact branch name; it never equates a
+fork's branch with a same-named branch in the base repository. A branch without a PR stays in the
+panel. Two PRs with the same head repository and branch trigger a cardinality warning and leave the
+lookup empty rather than selecting one arbitrarily. This relationship reads PRs under the selected
+connection's normal authority and does not use the GitHub mirror as a branch authority.
 
 `github/actions-jobs` reads workflow jobs across a selected repository list. Each record carries its
 repository, run, attempt, start and finish, duration, conclusion, and linked pull-request numbers.
@@ -99,8 +112,8 @@ uses the returned login's case. Repository and author values cannot inject searc
 
 The adapter reads at most 10 pages of 100 search matches. A provider count above 1,000 or continuation
 past that limit returns `incomplete`, including when the query requests a smaller `take`. Stable
-sorting uses node ID to break ties before applying `take`. This source advertises neither details
-nor incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
+sorting uses node ID to break ties before applying `take`. This source advertises fresh state details
+for write eligibility, but no incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
 changes during pagination.
 
 Continuation selections expire after 60 seconds. The plugin holds at most 16 selections and 16 MiB
