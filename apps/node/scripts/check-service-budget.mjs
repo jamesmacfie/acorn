@@ -25,7 +25,9 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // that rise is jsdiff, which the agent drivers use to write each file change's hunks
 // (plugins/agents/src/server/drivers/patchText.ts). `floor` is a lower bound, not a target: a graph
 // that small means the walk below stopped following imports, and a check that passes on that is blind.
-const limits = { ceiling: 3_217_000, floor: 1_000_000 }
+// 2026-10-04: dataset capture, storage, SQL reduction, and workflow writes are lazy; the remaining
+// core route, tool, source, and schema registration adds about 21 KB over the previous ceiling.
+const limits = { ceiling: 3_245_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

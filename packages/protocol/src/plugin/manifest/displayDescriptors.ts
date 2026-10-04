@@ -51,14 +51,16 @@ export const clientRouteDescriptor = z.object({
 
 export const contentLinkDescriptor = z.object({
   id: z.string().min(1).max(64),
-  match: contentLinkPattern,
+  match: contentLinkPattern.optional(),
   // A task-scoped pane this manifest declares, checked by the node. Optional, because the host can instead
   // open the plugin's reference panel for the matched item, which needs no task and no pane. Which of
   // the two a click gets is the clicking surface's call, not the manifest's.
   // See docs/plugins/client-half.md § Loaded plugins: the client half.
   openPane: z.string().min(1).max(64).optional(),
-  item: z.string().min(1).max(32),
-})
+  openOverlay: z.string().min(1).max(64).optional(),
+  item: z.string().min(1).max(32).optional(),
+  presentations: z.array(z.enum(['route', 'refPanel', 'pane', 'overlay', 'external'])).min(1).max(5).optional(),
+}).refine(value => !value.match || !!value.item, { message: 'URL targets need an item capture', path: ['item'] })
 
 // An entry in the agent composer's "add Acorn context" list, served by two routes on the plugin's own
 // node half (@acorn/protocol/agentContext.ts holds the response schemas).

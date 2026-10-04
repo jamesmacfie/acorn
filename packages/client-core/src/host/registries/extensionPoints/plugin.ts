@@ -197,6 +197,14 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     },
   })
   const sources = own(sourceRegistry)
+  const contentLinks: ClientContributionPoint<ContentLinkContribution> = {
+    register: (entry) => {
+      const provider = declaredProvider(entry)
+      if (provider !== undefined && provider !== name) throw new Error(`Plugin '${name}' registered '${entry.id}' under provider '${provider}'`)
+      const id = entry.id.startsWith(`${name}.`) ? entry.id : `${name}.${entry.id}`
+      record(contentLinkRegistry.register({ ...entry, id, ...(entry.target ? { providerId: name } : {}) }, name))
+    },
+  }
   const keybindings = own(keybindingRegistry)
   // Not `own`. The owner is the one field on a command the host states and the plugin may not, for
   // the reason a content link's `providerId` is stamped rather than read: a command that could name
@@ -272,7 +280,7 @@ function makeContext(name: string, record: (disposable: Disposable) => void): Co
     nodeStats: own(nodeStatRegistry),
     attentionSources: own(attentionRegistry),
     brandMarks: own(brandMarkRegistry),
-    contentLinks: own(contentLinkRegistry),
+    contentLinks,
     // Straight through `own`, so a plugin-published registry gets the same ownership check and the
     // same recorded disposable. Only the registry arrives as an argument.
     contribute: (registry, entry) => own(registry).register(entry),

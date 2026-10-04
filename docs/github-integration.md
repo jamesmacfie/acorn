@@ -63,8 +63,9 @@ the common API envelope and surfaced as GitHub-specific status where the UI need
 
 ## Typed pull-request source
 
-The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection
-and `parameters.repository` in `owner/name` form. Repository options enumerate repositories available
+The `github/pull-requests` [data source](./data-sources.md) requires an explicit GitHub connection.
+Its optional `parameters.repositories` list contains `owner/name` values; omitting it searches every
+repository visible to that account. Repository options enumerate repositories available
 through that connection, with continuation cursors. Option search filters each returned page; an empty
 page with a cursor is not exhaustion.
 
@@ -73,6 +74,38 @@ means closed without merging. Draft, mergeability, merge readiness, and auto-mer
 fields. Author login is nullable, and timestamps use epoch milliseconds. Row URLs retain the
 content-link action that opens a tracked pull request inside Acorn.
 
+The source also reports review decision, head-check rollup and individual outcomes, requested users
+and teams with request times, labels, last commit/comment/review activity, and GitHub merge readiness.
+`lastActivityAt` starts at PR creation and advances on commits, comments, or reviews; a label-only
+`updatedAt` change does not advance it. Each record also identifies the head repository and head
+branch separately from the base `repository`. A deleted fork has an unknown head repository.
+Its identity operation supplies the selected account's login for **You**. A review-requested-from-you
+filter uses GitHub's native `review-requested:@me` search, including team requests. The mirror stores
+team requests as well as user requests. GitHub search and nested connections have provider caps; an
+exceeded cap yields an incomplete selection.
+
+Choose **Local branches with pull requests** and the same GitHub account as the pull-request source
+to look up a PR for each branch. This GitHub source delegates workspace and project scoped reads to
+the core local-branches source. Core reads each branch's tracked GitHub remote, or origin when the
+branch has no upstream, using the project repository-facet parser.
+The lookup matches provider, connection, head repository,
+and exact branch name; it never equates a
+fork's branch with a same-named branch in the base repository. A branch without a PR stays in the
+panel. Two PRs with the same head repository and branch trigger a cardinality warning and leave the
+lookup empty rather than selecting one arbitrarily. This relationship reads PRs under the selected
+connection's normal authority and does not use the GitHub mirror as a branch authority.
+
+`github/actions-jobs` reads workflow jobs across a selected repository list. Each record carries its
+repository, run, attempt, start and finish, duration, conclusion, and linked pull-request numbers.
+The source declares event coverage matching GitHub's Actions retention and reports the actual lower
+bound of a read. Its bounded REST scan reports incomplete when a page, run, or attempt cap is hit;
+GitHub supplies no durable cursor suitable for incremental source continuation.
+Completed job rows offer **Re-run job**. The Node rechecks named-action eligibility at press time;
+the GitHub source route then reads the current job, verifies the selected connection and repository,
+and calls GitHub's job rerun endpoint. A job that disappeared or resumed is refused, and the host
+requires confirmation for the execute risk. The action runs through the same device-scoped
+idempotency middleware as other dashboard actions.
+
 Queries support equality on state, author login, and draft, ordered comparisons on created/updated
 time, and `all` groups. Number, created time, and updated time support sorting. The provider search
 narrows candidates, then exact typed comparisons run over the exhausted selection. Author equality
@@ -80,8 +113,8 @@ uses the returned login's case. Repository and author values cannot inject searc
 
 The adapter reads at most 10 pages of 100 search matches. A provider count above 1,000 or continuation
 past that limit returns `incomplete`, including when the query requests a smaller `take`. Stable
-sorting uses node ID to break ties before applying `take`. This source advertises neither details
-nor incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
+sorting uses node ID to break ties before applying `take`. This source advertises fresh state details
+for write eligibility, but no incremental checkpoints. Search consistency remains subject to GitHub's indexing and concurrent
 changes during pagination.
 
 Continuation selections expire after 60 seconds. The plugin holds at most 16 selections and 16 MiB

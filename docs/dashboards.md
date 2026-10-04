@@ -8,23 +8,84 @@ record cache.
 
 ## Published panels
 
-The dashboard editor builds a `DashboardPanelContent` draft from one or more saved or inline typed
-queries. Publishing freezes those query references, the mapping, and the display rules in the Node's
-dashboard library. A placed `PanelDefinition` holds only the publication ID and small indexing
-metadata: `sources`, `fieldRoles`, and the view. The renderer resolves the publication and runs its
-queries through the shared data-source runtime ([typed data sources](./data-sources.md)).
+The dashboard editor builds a version 2 `PanelPlan` from saved or inline typed queries. Its columns
+bind source fields into panel-owned values. Filter, compute, summarize, expand, and overlap stages,
+sorting, grouping, limits, view options,
+and a time policy operate on those values. The Node stores drafts and immutable published revisions.
+A placed `PanelDefinition` carries the publication ID and derived indexing metadata (`sources`,
+`fieldRoles`, and the view).
 
-There's one execution path:
+There is one execution path:
 
 1. Resolve the dashboard publication in its workspace or project scope.
 2. Resolve each saved or inline query, including typed parameter bindings.
-3. Ask the Node data-source runtime to describe and query its source.
-4. Project the typed records with `packages/dashboards-core`.
-5. Draw the declared list, table, board, stat, or chart view.
+3. Ask the Node data-source runtime to describe each source and validate column bindings.
+4. Plan and share authorized reads, query each source, and run the plan on the Node.
+5. Render the declared list, table, board, stat, or chart view.
 
-A missing plugin, connection, publication, or field is an unavailable state, never an empty result or
-a guessed schema. Source identity is `(pluginId, sourceId)`, and record identity and provenance belong
-to the source contract.
+Primary sources contribute rows. A declared lookup attaches fields, and a declared children relation
+attaches a bounded list. Only equivalence merges two primary records into one row; the merged row
+retains both references and uses each column's declared source precedence. Relation keys match exact
+typed values and must include provider, account, and identity scope, plus a container when the source
+requires one. A missing lookup keeps its primary row unless the plan explicitly drops it. Cardinality
+violations warn with the relation and key and never multiply rows.
+
+A plan has at most eight ordered stages, three summaries, and one overlap. Summaries group by up to
+three columns and can calculate filtered counts, sums, averages, extrema, median, percentiles,
+distinct counts or lists, and earliest or latest values. Measures can be shares of their total;
+time buckets can fill gaps and show previous-bucket changes; an enum can pivot a measure. A compute
+stage uses a closed, typed expression set. Expand and overlap carry row and pair limits. Stage
+diagnostics report both row counts and what one row means after each step. An incomplete source or
+unknown measure input marks the affected measure partial, with a reason; mixed per-row units fail
+the measure rather than making an invented total. The history sampler skips a run with partial
+measures or a failed relation. Summary cells retain the exact contributing rows
+for read-only drill-down at the original evaluation instant. Adding a bucket drill-down as a panel
+stores its exact calendar range, including the selected time zone's offset changes.
+
+Missing plugins, connections, publications, or fields are unavailable states. They are never
+silently replaced with an empty result or a guessed schema. Source identity is
+`(pluginId, sourceId)`; record identity and provenance remain the source contract's responsibility.
+
+A placed panel caches a Node run by Node, scope, panel, revision, and viewer time zone. It refetches
+after a reported account or plugin changes, when the window regains focus, and at the plan's refresh
+interval. The Node shares identical authorized reads briefly across panels.
+
+The plan can choose a row press destination and up to three trailing buttons. Runs keep full source
+record references, including account and scope. A row menu offers the same actions from the keyboard.
+Group headers and stat measures open their underlying rows in a read-only side panel; **Add as panel**
+publishes the derived plan. See [panels](./dashboards/panels.md#provenance-and-what-a-row-may-not-claim).
+
+An enum choice can store one write value for each bound source. The column editor lists only values
+that the source declares writable. Dragging a board card to a choice, or choosing **Move to** in its
+row menu, uses that value. The host asks for confirmation before a risky change, moves the card while
+the request runs, and refreshes after success. Cancellation sends no request. A missing mapping,
+merged or summary row, changed source eligibility, or failed write shows a source-specific reason;
+a failed move returns the card to its previous column. Panel movement still starts from the panel
+header, leaving the card body for its own gesture.
+
+`POST /v1/core/dashboards/run` accepts a scoped published revision or a draft `PanelPlan`, `preview`
+or `execution` mode, and an optional viewer time zone. It returns the resolved plan, rows, groups,
+plain-language description, and diagnostics for sources, stages, and budgets. Dashboard authoring's
+`list-accounts` metadata operation returns account IDs, provider IDs, and display names without
+reading provider records.
+
+## Datasets and history
+
+**Keep history** in the editor creates a workspace-scoped or project-scoped dataset from a query and
+asks the owner to approve a capture cadence. The owner chooses one immutable storage mode: **latest
+state** upserts an identity and marks missing records removed after a complete capture; **every
+event** retains stable event identities and arrival times; **daily snapshots** stores each identity
+at each capture time. A different mode needs a new dataset. The new dataset appears in Pick data as
+a core source. Settings → Datasets shows its feeder, size, 90-day default retention, caps, and
+coverage, and permits deletion.
+
+An event archive claims completeness only for source-proved or checkpoint-proved windows. Capture
+failures, schema mismatches, and uncovered windows remain visible as gaps. Dataset panels carry
+coverage labels and mark affected summaries partial. A dataset summary applies preceding filters and
+groups in Node SQLite, returning at most 5,000 summary rows; the panel asks separately for up to
+1,000 underlying rows when a person drills into a measure. Live provider summaries continue through
+the in-memory runner. Stat measure history remains in its existing table and keeps its sampling and
+retention behavior.
 
 ## Persistence
 

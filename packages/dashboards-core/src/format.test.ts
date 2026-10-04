@@ -21,6 +21,14 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'number' }), 'not a number')).toEqual({ kind: 'empty' })
   })
 
+  it('groups digits and keeps at most two decimals in the device locale', () => {
+    const locale = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2, useGrouping: true })
+    expect(formatCell(field({ type: 'number' }), 10 / 3)).toEqual({ kind: 'number', text: locale.format(3.33) })
+    expect((formatCell(field({ type: 'number' }), 10 / 3) as { text: string }).text).toMatch(/^3\D33$/)
+    expect(formatCell(field({ type: 'number' }), 1234567.891)).toEqual({ kind: 'number', text: locale.format(1234567.89) })
+    expect(formatCell(field({ type: 'number', unit: '%' }), 12.5)).toEqual({ kind: 'number', text: `${locale.format(12.5)}%` })
+  })
+
   it('gives a datetime both an age and an absolute time', () => {
     const cell = formatCell(field({ type: 'datetime' }), NOW - 2 * 60 * 60 * 1000, NOW)
     expect(cell).toMatchObject({ kind: 'datetime', relative: '2h ago' })
@@ -28,6 +36,13 @@ describe('formatCell', () => {
     expect(formatCell(field({ type: 'datetime' }), NOW - 30_000, NOW)).toMatchObject({ relative: 'now' })
     expect(formatCell(field({ type: 'datetime' }), NOW - 40 * 24 * 3600_000, NOW)).toMatchObject({ relative: '1mo ago' })
     expect(formatCell(field({ type: 'datetime' }), 'yesterday')).toEqual({ kind: 'empty' })
+  })
+
+  it('keeps calendar days unchanged and formats instants in the plan zone', () => {
+    expect(formatCell(field({ type: 'datetime' }), '2026-10-03')).toMatchObject({ kind: 'datetime', absolute: '2026-10-03' })
+    const inUtc = formatCell(field({ type: 'datetime', zone: 'UTC' }), Date.UTC(2026, 9, 3, 0, 30))
+    const inAuckland = formatCell(field({ type: 'datetime', zone: 'Pacific/Auckland' }), Date.UTC(2026, 9, 3, 0, 30))
+    expect(inUtc.kind === 'datetime' && inAuckland.kind === 'datetime' && inUtc.absolute).not.toBe(inAuckland.kind === 'datetime' ? inAuckland.absolute : '')
   })
 
   it('tones an enum from its declared value, and still renders one that was never declared', () => {

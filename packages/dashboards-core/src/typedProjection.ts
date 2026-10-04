@@ -53,7 +53,7 @@ export function dashboardFields(description: DataSourceDescription): DashboardDi
     if (!schema) return []
     const type = displayType(field, schema)
     const values = type === 'enum' && field.choices?.kind === 'static'
-      ? field.choices.values.map(value => ({ id: value.id, label: value.label }))
+      ? field.choices.values.map(value => ({ ...value }))
       : undefined
     return [{
       id: field.pointer,
@@ -61,6 +61,8 @@ export function dashboardFields(description: DataSourceDescription): DashboardDi
       type,
       ...(field.display?.role ? { role: field.display.role } : {}),
       ...(field.display?.unit && type === 'number' ? { unit: field.display.unit } : {}),
+      ...(field.display?.precision ? { precision: field.display.precision } : {}),
+      ...(field.display?.list ? { list: true } : {}),
       ...(values?.length ? { values } : {}),
     }]
   })
@@ -91,8 +93,13 @@ function sourceRows(preview: DashboardQueryProjection): DashboardDisplayRow[] {
     values: Object.fromEntries(fields.map(field => [field.id, cell(readDataPointer(record.data, field.id))])),
     pluginId: record.ref.pluginId,
     sourceId: `${record.ref.sourceId}@${preview.instanceId}`,
+    sourceRowId: record.ref.recordId,
+    records: [record.ref],
+    recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
+    ...(record.actions ? { actions: record.actions } : {}),
+    ...(record.target ? { target: record.target } : {}),
   }))
 }
 

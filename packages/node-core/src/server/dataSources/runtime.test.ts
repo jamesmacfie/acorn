@@ -12,7 +12,7 @@ import type { NodePlugin, PluginFetchHandler, PluginStorage } from '../pluginHos
 import { pluginManifestSchema } from '../plugins/manifest'
 import type { AppEnv } from '../middleware/auth'
 import { dataSources } from '../routes/dataSources'
-import { discoverDataSources, invokeDataSource, listDataSources } from './runtime'
+import { actOnDataRecord, discoverDataSources, invokeDataSource, listDataSources } from './runtime'
 
 const directory = new URL('../../../../../apps/node/test/__fixtures__/typed-source/', import.meta.url)
 const fixtureModule: { fetchSource: PluginFetchHandler } = await import(new URL('node.mjs', directory).href)
@@ -53,6 +53,78 @@ async function world(loaded = true, handler = fixtureModule.fetchSource) {
 }
 
 describe('typed source transport conformance', () => {
+  it('checks a field move against fresh source metadata, current value, and the confined route', async () => {
+    let current = 'open'
+    let writable = true
+    let eligible = true
+    let writes = 0
+    let changeBeforeDispatch = false
+    const handler: PluginFetchHandler = async (request, context) => {
+      const body = await request.json() as { operation?: string; field?: string; expected?: string; target?: string }
+      if (new URL(request.url).pathname.endsWith('/write')) {
+        writes++
+        if (changeBeforeDispatch) { current = 'closed'; changeBeforeDispatch = false }
+        if (current !== body.expected) return Response.json({ outcome: 'stale' })
+        current = body.target!
+        return Response.json({ outcome: 'done' })
+      }
+      if (body.operation === 'describe') {
+        const base = await fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+        return Response.json({ ...await base.json() as object,
+          detailSchema: { type: 'object', properties: { state: { type: 'string' } }, required: ['state'], additionalProperties: false },
+          writable: writable ? [{ field: '/state', path: `/v1/p/${pluginId}/source/write`, risk: 'write', values: ['open', 'closed'] }] : [] })
+      }
+      if (body.operation === 'details') return Response.json({ kind: 'found', data: { state: current }, fetchedTime: Date.now(), writableFields: eligible ? ['/state'] : [] })
+      return fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+    }
+    const { env } = await world(false, handler)
+    const ref = { ...source, recordId: 'sample-1', scope: { parameters: {} } }
+    const key = '11111111-2222-4333-8444-555555555555'
+    const move = { ref, field: '/state', expected: 'open', target: 'closed', confirmedRisk: 'write' }
+    const device = { ...invocation(), principal: { kind: 'device' as const, userId: 'owner', deviceId: 'device' } }
+    await expect(actOnDataRecord(env, move, key, invocation())).rejects.toMatchObject({ code: 'forbidden' })
+    expect(await actOnDataRecord(env, move, key, device)).toEqual({ outcome: 'done' })
+    expect(current).toBe('closed')
+    expect(await actOnDataRecord(env, move, key, device)).toEqual({ outcome: 'stale' })
+    expect(writes).toBe(1)
+    expect(await actOnDataRecord(env, { ...move, expected: 'closed', target: 'open' }, key, device)).toEqual({ outcome: 'done' })
+    expect(current).toBe('open')
+    eligible = false
+    expect(await actOnDataRecord(env, { ...move, target: 'closed' }, key, device)).toEqual({ outcome: 'not-writable' })
+    eligible = true
+    writable = false
+    expect(await actOnDataRecord(env, { ...move, target: 'closed' }, key, device)).toEqual({ outcome: 'not-writable' })
+    expect(writes).toBe(2)
+    writable = true
+    changeBeforeDispatch = true
+    expect(await actOnDataRecord(env, move, key, device)).toEqual({ outcome: 'stale' })
+    expect(writes).toBe(3)
+    await expect(actOnDataRecord(env, { ...move, ref: { ...ref, connectionId: 'foreign' } }, key, device))
+      .rejects.toMatchObject({ code: 'invalid-request' })
+  })
+  it('re-reads named actions and refuses one that stopped applying before dispatch', async () => {
+    let eligible = true
+    let calls = 0
+    const handler: PluginFetchHandler = async (request, context) => {
+      const body = await request.json() as { operation?: string; actionId?: string }
+      if (body.operation === 'describe') {
+        const base = await fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+        return Response.json({ ...await base.json() as object, actions: [{ id: 'retry', label: 'Retry', risk: 'execute' }] })
+      }
+      if (body.operation === 'actions') return Response.json({ actions: eligible ? [{ id: 'retry', label: 'Retry', risk: 'execute', action: { verb: 'runNodeAction', path: `/v1/p/${pluginId}/source` } }] : [] })
+      if (body.actionId === 'retry') { calls++; return Response.json({ ok: true }) }
+      return fixtureModule.fetchSource(new Request(request.url, { method: 'POST', body: JSON.stringify(body) }), context)
+    }
+    const { env } = await world(false, handler)
+    const ref = { ...source, recordId: 'sample-1', scope: { parameters: {} } }
+    const key = '11111111-2222-4333-8444-555555555555'
+    eligible = false
+    expect(await actOnDataRecord(env, { ref, actionId: 'retry', confirmedRisk: 'execute' }, key, invocation())).toEqual({ outcome: 'no-longer-available' })
+    expect(calls).toBe(0)
+    eligible = true
+    expect(await actOnDataRecord(env, { ref, actionId: 'retry', confirmedRisk: 'execute' }, key, invocation())).toEqual({ outcome: 'done' })
+    expect(calls).toBe(1)
+  })
   it('uses source-declared baseline and opaque continuation, not page cursors', async () => {
     const { env } = await world()
     const request = query()

@@ -10,6 +10,15 @@ install. The client output must be one JavaScript file with no unresolved import
 the bridge and the tree protocol, so a tree needs no bundler. Install `acorn-plugin-types` for editor
 completion on the node context. [Contribution kinds](./contribution-kinds.md) says which features a
 loaded plugin can use.
+Dashboard-capable sources can return `starterPlans` from `describe`. Each card must be a valid
+version 2 panel plan for the chosen source and account; the host validates it before display.
+Static field choices can set `tone` (`ok`, `warn`, `bad`, `muted`, or `accent`) and numeric `rank`.
+Those hints flow to panel enum columns unless the author overrides them.
+For each source, state its default and selectable reach, the scope in its record identity, whether
+it can return an account identity, field `viewerMatch` pointers or native viewer fields, time and
+date-only precision, snapshot or event coverage, freshness, and honest upstream caps. A source with
+partial history must give the dashboard enough information to distinguish an empty covered window
+from an empty uncovered one. See [Typed data sources](./data-sources.md#identity-reach-time-and-coverage).
 
 ## Start here
 
@@ -41,6 +50,12 @@ loaded plugin can use.
 <a id="add-task-annotations"></a>
 <a id="harnesses"></a>
 <a id="the-action-verbs"></a>
+
+`contentLinks` can declare a target without `match`, with a plugin-owned kind and item ID. A loaded
+manifest may name a declared task pane or overlay and list supported presentations. Compiled plugins
+register a target resolver through `ctx.contentLinks`. Sources describe target kinds and named record
+actions separately from each record's current eligibility; the `actions` source operation must answer
+for an exact record reference before a Node action runs.
 <a id="permissions"></a>
 <a id="keybindings"></a>
 <a id="cli-commands"></a>

@@ -6,7 +6,15 @@ capabilities, health, and encrypted credential reference. The plugin that implem
 contributes its descriptors, validation, routes, and projections. Read this page for the connection
 model and to find the page for each provider.
 
-Typed Linear and Rollbar query operations are in [typed data sources](./data-sources.md).
+Typed Linear and Rollbar query operations are documented in [typed data sources](./data-sources.md).
+GitHub pull requests and Actions jobs use an explicit connection. Workspace reach includes links
+stored in `workspace_external_projects` and the repository facets of local projects; the latter are
+GitHub's project association, not duplicate external-project rows. Linear's richer issue facts remain
+demand-dependent.
+
+Provider resource requests can set `requireFresh: true` to block on a refresh and return its failure.
+This mode refuses cached fallback, including when the connection needs authentication or is disabled.
+Ordinary resource reads and `force` refreshes retain their cache behavior.
 
 ## Connection lifecycle
 

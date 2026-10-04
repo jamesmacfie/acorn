@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Match, onCleanup, Show, Switch, untrack } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration } from '@acorn/protocol/api.ts'
 import type { DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
@@ -19,7 +19,7 @@ import {
   schemaAtPointer, setScopeParameter, valueAt,
 } from './editorModel'
 import {
-  dataSourceCatalogOptions, dataSourceQueryOptions, dataSourceRequestDigest,
+  dataSourceCatalogOptions, dataSourceQueryOptions,
 } from './queries'
 import AuthoringConversation from './AuthoringConversation'
 import { mergeAuthoringCandidate } from './authoringMerge'
@@ -86,7 +86,8 @@ function DynamicOptions(props: {
   target: 'field' | 'parameter'
   value: DataValue | typeof MISSING
   disabled?: boolean
-  onChange(value: string): void
+  multiple?: boolean
+  onChange(value: DataValue): void
 }) {
   const [search, setSearch] = createSignal('')
   const request = () => ({
@@ -94,16 +95,17 @@ function DynamicOptions(props: {
     target: props.target, pointer: props.field.pointer, search: search(), pageSize: 100,
   })
   const options = createQuery(() => ({ ...dataSourceQueryOptions(props.nodeId, request()), enabled: !props.disabled }))
-  const selected = () => options.data?.options.find(option => option.id === props.value)
+  const selectedIds = () => Array.isArray(props.value) ? props.value.filter((id): id is string => typeof id === 'string') : typeof props.value === 'string' ? [props.value] : []
+  const selected = () => options.data?.options.filter(option => selectedIds().includes(option.id)) ?? []
   return <Picker
-    label={selected()?.label ?? (props.value === MISSING ? 'Choose…' : String(props.value))}
+    label={selected().length ? selected().map(option => option.label).join(', ') : props.value === MISSING ? props.multiple ? 'Every available scope' : 'Choose…' : String(props.value)}
     ariaLabel={props.field.label}
     placeholder={`Search ${props.field.label.toLowerCase()}`}
     emptyText={options.isPending ? 'Loading options…' : options.isError ? 'Options unavailable.' : 'No matching options.'}
     disabled={props.disabled}
     onSearch={setSearch}
-    items={(options.data?.options ?? []).map(option => ({ id: option.id, label: option.label, active: option.id === props.value }))}
-    onPick={props.onChange}
+    items={(options.data?.options ?? []).map(option => ({ id: option.id, label: option.label, active: selectedIds().includes(option.id) }))}
+    onPick={id => props.onChange(props.multiple ? selectedIds().includes(id) ? selectedIds().filter(value => value !== id) : [...selectedIds(), id] : id)}
     status={options.isError ? <Text emphasis="muted">Options could not be loaded. Your existing selection is retained.</Text> : undefined}
   />
 }
@@ -135,6 +137,7 @@ function ComparisonEditor(props: {
     target: 'field', pointer: '', search: '', pageSize: 100,
   }), enabled: dynamic() }))
   const right = () => props.value.right?.address.from === 'literal' ? props.value.right.address.value : undefined
+  const isViewer = () => props.value.right?.address.from === 'context' && props.value.right.address.name === 'viewer'
   return <Stack gap="row">
     <Show when={!selected()}>
       <Alert tone="warn">The selected field is no longer described by this source. Choose a replacement; the saved value has not been discarded.</Alert>
@@ -152,6 +155,9 @@ function ComparisonEditor(props: {
         onChange={operator => schema() && props.onChange(replaceComparisonOperator(props.value, operator as DataOperator, schema()!))} />
       <Button size="sm" variant="bare" disabled={props.disabled} onPress={props.onRemove}>Remove condition</Button>
     </Inline>
+    <Show when={selected()?.viewerMatch}><Button size="sm" variant={isViewer() ? 'solid' : 'bare'} disabled={props.disabled}
+      onPress={() => props.onChange({ ...props.value, right: { address: { from: 'context', name: 'viewer', pointer: selected()!.viewerMatch! } } })}>You</Button></Show>
+    <Show when={isViewer()}><Button size="sm" variant="bare" disabled={props.disabled} onPress={() => props.onChange({ ...props.value, right: literalBinding('') })}>Use a value</Button></Show>
     <Show when={schema() && right() !== undefined}>{dynamic() ? (
       <Picker
         label={dynamicOptions.data?.options.find(option => option.id === right())?.label ?? String(right())}
@@ -228,6 +234,8 @@ export default function SourceQueryEditor(props: {
    *  already has a query, such as a placed panel's Edit. A preview reads the source and writes
    *  nothing. */
   previewOnOpen?: boolean
+  hideAuthoring?: boolean
+  pickSourceAccount?: boolean
   onChange(value: QueryReference | undefined): void
   /** Lets consumers project the shared editor's exact described fields and retained preview. It is
    * observational only: display changes never flow back into query semantics. */
@@ -270,7 +278,8 @@ export default function SourceQueryEditor(props: {
     const providerId = source()?.providerId
     return providerId ? (integrations.data?.integrations ?? []).filter(connection => connection.providerId === providerId && connection.status !== 'disabled') : []
   }
-  const canDescribe = () => !!query() && (!source()?.providerId || !!query()!.scope.connectionId)
+  const canDescribe = () => !!query() && !(query()!.source.pluginId === 'core' && query()!.source.sourceId === 'choose')
+    && (!source()?.providerId || !!query()!.scope.connectionId)
   const describeRequest = () => ({
     operation: 'describe' as const,
     source: query()?.source ?? { pluginId: 'unavailable', sourceId: 'unavailable' },
@@ -327,9 +336,9 @@ export default function SourceQueryEditor(props: {
     return undefined
   }
 
-  const selectSource = (next: Source): void => {
+  const selectSource = (next: Source, chosenConnectionId?: string): void => {
     const matches = (integrations.data?.integrations ?? []).filter(connection => connection.providerId === next.providerId && connection.status !== 'disabled')
-    const connectionId = next.providerId && matches.length === 1 ? matches[0]!.id : undefined
+    const connectionId = chosenConnectionId ?? (next.providerId && matches.length === 1 ? matches[0]!.id : undefined)
     const nextQuery: DataSourceQuery = {
       source: { pluginId: next.pluginId, sourceId: next.sourceId },
       scope: { ...baseScope(), ...(connectionId ? { connectionId } : {}) }, sort: [],
@@ -345,20 +354,22 @@ export default function SourceQueryEditor(props: {
     props.onChange({ kind: 'saved', queryId: id, bindings: {} })
   }
 
-  const digest = () => query() ? dataSourceRequestDigest({ operation: 'query', query: query()!, mode: 'preview', evaluationTime: 0, pageSize: 25 }) : 'none'
+  const digest = () => content() ? JSON.stringify(content()) : 'none'
   const [preview, setPreview] = createSignal(initialPreviewState(digest()))
   createEffect(() => setPreview(state => editPreview(state, digest())))
-  createEffect(() => props.onStateChange?.({
-    query: query(), source: source(), description: description.data,
-    preview: preview().result, stale: previewIsStale(preview()),
-  }))
+  createEffect(() => {
+    const state = { query: query(), source: source(), description: description.data,
+      preview: preview().result, stale: previewIsStale(preview()) }
+    untrack(() => props.onStateChange?.(state))
+  })
   const refresh = async (): Promise<void> => {
     const current = query()
     if (!current) return
     const begun = beginPreview(preview())
     setPreview(begun.state)
-    const request = { operation: 'query' as const, query: current, mode: 'preview' as const, evaluationTime: Date.now(), pageSize: 25 }
     try {
+      const resolved = content() ? await queriesClient(nodeId(), scope()).resolve({ kind: 'inline', content: content()!, bindings: {} }) : undefined
+      const request = { operation: 'query' as const, query: resolved?.query ?? current, mode: 'preview' as const, evaluationTime: Date.now(), pageSize: 25 }
       const result = await queryClient.fetchQuery(dataSourceQueryOptions(nodeId(), request, description.data?.revision))
       setPreview(state => resolvePreview(state, begun.token, result))
     } catch (error) {
@@ -385,7 +396,18 @@ export default function SourceQueryEditor(props: {
   }
   const updateParameter = (field: DataField, value: DataValue): void => {
     if (!query() || !description.data) return
-    emitQuery(setScopeParameter(query()!, description.data, field.pointer, value).query)
+    const next = setScopeParameter(query()!, description.data, field.pointer, value).query
+    const key = field.pointer.slice(1)
+    const { [key]: _binding, ...bindings } = content()?.sourceParameters ?? {}
+    emitContent({ ...content()!, query: next, sourceParameters: bindings })
+  }
+  const setListReach = (field: DataField, reach: 'account' | 'workspace'): void => {
+    if (!query() || !content()) return
+    const key = field.pointer.slice(1)
+    const { [key]: _value, ...parameters } = query()!.scope.parameters
+    const { [key]: _binding, ...bindings } = content()!.sourceParameters
+    emitContent({ ...content()!, query: { ...query()!, scope: { ...query()!.scope, parameters } },
+      sourceParameters: reach === 'workspace' ? { ...bindings, [key]: { address: { from: 'context', name: 'workspaceLinks' } } } : bindings })
   }
   const currentParameter = (field: DataField) => query() ? readDataPointer(query()!.scope.parameters, field.pointer) : MISSING
   const parameterSchema = (field: DataField) => description.data ? schemaAtPointer(description.data.parameters, field.pointer) : undefined
@@ -426,9 +448,18 @@ export default function SourceQueryEditor(props: {
         disabled={props.disabled}
         items={[
           ...(library.data ?? []).map(saved => ({ id: `saved:${saved.id}`, label: saved.content.name, note: 'Saved query', active: props.value?.kind === 'saved' && props.value.queryId === saved.id })),
-          ...sources().map(entry => ({ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') })),
+          ...sources().flatMap(entry => props.pickSourceAccount && entry.providerId
+            ? (integrations.data?.integrations ?? []).filter(connection => connection.providerId === entry.providerId && connection.status !== 'disabled').map(connection => ({
+              id: `source:${sourceKey(entry)}|${connection.id}`, label: `${entry.name} · ${connection.name ?? connection.label}`,
+              note: pluginLabel(entry.pluginId), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') && query()?.scope.connectionId === connection.id,
+            }))
+            : [{ id: `source:${sourceKey(entry)}`, label: entry.name, ...(entry.pluginId === 'core' ? {} : { note: pluginLabel(entry.pluginId) }), active: sourceKey(entry) === (source() ? sourceKey(source()!) : '') }]),
         ]}
-        onPick={id => id.startsWith('saved:') ? selectSaved(id.slice(6)) : selectSource(sources().find(entry => sourceKey(entry) === id.slice(7))!)}
+        onPick={id => {
+          if (id.startsWith('saved:')) return selectSaved(id.slice(6))
+          const [key, connectionId] = id.slice(7).split('|')
+          selectSource(sources().find(entry => sourceKey(entry) === key)!, connectionId)
+        }}
       />
     </Field>
     <Show when={catalog.isError}><Alert tone="danger">Sources could not be loaded. Retry after reconnecting the Node.</Alert></Show>
@@ -455,7 +486,7 @@ export default function SourceQueryEditor(props: {
       </Stack>
     </Alert>}</Show>
     <Show when={query()}>{current => <Stack gap="stack">
-      <AuthoringConversation
+      <Show when={!props.hideAuthoring}><AuthoringConversation
         endpoint="/v1/core/authoring/turn"
         target="query"
         targetId={editingShared()?.id ?? selectedSaved()?.id ?? `inline:${sourceKey(current().source)}`}
@@ -466,22 +497,27 @@ export default function SourceQueryEditor(props: {
         disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
         defaultOpen={false}
         onApply={applyAiProposal}
-      />
+      /></Show>
       <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { emitContent(previous()); setAiUndo(undefined) }}>Undo AI edit</Button>}</Show>
       <Show when={source()?.providerId}>
         <Field label="Connection" hint="The account scope is always explicit." group>
           <Select size="sm" label="Connection" disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
             value={current().scope.connectionId ?? ''}
-            options={[{ value: '', label: connections().length ? 'Choose an account…' : 'No connected account' }, ...connections().map((connection: Integration) => ({ value: connection.id, label: connection.label }))]}
+            options={[{ value: '', label: connections().length ? 'Choose an account…' : 'No connected account' }, ...connections().map((connection: Integration) => ({ value: connection.id, label: connection.name ?? connection.label }))]}
             onChange={updateConnection} />
         </Field>
       </Show>
       <Show when={description.isPending && canDescribe()}><Text emphasis="muted">Loading source fields…</Text></Show>
       <Show when={description.isError}><Alert tone="danger">{errorMessage(description.error)}</Alert></Show>
       <Show when={description.data}>{described => <>
+        <Show when={props.pickSourceAccount}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
         <For each={described().parameterFields}>{field => <Field label={field.label} hint={field.description} group>
+          <Show when={parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
+            <Button size="sm" variant="bare" onPress={() => setListReach(field, 'account')}>Everywhere this account can see</Button>
+            <Button size="sm" variant="bare" onPress={() => setListReach(field, 'workspace')}>Workspace links</Button>
+          </Inline></Show>
           <Show when={parameterSchema(field)}>{schema => field.choices?.kind === 'dynamic' ? (
-            <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)}
+            <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple={schema().type === 'array'}
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           ) : (
             <TypedOperand label={field.label} schema={schema()} field={field} value={currentParameter(field) === MISSING ? '' : currentParameter(field) as DataValue}

@@ -6,13 +6,14 @@ import { activeTaskId } from '../../tasks/tasks'
 import Icon from '../../../kit/components/content/Icon'
 import { StatusDot } from '../../../kit/components/primitives'
 import { formatCell, type FormattedCell } from '../format'
+import { cellText } from '@acorn/dashboards-core/format.ts'
 import { panelDotTone } from './props'
 
 // One cell, drawn by its semantic field type. Every decision worth testing is in `formatCell`; this file
 // is the JSX for its answers and nothing else, because vitest here can't render a Solid component.
 
-export default function Cell(props: { field: DashboardDisplayField; value: DashboardDisplayCell | undefined }) {
-  const cell = createMemo(() => formatCell(props.field, props.value))
+export default function Cell(props: { field: DashboardDisplayField; value: DashboardDisplayCell | undefined; unit?: string }) {
+  const cell = createMemo(() => formatCell(props.unit ? { ...props.field, unit: props.unit } : props.field, props.value))
   const navigate = useNavigate()
   // Narrows the union for `Match`, which can't do it from a `kind ===` comparison on its own.
   const of = <K extends FormattedCell['kind']>(kind: K) => (): Extract<FormattedCell, { kind: K }> | undefined => {
@@ -83,6 +84,7 @@ export default function Cell(props: { field: DashboardDisplayField; value: Dashb
       </Match>
       <Match when={of('boolean')()}>{(value) => <span>{value().text}</span>}</Match>
       <Match when={of('text')()}>{(value) => <span>{value().text}</span>}</Match>
+      <Match when={of('list')()}>{(value) => <span class="dash-cell-list">{value().items.map(item => <span class="dash-cell-chip">{cellText(item)}</span>)}</span>}</Match>
     </Switch>
   )
 }

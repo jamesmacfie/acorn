@@ -27,7 +27,7 @@ export async function dispatchSource(
       env, pluginId, handler, { method: 'POST', body: JSON.stringify(body) }, signal,
       invocation.principal, connectionScope,
     )
-    if (!response.ok) throw new DataSourceError('provider-failure')
+    if (!response.ok) throw new DataSourceError(response.status === 429 ? 'rate-limited' : 'provider-failure')
     const reader = response.body?.getReader()
     if (!reader) throw new DataSourceError('invalid-response')
     let size = 0

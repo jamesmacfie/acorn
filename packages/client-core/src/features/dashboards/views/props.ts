@@ -4,6 +4,9 @@ import type {
   DashboardDisplaySchema,
 } from '@acorn/dashboards-core/render'
 import type { PanelTone, PanelView } from '../model'
+import type { DisplayPlanGroup } from '@acorn/dashboards-core/plan.ts'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
 
   /** What every view is handed: rows already shaped and fields already projected. The shaping
    *  layer runs once per panel, not once per view, which is what lets a person flip between views
@@ -17,6 +20,7 @@ export type PanelViewProps = {
   schema: DashboardDisplaySchema
   fields: DashboardDisplayField[]
   rows: DashboardDisplayRow[]
+  groups?: DisplayPlanGroup[]
   /** The shaping layer's group-by, which only the board draws with. It lives in shaping rather than
    *  in the view for the same reason the filters do, so it arrives the same way. */
   groupBy?: string
@@ -29,12 +33,23 @@ export type PanelViewProps = {
   /** Runs the row's own declared verb through the host dispatcher. Views never act themselves.
    *  Absent in the editor's preview, so its rows are not pressable. */
   onActivate?: (row: DashboardDisplayRow) => void
+  canActivate?: (row: DashboardDisplayRow) => boolean
+  pressConfigured?: boolean
+  buttons?: NonNullable<PanelPlan['actions']>['buttons']
+  onButton?: (row: DashboardDisplayRow, button: NonNullable<PanelPlan['actions']>['buttons'][number]) => void
+  onOpenRecord?: (row: DashboardDisplayRow, item: PlanRecordItem) => void
+  onDrilldown?: (group: DisplayPlanGroup) => void
+  onMeasureDrilldown?: (row: DashboardDisplayRow, measure: string) => void
+  onCorrect?: (row: DashboardDisplayRow) => void
+  boardChoices?: { id: string; label: string }[]
+  boardMoveReason?: (row: DashboardDisplayRow, choiceId: string) => string | undefined
+  onBoardMove?: (row: DashboardDisplayRow, choiceId: string) => void
 }
 
 /** A row's press handler: only when the row declares a verb and the host can run it. */
 export const rowPress = (props: PanelViewProps, row: DashboardDisplayRow): (() => void) | undefined => {
   const activate = props.onActivate
-  return row.action && activate ? () => activate(row) : undefined
+  return (props.canActivate ? props.canActivate(row) : row.action || row.target || row.taskId || props.pressConfigured) && activate ? () => activate(row) : undefined
 }
 
 /** A panel tone as StatusDot's. The dashboards vocabulary comes off the wire, where a plugin says

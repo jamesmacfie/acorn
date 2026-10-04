@@ -82,4 +82,19 @@ describe('workflow data and condition steps', () => {
     expect(parseWorkflowToml(writeWorkflowToml({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Data', steps: [step] }), 'test', 'repo', errors)).toMatchObject({ steps: [step] })
     expect(errors).toEqual([])
   })
+  it('writes only validated rows bound from a predecessor through the task-scoped host capability', async () => {
+    const writeDataset = vi.fn(async () => 1)
+    const access = vi.fn(async () => ({ scope, writeDataset }) as unknown as WorkflowDataAccess)
+    const handlers = workflowDataHandlers({ access, setStep: async () => {} })
+    const ctx = context()
+    ctx.def = { id: 'write', name: 'Write', kind: 'write-dataset', dataset: { id: 'dataset-1', version: 3,
+      rows: { address: { from: 'step', stepId: 'previous', pointer: '/rows' } } } }
+    ctx.predecessorValues = { previous: { rows: [{ data: { id: 'one' } }] } }
+    expect(await handlers['write-dataset'](ctx)).toMatchObject({ status: 'done', structured: { written: 1 } })
+    expect(access).toHaveBeenCalledWith('task', ctx.signal)
+    expect(writeDataset).toHaveBeenCalledWith({ datasetId: 'dataset-1', version: 3, rows: [{ data: { id: 'one' } }] })
+    ctx.predecessorValues = { previous: { rows: [{ data: { id: 'one' }, unknown: true }] } }
+    await expect(handlers['write-dataset'](ctx)).rejects.toThrow()
+    expect(writeDataset).toHaveBeenCalledTimes(1)
+  })
 })

@@ -13,8 +13,8 @@ publication and every query, calls the same data-source runtime, projects the pa
 means. A pass samples at most 200 panels (`MAX_PANELS_PER_PASS`) and reports the rest.
 
 An unplaced panel is skipped, because nothing draws it. Placing it again resumes sampling, and the gap
-between draws as a gap. If any source is unavailable, or the projection has no finite measure, the
-panel is skipped, and the run detail names it with the reason. A dip recorded
+between draws as a gap. If any source is unavailable, any read is neither `complete` nor `bounded`, or the projection
+has no finite measure, the panel is skipped, and the run detail names it with the reason. A dip recorded
 because one provider was briefly down would be a number that never happened.
 
 The sampler is the store's only writer, and there's no write route. The client reads a series from
@@ -37,6 +37,12 @@ mustn't delete its history. When the preference can't be read, the pass skips th
 Samples are keyed by panel ID and a signature of the measure's definition
 (`packages/dashboards-core/src/signature.ts`). A signature change resets that panel's series, because
 the old samples would describe a different measure. The signature covers what changes the measure's
-meaning: the queries, the mapping, the filters, the aggregate, and the measured field. The view kind,
-sort, limit, visible fields, title, geometry, and trend display keys don't count, so retitling or
+meaning: the queries, the mapping, the filters, the aggregate, and the measured field. For version 2
+plans, it also includes source roles, relations, columns, stages, time policy, sort, group, and limit;
+changing a summary or its input window cannot retain the former measure history. Query identity
+includes the published revision digest of a saved query or the digest of inline content, its
+resolved parameters, and its account. Republishing a saved query with a different filter resets the
+series. The pass counts resets in its run result. Series recorded before query identity joined the
+signature are relabelled on their next sample instead of reset. The view kind,
+visible fields, title, geometry, and trend display keys don't count, so retitling or
 moving a panel keeps its history.

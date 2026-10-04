@@ -210,30 +210,36 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
   if (metadataOnly) return disposables
 
   for (const descriptor of contributions.contentLinks ?? []) {
+    const kind = descriptor.id.startsWith(`${pluginId}.`) ? descriptor.id : `${pluginId}.${descriptor.id}`
     // `openPane` is optional: a plugin whose only home for a matched item is its own reference panel
     // declares no pane, and the host resolves the panel by provider at click time. An openPane that is
     // named still has to be a declared task pane, so the node's parse-time check is re-run here rather
     // than trusted.
     const pane = descriptor.openPane
+    const overlay = descriptor.openOverlay
     if (pane !== undefined && !taskPanes.has(pane)) {
       log.warn(`${pluginId} content link '${descriptor.id}' names an undeclared pane '${pane}'`, undefined, { 'plugin.id': pluginId })
       continue
     }
+    if (overlay !== undefined && !surfaces.overlays.has(overlay)) continue
     add('content link', descriptor.id, () => {
-      const pattern = compileContentLinkPattern(descriptor.match)
-      if (!pattern.captures.includes(descriptor.item)) {
+      const pattern = descriptor.match ? compileContentLinkPattern(descriptor.match) : undefined
+      if (pattern && (!descriptor.item || !pattern.captures.includes(descriptor.item))) {
         throw new Error(`item '${descriptor.item}' is not captured by its pattern`)
       }
       return own(contentLinkRegistry, {
-        id: descriptor.id,
+        id: kind,
+        overlay,
+        presentations: descriptor.presentations,
+        target: (item) => ({ kind, item, ...(pane ? { pane } : {}), ...(overlay ? { overlay } : {}) }),
         // Stamped from the plugin id, never read off the descriptor. It's what makes the plugin's own
         // reference panel reachable from one of its links, and a manifest that could state it could
         // point a link at another plugin's panel.
         providerId: pluginId,
         parse: (href) => {
-          const captures = pattern.match(href)
+          const captures = pattern?.match(href)
           if (!captures) return null
-          return { ...captures, kind: descriptor.id, ...(pane ? { pane } : {}), item: captures[descriptor.item] }
+          return { ...captures, kind, ...(pane ? { pane } : {}), ...(overlay ? { overlay } : {}), item: captures[descriptor.item!] }
         },
       })
     })

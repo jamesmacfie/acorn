@@ -618,10 +618,10 @@ describe('architecture boundaries', () => {
       // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
       // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
       // `features/editor/documentCustody.ts`, merged in from perf.
-      '@acorn/client-core': 166, // PaneModelHost and QueryCacheProvider are renderer composition seams.
+      '@acorn/client-core': 167, // Includes the host-owned Datasets settings page.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 10,
+      '@acorn/dashboards-core': 14, // Shared SQL/in-memory summary and time-bucket semantics.
       '@acorn/diff-document': 2,
     }
     const problems: string[] = []
@@ -720,7 +720,7 @@ describe('architecture boundaries', () => {
     // name collisions rather than dependencies: two with core vocabulary, and `browserRules.ts` with
     // the `browser` plugin. Those rules are the preview pane's page-fill rules and belong to
     // `preview`. Nothing in `plugins/browser` reads them.
-    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts']
+    const NAME_COLLISIONS = ['agentContext.ts', 'browserRules.ts', 'contextMenus.ts', 'contextTime.ts']
     const pluginNames = PACKAGES.filter((p) => p.kind === 'plugin').map((p) => p.name.replace('@acorn/plugin-', ''))
     const proto = byName.get('@acorn/protocol')!
     const named = walk(proto.src)
@@ -751,6 +751,17 @@ describe('architecture boundaries', () => {
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
+      ['packages/client-core/src/features/dashboards/DashboardEditor.tsx', 'context is a binding address and preview is a run mode'],
+      ['packages/client-core/src/features/dashboards/dashboardClient.ts', 'preview is a dashboard run mode'],
+      ['packages/client-core/src/features/dataSources/fieldPickerModel.ts', 'context is a binding address'],
+      ['packages/dashboards-core/src/plan.ts', 'context is a binding address; github is a provider example in a description'],
+      ['packages/node-core/src/server/dashboards/run.ts', 'context is a binding address and preview is a run mode'],
+      ['packages/node-core/src/server/queries/sourceContext.ts', 'context is a host binding; github names the core-owned project repository facet'],
+      ['packages/node-core/src/server/queries/validation.ts', 'context is a binding address'],
+      ['packages/protocol/src/dashboards/panels.ts', 'preview is a dashboard run mode'],
+      ['packages/protocol/src/data/queries/contextTime.ts', 'context is a binding address'],
+      ['packages/protocol/src/data/queries/dataQueryResolution.ts', 'context is a binding address'],
+      ['packages/protocol/src/data/values/dataBindings.ts', 'context is a binding address'],
       // `terminal` the UI style pack, which is a shape-and-density choice with no plugin behind it.
       ['packages/client-core/src/features/settings/StyleGallery.tsx', "the 'terminal' UI style"],
       ['packages/client-core/src/features/settings/uiStyles.ts', "the 'terminal' UI style"],

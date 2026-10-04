@@ -11,11 +11,15 @@ const valueSchema = z.unknown().transform((value, ctx): DataValue => {
   }
 })
 const id = z.string().min(1).max(200)
-const addressSchema = z.discriminatedUnion('from', [
+const addressSchema = z.union([
   z.object({ from: z.literal('literal'), value: valueSchema }).strict(),
   z.object({ from: z.literal('input'), name: id, pointer: dataPointerSchema }).strict(),
   z.object({ from: z.literal('step'), stepId: id, pointer: dataPointerSchema }).strict(),
   z.object({ from: z.literal('item'), pointer: dataPointerSchema }).strict(),
+  z.object({ from: z.literal('context'), name: z.literal('viewer'), pointer: dataPointerSchema }).strict(),
+  z.object({ from: z.literal('context'), name: z.literal('workspaceLinks') }).strict(),
+  z.object({ from: z.literal('context'), name: z.literal('now'), offset: z.string().regex(/^[+-]P\d+[DW]$/).optional() }).strict(),
+  z.object({ from: z.literal('context'), name: z.literal('calendar'), boundary: z.enum(['startOfDay', 'startOfWeek', 'startOfMonth']), offset: z.string().regex(/^[+-]P\d+[DWM]$/).optional() }).strict(),
 ])
 export const dataBindingSchema = z.object({
   address: addressSchema,
@@ -33,14 +37,21 @@ export const dataFieldSchema = z.object({
   origin: z.enum(['declared', 'dynamic', 'observed']),
   display: z.object({
     kind: z.enum(['text', 'number', 'boolean', 'datetime', 'enum', 'status', 'person', 'link']),
+    precision: z.literal('day').optional(),
+    list: z.boolean().optional(),
     unit: z.string().max(16).optional(),
     role: z.enum(['title', 'status', 'assignee', 'url', 'updated']).optional(),
   }).strict().optional(),
   query: z.object({ operators: z.array(z.enum(DATA_OPERATORS)).max(DATA_OPERATORS.length), sortable: z.boolean() }).strict().optional(),
   choices: z.discriminatedUnion('kind', [
-    z.object({ kind: z.literal('static'), values: z.array(z.object({ id, label: z.string().min(1).max(DATA_LIMITS.labelChars) }).strict()).max(DATA_LIMITS.options) }).strict(),
+    z.object({ kind: z.literal('static'), values: z.array(z.object({
+      id, label: z.string().min(1).max(DATA_LIMITS.labelChars),
+      tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(),
+      rank: z.number().finite().optional(),
+    }).strict()).max(DATA_LIMITS.options) }).strict(),
     z.object({ kind: z.literal('dynamic'), dependsOn: z.array(dataPointerSchema).max(DATA_LIMITS.fields) }).strict(),
   ]).optional(),
+  viewerMatch: dataPointerSchema.optional(),
 }).strict().superRefine((field, ctx) => {
   if (field.origin === 'observed' && (field.query || field.choices)) {
     ctx.addIssue({ code: 'custom', message: 'Observed fields cannot declare query support or choices' })

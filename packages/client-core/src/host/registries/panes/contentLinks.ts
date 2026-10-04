@@ -1,10 +1,12 @@
 import { Registry } from '../../../kit/lib/state/registry'
 import { openPane } from '../commands/clientEvents'
 import { paneAvailable, paneContribution } from './panes'
-import { openRefPanel } from './refPanels'
+import { openRefPanel, refPanelFor } from './refPanels'
 import { sourceIdForPath } from '../sources/sources'
 import { taskById } from '../../../features/tasks/taskLookup'
+import { pathForTask } from '../../../features/tasks/activate'
 import { setSelectedSource } from '../../../features/tasks/tasks'
+import { openPluginOverlay } from '../../frames/overlays'
 
 // Resolving an external URL in rendered content to somewhere inside the app, so a link to
 // github.com/o/r/pull/9 or linear.app/acme/issue/ENG-1 opens the pane instead of the browser. The
@@ -28,6 +30,10 @@ export type ContentLinkContribution = {
   // is what the per-node plugin-disable test asserts against, and what makes an unclaimed kind
   // traceable.
   id: string
+  /** Build a target without a URL, for records whose identity is local to acorn. */
+  target?: (item: string) => InAppTarget | null
+  overlay?: string
+  presentations?: readonly ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[]
   // Whose items these URLs identify, and the only thing that makes a reference panel reachable from a
   // link: the ladder below looks the panel up by provider, never by a panel id a recogniser named.
   //
@@ -50,6 +56,22 @@ export type ContentLinkContribution = {
 }
 
 export const contentLinkRegistry = new Registry<ContentLinkContribution>('content-link')
+
+const coreTaskContentLink: ContentLinkContribution = { id: 'core.task', providerId: 'core', parse: () => null,
+  target: item => ({ kind: 'core.task', item }),
+  path: target => { const task = typeof target.item === 'string' ? taskById(target.item) : undefined; return task ? pathForTask(task) : null },
+  presentations: ['route'] }
+
+/** Names are bound to their registering plugin, never to a kind copied from a record. */
+export function resolveNamedContentTarget(kind: string, item: string): { target: InAppTarget; contribution: ContentLinkContribution } | null {
+  if (!item || !/^[a-z0-9-]+\.[a-z0-9-]+$/.test(kind)) return null
+  const contribution = kind === 'core.task' ? coreTaskContentLink
+    : contentLinkRegistry.entries().find(entry => entry.id === kind && kind.startsWith(`${entry.providerId}.`))
+  if (!contribution) return null
+  const candidate = contribution.target?.(item) ?? { kind, item }
+  if (!candidate || candidate.kind !== kind || candidate.item !== item) return null
+  return { target: { ...candidate, providerId: contribution.providerId }, contribution }
+}
 
 // First recogniser to claim the href wins. Order is the registry's declared order, so two providers
 // whose patterns overlap resolve deterministically rather than by registration accident.
@@ -282,7 +304,7 @@ function openRefPanelTarget(target: InAppTarget): boolean {
 // early `return` added on the way silently became "let the browser have it". Naming the outcomes makes
 // the fall-through the one value a caller has to mention, instead of the default of any branch that
 // forgets.
-export type ContentLinkOutcome = 'route' | 'refPanel' | 'pane' | 'external'
+export type ContentLinkOutcome = 'route' | 'refPanel' | 'pane' | 'overlay' | 'external'
 
 export type ContentLinkPresentation = {
   // The task whose layout a pane would open into. `null` or absent is normal, not an error: classic
@@ -291,7 +313,7 @@ export type ContentLinkPresentation = {
   // Which presentation the clicking surface would rather have. The surface knows where the reader is and
   // the target does not, which is the whole argument. See docs/dashboards/panels.md § Provenance, and what a row
   // may not claim for the ranking and the bug that produced it.
-  prefer?: 'route' | 'pane' | 'refPanel'
+  prefer?: 'route' | 'pane' | 'refPanel' | 'overlay'
   // The shell's navigator, for the `route` rung. Absent is normal: a surface with no navigator in scope
   // has one fewer destination, and the others still work.
   navigate?: (to: string) => void
@@ -312,7 +334,7 @@ function openRouteTarget(path: string | null | undefined, navigate: ((to: string
 // Pane, then panel, then route, for a surface that states no preference. This is the order the first two
 // have always resolved in, and the route joins the end rather than the front: a caller that did not ask
 // to be moved should not be moved. Every surface that wants otherwise says so.
-const DEFAULT_ORDER = ['pane', 'refPanel', 'route'] as const
+const DEFAULT_ORDER = ['pane', 'refPanel', 'route', 'overlay'] as const
 
 // The general ladder: what the host can do with a recognised target, in the order the surface asked for.
 // It knows nothing plugin-specific. A provider declares what it has and the surface declares where it
@@ -320,14 +342,19 @@ const DEFAULT_ORDER = ['pane', 'refPanel', 'route'] as const
 //
 // `path` is passed in rather than resolved here because only `claimFor` knows which contribution made
 // the claim, and a target must never be able to resolve to one provider's item and another's route.
-function openClaim(target: InAppTarget, path: string | null | undefined, presentation: ContentLinkPresentation): ContentLinkOutcome {
+function openClaim(target: InAppTarget, path: string | null | undefined, presentation: ContentLinkPresentation, contribution?: ContentLinkContribution): ContentLinkOutcome {
   const order = presentation.prefer
     ? [presentation.prefer, ...DEFAULT_ORDER.filter((rung) => rung !== presentation.prefer)]
     : DEFAULT_ORDER
   for (const rung of order) {
+    if (contribution?.presentations && !contribution.presentations.includes(rung)) continue
     if (rung === 'pane' && openPluginContentTarget(target, presentation.taskId)) return 'pane'
     if (rung === 'refPanel' && openRefPanelTarget(target)) return 'refPanel'
     if (rung === 'route' && openRouteTarget(path, presentation.navigate)) return 'route'
+    if (rung === 'overlay' && contribution?.overlay && typeof target.providerId === 'string') {
+      openPluginOverlay(target.providerId, contribution.overlay)
+      return 'overlay'
+    }
   }
   return 'external'
 }
@@ -336,6 +363,26 @@ function openClaim(target: InAppTarget, path: string | null | undefined, present
  *  the href, which a bare target does not carry, and `openInAppUrl` is the entry point that has both. */
 export function openContentTarget(target: InAppTarget, presentation: ContentLinkPresentation = {}): ContentLinkOutcome {
   return openClaim(target, null, presentation)
+}
+
+export function openNamedContentTarget(kind: string, item: string, presentation: ContentLinkPresentation = {}): ContentLinkOutcome {
+  const claim = resolveNamedContentTarget(kind, item)
+  if (!claim) return 'external'
+  return openClaim(claim.target, claim.contribution.path?.(claim.target), presentation, claim.contribution)
+}
+
+/** Editor metadata for a concrete row. This never opens a destination. */
+export function availableContentPresentations(input: { href?: string; kind?: string; item?: string; taskId?: string }, navigate = true): ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[] {
+  const claim = input.href ? claimFor(input.href) : input.kind && input.item ? resolveNamedContentTarget(input.kind, input.item) : null
+  const result: ('route' | 'refPanel' | 'pane' | 'overlay' | 'external')[] = []
+  if (claim) {
+    if (navigate && claim.contribution.path?.(claim.target)) result.push('route')
+    if (typeof claim.target.providerId === 'string' && typeof claim.target.item === 'string' && refPanelFor(claim.target.providerId)) result.push('refPanel')
+    if (input.taskId && typeof claim.target.pane === 'string' && paneContribution(claim.target.pane) && paneAvailable(paneContribution(claim.target.pane)!, taskById(input.taskId))) result.push('pane')
+    if (claim.contribution.overlay && typeof claim.target.providerId === 'string') result.push('overlay')
+  }
+  if (input.href) result.push('external')
+  return claim?.contribution.presentations ? result.filter(value => claim.contribution.presentations!.includes(value)) : result
 }
 
 // ── An external URL that a surface was about to hand to the browser ───────────────────────────────
@@ -351,7 +398,7 @@ export function openContentTarget(target: InAppTarget, presentation: ContentLink
 export function openInAppUrl(href: string, destination: ContentLinkPresentation = {}): boolean {
   const claim = claimFor(href)
   if (!claim) return false
-  return openClaim(claim.target, claim.contribution.path?.(claim.target), destination) !== 'external'
+  return openClaim(claim.target, claim.contribution.path?.(claim.target), destination, claim.contribution) !== 'external'
 }
 
 export function handlePluginContentLinkClick(event: MouseEvent, presentation: ContentLinkPresentation = {}): boolean {

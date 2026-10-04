@@ -33,6 +33,14 @@ export function validateQueryTemplate(content: QueryContent, description: DataSo
       validateDataValue(resolveDataBinding(value, {}), expected)
       return
     }
+    if (address.from === 'context') {
+      if (address.name === 'viewer') {
+        if (!description.operations.identity || !description.fields.some(field => field.viewerMatch === address.pointer)) throw new Error('Source does not declare this viewer identity field')
+      } else if (address.name === 'workspaceLinks') {
+        if (expected.type !== 'array' || expected.items?.type !== 'string') throw new Error('Workspace links require a string-list parameter')
+      } else if (expected.type !== 'number' && expected.type !== 'string') throw new Error('Time context requires a datetime field')
+      return
+    }
     if (address.from !== 'input' || !Object.hasOwn(content.parameters.properties ?? {}, address.name)) throw new Error('Undeclared query parameter')
     const declaration = content.parameters.properties![address.name]!
     const selected = sourceFieldSchema(declaration, address.pointer)

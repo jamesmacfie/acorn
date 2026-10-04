@@ -1,3 +1,11 @@
+> **Completed 2026-10-04** by the "Phase 04 row actions and navigation" task.
+>
+> **What landed:** Dashboard rows now retain full source references and expose authored presses, three row buttons, keyboard menus, named targets, task promotion, and Node-validated named actions with confirmation and idempotency keys. Group headers and stat measures open read-only drill-downs showing the exact rows behind the displayed result, with a derived plan that can be added as a panel.
+>
+> **Deviations:** At Phase 04 completion the Phase 03 job source was on a separate branch; it is now integrated, with **Re-run job** through the confined named-action route. The terminal client does not yet draw dashboard panels, so its row menu has no rendering site. Phase 05 summary stages were added later and now use `deriveDrilldownPlan` for summary and measure drill-down.
+>
+> **For later phases:** `packages/dashboards-core/src/plan.ts` exports `deriveDrilldownPlan(plan, rows, { stageIndex, measureFilter })`; pass the stage preceding a Phase 05 summary and its measure filter, then render the originating rows as the snapshot to preserve the displayed count. `packages/node-core/src/server/dataSources/runtime.ts` owns `actOnDataRecord`, and named targets resolve through `openNamedContentTarget` in client-core. The full test gate needs a supported Node version; backup tests timed out even in isolation on this machine. Desktop `dev:agent` UI verification was rejected by automatic approval review because it treated the test session as an agent launch.
+
 # Workstream 4: row actions and navigation
 
 Status: proposed, 2026-10-02, revised the same day. Depends on

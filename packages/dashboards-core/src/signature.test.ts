@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { PanelDefinition } from './model'
 import { measureSignature, stableStringify } from './signature'
+import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 
 const panel = (overrides: Partial<PanelDefinition> = {}): PanelDefinition => ({
   id: 'p1',
@@ -43,6 +44,27 @@ describe('what resets a series and what does not', () => {
     expect(measureSignature(panel({ sources: [{ pluginId: 'github', sourceId: 'pulls-mine@second-query' }] }))).not.toBe(base)
     expect(measureSignature(panel({ mapping: { unmapped: 'hidden' } }))).not.toBe(base)
     expect(measureSignature(panel({ view: { kind: 'stat', aggregate: 'sum', field: 'additions' } }))).not.toBe(base)
+  })
+
+  it("resets when a query's content, parameters, or account changes", () => {
+    const query = { id: 'q', digest: 'a', parameters: { repo: 'acorn' }, account: 'work' }
+    const base = measureSignature(panel(), [query])
+    expect(measureSignature(panel(), [{ ...query }])).toBe(base)
+    expect(measureSignature(panel(), [{ ...query, digest: 'b' }])).not.toBe(base)
+    expect(measureSignature(panel(), [{ ...query, parameters: { repo: 'other' } }])).not.toBe(base)
+    expect(measureSignature(panel(), [{ ...query, account: 'personal' }])).not.toBe(base)
+    expect(measureSignature(panel())).not.toBe(base)
+  })
+
+  it('resets when a version 2 summary changes without changing its source query', () => {
+    const plan = panelPlanSchema.parse({ version: 2, title: 'Totals', time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+      sources: [{ id: 'a', label: 'A', role: 'primary', reference: { kind: 'inline', content: { name: 'A', parameters: { type: 'object', additionalProperties: false }, sourceParameters: {}, query: { source: { pluginId: 'core', sourceId: 'tasks' }, scope: { parameters: {} }, sort: [] } }, bindings: {} } }],
+      columns: [{ id: 'status', label: 'Status', type: 'text', bind: { a: { field: '/status' } } }],
+      stages: [{ op: 'summarize', by: [], measures: [{ id: 'total', label: 'Total', kind: 'count' }] }], view: { kind: 'stat', aggregate: 'sum', field: 'total' } })
+    const query = [{ id: 'a', digest: 'same', parameters: {}, account: null }]
+    const base = measureSignature(panel(), query, plan)
+    expect(measureSignature(panel(), query, { ...plan, stages: [{ op: 'summarize', by: [], measures: [{ id: 'total', label: 'Total', kind: 'count-where', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/status' } }, operator: 'eq', right: { address: { from: 'literal', value: 'open' } } } }] }] })).not.toBe(base)
+    expect(measureSignature(panel(), query, { ...plan, title: 'Renamed' })).toBe(base)
   })
 
   it('gives two panels with the same meaning the same signature', () => {

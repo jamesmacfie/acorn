@@ -92,6 +92,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const clarification = () => pending()?.state === 'clarification' ? pending() as Extract<AuthoringTurnResult, { state: 'clarification' }> : undefined
   const proposal = () => pending()?.state === 'proposal' ? pending() as Extract<AuthoringTurnResult, { state: 'proposal' }> : undefined
   const stopped = () => pending()?.state === 'stopped' ? pending() as Extract<AuthoringTurnResult, { state: 'stopped' }> : undefined
+  const unavailable = () => pending()?.state === 'unavailable' ? pending() as Extract<AuthoringTurnResult, { state: 'unavailable' }> : undefined
 
   const save = (): void => {
     if (typeof localStorage === 'undefined') return
@@ -136,7 +137,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
       setContext(result.context)
       showReply(result)
       setInstruction('')
-      setStatus(result.state === 'proposal' ? 'Proposal ready for review.' : result.state === 'clarification' ? 'Waiting for your answer.' : result.reason)
+      setStatus(result.state === 'proposal' ? 'Proposal ready for review.' : result.state === 'clarification' ? 'Waiting for your answer.' : result.state === 'unavailable' ? 'This request is unavailable.' : result.reason)
     } catch (failure) {
       if (!request.signal.aborted && controller === request) setError(failure instanceof Error ? failure.message : 'AI authoring failed.')
     } finally {
@@ -211,6 +212,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
             <For each={value().diff.slice(0, 20)}>{change => <Text wrap>{`${CHANGE_WORD[change.change] ?? change.change} ${describe(change.path, value().candidate)}: ${clipped(change.before)} → ${clipped(change.after)}`}</Text>}</For>
             <Show when={value().diff.length > 20}><Text emphasis="muted">{`and ${value().diff.length - 20} more changes`}</Text></Show>
             <For each={value().problems}>{problem => <Text wrap>{problem}</Text>}</For>
+            <For each={value().unaddressed ?? []}>{item => <Text wrap>{`Not addressed: ${item}`}</Text>}</For>
             <Text emphasis="muted">{`${value().usage.requests} model request${value().usage.requests === 1 ? '' : 's'} · ${value().usage.inputTokens} input tokens · ${value().usage.outputTokens} output tokens`}</Text>
             <Inline gap="inline">
               <Button variant="solid" disabled={value().problems.length > 0 || props.disabled} onPress={() => void apply(value())}>Apply reviewed edit</Button>
@@ -219,6 +221,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
           </Stack>
         </Alert>}</Show>
       <Show when={stopped()}>{value => <Alert tone="warn">{value().reason}</Alert>}</Show>
+      <Show when={unavailable()}>{value => <Alert tone="warn" title="This request is unavailable"><For each={value().reasons}>{reason => <Text wrap>{`${reason.capability}: ${reason.reason}`}</Text>}</For></Alert>}</Show>
       </ErrorBoundary>
     </Stack>
   )

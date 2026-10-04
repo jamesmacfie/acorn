@@ -4,6 +4,7 @@ import { queryReferenceSchema, type QueryScope, type ResolvedQuery } from '@acor
 import { readDataBinding, resolveDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
 import { dataRecordRefSchema, type DataSourceRequest, type DataSourceResponse } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, parseDataValue } from '@acorn/protocol/dataValues.ts'
+import { datasetWriteSchema, type DatasetWrite } from '@acorn/protocol/datasets.ts'
 import type { StepHandler, StepHandlerContext, WorkflowStepRow } from '../../shared/workflowContracts'
 
 type PluginContext = Parameters<NonNullable<NodePlugin['init']>>[0]
@@ -11,6 +12,7 @@ export type WorkflowDataAccess = {
   scope: QueryScope
   resolve(reference: Parameters<PluginContext['dataSources']['resolveQuery']>[1], context: Parameters<PluginContext['dataSources']['resolveQuery']>[2]): Promise<ResolvedQuery>
   invoke<R extends DataSourceRequest>(request: R): Promise<DataSourceResponse<R>>
+  writeDataset?(input: DatasetWrite): Promise<number>
 }
 export type WorkflowDataServices = {
   incremental?(runId: string, stepId: string, query: ResolvedQuery['query']): ResolvedQuery['query']
@@ -33,8 +35,16 @@ export function evaluateWorkflowCondition(input: DataPredicate, context: StepHan
 }
 
 /** The source facade owns paging, authority and schema validation; these handlers own durable workflow values. */
-export function workflowDataHandlers(services: WorkflowDataServices): Record<'find-records' | 'get-record-details' | 'if', StepHandler> {
+export function workflowDataHandlers(services: WorkflowDataServices): Record<'find-records' | 'get-record-details' | 'write-dataset' | 'if', StepHandler> {
   return {
+    'write-dataset': async context => {
+      if (!services.access || !context.def.dataset) throw new Error('Dataset write needs a dataset and source access')
+      const access = await services.access(context.run.taskId, context.signal)
+      if (!access.writeDataset) throw new Error('Dataset writes unavailable')
+      const resolved = resolveDataBinding(context.def.dataset.rows, { inputs: { ...context.inputs }, steps: { ...context.predecessorValues } })
+      const input = datasetWriteSchema.parse({ datasetId: context.def.dataset.id, version: context.def.dataset.version, rows: resolved })
+      return { status: 'done', structured: { written: await access.writeDataset(input) } }
+    },
     if: async context => {
       if (!context.def.condition) throw new Error('If needs a condition')
       const matched = evaluateWorkflowCondition(context.def.condition, context)

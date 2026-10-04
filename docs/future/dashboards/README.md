@@ -1,7 +1,8 @@
 # Dashboards: panels that answer real questions
 
-Status: proposed, 2026-10-02, revised the same day after a third review. Nothing in this programme is
-built. It replaces the August 2026 backlog that lived here: the redesign verification pass,
+Status: workstreams 1–7 implemented and integrated as of 2026-10-04; live-provider and human
+acceptance limits are recorded in the [integration audit](./integration-audit.md). This programme
+replaces the August 2026 backlog that lived here: the redesign verification pass,
 `project-database.md`, `dynamic-collections.md`, and the old `write-back.md`. Git history keeps them,
 and their surviving decisions are carried into the files below. [Dashboards](../../dashboards.md) and
 [typed data sources](../../data-sources.md) own shipped behaviour and win over anything here until a
@@ -41,6 +42,7 @@ formula language or SQL inside panels.
 | [05-composition-and-analysis.md](./05-composition-and-analysis.md) | Workstream 5. The row model, relations and equivalence, repeated stages, summaries, and overlap. |
 | [06-datasets-and-history.md](./06-datasets-and-history.md) | Workstream 6. Datasets with storage modes and two kinds of coverage, filled by schedules, workflows, and agents. |
 | [07-write-back.md](./07-write-back.md) | Workstream 7. Board drag that changes provider values. Gated. |
+| [integration-audit.md](./integration-audit.md) | Mandatory milestone inventory, explicit deferrals, integrated paths, and verification limits. |
 
 ## Workstreams and milestones
 

@@ -1,19 +1,23 @@
+import { createHash } from 'node:crypto'
 import { and, eq } from 'drizzle-orm'
 import { parsePanels } from '@acorn/dashboards-core/contract'
-import type { PanelDefinition } from '@acorn/dashboards-core/model.ts'
-import { panelMeasure } from '@acorn/dashboards-core/projection'
-import { measureSignature } from '@acorn/dashboards-core/contract'
-import { projectDashboardPanel, type DashboardQueryProjection } from '@acorn/dashboards-core/projection'
-import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
+import type { PanelDefinition } from '@acorn/dashboards-core/contract'
+import { measureSignature, type MeasureQueryIdentity } from '@acorn/dashboards-core/contract'
+import { displayPlanRun } from '@acorn/dashboards-core/plan.ts'
+import { aggregateRows } from '@acorn/dashboards-core/shaping.ts'
+import { canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import { type AppDatabase, schema } from '../db'
-import { invokeDataSource } from '../dataSources/runtime'
-import { resolveQuery } from '../queries/runtime'
 import { appendSample, hourBucket } from './history'
 import { dashboardStore } from './store'
 import { createLogger, describeError } from '../telemetry/logger'
+import { runDashboard } from './run'
 
 const log = createLogger('dashboards')
+
+/** The digest the query library gives a published revision, applied to inline content. */
+const contentDigest = (content: unknown): string =>
+  createHash('sha256').update(canonicalDataEncoding(parseDataValue(content))).digest('hex')
 
 // One pass of `core:sample-measures`. See docs/schedules.md for why it is one core schedule rather
 // than a row per panel, and docs/dashboards/sampling.md § Sampling and retention for what a pass does.
@@ -87,8 +91,6 @@ export async function runSamplePass(
   for (const panel of panels) {
     if (signal.aborted) break
     if (!panel.publication) continue
-    const projections: DashboardQueryProjection[] = []
-    let unavailable: string | null = null
     let published
     try { published = dashboardStore(db).publishedById(panel.publication.dashboardId) }
     catch {
@@ -96,36 +98,24 @@ export async function runSamplePass(
       continue
     }
     const principal = { kind: 'internal' as const, scope: 'service' as const, userId: env.ACTIVE_IDENTITY.get()! }
-    for (const entry of published.content.queries) {
-      try {
-        const invocation = { principal, signal }
-        const resolved = await resolveQuery(env, {
-          workspaceId: published.workspaceId,
-          ...(published.projectId ? { projectId: published.projectId } : {}),
-        }, entry.reference, {}, invocation)
-        const description = await invokeDataSource(env, {
-          operation: 'describe', source: resolved.query.source, scope: resolved.query.scope,
-        }, invocation)
-        const page = await invokeDataSource(env, {
-          operation: 'query', query: resolved.query, mode: 'execution', evaluationTime: now,
-          pageSize: DATA_LIMITS.options,
-        }, invocation)
-        projections.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description, result: page })
-      } catch (error) {
-        unavailable = `${entry.label} unavailable`
-        // One line for the author. The run row gets the short form, because it is a settings list,
-        // not a log.
-        log.warn(`${panel.id} skipped: ${entry.label}: ${describeError(error).message}`)
-        break
-      }
-    }
-    if (unavailable) {
-      result.skipped.push({ panelId: panel.id, reason: unavailable })
+    let run
+    try {
+      run = await runDashboard(env, {
+        scope: { workspaceId: published.workspaceId, ...(published.projectId ? { projectId: published.projectId } : {}) },
+        target: { kind: 'published', id: published.dashboardId, revision: published.revision },
+        mode: 'execution', evaluationTime: now,
+      }, { principal, signal })
+    } catch (error) {
+      log.warn(`${panel.id} skipped: ${describeError(error).message}`)
+      result.skipped.push({ panelId: panel.id, reason: 'panel unavailable' })
       continue
     }
-
-    const projection = projectDashboardPanel(published.content, projections)
-    const value = panelMeasure(projection.definition, projection.sources)
+    if (!run.diagnostics.complete) {
+      result.skipped.push({ panelId: panel.id, reason: run.diagnostics.problems[0]?.message ?? 'partial data' })
+      continue
+    }
+    const projection = displayPlanRun(run.plan, run.rows)
+    const value = aggregateRows(projection.rows, projection.schema, run.plan.view)
     if (value === null || !Number.isFinite(value)) {
       // An aggregate over a field that is not there, or over rows with no numbers. The stat draws a
       // dash for this, so the series records nothing rather than a 0 that never happened.
@@ -135,7 +125,13 @@ export async function runSamplePass(
 
     const { reset } = await appendSample(db, {
       panelId: panel.id,
-      signature: measureSignature(projection.definition),
+      signature: measureSignature({ ...panel, view: run.plan.view }, run.plan.sources.map((entry, index): MeasureQueryIdentity => ({
+        id: entry.id,
+        digest: run.diagnostics.sources[index]?.queryDigest ?? contentDigest(entry.reference),
+        parameters: run.diagnostics.sources[index]?.parameters ?? {}, account: run.diagnostics.sources[index]?.account ?? null,
+      })), run.plan),
+      // Drop `adopt` once every series has been sampled under query identity.
+      adopt: measureSignature(panel),
       bucket,
       value,
       recordedAt: now,

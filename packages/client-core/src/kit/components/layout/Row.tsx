@@ -71,6 +71,7 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
+  onMenu?: () => void
   /** A mouse double-click, for rows where the second press has a distinct conventional meaning. */
   onDoublePress?: () => void
   /** Renders an <a class="ui-row">.
@@ -173,6 +174,8 @@ export function Row(props: {
           event.preventDefault()
           activate()
         }}
+        onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.() } : undefined}
+        onKeyDown={props.onMenu ? (event) => { if (event.target === event.currentTarget && (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) { event.preventDefault(); props.onMenu?.() } } : undefined}
         onDblClick={(event) => {
           if (!fromNestedControl(event)) props.onDoublePress?.()
         }}
@@ -201,15 +204,18 @@ export function Row(props: {
       aria-label={props.label}
       aria-selected={props.item ? !!props.selected : undefined}
       style={placement(props)}
-      role={props.item?.role ?? (props.onPress ? 'button' : undefined)}
-      tabindex={props.item ? props.item.tabindex : props.onPress ? 0 : undefined}
+      role={props.item?.role ?? (props.onPress || props.onMenu ? 'button' : undefined)}
+      tabindex={props.item ? props.item.tabindex : props.onPress || props.onMenu ? 0 : undefined}
       onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
+      onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.() } : undefined}
       onDblClick={props.onDoublePress ? (event) => { if (!fromNestedControl(event)) props.onDoublePress?.() } : undefined}
-      onKeyDown={props.onPress && !props.item
+      onKeyDown={(props.onPress || props.onMenu) && !props.item
         ? (event) => {
           // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
           // collection this is the `activate` intent instead, so the row does not answer twice.
           if (event.target !== event.currentTarget) return
+          if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.(); return }
+          if (!props.onPress) return
           if (event.key !== 'Enter' && event.key !== ' ') return
           event.preventDefault()
           activate()

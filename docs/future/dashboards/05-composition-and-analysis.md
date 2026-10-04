@@ -1,3 +1,11 @@
+> **Completed 2026-10-04** by the "Phase 05 composition and analysis" task.
+>
+> **What landed:** Plans now define scoped relations, explicit equivalence, and bounded filter, compute, summarize, expand, and overlap stages. Node reads related sources in one run, preserves record provenance and exact summary measure rows for drill-down, and exposes partial results and stage row counts. The editor has forms for these operations, and fixture evaluations cover the worked examples and stat and chart summaries.
+>
+> **Deviations:** Phase 03 provider enrichment was separate at Phase 05 completion and is now integrated; live-provider acceptance remains unverified. Fixture sources exercise the generic relation contracts, and GitHub provider fixtures cover enriched fields. The flaky-test expectations have no human annotation. The earlier desktop source-picker attempt and full Node suite were inconclusive; the integration audit records later verification.
+>
+> **For later phases:** Pure summary and bucket logic lives in `packages/dashboards-core/src/analysis.ts` and `planBuckets.ts`; `runPlanStages` in `plan.ts` remains the execution seam for a future database path. `PlanRow.measureRows` and `representedRows` hold the original evaluation snapshot used by measure and group drill-down. Source declarations use `DataSourceDescription.relations`; the editor offers those declarations and explicit scoped equivalence. Phase 06 can reuse the summary functions without adding dataset behavior to this phase.
+
 # Workstream 5: composition and analysis
 
 Status: proposed, 2026-10-02, revised the same day. Depends on

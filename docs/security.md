@@ -7,6 +7,22 @@ acorn is single-owner software. A paired device has full owner authority for its
 protect the transport, credential custody, process boundaries, repository data, and untrusted provider
 and preview content, rather than implementing multi-user roles.
 
+Dashboard named actions send an action ID and full source reference. The Node checks scope, account
+authority, current eligibility, and confined route ownership before dispatch. The host confirms write
+and execute risk before sending anything, and a device-scoped idempotency key replays a completed
+press. [Plugin routes](./security/plugin-secrets-and-routes.md) owns the dispatch boundary.
+Board moves use the same `act` gate with a source field, expected value, and target. The Node
+rechecks the registered source, account, field declaration, live value, target set, and plugin-owned
+route. A device principal and host confirmation are required before dispatch. One move intent keeps its device-scoped
+idempotency key across retries; a changed intent gets a new key. Plugin frames do not receive this
+capability.
+
+Datasets store copies of provider and workflow data at rest in core SQLite. Definition, version,
+correction, and deletion routes require a device principal and are absent from plugin frame
+bridges. Capture schedules also require device consent. Dataset sources enforce workspace and
+optional project scope; task-scoped workflow and agent writes derive that scope from the task.
+Deleting a workspace removes its datasets. Row and byte caps plus retention bound local storage.
+
 ## Trust boundaries
 
 - **The renderer** runs UI code and third-party preview content. It holds no device token,

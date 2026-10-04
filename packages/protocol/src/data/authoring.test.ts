@@ -53,10 +53,10 @@ describe.each(['connection:model-key', 'harness:codex'])('bounded authoring thro
     expect(generate).toHaveBeenCalledTimes(2)
   })
 
-  it('stops after two malformed responses', async () => {
+  it('stops after three malformed responses', async () => {
     const generate = vi.fn(async () => ({ text: 'not json', providerId: 'fake', modelId: 'm' }))
     const result = await runAuthoringTurn({ request: request(backendId), system: 'system', generate, metadata: vi.fn(), validate: vi.fn() })
-    expect(result).toMatchObject({ state: 'stopped', usage: { requests: 2 } })
+    expect(result).toMatchObject({ state: 'stopped', usage: { requests: 3 } })
   })
 })
 
@@ -66,11 +66,17 @@ it('refuses a repair that drops an invalid filter', async () => {
   const generate = vi.fn()
     .mockResolvedValueOnce({ text: reply({ kind: 'proposal', candidate: invalid, summary: 'Invalid.' }), providerId: 'p', modelId: 'm' })
     .mockResolvedValueOnce({ text: reply({ kind: 'proposal', candidate: { query: {} }, summary: 'Deleted it.' }), providerId: 'p', modelId: 'm' })
+    .mockResolvedValueOnce({ text: reply({ kind: 'proposal', candidate: { query: {} }, summary: 'Still deleted.' }), providerId: 'p', modelId: 'm' })
   const result = await runAuthoringTurn({
     request: request('connection:c'), system: 'system', generate, metadata: vi.fn(),
     validate: async candidate => ({ candidate, problems: JSON.stringify(candidate).includes('/bad') ? ['bad field'] : [] }),
   })
   expect(result).toMatchObject({ state: 'proposal', problems: [expect.stringContaining('filter')] })
+})
+
+it('refuses a dashboard repair that removes a filter stage', () => {
+  const before = { stages: [{ op: 'filter', where: { kind: 'comparison', operator: 'eq' } }] }
+  expect(droppedFilterProblems(before, { stages: [] })).toEqual([expect.stringContaining('filter')])
 })
 
 it('enforces the metadata budget and labels provider content as untrusted data', async () => {

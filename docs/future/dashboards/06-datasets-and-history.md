@@ -1,3 +1,11 @@
+> **Completed 2026-10-04** by the "Phase 06 datasets and history" task.
+>
+> **What landed:** Core SQLite datasets now support current mirror, event archive, and snapshot history storage with versions, caps, retention, captures, explicit event coverage, and scoped source discovery. Device-approved capture schedules, task-scoped workflow and evidence-backed agent writes, durable human corrections, the Keep history editor flow, Settings → Datasets, authoring context and evaluation cases, and SQLite summaries with bounded drill-down are wired through the Node and client.
+>
+> **Deviations:** The Phase 03 GitHub Actions source was separate at Phase 06 completion and is now integrated; capture and continuation used fixtures, while live-provider acceptance remains open. Stat measure history stays in its existing table and compactor to preserve stored trends; datasets default to 90 days, 500,000 rows, and 512 MB. The Phase 06 Node cold-start budget rose by 28 KB after dataset work was moved behind request and schedule boundaries.
+>
+> **For later phases:** Dataset storage, capture, source, and SQL summary seams live in `packages/node-core/src/server/datasets/`; `dataset_write` and `write-dataset` require a project-owned dataset at its current version. Corrections count against the byte cap and persist until dataset deletion. A provider must declare event coverage or incremental boundaries before a successful capture can prove event completeness. The 200,000-row SQLite percentile check passed; the earlier source-picker attempt was inconclusive, but the integration desktop check opened it and created a disposable snapshot dataset with daily capture. Human annotation remains unverified. Bucketed stored-summary drill-down stays bounded; integration added an exact calendar range to its reusable Add as panel plan.
+
 # Workstream 6: datasets and history
 
 Status: proposed, 2026-10-02, revised the same day. Depends on

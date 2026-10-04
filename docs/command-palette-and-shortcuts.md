@@ -23,6 +23,7 @@ These are the default desktop chords. Settings → Keyboard shortcuts can rebind
 | `⌘,` | Open Settings on the last page used |
 | `⌘/` | Open the cheat sheet of keys that work here |
 | `Shift+F10` or the menu key | Open the context menu for the focused row. The platform fires `contextmenu`, and the shell doesn't bind it. |
+| `Enter` on a dashboard row | Open its configured destination. Its menu carries the row buttons and Start task. |
 | `Escape` | Close the topmost overlay or cancel the current action |
 
 The keyboard layer picks the platform modifier: Cmd on macOS, Ctrl elsewhere, and Ctrl in the

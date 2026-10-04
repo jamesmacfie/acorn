@@ -4,20 +4,22 @@ import type { Env } from '../bindings'
 import { getDb, schema } from '../db'
 import { createDataSelectionPager, selectDataRecords } from './selection'
 import { registerCoreDataSource } from './registry'
+import type { WorktreeCounts } from './localGitRead'
 
 export const CORE_TASK_SOURCE_ID = 'tasks'
 
 export const coreTaskSourceDescription: DataSourceDescription = {
-  revision: '1',
+  revision: '2',
   schema: {
     type: 'object', additionalProperties: false,
     properties: {
       title: { type: 'string' }, projectId: { type: 'string' }, project: { type: 'string' },
       workspaceId: { type: 'string' }, workspace: { type: 'string' }, origin: { type: 'string' },
       branch: { type: ['string', 'null'] }, status: { type: 'string' }, worktreeChanged: { type: ['boolean', 'null'] },
+      worktreePath: { type: ['string', 'null'] }, modifiedCount: { type: ['number', 'null'] }, untrackedCount: { type: ['number', 'null'] },
       createdAt: { type: 'number' }, updatedAt: { type: 'number' },
     },
-    required: ['title', 'projectId', 'project', 'workspaceId', 'workspace', 'origin', 'branch', 'status', 'worktreeChanged', 'createdAt', 'updatedAt'],
+    required: ['title', 'projectId', 'project', 'workspaceId', 'workspace', 'origin', 'branch', 'status', 'worktreeChanged', 'worktreePath', 'modifiedCount', 'untrackedCount', 'createdAt', 'updatedAt'],
   },
   fields: [
     { pointer: '/title', label: 'Task', origin: 'declared', display: { kind: 'text', role: 'title' }, query: { operators: ['eq', 'ne', 'contains'], sortable: false } },
@@ -29,13 +31,17 @@ export const coreTaskSourceDescription: DataSourceDescription = {
       { id: 'active', label: 'Active' }, { id: 'archived', label: 'Archived' }, { id: 'cancelled', label: 'Cancelled' },
     ] } },
     { pointer: '/worktreeChanged', label: 'Uncommitted changes', description: 'Null when the Node has not inspected the worktree.', origin: 'declared', display: { kind: 'boolean' } },
+    { pointer: '/worktreePath', label: 'Worktree path', origin: 'declared' },
+    { pointer: '/modifiedCount', label: 'Modified files', origin: 'declared', display: { kind: 'number' } },
+    { pointer: '/untrackedCount', label: 'Untracked files', origin: 'declared', display: { kind: 'number' } },
     { pointer: '/createdAt', label: 'Created', origin: 'declared', display: { kind: 'datetime' }, query: { operators: ['gt', 'gte', 'lt', 'lte'], sortable: true } },
     { pointer: '/updatedAt', label: 'Updated', origin: 'declared', display: { kind: 'datetime', role: 'updated' }, query: { operators: ['gt', 'gte', 'lt', 'lte'], sortable: true } },
   ],
   parameters: { type: 'object', additionalProperties: false, properties: {} },
   parameterFields: [],
   operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
-  consistency: 'A task query is a transactionally consistent read of core task metadata. Worktree change status is optional and remains null when it has not been inspected.',
+  targets: [{ kind: 'core.task' }],
+  consistency: 'Task metadata is read from core storage; worktree counts are observed from local Git and remain null if the worktree is unavailable.',
 }
 
 const page = createDataSelectionPager()
@@ -53,15 +59,25 @@ async function coreTasks(request: DataSourceRequest, env: Env) {
       : await db.select({ task: schema.tasks, project: schema.projects, workspace: schema.workspaces })
         .from(schema.tasks).innerJoin(schema.projects, eq(schema.tasks.projectId, schema.projects.id))
         .innerJoin(schema.workspaces, eq(schema.projects.workspaceId, schema.workspaces.id))
-    const records = tasks.filter(({ project }) => !project.hidden).map(({ task, project, workspace }) => ({
+    const visible = tasks.filter(({ project }) => !project.hidden)
+    const counts = new Map<string, WorktreeCounts | null>()
+    const { worktreeCounts } = await import('./localGitRead')
+    for (let index = 0; index < visible.length; index += 4) {
+      await Promise.all(visible.slice(index, index + 4).map(async ({ task }) => {
+        if (task.worktreePath) counts.set(task.id, await worktreeCounts(task.worktreePath))
+      }))
+    }
+    const records = visible.map(({ task, project, workspace }) => ({
       recordId: task.id,
       data: {
         title: task.title, projectId: project.id, project: project.name,
         workspaceId: workspace.id, workspace: workspace.name, origin: task.origin,
-        branch: task.branch, status: task.status, worktreeChanged: null,
+        branch: task.branch, status: task.status, worktreeChanged: counts.get(task.id)?.changed ?? null,
+        worktreePath: task.worktreePath, modifiedCount: counts.get(task.id)?.modifiedCount ?? null,
+        untrackedCount: counts.get(task.id)?.untrackedCount ?? null,
         createdAt: task.createdAt, updatedAt: task.updatedAt,
       },
-      display: { title: task.title }, taskId: task.id, action: { verb: 'openTask' as const },
+      display: { title: task.title }, taskId: task.id, action: { verb: 'openTask' as const }, target: { kind: 'core.task', item: task.id },
     }))
     const selected = selectDataRecords(records, request.query)
     return { ...selected, revision: coreTaskSourceDescription.revision, readTime: request.evaluationTime }

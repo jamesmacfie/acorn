@@ -1,5 +1,6 @@
 import { type DataBinding, type DataPredicate, dataBindingSchema } from '../values/dataBindings'
 import { resolveQueryTimeWindow } from './dataQueryTime'
+import { resolveContextTime } from './contextTime'
 import { type QueryBindingContext, type QueryContent, type QueryBindings } from './dataQueries'
 import { validateDataValue } from '../values/dataSchemas'
 import { DATA_LIMITS, MISSING, parseDataValue, readDataPointer, type DataRead, type DataValue } from '../values/dataValues'
@@ -18,9 +19,16 @@ export function readDataBinding(input: DataBinding, context: QueryBindingContext
   let value: DataRead
   if (address.from === 'literal') value = address.value
   else {
-    const root = address.from === 'item' ? context.item
-      : address.from === 'input' ? own(context.inputs, address.name) : own(context.steps, address.stepId)
-    value = root === undefined ? MISSING : readDataPointer(root, address.pointer)
+    if (address.from === 'context') {
+      if (address.name === 'workspaceLinks') value = context.workspaceLinks ?? MISSING
+      else if (address.name === 'viewer') value = context.viewer ? readDataPointer(context.viewer, address.pointer) : MISSING
+      else value = context.evaluationTime === undefined ? MISSING
+        : resolveContextTime(address, context.evaluationTime, context.timePolicy ?? { zone: 'UTC', weekStart: 'monday' })
+    } else {
+      const root = address.from === 'item' ? context.item
+        : address.from === 'input' ? own(context.inputs, address.name) : own(context.steps, address.stepId)
+      value = root === undefined ? MISSING : readDataPointer(root, address.pointer)
+    }
   }
   if (value === MISSING) value = binding.fallback === undefined ? MISSING : binding.fallback
   if (value === MISSING) return MISSING
@@ -39,11 +47,11 @@ export function resolveQueryParameters(content: QueryContent, bindings: QueryBin
   validateDataValue(values, content.parameters)
   return values
 }
-export function resolveQueryContent(content: QueryContent, values: Record<string, DataValue>, evaluationTime = Date.now()) {
+export function resolveQueryContent(content: QueryContent, values: Record<string, DataValue>, evaluationTime = Date.now(), bindingContext: QueryBindingContext = {}) {
   validateDataValue(values, content.parameters)
-  const context = { inputs: values }
+  const context = { ...bindingContext, inputs: values, evaluationTime }
   const resolve = (binding: DataBinding) => {
-    if (!['literal', 'input'].includes(binding.address.from)) throw new Error('Query content can bind only declared parameters')
+    if (!['literal', 'input', 'context'].includes(binding.address.from)) throw new Error('Query content can bind only declared parameters or host context')
     return resolveDataBinding(binding, context)
   }
   function predicate(value: DataPredicate): DataPredicate {

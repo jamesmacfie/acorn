@@ -2,7 +2,7 @@ import { z } from 'zod'
 import { dataFieldsSchema, dataPointerSchema, parseDataPredicate, type DataPredicate } from './values/dataBindings'
 import { parseDataSchema } from './values/dataSchemas'
 import { DATA_LIMITS, parseDataValue } from './values/dataValues'
-import { dataRecordActionSchema } from './dataActions'
+import { dataRecordActionSchema, dataRecordTargetSchema, namedDataRecordActionSchema } from './dataActions'
 import {
   dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
@@ -50,6 +50,16 @@ export const dataSourceScopeSchema = z.object({
   connectionId: id.optional(),
   parameters: z.record(z.string(), value).default({}),
 }).strict()
+export const dataSourceIdentitySchema = z.object({
+  id: id.optional(), login: id.optional(), name: z.string().max(200).optional(),
+  email: z.email().optional(), teamIds: z.array(id).max(200).optional(),
+  teams: z.array(z.object({ id, name: z.string().max(200) }).strict()).max(200).optional(),
+}).strict()
+const coverageRangeSchema = z.object({ start: z.number().finite(), end: z.number().finite() }).strict()
+export const dataSourceCoverageSchema = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('snapshot') }).strict(),
+  z.object({ kind: z.literal('events'), retention: z.string().max(200).optional(), earliestTime: z.number().finite().optional(), complete: z.boolean() }).strict(),
+])
 export const dataSourceDescriptionSchema = z.object({
   schema: structure,
   fields: dataFieldsSchema,
@@ -61,6 +71,7 @@ export const dataSourceDescriptionSchema = z.object({
     details: z.boolean(),
     incremental: z.boolean(),
     groups: z.array(z.enum(['all', 'any'])).max(2),
+    identity: z.boolean().optional(),
   }).strict(),
   detailSchema: structure.optional(),
   incremental: z.object({
@@ -68,6 +79,28 @@ export const dataSourceDescriptionSchema = z.object({
   }).strict().optional(),
   revision: id,
   consistency: z.string().min(1).max(2048),
+  /** Host-owned dataset metadata; only core dataset sources set this. */
+  dataset: z.object({ mode: z.enum(['current-mirror', 'event-archive', 'snapshot-history']),
+    feeder: z.enum(['capture', 'workflow', 'agent']) }).strict().optional(),
+  coverageWindows: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite(), kind: z.enum(['complete', 'gap']), reason: z.string().max(512).nullable() }).strict()).max(100).optional(),
+  reach: z.object({ parameter: dataPointerSchema, itemPlural: z.string().min(1).max(80),
+    default: z.string().min(1).max(300), empty: z.string().min(1).max(300) }).strict().optional(),
+  coverage: dataSourceCoverageSchema.optional(),
+  /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
+  starterPlans: z.array(z.unknown()).max(10).optional(),
+  /** Action and target metadata is structural; current eligibility is checked per record. */
+  actions: z.array(z.object({ id, label: id, icon: id.optional(), risk: z.enum(['read', 'write', 'execute']) }).strict()).max(16).optional(),
+  writable: z.array(z.object({ field: dataPointerSchema, path: z.string().min(1).max(256), risk: z.enum(['read', 'write', 'execute']),
+    values: z.array(value).min(1).max(100) }).strict()).max(16).optional(),
+  targets: z.array(dataRecordTargetSchema.pick({ kind: true })).max(16).optional(),
+  /** Declarative relationship metadata. The host checks the scopes before matching rows. */
+  relations: z.array(z.object({
+    id, label: id, target: dataSourceRefSchema,
+    kind: z.enum(['implements', 'blocks', 'belongs-to', 'references', 'equivalence']),
+    cardinality: z.enum(['one-to-one', 'many-to-one', 'one-to-many']),
+    keys: z.array(z.object({ from: dataPointerSchema, to: dataPointerSchema, scope: z.enum(['provider', 'account', 'container', 'identity']) }).strict()).min(1).max(8),
+    requiredScopes: z.array(z.enum(['provider', 'account', 'container'])).min(2).max(3),
+  }).strict()).max(16).optional(),
 }).strict()
 export const dataSourceQuerySchema = z.object({
   source: dataSourceRefSchema,
@@ -86,6 +119,7 @@ export const dataSourceQuerySchema = z.object({
   .refine(query => !(query.take && query.incremental), 'Incremental queries cannot use take')
 export const dataRecordRefSchema = dataSourceRefSchema.extend({ connectionId: id.optional(), recordId: id, scope: dataSourceScopeSchema.optional() })
 export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
+  z.object({ operation: z.literal('identity'), source: dataSourceRefSchema, scope: dataSourceScopeSchema }).strict(),
   z.object({
     operation: z.literal('describe'),
     source: dataSourceRefSchema,
@@ -116,6 +150,13 @@ export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
     scope: dataSourceScopeSchema,
     projection: z.array(dataPointerSchema).max(DATA_LIMITS.fields).default([]),
   }).strict(),
+  z.object({ operation: z.literal('actions'), ref: dataRecordRefSchema, scope: dataSourceScopeSchema }).strict(),
+])
+export const dataSourceActionsSchema = z.object({ actions: z.array(namedDataRecordActionSchema).max(16) }).strict()
+export const dataSourceActSchema = z.union([
+  z.object({ ref: dataRecordRefSchema, actionId: id, confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict(),
+  z.object({ ref: dataRecordRefSchema, field: dataPointerSchema, expected: value, target: value,
+    confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict(),
 ])
 export const dataSourceDiscoveryRequestSchema = z.object({
   pluginId: id,
@@ -144,7 +185,7 @@ export const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bounded') }).strict(),
   z.object({
     kind: z.literal('incomplete'),
-    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget']),
+    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget', 'coverage-gap']),
   }).strict(),
 ])
 export const dataSourcePageSchema = z.object({
@@ -157,19 +198,27 @@ export const dataSourcePageSchema = z.object({
     }).strict().optional(),
     taskId: z.string().uuid().optional(),
     action: dataRecordActionSchema.optional(),
+    actions: z.array(namedDataRecordActionSchema).max(16).optional(),
+    writableFields: z.array(dataPointerSchema).max(16).optional(),
+    target: dataRecordTargetSchema.optional(),
   }).strict()).max(DATA_LIMITS.options),
   revision: id,
   readTime: z.number().finite(),
   completeness: dataSourceCompletenessSchema,
+  coveredRange: coverageRangeSchema.optional(),
+  observedAt: z.number().finite().optional(),
   incrementalBoundary: value.optional(),
+  /** Source-proved windows, independent of the time a capture happened. */
+  eventCoverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite() }).strict()).max(32).optional(),
 }).strict()
 export const dataSourceDetailsSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('found'), data: z.unknown().transform(input => parseDataValue(input, DATA_LIMITS.detailBytes)), fetchedTime: z.number().finite(), schema: structure.optional() }).strict(),
+  z.object({ kind: z.literal('found'), data: z.unknown().transform(input => parseDataValue(input, DATA_LIMITS.detailBytes)), fetchedTime: z.number().finite(), schema: structure.optional(), writableFields: z.array(dataPointerSchema).max(16).optional() }).strict(),
   z.object({ kind: z.literal('not-found') }).strict(),
 ])
 export type DataSourceRef = z.infer<typeof dataSourceRefSchema>
 export type DataSourceScope = z.infer<typeof dataSourceScopeSchema>
 export type DataSourceDescription = z.infer<typeof dataSourceDescriptionSchema>
+export type DataSourceIdentity = z.infer<typeof dataSourceIdentitySchema>
 export type DataSourceQuery = z.infer<typeof dataSourceQuerySchema>
 export type DataSourceRequest = z.infer<typeof dataSourceRequestSchema>
 export type DataRecordRef = z.infer<typeof dataRecordRefSchema>
@@ -178,9 +227,11 @@ export type DataSourcePage = z.infer<typeof dataSourcePageSchema>
 export type DataSourceResult = Omit<DataSourcePage, 'records'> & { records: DataRecord[]; mode: 'preview' | 'execution'; evaluationTime: number }
 export type DataSourceOptions = z.infer<typeof dataSourceOptionsSchema>
 export type DataSourceDetails = z.infer<typeof dataSourceDetailsSchema>
+export type DataSourceActions = z.infer<typeof dataSourceActionsSchema>
 export type DataSourceDiscoveryRequest = z.infer<typeof dataSourceDiscoveryRequestSchema>
 export type DataSourceDiscoveryPage = Omit<z.infer<typeof dataSourceDiscoveryPageSchema>, 'sources'> & { sources: (DataSourceDescriptor & DataSourceRef)[] }
 export type DataSourceCatalog = z.infer<typeof dataSourceCatalogSchema>
 export type DataSourceResponse<R extends DataSourceRequest> = R extends { operation: 'describe' } ? DataSourceDescription
+  : R extends { operation: 'identity' } ? DataSourceIdentity
   : R extends { operation: 'options' } ? DataSourceOptions
-    : R extends { operation: 'query' } ? DataSourceResult : DataSourceDetails
+    : R extends { operation: 'query' } ? DataSourceResult : R extends { operation: 'actions' } ? DataSourceActions : DataSourceDetails

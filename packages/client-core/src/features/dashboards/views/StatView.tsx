@@ -10,6 +10,7 @@ import {
 import { cellText, formatCell } from '../format'
 import { createMeasureHistory } from '../history'
 import { aggregateRows } from '../shaping'
+import { Button } from '../../../kit/components/primitives'
 import type { PanelViewProps } from './props'
 
 // The stat view: one number over the shaped rows. Count by default, because "how many of these are
@@ -68,7 +69,7 @@ export default function StatView(props: PanelViewProps) {
 
   return (
     <div class="dash-stat">
-      <span class="dash-stat-value">{text()}</span>
+      <Button size="sm" variant="bare" disabled={!props.onDrilldown} onPress={() => props.onDrilldown?.({ key: 'measure', label: label(), count: props.rows.length, rows: props.rows })}><span class="dash-stat-value">{text()}</span></Button>
       <span class="dash-stat-label">{label()}</span>
 
       {/* No axes, no grid, no ticks: the number above is the axis. `xMinYMid meet` scales uniformly

@@ -1,5 +1,5 @@
 import { backup as sqliteBackup, DatabaseSync } from 'node:sqlite'
-import type { StatementSync, SQLInputValue } from 'node:sqlite'
+import type { StatementSync, SQLInputValue, SQLOutputValue } from 'node:sqlite'
 import type { BetterSQLite3Database } from 'drizzle-orm/better-sqlite3'
 import { BetterSQLiteSession } from 'drizzle-orm/better-sqlite3/session'
 import { entityKind } from 'drizzle-orm/entity'
@@ -61,6 +61,7 @@ export type SqliteDatabase = {
   prepare(sql: string): SqliteStatement
   exec(sql: string): void
   pragma(statement: string): void
+  function(name: string, options: { deterministic?: boolean }, callback: (...args: SQLOutputValue[]) => SQLInputValue): void
   transaction<A extends unknown[], R>(fn: (...args: A) => R): SqliteTransaction<A, R>
   backup(destination: string): Promise<void>
   close(): void
@@ -177,6 +178,7 @@ export function openSqlite(path: string, options: {
     // better-sqlite3 had a `.pragma()` helper and `node:sqlite` does not. Every caller sets a value
     // and ignores the result, so this covers it.
     pragma: (statement) => db.exec(`PRAGMA ${statement}`),
+    function: (name, options, callback) => db.function(name, options, callback),
     transaction,
     // SQLite's online-backup API, which is a module-level function here rather than a method.
     backup: async (destination) => {

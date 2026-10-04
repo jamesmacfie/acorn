@@ -24,7 +24,7 @@ for pixels.
 | `keybindings` | 32 | A chord for a command in this manifest ([keybindings](../plugins/commands.md#keybindings)) |
 | `attention` | 4 | An attention-inbox feed, fetched per Node from your route |
 | `nodeStats` | 4 | A Node statistic, with a singular and plural label pair so a card reads "1 card stuck" |
-| `contentLinks` | 16 | An `https://` URL recognizer that delivers one captured segment to a task pane, your reference panel, or both ([content links](../plugins/descriptors.md#content-links)) |
+| `contentLinks` | 16 | An optional `https://` URL recognizer or named record target that opens your task pane, reference panel, or overlay ([content links](../plugins/descriptors.md#content-links)) |
 | `routes` | 8 | A renderer URL for a project-scoped pane, confined to `/p/:projectId/x/<id>/` |
 | `agentContexts` | 4 | An entry in the agent composer's context picker ([agent contexts](../plugins/more-descriptors.md#agent-contexts)) |
 | `refResolvers` | 4 | A batch enrichment route that turns identifiers of your items into a label and a state chip |
@@ -107,3 +107,10 @@ Your check has two seconds and your cleanup has sixty. The host stops waiting ei
 must be quick, not only interruptible. A check that's slow, throws, or answers with something the host
 can't draw adds no row, and the archive is never blocked by a broken plugin. Both routes appear in the
 trust prompt ([task checks](../plugins/task-checks.md)).
+
+## Dashboard source hints
+
+Dashboard-capable sources can return `starterPlans` from `describe`. Each card must be a valid
+version 2 panel plan for the chosen source and account; the host validates it before display.
+Static field choices can set `tone` (`ok`, `warn`, `bad`, `muted`, or `accent`) and numeric `rank`.
+Those hints flow to panel enum columns unless the author overrides them.

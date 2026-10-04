@@ -17,3 +17,5 @@ export { pullRequestSection } from '../server/contextSection'
 // Node source composition test in apps/node/test/integration/githubDataSource.test.ts.
 export { createPullSourceHandler } from '../server/data/pullSourceHandler'
 export { pullSource } from '../shared/pullSource'
+export { createBranchSourceHandler } from '../server/data/branchSourceHandler'
+export { branchSource } from '../shared/branchSource'

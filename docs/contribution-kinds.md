@@ -76,6 +76,7 @@ The Node runs these, with or without a client attached.
 | Routes | Both | `ctx.routes.register` (compiled, Hono) / `ctx.routes.fetch` (both, portable) | `/v1/p/<pluginId>/` |
 | Schedules | Both | `ctx.schedules` / `contributions.schedules` | The Node scheduler ([schedules](./schedules.md)) |
 | Typed data sources | Both | `ctx.dataSources.register` / `contributions.dataSources` | Bounded typed record reads |
+| Dataset writes | Compiled | `ctx.datasets` | A task-scoped host call for workflow output. **Direction: stays compiled.** Loaded plugins and frames cannot write host datasets; the Node validates the task, feeder, version, and row schema |
 | Source discovery | Both | `ctx.dataSources.discover` / `contributions.dataSourceDiscoveries` | Scoped dynamic source catalogues |
 | Task checks | Both | `ctx.taskChecks` / `contributions.taskChecks` | The archive gate |
 | Search providers | Compiled | `ctx.search` | The grouped archive search ([search providers](./plugins/search-providers.md)). **Direction: gains a manifest twin** when a loaded plugin wants to be searchable, as a route the host calls |

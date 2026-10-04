@@ -65,6 +65,7 @@ export type WorkflowStepDef = {
   record?: import('@acorn/protocol/dataBindings.ts').DataBinding
   condition?: import('@acorn/protocol/dataBindings.ts').DataPredicate
   projection?: string[]
+  dataset?: { id: string; version: number; rows: import('@acorn/protocol/dataBindings.ts').DataBinding }
   id?: string
   name: string
   kind?: string

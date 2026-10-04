@@ -16,14 +16,13 @@ import { attachment } from './routes/attachment'
 import { nodeProviderRoutes } from './routes/nodeProviders'
 import { integrations } from './routes/integrations'
 import { models } from './routes/models'
-import { authoring } from './routes/authoring'
 import { pairingRoutes } from './routes/pairing'
 import { prefs } from './routes/prefs'
 import { plugins } from './routes/plugins/plugins'
 import { dashboards } from './routes/dashboards'
+import { datasetsRoute } from './routes/datasets'
 import { schedules } from './routes/schedules'
 import { dataSources } from './routes/dataSources'
-import { queries } from './routes/queries'
 import { telemetry } from './routes/telemetry'
 import { harness } from './routes/plugins/harness'
 import { agentTools, agentToolsCatalog } from './routes/plugins/agentTools'
@@ -35,6 +34,7 @@ import { configTrust } from './routes/security/configTrust'
 import { worktree } from './routes/projects/worktree'
 import { dispatchPluginFetch } from './pluginHost/fetchRoute'
 import './dataSources/coreTasks'
+import './dataSources/localGitRegistration'
 
 // One server, one namespace: /v1. createApp() is a factory so the bootstrap can build a fresh instance.
 // Core mounts only core routers by name, under /v1/core. Every plugin-owned router arrives through the
@@ -44,6 +44,10 @@ export function createApp() {
   // Per-instance state (the pairing rate ceiling), so it must be built here rather than imported as a
   // module-level router.
   const pairing = pairingRoutes()
+  const authoring = new Hono<AppEnv>().post('/turn', async c =>
+    (await import('./routes/authoring')).handleAuthoringTurn(c))
+  const queries = new Hono<AppEnv>().use('*', requireProviderAccess).post('/:operation', async c =>
+    (await import('./routes/queries')).handleQuery(c))
 
   const app = new Hono<AppEnv>()
     // First, unconditionally. Every response carries a request id, so a user-reported failure is
@@ -137,6 +141,8 @@ export function createApp() {
     .use(`${CORE_NAMESPACE}/search/*`, requireDevice)
     .use(`${CORE_NAMESPACE}/authoring`, requireDevice)
     .use(`${CORE_NAMESPACE}/authoring/*`, requireDevice)
+    .use(`${CORE_NAMESPACE}/datasets`, requireDevice)
+    .use(`${CORE_NAMESPACE}/datasets/*`, requireDevice)
     // Telemetry another runtime collected. Device-only for a different reason from the rest of this
     // group: it is a write, not a read. Everything admitted here reaches every subscribed sink, and a
     // sink can post it off the machine, so a task-scoped agent must not be able to put words in one
@@ -146,6 +152,7 @@ export function createApp() {
     .route(CORE_NAMESPACE, pairing.core) // /pair, /pair/start, /devices: owner-only device administration
     .route(`${CORE_NAMESPACE}/prefs`, prefs)
     .route(`${CORE_NAMESPACE}/dashboards`, dashboards) // Typed panel drafts/publication plus /history measure series.
+    .route(`${CORE_NAMESPACE}/datasets`, datasetsRoute)
     .route(`${CORE_NAMESPACE}/plugins`, plugins) // Settings → Plugins: the roster + the per-node toggle
     .route(`${CORE_NAMESPACE}/audit`, audit) // Settings → Audit log: the append-only trail (security.md § Audit)
     .route(`${CORE_NAMESPACE}/security`, security) // Settings → Security and backup: this node's posture (security.md § On-disk)

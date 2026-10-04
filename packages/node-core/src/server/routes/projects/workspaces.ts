@@ -147,6 +147,8 @@ export const workspaces = new Hono<AppEnv>()
     // Reassign this workspace's projects back to Default rather than orphaning them.
     await db.update(schema.projects).set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id))
     await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
+    const { deleteWorkspaceDatasets } = await import('../../datasets/store')
+    deleteWorkspaceDatasets(db, id)
     await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
     if (defaultWorkspace.created) broadcastWorkspaceChanged({ workspaceId: defaultWorkspace.id })
     for (const project of reassignedProjects) broadcastProjectChanged({ projectId: project.id })

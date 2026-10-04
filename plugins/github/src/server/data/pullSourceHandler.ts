@@ -2,9 +2,10 @@ import { createHash, randomUUID } from 'node:crypto'
 import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { dataSourceRequestSchema, type DataSourcePage } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
-import { pullSourceDescription } from '../../shared/pullSource'
+import { pullSourceDescription } from '../../shared/pullSourceDescription'
 import { pullSearch, selectPulls } from './pullQuery'
-import { readPullSelection, readRepositoryOptions } from './pullRead'
+import { readPullSelection, readRepositoryOptions, readViewerIdentity } from './pullRead'
+import { pullStateDetails, writePullState } from './pullWrite'
 
 type Selection = { key: string; page: DataSourcePage; expires: number; bytes: number }
 
@@ -20,15 +21,26 @@ export function createPullSourceHandler(): PluginFetchHandler {
       if (context.principal.kind !== 'device' && !(context.principal.kind === 'internal' && context.principal.scope === 'service')) {
         return Response.json({ error: 'forbidden' }, { status: 403 })
       }
+      if (new URL(request.url).pathname.endsWith('/write')) return writePullState(request, context)
       const input = dataSourceRequestSchema.parse(await request.json())
       if (input.operation === 'describe') return Response.json(pullSourceDescription)
-      if (input.operation === 'details') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      if (input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
       const scope = input.operation === 'query' ? input.query.scope : input.scope
       if (!scope.connectionId) throw new Error('connection_required')
       if (!(await context.providers.connections('github')).some(connection => connection.id === scope.connectionId && connection.status === 'connected')) {
         throw new Error('connection_unavailable')
       }
-      if (input.operation === 'options' && (input.target !== 'parameter' || input.pointer !== '/repository')) throw new Error('unsupported_options')
+      if (input.operation === 'details') return pullStateDetails(input.ref, context)
+      if (input.operation === 'identity') {
+        const answers = await context.providers.withConnections('github', async (connection, token) =>
+          connection.id === scope.connectionId ? readViewerIdentity(token, request.signal) : undefined)
+        if (!answers[0]) throw new Error('connection_unavailable')
+        return Response.json(answers[0])
+      }
+      if (input.operation === 'query' && Array.isArray(input.query.scope.parameters.repositories) && input.query.scope.parameters.repositories.length === 0) {
+        return Response.json({ records: [], revision: pullSourceDescription.revision, readTime: Date.now(), completeness: { kind: 'complete' } })
+      }
+      if (input.operation === 'options' && (input.target !== 'parameter' || input.pointer !== '/repositories')) throw new Error('unsupported_options')
       sweep()
       const key = createHash('sha256').update(JSON.stringify({ owner: context.userId, scope,
         ...(input.operation === 'query' ? { query: input.query, evaluationTime: input.evaluationTime, mode: input.mode } : {}),
@@ -51,7 +63,7 @@ export function createPullSourceHandler(): PluginFetchHandler {
           if (connection.id !== scope.connectionId) return undefined
           if (input.operation === 'options') return { options: await readRepositoryOptions(token, input, request.signal) }
           const q = pullSearch(input.query)
-          const page = await readPullSelection(token, q, request.signal)
+          const page = await readPullSelection(token, q, scope.connectionId!, request.signal)
           if (page.completeness.kind === 'incomplete') return { page: { ...page, records: [] } }
           const records = selectPulls(page.records, input.query)
           const take = input.query.take

@@ -26,7 +26,9 @@ import { taskPulls } from '../server/routes/pulls/taskPulls'
 import { githubEmitter } from '../server/events'
 import { readCachedRepos, toPublicRepo } from '../server/routes/mirror/repoMirror'
 import { pullSource } from '../shared/pullSource'
-import { createPullSourceHandler } from '../server/data/pullSourceHandler'
+import { actionsSource } from '../shared/actionsRegistration'
+import { branchSource } from '../shared/branchSource'
+import type { PluginFetchHandler } from '@acorn/plugin-api/node'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { pullRequestEditorLineMarkers } from '../server/editorLineMarkers'
 import { startPullDiscovery } from '../server/pullDiscovery'
@@ -75,8 +77,24 @@ export const githubPlugin = (): NodePlugin => {
       // The device-flow router registers separately below because github's routes share a namespace
       // with twelve mirror routers whose registration order is load-bearing.
       ctx.providers.integration(createGithubProvider({ connectable: githubClientId() !== '' }))
-      ctx.routes.fetch(createPullSourceHandler(), { prefix: '/data/pulls' })
+      let pullHandler: PluginFetchHandler | undefined
+      ctx.routes.fetch(async (request, context) => {
+        pullHandler ??= (await import('../server/data/pullSourceHandler')).createPullSourceHandler()
+        return pullHandler(request, context)
+      }, { prefix: '/data/pulls' })
       ctx.dataSources.register(pullSource)
+      let branchHandler: PluginFetchHandler | undefined
+      ctx.routes.fetch(async (request, context) => {
+        branchHandler ??= (await import('../server/data/branchSourceHandler')).createBranchSourceHandler(ctx.dataSources.invoke)
+        return branchHandler(request, context)
+      }, { prefix: '/data/branches' })
+      ctx.dataSources.register(branchSource)
+      let actionsHandler: PluginFetchHandler | undefined
+      ctx.routes.fetch(async (request, context) => {
+        actionsHandler ??= (await import('../server/data/actionsSourceHandler')).createActionsSourceHandler()
+        return actionsHandler(request, context)
+      }, { prefix: '/data/actions' })
+      ctx.dataSources.register(actionsSource)
 
       // /v1/p/github/repos/* is the mirror. Several of these routers declare overlapping paths under
       // the same prefix (/:owner/:repo/pulls/:number/...), so registration order is the order Hono

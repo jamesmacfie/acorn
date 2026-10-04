@@ -451,6 +451,7 @@ export type NodePluginContext = {
 // An intersection rather than a second literal, so a member added to the loaded shape reaches this one
 // for free and the two can never disagree about the part they share.
 export type CompiledNodePluginContext = NodePluginContext & {
+  datasets: { writeForTask(taskId: string, input: import('@acorn/protocol/datasets.ts').DatasetWrite): Promise<number> }
   core: CompiledCoreServices
   schedules: CompiledPluginScheduleRegistry
   routes: CompiledPluginRouteRegistry

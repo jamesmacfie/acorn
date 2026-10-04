@@ -394,6 +394,7 @@ export default function PanelGrid(props: {
                 {(definition) => <PanelGridItem
                   definition={definition}
                   workspaceId={props.scope.workspaceId}
+                  scope={props.scope}
                   layout={{
                     collapsed,
                     style: () => slotStyle(definition.id),

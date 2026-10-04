@@ -7,6 +7,8 @@ import {
   openContentTarget,
   openInAppUrl,
   openPluginContentTarget,
+  openNamedContentTarget,
+  resolveNamedContentTarget,
   parseInAppTarget,
   scanContentRefs,
   splitRefTokens,
@@ -33,6 +35,16 @@ afterEach(() => {
 })
 
 describe('declarative content-link resolution', () => {
+  it('opens a URL-less record only through its registered plugin namespace', () => {
+    const own = contentLinkRegistry.register({ id: 'board.card', providerId: 'board', parse: () => null,
+      target: item => ({ kind: 'board.card', item, pane: 'board', providerId: 'linear' }) })
+    try {
+      expect(resolveNamedContentTarget('board.card', 'ENG-42')?.target.providerId).toBe('board')
+      expect(openNamedContentTarget('board.card', 'ENG-42', { taskId: 'task-1', prefer: 'pane' })).toBe('pane')
+      expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'ENG-42' })
+      expect(resolveNamedContentTarget('linear.card', 'ENG-42')).toBeNull()
+    } finally { own.dispose() }
+  })
   it('opens the declared pane and retains the captured item as its selection', () => {
     expect(openPluginContentTarget({ kind: 'board.card', pane: 'board', item: 'ENG-42' }, 'task-1')).toBe(true)
     expect(consumePaneIntent('task-1', 'board')).toEqual({ kind: 'plugin:select', item: 'ENG-42' })

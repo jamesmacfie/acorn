@@ -1,6 +1,12 @@
 # Workflow checks
 
 Run these checks when changing workflow authoring, execution, children, schedules, or data sources.
+
+For dashboard editor changes, also run the panel-plan and Node dashboard tests described in
+[Dashboard plan checks](#dashboard-plan-checks). In an isolated Tauri session, pick a source and
+account, inspect a starter plan, edit a filter and view, publish, and inspect the placed panel. Test
+the **Describe it** entrance with two accounts, ambiguous reach, and an unavailable source; confirm
+that the conversation asks for a choice or records an unavailable requirement.
 The numbers retain their original acceptance-check IDs.
 
 ## Authoring and the run pane
@@ -148,6 +154,34 @@ The dashboards programme keeps its own once-only check of the surfaces that ship
 v2 in [workstream 1](../future/dashboards/01-trustworthy-results.md#verify-what-shipped), because its items
 gate that programme's work rather than a release.
 
+Result, 2026-10-03, in `pnpm dev:agent` on macOS with 18 seeded tasks (six each active, archived, and
+cancelled). The session window runs hidden until brought to the front. While hidden, WebKit runs no
+animation frames and screenshots show stale frames, so every result below was taken with the window
+in front. WebDriver pointer actions arrive only as an untrusted `mousedown`, so the drag was driven
+with synthetic pointer events dispatched in the page.
+
+- Editor: unticking a visible field and adding one column per state both autosaved, and the board
+  published with `groupBy: "status"`. Before workstream 1 both drafts failed the schema and stopped
+  saving. The validate route named `/display/groupBy` and `/display/view/series` for bad references.
+- Grid drag: passes. The dot lattice shows, the soft slot marks the landing cells, the dragged panel
+  lifts with a shadow, a neighbour moves out of the way, and the release commits the new layout.
+  Keyboard **Move or resize** shrinks a chart to its 4 by 3 minimum.
+- Tab bar: passes once a second tab exists. **+** creates a tab and opens its rename field, Enter
+  commits the name, arrow keys wrap, Home and End jump, the first **Delete dashboard** press arms and
+  the second deletes, and the active tab survives a reload after its debounced write. **Broken:** with
+  only the default tab, Home draws no tab bar and no **+**, so a person can't create a second
+  dashboard. Filed against workstream 1.
+- Chart legend and series colours: passes. A line chart split by status draws three series, each in
+  its own colour, with its legend. The legend stays on one line without overflow down to a 266-pixel
+  panel, so wrapping was never exercised by three short labels. The three series colours are the same
+  in every style pack (terminal, cozy, cute, modern) in light and dark, by design
+  (`tokens-theme.css` § Series identity), and read clearly on both grounds.
+- Stat sparkline: the history stat shows "Recording once an hour from today" before its first
+  sample. `trend` was set through the draft API, since the editor has no view controls yet.
+- Rail-source side panel and `pane.aside`: not checked. No plugin in this build reserves either
+  region, so neither can be placed without a fixture plugin. With the window at 560 and 330 pixels,
+  Home's grid collapses to one column and every panel stays readable.
+
 Workflow-v2 dashboard checks are split by owner:
 `packages/dashboards-core/src/typedProjection.test.ts` covers nested projection and independent exact-status mappings;
 `packages/node-core/src/server/dashboards/*.test.ts`
@@ -155,3 +189,21 @@ uses migrated temporary SQLite stores for revision and publication behavior; and
 `packages/client-core/src/features/dashboards/dashboardEditorModel.test.ts` plus `dashboardRecovery.test.ts`
 cover local display semantics and device recovery. Real-window checks still exercise the composed
 editor and placement because those interactions are not proved by pure tests.
+
+## Dashboard plan checks
+
+Run the protocol, dashboards-core, Node dashboard, and client dashboard tests after changing panel
+plans. `packages/dashboards-core/src/plan.test.ts` checks version 2 schema examples, binding, sorting,
+grouping, and version 1 upgrades. Node dashboard tests cover publication and sampling through the
+shared runner. Run the editor in an isolated Tauri window with `pnpm dev:agent -- --session <name>`;
+use `pnpm dev:agent:ui -- --session <name> snapshot` after each transition and stop the session when
+done. Check account choice, starter cards, stages, rebind notices, preview, publish, and a placed run.
+
+Dashboard authoring evaluation has scripted cases in
+`packages/dashboards-core/src/authoringEvaluation.test.ts`. Run the real-model layer on demand with
+`node scripts/dashboard-authoring-eval.mjs <output.jsonl>` after setting `ACORN_EVAL_URL`,
+`ACORN_EVAL_TOKEN`, `ACORN_EVAL_BACKEND_ID`, and `ACORN_EVAL_WORKSPACE_ID`; optionally set
+`ACORN_EVAL_MODEL_ID`. The report records outcomes per model without provider rows. The scripted
+cases are implementation fixtures, not acceptance labels collected from people. Product acceptance
+also requires at least 20 previously unseen requests collected from people and reviewed against
+[dashboard acceptance](../future/dashboards/design.md#acceptance). Record failures as evaluation cases.

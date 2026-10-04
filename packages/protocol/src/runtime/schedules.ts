@@ -89,7 +89,7 @@ export type ScheduleTargetOption = {
   actionId: string
   name: string
   risk: ToolRisk
-}
+} | { kind: 'dataset-capture'; datasetId: string; name: string; risk: ToolRisk }
 
 export type ScheduleTargetsResponse = { targets: ScheduleTargetOption[] }
 

@@ -16,7 +16,10 @@ export function queryInScope(content: QueryContent, scope: QueryScope): void {
   if (content.query.scope.workspaceId !== scope.workspaceId || content.query.scope.projectId !== scope.projectId) throw new QueryLibraryError('invalid-query')
 }
 export async function validateQueryPublication(env: Env, content: QueryContent, parameters: Record<string, DataValue>, invocation: DataSourceInvocation): Promise<string> {
-  const query = resolveQueryContent(queryContentSchema.parse(content), parameters)
+  const parsed = queryContentSchema.parse(content)
+  const time = Date.now()
+  const hostContext = await (await import('./sourceContext')).sourceBindingContext(env, parsed, invocation, time)
+  const query = resolveQueryContent(parsed, parameters, time, hostContext)
   const bounded = { ...invocation, signal: AbortSignal.any([invocation.signal, AbortSignal.timeout(60_000)]) }
   const description = await invokeDataSource(env, { operation: 'describe', source: query.source, scope: query.scope }, bounded)
   validateQueryTemplate(content, description)
@@ -41,8 +44,10 @@ export async function resolveQuery(env: Env, scope: QueryScope, input: QueryRefe
   const content = reference.kind === 'inline' ? reference.content : published!.content
   if (allowedPluginId && content.query.source.pluginId !== allowedPluginId) throw new QueryLibraryError('not-found')
   queryInScope(content, published ? { workspaceId: published.workspaceId, projectId: published.projectId } : scope)
-  const parameters = resolveQueryParameters(content, reference.bindings, context)
-  const query = resolveQueryContent(content, parameters, context.evaluationTime)
+  const evaluationTime = context.evaluationTime ?? Date.now()
+  const hostContext = await (await import('./sourceContext')).sourceBindingContext(env, content, invocation, evaluationTime, context.timePolicy)
+  const parameters = resolveQueryParameters(content, reference.bindings, { ...hostContext, ...context })
+  const query = resolveQueryContent(content, parameters, evaluationTime, { ...hostContext, ...context })
   // A workspace query used by a project keeps its authored workspace scope, never silently narrows.
   await validateQueryPublication(env, content, parameters, invocation)
   return { query, parameters, ...(published ? { published } : {}) }

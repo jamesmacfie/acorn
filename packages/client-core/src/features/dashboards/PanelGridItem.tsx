@@ -39,6 +39,7 @@ export type PanelGridItemActions = {
 export default function PanelGridItem(props: {
   definition: PanelDefinition
   workspaceId?: string
+  scope: import('./persist').PlacementScope
   layout: PanelGridItemLayout
   actions: PanelGridItemActions
 }) {
@@ -127,6 +128,7 @@ export default function PanelGridItem(props: {
         <PublishedDashboardPanel
           definition={props.definition}
           workspaceId={props.workspaceId}
+          placement={props.scope}
           actions={chrome()}
           onEdit={props.actions.edit}
           headProps={props.layout.collapsed() ? {} : { onPointerDown: props.layout.onBeginDrag }}

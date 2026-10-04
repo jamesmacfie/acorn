@@ -16,9 +16,10 @@ A panel definition has four layers, each owned by a different party:
 | `view` | Host | Which view, its measure, and for a chart its shape and axes |
 
 The layers let you flip a table to a board without losing filters, and swap a source without losing
-the layout. Shaping is generic and runs over the projected rows (`shaping.ts`). Filters are all-AND
-with seven operators, because an OR tree is a query language, and a panel that needs one belongs in
-the source's query. Group-by is shaping, not a view option, so it survives a view switch.
+the layout. Version 2 plans also declare exact relations and ordered filter, compute, summarize,
+expand, and overlap stages. The Node applies these to mapped rows and preserves coverage and
+provenance through summaries. The older generic shaping helpers (`shaping.ts`) still serve legacy
+panels.
 
 Where a panel is placed isn't a layer. A definition is free of any surface, and a placement refers to
 it by ID and owns its geometry ([placements](./placements.md)).
@@ -58,11 +59,22 @@ name its own source could put a stranger's items under a stranger's badge. The b
 `brand:<pluginId>` mark, or its ID as text (`views/Provenance.tsx`). Row IDs are qualified by source,
 because two providers can both have a row `42`.
 
-Pressing a row in a placed panel runs its declared action through `runChromeAction`, the dispatcher a
-rail row uses. A row may name its `taskId`, which lets `openPane` and `openTask` land in the row's own
-task. An action whose `risk` is `write` or `execute` asks first, in a host-drawn strip above the rows,
-because a plugin that drew its own dialog could draw a reassuring one. Rows in the editor's preview
-aren't pressable.
+The version 2 plan's `actions.press` chooses the source record, its task, or a link column and a
+preferred presentation. The content-link registry falls back through its available destinations.
+Without a configured press, the source's default action still runs through `runChromeAction`. Runs
+carry the full reference for every contributing record, including account and scope, along with
+task IDs, targets, and named actions. A record can name a plugin-owned target without a URL.
+
+The plan has up to three row buttons. Buttons and **Start task** also appear in the row menu, reached
+with the context-menu key or Shift+F10; Enter presses the row. A risky action first shows the host's
+confirmation strip. Named actions send their ID and full reference to the Node, which asks the source
+for current eligibility before dispatching. A refusal appears beside the panel. Rows in the editor's
+preview remain noninteractive.
+
+Pressing a group header or stat measure builds a detail plan from the group values, removes grouping,
+and opens a read-only side panel at the original evaluation instant. **Add as panel** publishes that
+detail plan. Summary-stage and measure-filter arguments to `deriveDrilldownPlan` narrow the
+underlying records to the selected measure at the run's evaluation instant.
 
 `openUrl` isn't automatically a trip to the browser. The dispatcher first asks the content-link
 registry whether acorn has its own surface for the URL (`openInAppUrl` in

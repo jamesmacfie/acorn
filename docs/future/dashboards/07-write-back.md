@@ -1,3 +1,11 @@
+> **Completed 2026-10-04** by the "Phase 07 write-back" task.
+>
+> **What landed:** Enum choices now persist per-source write values, and source descriptions declare confined writable fields and target values. Board drag and row-menu moves use the Node `act` gate for fresh authority, eligibility, and value checks, then confirm, optimistically move, refresh, or roll back with a source-specific refusal. The editor, plan description, AI requirements, product docs, and fixture tests cover the new path.
+>
+> **Deviations:** The user explicitly authorized this phase before read-only board usage measurements; no usage numbers were claimed. GitHub pull request state is the first declared provider mutation; unsupported provider writes were not invented.
+>
+> **For later phases:** The write route lives in `plugins/github/src/server/data/pullWrite.ts`; `boardWrite.ts` owns confirmation, retry, and rollback state. The integrated Node build is within the existing size budget after moving provider handlers behind request paths. The integration desktop check opened the source picker, selected Workspace tasks, and published a panel; graphical drag on populated provider cards and live-provider acceptance remain unverified. Test mutations only against fixture records unless the owner separately authorizes changes to real provider records.
+
 # Workstream 7: write-back
 
 Status: proposed and gated, 2026-10-02, revised the same day. Depends on

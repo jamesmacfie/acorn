@@ -30,5 +30,6 @@ export const issueSourceDescription: DataSourceDescription = {
   parameters: { type: 'object', properties: { project: { type: 'string' } }, required: ['project'], additionalProperties: false },
   parameterFields: [{ pointer: '/project', label: 'Project', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
   operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
+  targets: [{ kind: 'linear.issue' }],
   consistency: 'Linear project issues, including archived issues, with exact state IDs. No snapshot isolation across upstream pages. At most 5,000 candidates are exhausted before stable sorting; a larger selection is incomplete. Continuations retain the selection for 60 seconds.',
 }

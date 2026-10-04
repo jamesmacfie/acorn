@@ -1,7 +1,53 @@
 # Workstream 1: trustworthy results
 
-Status: proposed, 2026-10-02. Read [design.md](./design.md) first. This workstream changes no
-contract except where a bug forces it, and it builds nothing new.
+Status: complete, 2026-10-03, in commit `49166f6b9` on the `dashboards` branch. Read
+[design.md](./design.md) first. This workstream changes no contract except where a bug forces it, and
+it builds nothing new. [Dashboards](../../dashboards.md) owns the shipped behaviour. The decisions
+below record where the work departed from this plan.
+
+## Outcome
+
+Every requirement below landed except where a decision says otherwise. `pnpm lint` and the tests of
+every touched package pass. A full `pnpm test` run fails in seven packages for reasons outside this
+work: the loaded-plugin runtime refuses Node 24.11.0, and a few tests fail on additions from the
+starting commit `0a9b222f`.
+
+### Decisions
+
+- **Old history is relabelled, not reset.** Requirement 10 says a changed signature resets the
+  series. A series recorded under the previous signature formula is relabelled once on its next
+  sample instead, so the upgrade doesn't wipe every panel's history. Real query changes after that
+  reset as specified.
+- **Focus refresh needed no code.** Requirement 11 asks for a refetch when the window regains focus.
+  The client's default `refetchOnWindowFocus` with a 30-second `staleTime` already covers placed
+  panels.
+- **A plugin change refetches every placed panel on the Node.** The plugin-change event carries only
+  the Node ID, not the plugin ID, so a panel can't match on the plugin it uses. Account changes do
+  match per account.
+- **View options on mapped panels still take source pointers.** Requirement 2 lets `display.groupBy`
+  and `display.fields` take panel field IDs. The view's `field`, `x`, and `series` options still
+  need source pointers, because the view schema is shared with plugin manifests. Publication refuses
+  a mismatch, and workstream 2's column IDs remove the gap.
+- **Old stored rows load leniently.** A stored panel that breaks the stricter field rule is read with
+  its unresolvable references dropped, so the library list never fails to load.
+- **The sessions budget is the host's record limit.** Requirement 7's host budget is the existing
+  5,000-record limit. Past it, the source reports `incomplete` with the cause `host-budget`.
+- **Editor edits moved into model functions.** The board and visible-field edits now live in
+  `dashboardEditorModel.ts` as pure functions, which is what lets requirement 3's test build panels
+  without rendering the editor.
+
+### Manual check findings
+
+The results are recorded in [testing](../../testing.md). Two items for later work:
+
+- **Bug, not fixed:** with only the default Home tab, no tab bar or **+** button renders, so a
+  person can't create a second dashboard from the UI.
+- **Not checked:** the rail-source side panel and the `pane.aside` placement. No plugin in this build
+  reserves either region, so check them once one does.
+
+The visual checks only work with the `pnpm dev:agent` window in front, because a hidden window
+paints nothing. The grid drag was driven with in-page pointer events, because WebDriver pointer
+actions arrive as a single untrusted `mousedown`.
 
 ## Milestones
 

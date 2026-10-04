@@ -113,6 +113,10 @@ const schedules: SearchDeclaration = {
     { id: 'new', label: 'New schedule', rows: ['Action', 'Name', 'When'], keywords: ['create', 'add', 'accept', 'risk'] },
   ],
 }
+const datasets: SearchDeclaration = {
+  keywords: ['dataset', 'capture', 'history', 'retention', 'coverage', 'stored records'],
+  sections: [{ id: 'datasets', label: 'Datasets', rows: ['Mode', 'Feeder', 'Retention', 'Coverage', 'Delete'] }],
+}
 const runs: SearchDeclaration = {
   keywords: ['workflow runs', 'agent sessions', 'cost', 'spend', 'history'],
   sections: [
@@ -228,6 +232,7 @@ export const CORE_SETTINGS_PAGES = [
   // machine. Run history is core's rather than any plugin's, because the list is merged from every
   // plugin that declared a run source and no one of them owns it (@acorn/protocol/runs.ts).
   { id: 'schedules', ...schedules, label: 'Schedules', category: 'automation', scope: 'node', icon: 'calendar-clock', order: 10, followsNodeSwitcher: true },
+  { id: 'datasets', ...datasets, label: 'Datasets', category: 'automation', scope: 'node', icon: 'database', order: 15, followsNodeSwitcher: true },
   { id: 'runs', ...runs, label: 'Run history', category: 'automation', scope: 'node', icon: 'clock', order: 20, followsNodeSwitcher: true },
 
   // Machines. Nodes is the device's fleet, so its scope is this device. Not `requires: 'desktop'`: the

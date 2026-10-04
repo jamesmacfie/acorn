@@ -18,6 +18,7 @@ export type FormattedCell =
   | { kind: 'enum'; label: string; tone: PanelTone; icon?: string }
   | { kind: 'person'; name: string; initials: string }
   | { kind: 'link'; url: string; text: string }
+  | { kind: 'list'; items: FormattedCell[] }
 
 const EMPTY: FormattedCell = { kind: 'empty' }
 
@@ -43,6 +44,10 @@ export function personInitials(name: string): string {
   return (letters.length > 1 ? letters[0] + letters[letters.length - 1] : letters[0]).toUpperCase()
 }
 
+/** Digit grouping and at most two decimals, in the device locale. No unit asks for more precision yet;
+ *  workstream 2's units decide their own. */
+const NUMBER = new Intl.NumberFormat(undefined, { maximumFractionDigits: 2 })
+
 /** `%` reads wrong with a space and every other unit reads wrong without one. */
 const withUnit = (text: string, unit: string | undefined): string =>
   unit === undefined ? text : unit === '%' ? `${text}%` : `${text} ${unit}`
@@ -55,23 +60,31 @@ export function formatCell(
   // `null` means this row has no value here, which the wire distinguishes from an empty string.
   // Both draw as nothing; only the sort order tells them apart (shaping.ts).
   if (value === null || value === undefined || value === '') return EMPTY
+  if (Array.isArray(value)) return { kind: 'list', items: value.map(item => formatCell({ ...field, list: false }, item, now)) }
 
   switch (field.type) {
     case 'number': {
       const numeric = Number(value)
-      return Number.isFinite(numeric) ? { kind: 'number', text: withUnit(String(numeric), field.unit) } : EMPTY
+      if (!Number.isFinite(numeric)) return EMPTY
+      const unit = field.unit
+      if (unit && /^[A-Z]{3}$/.test(unit)) return { kind: 'number', text: new Intl.NumberFormat(undefined, { style: 'currency', currency: unit, maximumFractionDigits: 2 }).format(numeric) }
+      if (unit === 'percent') return { kind: 'number', text: `${NUMBER.format(numeric)}%` }
+      if (unit === 'ms' || unit === 's') return { kind: 'number', text: withUnit(NUMBER.format(unit === 's' ? numeric * 1000 : numeric), 'ms') }
+      if (unit === 'bytes') return { kind: 'number', text: new Intl.NumberFormat(undefined, { style: 'unit', unit: 'byte', unitDisplay: 'short', maximumFractionDigits: 2 }).format(numeric) }
+      return { kind: 'number', text: withUnit(NUMBER.format(numeric), unit) }
     }
     case 'boolean':
       return { kind: 'boolean', value: Boolean(value), text: value ? 'Yes' : 'No' }
     case 'datetime': {
+      if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return { kind: 'datetime', absolute: value, relative: value }
       // Epoch milliseconds, because that is what every other timestamp on this wire is. Both forms
       // are returned rather than one: the age is what a person reads and the absolute time is what
       // they check, so the age is the label and the absolute time is the tooltip.
-      const at = Number(value)
+      const at = typeof value === 'string' && Number.isNaN(Number(value)) ? Date.parse(value) : Number(value)
       if (!Number.isFinite(at)) return EMPTY
       return {
         kind: 'datetime',
-        absolute: new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' }),
+        absolute: new Date(at).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short', ...(field.zone ? { timeZone: field.zone } : {}) }),
         relative: formatRelativeTime(at, now),
       }
     }
@@ -109,6 +122,8 @@ export const cellText = (cell: FormattedCell): string => {
       return cell.label
     case 'person':
       return cell.name
+    case 'list':
+      return cell.items.map(cellText).join(', ')
     default:
       return cell.text
   }

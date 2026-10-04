@@ -333,12 +333,16 @@ export function unionRows(
         // select `agents:sessions:<uuid>` finds nothing. `id` stays qualified, because two sources can
         // collide on `42` and the board dedupes on it.
         sourceRowId: row.id,
+        ...(row.records ? { records: row.records } : {}),
+        ...(row.recordItems ? { recordItems: row.recordItems } : {}),
         values,
         // Carried for the same reason `action` is: they're one thing. The action opens a pane and this
         // says in which task, so a mapped panel that dropped it would send every click to the "open a
         // task first" refusal.
         ...(row.taskId ? { taskId: row.taskId } : {}),
         ...(row.action ? { action: row.action } : {}),
+        ...(row.actions ? { actions: row.actions } : {}),
+        ...(row.target ? { target: row.target } : {}),
         pluginId: row.pluginId,
         sourceId: row.sourceId,
       }]

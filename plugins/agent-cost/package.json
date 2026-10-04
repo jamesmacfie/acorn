@@ -10,6 +10,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@acorn/protocol": "workspace:*",
     "acorn-plugin-sdk": "workspace:*",
     "solid-js": "catalog:"
   },

@@ -53,23 +53,27 @@ export function TableHead(props: { align?: CellAlign; priority?: ColumnPriority;
  *  `onPress` is here rather than left to the caller because a table whose rows open something was
  *  clickable by mouse and by nothing else at all three call sites: `Row` gives a list its keyboard,
  *  and a table cell cannot be a `Row`. */
-export function TableRow(props: { head?: boolean; onPress?: () => void; children: JSX.Element }) {
+export function TableRow(props: { head?: boolean; onPress?: () => void; onMenu?: () => void; tip?: string; children: JSX.Element }) {
   const row = () => (
     <tr
-      role={props.onPress ? 'button' : undefined}
-      tabindex={props.onPress ? 0 : undefined}
+      role={props.onPress || props.onMenu ? 'button' : undefined}
+      tabindex={props.onPress || props.onMenu ? 0 : undefined}
+      title={props.tip}
       onClick={(event) => {
         // A click on a cell's own control, such as a checkbox or a button, is that control's.
         if (inCellControl(event.target, event.currentTarget)) return
         props.onPress?.()
       }}
+      onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.() } : undefined}
       onKeyDown={(event) => {
-        if (!props.onPress) return
+        if (!props.onPress && !props.onMenu) return
         // A press inside a cell's own control is that control's, not the row's.
         if (event.target !== event.currentTarget) return
+        if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.(); return }
+        if (!props.onPress) return
         if (event.key !== 'Enter' && event.key !== ' ') return
         event.preventDefault()
-        props.onPress()
+        props.onPress?.()
       }}
     >{props.children}</tr>
   )

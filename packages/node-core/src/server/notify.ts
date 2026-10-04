@@ -3,6 +3,8 @@
 import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
+import { clearDashboardReadCache } from './dashboards/readCache'
+import { clearSourceIdentity } from './dataSources/identityCache'
 
 // "Re-read this plugin's chrome descriptors": rail rows, badges, sources, agent context. One
 // client-side consumer, `client-core/host/chrome/chromeData.ts`, and nothing else hears it.
@@ -89,6 +91,7 @@ export function broadcastWorkflowStepEvent(runId: string, stepId: string, event:
 // dev loop). Content-free, like `term:status`: the roster is a fetchable route, and putting it on
 // the wire too would mean two projections of the same state to keep in step.
 export function broadcastPluginsChanged(): void {
+  clearDashboardReadCache()
   wsBroadcast({ channel: 'plugins:changed' })
 }
 
@@ -130,6 +133,8 @@ export function broadcastWorkspaceProjectsChanged(event: WorkspaceProjectsChange
 // `status` is what the row now says, not what changed about it, so a client that missed a frame is not
 // left holding a gap. Everything else about the connection stays a fetchable route.
 export function broadcastConnectionChanged(connection: ConnectionChangedEvent): void {
+  clearDashboardReadCache()
+  clearSourceIdentity(connection.integrationId)
   wsBroadcast({ channel: 'connection:changed', ...connection })
 }
 

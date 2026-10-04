@@ -1,4 +1,5 @@
 import type { PanelDefinition } from './model'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 
 // What makes a recorded series still true. See docs/dashboards/sampling.md § Sampling and retention for what
 // goes into the signature and why the rest is left out.
@@ -28,12 +29,26 @@ function fnv1a(text: string): string {
   return hash.toString(16).padStart(8, '0')
 }
 
-export function measureSignature(panel: PanelDefinition): string {
+/** What one query read when it was sampled. `digest` is the saved query's published revision digest or
+ *  the digest of inline content, so editing a saved query's filter changes the series it feeds. */
+export type MeasureQueryIdentity = {
+  id: string
+  digest: string
+  parameters: Record<string, unknown>
+  account: string | null
+}
+
+/** Without `queries` this is the signature series were written under before query identity counted,
+ *  which the sampler uses once to adopt them rather than reset them. */
+export function measureSignature(panel: PanelDefinition, queries?: readonly MeasureQueryIdentity[], plan?: PanelPlan): string {
   return fnv1a(stableStringify({
     sources: (panel.sources ?? []).map((source) => ({ pluginId: source.pluginId, sourceId: source.sourceId })),
     mapping: panel.mapping ?? {},
     filters: panel.shaping.filters ?? [],
     aggregate: panel.view.aggregate ?? 'count',
     field: panel.view.field ?? '',
+    ...(queries ? { queries } : {}),
+    ...(plan ? { plan: { time: plan.time, sources: plan.sources.map(source => ({ id: source.id, role: source.role })),
+      relations: plan.relations, columns: plan.columns, stages: plan.stages, sort: plan.sort, group: plan.group, limit: plan.limit } } : {}),
   }))
 }

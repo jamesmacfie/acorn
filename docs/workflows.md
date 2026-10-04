@@ -33,6 +33,9 @@ Bindings use the shared data address vocabulary:
 An empty pointer selects the whole value. `fallback` applies only to missing values. The explicit
 conversions are `scalar-to-text` and `json-to-text`. Only completed transitive predecessors reach a
 handler's `predecessorValues`, so a completed sibling can't supply a binding.
+Workflow query bindings can also use Node-resolved `context` addresses for the selected account's
+`viewer`, the workspace's linked external IDs, and `now` or a local `calendar` boundary with ISO 8601
+offsets. The Node resolves these at the frozen query evaluation time before calling the source.
 
 Named definition `outputs` declare `{ name, schema, binding, required? }`, binding completed step
 values. A child step exposes them as `outputs` beside its task, run, and status, so a consumer doesn't
@@ -47,6 +50,15 @@ contract.
 
 An unversioned definition, a missing stable ID, an old binding table, or an unknown version is refused
 with a diagnostic that names the file. There's no read-time normalization or execution adapter.
+
+The built-in `write-dataset` step binds an array from a completed predecessor to
+`dataset: { id, version, rows }`. The Node derives workspace and project from the running task,
+requires a workflow-fed dataset there, validates the current schema version and every row, and
+writes them transactionally. A scheduled workflow can use the same step; the step does not create or
+change dataset definitions.
+
+Dashboard board moves use source-declared field mutations through the Node's `act` route. They do not
+add a generic provider write-back step or change workflow data-source reads.
 
 ## Limits and capabilities
 

@@ -4,6 +4,14 @@ Workspaces, projects, and tasks are core Node entities. Read this page for the d
 find the topic page that owns worktrees, archive, task creation, project configuration, and task
 script results.
 
+Core task records expose the inspected worktree path, whether it has changes, and modified and
+untracked counts. Uninspected or unavailable worktrees retain null counts. Project-scoped
+`core/local-branches` and `core/local-worktrees` data sources inspect local Git refs and the complete
+worktree roster, including worktrees Acorn did not create and detached heads. Branch divergence uses
+the last fetched upstream/default refs. Reads do not fetch; each record has an observation time.
+On workspace panels, choose a local Git project through the source's Project scope option; a
+project-scoped panel uses its project by default.
+
 ## Workspace and project
 
 A workspace groups projects. It has a name and a sort order, and no icon or color, because the

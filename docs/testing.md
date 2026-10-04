@@ -74,6 +74,11 @@ These old section names now live in the pages above:
 - The smoke checklist is its own [page](./testing/smoke-checklist.md).
 - Memory acceptance is in [memory checks](./testing/memory.md).
 
+## Dashboard plan checks
+
+[Dashboard plan checks](./testing/workflows.md#dashboard-plan-checks) covers panel plans, editor
+acceptance, and authoring evaluation.
+
 ## Feature checks
 
 Some behavior needs a real window, a real terminal, or a real provider. Each feature's manual checks

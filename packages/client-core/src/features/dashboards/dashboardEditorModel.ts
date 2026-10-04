@@ -1,4 +1,4 @@
-import type { DashboardDraft, DashboardMapping, DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
+import { isMappedDashboard, type DashboardMapping, type DashboardPanelContent } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import { DATA_SOURCE_PREVIEW_MODE } from '@acorn/protocol/dataSources.ts'
@@ -6,6 +6,7 @@ import { MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import { projectDashboardPanel } from '@acorn/dashboards-core/projection'
 import { viewsForSchema, type PanelViewKind } from './model'
+import { PANEL_STATUS_FIELD_ID } from './mapping'
 
 export const emptyDashboardContent = (): DashboardPanelContent => ({
   title: 'New panel', queries: [],
@@ -13,7 +14,7 @@ export const emptyDashboardContent = (): DashboardPanelContent => ({
   display: { view: { kind: 'list' }, fields: [] },
 })
 
-export const latestUnpublishedDashboard = (drafts: readonly DashboardDraft[]): DashboardDraft | undefined =>
+export const latestUnpublishedDashboard = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T | undefined =>
   drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)[0]
 
 export function setDashboardQuery(
@@ -115,3 +116,54 @@ export const availableDashboardViews = (
 export const unavailableViewReason = (kind: PanelViewKind): string => kind === 'board'
   ? 'Board needs a status or other field with a fixed set of values.'
   : kind === 'chart' ? 'Chart needs a status, category, or date field.' : ''
+
+/** A board groups on the panel's status field, which only a mapped panel has. */
+const groupOnStatus = (content: DashboardPanelContent): DashboardPanelContent => isMappedDashboard(content)
+  ? { ...content, display: { ...content.display, groupBy: PANEL_STATUS_FIELD_ID } }
+  : content
+
+/** One board column per exact status of every query, keeping columns the owner already made. */
+export function addStatusColumns(
+  content: DashboardPanelContent,
+  states: Readonly<Record<string, SourceQueryEditorState | undefined>>,
+): DashboardPanelContent {
+  const existing = new Map(content.mapping.columns.map(column => [column.id, column]))
+  const values = structuredClone(content.mapping.values)
+  for (const entry of content.queries) {
+    for (const choice of exactStatusOptions(states[entry.id], content.mapping.fields[entry.id]?.status)) {
+      existing.set(choice.id, existing.get(choice.id) ?? { id: choice.id, label: choice.label })
+      values[entry.id] ??= {}
+      values[entry.id]![choice.id] = [...new Set([...(values[entry.id]![choice.id] ?? []), choice.id])]
+    }
+  }
+  return groupOnStatus({ ...content, mapping: { ...content.mapping, columns: [...existing.values()], values } })
+}
+
+/** Board columns from `suggestStateCategoryMapping`, replacing that query's exact status mapping. */
+export function applyCategoryColumns(
+  content: DashboardPanelContent,
+  instanceId: string,
+  suggestion: { columns: DashboardMapping['columns']; values: Record<string, string[]> },
+): DashboardPanelContent {
+  return groupOnStatus({
+    ...content,
+    mapping: {
+      ...content.mapping,
+      columns: [...new Map([...content.mapping.columns, ...suggestion.columns].map(column => [column.id, column])).values()],
+      values: { ...content.mapping.values, [instanceId]: suggestion.values },
+    },
+  })
+}
+
+/** Shows or hides one field of the projected schema. An empty list means every field is visible. */
+export function setFieldVisible(
+  content: DashboardPanelContent,
+  states: Readonly<Record<string, SourceQueryEditorState | undefined>>,
+  fieldId: string,
+  visible: boolean,
+): DashboardPanelContent {
+  const all = displaySchema(states, content.mapping).fields.map(candidate => candidate.id)
+  const selected = content.display.fields.length ? content.display.fields : all
+  const fields = visible ? [...new Set([...selected, fieldId])] : selected.filter(id => id !== fieldId)
+  return { ...content, display: { ...content.display, fields } }
+}

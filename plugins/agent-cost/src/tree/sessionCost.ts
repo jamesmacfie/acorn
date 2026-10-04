@@ -1,9 +1,9 @@
 import type {
   SessionHeaderProps,
   SessionHeaderTokenPrice,
-  SessionHeaderTurn,
   SessionHeaderUsage,
 } from './sessionHeaderContract'
+import { estimateUsageEventCost } from '@acorn/protocol/usageCost.ts'
 
 export type SessionCostEstimate = {
   amountUsd: number
@@ -12,19 +12,6 @@ export type SessionCostEstimate = {
 
 const finiteCount = (value: number | undefined): number | null =>
   typeof value === 'number' && Number.isFinite(value) && value >= 0 ? value : null
-
-function reportedUsdCost(props: SessionHeaderProps): number | null {
-  const amounts = props.turns.flatMap((turn) => {
-    const cost = turn.usage.cost
-    return cost?.currency.toUpperCase() === 'USD' && finiteCount(cost.amount) !== null
-      ? [cost.amount]
-      : []
-  })
-  if (!amounts.length) return null
-  return props.costAccounting === 'cumulative'
-    ? amounts.at(-1)!
-    : amounts.reduce((sum, amount) => sum + amount, 0)
-}
 
 function tokenCost(
   usage: SessionHeaderUsage,
@@ -41,40 +28,29 @@ function tokenCost(
   const cached = cachedTotal - (finiteCount(previous.cachedInputTokens) ?? 0)
   const cacheWrite = writeTotal - (finiteCount(previous.cacheWriteInputTokens) ?? 0)
   if ([input, output, cached, cacheWrite].some((count) => count < 0)) return null
-  const uncachedInput = input - cached - cacheWrite
-  if (uncachedInput < 0) return null
-  return (
-    uncachedInput * price.input
-    + output * price.output
-    + cached * price.cacheRead
-    + cacheWrite * price.cacheWrite
-  ) / 1_000_000
+  return estimateUsageEventCost({ input, output, cacheRead: cached, cacheWrite }, price)
 }
 
-function estimatedTokenCost(
-  turns: readonly SessionHeaderTurn[],
-  accounting: SessionHeaderProps['tokenAccounting'],
-): number | null {
-  let previous: SessionHeaderUsage = {}
-  let amountUsd = 0
-  let priced = false
-  for (const turn of turns) {
-    if (finiteCount(turn.usage.inputTokens) === null) continue
-    if (!turn.price) return null
-    const turnCost = tokenCost(turn.usage, accounting === 'cumulative' ? previous : {}, turn.price)
-    if (turnCost === null) return null
-    amountUsd += turnCost
-    previous = turn.usage
-    priced = true
-  }
-  return priced ? amountUsd : null
-}
-
-/** The plugin's complete pricing policy. Provider-reported USD takes precedence; otherwise the
- *  owner-projected token snapshots are priced according to their declared accounting mode. */
+/** Sum the same per-event reported-or-estimated policy used by the ledger source. */
 export function estimateSessionCost(props: SessionHeaderProps): SessionCostEstimate | null {
-  const reported = reportedUsdCost(props)
-  if (reported !== null) return { amountUsd: reported, source: 'provider' }
-  const estimated = estimatedTokenCost(props.turns, props.tokenAccounting)
-  return estimated === null ? null : { amountUsd: estimated, source: 'estimated' }
+  let previousUsage: SessionHeaderUsage = {}
+  let previousReported: number | null = null
+  let amountUsd = 0
+  let estimated = false
+  let counted = false
+  for (const turn of props.turns) {
+    const raw = turn.usage.cost
+    const amount = raw?.currency.toUpperCase() === 'USD' ? finiteCount(raw.amount) : null
+    const reported = amount === null ? null : props.costAccounting === 'cumulative'
+      ? previousReported === null || amount < previousReported ? amount : amount - previousReported : amount
+    const cost = reported ?? (turn.price ? tokenCost(turn.usage,
+      props.tokenAccounting === 'cumulative' ? previousUsage : {}, turn.price) : null)
+    if (cost === null) return null
+    amountUsd += cost
+    estimated ||= reported === null
+    counted = true
+    if (amount !== null) previousReported = amount
+    previousUsage = turn.usage
+  }
+  return counted ? { amountUsd, source: estimated ? 'estimated' : 'provider' } : null
 }

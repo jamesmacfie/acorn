@@ -41,6 +41,7 @@
     "./features/settings/ProjectSettings.tsx": "./src/features/settings/ProjectSettings.tsx",
     "./features/settings/RunsSettings.tsx": "./src/features/settings/RunsSettings.tsx",
     "./features/settings/SchedulesSettings.tsx": "./src/features/settings/SchedulesSettings.tsx",
+    "./features/settings/DatasetsSettings.tsx": "./src/features/settings/DatasetsSettings.tsx",
     "./features/settings/SecuritySettings.tsx": "./src/features/settings/SecuritySettings.tsx",
     "./features/settings/SettingsView.tsx": "./src/features/settings/SettingsView.tsx",
     "./features/settings/ShortcutsSettings.tsx": "./src/features/settings/ShortcutsSettings.tsx",

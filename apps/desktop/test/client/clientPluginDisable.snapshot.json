@@ -117,8 +117,10 @@
       "workflows.gates"
     ],
     "contentLinks": [
+      "agents.session",
       "github.pull-request",
-      "github.repository"
+      "github.repository",
+      "workflows.run"
     ],
     "brandMarks": [
       "github",
@@ -292,6 +294,9 @@
       ],
       "attentionSources": [
         "workflows.gates"
+      ],
+      "contentLinks": [
+        "workflows.run"
       ]
     }
   }

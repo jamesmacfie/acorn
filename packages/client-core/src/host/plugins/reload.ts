@@ -10,6 +10,7 @@ import {
 import { syncPluginContributions } from './syncContributions'
 import { createLogger } from '../../infra/telemetry/logger'
 import { invalidateDataSources } from '../../features/dataSources/queries'
+import { invalidatePublishedPanels } from '../../features/dashboards/dashboardClient'
 
 const log = createLogger('plugins')
 
@@ -19,6 +20,8 @@ export async function reconcilePluginChange(nodeId: string = activeNodeId() ?? '
   if (nodeId === activeNodeId()) {
     await refreshNodePlugins(nodeId)
     void invalidateDataSources(clientFor(activeCacheId()).client, activeCacheId())
+    // The plugin frame names only the Node, so every placed panel on it refetches.
+    void invalidatePublishedPanels(clientFor(activeCacheId()).client, activeCacheId())
   }
   await syncPluginDistribution({ nodeIds: [nodeId] })
 }

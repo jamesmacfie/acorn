@@ -22,11 +22,13 @@ const targetName = (step: WorkflowStepDef, catalog: WorkflowCatalog | undefined)
 const bindingLabel = (binding: DataBinding | undefined, def: WorkflowDef): string => {
   const address = binding?.address
   if (!address) return 'a field'
-  const pointer = address.from === 'literal' ? '' : address.pointer
+  const pointer = 'pointer' in address ? address.pointer : ''
   const field = pointer ? pointer.split('/').filter(Boolean).at(-1)?.replace(/~1/g, '/').replace(/~0/g, '~') : undefined
   if (address.from === 'literal') return JSON.stringify(address.value)
   if (address.from === 'input') return field ?? address.name
   if (address.from === 'item') return field ?? 'current record'
+  if (address.from === 'context') return address.name === 'viewer' ? field ?? 'you'
+    : address.name === 'workspaceLinks' ? 'workspace links' : address.name === 'now' ? 'now' : 'calendar time'
   return field ?? def.steps.find(step => stepIdentity(step) === address.stepId)?.name ?? 'step result'
 }
 

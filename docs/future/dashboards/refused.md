@@ -50,8 +50,8 @@ Revisit if starter plans prove unable to carry what plugins want to offer.
 The August record refused cross-source joins, with the revisit condition "if union and mapping
 demonstrably fail" and the note that a declared relation should come before a general join. The 30
 examples meet that condition: release checklists, mirrored issues, invoice matching, branch-to-pull
-request lookups, and budget lookups all need records from two sources in one row. Workstream 5
-therefore adds declared relations and a row model that says which source supplies the rows.
+request lookups, and budget lookups all need records from two sources in one row. Declared relations
+and a row model now say which source supplies the rows.
 
 What stays refused is everything around them. There is no join on a key the author or the source
 hasn't declared, and no key that leaves out the scope that makes it unique. There is no matching on
@@ -75,7 +75,7 @@ measures can't express.
 ## A formula language or SQL inside panels
 
 An open expression language makes plans uncheckable, gives the AI a way to produce plausible nonsense,
-and turns the editor into a text box. Workstream 5's compute stage offers a closed set of expressions,
+and turns the editor into a text box. The compute stage offers a closed set of expressions,
 each with a form, a description, a validator, and evaluation cases, and repeated stages give that set
 room to work. Logic beyond it runs in a workflow or an agent that writes a dataset, where it is
 visible, testable, and scheduled.

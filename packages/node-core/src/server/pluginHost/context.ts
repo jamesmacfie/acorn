@@ -236,9 +236,16 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         if (!options.env) throw new Error('Source invocation requires host bindings')
         // Loaded code may only invoke its own sources. Cross-plugin workflow execution is a
         // compiled host consumer; raw task principals remain refused by source admission.
-        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' ? request.ref : request.source
+        const source = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
         if (permissions && source.pluginId !== plugin) throw new Error('Source belongs to another plugin')
         return invokeDataSource(options.env, request, invocation)
+      },
+    },
+    datasets: permissions ? (undefined as never) : {
+      writeForTask: async (taskId, input) => {
+        if (!options.env) throw new Error('Dataset writes require host bindings')
+        const { writeWorkflowDataset } = await import('../datasets/workflow')
+        return writeWorkflowDataset(options.env.DB, taskId, input)
       },
     },
     // Owner-bound. This is the list anything unattended picks an action from — a person arming a

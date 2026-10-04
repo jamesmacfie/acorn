@@ -81,6 +81,7 @@ export function validateFrames(refs: ManifestReferences): void {
 export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: string): void {
   const { manifest, issues: ctx, confine, openedOverlays, projectPanes, taskPanes } = refs
   const { frames, routes, sources, commands, contentLinks } = manifest.contributions
+  for (const link of contentLinks) if (link.openOverlay) openedOverlays.add(link.openOverlay)
   // A core replacement needs a target slot and bundle before it can displace core UI.
   frames.forEach((frame, i) => {
     const at = ['contributions', 'frames', i] as (string | number)[]
@@ -144,8 +145,11 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
         message: `content link names '${entry.openPane}', which this manifest does not declare as a task-scoped pane`,
       })
     }
+    if (entry.openOverlay !== undefined && !frames.some(frame => frame.target === 'overlay' && frame.id === entry.openOverlay)) {
+      ctx.addIssue({ code: 'custom', path: [...at, 'openOverlay'], message: `content link names an undeclared overlay '${entry.openOverlay}'` })
+    }
     // Without a pane or reference panel, the link has nowhere to open.
-    if (entry.openPane === undefined && !declaresRefPanel) {
+    if (entry.openPane === undefined && entry.openOverlay === undefined && !declaresRefPanel) {
       ctx.addIssue({
         code: 'custom',
         path: at,
@@ -153,8 +157,8 @@ export function validateSurfaceDestinations(refs: ManifestReferences, ownPath: s
       })
     }
     try {
-      const compiled = compileContentLinkPattern(entry.match)
-      if (!compiled.captures.includes(entry.item)) {
+      const compiled = entry.match ? compileContentLinkPattern(entry.match) : undefined
+      if (compiled && (!entry.item || !compiled.captures.includes(entry.item))) {
         ctx.addIssue({
           code: 'custom',
           path: ['contributions', 'contentLinks', i, 'item'],
