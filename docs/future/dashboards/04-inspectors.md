@@ -1,6 +1,7 @@
 # Phase 4: inspectors in plain words
 
-Status: proposed, October 5, 2026. Depends on [phase 3](./03-studio-shell.md), and on the label
+Status: shipped, October 5, 2026, in commit `403dbdb85`. [What shipped](#what-shipped) records the choices made while
+building it and what it left for later. Depends on [phase 3](./03-studio-shell.md), and on the label
 map from [phase 1](./01-quick-wins.md). Read the [programme README](./README.md) first. The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows a filter step's
 inspector in "The studio".
@@ -218,3 +219,60 @@ screen should show a schema value, a JSON pointer, or an ID outside the **Plan**
 - Whether the run reports pushed-down predicates in `diagnostics.sources`. It reports
   `queryDigest` and `parameters`. If neither says which predicates were pushed down, requirement 8's
   note waits for a Node change, which is out of scope here.
+
+## What shipped
+
+Requirements 1 to 7 and 9 to 23 shipped. Requirement 8 shipped without the pushed-down filter note,
+as the last check above allows: a run's `diagnostics.sources` reports `queryDigest` and `parameters`,
+and neither says which predicates the source applied. Adding that note needs a Node change.
+`docs/dashboards/mapping-and-editor.md` § The generated editor describes the shipped behaviour and wins
+over this page.
+
+Where the code lives, in `packages/client-core/src/features/dashboards/studio/`:
+
+- `operationForms.ts` holds the registry. Its type is per operation, so each form receives its own
+  step's type.
+- `FilterForm.tsx`, `ComputeForm.tsx`, `SummarizeForm.tsx`, `ExpandForm.tsx`, and `OverlapForm.tsx`
+  are the step forms. `stageFormParts.tsx` holds what they share: `StageFormProps` and
+  `ConditionEditor`, which the filter step and a measure's condition both use.
+- `inspectors.tsx` holds every other inspector. `CompositionStageForm.tsx` is gone.
+- `packages/client-core/src/testkit/stageForms.tsx` drives a step form in jsdom by its captions.
+
+In `packages/dashboards-core/src/`, `newColumnId` and `planColumnIds` are in `planColumns.ts` and
+exported through `plan.ts`. `labels.ts` gained maps for trend, comparison, good direction, group
+order, empty values in a sort, date precision, values not listed, previous-period change, and units.
+`outline.ts` exports `VIEW_ICONS`.
+
+Choices made while building it:
+
+- **Show as** draws icons only. Five named segments need about 335 pixels, and the kit's
+  `SegmentedControl` doesn't wrap. Each segment keeps its name for screen readers and as its
+  tooltip, with the reason when it's disabled, and the inspector's heading names the chosen view.
+- **Reach** lives in `SourceQueryEditor`, behind `pickSourceAccount`, which only the studio sets.
+  **Account** shows there only when the source has more than one usable account. Both kit seams for
+  that editor, client-core's and the terminal's, gained `SegmentedControl`.
+- The person picker offers **You** and **Someone else**, then a text field. No source lists people
+  to pick from.
+- **A specific date** writes the day itself for a calendar-day column and local midnight's instant
+  otherwise, which is what the relative dates resolve to.
+- A calculation's result type follows its expression: a number for time between and arithmetic, the
+  values' type for **By choice**, and the first value's type for a list.
+- An expanded list's item column reads "*List* item" rather than its ID. That label comes from
+  `outputPlanColumns`, so placed panels show it too.
+- A custom group order lists the column's choices and the groups the last run made, with **Up** and
+  **Down** in place of dragging.
+- Changing a column's type drops settings that belong to the old type, because the plan refuses
+  some of them.
+- The registry test is `operationForms.test.tsx`, not `.test.ts`. It imports Solid components, and
+  only the `hosts` project compiles JSX. `authoringEvaluation.test.ts` gained one scripted proposal
+  per operation.
+
+Checked in a `dev:agent` session with **Workspace tasks**: a filter step on **Updated** with **Start
+of this week**, its row counts, the columns list, a Choice column's settings, and **Show as**. The
+session has no tasks, so every count was zero. The driver can't hover, so the column row menu and
+the view tooltips were checked only in tests.
+
+Left for later:
+
+- The pushed-down filter note in requirement 8.
+- The relations inspector is unchanged from phase 3. No requirement here covered it.

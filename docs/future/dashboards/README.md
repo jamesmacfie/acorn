@@ -1,8 +1,8 @@
 # Panel studio: creating, editing, and previewing dashboard panels
 
 Status: proposed, October 5, 2026. [Phase 1](./01-quick-wins.md),
-[phase 2](./02-plan-outline-model.md), and [phase 3](./03-studio-shell.md) shipped on October 5, 2026,
-and the other phases aren't built. This programme replaces the dashboards programme that lived in
+[phase 2](./02-plan-outline-model.md), [phase 3](./03-studio-shell.md), and
+[phase 4](./04-inspectors.md) shipped on October 5, 2026, and the other phases aren't built. This programme replaces the dashboards programme that lived in
 this folder. Its workstreams 1 to 7 shipped by October 4, 2026, and its files were removed on
 October 5, 2026; git history keeps them (commit `1d8c37913`).
 
