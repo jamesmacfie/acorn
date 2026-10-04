@@ -20,6 +20,7 @@ import { railStatusMarkers } from '../tasks/railStatus'
 import { createTaskScripts } from '../tasks/taskScripts'
 import { requestTaskAnnotations } from '../../host/annotations/taskAnnotations'
 import { unreadForTask } from '../notifications/notifications'
+import { toast } from '../notifications/toast'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
 import { slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
@@ -346,7 +347,7 @@ export default function TabRail() {
     setMenuId(null)
     const options = (projects.data ?? []).filter((project) => !project.hidden && project.workspaceId === activeWorkspace()?.id)
     if (!options.length) {
-      setArchiveErr('This workspace has no visible projects yet. Add one in Projects settings first.')
+      toast('This workspace has no visible projects yet. Add one in Projects settings first.')
       return
     }
     const current = params.projectId
@@ -421,14 +422,12 @@ export default function TabRail() {
   // has no window.prompt. With the bridge present the archive runs through the guarded teardown
   // flow (docs/workspaces-and-tasks/archive.md § Archive a task); the plain HTTP flip is only for the
   // browser dev build.
-  const [archiveErr, setArchiveErr] = createSignal('')
   const [draftErr, setDraftErr] = createSignal('')
   // The title, not the project picker above it, is where a person starts typing.
   let draftTitle: HTMLInputElement | undefined
 
   async function openArchive(w: Task) {
     setMenuId(null)
-    setArchiveErr('')
     const decision = await confirmTaskArchive(w)
     if (decision.confirmed) await archive(w, decision.checked)
   }
@@ -446,10 +445,10 @@ export default function TabRail() {
       // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
       // danger row.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
-      if (!res.ok) return setArchiveErr(res.output ? `${res.reason}\n${res.output}` : res.reason)
+      if (!res.ok) return toast(res.output ? `${res.reason}\n${res.output}` : res.reason, { tone: 'danger' })
       const warnings: string[] = []
       if (res.cleanupFailed?.length) warnings.push(`cleanup failed for: ${res.cleanupFailed.join(', ')}`)
-      if (warnings.length) setArchiveErr(`Archived, but ${warnings.join('; ')}.`)
+      if (warnings.length) toast(`Archived, but ${warnings.join('; ')}.`, { tone: 'danger' })
     } else {
       await archiveTask(w.id)
     }
@@ -662,7 +661,6 @@ export default function TabRail() {
         onClose={() => setSourceMenu(null)}
         returnFocus={() => sourceMenuReturnFocus?.isConnected ? sourceMenuReturnFocus : undefined}
       />
-      <Show when={archiveErr()}><Alert>{archiveErr()}</Alert></Show>
       <Show when={draft()}>
         {(d) => (
           <Modal title={d().mode === 'new' ? 'New task' : 'Rename task'} autoFocus={() => draftTitle} onDismiss={() => setDraft(null)}>

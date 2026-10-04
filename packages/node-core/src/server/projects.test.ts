@@ -13,7 +13,12 @@ describe('parseGithubRemote', () => {
   it('parses https and ssh forms, with and without .git, case-insensitively', () => {
     expect(parseGithubRemote('https://github.com/acme/web.git')).toEqual({ owner: 'acme', name: 'web' })
     expect(parseGithubRemote('git@github.com:acme/web')).toEqual({ owner: 'acme', name: 'web' })
+    expect(parseGithubRemote('git@github.com:/acme/web')).toEqual({ owner: 'acme', name: 'web' })
+    expect(parseGithubRemote('git@GITHUB.COM:/Acme/Web.git')).toEqual({ owner: 'Acme', name: 'Web' })
     expect(parseGithubRemote('ssh://git@GITHUB.COM/Acme/Web.git')).toEqual({ owner: 'Acme', name: 'Web' })
+    expect(parseGithubRemote('git@github.com://acme/web')).toBeNull()
+    expect(parseGithubRemote('https://github.com//acme/web')).toBeNull()
+    expect(parseGithubRemote('ssh://git@github.com//acme/web')).toBeNull()
     expect(parseGithubRemote('https://gitlab.com/acme/web.git')).toBeNull()
     expect(parseGithubRemote('https://example.com/github.com/acme/web.git')).toBeNull()
     expect(parseGithubRemote('https://github.com.evil/acme/web.git')).toBeNull()

@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { For, type JSX } from 'solid-js'
 import type { Size, Tone } from '@acorn/client-core/kit/tokens'
-import { flatten, Line, pad, slot } from '../cells'
+import { Line, pad, slot } from '../cells'
 
 /** Two columns, labels dim; `grouping="rows"` is one pair per line, which in cells is what both
  *  groupings are. */
@@ -30,7 +30,7 @@ export function DescriptionList(props: { layout?: 'columns' | 'facts'; size?: 's
 }
 DescriptionList.Item = (props: { label: JSX.Element; mono?: boolean; children: JSX.Element }) => (
   <box flexDirection="row" gap={1}>
-    <Line role="muted">{flatten(props.label)}</Line>
+    <Line role="muted">{props.label}</Line>
     {slot(props.children)}
   </box>
 )

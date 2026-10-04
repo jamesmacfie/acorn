@@ -54,6 +54,9 @@ it('limits the feed to the selected project and private scope, with Undo only on
   const feed = await store.feed('project-a')
   expect(feed.map((change) => change.projectId)).toEqual([null, 'project-a', 'project-a'])
   expect(feed.map((change) => change.canUndo)).toEqual([true, true, false])
+  const core = { projects: { byId: async () => ({ id: 'project-a' }) } } as unknown as KnowledgeCoreServices
+  const projectFeed = await memoryLibrary(store, core)('changes', 'project-a', { scope: 'project' }) as typeof feed
+  expect(projectFeed.map((change) => change.projectId)).toEqual(['project-a', 'project-a'])
   await store.undo(updated.id)
   const restored = (await store.get(address))!
   expect(restored.body).toBe(input.body)
@@ -69,6 +72,7 @@ it('uses the session context builder for preview and applies cap preferences onl
   const core = { projects: { byId: async () => ({ id: 'project-a' }) }, identity: { active: () => 'owner' }, tasks: { load: async () => ({ projectId: 'project-a' }) }, prefs: { read: async () => prefs, write: async (_user: string, _key: string, value: string) => { prefs = value } } } as unknown as KnowledgeCoreServices
   const library = memoryLibrary(store, core)
   for (let i = 0; i < 8; i++) await store.write({ ...address, name: `rule-${i}` }, { ...input, name: `rule-${i}`, description: 'x'.repeat(150) }, agent)
+  await store.write({ scope: 'private', projectId: null, name: 'shared-preference' }, { ...input, name: 'shared-preference' }, agent)
   const build = standingContextBuilder(store, core)
   const snapshot = await build('task-a')
   await library('caps', 'project-a', { caps: { project: 500, private: 4000 } })
@@ -78,5 +82,9 @@ it('uses the session context builder for preview and applies cap preferences onl
   expect(preview.counts.project).toBeGreaterThan(500)
   expect(preview.shown.project).toBeLessThanOrEqual(500)
   expect(snapshot).not.toContain('MEMORY.md truncated:')
+  const projectPreview = await library('preview', 'project-a', { scope: 'project' }) as typeof preview
+  expect(projectPreview.text).toContain('## Project memory')
+  expect(projectPreview.text).not.toContain('shared-preference')
+  expect(await build('task-a')).toContain('shared-preference')
   await expect(library('get', 'project-a', { address: { ...address, projectId: 'foreign' } })).rejects.toMatchObject({ status: 400 })
 })

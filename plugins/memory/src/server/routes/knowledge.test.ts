@@ -121,8 +121,8 @@ describe('memory routes', () => {
     expect(scope).not.toHaveBeenCalled()
     const reads = path.includes('search') ? memorySearch.mock.calls : memoryList.mock.calls
     expect(reads).toHaveLength(6)
-    if (path.includes('search')) expect(reads).toEqual([['reference', undefined, undefined], ['reference', 'project-widget', undefined], ['reference', 'project-foreign', undefined], ['reference', undefined, undefined], ['reference', 'project-foreign', undefined], ['reference', undefined, undefined]])
-    else expect(reads).toEqual([[undefined], ['project-widget'], ['project-foreign'], [undefined], ['project-foreign'], [undefined]])
+    if (path.includes('search')) expect(reads).toEqual([['reference', undefined, undefined, undefined], ['reference', 'project-widget', undefined, undefined], ['reference', 'project-foreign', undefined, undefined], ['reference', undefined, undefined, undefined], ['reference', 'project-foreign', undefined, undefined], ['reference', undefined, undefined, undefined]])
+    else expect(reads).toEqual([[undefined, undefined], ['project-widget', undefined], ['project-foreign', undefined], [undefined, undefined], ['project-foreign', undefined], [undefined, undefined]])
   })
 
   it.each(['/memory', '/memory/search?q=reference'])('%s fails closed for missing tasks, missing task claims, and scope failures', async (path) => {
@@ -149,6 +149,6 @@ describe('memory routes', () => {
     setKnowledgeBridge(bridge({ taskMemoryScope: async () => ({ projectId: null }), memoryList }))
     expect((await task().fetch(req('/memory'), {} as Env)).status).toBe(200)
     expect((await task().fetch(req('/memory?projectId=project-widget'), {} as Env)).status).toBe(404)
-    expect(memoryList).toHaveBeenCalledExactlyOnceWith(undefined)
+    expect(memoryList).toHaveBeenCalledExactlyOnceWith(undefined, undefined)
   })
 })

@@ -1,5 +1,6 @@
 import { readFileSync } from 'node:fs'
 import type { CoreServices } from '@acorn/plugin-api/node'
+import type { MemoryScope } from '../contract/library'
 import { renderMemoryIndex } from './memory'
 import type { MemoryStore } from './memoryStore'
 
@@ -35,17 +36,18 @@ export async function memoryCaps(core: Pick<CoreServices, 'identity' | 'prefs'>)
   return caps
 }
 
-export async function memoryPreview(store: Pick<MemoryStore, 'list'>, core: Pick<CoreServices, 'identity' | 'prefs'>, projectId: string | null) {
+export async function memoryPreview(store: Pick<MemoryStore, 'list'>, core: Pick<CoreServices, 'identity' | 'prefs'>, projectId: string | null, scope?: MemoryScope) {
   const caps = await memoryCaps(core)
-  const memories = await store.list(projectId)
+  const memories = await store.list(projectId, scope)
   const indexes = {
     private: renderMemoryIndex(memories.filter((memory) => memory.scope === 'private')),
     project: renderMemoryIndex(memories.filter((memory) => memory.scope === 'project')),
   }
   const privateIndex = cappedMemoryIndex(indexes.private, caps.private)
   const projectIndex = cappedMemoryIndex(indexes.project, caps.project)
-  const blocks = [memoryContract, '## Private memory', privateIndex || '(No memories yet.)']
-  if (projectId) blocks.push('## Project memory', projectIndex || '(No memories yet.)')
+  const blocks = [memoryContract]
+  if (scope !== 'project') blocks.push('## Private memory', privateIndex || '(No memories yet.)')
+  if (projectId && scope !== 'private') blocks.push('## Project memory', projectIndex || '(No memories yet.)')
   return { text: blocks.join('\n\n'), caps,
     counts: { private: indexes.private.length, project: indexes.project.length },
     shown: { private: privateIndex.length, project: projectIndex.length } }

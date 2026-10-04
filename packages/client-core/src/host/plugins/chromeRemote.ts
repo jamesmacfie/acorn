@@ -2,7 +2,7 @@ import type { RailData, RailProps, TopbarData, TopbarProps } from '@acorn/protoc
 import type { OwnerActions } from '../tree/hostRequests'
 
 export const RAIL_ACTIONS = ['selectSource', 'openWorkspace', 'toggleCollapsed', 'reorderSources', 'createTask', 'openContextMenu'] as const
-export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'collapseRail', 'navigate', 'clearCache'] as const
+export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'collapseRail', 'navigate', 'clearCache', 'addProject'] as const
 
 const known = (id: unknown, list: readonly { id: string }[]): string => {
   if (typeof id !== 'string' || !list.some((item) => item.id === id)) throw new Error('That choice is unavailable')
@@ -45,10 +45,10 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
 
 export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: OwnerActions } {
   const { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
-    breadcrumb, node, nodes, account, railCollapsed, slots } = value
+    breadcrumb, node, nodes, account, railCollapsed, canAddProject, slots } = value
   return {
     data: { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
-      breadcrumb, node, nodes, account, railCollapsed, slots },
+      breadcrumb, node, nodes, account, railCollapsed, canAddProject, slots },
     actions: {
       pickWorkspace: (selection) => {
         const selected = selection as { id?: unknown; nodeId?: unknown } | null
@@ -68,6 +68,10 @@ export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: O
         value.navigate(route)
       },
       clearCache: () => value.clearCache(),
+      addProject: () => {
+        if (!canAddProject) throw new Error('Adding a project is unavailable')
+        value.addProject()
+      },
     },
   }
 }

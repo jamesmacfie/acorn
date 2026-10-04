@@ -59,3 +59,33 @@ Agents in a task can read data sources and write datasets, but can't create pane
 `dashboard_propose` tool that saves an unpublished draft for the launcher's "Unfinished" list would
 fit this design. It isn't part of the editor work. Revisit after phase 6, when the review flow it
 would feed exists.
+
+## Discovered sources as inputs
+
+An input names a statically registered source, such as `github:pull-requests`. Sources a plugin
+discovers at run time, per scope, can't be inputs, because the approval dialog has to name the input
+before any code runs. Revisit if a plugin needs to read a discovered source and can name the
+discovery up front.
+
+## Write-back through a derived source
+
+Dragging a card from Blocked to Ready on a derived source means nothing upstream. Write-back stays
+with the source that owns the record, and input handles have no write or action path. Revisit when a
+plugin can name exactly which upstream field and value a choice maps to.
+
+## Derived sources deeper than two levels
+
+A derived source may read another derived source, two levels deep at most, and never in a loop.
+Deeper chains make budgets and failure messages hard to explain. Revisit with a real case.
+
+## A dashboard step that runs plugin code
+
+Custom logic could have been a plugin-provided panel step instead of a source. That would put plugin
+code inside the Node's plan runner and the history sampler, and break the closed set the editor and
+the AI rely on. A derived source gives the same power at the boundary Acorn already enforces.
+
+## Opening Settings from a loaded plugin
+
+Loaded plugins can't open Settings, and this programme doesn't add a bridge verb for it. Acorn draws
+every **Connect…**, **Reconnect…**, and **Review** button itself. Revisit if a plugin needs Settings
+for something the host can't anticipate.

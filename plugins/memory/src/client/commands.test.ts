@@ -57,7 +57,7 @@ describe('the memory plugin catalogue', () => {
     expect(find().select(rows[0], world)).toEqual({ effect: 'close' })
     expect(mocks.setSelectedSource).toHaveBeenCalledWith('memory')
     expect(navigate).toHaveBeenCalledWith('/p/p-1')
-    expect(selectedMemory()).toEqual({ name: 'no-ponytail-comments', scope: 'project' })
+    expect(selectedMemory()).toEqual({ name: 'no-ponytail-comments', scope: 'project', projectId: 'p-1' })
   })
 
 })

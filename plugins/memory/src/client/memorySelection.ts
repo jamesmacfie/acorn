@@ -4,14 +4,14 @@ import { MEMORY_SOURCE_ID } from '../shared/api'
 
 // The list and the detail are two regions that a host mounts apart, so what they share lives here.
 // Kept free of the page's imports, because the palette command loads this at startup.
-export const [selectedMemory, setSelectedMemory] = createSignal<{ name: string; scope: string } | undefined>()
-export const [addingMemory, setAddingMemory] = createSignal(false)
-export function selectMemory(memory: { name: string; scope: string } | undefined): void {
-  setAddingMemory(false)
+export const [selectedMemory, setSelectedMemory] = createSignal<{ name: string; scope: string; projectId: string | null } | undefined>()
+export const [addingMemory, setAddingMemory] = createSignal<string>()
+export function selectMemory(memory: { name: string; scope: string; projectId: string | null } | undefined): void {
+  setAddingMemory(undefined)
   setSelectedMemory(memory)
 }
 export function openMemory(name: string, scope: string, projectId?: string, navigate?: (path: string) => void): void {
-  selectMemory({ name, scope })
+  selectMemory({ name, scope, projectId: scope === 'project' ? projectId ?? null : null })
   setSelectedSource(MEMORY_SOURCE_ID)
   if (projectId) navigate?.(projectPath(projectId))
 }

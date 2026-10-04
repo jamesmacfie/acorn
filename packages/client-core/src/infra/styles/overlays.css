@@ -153,7 +153,7 @@
 @media (prefers-reduced-motion: reduce) { .ui-toast { animation: none; } }
 .ui-toast[data-tone='success'] { border-color: var(--success); }
 .ui-toast[data-tone='danger'] { border-color: var(--danger); }
-.ui-toast-message { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.ui-toast-message { flex: 1; min-width: 0; overflow-wrap: anywhere; white-space: pre-line; }
 
 /* ── Drawer ─────────────────────────────────────────────────────────────────────────────────
    The app's one drawer: a bottom dock between the two icon rails, above the task footer. Not a modal

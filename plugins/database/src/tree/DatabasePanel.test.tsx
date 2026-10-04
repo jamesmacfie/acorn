@@ -23,21 +23,27 @@ const queries: DbSavedQuery[] = [
 ]
 
 const runQuery = vi.fn()
+const updateCell = vi.fn(async () => ({ ok: true, rowCount: 1 }))
+const connectDb = vi.fn(async () => ({ ok: true, database: 'dev' }))
+const listRows = vi.fn(async () => ({ columns: ['id', 'name'], rows: [['1', 'Account']], rowCount: 1, command: 'SELECT', total: 1 }))
+let taskId = 'task-1'
+let taskSequence = 0
+const states = new Map<string, unknown>()
 const readScratch = vi.fn(async () => 'SELECT generated;')
 const flush = vi.fn(async () => {})
 const read = vi.fn(async () => '')
 let saved: () => Promise<DbSavedQuery[]> = async () => queries
 
 vi.mock('./databaseClient', () => ({ createDatabaseClient: () => ({
-  connectDb: async () => ({ ok: true, database: 'dev' }),
+  connectDb: () => connectDb(),
   disconnectDb: async () => ({ ok: true }),
-  listTables: async () => ({ tables: [] }),
-  listColumns: async () => ({ columns: [] }),
-  listRows: async () => ({ columns: [], rows: [], rowCount: 0, command: 'SELECT', total: 0 }),
+  listTables: async () => ({ tables: [{ schema: 'public', name: 'accounts' }, { schema: 'public', name: 'users' }] }),
+  listColumns: async () => ({ columns: [{ name: 'id', dataType: 'integer', nullable: false, isPk: true }, { name: 'name', dataType: 'text', nullable: true, isPk: false }] }),
+  listRows: () => listRows(),
   listSavedQueries: () => saved(),
   listModelBackends: async () => [],
   deleteSavedQuery: async () => {},
-  updateCell: async () => ({ ok: true, rowCount: 1 }),
+  updateCell: (...args: unknown[]) => (updateCell as (...args: unknown[]) => Promise<unknown>)(...args),
   insertRow: async () => ({ ok: true, rowCount: 1 }),
   deleteRow: async () => ({ ok: true, rowCount: 1 }),
   readScratch: () => readScratch(),
@@ -48,16 +54,21 @@ const settle = async () => {
   for (let at = 0; at < 4; at++) await new Promise<void>((resolve) => setTimeout(resolve, 0))
 }
 
-type Harness = { written: string[]; select: (item: string) => void; execute: () => void; pressExecute: () => void; text: () => string; dispose: () => void }
+type TreeNode = ReturnType<typeof createRemoteRoot>['node']
+type Harness = { nodes: () => TreeNode[]; written: string[]; select: (item: string) => void; execute: () => void; pressExecute: () => void; text: () => string; dispose: () => void }
 
-const mount = (item?: string): Harness => {
+const mount = (item?: string, scope: { nodeId?: string; taskId?: string; render?: ReturnType<typeof solidTree> } = {}): Harness => {
   const ops: TreeMutation[] = []
   const root = createRemoteRoot((batch) => ops.push(...batch))
   const written: string[] = []
   let onAction: (command: string) => void = () => {}
   let onSelect: (item: string) => void = () => {}
   const bridge = {
-    context: { surface: 'database', target: 'remote', nodeId: 'node-a', ...(item ? { item } : {}) },
+    context: { surface: 'database', target: 'remote', nodeId: scope.nodeId ?? 'node-a', ...(item ? { item } : {}) },
+    state: {
+      get: async (key: string) => states.get(`${scope.nodeId ?? 'node-a'}:${key}`) ?? null,
+      set: async (key: string, value: unknown) => { states.set(`${scope.nodeId ?? 'node-a'}:${key}`, structuredClone(value)) },
+    },
     document: {
       read: () => read(),
       write: async (text: string) => void written.push(text),
@@ -70,10 +81,10 @@ const mount = (item?: string): Harness => {
     onSurfaceAction: (handler: (command: string) => void) => { onAction = handler; return () => {} },
   } as unknown as AcornBridge
   let unmount = () => {}
-  solidTree(DatabasePaneApp)(bridge, {
+  ;(scope.render ?? solidTree(DatabasePaneApp))(bridge, {
     entry: 'panel',
     root,
-    props: () => ({ taskId: 'task-1' }),
+    props: () => ({ taskId: scope.taskId ?? taskId }),
     onProps: () => {},
     onUnmount: (dispose) => { unmount = dispose },
     // This tree asks its host for nothing, so both throw: a fixture that silently answered
@@ -83,11 +94,14 @@ const mount = (item?: string): Harness => {
       openOverlay: () => Promise.reject(new Error('this fixture answers no host requests')),
     },
   })
-  const pressExecute = () => {
-    const nodes: typeof root.node.children = []
-    const visit = (node: typeof root.node) => { nodes.push(node); node.children.forEach(visit) }
+  const nodes = () => {
+    const all: TreeNode[] = []
+    const visit = (node: TreeNode) => { all.push(node); node.children.forEach(visit) }
     root.node.children.forEach(visit)
-    const button = nodes.find((node) => node.type === 'Button' && node.children.some((child) => child.props.value === 'Run'))
+    return all
+  }
+  const pressExecute = () => {
+    const button = nodes().find((node) => node.type === 'Button' && node.children.some((child) => child.props.value === 'Run'))
     if (!button) throw new Error('Run button missing')
     ;(button.props.onPress as () => void)()
   }
@@ -95,11 +109,15 @@ const mount = (item?: string): Harness => {
     const visit = (node: typeof root.node): string => String(node.props.value ?? '') + node.children.map(visit).join('')
     return visit(root.node)
   }
-  return { written, text, select: (next) => onSelect(next), execute: () => onAction('execute'), pressExecute, dispose: () => { unmount(); root.dispose() } }
+  return { nodes, written, text, select: (next) => onSelect(next), execute: () => onAction('execute'), pressExecute, dispose: () => { unmount(); root.dispose() } }
 }
 
 beforeEach(() => {
-    runQuery.mockClear()
+    taskId = `task-${++taskSequence}`
+    connectDb.mockReset().mockResolvedValue({ ok: true, database: 'dev' })
+    listRows.mockReset().mockResolvedValue({ columns: ['id', 'name'], rows: [['1', 'Account']], rowCount: 1, command: 'SELECT', total: 1 })
+    updateCell.mockClear()
+    runQuery.mockReset()
     readScratch.mockReset().mockResolvedValue('SELECT generated;')
     flush.mockReset().mockResolvedValue(undefined)
     read.mockReset().mockResolvedValue('')
@@ -172,7 +190,7 @@ it.each(['button', 'action'])('%s execute waits for flush and propagates failure
     runQuery.mockResolvedValue({ columns: [], rows: [], rowCount: 0, command: 'SELECT', ms: 1 })
     execute()
     await settle()
-    expect(runQuery).toHaveBeenCalledExactlyOnceWith('task-1', 'SELECT on_screen;')
+    expect(runQuery).toHaveBeenCalledExactlyOnceWith(taskId, 'SELECT on_screen;')
     read.mockRejectedValueOnce(new Error('retired'))
     execute()
     await settle()
@@ -200,4 +218,93 @@ it('ignores held scratch reads after later selection or pane retirement', async 
   complete('SELECT retired;')
   await settle()
   expect(pane.written).toEqual(['SELECT 2;'])
+})
+
+it('restores a filtered table, selected record, and unsaved edits without fetching rows or writing SQL again', async () => {
+  let pane = mount()
+  await settle()
+  const table = pane.nodes().find((node) => node.type === 'Row' && node.props.title === 'public.accounts')!
+  ;(table.props.onPress as () => void)()
+  await settle()
+  ;(pane.nodes().find((node) => node.type === 'Input')!.props.onChange as (value: string) => void)('accounts')
+  ;(pane.nodes().find((node) => node.type === 'Grid')!.props.onSelect as (index: number) => void)(0)
+  await settle()
+  const field = pane.nodes().find((node) => node.type === 'Textarea' && node.props.value === 'Account')!
+  ;(field.props.onChange as (value: string) => void)('Unsaved account')
+  pane.dispose()
+
+  // Returning uses a new bridge and renders before even the connection check can settle.
+  let connected!: () => void
+  connectDb.mockImplementationOnce(() => new Promise((resolve) => { connected = () => resolve({ ok: true, database: 'dev' }) }))
+  pane = mount()
+  expect(pane.nodes().find((node) => node.type === 'Input')?.props.value).toBe('accounts')
+  expect(pane.text()).toContain('Row in accounts')
+  expect(pane.nodes().find((node) => node.type === 'Textarea' && node.props.value === 'Unsaved account')).toBeDefined()
+  expect(pane.written).toEqual([])
+  expect(listRows).toHaveBeenCalledTimes(1)
+  expect(runQuery).not.toHaveBeenCalled()
+  await settle()
+  connected()
+  await settle()
+  listRows.mockResolvedValueOnce({ columns: ['id', 'name'], rows: [['1', 'Unsaved account']], rowCount: 1, command: 'SELECT', total: 1 })
+  const save = pane.nodes().find((node) => node.type === 'Button' && node.props.variant === 'solid' && node.children.some((child) => child.props.value === 'Save'))!
+  ;(save.props.onPress as () => void)()
+  await settle()
+  expect(updateCell).toHaveBeenCalledExactlyOnceWith(taskId, 'public', 'accounts', 'name', 'Unsaved account', { id: '1' })
+  expect(pane.nodes().find((node) => node.type === 'Grid')?.props.rows).toEqual([['1', 'Unsaved account']])
+  pane.dispose()
+})
+
+it('keeps query results independent across tasks and Nodes and never replays SQL on return', async () => {
+  read.mockResolvedValue('SELECT original;')
+  runQuery.mockResolvedValueOnce({ columns: ['value'], rows: [['original result']], rowCount: 1, command: 'SELECT', ms: 7 })
+  const original = mount()
+  await settle()
+  original.execute()
+  await settle()
+  // A held second result must not replace the cached answer after its pane retires.
+  let complete!: (result: unknown) => void
+  runQuery.mockImplementationOnce(() => new Promise((resolve) => { complete = resolve }))
+  original.execute()
+  await settle()
+  original.dispose()
+  for (const scope of [{ taskId: `${taskId}-other` }, { nodeId: 'node-b' }]) {
+    const other = mount(undefined, scope)
+    await settle()
+    expect(other.nodes().some((node) => node.type === 'Grid')).toBe(false)
+    other.dispose()
+  }
+  const returned = mount()
+  expect(returned.nodes().find((node) => node.type === 'Grid')?.props.rows).toEqual([['original result']])
+  complete({ columns: ['value'], rows: [['retired result']], rowCount: 1, command: 'SELECT', ms: 9 })
+  await settle()
+  expect(returned.nodes().find((node) => node.type === 'Grid')?.props.rows).toEqual([['original result']])
+  expect(returned.text()).toContain('7ms')
+  expect(runQuery).toHaveBeenCalledTimes(2)
+  expect(returned.written).toEqual([])
+  returned.dispose()
+})
+
+it('restores results through host storage after the plugin worker restarts', async () => {
+  read.mockResolvedValue('SELECT persisted;')
+  runQuery.mockResolvedValueOnce({ columns: ['value'], rows: [['Persisted result']], rowCount: 1, command: 'SELECT', ms: 3 })
+  const pane = mount()
+  await settle()
+  pane.execute()
+  await settle()
+  pane.dispose()
+  // A new module graph has no worker-local workspace cache. The host state still has what was saved.
+  vi.resetModules()
+  const { DatabasePaneApp: restartedApp } = await import('./app')
+  const { solidTree: restartedTree } = await import('@acorn/plugin-api/ui/tree')
+  const render = restartedTree(restartedApp)
+  // Navigating away before the cold restore finishes must not cache an empty workspace.
+  const abandoned = mount(undefined, { render })
+  abandoned.dispose()
+  const restarted = mount(undefined, { render })
+  await settle()
+  expect(restarted.nodes().find((node) => node.type === 'Grid')?.props.rows).toEqual([['Persisted result']])
+  expect(restarted.written).toEqual([])
+  expect(runQuery).toHaveBeenCalledTimes(1)
+  restarted.dispose()
 })

@@ -17,9 +17,9 @@ const changeLine = (change: MemoryChange) => [
 const originPath = (change: MemoryChange) => change.taskId
   ? `/t/${encodeURIComponent(change.taskId)}${change.sessionId ? `?pane=agents&item=${encodeURIComponent(change.sessionId)}` : ''}` : undefined
 
-export default function MemoryFeed(props: { projectId?: string }) {
+export default function MemoryFeed(props: { projectId: string }) {
   const navigate = useNavigate()
-  const { value: changes, error: loadError, loaded } = createMemoryResource(() => [props.projectId, memoryRevision()] as const, ([projectId]) => memoryApi().changes(projectId), [])
+  const { value: changes, error: loadError, loaded } = createMemoryResource(() => [props.projectId, memoryRevision()] as const, async ([projectId]) => (await memoryApi().changes(projectId)).filter((change) => change.scope === 'project' && change.projectId === projectId), [])
   const [error, setError] = createSignal('')
   const [busy, setBusy] = createSignal(false)
   async function undo(id: string) {
@@ -38,7 +38,7 @@ export default function MemoryFeed(props: { projectId?: string }) {
               <Row
                 variant="stacked"
                 title={`${change.name}, ${memoryDate(change.at)}`}
-                onPress={() => selectMemory({ name: change.name, scope: change.scope })}
+                onPress={() => selectMemory({ name: change.name, scope: change.scope, projectId: change.projectId })}
                 meta={<Text emphasis="muted">{formatRelativeTime(Date.parse(change.at))}</Text>}
                 trailing={<>
                   <Show when={originPath(change)}>{(path) => <Button size="xs" variant="ghost" onPress={() => navigate(path())}>{change.sessionId ? 'Session' : 'Task'}</Button>}</Show>

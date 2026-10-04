@@ -9,7 +9,7 @@ import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsO
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  createFleetWorkspaces, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -114,6 +114,10 @@ export default function App() {
   onMount(() => {
     const commands = registerCommands([
       { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
+      {
+        id: 'core.project.add', title: 'Add project', hint: 'from a folder, into this workspace', category: 'workspace', palette: true,
+        when: canAddProjectFromFolder, run: () => void addProjectFromFolder(queryClient, activeWorkspace()?.id),
+      },
       { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
         id: 'core.surface.toggle-maximize', title: 'Toggle focused surface maximize', category: 'pane',
@@ -490,6 +494,7 @@ export default function App() {
       nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
       account: null,
       railCollapsed: railCollapsed(),
+      canAddProject: canAddProjectFromFolder(),
       slots: { right: rightSlotRef },
       pickWorkspace: (id, nodeId) => {
         const entry = fleetWorkspaces().entries.find((candidate) => candidate.workspace.id === id && candidate.nodeId === nodeId)
@@ -517,6 +522,7 @@ export default function App() {
         navigate(route)
       },
       clearCache: () => clearCache(queryClient),
+      addProject: () => void addProjectFromFolder(queryClient, activeWorkspace()?.id),
     }
   }
   const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)

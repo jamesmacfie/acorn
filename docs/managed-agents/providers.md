@@ -35,7 +35,7 @@ The client reads the list through the shared `['agents', 'providers']` query
 Plan usage is per harness and per account. The built-in CLI probes and a contributed harness's
 `probes.usage` route feed one registry (`collectors.ts`), and a harness with no collector shows no
 usage section. The Node probes availability and usage on bounded intervals. Five-minute polling and
-the full refresh action check every harness. The refresh icon beside one harness's usage probes only
+the full refresh action check every harness. The refresh icon beside the harness name probes only
 that harness.
 
 Each quota row draws a bar under its sentence, colored by the same reading as the dot beside the

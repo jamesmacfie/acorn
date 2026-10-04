@@ -33,6 +33,11 @@ export default function Topbar(own: { value?: unknown }) {
             rowDescription={(entry) => entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
             isActive={(entry) => entry.id === props().workspace?.id && entry.nodeId === props().node?.id}
             onSelect={(entry) => props().pickWorkspace(entry.id, entry.nodeId)}
+            footer={props().canAddProject
+              ? (close) => (
+                <Button variant="ghost" size="sm" onPress={() => { close(); props().addProject() }}>Add project…</Button>
+              )
+              : undefined}
           />
         </Show>
         <Show when={props().projectPickerVisible}>

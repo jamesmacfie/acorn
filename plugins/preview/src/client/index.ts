@@ -1,9 +1,10 @@
 // The preview plugin's client part (docs/plugins/plugin-api.md § The plugin API).
-import { activeNodeId, activeTaskId, clientEvents, openPane, previewViews, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
+import { activeNodeId, activeTaskId, clientEvents, openPane, previewViews, readJson, toast, type ClientPlugin, writeJson } from '@acorn/plugin-api/client'
 import { PREVIEW_RECIPE_SELECTION } from '@acorn/plugin-terminal/contract/previewSelection.ts'
 import { previewConfigured, previewConfiguredSchedule } from './configuredStore'
 import { previewPaneContribution } from './paneContribution'
-import { previewRecipeUrlRoute } from '../shared/api'
+import type { PreviewUrlState } from '../contract/urls'
+import { previewRecipeUrlRoute, previewUrlRoute } from '../shared/api'
 
 export const previewClientPlugin: ClientPlugin = {
   name: 'preview',
@@ -18,6 +19,24 @@ export const previewClientPlugin: ClientPlugin = {
       },
     })
     ctx.panes.register(previewPaneContribution)
+    ctx.contextMenus.register({
+      id: 'preview.copy-url', location: 'rail.pane', surface: 'preview',
+      label: 'Copy URL', icon: 'copy', order: 130,
+      run: async (target) => {
+        if (target.location !== 'rail.pane') return
+        try {
+          const address = readJson<PreviewUrlState | null>(previewUrlRoute(target.taskId), { nodeId: target.nodeId }).then((state) => {
+            if (!state?.url || state.taskId !== target.taskId) throw new Error('No preview URL available')
+            return new Blob([state.url], { type: 'text/plain' })
+          })
+          // Start the write during the click. WebKit loses clipboard permission after an async read.
+          await navigator.clipboard.write([new ClipboardItem({ 'text/plain': address })])
+          toast('Copied the preview URL')
+        } catch {
+          toast('Could not copy the preview URL')
+        }
+      },
+    })
     ctx.schedules.register(previewConfiguredSchedule)
     // One row, gated on the same seam the pane is: a terminal installs no preview seam, so this is
     // absent there rather than present and useless (docs/tui/plugin-losses.md § What a plugin loses here). URL rules

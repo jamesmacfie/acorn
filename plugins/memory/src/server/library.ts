@@ -39,10 +39,10 @@ export function memoryLibrary(store: MemoryStoreAccess, core: KnowledgeCoreServi
           if (!address || !request.version) throw new ToolError('bad_request', 'Missing history version.')
           return await store.restore(address, request.version, request.hash)
         }
-        case 'changes': return await store.feed(projectId ?? null)
+        case 'changes': return await store.feed(projectId ?? null, request.scope)
         case 'preview': {
           const { memoryPreview } = await import('./standingContext')
-          return await memoryPreview(store, core, projectId ?? null)
+          return await memoryPreview(store, core, projectId ?? null, request.scope)
         }
         case 'caps': {
           const user = core.identity.active()

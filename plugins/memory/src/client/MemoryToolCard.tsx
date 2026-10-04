@@ -48,7 +48,7 @@ export function MemoryToolCard(props: AgentToolCardProps) {
     <Show when={output()?.description ?? input()?.description}>{(description) => <Text wrap>{String(description())}</Text>}</Show>
     <Show when={saved()} fallback={<Show when={props.tool.output}><CodeBlock wrap maxHeight="block">{props.tool.output}</CodeBlock></Show>}>
       <Inline>
-        <Button size="sm" onPress={() => openMemory(name(), scope(), typeof output()?.projectId === 'string' ? output()!.projectId as string : undefined, navigate)}>Open</Button>
+        <Show when={scope() === 'project'}><Button size="sm" onPress={() => openMemory(name(), scope(), typeof output()?.projectId === 'string' ? output()!.projectId as string : undefined, navigate)}>Open</Button></Show>
         <Button size="sm" disabled={busy() || undone()} onPress={() => void undo()}>{undone() ? 'Undone' : 'Undo'}</Button>
       </Inline>
     </Show>

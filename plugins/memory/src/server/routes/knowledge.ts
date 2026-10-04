@@ -2,14 +2,15 @@ import { Hono, type Context } from 'hono'
 import { z } from 'zod'
 import { type AppEnv, BridgeError, requireDevice, respondError, routeCapability, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 
+import type { MemoryScope } from '../../contract/library'
 import type { LibraryRequest } from '../library'
 
 // Memory's route surface. Notes owns its own routes.
 
 export type KnowledgeBridge = {
   taskMemoryScope(taskId: string): Promise<{ projectId: string | null } | null>
-  memoryList(projectId?: string): Promise<unknown>
-  memorySearch(query: string, projectId?: string, type?: string): Promise<unknown>
+  memoryList(projectId?: string, scope?: MemoryScope): Promise<unknown>
+  memorySearch(query: string, projectId?: string, type?: string, scope?: MemoryScope): Promise<unknown>
   memoryAdd(taskId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryProjectAdd?(projectId: string, p: { scope: 'project' | 'private'; name: string; description: string; type: string; body: string }): Promise<unknown>
   memoryUndo?(changeId: string): Promise<unknown>
@@ -48,12 +49,14 @@ async function mayReadMemory(c: Context<AppEnv>, bridge: KnowledgeBridge, projec
   return false
 }
 
-async function readMemory(c: Context<AppEnv>, read: (bridge: KnowledgeBridge, projectId: string | undefined) => Promise<unknown>): Promise<Response> {
+async function readMemory(c: Context<AppEnv>, read: (bridge: KnowledgeBridge, projectId: string | undefined, scope: MemoryScope | undefined) => Promise<unknown>): Promise<Response> {
   const projectId = c.req.query('projectId') ?? undefined
   if (!c.get('principal')) return respondError(c, 401, 'unauthenticated')
+  const scope = c.req.query('scope')
+  if (scope !== undefined && scope !== 'project' && scope !== 'private') return respondError(c, 400, 'bad_request')
   return viaBridge(c, KNOWLEDGE, async (bridge) => {
     if (!await mayReadMemory(c, bridge, projectId)) throw new BridgeError(404, 'not_found')
-    return read(bridge, projectId)
+    return read(bridge, projectId, scope)
   })
 }
 
@@ -66,11 +69,11 @@ export const knowledge = new Hono<AppEnv>()
       return bridge.memoryLibrary(c.req.param('action'), c.req.query('projectId'), parsed.data)
     })
   })
-  .get('/memory', (c) => readMemory(c, (b, projectId) => b.memoryList(projectId)))
+  .get('/memory', (c) => readMemory(c, (b, projectId, scope) => b.memoryList(projectId, scope)))
   .get('/memory/search', (c) => {
     const q = c.req.query('q')
     if (!q) return respondError(c, 400, 'bad_request')
-    return readMemory(c, (b, projectId) => b.memorySearch(q, projectId, c.req.query('type') ?? undefined))
+    return readMemory(c, (b, projectId, scope) => b.memorySearch(q, projectId, c.req.query('type') ?? undefined, scope))
   })
   .post('/memory/changes/:id/undo', requireDevice, (c) => viaBridge(c, KNOWLEDGE, (bridge) => {
     if (!bridge.memoryUndo) throw new BridgeError(404, 'not_found')

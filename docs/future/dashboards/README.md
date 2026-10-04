@@ -3,15 +3,20 @@
 Status: proposed, October 5, 2026. [Phase 1](./01-quick-wins.md),
 [phase 2](./02-plan-outline-model.md), [phase 3](./03-studio-shell.md),
 [phase 4](./04-inspectors.md), and [phase 5](./05-launcher.md) shipped on October 5, 2026, and the
-other phases aren't built. This programme replaces the dashboards programme that lived in
-this folder. Its workstreams 1 to 7 shipped by October 4, 2026, and its files were removed on
-October 5, 2026; git history keeps them (commit `1d8c37913`).
+other phases aren't built. Phases 8 to 12, derived sources, were added the same day. This programme
+replaces the dashboards programme that lived in this folder. Its workstreams 1 to 7 shipped by
+October 4, 2026, and its files were removed on October 5, 2026; git history keeps them (commit
+`1d8c37913`).
 
 Read this page before any phase. It says what's wrong, what we're building, the decisions already
-made, the order of work, and how to check your work in the app. The
-[Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) is the design source:
-screenshots of today's editor, the findings, and mockups of every piece below. Open it beside these
-files.
+made, the order of work, and how to check your work in the app. Two pages are the design source.
+Open them beside these files:
+
+- The [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) covers phases 1 to
+  7: screenshots of today's editor, the findings, and mockups of the launcher, studio, and docked AI.
+- [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) covers phases 8 to 12: how a
+  third-party plugin builds a source from GitHub, Linear, and other sources with its own logic, from
+  writing and testing it to approving and using it in a panel.
 
 [Dashboards](../../dashboards.md) and its topic pages own shipped behaviour and win over anything
 here until a phase changes them.
@@ -51,6 +56,24 @@ Three pieces, each drawn from a pattern acorn already has:
 
 Small edits after publishing (rename, view, sort) move to the panel's own menu.
 
+## Derived sources
+
+People want panels that apply their own rules to data Acorn already reads. For example, a team's
+"Release readiness" panel takes the Linear issues in the current cycle, finds their pull requests,
+and marks each issue Ready, At risk, or Blocked by the team's own rules. Panel steps are a closed
+set, so that logic belongs in a plugin.
+
+Phases 8 to 12 let a third-party plugin publish a _derived source_: an ordinary data source that
+declares other sources as inputs. Acorn reads the inputs on its behalf, with the accounts the person
+chose for that panel, and the plugin returns records in the shape it declared. Panels, workflows,
+datasets, and the AI author all accept it like any other source.
+
+Today a loaded plugin can't do this. `ctx.dataSources.invoke` refuses another plugin's source for
+loaded code (`packages/node-core/src/server/pluginHost/context.ts`). A source can't ask for an account
+from a provider it doesn't own (`packages/node-core/src/server/dataSources/authority.ts`). The trust
+prompt and plugin page say nothing about data, and the author tools have no data source template or
+test helper. Compiled plugins can already do it, and GitHub's branch source does.
+
 ## Decisions already made
 
 These are settled. Raise a concern with the owner before building against one of them, rather than
@@ -77,6 +100,16 @@ working around it.
    conditions change rows, so the editor shows them read-only rather than dropping them.
 7. **Every step form registers against its operation**, so the editor grows by registry, not by
    editing one big component ([phase 4](./04-inspectors.md)).
+8. **Custom logic lives in a derived source, not in a panel step.** A source works everywhere a
+   source works, keeps panel steps a closed set, and keeps plugin code out of the Node's plan runner.
+9. **Acorn reads a derived source's inputs, never the plugin.** The plugin gets handles scoped to one
+   request's chosen accounts. It never sees credentials, can't run actions or writes on inputs, and
+   can't read a source it didn't declare ([phase 8](./08-source-inputs.md)).
+10. **Accounts are chosen per panel, and approval is per input list.** The person approves which
+    sources a plugin reads once. Each panel still picks which account each input uses
+    ([phase 9](./09-input-consent.md)).
+11. **Acorn draws every fix.** Loaded plugins can't open Settings, so **Connect…**, **Reconnect…**,
+    and **Review** buttons are host UI ([phase 10](./10-inputs-in-the-studio.md)).
 
 ## The phases
 
@@ -89,10 +122,18 @@ working around it.
 | [5. Launcher](./05-launcher.md) | The **Add panel** launcher, and starter plans for built-in sources. | 3 |
 | [6. Docked AI](./06-docked-ai.md) | The docked conversation, proposal review on the outline and preview, aimed requests, and the end of the requirements gate. | 2, 3 |
 | [7. Panel menu](./07-panel-menu.md) | Rename, view, and sort from the panel menu, **About this panel**, **Duplicate**, and an **Edit…** path from **Add as panel**. | 2; 3 for the edit entries |
+| [8. Source inputs](./08-source-inputs.md) | Declared inputs on a data source, per-input account bindings, host-mediated reads through the request context, input grants, composed versions, and incomplete and invalid-record handling. GitHub's branch source moves onto it. | Nothing |
+| [9. Input consent](./09-input-consent.md) | The **Reads your data** and **Provides** lines in the approval dialog, node-side input grants with an update diff, and data sources and inputs on the plugin page. | 8 |
+| [10. Inputs in the studio](./10-inputs-in-the-studio.md) | Input account pickers in the launcher and inspector, input rows in the outline, host-drawn **Connect…** fixes, plain failure messages for every source, and AI support for inputs. | 8; 3, 4, 5 |
+| [11. Derived source SDK](./11-derived-source-sdk.md) | `defineDerivedSource`, field builders, typed input handles, `testDerivedSource` with real field fixtures, the `--data-source` scaffold, and an agent prompt. | 8 |
+| [12. Plugin dev loop](./12-plugin-dev-loop.md) | Development mode for folder-installed node plugins, reload on save, an in-app log view, and the studio's development strip. | 8, 11; 3 for the strip |
 
 Phases 1 and 2 can run at the same time. After phase 3, phases 4, 5, and 6 can run at the same time
 if their owners agree who touches `inspectors.tsx` and `studioStore.ts` first. Phase 7's quick
 edits can ship any time after phase 2.
+
+Phase 8 doesn't depend on the studio, so it can start beside phase 1. Phases 9 and 11 follow it and
+can run at the same time. Phase 10 waits for phases 3 to 5. Phase 12 comes last.
 
 [refused.md](./refused.md) lists what this programme decided not to build.
 
@@ -108,6 +149,10 @@ edits can ship any time after phase 2.
 | _Proposal_ | An AI reply that carries a candidate plan. |
 | _Review_ | The studio state while a proposal is pending. |
 | _Draft_ | The Node's editable copy of a plan. A published revision is immutable. |
+| _Derived source_ | A data source that declares other sources as inputs and returns records built from them. |
+| _Input_ | One named source a derived source reads, such as `pulls` for `github:pull-requests`. |
+| _Binding_ | The account and parameters chosen for one input, stored in the query's `scope.inputs`. |
+| _Input grant_ | The Node's record that the person approved a plugin's list of inputs. |
 
 ## Where things live
 
@@ -127,6 +172,14 @@ edits can ship any time after phase 2.
 | Run route | `packages/node-core/src/server/dashboards/run.ts` |
 | Layout to copy | `plugins/workflows/src/client/editor/WorkflowEditor.tsx`, `draftStore.ts` |
 | Full-window layer to copy | `packages/client-core/src/features/settings/SettingsView.tsx` |
+| Source registration schema | `packages/protocol/src/data/dataSourceContributions.ts` |
+| Source request and scope schemas | `packages/protocol/src/data/dataSources.ts` |
+| Source runtime and checks | `packages/node-core/src/server/dataSources/runtime.ts`, `authority.ts`, `dispatch.ts` |
+| Plugin context and request context | `packages/node-core/src/server/pluginHost/context.ts`, `requestContext.ts` |
+| Trust and approval dialogs | `packages/client-core/src/host/trust/PluginTrustDialog.tsx`, `PluginApprovalDialog.tsx` |
+| Plugin settings | `packages/client-core/src/features/settings/plugins/PluginsSettings.tsx`, `PluginPage.tsx` |
+| Published SDK, types, and scaffold | `packages/plugin-sdk`, `packages/plugin-types`, `packages/create-acorn-plugin` |
+| A derived source today (compiled) | `plugins/github/src/server/data/branchSourceHandler.ts` |
 
 New studio files go in a `studio/` folder inside `packages/client-core/src/features/dashboards`.
 New pure functions go in `packages/dashboards-core/src` and need an entry in that package's
@@ -171,6 +224,9 @@ For more, see [local development](../../local-development.md).
   `pnpm test --filter=@acorn/dashboards-core`, and `pnpm test --filter=@acorn/node-core` for any
   phase that touches the describer or authoring.
 - If you change a doc: `pnpm --filter @acorn/arch-tests test`.
+- Phases 8, 9, and 11 change published plugin types. Run the arch tests and update
+  `tools/arch/publishedPluginSurface.snapshot.txt` on purpose.
+- Phase 11 adds tests to `packages/plugin-sdk`: `pnpm test --filter=acorn-plugin-sdk`.
 - Component tests (`.test.tsx`) in client-core run under jsdom in the `hosts` project.
 
 ## The terminal client
@@ -186,7 +242,14 @@ changes it. The outline is text first, so a later terminal panel editor could re
 - `docs/dashboards/placements.md`: region checks at publish, and the panel menu.
 - `docs/ui-design/overlays.md`: the studio as a full-window layer beside Settings.
 - `docs/data-sources.md` and `docs/plugin-authoring.md`: starter plans and `viewerMatch`.
-- `docs/api-reference/core-routes.md`: the authoring focus prefix.
+- `docs/api-reference/core-routes.md`: the authoring focus prefix, the input grant routes, the run's
+  structured problems, and the plugin logs route.
+- `docs/data-sources.md`: inputs, bindings, derived source rules, and the new error codes.
+- `docs/security/plugin-node-realm.md`: what a loaded plugin may read, and the input grant.
+- `docs/plugins/distribution.md` and `docs/plugins/dev-loop.md`: input approval, and development mode
+  for folder-installed node plugins.
+- `docs/plugin-authoring/`: the manifest's `inputs`, permissions, the node half, testing, the scaffold,
+  telemetry, and a new walkthrough page for derived sources.
 
 ## Verify before building
 

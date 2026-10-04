@@ -1,4 +1,5 @@
 export { workspaceForProject } from './activeWorkspace.ts'
+export { addProjectFromFolder, canAddProjectFromFolder } from './addProject.ts'
 export { createFleetWorkspaces, selectFleetWorkspace } from './fleetWorkspaces.ts'
 export { currentWorkspaceId, noteWorkspaceVisit, previousWorkspaceId } from './lastWorkspace.ts'
 export { createProject, createWorkspace, patchProject } from './workspaceMutations.ts'
