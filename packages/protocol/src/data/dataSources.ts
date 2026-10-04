@@ -73,6 +73,14 @@ export const dataSourceDescriptionSchema = z.object({
   /** Action and target metadata is structural; current eligibility is checked per record. */
   actions: z.array(z.object({ id, label: id, icon: id.optional(), risk: z.enum(['read', 'write', 'execute']) }).strict()).max(16).optional(),
   targets: z.array(dataRecordTargetSchema.pick({ kind: true })).max(16).optional(),
+  /** Declarative relationship metadata. The host checks the scopes before matching rows. */
+  relations: z.array(z.object({
+    id, label: id, target: dataSourceRefSchema,
+    kind: z.enum(['implements', 'blocks', 'belongs-to', 'references', 'equivalence']),
+    cardinality: z.enum(['one-to-one', 'many-to-one', 'one-to-many']),
+    keys: z.array(z.object({ from: dataPointerSchema, to: dataPointerSchema, scope: z.enum(['provider', 'account', 'container', 'identity']) }).strict()).min(1).max(8),
+    requiredScopes: z.array(z.enum(['provider', 'account', 'container'])).min(2).max(3),
+  }).strict()).max(16).optional(),
 }).strict()
 export const dataSourceQuerySchema = z.object({
   source: dataSourceRefSchema,

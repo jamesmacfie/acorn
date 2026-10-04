@@ -37,10 +37,12 @@ mustn't delete its history. When the preference can't be read, the pass skips th
 Samples are keyed by panel ID and a signature of the measure's definition
 (`packages/dashboards-core/src/signature.ts`). A signature change resets that panel's series, because
 the old samples would describe a different measure. The signature covers what changes the measure's
-meaning: the queries, the mapping, the filters, the aggregate, and the measured field. Query identity
+meaning: the queries, the mapping, the filters, the aggregate, and the measured field. For version 2
+plans, it also includes source roles, relations, columns, stages, time policy, sort, group, and limit;
+changing a summary or its input window cannot retain the former measure history. Query identity
 includes the published revision digest of a saved query or the digest of inline content, its
 resolved parameters, and its account. Republishing a saved query with a different filter resets the
 series. The pass counts resets in its run result. Series recorded before query identity joined the
 signature are relabelled on their next sample instead of reset. The view kind,
-sort, limit, visible fields, title, geometry, and trend display keys don't count, so retitling or
+visible fields, title, geometry, and trend display keys don't count, so retitling or
 moving a panel keeps its history.

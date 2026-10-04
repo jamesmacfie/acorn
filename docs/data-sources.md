@@ -48,6 +48,14 @@ numeric `rank`; panel columns inherit these until the author overrides them. The
 contract does not yet offer projection lists; source-side projection belongs to the later report
 volume milestone.
 
+A description may also declare `relations`: a named target source, relation kind (`implements`,
+`blocks`, `belongs-to`, `references`, or `equivalence`), cardinality, and exact pairs of scoped key
+fields. Scope components identify provider, account, identity, and any required container. The host
+checks the declaration and reads the target through the same data-source runtime under the caller's
+authority. Lookup and children relations attach data to primary rows; an equivalence states that
+two primary records are the same item. It is the only relation that merges rows. No relation guesses
+from labels or names, and a cardinality violation does not duplicate a row.
+
 ## Operations and transport
 
 Use POST JSON under `/v1/core/data-sources`. The `list` body is a scope, and `discover` adds a plugin

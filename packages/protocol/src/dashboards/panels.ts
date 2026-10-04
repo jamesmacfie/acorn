@@ -110,12 +110,51 @@ const bindingSchema = z.union([
   z.object({ field: pointer, values: z.record(id, z.array(id).max(100)).optional() }).strict(),
   z.object({ value: dataValueSchema }).strict(),
 ])
+export type PlanExpression =
+  | { kind: 'column'; column: string }
+  | { kind: 'literal'; value: DataValue }
+  | { kind: 'clock'; name: 'now' }
+  | { kind: 'arithmetic'; operator: 'add' | 'subtract' | 'multiply' | 'divide'; left: PlanExpression; right: PlanExpression }
+  | { kind: 'duration'; start: PlanExpression; end: PlanExpression; unit: 'ms' | 's' | 'minutes' | 'hours' | 'days' }
+  | { kind: 'coalesce' | 'min' | 'max'; values: PlanExpression[] }
+  | { kind: 'choice'; column: string; cases: Record<string, DataValue>; otherwise?: DataValue }
+const expressionSchema: z.ZodType<PlanExpression> = z.lazy(() => z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('column'), column: columnId }).strict(),
+  z.object({ kind: z.literal('literal'), value: dataValueSchema }).strict(),
+  z.object({ kind: z.literal('clock'), name: z.literal('now') }).strict(),
+  z.object({ kind: z.literal('arithmetic'), operator: z.enum(['add', 'subtract', 'multiply', 'divide']), left: expressionSchema, right: expressionSchema }).strict(),
+  z.object({ kind: z.literal('duration'), start: expressionSchema, end: expressionSchema, unit: z.enum(['ms', 's', 'minutes', 'hours', 'days']) }).strict(),
+  z.object({ kind: z.enum(['coalesce', 'min', 'max']), values: z.array(expressionSchema).min(2).max(8) }).strict(),
+  z.object({ kind: z.literal('choice'), column: columnId, cases: z.record(id, dataValueSchema), otherwise: dataValueSchema.optional() }).strict(),
+]))
+const relationSchema = z.object({
+  id: columnId, from: columnId, to: columnId,
+  kind: z.enum(['implements', 'blocks', 'belongs-to', 'references', 'equivalence']),
+  cardinality: z.enum(['one-to-one', 'many-to-one', 'one-to-many']),
+  keys: z.array(z.object({ from: pointer, to: pointer, scope: z.enum(['provider', 'account', 'container', 'identity']).default('identity') }).strict()).min(1).max(8),
+  unmatched: z.enum(['keep', 'drop']).default('keep'),
+  output: columnId.optional(),
+  maxMatches: z.number().int().min(1).max(5000).default(5000),
+}).strict()
+const measureSchema = z.object({
+  id: columnId, label, kind: z.enum(['count', 'count-where', 'sum', 'average', 'minimum', 'maximum', 'median', 'percentile', 'distinct-count', 'distinct-list', 'earliest', 'latest']),
+  column: columnId.optional(), where: predicateSchema.optional(), percentile: z.number().int().min(1).max(99).optional(),
+  share: z.boolean().optional(), previous: z.enum(['amount', 'ratio']).optional(),
+}).strict()
+const stageSchema = z.discriminatedUnion('op', [
+  z.object({ op: z.literal('filter'), where: predicateSchema }).strict(),
+  z.object({ op: z.literal('compute'), columns: z.array(z.object({ id: columnId, label, type: z.enum(['number', 'boolean', 'text', 'datetime']).optional(), unit: z.string().optional(), expression: expressionSchema }).strict()).min(1).max(20) }).strict(),
+  z.object({ op: z.literal('summarize'), by: z.array(z.object({ column: columnId, bucket: z.enum(['value', 'day', 'week', 'month']).optional() }).strict()).max(3), measures: z.array(measureSchema).min(1).max(30), pivot: z.object({ column: columnId, measure: columnId }).strict().optional(), fill: z.boolean().optional() }).strict(),
+  z.object({ op: z.literal('expand'), column: columnId, output: columnId, perRow: z.number().int().min(1).max(100).default(100) }).strict(),
+  z.object({ op: z.literal('overlap'), start: columnId, end: columnId, partition: columnId.optional(), maxPairs: z.number().int().min(1).max(25000).default(5000) }).strict(),
+])
 export const panelPlanSchema = z.object({
   version: z.literal(2),
   title: label,
   request: z.string().max(8000).optional(),
   time: z.object({ zone: z.string().min(1).max(100), mode: z.enum(['fixed', 'viewer']), weekStart: z.enum(['monday', 'sunday', 'saturday']) }).strict(),
-  sources: z.array(z.object({ id: columnId, label, role: z.literal('primary'), reference: queryReferenceSchema }).strict()).min(1).max(8),
+  sources: z.array(z.object({ id: columnId, label, role: z.enum(['primary', 'lookup', 'children']), reference: queryReferenceSchema }).strict()).min(1).max(8),
+  relations: z.array(relationSchema).max(8).optional(),
   columns: z.array(z.object({
     id: columnId, label,
     type: z.enum(['text', 'number', 'boolean', 'datetime', 'enum', 'person', 'link']).optional(),
@@ -124,9 +163,10 @@ export const panelPlanSchema = z.object({
     precision: z.enum(['instant', 'day']).optional(),
     choices: z.array(choiceSchema).max(100).optional(),
     unmatched: z.enum(['catch-all', 'hidden']).optional(),
+    precedence: z.array(columnId).max(8).optional(),
     bind: z.record(columnId, bindingSchema),
   }).strict()).max(100),
-  stages: z.array(z.object({ op: z.literal('filter'), where: predicateSchema }).strict()).max(12),
+  stages: z.array(stageSchema).max(8),
   sort: z.array(z.object({ column: columnId, direction: z.enum(['asc', 'desc']), empty: z.enum(['first', 'last']).optional() }).strict()).max(8).optional(),
   group: z.array(z.object({ column: columnId, bucket: z.enum(['value', 'day', 'week', 'month', 'relative']).optional(), order: z.enum(['declared', 'label', 'count', 'explicit']).optional(), values: z.array(z.string()).max(100).optional() }).strict()).max(2).optional(),
   limit: z.number().int().min(1).max(5000).optional(),

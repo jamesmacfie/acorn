@@ -129,7 +129,7 @@ export async function runSamplePass(
         id: entry.id,
         digest: run.diagnostics.sources[index]?.queryDigest ?? contentDigest(entry.reference),
         parameters: run.diagnostics.sources[index]?.parameters ?? {}, account: run.diagnostics.sources[index]?.account ?? null,
-      }))),
+      })), run.plan),
       // Drop `adopt` once every series has been sampled under query identity.
       adopt: measureSignature(panel),
       bucket,

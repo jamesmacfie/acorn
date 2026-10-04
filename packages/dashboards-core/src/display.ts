@@ -34,4 +34,6 @@ export type DashboardDisplayRow = {
   records?: DataRecordRef[]
   recordItems?: PlanRecordItem[]
   target?: { kind: string; item: string }
+  partial?: Record<string, string>
+  summaryStage?: number
 }

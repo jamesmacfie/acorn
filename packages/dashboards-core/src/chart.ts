@@ -4,6 +4,7 @@ import type {
   DashboardDisplaySchema,
 } from './display'
 import { cellText, formatCell } from './format'
+import { dayBucket } from './planBuckets'
 import type { PanelShaping, PanelTone, PanelView } from './model'
 import { aggregateRows, boardColumns, groupField } from './shaping'
 
@@ -295,7 +296,7 @@ export function niceTicks(max: number, count = 4): number[] {
 
 /** UTC midnight of a timestamp. The line shape buckets by day: a count has no meaning at a point in
  *  time, and one rule for every aggregate beats a per-aggregate special case. */
-export const dayBucket = (at: number): number => Math.floor(at / 86_400_000) * 86_400_000
+export { dayBucket } from './planBuckets'
 
 // ── Building the plot ─────────────────────────────────────────────────────────────────────────
 

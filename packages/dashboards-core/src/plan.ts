@@ -1,17 +1,20 @@
 import { compareDataValues, type DataBinding, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
-import type { DashboardPanelContent, PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
+import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 import type { DataRecord, DataSourceDescription, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { PANEL_CAPABILITIES } from './capabilities'
+import { outputPlanColumns } from './planColumns'
+import { evaluateExpression, expandRows, overlapRows, summarizeRows } from './analysis'
+import { relatePanelRows } from './relations'
 import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
 import { dashboardFields } from './typedProjection'
 
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
 export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; result?: DataSourceResult }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
-export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target'] }
+export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>> }
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
-export type PlanStageCount = { path: string; input: number; output: number }
+export type PlanStageCount = { path: string; input: number; output: number; meaning?: string }
 export type DashboardRun = {
   plan: PanelPlan
   rows: PlanRow[]
@@ -30,6 +33,7 @@ export type DashboardRun = {
 
 const pathPart = (value: string): string => value.replaceAll('~', '~0').replaceAll('/', '~1')
 const columnAt = (plan: PanelPlan, id: string): PanelPlanColumn | undefined => plan.columns.find(column => column.id === id)
+export { outputPlanColumns } from './planColumns'
 const pointerColumn = (pointer: string): string | undefined => /^\/[A-Za-z0-9_-]{1,100}$/.test(pointer) ? pointer.slice(1) : undefined
 const bindingColumns = (binding: DataBinding): string[] => binding.address.from === 'item'
   ? [pointerColumn(binding.address.pointer) ?? ''] : []
@@ -82,6 +86,7 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   try { new Intl.DateTimeFormat('en', { timeZone: plan.time.zone }) }
   catch { add('/time/zone', `"${plan.time.zone}" is not an IANA time zone.`) }
   if (new Set(plan.sources.map(source => source.id)).size !== plan.sources.length) add('/sources', 'Source IDs must be unique.')
+  if (!plan.sources.some(source => source.role === 'primary')) add('/sources', 'Choose at least one primary source to supply rows.')
   if (new Set(plan.columns.map(column => column.id)).size !== plan.columns.length) add('/columns', 'Column IDs must be unique.')
   for (const [index, source] of plan.sources.entries()) {
     if (!sources.some(candidate => candidate.instanceId === source.id)) add(`/sources/${index}`, `${source.label} is unavailable.`)
@@ -89,6 +94,7 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   for (const [index, column] of plan.columns.entries()) {
     if (column.precision && column.type !== 'datetime') add(`/columns/${index}/precision`, 'Only a date column has precision.')
     if (column.choices && column.type !== 'enum') add(`/columns/${index}/choices`, 'Only an enum column has choices.')
+    for (const sourceId of column.precedence ?? []) if (!plan.sources.some(source => source.id === sourceId)) add(`/columns/${index}/precedence`, `Source ${sourceId} is not in this plan.`)
     if (typeof column.unit === 'object' && !columnAt(plan, column.unit.column)) add(`/columns/${index}/unit`, `Unit column ${column.unit.column} is missing.`)
     for (const [sourceId, binding] of Object.entries(column.bind)) {
       const path = `/columns/${index}/bind/${pathPart(sourceId)}`
@@ -105,10 +111,102 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
       }
     }
   }
+  let available = new Set(plan.columns.map(column => column.id))
+  let summarized = 0, overlapped = 0
+  if (plan.stages.length > 8) add('/stages', 'A panel can have at most eight stages.')
+  for (const [index, relation] of (plan.relations ?? []).entries()) {
+    const from = plan.sources.find(source => source.id === relation.from)
+    const to = plan.sources.find(source => source.id === relation.to)
+    if (!from || !to) add(`/relations/${index}`, 'Both sources must exist.')
+    else if (relation.kind === 'equivalence' && (from.role !== 'primary' || to.role !== 'primary')) add(`/relations/${index}/kind`, 'Equivalence joins two primary sources.')
+    else if (relation.kind !== 'equivalence' && (from.role !== 'primary' || to.role === 'primary')) add(`/relations/${index}`, 'Lookup or children relation starts at a primary source.')
+    if (relation.kind !== 'equivalence' && relation.cardinality === 'one-to-many' && to?.role !== 'children') add(`/relations/${index}/cardinality`, 'A one-to-many relation needs a children source.')
+    if (relation.kind === 'equivalence' && relation.cardinality !== 'one-to-one') add(`/relations/${index}/cardinality`, 'Equivalence must match one item on each side.')
+    if (relation.kind !== 'equivalence' && relation.cardinality !== 'one-to-many' && to?.role !== 'lookup') add(`/relations/${index}/cardinality`, 'A lookup needs one-to-one or many-to-one cardinality.')
+    const scopes = new Set(relation.keys.map(part => part.scope))
+    for (const scope of ['provider', 'account', 'identity'] as const) if (!scopes.has(scope)) add(`/relations/${index}/keys`, `Relation key must include ${scope} scope.`)
+    const declared = sources.find(source => source.instanceId === relation.from)?.description.relations?.find(item => item.id === relation.id)
+    if (declared) for (const scope of declared.requiredScopes) if (!scopes.has(scope)) add(`/relations/${index}/keys`, `Declared relation needs ${scope} scope.`)
+    if (declared && (declared.target.pluginId !== sources.find(source => source.instanceId === relation.to)?.query.source.pluginId
+      || declared.target.sourceId !== sources.find(source => source.instanceId === relation.to)?.query.source.sourceId
+      || declared.kind !== relation.kind || declared.cardinality !== relation.cardinality)) add(`/relations/${index}`, 'Relation does not match the source declaration.')
+    if (declared && (declared.keys.length !== relation.keys.length || declared.keys.some((part, at) => {
+      const selected = relation.keys[at]
+      return !selected || part.from !== selected.from || part.to !== selected.to || part.scope !== selected.scope
+    }))) add(`/relations/${index}/keys`, 'Use the exact keys declared by the source.')
+    if (!declared && relation.kind !== 'equivalence') add(`/relations/${index}`, 'This relation is not declared by its source.')
+    for (const [at, key] of relation.keys.entries()) {
+      if (from && !sources.find(source => source.instanceId === from.id)?.description.fields.some(field => field.pointer === key.from)) add(`/relations/${index}/keys/${at}/from`, `Key field ${key.from} is not described by ${from.label}.`)
+      if (to && !sources.find(source => source.instanceId === to.id)?.description.fields.some(field => field.pointer === key.to)) add(`/relations/${index}/keys/${at}/to`, `Key field ${key.to} is not described by ${to.label}.`)
+    }
+    if (relation.cardinality === 'one-to-many' && !relation.output) add(`/relations/${index}/output`, 'Choose a list column for children.')
+    if (relation.cardinality === 'one-to-many' && relation.output && !plan.columns.some(column => column.id === relation.output && column.list)) add(`/relations/${index}/output`, 'Children output must be a list column.')
+  }
   for (const [index, stage] of plan.stages.entries()) {
+    const columnsHere = outputPlanColumns({ ...plan, stages: plan.stages.slice(0, index) })
+    const here = (id: string) => columnsHere.find(column => column.id === id)
     if (!PANEL_CAPABILITIES.operations.some(operation => operation.id === stage.op)) add(`/stages/${index}/op`, `Operation ${stage.op} is unavailable.`)
+    if (stage.op === 'summarize') {
+      if (++summarized > 3) add(`/stages/${index}`, 'A panel can summarize at most three times.')
+      for (const [at, by] of stage.by.entries()) if (!available.has(by.column)) add(`/stages/${index}/by/${at}/column`, `Column ${by.column} is unavailable here.`)
+      for (const [at, by] of stage.by.entries()) if (by.bucket && by.bucket !== 'value' && here(by.column)?.type !== 'datetime') add(`/stages/${index}/by/${at}/bucket`, 'A time bucket needs a datetime column.')
+      for (const [at, measure] of stage.measures.entries()) {
+        if (measure.column && !available.has(measure.column)) add(`/stages/${index}/measures/${at}/column`, `Column ${measure.column} is unavailable here.`)
+        if (['sum', 'average', 'median', 'percentile', 'minimum', 'maximum'].includes(measure.kind) && !measure.column) add(`/stages/${index}/measures/${at}/column`, 'This measure needs a column.')
+        if (['sum', 'average', 'median', 'percentile', 'minimum', 'maximum'].includes(measure.kind) && measure.column && here(measure.column)?.type !== 'number') add(`/stages/${index}/measures/${at}/column`, 'This measure needs a number column.')
+        if (['earliest', 'latest'].includes(measure.kind) && measure.column && here(measure.column)?.type !== 'datetime') add(`/stages/${index}/measures/${at}/column`, 'This measure needs a date column.')
+        const unit = measure.column ? here(measure.column)?.unit : undefined
+        if (typeof unit === 'object' && ['sum', 'average', 'minimum', 'maximum', 'median', 'percentile'].includes(measure.kind)
+          && !stage.by.some(group => group.column === unit.column)
+          && !plan.stages.slice(0, index).some(previous => previous.op === 'filter' && fixesUnit(previous.where, unit.column))) add(`/stages/${index}/measures/${at}/column`, 'Group or filter by the unit column before totaling mixed currencies.')
+        if (measure.share && typeof unit === 'object' && !plan.stages.slice(0, index).some(previous => previous.op === 'filter' && fixesUnit(previous.where, unit.column))) add(`/stages/${index}/measures/${at}/share`, 'A share of total needs one fixed currency.')
+        for (const ref of measure.where ? predicateColumns(measure.where) : []) if (!available.has(ref)) add(`/stages/${index}/measures/${at}/where`, `Filter column ${ref} is unavailable here.`)
+        if (measure.kind === 'percentile' && !measure.percentile) add(`/stages/${index}/measures/${at}/percentile`, 'Choose a percentile from 1 to 99.')
+        if (measure.kind === 'count-where' && !measure.where) add(`/stages/${index}/measures/${at}/where`, 'Count where needs a filter.')
+        if (measure.previous && !stage.by.some(by => by.bucket && by.bucket !== 'value')) add(`/stages/${index}/measures/${at}/previous`, 'Previous change needs a time bucket.')
+      }
+      if (stage.fill && (stage.by.length !== 1 || !stage.by[0]?.bucket || stage.by[0].bucket === 'value')) add(`/stages/${index}/fill`, 'Filling empty buckets needs one time group.')
+      if (stage.pivot) {
+        const column = plan.columns.find(column => column.id === stage.pivot?.column)
+        if (!column?.choices || !stage.by.some(by => by.column === stage.pivot?.column)) add(`/stages/${index}/pivot/column`, 'Pivot needs a grouped enum column with declared choices.')
+        if (!stage.measures.some(measure => measure.id === stage.pivot?.measure)) add(`/stages/${index}/pivot/measure`, 'Pivot measure is unavailable.')
+      }
+      available = new Set([...stage.by.map(by => by.column), ...stage.measures.flatMap(measure => [measure.id, ...(measure.previous ? [`${measure.id}Previous`] : [])])])
+      continue
+    }
+    if (stage.op === 'compute') {
+      for (const [at, computed] of stage.columns.entries()) {
+        const refs = (expression: typeof computed.expression): string[] => expression.kind === 'column' || expression.kind === 'choice' ? [expression.column]
+          : expression.kind === 'arithmetic' ? [...refs(expression.left), ...refs(expression.right)]
+          : expression.kind === 'duration' ? [...refs(expression.start), ...refs(expression.end)]
+          : expression.kind === 'coalesce' || expression.kind === 'min' || expression.kind === 'max' ? expression.values.flatMap(refs) : []
+        for (const ref of refs(computed.expression)) if (!available.has(ref)) add(`/stages/${index}/columns/${at}/expression`, `Column ${ref} is unavailable here.`)
+        if (computed.expression.kind === 'arithmetic' || computed.expression.kind === 'min' || computed.expression.kind === 'max') {
+          for (const ref of refs(computed.expression)) if (here(ref)?.type !== 'number') add(`/stages/${index}/columns/${at}/expression`, `${ref} must be numeric.`)
+          const units = refs(computed.expression).map(ref => here(ref)?.unit).filter(unit => unit !== undefined)
+          if (units.some(unit => typeof unit === 'object') && !plan.stages.slice(0, index).some(previous => previous.op === 'filter' && units.some(unit => typeof unit === 'object' && fixesUnit(previous.where, unit.column)))) add(`/stages/${index}/columns/${at}/expression`, 'Fix a per-row currency before arithmetic.')
+          if (new Set(units.map(unit => JSON.stringify(unit))).size > 1) add(`/stages/${index}/columns/${at}/expression`, 'Arithmetic cannot mix units.')
+        }
+        if (computed.expression.kind === 'duration') for (const ref of refs(computed.expression)) if (here(ref)?.type !== 'datetime') add(`/stages/${index}/columns/${at}/expression`, `${ref} must be a datetime.`)
+        if (available.has(computed.id)) add(`/stages/${index}/columns/${at}/id`, `Column ${computed.id} already exists.`)
+      }
+      for (const computed of stage.columns) available.add(computed.id)
+      continue
+    }
+    if (stage.op === 'expand') {
+      if (!available.has(stage.column) || !here(stage.column)?.list) add(`/stages/${index}/column`, 'Expand needs a list column.')
+      available.add(stage.output)
+      continue
+    }
+    if (stage.op === 'overlap') {
+      if (++overlapped > 1) add(`/stages/${index}`, 'A panel can overlap once.')
+      for (const id of [stage.start, stage.end]) if (!available.has(id) || here(id)?.type !== 'datetime') add(`/stages/${index}`, `${id} must be a date column.`)
+      if (stage.partition && !available.has(stage.partition)) add(`/stages/${index}/partition`, 'Partition column is unavailable.')
+      available = new Set([...available, ...[...available].map(id => `right_${id}`), 'overlapDuration'])
+      continue
+    }
     for (const id of predicateColumns(stage.where)) {
-      if (!id || !columnAt(plan, id)) add(`/stages/${index}/where`, `Filter names an unavailable column: ${id || '(invalid pointer)'}.`)
+      if (!id || !available.has(id)) add(`/stages/${index}/where`, `Filter names an unavailable column: ${id || '(invalid pointer)'}.`)
     }
     const check = (predicate: DataPredicate): void => {
       if (predicate.kind !== 'comparison') { predicate.predicates.forEach(check); return }
@@ -123,34 +221,35 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
         if (column.type === 'boolean' && typeof right.value !== 'boolean' && predicate.operator !== 'in') add(`/stages/${index}/where`, `${column.label} needs a true or false comparison value.`)
       }
       if (column.type === 'number' && typeof column.unit === 'object' && !['missing', 'present'].includes(predicate.operator)
-        && !plan.stages.slice(0, index).some(previous => fixesUnit(previous.where, (column.unit as { column: string }).column))) add(`/stages/${index}/where`, `${column.label} has per-row units; compare only after fixing one unit.`)
+        && !plan.stages.slice(0, index).some(previous => previous.op === 'filter' && fixesUnit(previous.where, (column.unit as { column: string }).column))) add(`/stages/${index}/where`, `${column.label} has per-row units; compare only after fixing one unit.`)
     }
     check(stage.where)
   }
+  const finalColumn = (id: string) => outputPlanColumns(plan).find(column => column.id === id)
   for (const [index, sort] of (plan.sort ?? []).entries()) {
-    const column = columnAt(plan, sort.column)
+    const column = finalColumn(sort.column)
     if (!column) add(`/sort/${index}/column`, `Sort column ${sort.column} is unavailable.`)
     else if (typeof column.unit === 'object' && !plan.group?.some(group => group.column === (column.unit as { column: string }).column)) add(`/sort/${index}/column`, `${column.label} has mixed units; group by its unit first.`)
   }
   for (const [index, group] of (plan.group ?? []).entries()) {
-    const column = columnAt(plan, group.column)
+    const column = finalColumn(group.column)
     if (!column) add(`/group/${index}/column`, `Group column ${group.column} is unavailable.`)
     else if (group.bucket && group.bucket !== 'value' && column.type !== 'datetime') add(`/group/${index}/bucket`, 'Time buckets require a date column.')
     if (group.order === 'explicit' && !group.values?.length) add(`/group/${index}/values`, 'An explicit order needs values.')
   }
-  if (plan.view.kind === 'board' && (plan.group?.length !== 1 || columnAt(plan, plan.group[0]!.column)?.type !== 'enum')) add('/view/kind', 'A board needs one enum group.')
+  if (plan.view.kind === 'board' && (plan.group?.length !== 1 || finalColumn(plan.group[0]!.column)?.type !== 'enum')) add('/view/kind', 'A board needs one enum group.')
   for (const key of ['field', 'x', 'series'] as const) {
     const ref = plan.view[key]
-    if (ref !== undefined && !columnAt(plan, ref)) add(`/view/${key}`, `View column ${ref} is unavailable.`)
+    if (ref !== undefined && !finalColumn(ref)) add(`/view/${key}`, `View column ${ref} is unavailable.`)
   }
-  if (plan.view.aggregate && plan.view.aggregate !== 'count' && columnAt(plan, plan.view.field ?? '')?.type !== 'number') add('/view/field', 'This aggregate needs a number column.')
-  const measured = columnAt(plan, plan.view.field ?? '')
+  if (plan.view.aggregate && plan.view.aggregate !== 'count' && finalColumn(plan.view.field ?? '')?.type !== 'number') add('/view/field', 'This aggregate needs a number column.')
+  const measured = finalColumn(plan.view.field ?? '')
   if (plan.view.aggregate && plan.view.aggregate !== 'count' && typeof measured?.unit === 'object'
-    && !plan.stages.some(stage => fixesUnit(stage.where, (measured.unit as { column: string }).column))) add('/view/field', 'An aggregate needs one fixed unit; filter by currency first.')
-  if (plan.view.kind === 'chart' && !['datetime', 'enum'].includes(columnAt(plan, plan.view.x ?? '')?.type ?? '')) add('/view/x', 'A chart needs a date or enum axis.')
-  if (plan.view.shape === 'line' && columnAt(plan, plan.view.x ?? '')?.type !== 'datetime') add('/view/x', 'A line chart needs a date axis.')
-  if (plan.view.shape === 'bar' && columnAt(plan, plan.view.x ?? '')?.type !== 'enum') add('/view/x', 'A bar chart needs an enum axis.')
-  if (plan.view.series && columnAt(plan, plan.view.series)?.type !== 'enum') add('/view/series', 'A series needs an enum column.')
+    && !plan.stages.some(stage => stage.op === 'filter' && fixesUnit(stage.where, (measured.unit as { column: string }).column))) add('/view/field', 'An aggregate needs one fixed unit; filter by currency first.')
+  if (plan.view.kind === 'chart' && !['datetime', 'enum'].includes(finalColumn(plan.view.x ?? '')?.type ?? '')) add('/view/x', 'A chart needs a date or enum axis.')
+  if (plan.view.shape === 'line' && finalColumn(plan.view.x ?? '')?.type !== 'datetime') add('/view/x', 'A line chart needs a date axis.')
+  if (plan.view.shape === 'bar' && finalColumn(plan.view.x ?? '')?.type !== 'enum') add('/view/x', 'A bar chart needs an enum axis.')
+  if (plan.view.series && finalColumn(plan.view.series)?.type !== 'enum') add('/view/series', 'A series needs an enum column.')
   if (plan.view.trend && plan.view.kind !== 'stat') add('/view/trend', 'A trend belongs on a stat view.')
   const checkReference = (reference: NonNullable<PanelPlan['actions']>['press'], path: string): void => {
     if (!reference) return
@@ -189,16 +288,20 @@ function mappedValue(column: PanelPlanColumn, source: PlanSource, record: DataRe
 }
 
 export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): PlanRow[] {
-  return sources.flatMap(source => (source.result?.records ?? []).map(record => ({
+  return sources.filter(source => plan.sources.find(entry => entry.id === source.instanceId)?.role === 'primary').flatMap(source => (source.result?.records ?? []).map(record => {
+    const values = Object.fromEntries(plan.columns.map(column => [column.id, mappedValue(column, source, record)]))
+    return {
     id: `${source.instanceId}:${record.ref.recordId}`,
-    values: Object.fromEntries(plan.columns.map(column => [column.id, mappedValue(column, source, record)])),
+    sourceRecords: { [source.instanceId]: record.ref },
+    sourceValues: { [source.instanceId]: values },
+    values,
     records: [record.ref],
     recordItems: [{ ref: record.ref, ...(record.taskId ? { taskId: record.taskId } : {}), ...(record.action ? { action: record.action } : {}), ...(record.actions ? { actions: record.actions } : {}), ...(record.target ? { target: record.target } : {}) }],
     ...(record.taskId ? { taskId: record.taskId } : {}),
     ...(record.action ? { action: record.action } : {}),
     ...(record.actions ? { actions: record.actions } : {}),
     ...(record.target ? { target: record.target } : {}),
-  })))
+  }}))
 }
 
 export function resolvePlanColumns(plan: PanelPlan, sources: readonly PlanSource[]): PanelPlan {
@@ -224,98 +327,44 @@ export function resolvePlanColumns(plan: PanelPlan, sources: readonly PlanSource
   }) }
 }
 
-const stageRunners: Record<PanelPlan['stages'][number]['op'], (rows: PlanRow[], stage: PanelPlan['stages'][number]) => PlanRow[]> = {
-  filter: (rows, stage) => rows.filter(row => matchesPlanFilter(row, stage.where)),
-}
-
-export function runPlanStages(plan: PanelPlan, rows: readonly PlanRow[]): { rows: PlanRow[]; counts: PlanStageCount[] } {
+export { relatePanelRows }
+export function runPlanStages(plan: PanelPlan, rows: readonly PlanRow[], evaluationTime = Date.now(), incomplete = false): { rows: PlanRow[]; counts: PlanStageCount[]; problems: PlanProblem[] } {
   let current = [...rows]
+  let meaning = 'one row per source item'
   const counts: PlanStageCount[] = []
+  const problems: PlanProblem[] = []
   for (const [index, stage] of plan.stages.entries()) {
     const input = current.length
-    current = stageRunners[stage.op](current, stage)
-    counts.push({ path: `/stages/${index}`, input, output: current.length })
+    try {
+      switch (stage.op) {
+        case 'filter': current = current.filter(row => matchesPlanFilter(row, stage.where)); break
+        case 'compute': current = current.map(row => ({ ...row, values: { ...row.values, ...Object.fromEntries(stage.columns.map(column => [column.id, evaluateExpression(column.expression, row, evaluationTime)])) } })); break
+        case 'summarize': {
+          const result = summarizeRows(plan, stage, current, matchesPlanFilter, incomplete)
+          current = result.rows.map(row => ({ ...row, summaryStage: index }))
+          for (const message of result.errors) problems.push({ path: `/stages/${index}`, message, severity: 'error' })
+          break
+        }
+        case 'expand': current = expandRows(plan, current, stage); break
+        case 'overlap': current = overlapRows(current, stage); break
+      }
+    } catch (error) { problems.push({ path: `/stages/${index}`, message: error instanceof Error ? error.message : 'Stage failed.', severity: 'error' }); current = []; break }
+    if (stage.op === 'summarize') meaning = `one row per ${stage.by.map(by => by.column).join(' and ') || 'all rows'}`
+    if (stage.op === 'overlap') meaning = 'one row per overlapping pair'
+    if (stage.op === 'expand') meaning = `one row per ${stage.column} element`
+    counts.push({ path: `/stages/${index}`, input, output: current.length, meaning })
+    if (current.length > 25000) { problems.push({ path: `/stages/${index}`, message: 'Intermediate row budget exceeded.', severity: 'error' }); current = []; break }
   }
-  return { rows: current, counts }
+  return { rows: current, counts, problems }
 }
 
-function compareCells(left: DataValue | undefined, right: DataValue | undefined): number {
-  if (typeof left === 'number' && typeof right === 'number') return left - right
-  return String(left).localeCompare(String(right))
-}
-
-export function sortPlanRows(plan: PanelPlan, rows: readonly PlanRow[]): PlanRow[] {
-  const sorted = [...rows]
-  sorted.sort((left, right) => {
-    for (const key of plan.sort ?? []) {
-      const a = left.values[key.column], b = right.values[key.column]
-      const absentA = a == null, absentB = b == null
-      if (absentA || absentB) {
-        if (absentA === absentB) continue
-        return (absentA ? 1 : -1) * (key.empty === 'first' ? -1 : 1)
-      }
-      const column = columnAt(plan, key.column)
-      const rank = (value: DataValue): number => {
-        const index = column?.choices?.findIndex(choice => choice.id === value) ?? -1
-        return index < 0 ? (column?.choices?.length ?? 0) : (column?.choices?.[index]?.rank ?? index)
-      }
-      const ranked = column?.type === 'enum' ? rank(a) - rank(b) : 0
-      const order = ranked || compareCells(a, b)
-      if (order) return key.direction === 'desc' ? -order : order
-    }
-    return 0
-  })
-  return sorted
-}
-
-function datePart(value: DataValue, zone: string): { day: string; month: string } | undefined {
-  if (typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value)) return { day: value, month: value.slice(0, 7) }
-  const instant = typeof value === 'number' ? value : typeof value === 'string' ? Date.parse(value) : NaN
-  if (!Number.isFinite(instant)) return undefined
-  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: zone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(instant)
-  const get = (kind: string) => parts.find(part => part.type === kind)?.value ?? ''
-  return { day: `${get('year')}-${get('month')}-${get('day')}`, month: `${get('year')}-${get('month')}` }
-}
-
-export function groupPlanRows(plan: PanelPlan, rows: readonly PlanRow[], evaluationTime: number): PlanGroup[] {
-  const zone = plan.time.zone
-  const today = datePart(evaluationTime, zone)?.day ?? ''
-  const keys = plan.group ?? []
-  const group = (items: readonly PlanRow[], depth: number): PlanGroup[] => {
-    const spec = keys[depth]
-    if (!spec) return []
-    const buckets = new Map<string, PlanRow[]>()
-    for (const row of items) {
-      const value = row.values[spec.column]
-      const date = spec.bucket && spec.bucket !== 'value' ? datePart(value, zone) : undefined
-      let key = value == null ? 'No value' : String(value)
-      if (spec.bucket === 'day') key = date?.day ?? 'No date'
-      if (spec.bucket === 'month') key = date?.month ?? 'No date'
-      if (spec.bucket === 'week' && date) {
-        const day = new Date(`${date.day}T12:00:00Z`)
-        const start = { sunday: 0, monday: 1, saturday: 6 }[plan.time.weekStart]
-        day.setUTCDate(day.getUTCDate() - (day.getUTCDay() - start + 7) % 7)
-        key = day.toISOString().slice(0, 10)
-      }
-      if (spec.bucket === 'relative') key = !date ? 'No date' : date.day < today ? 'Overdue' : date.day === today ? 'Today' : date.day <= new Date(Date.parse(`${today}T12:00:00Z`) + 7 * 86400000).toISOString().slice(0, 10) ? 'Next seven days' : 'Later'
-      buckets.set(key, [...(buckets.get(key) ?? []), row])
-    }
-    const declared = columnAt(plan, spec.column)?.choices?.map(choice => choice.id) ?? []
-    const ordered = [...buckets].sort(([a, ar], [b, br]) => spec.order === 'count' ? br.length - ar.length
-      : spec.order === 'declared' || spec.order === 'explicit' ? (() => {
-        const order = spec.order === 'explicit' ? spec.values ?? [] : declared
-        const ai = order.indexOf(a), bi = order.indexOf(b)
-        return (ai < 0 ? order.length : ai) - (bi < 0 ? order.length : bi) || a.localeCompare(b)
-      })() : a.localeCompare(b))
-    return ordered.map(([key, members]) => ({ key, label: key, count: members.length, rows: members, ...(depth + 1 < keys.length ? { children: group(members, depth + 1) } : {}) }))
-  }
-  return group(rows, 0)
-}
+export { sortPlanRows, groupPlanRows } from './planShaping'
 
 /** A drill-down begins before the summary it explains. Phase 05 can pass its summary stage and measure filter here. */
 export function deriveDrilldownPlan(plan: PanelPlan, rows: readonly Pick<PlanRow, 'values'>[], options: {
   stageIndex?: number
   measureFilter?: DataPredicate
+  summaryKeys?: Record<string, DataValue>
 } = {}): PanelPlan {
   const stages = plan.stages.slice(0, options.stageIndex ?? plan.stages.length)
   const predicates: DataPredicate[] = []
@@ -324,10 +373,11 @@ export function deriveDrilldownPlan(plan: PanelPlan, rows: readonly Pick<PlanRow
     predicates.push({ kind: 'comparison', left: { address: { from: 'item', pointer: `/${group.column}` } },
       operator: 'in', right: { address: { from: 'literal', value: values } } })
   }
+  for (const [column, value] of Object.entries(options.summaryKeys ?? {})) predicates.push({ kind: 'comparison',
+    left: { address: { from: 'item', pointer: `/${column}` } }, operator: 'eq', right: { address: { from: 'literal', value } } })
   if (options.measureFilter) predicates.push(options.measureFilter)
   const where: DataPredicate = predicates.length === 1 ? predicates[0]! : { kind: 'all', predicates }
-  const filtered = !predicates.length ? stages : stages.length < 12 ? [...stages, { op: 'filter' as const, where }]
-    : [...stages.slice(0, -1), { op: 'filter' as const, where: { kind: 'all' as const, predicates: [stages.at(-1)!.where, where] } }]
+  const filtered = !predicates.length ? stages : [...stages, { op: 'filter' as const, where }]
   return { ...plan, title: `${plan.title} · rows`, group: [], view: { kind: 'table' }, stages: filtered }
 }
 
@@ -352,11 +402,19 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   const pressedSource = sources.filter(source => !selectedPress?.source || source.instanceId === selectedPress.source)
   const pressedKinds = [...new Set(pressedSource.flatMap(source => source.description.targets?.map(target => target.kind) ?? []))]
   const pressedRecord = pressedKinds.length === 1 ? `the ${pressedKinds[0]!.split('.').at(-1)!.replaceAll('-', ' ')}` : 'the source record'
+  const finalStage = [...plan.stages].reverse().find(stage => stage.op === 'summarize' || stage.op === 'expand' || stage.op === 'overlap')
+  const rowMeaning = finalStage?.op === 'summarize' ? `One row per ${finalStage.by.map(by => columnAt(plan, by.column)?.label ?? by.column).join(' and ') || 'whole selection'}.`
+    : finalStage?.op === 'overlap' ? 'One row per pair of overlapping intervals.'
+      : finalStage?.op === 'expand' ? `One row per ${finalStage.column} element.` : `One row per record from ${labels.join(' and ')}.`
   return [
-    `One row per record from ${labels.join(' and ')}.`,
+    rowMeaning,
     ...sources.map(source => `${source.label} reaches ${source.description.consistency}; scope ${JSON.stringify(source.query.scope.parameters)}.`),
     `Columns: ${plan.columns.map(column => column.label).join(', ') || 'none'}.`,
-    ...plan.stages.map(stage => `Keep rows where ${describePredicate(stage.where)}.`),
+    ...(plan.relations ?? []).map(relation => `${relation.kind === 'equivalence' ? 'Merge equivalent' : relation.cardinality === 'one-to-many' ? 'Attach children from' : 'Look up'} ${relation.to} through ${relation.id}${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`),
+    ...plan.stages.map(stage => stage.op === 'filter' ? `Keep rows where ${describePredicate(stage.where)}.`
+      : stage.op === 'compute' ? `Compute ${stage.columns.map(column => column.label).join(', ')}.`
+      : stage.op === 'summarize' ? `One row per ${stage.by.map(by => columnAt(plan, by.column)?.label ?? by.column).join(' and ') || 'all rows'}; measure ${stage.measures.map(measure => measure.label).join(', ')}.`
+      : stage.op === 'expand' ? `Expand ${stage.column} into one row per element.` : `One row per overlapping pair from ${stage.start} and ${stage.end}.`),
     ...(sources.some(source => source.query.take && plan.stages.length) ? ['A source limit applies before the panel filter.'] : []),
     ...(plan.sort?.length ? [`Sort by ${plan.sort.map(item => `${columnAt(plan, item.column)?.label ?? item.column} ${item.direction === 'desc' ? 'newest or highest first' : 'oldest or lowest first'}`).join(', ')}.`] : []),
     ...(plan.group?.length ? [`Group by ${plan.group.map(item => columnAt(plan, item.column)?.label ?? item.column).join(' then ')}.`] : []),
@@ -367,7 +425,7 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
 
 /** A renderer adapter over the Node's plan rows. The Node remains the only executor. */
 export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { schema: DashboardDisplaySchema; fields: DashboardDisplayField[]; rows: DashboardDisplayRow[] } {
-  const fields: DashboardDisplayField[] = plan.columns.map(column => ({
+  const fields: DashboardDisplayField[] = outputPlanColumns(plan).map(column => ({
     id: column.id, name: column.label, type: column.type ?? 'text',
     ...(column.id === 'title' || column.id === 'status' || column.id === 'updated' || column.id === 'url'
       ? { role: column.id } : {}),
@@ -402,6 +460,8 @@ export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { sch
       ...(row.action ? { action: row.action } : {}),
       ...(row.actions ? { actions: row.actions } : {}),
       ...(row.target ? { target: row.target } : {}),
+      ...(row.partial ? { partial: row.partial } : {}),
+      ...(row.summaryStage !== undefined ? { summaryStage: row.summaryStage } : {}),
     })),
   }
 }
@@ -416,52 +476,4 @@ export function displayPlanGroups(groups: readonly PlanGroup[], rows: readonly D
   }))
 }
 
-/** A read-only projection of a version 1 revision. Callers must keep its original bytes and digest. */
-export function upgradePanelContent(content: DashboardPanelContent): PanelPlan {
-  const mapped = content.queries.length > 1 || content.mapping.columns.length > 0
-    || Object.values(content.mapping.fields).some(fields => Object.keys(fields).length > 0)
-  const roles = ['title', 'status', 'assignee', 'updated', 'url'] as const
-  const columns: PanelPlanColumn[] = mapped
-    ? roles.flatMap(role => content.queries.some(query => content.mapping.fields[query.id]?.[role]) ? [{
-      id: role,
-      label: role[0]!.toUpperCase() + role.slice(1),
-      bind: Object.fromEntries(content.queries.flatMap(query => {
-        const field = content.mapping.fields[query.id]?.[role]
-        return field ? [[query.id, { field, ...(role === 'status' && content.mapping.values[query.id] ? { values: content.mapping.values[query.id] } : {}) }]] : []
-      })),
-      ...(role === 'status' && content.mapping.columns.length ? {
-        type: 'enum' as const,
-        choices: content.mapping.columns.map(choice => ({ id: choice.id, label: choice.label, ...(choice.tone ? { tone: choice.tone } : {}) })),
-        unmatched: content.mapping.unmapped,
-      } : {}),
-    }] : [])
-    : [...new Set(content.display.fields)].filter(field => /^\/[A-Za-z0-9_-]+$/.test(field)).map(field => ({
-      id: field.slice(1), label: field.slice(1), bind: { [content.queries[0]!.id]: { field } },
-    }))
-  if (mapped) columns.push({
-    id: 'source', label: 'Source', type: 'text',
-    bind: Object.fromEntries(content.queries.map(query => [query.id, { value: query.label }])),
-  })
-  const toId = (reference: string | undefined): string | undefined => {
-    if (!reference) return undefined
-    const found = columns.find(column => column.id === reference || reference === `/${column.id}`)
-    return found?.id
-  }
-  const { field: _field, x: _x, series: _series, ...view } = content.display.view
-  return {
-    version: 2,
-    title: content.title,
-    time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
-    sources: content.queries.map(query => ({ ...query, role: 'primary' })),
-    columns,
-    stages: [],
-    ...(toId(content.display.groupBy) ? { group: [{ column: toId(content.display.groupBy)!, bucket: 'value' }] } : {}),
-    ...(content.display.limit ? { limit: content.display.limit } : {}),
-    view: {
-      ...view,
-      ...(toId(content.display.view.field) ? { field: toId(content.display.view.field) } : {}),
-      ...(toId(content.display.view.x) ? { x: toId(content.display.view.x) } : {}),
-      ...(toId(content.display.view.series) ? { series: toId(content.display.view.series) } : {}),
-    },
-  }
-}
+export { upgradePanelContent } from './upgrade'

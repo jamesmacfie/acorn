@@ -39,6 +39,7 @@ export type PanelViewProps = {
   onButton?: (row: DashboardDisplayRow, button: NonNullable<PanelPlan['actions']>['buttons'][number]) => void
   onOpenRecord?: (row: DashboardDisplayRow, item: PlanRecordItem) => void
   onDrilldown?: (group: DisplayPlanGroup) => void
+  onMeasureDrilldown?: (row: DashboardDisplayRow, measure: string) => void
 }
 
 /** A row's press handler: only when the row declares a verb and the host can run it. */

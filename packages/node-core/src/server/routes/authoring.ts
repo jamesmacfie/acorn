@@ -28,7 +28,7 @@ const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
   query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
-  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Use only primary sources and supported operations. Account names are choices, never guesses. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
+  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
 } as const
 
 function message(error: unknown): string {

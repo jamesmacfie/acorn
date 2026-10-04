@@ -4,7 +4,7 @@ import { panelPlanSchema, type DashboardDraft, type DashboardView, type PanelPla
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
-import { describePanelPlan, displayPlanGroups, displayPlanRun } from '@acorn/dashboards-core/plan.ts'
+import { describePanelPlan, displayPlanGroups, displayPlanRun, outputPlanColumns } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../dataSources/SourceQueryEditor'
@@ -23,6 +23,8 @@ import { Stack } from '../../kit/components/layout/Stack'
 import { Text } from '../../kit/components/content/Text'
 import { Modal } from '../../kit/components/overlays/Modal'
 import PanelBody from './views/PanelBody'
+import CompositionStageForm from './CompositionStageForm'
+import EquivalenceForm from './EquivalenceForm'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { availableContentPresentations } from '../../host/registries/panes/contentLinks'
@@ -134,6 +136,7 @@ export default function DashboardEditor(props: {
     ...current, sources: reference
       ? current.sources.map(source => source.id === id ? { ...source, reference } : source)
       : current.sources.filter(source => source.id !== id),
+    relations: reference ? current.relations : current.relations?.filter(relation => relation.from !== id && relation.to !== id),
     columns: reference ? current.columns : current.columns.map(column => { const { [id]: _removed, ...bind } = column.bind; return { ...column, bind } }),
   }))
   const updateState = (id: string, state: SourceQueryEditorState): void => {
@@ -182,13 +185,33 @@ export default function DashboardEditor(props: {
       return { ...column, bind: { ...column.bind, [sourceId]: { ...binding, values } } }
     }),
   }))
-  const addFilter = (): void => {
-    const column = plan().columns[0]
-    if (column) change(current => ({ ...current, stages: [...current.stages, { op: 'filter', where: firstPredicate(column.id) }] }))
+  const editStage = (index: number, stage: PanelPlan['stages'][number]): void => change(current => ({ ...current,
+    stages: current.stages.map((entry, at) => at === index ? stage : entry),
+  }))
+  const addOperation = (op: PanelPlan['stages'][number]['op']): void => {
+    const columns = outputPlanColumns(plan())
+    const first = columns[0]?.id ?? ''
+    const dates = columns.filter(column => column.type === 'datetime')
+    const list = columns.find(column => column.list)
+    const stage: PanelPlan['stages'][number] | undefined = op === 'filter' ? { op, where: firstPredicate(first) }
+      : op === 'compute' ? { op, columns: [{ id: `computed${plan().stages.length}`, label: 'Calculated value', type: 'number', expression: { kind: 'column', column: first } }] }
+      : op === 'summarize' ? { op, by: [], measures: [{ id: `count${plan().stages.length}`, label: 'Count', kind: 'count' }] }
+      : op === 'expand' && list ? { op, column: list.id, output: `element${plan().stages.length}`, perRow: 100 }
+      : op === 'overlap' && dates.length >= 2 ? { op, start: dates[0]!.id, end: dates[1]!.id, maxPairs: 5000 } : undefined
+    if (stage) change(current => ({ ...current, stages: [...current.stages, stage] }))
+  }
+  const addDeclaredRelation = (from: string, to: string, declared: NonNullable<DataSourceDescription['relations']>[number]): void => {
+    const output = declared.cardinality === 'one-to-many' ? `${to}Children` : undefined
+    change(current => ({ ...current,
+      relations: [...current.relations ?? [], { id: declared.id, from, to, kind: declared.kind, cardinality: declared.cardinality,
+        keys: declared.keys, unmatched: 'keep', maxMatches: 5000, ...(output ? { output } : {}) }],
+      columns: output && !current.columns.some(column => column.id === output)
+        ? [...current.columns, { id: output, label: declared.label, type: 'text', list: true, bind: {} }] : current.columns,
+    }))
   }
   const editFilter = (index: number, changes: { column?: string; operator?: Comparison['operator']; value?: string }): void => change(current => ({
     ...current, stages: current.stages.map((stage, at) => {
-      if (at !== index) return stage
+      if (at !== index || stage.op !== 'filter') return stage
       const old = comparison(stage.where)
       const column = changes.column ?? (old?.left.address.from === 'item' ? old.left.address.pointer.slice(1) : current.columns[0]?.id ?? '')
       const operator = changes.operator ?? old?.operator ?? 'eq'
@@ -279,15 +302,30 @@ export default function DashboardEditor(props: {
           <For each={plan().sources}>{source => <Fold label={source.label} level="sub" defaultOpen><SourceQueryEditor
             workspaceId={scope.workspaceId} value={source.reference} previewOnOpen={!!props.dashboardId}
             hideAuthoring pickSourceAccount onChange={reference => setSource(source.id, reference)} onStateChange={state => updateState(source.id, state)} />
+            <Select label="Row role" size="sm" value={source.role} options={['primary', 'lookup', 'children'].map(value => ({ value, label: value }))}
+              onChange={role => change(current => ({ ...current, sources: current.sources.map(entry => entry.id === source.id ? { ...entry, role: role as typeof source.role } : entry) }))} />
             <For each={starters()[source.id] ?? []}>{starter => <Button size="sm" variant="ghost" onPress={() => change(() => starter)}>{`Start with ${starter.title} · ${describePanelPlan(starter)[0]}`}</Button>}</For>
             <Button size="sm" variant="ghost" onPress={() => setSource(source.id, undefined)}>Remove source</Button>
           </Fold>}</For>
           <Button size="sm" disabled={plan().sources.length >= 8} onPress={addSource}>Add another source</Button>
         </Stack></Fold>
+        <Fold label="Relations" level="group"><Stack gap="row">
+          <EquivalenceForm sources={plan().sources} columns={plan().columns} onAdd={relation => change(current => ({ ...current, relations: [...current.relations ?? [], relation] }))} />
+          <For each={plan().relations ?? []}>{(relation, index) => <Card><Stack gap="row">
+            <Text>{`${relation.kind} · ${relation.from} to ${relation.to} · ${relation.cardinality}`}</Text>
+            <Select label="Unmatched rows" size="sm" value={relation.unmatched} options={[{ value: 'keep', label: 'Keep' }, { value: 'drop', label: 'Drop' }]}
+              onChange={unmatched => change(current => ({ ...current, relations: current.relations?.map((entry, at) => at === index() ? { ...entry, unmatched: unmatched as 'keep' | 'drop' } : entry) }))} />
+            <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, relations: current.relations?.filter((_entry, at) => at !== index()) }))}>Remove relation</Button>
+          </Stack></Card>}</For>
+          <For each={plan().sources}>{from => <For each={states()[from.id]?.description?.relations ?? []}>{declared => <For each={plan().sources.filter(to => to.id !== from.id && states()[to.id]?.source?.pluginId === declared.target.pluginId && states()[to.id]?.source?.sourceId === declared.target.sourceId)}>{to => <Button size="sm" disabled={(plan().relations ?? []).some(relation => relation.id === declared.id && relation.from === from.id && relation.to === to.id)} onPress={() => addDeclaredRelation(from.id, to.id, declared)}>{`Add ${declared.label}: ${from.label} to ${to.label}`}</Button>}</For>}</For>}</For>
+        </Stack></Fold>
         <Fold label="Columns" level="group" defaultOpen><Stack gap="row">
           <For each={plan().columns}>{column => <Card><Stack gap="row">
             <Field label="Column name"><Input label="Column name" assist={false} value={column.label} onInput={label => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, label } : entry) }))} /></Field>
             <Select label={`${column.label} type`} size="sm" value={column.type ?? 'text'} options={['text', 'number', 'boolean', 'datetime', 'enum', 'person', 'link'].map(value => ({ value, label: value }))} onChange={type => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, type: type as NonNullable<PanelPlan['columns'][number]['type']> } : entry) }))} />
+            <Show when={plan().relations?.some(relation => relation.kind === 'equivalence')}><Select label="Preferred source for equivalent records" size="sm" value={column.precedence?.[0] ?? ''}
+              options={[{ value: '', label: 'First available' }, ...plan().sources.filter(source => source.role === 'primary').map(source => ({ value: source.id, label: source.label }))]}
+              onChange={sourceId => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, precedence: sourceId ? [sourceId] : undefined } : entry) }))} /></Show>
             <Checkbox label="List of values" checked={!!column.list} onChange={list => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, list } : entry) }))} />
             <Show when={column.type === 'number'}><Input label="Fixed unit (currency, percent, ms, s, bytes)" assist={false} value={typeof column.unit === 'string' ? column.unit : ''} onInput={unit => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, unit: unit || undefined } : entry) }))} />
               <Select label="Or unit from column" size="sm" value={typeof column.unit === 'object' ? column.unit.column : ''} options={[{ value: '', label: 'Fixed unit' }, ...plan().columns.filter(entry => entry.id !== column.id).map(entry => ({ value: entry.id, label: entry.label }))]} onChange={unitColumn => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, unit: unitColumn ? { column: unitColumn } : undefined } : entry) }))} /></Show>
@@ -321,16 +359,23 @@ export default function DashboardEditor(props: {
           <Button size="sm" onPress={addColumn}>Add column</Button>
         </Stack></Fold>
         <Fold label="Stages" level="group" defaultOpen><Stack gap="row">
-          <For each={plan().stages}>{(stage, index) => <Fold label={`Keep matching rows · ${index() + 1}`} level="sub"><Stack gap="row">
-            <Select label="Column" size="sm" value={filterColumn(stage.where)}
+          <For each={plan().stages}>{(stage, index) => <Fold label={`${stage.op} · ${index() + 1}`} level="sub"><Stack gap="row">
+            <Show when={stage.op === 'filter' ? stage : undefined}>{filter => <>
+            <Select label="Column" size="sm" value={filterColumn(filter().where)}
               options={plan().columns.map(column => ({ value: column.id, label: column.label }))} onChange={column => editFilter(index(), { column })} />
-            <Select label="Comparison" size="sm" value={comparison(stage.where)?.operator ?? 'eq'}
+            <Select label="Comparison" size="sm" value={comparison(filter().where)?.operator ?? 'eq'}
               options={['eq', 'ne', 'lt', 'lte', 'gt', 'gte', 'contains', 'in', 'missing', 'present'].map(value => ({ value, label: value }))}
               onChange={operator => editFilter(index(), { operator: operator as Comparison['operator'] })} />
-            <Show when={!['missing', 'present'].includes(comparison(stage.where)?.operator ?? '')}><Input label="Value" assist={false} value={operand(stage.where)} onInput={value => editFilter(index(), { value })} /></Show>
+            <Show when={!['missing', 'present'].includes(comparison(filter().where)?.operator ?? '')}><Input label="Value" assist={false} value={operand(filter().where)} onInput={value => editFilter(index(), { value })} /></Show>
+            </>}</Show>
+            <Show when={stage.op !== 'filter'}><CompositionStageForm stage={stage} columns={plan().columns} onChange={next => editStage(index(), next)} /></Show>
+            <Button size="sm" variant="bare" disabled={index() === 0} onPress={() => change(current => { const stages = [...current.stages]; [stages[index() - 1], stages[index()]] = [stages[index()]!, stages[index() - 1]!]; return { ...current, stages } })}>Move up</Button>
             <Button size="sm" variant="bare" onPress={() => change(current => ({ ...current, stages: current.stages.filter((_entry, at) => at !== index()) }))}>Remove stage</Button>
           </Stack></Fold>}</For>
-          <Button size="sm" disabled={!plan().columns.length || plan().stages.length >= 12} onPress={addFilter}>Add stage · {PANEL_CAPABILITIES.operations[0].label}</Button>
+          <For each={PANEL_CAPABILITIES.operations}>{operation => <Button size="sm" disabled={!plan().columns.length || plan().stages.length >= 8
+            || operation.id === 'summarize' && plan().stages.filter(stage => stage.op === 'summarize').length >= 3
+            || operation.id === 'overlap' && (plan().stages.some(stage => stage.op === 'overlap') || outputPlanColumns(plan()).filter(column => column.type === 'datetime').length < 2)
+            || operation.id === 'expand' && !outputPlanColumns(plan()).some(column => column.list)} onPress={() => addOperation(operation.id)}>Add stage · {operation.label}</Button>}</For>
           <Show when={!plan().columns.length}><Text emphasis="muted">Add a column before filtering rows.</Text></Show>
         </Stack></Fold>
         <Fold label="When a row is pressed" level="group"><Stack gap="row">
@@ -374,16 +419,16 @@ export default function DashboardEditor(props: {
         </Stack></Fold>
         <Fold label="View and timing" level="group" defaultOpen><Stack gap="row">
           <Field label="Panel title"><Input label="Panel title" assist={false} value={plan().title} onInput={title => change(current => ({ ...current, title }))} /></Field>
-          <Select label="View" size="sm" value={plan().view.kind} options={Object.keys(PANEL_CAPABILITIES.views).map(kind => ({ value: kind, label: kind }))} onChange={kind => change(current => ({ ...current, view: { ...current.view, kind: kind as PanelPlan['view']['kind'] } }))} />
+          <Select label="View" size="sm" value={plan().view.kind} options={Object.keys(PANEL_CAPABILITIES.views).map(kind => ({ value: kind, label: kind }))} onChange={kind => change(current => { const summary = [...current.stages].reverse().find(stage => stage.op === 'summarize'); return { ...current, view: { ...current.view, kind: kind as PanelPlan['view']['kind'], ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart') ? { aggregate: 'sum' as const, field: summary.measures[0]?.id, ...(kind === 'chart' ? { x: summary.by[0]?.column } : {}) } : {}) } } })} />
           <Select label="Aggregate" size="sm" value={plan().view.aggregate ?? 'count'} options={['count', 'sum', 'avg', 'min', 'max'].map(value => ({ value, label: value }))} onChange={aggregate => change(current => ({ ...current, view: { ...current.view, aggregate: aggregate as NonNullable<PanelPlan['view']['aggregate']> } }))} />
-          <For each={(['field', 'x', 'series'] as const)}>{key => <Select label={key} size="sm" value={plan().view[key] ?? ''} options={[{ value: '', label: 'None' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={value => change(current => ({ ...current, view: { ...current.view, [key]: value || undefined } }))} />}</For>
+          <For each={(['field', 'x', 'series'] as const)}>{key => <Select label={key} size="sm" value={plan().view[key] ?? ''} options={[{ value: '', label: 'None' }, ...outputPlanColumns(plan()).map(column => ({ value: column.id, label: column.label }))]} onChange={value => change(current => ({ ...current, view: { ...current.view, [key]: value || undefined } }))} />}</For>
           <Select label="Chart shape" size="sm" value={plan().view.shape ?? 'bar'} options={['bar', 'line'].map(value => ({ value, label: value }))} onChange={shape => change(current => ({ ...current, view: { ...current.view, shape: shape as 'bar' | 'line' } }))} />
           <Select label="Trend" size="sm" value={plan().view.trend ?? ''} options={[{ value: '', label: 'None' }, { value: 'history', label: 'History' }, { value: 'activity', label: 'Activity' }]} onChange={trend => change(current => ({ ...current, view: { ...current.view, trend: trend ? trend as 'history' | 'activity' : undefined } }))} />
           <Select label="Compare" size="sm" value={plan().view.compare ?? ''} options={[{ value: '', label: 'None' }, { value: 'day', label: 'Day' }, { value: 'week', label: 'Week' }]} onChange={compare => change(current => ({ ...current, view: { ...current.view, compare: compare ? compare as 'day' | 'week' : undefined } }))} />
           <Select label="Good direction" size="sm" value={plan().view.good ?? ''} options={[{ value: '', label: 'Neutral' }, { value: 'up', label: 'Up' }, { value: 'down', label: 'Down' }]} onChange={good => change(current => ({ ...current, view: { ...current.view, good: good ? good as 'up' | 'down' : undefined } }))} />
-          <Select label="Sort column" size="sm" value={plan().sort?.[0]?.column ?? ''} options={[{ value: '', label: 'No sort' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, sort: column ? [{ column, direction: current.sort?.[0]?.direction ?? 'asc' }] : [] }))} />
+          <Select label="Sort column" size="sm" value={plan().sort?.[0]?.column ?? ''} options={[{ value: '', label: 'No sort' }, ...outputPlanColumns(plan()).map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, sort: column ? [{ column, direction: current.sort?.[0]?.direction ?? 'asc' }] : [] }))} />
           <Select label="Sort direction" size="sm" value={plan().sort?.[0]?.direction ?? 'asc'} options={[{ value: 'asc', label: 'Ascending' }, { value: 'desc', label: 'Descending' }]} onChange={direction => change(current => ({ ...current, sort: current.sort?.[0] ? [{ ...current.sort[0], direction: direction as 'asc' | 'desc' }] : [] }))} />
-          <Select label="Group column" size="sm" value={plan().group?.[0]?.column ?? ''} options={[{ value: '', label: 'No grouping' }, ...plan().columns.map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, group: column ? [{ column, bucket: 'value' }] : [] }))} />
+          <Select label="Group column" size="sm" value={plan().group?.[0]?.column ?? ''} options={[{ value: '', label: 'No grouping' }, ...outputPlanColumns(plan()).map(column => ({ value: column.id, label: column.label }))]} onChange={column => change(current => ({ ...current, group: column ? [{ column, bucket: 'value' }] : [] }))} />
           <Select label="Group bucket" size="sm" value={plan().group?.[0]?.bucket ?? 'value'} options={PANEL_CAPABILITIES.buckets.map(value => ({ value, label: value }))} onChange={bucket => change(current => ({ ...current, group: current.group?.[0] ? [{ ...current.group[0], bucket: bucket as NonNullable<PanelPlan['group']>[number]['bucket'] }] : [] }))} />
           <Input label="Limit" assist={false} value={String(plan().limit ?? '')} onInput={value => change(current => ({ ...current, limit: value ? Number(value) : undefined }))} />
           <Input label="Refresh seconds" assist={false} value={String(plan().refresh ?? '')} onInput={value => change(current => ({ ...current, refresh: value ? Number(value) : undefined }))} />
@@ -403,7 +448,7 @@ export default function DashboardEditor(props: {
         onChange={checked => setConfirmedRequirements(current => checked ? [...new Set([...current, requirement.id])] : current.filter(id => id !== requirement.id))}
       />}</For></Fold></Show>
       <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(entry => `${entry.path}: ${entry.message}`).join(' ')}</Alert></Show>
-      <For each={run()?.diagnostics.stages}>{stage => <Text emphasis="muted">{`${stage.path}: ${stage.input} → ${stage.output} rows`}</Text>}</For>
+      <For each={run()?.diagnostics.stages}>{stage => <Text emphasis="muted">{`${stage.path}: ${stage.input} → ${stage.output} rows${stage.meaning ? ` · ${stage.meaning}` : ''}`}</Text>}</For>
       <Show when={display()} fallback={<EmptyState align="start" size="sm" title="No preview yet">Choose a source to see its rows.</EmptyState>}>
         {value => <PanelBody view={plan().view} schema={value().schema} fields={value().fields} rows={value().rows} groups={displayPlanGroups(run()!.groups, value().rows)}
           {...(plan().group?.[0] ? { groupBy: plan().group![0]!.column } : {})} provenance={plan().sources.length > 1} />}

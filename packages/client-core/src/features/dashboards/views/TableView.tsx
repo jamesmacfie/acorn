@@ -30,7 +30,9 @@ export default function TableView(props: PanelViewProps) {
           {(row) => (
             <TableRow onPress={rowPress(props, row)} onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined} tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}>
               <For each={props.fields}>
-                {(field) => <TableCell><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></TableCell>}
+                {(field) => <TableCell><Show when={row.summaryStage !== undefined && props.onMeasureDrilldown && field.type === 'number'} fallback={<Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />}>
+                  <Button size="sm" variant="bare" onPress={() => props.onMeasureDrilldown?.(row, field.id)}><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></Button>
+                </Show><Show when={row.partial?.[field.id]}>{reason => <span title={reason()} aria-label={`Partial: ${reason()}`}> · partial</span>}</Show></TableCell>}
               </For>
               <Show when={props.onButton}><TableCell><RowControls panelId={props.panelId} row={row} buttons={props.buttons} onButton={props.onButton} onOpenRecord={props.onOpenRecord} /></TableCell></Show>
             </TableRow>

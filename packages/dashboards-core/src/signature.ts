@@ -1,4 +1,5 @@
 import type { PanelDefinition } from './model'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 
 // What makes a recorded series still true. See docs/dashboards/sampling.md § Sampling and retention for what
 // goes into the signature and why the rest is left out.
@@ -39,7 +40,7 @@ export type MeasureQueryIdentity = {
 
 /** Without `queries` this is the signature series were written under before query identity counted,
  *  which the sampler uses once to adopt them rather than reset them. */
-export function measureSignature(panel: PanelDefinition, queries?: readonly MeasureQueryIdentity[]): string {
+export function measureSignature(panel: PanelDefinition, queries?: readonly MeasureQueryIdentity[], plan?: PanelPlan): string {
   return fnv1a(stableStringify({
     sources: (panel.sources ?? []).map((source) => ({ pluginId: source.pluginId, sourceId: source.sourceId })),
     mapping: panel.mapping ?? {},
@@ -47,5 +48,7 @@ export function measureSignature(panel: PanelDefinition, queries?: readonly Meas
     aggregate: panel.view.aggregate ?? 'count',
     field: panel.view.field ?? '',
     ...(queries ? { queries } : {}),
+    ...(plan ? { plan: { time: plan.time, sources: plan.sources.map(source => ({ id: source.id, role: source.role })),
+      relations: plan.relations, columns: plan.columns, stages: plan.stages, sort: plan.sort, group: plan.group, limit: plan.limit } } : {}),
   }))
 }

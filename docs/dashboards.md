@@ -9,7 +9,8 @@ record cache.
 ## Published panels
 
 The dashboard editor builds a version 2 `PanelPlan` from saved or inline typed queries. Its columns
-bind source fields into panel-owned values. Filter stages, sorting, grouping, limits, view options,
+bind source fields into panel-owned values. Filter, compute, summarize, expand, and overlap stages,
+sorting, grouping, limits, view options,
 and a time policy operate on those values. The Node stores drafts and immutable published revisions.
 A placed `PanelDefinition` carries the publication ID and derived indexing metadata (`sources`,
 `fieldRoles`, and the view).
@@ -21,6 +22,24 @@ There is one execution path:
 3. Ask the Node data-source runtime to describe each source and validate column bindings.
 4. Plan and share authorized reads, query each source, and run the plan on the Node.
 5. Render the declared list, table, board, stat, or chart view.
+
+Primary sources contribute rows. A declared lookup attaches fields, and a declared children relation
+attaches a bounded list. Only equivalence merges two primary records into one row; the merged row
+retains both references and uses each column's declared source precedence. Relation keys match exact
+typed values and must include provider, account, and identity scope, plus a container when the source
+requires one. A missing lookup keeps its primary row unless the plan explicitly drops it. Cardinality
+violations warn with the relation and key and never multiply rows.
+
+A plan has at most eight ordered stages, three summaries, and one overlap. Summaries group by up to
+three columns and can calculate filtered counts, sums, averages, extrema, median, percentiles,
+distinct counts or lists, and earliest or latest values. Measures can be shares of their total;
+time buckets can fill gaps and show previous-bucket changes; an enum can pivot a measure. A compute
+stage uses a closed, typed expression set. Expand and overlap carry row and pair limits. Stage
+diagnostics report both row counts and what one row means after each step. An incomplete source or
+unknown measure input marks the affected measure partial, with a reason; mixed per-row units fail
+the measure rather than making an invented total. The history sampler skips a run with partial
+measures or a failed relation. Summary cells retain the exact contributing rows
+for read-only drill-down at the original evaluation instant.
 
 Missing plugins, connections, publications, or fields are unavailable states. They are never
 silently replaced with an empty result or a guessed schema. Source identity is

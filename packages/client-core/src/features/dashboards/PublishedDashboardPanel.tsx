@@ -145,9 +145,27 @@ export default function PublishedDashboardPanel(props: {
     const current = run()
     if (!current) return
     const ids = new Set(group.rows.map(row => row.id))
-    const sourceRows = current.rows.filter(row => ids.has(row.id))
-    const plan = deriveDrilldownPlan(current.plan, sourceRows)
+    const selected = current.rows.filter(row => ids.has(row.id))
+    const sourceRows = selected.flatMap(row => row.representedRows ?? [row])
+    const stageIndex = selected.length && selected.every(row => row.summaryStage === selected[0]?.summaryStage) ? selected[0]?.summaryStage : undefined
+    const plan = deriveDrilldownPlan(current.plan, sourceRows, { stageIndex })
     const snapshot = { ...current, plan, rows: sourceRows, groups: [] }
+    setDrill({ plan, snapshot, loading: true })
+    void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
+      .then(result => setDrill({ plan, snapshot, result, loading: false }))
+      .catch(() => setDrill({ plan, snapshot, loading: false, error: 'Could not prepare this as a panel.' }))
+  }
+  const openMeasureDrilldown = (row: DashboardDisplayRow, measure: string): void => {
+    const current = run()
+    const source = current?.rows.find(item => item.id === row.id)
+    if (!current || !source?.measureRows?.[measure] || source.summaryStage === undefined) return
+    const stage = current.plan.stages[source.summaryStage]
+    if (stage?.op !== 'summarize') return
+    const rows = source.measureRows[measure]
+    const filter = stage.measures.find(item => item.id === measure)?.where
+    const keys = Object.fromEntries(stage.by.filter(by => !by.bucket || by.bucket === 'value').map(by => [by.column, source.values[by.column] ?? null]))
+    const plan = deriveDrilldownPlan(current.plan, rows, { stageIndex: source.summaryStage, measureFilter: filter, summaryKeys: keys })
+    const snapshot = { ...current, plan, rows, groups: [] }
     setDrill({ plan, snapshot, loading: true })
     void client.run({ kind: 'draft', content: plan }, 'execution', zone, undefined, current.diagnostics.evaluationTime)
       .then(result => setDrill({ plan, snapshot, result, loading: false }))
@@ -189,6 +207,7 @@ export default function PublishedDashboardPanel(props: {
       <Show when={!loaded.error || loaded.data} fallback={<EmptyState align="start" size="sm" title="Couldn't load this panel" action={<Button size="sm" onPress={() => void loaded.refetch()}>Try again</Button>}>Edit the panel to repair its source or column.</EmptyState>}>
         <Show when={loaded.error && loaded.data}><Alert tone="warn">Couldn't refresh. Showing the last data we got.</Alert></Show>
         <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(problem => `${problem.path}: ${problem.message}`).join(' ')}</Alert></Show>
+        <Show when={run()?.rows.some(row => row.partial && Object.keys(row.partial).length)}><Alert tone="warn">{[...new Set(run()!.rows.flatMap(row => Object.values(row.partial ?? {})))].join(' ')} Measures marked partial may leave out unknown values.</Alert></Show>
         <Show when={outcome()}>{message => <Alert tone="muted">{message()}</Alert>}</Show>
         <Show when={taskRow()}>{row => <Alert tone="muted" actions={<>
           <Select label="Project" size="sm" value={taskProject()} options={allProjects().map(project => ({ value: project.id, label: project.name }))} onChange={setTaskProject} />
@@ -203,7 +222,7 @@ export default function PublishedDashboardPanel(props: {
           {value => <PanelBody view={run()!.plan.view} panelId={props.definition.id} schema={value().schema} fields={value().fields} rows={value().rows}
             groups={displayPlanGroups(run()!.groups, value().rows)}
             {...(run()!.plan.group?.[0] ? { groupBy: run()!.plan.group![0]!.column } : {})}
-            provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} buttons={run()!.plan.actions?.buttons ?? []} />}
+            provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} onMeasureDrilldown={openMeasureDrilldown} buttons={run()!.plan.actions?.buttons ?? []} />}
         </Show>
       </Show>
     </div>

@@ -1,5 +1,5 @@
 import type { DashboardDisplayField, DashboardDisplayRow, DashboardDisplaySchema } from './display'
-import { dayBucket } from './chart'
+import { dayBucket } from './planBuckets'
 import type { PanelView } from './model'
 import { aggregateRows } from './shaping'
 

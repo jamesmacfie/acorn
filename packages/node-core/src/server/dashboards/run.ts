@@ -2,7 +2,7 @@ import { createHash } from 'node:crypto'
 import { canonicalDataEncoding, DATA_LIMITS, MISSING, parseDataValue, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { DashboardContent, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
-import { bindPanelRows, describePanelPlan, groupPlanRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type DashboardRun, type PlanProblem, type PlanSource } from '@acorn/dashboards-core/plan.ts'
+import { bindPanelRows, describePanelPlan, groupPlanRows, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type DashboardRun, type PlanProblem, type PlanSource } from '@acorn/dashboards-core/plan.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInvocation } from '../dataSources/authority'
 import { invokeDataSource } from '../dataSources/runtime'
@@ -29,8 +29,10 @@ function fieldCanBeUnknown(source: PlanSource, pointer: string): boolean {
 }
 
 function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSource): DataSourceQuery {
+  if (plan.sources.find(entry => entry.id === source.instanceId)?.role !== 'primary') return query
   let next = query
   for (const stage of plan.stages) {
+    if (stage.op !== 'filter') break
     const where = stage.where
     if (where.kind !== 'comparison' || where.left.address.from !== 'item'
       || (where.right && where.right.address.from !== 'literal')) continue
@@ -143,7 +145,10 @@ export async function runDashboard(env: Env, args: {
     const column = plan.columns[index]
     if (column) row.values[column.id] = null
   }
-  const staged = runPlanStages(plan, initial)
+  const related = relatePanelRows(plan, sources, initial)
+  problems.push(...related.problems)
+  const staged = runPlanStages(plan, related.rows, evaluationTime, sourceDiagnostics.some(source => source.completeness?.kind === 'incomplete'))
+  problems.push(...staged.problems)
   if (staged.counts.some(count => count.input > MAX_STAGE_ROWS || count.output > MAX_STAGE_ROWS)) problems.push({ path: '/stages', message: 'Intermediate row budget exceeded.', severity: 'error' })
   const rows = sortPlanRows(plan, staged.rows).slice(0, plan.limit ?? 5000)
   if (new TextEncoder().encode(JSON.stringify(rows)).byteLength > MAX_OUTPUT_BYTES) problems.push({ path: '/rows', message: 'Output byte budget exceeded.', severity: 'error' })
@@ -156,7 +161,9 @@ export async function runDashboard(env: Env, args: {
       problems, sources: sourceDiagnostics, stages: staged.counts, evaluationTime,
       plugins: [...new Set(sources.map(source => source.query.source.pluginId))],
       accounts: [...new Set(sources.flatMap(source => source.query.scope.connectionId ? [source.query.scope.connectionId] : []))],
-      complete: !problems.some(problem => problem.severity === 'error') && sources.every(source => source.result?.completeness.kind === 'complete' || source.result?.completeness.kind === 'bounded'),
+      complete: !problems.some(problem => problem.severity === 'error') && !related.problems.length
+        && !rows.some(row => row.partial && Object.keys(row.partial).length)
+        && sources.every(source => source.result?.completeness.kind === 'complete' || source.result?.completeness.kind === 'bounded'),
     },
   }
 }
