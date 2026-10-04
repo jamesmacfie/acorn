@@ -1,15 +1,17 @@
 import { batch, createEffect, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import {
-  Alert, Badge, Button, Checkbox, ConfirmButton, DetailColumn, EmptyState, Field, formatChord, Grid, Heading,
-  IconButton, Input, ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Textarea, Toolbar, ToolbarSpacer,
+  Alert, Badge, Button, DetailColumn, EmptyState, formatChord, Grid, Heading,
+  IconButton, Input, ListColumn, ListDetail, Picker, Row, SectionHeader, Stack, Text, Toolbar, ToolbarSpacer,
 } from '@acorn/plugin-api/ui/tree'
 import type { AcornBridge } from '@acorn/plugin-api/ui/sdk'
-import type { DbCell, DbColumn, DbResultSet, DbSavedQuery, DbTable } from '../shared/database'
+import type { DbCell, DbSavedQuery, DbTable } from '../shared/database'
 import { SCRATCH_SELECT_ID } from '../shared/database'
 import { createDatabaseClient } from './databaseClient'
 import { quoteIdentifier, savedQueryLabel } from './databaseModel'
 import GenerateSqlModal from './GenerateSqlModal'
 import SaveQueryModal from './SaveQueryModal'
+import RowDetail from './RowDetail'
+import { createDatabaseWorkspace, databaseWorkspace, loadDatabaseWorkspace, rememberDatabaseWorkspace, saveDatabaseWorkspace } from './databaseWorkspaceStore'
 
 // The Database pane's plugin half: a searchable table list, the button bar, a virtualized results grid,
 // and a row-detail panel that doubles as the edit/insert/delete surface.
@@ -23,58 +25,55 @@ import SaveQueryModal from './SaveQueryModal'
 // has no keyboard. The host resolves it against the manifest's surface-scoped keybinding, flushes the
 // document, and posts `execute` here, handled below exactly as the Run button's click is.
 //
-// The results grid is the kit's `Grid` now, not a virtualizer this plugin shipped. It was the same
-// component twice — a sticky header, a fixed row height read from the density token, an overscan of
-// sixteen — and one of the two had to go.
-
-type Selected = { schema: string; name: string } | null
+// The shared Grid owns virtualization and row geometry.
 
 const count = (n: number): string => new Intl.NumberFormat().format(n)
 
 export default function DatabasePanel(props: { bridge: AcornBridge; taskId: string }) {
   const client = createDatabaseClient(props.bridge.api)
   const { connectDb, deleteRow, deleteSavedQuery, disconnectDb, insertRow, listColumns, listModelBackends, listRows, listSavedQueries, listTables, readScratch, runQuery, updateCell } = client
+  const nodeId = props.bridge.context.nodeId
+  const restored = databaseWorkspace(nodeId, props.taskId)
   const [status, setStatus] = createSignal<'connecting' | 'connected' | 'error'>('connecting')
-  const [dbName, setDbName] = createSignal('')
+  const workspaceModel = createDatabaseWorkspace(restored)
+  const {
+    dbName, setDbName, tables, setTables, filter, setFilter, selected, setSelected, columns, setColumns,
+    result, setResult, resultTable, setResultTable, footer, setFooter, activeRow, setActiveRow,
+    inserting, setInserting, rowDraft, setRowDraft, loadedName, setLoadedName,
+  } = workspaceModel
   const [error, setError] = createSignal('')
-  const [tables, setTables] = createSignal<DbTable[]>([])
-  const [filter, setFilter] = createSignal('')
-  const [selected, setSelected] = createSignal<Selected>(null)
-  const [columns, setColumns] = createSignal<DbColumn[]>([]) // of the selected table (drives editing/PK)
-  const [result, setResult] = createSignal<DbResultSet | null>(null)
-  const [resultTable, setResultTable] = createSignal<Selected>(null) // table the grid rows belong to (null = ad-hoc SQL)
-  const [footer, setFooter] = createSignal('')
-  const [activeRow, setActiveRow] = createSignal<number | null>(null)
-  const [inserting, setInserting] = createSignal(false)
   const [busy, setBusy] = createSignal(false)
   const [generating, setGenerating] = createSignal<{ expectedText: string; generation: number }>()
   const [saving, setSaving] = createSignal<string | null>(null) // the SQL being saved (null = modal closed)
 
+  const [restoredState, setRestoredState] = createSignal(!!restored)
+  let userChanged = false
   let disposed = false
   let selectionGeneration = 0
   onCleanup(() => { disposed = true; selectionGeneration++ })
 
-  const fail = (e: unknown) => setError(e instanceof Error ? e.message : String(e))
+  const fail = (e: unknown) => { if (!disposed) setError(e instanceof Error ? e.message : String(e)) }
 
   // AI SQL generation is offered only when there is something to spend: a connected model-provider
   // key, or an agent CLI installed on this machine. Read from this plugin's own route, because a frame
   // cannot see core's integrations. See databaseClient.ts.
   const [modelBackends] = createResource(
     () => props.taskId,
-    (taskId) => listModelBackends(taskId).catch(() => []),
+    (taskId) => listModelBackends(taskId).catch(() => restored?.modelBackends ?? []),
+    { initialValue: restored?.modelBackends ?? [] },
   )
   const backends = () => modelBackends() ?? []
 
   // Saved queries are project-scoped, so they outlive this task, and the route resolves the project
   // from the task id. Failures land in the pane's error line rather than rejecting: a resource in an
   // error state re-throws on read, taking the whole panel down over a missing list of snippets.
-  const [saved, { refetch: refetchSaved }] = createResource(
+  const [saved, { refetch: refetchSaved, mutate: restoreSaved }] = createResource(
     () => props.taskId,
-    (taskId) => listSavedQueries(taskId).catch((e: unknown) => (fail(e), [] as DbSavedQuery[])),
+    (taskId) => listSavedQueries(taskId).catch((e: unknown) => (fail(e), restored?.savedQueries ?? [])),
+    { initialValue: restored?.savedQueries ?? [] },
   )
   const savedList = (): DbSavedQuery[] => saved() ?? []
   // The name a Save would default to: whatever was last loaded, so load → tweak → Save updates in place.
-  const [loadedName, setLoadedName] = createSignal('')
   const deleteSaved = async (q: DbSavedQuery) => {
     try {
       await deleteSavedQuery(props.taskId, q.id)
@@ -101,20 +100,26 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     setStatus('connecting')
     setError('')
     const res = await connectDb(props.taskId).catch((e: unknown) => ({ ok: false as const, error: e instanceof Error ? e.message : String(e) }))
+    if (disposed) return
     if (!res.ok) return setStatus('error'), setError(res.error)
+    if (dbName() && dbName() !== res.database) {
+      batch(() => { setSelected(null); setColumns([]); setResult(null); setResultTable(null); setActiveRow(null); setRowDraft(null); setInserting(false); setFooter('') })
+    }
     setDbName(res.database)
     setStatus('connected')
-    void loadTables()
+    await loadTables()
   }
 
   async function loadTables() {
-    const res = await listTables(props.taskId)
+    const res = await listTables(props.taskId).catch((cause: unknown) => ({ error: cause instanceof Error ? cause.message : String(cause) }))
+    if (disposed) return
     if ('error' in res) return setError(res.error)
     setTables(res.tables)
   }
 
   async function openTable(t: DbTable) {
-    if (busy()) return
+    if (busy() || disposed || status() !== 'connected') return
+    userChanged = true
     const generation = ++selectionGeneration
     setBusy(true)
     try {
@@ -124,6 +129,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       batch(() => {
         setSelected(t)
         setActiveRow(null)
+        setRowDraft(null)
+        setInserting(false)
       })
       const cols = await listColumns(props.taskId, t.schema, t.name)
       if (disposed || generation !== selectionGeneration) return
@@ -148,7 +155,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   }
 
   async function execute() {
-    if (busy()) return
+    if (busy() || disposed || status() !== 'connected') return
+    userChanged = true
     setBusy(true)
     try {
       await props.bridge.document.flush()
@@ -156,6 +164,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       const sql = (await props.bridge.document.read()).trim()
       if (disposed || !sql) return
       const res = await runQuery(props.taskId, sql)
+      if (disposed) return
       if ('error' in res) {
         batch(() => { setError(res.error); setFooter('') })
         return
@@ -168,6 +177,8 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
         setSelected(null)
         setColumns([])
         setActiveRow(null)
+        setRowDraft(null)
+        setInserting(false)
         setError('')
         setFooter(`${res.command || 'OK'} · ${res.rows.length ? `${count(res.rows.length)} rows` : `${count(res.rowCount ?? 0)} affected`} · ${res.ms}ms`)
       })
@@ -181,7 +192,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   // After a write, re-open the current table to reflect it.
   async function reloadTable() {
     const t = resultTable()
-    if (t) await openTable(t)
+    if (t && !disposed) {
+      setBusy(false)
+      await openTable(t)
+    }
   }
 
   const primaryKey = (): Record<string, DbCell> => {
@@ -200,6 +214,25 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
   // the pane opens and the row and the list are two round trips racing each other.
   const [requested, setRequested] = createSignal<string | undefined>()
 
+  const snapshot = () => workspaceModel.snapshot(savedList(), backends())
+  const restore = async () => {
+    try {
+      const workspace = await loadDatabaseWorkspace(props.bridge.state, props.taskId)
+      if (disposed || userChanged || !workspace) return
+      batch(() => {
+        workspaceModel.restore(workspace)
+        if (!savedList().length) restoreSaved(workspace.savedQueries)
+      })
+    } catch (cause) { fail(cause) }
+    finally { if (!disposed) setRestoredState(true) }
+  }
+  createEffect(() => {
+    if (!restoredState()) return
+    const workspace = snapshot()
+    rememberDatabaseWorkspace(nodeId, props.taskId, workspace)
+    void saveDatabaseWorkspace(props.bridge.state, props.taskId, workspace).catch(fail)
+  })
+
   onMount(() => {
     // The host's half of a composed pane resolved a surface-scoped chord and sent it across. There is
     // one command today; the switch is here rather than an `if` because a second one is a manifest row
@@ -211,14 +244,19 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
     // (docs/plugins/tree-contract.md § The tree contract). Both land in the same signal.
     setRequested(props.bridge.context.item)
     onCleanup(props.bridge.onSelect((item) => { selectionGeneration++; setRequested(item) }))
-    void connect()
+    void (async () => { if (!restored) await restore(); if (!disposed) await connect() })()
   })
-  onCleanup(() => void disconnectDb(props.taskId).catch(() => {}))
+  onCleanup(() => {
+    // Keep data, never the retired bridge or an in-flight operation. The editor owns SQL custody.
+    if (restoredState()) rememberDatabaseWorkspace(nodeId, props.taskId, snapshot())
+    void disconnectDb(props.taskId).catch(() => {})
+  })
 
   // Loading a saved query is the picker's whole job, and it writes into the host's editor. Kept as an
   // effect-free handler rather than a signal→document sync, because the document is not this frame's
   // state. It is a thing on the other side of the port that the reader may also be typing into.
   const loadSaved = (q: DbSavedQuery) => {
+    userChanged = true
     const write = writeSql(q.sql)
     const generation = selectionGeneration
     void write.then(() => { if (!disposed && generation === selectionGeneration) setLoadedName(q.name) }).catch(fail)
@@ -310,10 +348,10 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
       <ListDetail split listLabel="Tables">
         <ListColumn label="Tables">
           <SectionHeader count={connected() ? tables().length : undefined}>Tables</SectionHeader>
-          {/* With no connection there is nothing to list, and the detail column says why. */}
-          <Show when={connected()}>
+          {/* Last-known tables remain visible while the connection check runs. */}
+          <Show when={connected() || tables().length > 0}>
             <Toolbar size="sm" ariaLabel="Filter tables">
-              <Input kind="filter" label="Filter tables" placeholder="Filter tables…" value={filter()} onChange={(value: string) => setFilter(value)} />
+              <Input kind="filter" label="Filter tables" placeholder="Filter tables…" value={filter()} onChange={(value: string) => { userChanged = true; setFilter(value) }} />
             </Toolbar>
             <For each={filtered()} fallback={<EmptyState align="start" size="sm">No tables</EmptyState>}>
               {(t) => (
@@ -341,11 +379,11 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               <Text tone="muted">{footer()}</Text>
               <ToolbarSpacer />
               <Show when={resultTable() && columns().some((c) => c.isPk)}>
-                <Button size="sm" variant="ghost" disabled={busy()} onPress={() => setInserting(true)}>Add row</Button>
+                <Button size="sm" variant="ghost" disabled={busy()} onPress={() => batch(() => { setRowDraft(null); setInserting(true) })}>Add row</Button>
               </Show>
             </Toolbar>
           </Show>
-          <Show when={result()} fallback={<Show when={!error()}><EmptyState title="Choose a table, or run a query" /></Show>}>
+          <Show when={activeRow() === null && !inserting() ? result() : null} fallback={<Show when={!error() && !result()}><EmptyState title="Choose a table, or run a query" /></Show>}>
             {(r) => (
               <Grid
                 ariaLabel="Query results"
@@ -355,7 +393,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                 // of this node says anyway.
                 rows={r().rows.map((row) => row.map((cell) => cell ?? 'NULL'))}
                 selected={activeRow()}
-                onSelect={(i: number) => batch(() => { setInserting(false); setActiveRow(i) })}
+                onSelect={(i: number) => batch(() => { setInserting(false); setRowDraft(null); setActiveRow(i) })}
               />
             )}
           </Show>
@@ -367,7 +405,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               row={[]}
               table={resultTable()}
               meta={columns()}
-              busy={busy()}
+              busy={busy() || !connected()}
+              initialDraft={rowDraft()}
+              onDraft={setRowDraft}
               onClose={() => setInserting(false)}
               onInsert={async (values) => {
                 const t = resultTable()
@@ -375,6 +415,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                 setBusy(true)
                 try {
                   const res = await insertRow(props.taskId, t.schema, t.name, values)
+                  if (disposed) return
                   if (!res.ok) { setError(res.error); return }
                   batch(() => { setInserting(false); setError('') })
                   await reloadTable()
@@ -393,7 +434,9 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
               row={result()!.rows[activeRow()!]}
               table={resultTable()}
               meta={columns()}
-              busy={busy()}
+              busy={busy() || !connected()}
+              initialDraft={rowDraft()}
+              onDraft={setRowDraft}
               onClose={() => setActiveRow(null)}
               onSave={async (edits) => {
                 const t = resultTable()
@@ -403,6 +446,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                 try {
                   for (const [col, val] of edits) {
                     const res = await updateCell(props.taskId, t.schema, t.name, col, val, pk)
+                    if (disposed) return
                     if (!res.ok) { setError(res.error); return }
                   }
                   setError('')
@@ -420,6 +464,7 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
                 setBusy(true)
                 try {
                   const res = await deleteRow(props.taskId, t.schema, t.name, pk)
+                  if (disposed) return
                   if (!res.ok) { setError(res.error); return }
                   setActiveRow(null)
                   setError('')
@@ -461,116 +506,6 @@ export default function DatabasePanel(props: { bridge: AcornBridge; taskId: stri
           </Show>
         </DetailColumn>
       </ListDetail>
-    </Stack>
-  )
-}
-
-// Row viewer + editor: column→value fields; editable when the rows belong to a single table with a
-// primary key (ad-hoc SQL results are read-only). Save commits changed columns; Delete removes by PK. In
-// `insert` mode the fields start blank and Save inserts a new row.
-function RowDetail(props: {
-  insert?: boolean
-  columns: string[]
-  row: DbCell[]
-  table: Selected
-  meta: DbColumn[]
-  busy: boolean
-  onClose: () => void
-  onSave?: (edits: [string, DbCell][]) => void | Promise<void>
-  onDelete?: () => void | Promise<void>
-  onInsert?: (values: Record<string, DbCell>) => void | Promise<void>
-}) {
-  const metaByName = new Map(props.meta.map((c) => [c.name, c]))
-  const editable = () => !!props.table && props.meta.some((c) => c.isPk)
-  // Draft state per column: value + explicit-null flag. Edit mode seeds from the row; insert mode
-  // starts every column null (so untouched columns take their DB default / are omitted).
-  const [draft, setDraft] = createSignal<Record<string, { value: string; isNull: boolean }>>(
-    Object.fromEntries(props.columns.map((c, i) => [c, props.insert ? { value: '', isNull: true } : { value: props.row[i] ?? '', isNull: props.row[i] === null }])),
-  )
-  // Reseed when the reader clicks a different row: the component is reused rather than remounted, so
-  // without this the draft would still hold the previous row's values.
-  createEffect(() => {
-    const columns = props.columns
-    const row = props.row
-    setDraft(Object.fromEntries(columns.map((c, i) => [c, props.insert ? { value: '', isNull: true } : { value: row[i] ?? '', isNull: row[i] === null }])))
-  })
-  const set = (col: string, patch: Partial<{ value: string; isNull: boolean }>) =>
-    setDraft((d) => ({ ...d, [col]: { ...d[col], ...patch } }))
-
-  const save = () => {
-    const d = draft()
-    if (props.insert) {
-      // Only send columns the user actually set (non-null); everything else takes its DB default.
-      const values: Record<string, DbCell> = {}
-      for (const c of props.columns) if (!d[c].isNull) values[c] = d[c].value
-      void props.onInsert?.(values)
-      return
-    }
-    const edits: [string, DbCell][] = []
-    props.columns.forEach((c, i) => {
-      const cur: DbCell = d[c].isNull ? null : d[c].value
-      const orig = props.row[i]
-      if (cur !== orig) edits.push([c, cur])
-    })
-    if (edits.length) void props.onSave?.(edits)
-  }
-
-  return (
-    <Stack gap="row">
-      <Toolbar variant="bar" size="sm">
-        <Heading level={3}>
-          {props.insert ? `New row in ${props.table?.name ?? ''}` : props.table ? `Row in ${props.table.name}` : 'Row'}
-        </Heading>
-        <ToolbarSpacer />
-        <IconButton size="sm" icon="x" label="Close" onPress={props.onClose} />
-      </Toolbar>
-      <For each={props.columns}>
-        {(col) => {
-          const m = metaByName.get(col)
-          return (
-            <Stack gap="none">
-              {/* The column's own name as the label, in its own case: `created_at`, not CREATED_AT.
-                  The field names the textarea; the null box is a second control beside it. */}
-              <Field label={col} hint={[m?.dataType, m?.isPk ? 'Primary key' : ''].filter(Boolean).join(' · ')}>
-                <Textarea
-                  rows={1}
-                  assist={false}
-                  disabled={!editable() || draft()[col]?.isNull}
-                  value={draft()[col]?.isNull ? '' : draft()[col]?.value ?? ''}
-                  placeholder={draft()[col]?.isNull ? 'NULL' : ''}
-                  onChange={(value: string) => set(col, { value })}
-                />
-              </Field>
-              {/* Insert mode always offers the null toggle (columns start null so untouched ones take
-                  their DB default); edit mode only for nullable columns. */}
-              <Show when={editable() && (props.insert || (m?.nullable ?? true))}>
-                <Checkbox label="Set to NULL" checked={draft()[col]?.isNull} onChange={(checked: boolean) => set(col, { isNull: checked })} />
-              </Show>
-            </Stack>
-          )
-        }}
-      </For>
-      <Toolbar variant="actions" size="sm">
-        <Show
-          when={editable()}
-          fallback={
-            <Text tone="muted">
-              {props.table ? "This table has no primary key, so its rows can't be edited here." : 'To edit a row, open its table from the list.'}
-            </Text>
-          }
-        >
-          <Button size="sm" variant="solid" disabled={props.busy} onPress={save}>Save</Button>
-          <Show when={!props.insert}>
-            {/* RowDetail stays mounted when selection changes. Remount the armed control with its
-                row so a second press cannot delete a different row. */}
-            <Show when={props.row} keyed>
-              <ConfirmButton size="sm" tone="danger" disabled={props.busy} confirmLabel="Delete row?" onConfirm={() => void props.onDelete?.()}>
-                Delete
-              </ConfirmButton>
-            </Show>
-          </Show>
-        </Show>
-      </Toolbar>
     </Stack>
   )
 }
