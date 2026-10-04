@@ -79,7 +79,7 @@ export const normalizeGithubPart = (value: string): string => value.trim().toLow
 // (GitHub owners and repos are case-insensitive). The host is anchored so a URL such as
 // https://example.com/github.com/acme/web cannot become a GitHub facet.
 export function parseGithubRemote(url: string): { owner: string; name: string } | null {
-  const match = /^(?:(?:https?|ssh):\/\/(?:[^@/\s]+@)?github\.com\/|git@github\.com:)([^/\s?#]+)\/([^/\s?#]+?)(?:\.git)?$/i.exec(url.trim())
+  const match = /^(?:(?:https?|ssh):\/\/(?:[^@/\s]+@)?github\.com\/|git@github\.com:\/?)([^/\s?#]+)\/([^/\s?#]+?)(?:\.git)?$/i.exec(url.trim())
   return match ? { owner: match[1]!, name: match[2]! } : null
 }
 
