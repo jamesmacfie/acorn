@@ -8,32 +8,36 @@ import flow, and the card an agent's memory write draws in the transcript. The s
 
 The project rail's **Memory** page is a list beside a detail, drawn the way GitHub and Workflows
 are: the source hands over `regions`, so the desktop draws one split and the terminal puts the list
-in its Browse panel. The list has a **This project** tab and an **All projects** tab for private
-memory, each newest update first. Its filter calls the same Node scan as `memory_search`, matching
+in its Browse panel. The page shows only memories for the selected project, newest update first.
+Private memories are shared across projects and stay outside this page. Without a selected project,
+the page asks you to select one. Its filter calls the same Node scan as `memory_search`, matching
 every term across names, descriptions, and bodies, with up to 10 results. Select a memory to read its
 body, type, scope, timestamp, and last author in the detail column. Agent changes link to their
 originating session. With nothing selected, the detail column shows the overview: **Recent changes**,
-**What agents see**, and **Import memory**. Close the reader to return to it.
+**Project context**, and **Import memory**. Close the reader to return to it.
+
+Switching projects retires the previous list, reader, and drafts. A selection keeps its project ID, so it cannot open a same-named memory in another project.
 
 **New** in the list header opens a form in the detail column. It accepts a name, description, type,
-scope, and body, and opens the saved memory. **Edit** uses the hash captured when
+and body, saves in project scope, and opens the saved memory. **Edit** uses the hash captured when
 the draft opens. A conflicting write preserves the draft and displays the current body with
-**Reload current version**. Changing a name or scope creates the destination and deletes the source
+**Reload current version**. Changing a name creates the destination and deletes the source
 under the store lock. A destination name collision refuses the move. Each address retains its own
 history and change entry. **Delete** and **Restore** each ask for a second press. **Delete** retains
 the previous content; a deleted memory stays reachable
 from the feed. **History** lists up to 20 retained versions with timestamps and authors; **Restore**
 checks the current hash before replacing the memory.
 
-**Recent changes** shows the 50 most recent mutations across this project and private scope. Each
+**Recent changes** shows the 50 most recent mutations in the selected project. Each
 entry identifies the action, name, author, and time. An agent entry links to its session, or to its
 task when no session is recorded.
 **Undo** appears when the entry is the last mutation at that address, its hash matches the file, and
-its prior version is available. The page refreshes its library, reader, feed, history, and context
-preview on `plugin:memory:memories-changed`.
+its prior version is available. The page refreshes its library, reader, feed, history,
+and project context preview on `plugin:memory:memories-changed`.
 
-**What agents see** uses the same builder as session admission. It displays the contract and capped
-indexes, each index's full and displayed character counts, and editable caps. Saving caps writes
+**Project context** uses the same builder as session admission with project scope selected. It displays
+the contract, the capped project index, its full and displayed character counts, and its editable cap.
+Agents also receive their shared private index. Saving the project cap writes
 `memory:index-caps:v1` for the active owner. Sessions created after the save receive the changed
 snapshot; stored session snapshots keep their original text.
 
@@ -57,6 +61,6 @@ kills the PTY. Compiled plugins have no CLI command registration seam, so memory
 through the desktop and TUI.
 
 The memory plugin renders `memory_write` and `memory_delete` through `agents:tool-card`. Successful
-calls show the scope, name, description, **Open**, and **Undo**. Undo calls
+calls show the scope, name, description, and **Undo**. Project memories also offer **Open**. Undo calls
 `POST /v1/p/memory/memory/changes/:id/undo`, which requires a paired device. Manual additions also
 require a device and use the same validation, history, and change log as agent writes.

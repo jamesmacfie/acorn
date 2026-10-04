@@ -11,7 +11,6 @@ export const MEMORY_TYPE_LABEL: Record<MemoryType, string> = {
 }
 export const MEMORY_TYPE_OPTIONS = (['user', 'feedback', 'project', 'reference'] as MemoryType[]).map((value) => ({ value, label: MEMORY_TYPE_LABEL[value] }))
 export const MEMORY_SCOPE_LABEL: Record<'project' | 'private', string> = { project: 'This project', private: 'All projects' }
-export const MEMORY_SCOPE_OPTIONS = (['project', 'private'] as const).map((value) => ({ value, label: MEMORY_SCOPE_LABEL[value] }))
 // Documents and versions carry the type as a plain string, and an older file may hold any word.
 export const memoryTypeLabel = (type: string): string => MEMORY_TYPE_LABEL[type as MemoryType] ?? type
 export const MEMORY_ACTION_LABEL: Record<MemoryChange['action'], string> = { write: 'Saved', delete: 'Deleted', restore: 'Restored' }
@@ -50,14 +49,14 @@ const api: MemoryApi = {
   edit: (address, input, scope, projectId) => page('edit', projectId, { address, input, scope }),
   delete: (address, hash, projectId) => page('delete', projectId, { address, hash }),
   restore: (address, version, hash, projectId) => page('restore', projectId, { address, version, hash }),
-  changes: (projectId) => page('changes', projectId),
-  preview: (projectId) => page('preview', projectId),
+  changes: (projectId) => page('changes', projectId, { scope: 'project' }),
+  preview: (projectId) => page('preview', projectId, { scope: 'project' }),
   caps: (caps, projectId) => page('caps', projectId, { caps }),
   sources: (projectId) => page('sources', projectId),
   importPreview: (projectId, sourceId) => page('import-preview', projectId, { sourceId }),
   import: (projectId, sourceId, files) => page('import', projectId, { sourceId, files }),
-  list: (projectId) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(projectId)),
-  search: (query, projectId, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, projectId, type)),
+  list: (projectId) => readJson<MemoryRow[] | { error: string }>(memoryListRoute(projectId, 'project')),
+  search: (query, projectId, type) => readJson<(MemoryRow & { rank: number })[] | { error: string }>(memorySearchRoute(query, projectId, type, 'project')),
   add: (p) => post<{ path: string } | { error: string }>(p.taskId ? memoryAddRoute(p.taskId) : memoryProjectAddRoute(p.projectId ?? ''), { scope: p.scope, name: p.name, description: p.description, type: p.type, body: p.body }),
   undo: (changeId) => post<unknown>(memoryUndoRoute(changeId)),
 }

@@ -33,7 +33,7 @@ export const memoryCommands: readonly ContributedCommand[] = [
     query: async (text, context) => {
       const found = await memoryApi().search(text, context.projectId ?? undefined)
       if ('error' in found) throw new Error(found.error)
-      return found.map((memory): CommandSearchItem => ({
+      return found.filter((memory) => memory.scope === 'project' && memory.projectId === context.projectId).map((memory): CommandSearchItem => ({
         id: memory.id,
         title: memory.name,
         subtitle: memory.description,
@@ -46,7 +46,7 @@ export const memoryCommands: readonly ContributedCommand[] = [
       if (!item.ref) return COMMAND_CLOSED
       try {
         const selected = JSON.parse(item.ref) as { name: string; scope: string }
-        selectMemory(selected)
+        selectMemory({ ...selected, projectId: context.projectId })
         openMemory(context)
       } catch { /* An obsolete search row is safe to ignore. */ }
       return COMMAND_CLOSED

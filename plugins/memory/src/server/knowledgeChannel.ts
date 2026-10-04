@@ -5,7 +5,7 @@ import type { KnowledgeBridge } from '../server/routes/knowledge'
 import { contentHashId, MEMORY_TYPES, privateMemoryRoot, normalizeMemoryType } from './memory'
 import { searchMemoryFiles } from './memorySearch'
 import { formatLaunchContext } from '@acorn/plugin-context/contract/contextBlock.ts'
-import type { MemoryRow, MemoryType } from '../contract/library'
+import type { MemoryRow, MemoryType, MemoryScope } from '../contract/library'
 import type { MemoryStoreAccess } from './memoryStore'
 import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 
@@ -53,7 +53,7 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
     restore: async (...args) => (await loadStore()).restore(...args),
     feed: async (...args) => (await loadStore()).feed(...args),
   }
-  const list = async (projectId: string | null): Promise<MemoryRow[]> => (await store.list(projectId)).map((memory) => ({
+  const list = async (projectId: string | null, scope?: MemoryScope): Promise<MemoryRow[]> => (await store.list(projectId, scope)).map((memory) => ({
     ...memory,
     id: `${memory.scope}:${memory.projectId ?? ''}:${contentHashId(memory.name, memory.body, memory.description)}`,
     createdAt: memory.createdAt || Math.round(memory.updatedAt),
@@ -101,11 +101,11 @@ export function registerKnowledgeChannel(core: KnowledgeCoreServices, deps: Know
       const project = await core.projects.byId(task.projectId)
       return project ? { projectId: project.id } : null
     },
-    memoryList: (projectId) =>
-      guard(() => list(projectId ?? null)),
-    memorySearch: (query, projectId, type) =>
+    memoryList: (projectId, scope) =>
+      guard(() => list(projectId ?? null, scope)),
+    memorySearch: (query, projectId, type, scope) =>
       guard(async () => {
-        const rows = await list(projectId ?? null)
+        const rows = await list(projectId ?? null, scope)
         const filtered = type && MEMORY_TYPES.includes(type as MemoryType) ? rows.filter((row) => row.type === normalizeMemoryType(type)) : rows
         return searchMemoryFiles(filtered.filter((row) => !row.supersededBy), query)
       }),

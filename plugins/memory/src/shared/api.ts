@@ -1,9 +1,9 @@
 // The memory pane's route builders (docs/notes-and-memory.md), moved verbatim out of
 // @acorn/protocol/api.ts so this plugin owns the shape of its own namespace.
 
-export const memoryListRoute = (projectId?: string) => `/v1/p/memory/memory${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}`
-export const memorySearchRoute = (query: string, projectId?: string, type?: string) =>
-  `/v1/p/memory/memory/search?q=${encodeURIComponent(query)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}`
+export const memoryListRoute = (projectId?: string, scope?: 'project' | 'private') => `/v1/p/memory/memory${projectId ? `?projectId=${encodeURIComponent(projectId)}` : ''}${scope ? `${projectId ? '&' : '?'}scope=${scope}` : ''}`
+export const memorySearchRoute = (query: string, projectId?: string, type?: string, scope?: 'project' | 'private') =>
+  `/v1/p/memory/memory/search?q=${encodeURIComponent(query)}${projectId ? `&projectId=${encodeURIComponent(projectId)}` : ''}${type ? `&type=${encodeURIComponent(type)}` : ''}${scope ? `&scope=${scope}` : ''}`
 export const memoryAddRoute = (taskId: string) => `/v1/p/memory/tasks/${taskId}/memory`
 export const memoryProjectAddRoute = (projectId: string) => `/v1/p/memory/projects/${encodeURIComponent(projectId)}/memory`
 export const memoryUndoRoute = (changeId: string) => `/v1/p/memory/memory/changes/${encodeURIComponent(changeId)}/undo`

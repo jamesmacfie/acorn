@@ -146,13 +146,13 @@ worktree answers `404 not_found`.
 | `/v1/p/preview/tasks/:taskId/url`, `/recipe-url`, `/configured` | The resolved preview home, recipe selection, and which tasks have one |
 | `/v1/p/browser/captures/:id` | A browser tool screenshot |
 
-Memory lists and searches enforce the signed task's project scope. Undo restores the prior version or
-removes a created memory, and a later write or an outside edit returns a conflict. The library takes
-`get`, `edit`, `delete`, `history`, `restore`, `changes`, `preview`, `caps`, `sources`,
-`import-preview`, and `import`. Edits, deletes, and restores carry the current file hash. Import binds
-each previewed file to its source and destination hashes. Caps are integers from 200 to 32,000
-characters. Conflicts return 409. See
-[notes and memory](../notes-and-memory.md#the-memory-page-and-transcript).
+Memory lists and searches enforce the signed task's project scope. Their optional `scope` query
+accepts `project` or `private` and filters before search limits. Library `changes` and `preview`
+accept the same scope in their body. Omission includes both applicable scopes. The page selects
+project scope. Undo refuses later writes or outside edits. Library actions are `get`, `edit`,
+`delete`, `history`, `restore`, `changes`, `preview`, `caps`, `sources`, `import-preview`, and `import`.
+Edits, deletes, and restores carry the current hash. Import binds source and destination hashes.
+Caps range from 200 to 32,000 characters. Conflicts return 409. See [notes and memory](../notes-and-memory.md#the-memory-page-and-transcript).
 
 `/configured` lists every task with a preview, so it refuses a task token. A browser capture answers
 only its own task to a task token, and an unknown or foreign id gets the same empty 404.

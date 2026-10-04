@@ -10,14 +10,14 @@ vi.mock('@solidjs/router', () => ({ useParams: () => ({ projectId: 'project-1' }
 vi.mock('@acorn/plugin-api/client', async original => ({
   ...await original<Record<string, unknown>>(),
   onPluginFrame: () => () => {},
-  readJson: async () => fixture.exists ? [{ name: 'terminal-rule', scope: 'project', type: 'project', description: 'Release rule', updatedAt: 1 }] : [],
+  readJson: async () => fixture.exists ? [{ name: 'terminal-rule', scope: 'project', projectId: 'project-1', type: 'project', description: 'Release rule', updatedAt: 1 }] : [],
   writeJson: async (url: string) => {
     if (url.endsWith('/undo')) { fixture.undo(url); fixture.exists = false; return {} }
     switch (url.split('/library/')[1]?.split('?')[0]) {
       case 'changes': return fixture.exists ? [{ id: 'change-1', name: 'terminal-rule', scope: 'project', projectId: 'project-1', by: 'agent', at: '2026-10-02T00:00:00Z', action: 'write', canUndo: true }] : []
-      case 'get': return fixture.exists ? { name: 'terminal-rule', scope: 'project', type: 'project', description: 'Release rule', hash: 'h', body: 'Run the pipeline before release.', updatedAt: 1 } : null
+      case 'get': return fixture.exists ? { name: 'terminal-rule', scope: 'project', projectId: 'project-1', type: 'project', description: 'Release rule', hash: 'h', body: 'Run the pipeline before release.', updatedAt: 1 } : null
       case 'history': case 'sources': return []
-      case 'preview': return { text: 'Exact agent context', counts: { private: 0, project: 51 }, shown: { private: 0, project: 51 }, caps: { private: 4000, project: 12000 } }
+      case 'preview': return { text: 'Project agent context', counts: { private: 0, project: 51 }, shown: { private: 0, project: 51 }, caps: { private: 4000, project: 12000 } }
       default: throw new Error(`Unexpected fixture request: ${url}`)
     }
   },
@@ -50,11 +50,11 @@ it('lets the terminal keyboard read a memory, inspect context, and undo an agent
     await waitFor('Run the pipeline before release.')
     // Closing the reader brings back the overview, which holds the context preview and the feed.
     selectMemory(undefined)
-    await waitFor('What agents see')
+    await waitFor('Project context')
     expect(focusRegion({ paneId: 'memory', regionId: 'detail' })).toBe(true)
-    expect(await reach('What agents see')).toBe(true)
+    expect(await reach('Project context')).toBe(true)
     screen = await screen.press('RETURN')
-    await waitFor('Exact agent context')
+    await waitFor('Project agent context')
     // Move back through the same reachable controls to the feed's guarded Undo.
     for (let step = 0; step < 40 && !runText(focusedRenderable()!).includes('Undo'); step += 1) screen = await screen.press('ARROW_UP')
     expect(runText(focusedRenderable()!)).toContain('Undo')
