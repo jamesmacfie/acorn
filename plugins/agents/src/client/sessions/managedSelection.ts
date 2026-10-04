@@ -8,6 +8,15 @@ const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Recor
 // Keyed by session rather than by task, so switching sessions in the sidebar and back returns to the
 // subagent you were reading instead of the top of the transcript.
 const [selectedSubagentBySession, setSelectedSubagentBySession] = createSignal<Record<string, string | undefined>>({})
+// Keyed by session for the same reason: the transcript remounts on every return, and the "Chats only"
+// filter should still be on when you come back. Held for the app's lifetime, not across relaunches.
+const [chatsOnlyBySession, setChatsOnlyBySession] = createSignal<Record<string, boolean>>({})
+
+export const managedChatsOnly = (sessionId: string): boolean => chatsOnlyBySession()[sessionId] === true
+
+export function toggleManagedChatsOnly(sessionId: string): void {
+  setChatsOnlyBySession((current) => ({ ...current, [sessionId]: !current[sessionId] }))
+}
 
 export const selectedManagedSession = (taskId: string): string | undefined => selectedByTask()[taskId]
 export const focusedManagedRequest = (sessionId: string): string | undefined =>

@@ -10,7 +10,7 @@ import ManagedChildRows from './ManagedChildRows'
 import { agentSessionIsStarting } from '../composer/agentComposerState'
 import { latestAutomaticTaskContext } from '../composer/automaticTaskContext'
 import { managedAgentStore } from './managedStore'
-import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, selectedManagedSubagent } from './managedSelection'
+import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, managedChatsOnly, selectedManagedSubagent, toggleManagedChatsOnly } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 import TerminalConversationShortcuts from './TerminalConversationShortcuts'
 
@@ -57,10 +57,12 @@ function SessionConversation(input: {
   // Opened by `/mcp` in the composer. Per conversation, which is per session: this owner is keyed by it.
   const [mcpOpen, setMcpOpen] = createSignal(false)
   // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
-  // `onControls`, while the filter and collapse-all push down as a signal and a counter. The desktop
-  // draws buttons above the composer; the terminal registers shortcuts for the same actions.
+  // `onControls`, while the filter and collapse-all push down as a signal and a counter. The filter is
+  // kept per session in ./managedSelection.ts, so it survives leaving the session and coming back. The
+  // desktop draws buttons above the composer; the terminal registers shortcuts for the same actions.
   const [scrollControls, setScrollControls] = createSignal<TimelineControls>()
-  const [chatsOnly, setChatsOnly] = createSignal(false)
+  const chatsOnly = () => managedChatsOnly(sessionId())
+  const toggleChatsOnly = () => toggleManagedChatsOnly(sessionId())
   const [collapseTick, setCollapseTick] = createSignal(0)
   const snapshot = createMemo(() => managedAgentStore.snapshots()[sessionId()])
   const stored = createMemo(() => managedAgentStore.sessions().find((item) => item.id === sessionId()))
@@ -131,7 +133,7 @@ function SessionConversation(input: {
         <TerminalConversationShortcuts
           top={() => scrollControls()?.toTop()}
           bottom={() => scrollControls()?.toBottom()}
-          toggleChats={() => setChatsOnly((on) => !on)}
+          toggleChats={toggleChatsOnly}
           collapseTools={() => setCollapseTick((tick) => tick + 1)}
         />
       </Only>
@@ -211,7 +213,7 @@ function SessionConversation(input: {
                     label="Show only agent and user messages"
                     tip="Chats only"
                     pressed={chatsOnly()}
-                    onPress={() => setChatsOnly((on) => !on)}
+                    onPress={toggleChatsOnly}
                   />
                   <IconButton
                     icon="fold-vertical"
