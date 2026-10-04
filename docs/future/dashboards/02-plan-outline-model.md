@@ -1,7 +1,8 @@
 # Phase 2: the plan outline model
 
-Status: proposed, October 5, 2026. Depends on nothing, and can run beside
-[phase 1](./01-quick-wins.md). Read the [programme README](./README.md) first. The
+Status: shipped, October 5, 2026, in commit `69ebfb26a`. [What shipped](#what-shipped) records the
+choices made while building it and what it left for later phases. Depends on nothing, and can run
+beside [phase 1](./01-quick-wins.md). Read the [programme README](./README.md) first. The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows the outline this
 phase feeds, in the "The studio" mockup.
 
@@ -168,3 +169,65 @@ handoff, because the Node's run uses the describer.
   deliberately in the same change.
 - `PlanProblem.path` values the validator emits. Read `validatePanelPlan` in `plan.ts` for every
   `path:` it writes, so `partForPath` covers them.
+
+## What shipped
+
+All 13 requirements shipped, with the tests listed above. This phase draws no new screens, so it
+wasn't checked in a `dev:agent` session. `docs/dashboards/mapping-and-editor.md` § The generated
+editor describes the shipped behaviour and wins over this page.
+
+Where the code lives:
+
+- `packages/dashboards-core/src/outline.ts` holds `planOutline`, `columnParts`, `partForPath`,
+  `problemsByPart`, `countsByPart`, `availableOperations`, `availableViews`, and `diffOutline`. It
+  also exports the wording helpers the describer reads: `columnLabel`, `describePredicate`,
+  `sourceReach`, and `pressTarget`.
+- `labels.ts` gains `offsetLabel`, `calendarLabel`, `PRESENTATION_LABELS`, and
+  `sortDirectionLabel`. `offsetLabel` reads any stored offset, not only the presets.
+- `pointerColumn` moved from `plan.ts` to `planColumns.ts`, so `plan.ts` and `outline.ts` share it.
+  `outline.ts` imports only types from `plan.ts`, so the two files don't form a runtime cycle.
+- `outline.test.ts` keeps an inline snapshot of `describePanelPlan` for two fixture plans. It was
+  recorded before the refactor, so the commit's diff shows each line that changed.
+- Adding `outline.ts` to the `exports` map raised the entrypoint count for `@acorn/dashboards-core`
+  in `tools/arch/boundaries.test.ts` from 15 to 16. The "core never names a plugin" exception moved
+  from `plan.ts` to `outline.ts`, because the filter code that names the `context` address moved
+  there, and the source part's icon is `database`.
+- The outline's Lucide names are in `packages/client-core/src/kit/tokens/iconNodes.eager.json`.
+  Rerun `pnpm --filter @acorn/client-core icons` after changing one.
+
+Choices made while building it:
+
+- Outline titles don't reuse `planPartLabel` from phase 1. That function names a part for a problem
+  line, such as "Step 2". The outline titles a part by what it does, such as "Keep where Author is
+  you". `planPartLabel` stays for the editor until phase 3 deletes it.
+- **Behaviour** sits in the `look` section, because the section list has no slot of its own for it.
+- **Settings** owns `/title`, `/time`, and `/refresh`. Problems at the bare `/sources` and `/stages`
+  paths, and at `/requirements` or `/request`, belong to no part and go under `plan`.
+- `countsByPart` returns `{ stages, sourceTotal }`. `sourceTotal` is the input count at `/stages/0`
+  and is set only when the plan has one source.
+- `availableOperations` checks in a fixed order, so a plan with no columns always reads "Add a
+  column first." An existing overlap step is reported before a missing date column.
+- `availableViews` reads each view's `needs` through a table keyed by the need string. A new need in
+  `capabilities.ts` fails `tsc` until the table has a row for it.
+- `diffOutline` compares JSON with sorted object keys, so a plan the AI built in a different key
+  order still compares equal. A non-step part is `changed` when its title, detail, or JSON at its
+  paths differs. Changing a column's label marks the steps that name it as `same`, because step
+  matching reads only step JSON.
+- The describer changed only lines that printed schema values. Operators read as words ("is",
+  "is one of", "is after"), offsets read as "7 days ago", choice ids read as choice labels, and
+  column and source ids read as labels. The sort line and the relation line keep their old shape.
+- The editor's **Add step** buttons use `availableOperations`, and a disabled button's tooltip gives
+  the reason.
+
+Fixed along the way:
+
+- Phase 1's "1 day from now" and "7 days from now" offset presets were stored as `P1D` and `P7D`.
+  The schema requires a sign, so picking either broke the plan. They're `+P1D` and `+P7D`, and
+  `labels.test.ts` checks every preset reads back through `offsetLabel`.
+
+Left for later phases:
+
+- `operatorLabel` words only `lt` and `gt` differently on a date column, so a date filter reads
+  "Closed is at least the start of the week". Phase 4's inspectors may want "on or after".
+- Nothing draws the outline yet. [Phase 3](./03-studio-shell.md) draws it, and
+  [phase 6](./06-docked-ai.md) draws `diffOutline`.
