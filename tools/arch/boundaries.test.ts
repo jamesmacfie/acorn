@@ -621,7 +621,7 @@ describe('architecture boundaries', () => {
       '@acorn/client-core': 167, // Includes the host-owned Datasets settings page.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
-      '@acorn/dashboards-core': 14, // Shared SQL/in-memory summary and time-bucket semantics.
+      '@acorn/dashboards-core': 15, // Shared SQL/in-memory summary and time-bucket semantics, and the plan's labels.
       '@acorn/diff-document': 2,
     }
     const problems: string[] = []

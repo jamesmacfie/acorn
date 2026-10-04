@@ -765,3 +765,13 @@
   align-items: center;
   gap: var(--space-1);
 }
+
+/* The editor's description lines and problems: one line each, rather than spans run together. */
+.dash-v2-lines {
+  display: flex;
+  flex-direction: column;
+  gap: var(--gap-row);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}

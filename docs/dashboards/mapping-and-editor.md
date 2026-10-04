@@ -43,13 +43,28 @@ that type can answer, a value drawn by the field's type, and a tone. Selectors m
 unofferable. `normalizePanel` drops stale choices no selector catches, such as a filter on a field that
 disappeared when you swapped the source.
 
-**Add panel** starts with **Pick data** or **Describe it**. The source picker shows source and account
-pairs; the AI conversation asks for missing choices and proposes the same plan used by the forms.
-The editor shows columns, relation choices, filter, compute, summarize, expand, and overlap stages,
-view options, the host's plan description, and a live Node preview. Source descriptions may offer
-starter plans, which the host validates before showing them. **Keep history** can create a dataset
-from the chosen query.
-Each change autosaves the draft and a device recovery copy.
+**Add panel** always opens a blank plan with **Pick data** or **Describe it**. If an unpublished draft
+exists, one line above them names the newest, with **Continue** to reopen it and **Discard** to delete
+it. The source picker shows source and account pairs, and a source joins the plan only once it's
+picked, so nothing is reported before then. The AI conversation asks for missing choices and
+proposes the same plan used by the forms.
+
+The editor shows the title, then data, relations (with two or more sources), columns, steps, and
+**Arrange**, **Look**, row actions, and **Settings**. Every control has a visible caption, and every
+option reads as words from `packages/dashboards-core/src/labels.ts` rather than a schema value. **Look**
+offers only the options the chosen view takes. Each step's fold shows its row count, such as "Keep
+matching rows · 312 → 41". Source descriptions may offer starter plans, which the host validates and
+lists under **Start from**. **Keep history** can create a dataset from the chosen query.
+
+The first source described creates one column per field with a display role (title, status,
+assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`).
+Rows are filtered by the panel's own filter step, which the Node pushes down to the source, so the
+source picker hides **Add condition** and its own preview. Conditions a query already has show
+read-only, because they change which records come back.
+
+Problems show under the part they belong to, such as "Column Status", with the JSON Pointer in the
+hover title. **Publish** stays off while the plan fails its schema or the latest preview reports an
+error, and the reason shows beside it. Each change autosaves the draft and a device recovery copy.
 
 `PanelPlan` version 2 permits primary, lookup, and children sources and up to eight ordered stages.
 The closed capability list in

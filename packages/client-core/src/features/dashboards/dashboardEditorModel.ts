@@ -4,7 +4,7 @@ import type { DataField } from '@acorn/protocol/dataBindings.ts'
 import { DATA_SOURCE_PREVIEW_MODE } from '@acorn/protocol/dataSources.ts'
 import { MISSING, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
-import { projectDashboardPanel } from '@acorn/dashboards-core/projection'
+import { dashboardFields, projectDashboardPanel } from '@acorn/dashboards-core/projection'
 import { viewsForSchema, type PanelViewKind } from './model'
 import { PANEL_STATUS_FIELD_ID } from './mapping'
 
@@ -16,6 +16,20 @@ export const emptyDashboardContent = (): DashboardPanelContent => ({
 
 export const latestUnpublishedDashboard = <T extends { publishedRevision: number | null; updatedAt: number }>(drafts: readonly T[]): T | undefined =>
   drafts.filter(draft => draft.publishedRevision === null).sort((left, right) => right.updatedAt - left.updatedAt)[0]
+
+const safeColumnId = (value: string): string => value.replace(/^\//, '').replace(/[^A-Za-z0-9_-]/g, '_').slice(0, 100) || crypto.randomUUID()
+
+/** The columns a panel starts with from its first source: one per field with a display role (title,
+ *  status, assignee, url, updated), or the first six fields when the source declares no roles. Every
+ *  field made a column buried the few that matter under dozens of IDs. */
+export function defaultPlanColumns(sourceId: string, fields: ReturnType<typeof dashboardFields>): PanelPlan['columns'] {
+  const roled = fields.filter(field => field.role)
+  return (roled.length ? roled : fields.slice(0, 6)).map(field => ({
+    id: safeColumnId(field.id), label: field.name, type: field.type, bind: { [sourceId]: { field: field.id } },
+    ...(field.unit ? { unit: field.unit } : {}), ...(field.precision ? { precision: field.precision } : {}),
+    ...(field.list ? { list: true } : {}), ...(field.values ? { choices: field.values } : {}),
+  }))
+}
 
 /** After a source switches, drops the column bindings the new source can't fill: a field it doesn't
  *  describe, or one of another type. A column with no type keeps any field the source still has. */

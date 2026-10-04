@@ -235,6 +235,13 @@ export default function SourceQueryEditor(props: {
    *  nothing. */
   previewOnOpen?: boolean
   hideAuthoring?: boolean
+  /** For a consumer that filters rows itself, such as a dashboard's filter step. Hides **Add
+   *  condition**, and shows conditions the query already has read-only, because they change which
+   *  records it returns. */
+  hideConditions?: boolean
+  /** For a consumer with its own live preview. Hides **Refresh preview** and the records, and turns
+   *  `previewOnOpen` off. */
+  hidePreview?: boolean
   pickSourceAccount?: boolean
   onChange(value: QueryReference | undefined): void
   /** Lets consumers project the shared editor's exact described fields and retained preview. It is
@@ -379,7 +386,7 @@ export default function SourceQueryEditor(props: {
 
   let previewedOnOpen = false
   createEffect(() => {
-    if (!props.previewOnOpen || previewedOnOpen || !query() || !description.data) return
+    if (!props.previewOnOpen || props.hidePreview || previewedOnOpen || !query() || !description.data) return
     previewedOnOpen = true
     void refresh()
   })
@@ -524,33 +531,38 @@ export default function SourceQueryEditor(props: {
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           )}</Show>
         </Field>}</For>
-        <Show when={current().predicate} fallback={<Button size="sm" disabled={props.disabled || !queryFields().length || !!(props.value?.kind === 'saved' && !editingShared())} onPress={addFirstCondition}>Add condition</Button>}>
-          {predicate => <PredicateEditor nodeId={nodeId()} query={current()} description={described()} value={predicate()}
-            disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
-            onChange={value => emitQuery({ ...current(), predicate: value })}
-            onRemove={() => {
-              const { predicate: _predicate, ...withoutPredicate } = current()
-              emitQuery(withoutPredicate)
-            }} />}
+        <Show when={current().predicate} fallback={<Show when={!props.hideConditions}><Button size="sm" disabled={props.disabled || !queryFields().length || !!(props.value?.kind === 'saved' && !editingShared())} onPress={addFirstCondition}>Add condition</Button></Show>}>
+          {predicate => <>
+            <Show when={props.hideConditions}><Text emphasis="muted">These conditions run inside the source.</Text></Show>
+            <PredicateEditor nodeId={nodeId()} query={current()} description={described()} value={predicate()}
+              disabled={props.disabled || props.hideConditions || !!(props.value?.kind === 'saved' && !editingShared())}
+              onChange={value => emitQuery({ ...current(), predicate: value })}
+              onRemove={() => {
+                const { predicate: _predicate, ...withoutPredicate } = current()
+                emitQuery(withoutPredicate)
+              }} />
+          </>}
         </Show>
-        <Inline gap="inline" wrap>
-          <Button variant="solid" size="sm" busy={preview().loading} disabled={props.disabled || !canDescribe()} onPress={() => void refresh()}>Refresh preview</Button>
-          <Show when={previewIsStale(preview())}><Badge tone="warn">Preview is out of date</Badge></Show>
-          <Show when={preview().result}><Text emphasis="muted" tip={`Read ${new Date(preview().result!.readTime).toLocaleString()}`}>Showing up to 25</Text></Show>
-        </Inline>
-        <Show when={preview().error}><Alert tone="danger" title="Couldn't load a preview">{preview().error} The last preview stays until you refresh.</Alert></Show>
-        <Show when={preview().result}>{result => <Stack gap="row">
-          <Show when={incompleteCause()}>{cause => <Alert tone="warn">{`Preview is incomplete: ${cause()}.`}</Alert>}</Show>
-          <Show when={!result().records.length}><Alert>{`No matching ${source()?.plural.toLowerCase() ?? 'records'}. Edit filters and refresh again.`}</Alert></Show>
-          <For each={result().records}>{record => <Fold label={record.display?.title ?? record.ref.recordId} level="sub">
-            <Stack gap="row">
-              <For each={[...described().fields, ...Object.keys(record.data && typeof record.data === 'object' && !Array.isArray(record.data) ? record.data : {}).filter(key => !described().fields.some(field => field.pointer === `/${key}`)).map(key => ({ pointer: `/${key}`, label: key, origin: 'observed' as const }))]}>{field => {
-                const selected = valueAt(record.data, field.pointer)
-                return <Inline gap="inline" wrap><Text emphasis="strong">{field.label}</Text><Text emphasis="mono" wrap>{selected === undefined ? 'Missing' : typeof selected === 'string' ? selected : JSON.stringify(selected)}</Text><Show when={field.origin === 'observed'}><Badge>Observed</Badge></Show></Inline>
-              }}</For>
-            </Stack>
-          </Fold>}</For>
-        </Stack>}</Show>
+        <Show when={!props.hidePreview}>
+          <Inline gap="inline" wrap>
+            <Button variant="solid" size="sm" busy={preview().loading} disabled={props.disabled || !canDescribe()} onPress={() => void refresh()}>Refresh preview</Button>
+            <Show when={previewIsStale(preview())}><Badge tone="warn">Preview is out of date</Badge></Show>
+            <Show when={preview().result}><Text emphasis="muted" tip={`Read ${new Date(preview().result!.readTime).toLocaleString()}`}>Showing up to 25</Text></Show>
+          </Inline>
+          <Show when={preview().error}><Alert tone="danger" title="Couldn't load a preview">{preview().error} The last preview stays until you refresh.</Alert></Show>
+          <Show when={preview().result}>{result => <Stack gap="row">
+            <Show when={incompleteCause()}>{cause => <Alert tone="warn">{`Preview is incomplete: ${cause()}.`}</Alert>}</Show>
+            <Show when={!result().records.length}><Alert>{`No matching ${source()?.plural.toLowerCase() ?? 'records'}. Edit filters and refresh again.`}</Alert></Show>
+            <For each={result().records}>{record => <Fold label={record.display?.title ?? record.ref.recordId} level="sub">
+              <Stack gap="row">
+                <For each={[...described().fields, ...Object.keys(record.data && typeof record.data === 'object' && !Array.isArray(record.data) ? record.data : {}).filter(key => !described().fields.some(field => field.pointer === `/${key}`)).map(key => ({ pointer: `/${key}`, label: key, origin: 'observed' as const }))]}>{field => {
+                  const selected = valueAt(record.data, field.pointer)
+                  return <Inline gap="inline" wrap><Text emphasis="strong">{field.label}</Text><Text emphasis="mono" wrap>{selected === undefined ? 'Missing' : typeof selected === 'string' ? selected : JSON.stringify(selected)}</Text><Show when={field.origin === 'observed'}><Badge>Observed</Badge></Show></Inline>
+                }}</For>
+              </Stack>
+            </Fold>}</For>
+          </Stack>}</Show>
+        </Show>
       </>}</Show>
     </Stack>}</Show>
   </Stack>

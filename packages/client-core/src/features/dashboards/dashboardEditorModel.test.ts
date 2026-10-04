@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { dashboardPanelContentSchema, type DashboardPanelContent, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import {
-  addStatusColumns, applyCategoryColumns, availableDashboardViews, displaySchema, emptyDashboardContent, exactStatusOptions,
+  addStatusColumns, applyCategoryColumns, availableDashboardViews, defaultPlanColumns, displaySchema, emptyDashboardContent, exactStatusOptions,
   latestUnpublishedDashboard, mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason, unbindMissingFields,
 } from './dashboardEditorModel'
 
@@ -16,6 +16,15 @@ const content: DashboardPanelContent = {
 }
 
 describe('dashboard editor model', () => {
+  it('starts a panel with the fields a source gives a display role, or its first six', () => {
+    const field = (id: string, role?: 'title' | 'status') => ({ id: `/${id}`, name: id, type: 'text' as const, ...(role ? { role } : {}) })
+    const roled = defaultPlanColumns('s', [field('id'), field('name', 'title'), field('body'), field('state', 'status')])
+    expect(roled.map(column => column.label)).toEqual(['name', 'state'])
+    expect(roled[0]).toEqual({ id: 'name', label: 'name', type: 'text', bind: { s: { field: '/name' } } })
+    expect(defaultPlanColumns('s', ['a', 'b', 'c'].map(id => field(id))).map(column => column.id)).toEqual(['a', 'b', 'c'])
+    expect(defaultPlanColumns('s', ['a', 'b', 'c', 'd', 'e', 'f', 'g', 'h'].map(id => field(id)))).toHaveLength(6)
+  })
+
   it('keeps display edits separate from query semantics', () => {
     const withQuery = setDashboardQuery(content, 'mine', query)
     const displayed = { ...withQuery, display: { ...withQuery.display, view: { kind: 'table' as const }, fields: ['/title'] } }

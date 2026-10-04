@@ -35,7 +35,7 @@ beforeEach(() => {
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
     if (body?.operation === 'describe') return {
       revision: '1', consistency: 'fixture', schema: { type: 'object', properties: { title: { type: 'string' } }, required: ['title'], additionalProperties: true },
-      fields: [{ pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' } }],
+      fields: [{ pointer: '/title', label: 'Title', origin: 'declared', display: { kind: 'text', role: 'title' }, query: { operators: ['eq'], sortable: false } }],
       parameters: { type: 'object', properties: { term: { type: 'string' } }, additionalProperties: false },
       parameterFields: [{ pointer: '/term', label: 'Search term', origin: 'declared' }],
       operations: { query: true, options: false, details: false, incremental: false, groups: ['all'] },
@@ -115,5 +115,41 @@ describe('SourceQueryEditor', () => {
     expect(requests.mock.calls.filter(([, options]) => options?.body && JSON.parse(options.body).operation === 'query')).toHaveLength(1)
     expect(host.textContent).toContain('<img src=x>')
     expect(host.querySelector('img')).toBeNull()
+  })
+
+  it('hides conditions and the preview for a consumer that has its own', async () => {
+    const buttons = () => [...host.querySelectorAll('button')].map(button => button.textContent ?? '')
+    dispose = render(() => <QueryClientProvider client={client}>
+      <SourceQueryEditor workspaceId="w" projectId="p" value={initial} onChange={() => {}} hideConditions hidePreview previewOnOpen />
+    </QueryClientProvider>, host)
+    await settle()
+    await settle()
+    expect(host.querySelector('input[aria-label="Search term"]')).toBeTruthy()
+    expect(buttons().some(text => text.includes('Add condition'))).toBe(false)
+    expect(buttons().some(text => text.includes('Refresh preview'))).toBe(false)
+    expect(requests.mock.calls.filter(([, options]) => options?.body && JSON.parse(options.body).operation === 'query')).toHaveLength(0)
+  })
+
+  it('shows conditions a query already has read-only when they are hidden', async () => {
+    const filtered: QueryReference = { ...initial, content: { ...initial.content, query: { ...initial.content.query,
+      predicate: { kind: 'all', predicates: [{ kind: 'comparison', left: { address: { from: 'item', pointer: '/title' } }, operator: 'eq', right: { address: { from: 'literal', value: 'x' } } }] },
+    } } }
+    dispose = render(() => <QueryClientProvider client={client}>
+      <SourceQueryEditor workspaceId="w" projectId="p" value={filtered} onChange={() => {}} hideConditions />
+    </QueryClientProvider>, host)
+    await settle()
+    await settle()
+    expect(host.textContent).toContain('These conditions run inside the source.')
+    const remove = [...host.querySelectorAll('button')].find(button => button.textContent === 'Remove condition') as HTMLButtonElement
+    expect(remove.disabled).toBe(true)
+  })
+
+  it('offers Add condition by default', async () => {
+    dispose = render(() => <QueryClientProvider client={client}>
+      <SourceQueryEditor workspaceId="w" projectId="p" value={initial} onChange={() => {}} />
+    </QueryClientProvider>, host)
+    await settle()
+    await settle()
+    expect([...host.querySelectorAll('button')].some(button => button.textContent === 'Add condition')).toBe(true)
   })
 })

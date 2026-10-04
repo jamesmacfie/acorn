@@ -8,6 +8,7 @@
     "./chart.ts": "./src/chart.ts",
     "./contract": "./src/contract/public.ts",
     "./format.ts": "./src/format.ts",
+    "./labels.ts": "./src/labels.ts",
     "./layout.ts": "./src/layout.ts",
     "./mapping.ts": "./src/mapping.ts",
     "./model.ts": "./src/model.ts",
