@@ -41,6 +41,9 @@ export type PanelViewProps = {
   onDrilldown?: (group: DisplayPlanGroup) => void
   onMeasureDrilldown?: (row: DashboardDisplayRow, measure: string) => void
   onCorrect?: (row: DashboardDisplayRow) => void
+  boardChoices?: { id: string; label: string }[]
+  boardMoveReason?: (row: DashboardDisplayRow, choiceId: string) => string | undefined
+  onBoardMove?: (row: DashboardDisplayRow, choiceId: string) => void
 }
 
 /** A row's press handler: only when the row declares a verb and the host can run it. */

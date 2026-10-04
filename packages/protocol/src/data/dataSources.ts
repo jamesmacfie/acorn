@@ -76,6 +76,8 @@ export const dataSourceDescriptionSchema = z.object({
   starterPlans: z.array(z.unknown()).max(10).optional(),
   /** Action and target metadata is structural; current eligibility is checked per record. */
   actions: z.array(z.object({ id, label: id, icon: id.optional(), risk: z.enum(['read', 'write', 'execute']) }).strict()).max(16).optional(),
+  writable: z.array(z.object({ field: dataPointerSchema, path: z.string().min(1).max(256), risk: z.enum(['read', 'write', 'execute']),
+    values: z.array(value).min(1).max(100) }).strict()).max(16).optional(),
   targets: z.array(dataRecordTargetSchema.pick({ kind: true })).max(16).optional(),
   /** Declarative relationship metadata. The host checks the scopes before matching rows. */
   relations: z.array(z.object({
@@ -136,7 +138,11 @@ export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('actions'), ref: dataRecordRefSchema, scope: dataSourceScopeSchema }).strict(),
 ])
 export const dataSourceActionsSchema = z.object({ actions: z.array(namedDataRecordActionSchema).max(16) }).strict()
-export const dataSourceActSchema = z.object({ ref: dataRecordRefSchema, actionId: id, confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict()
+export const dataSourceActSchema = z.union([
+  z.object({ ref: dataRecordRefSchema, actionId: id, confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict(),
+  z.object({ ref: dataRecordRefSchema, field: dataPointerSchema, expected: value, target: value,
+    confirmedRisk: z.enum(['read', 'write', 'execute']), idempotencyKey: z.string().uuid() }).strict(),
+])
 export const dataSourceDiscoveryRequestSchema = z.object({
   pluginId: id,
   discoveryId: id,
@@ -178,6 +184,7 @@ export const dataSourcePageSchema = z.object({
     taskId: z.string().uuid().optional(),
     action: dataRecordActionSchema.optional(),
     actions: z.array(namedDataRecordActionSchema).max(16).optional(),
+    writableFields: z.array(dataPointerSchema).max(16).optional(),
     target: dataRecordTargetSchema.optional(),
   }).strict()).max(DATA_LIMITS.options),
   revision: id,
@@ -188,7 +195,7 @@ export const dataSourcePageSchema = z.object({
   eventCoverage: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite() }).strict()).max(32).optional(),
 }).strict()
 export const dataSourceDetailsSchema = z.discriminatedUnion('kind', [
-  z.object({ kind: z.literal('found'), data: z.unknown().transform(input => parseDataValue(input, DATA_LIMITS.detailBytes)), fetchedTime: z.number().finite(), schema: structure.optional() }).strict(),
+  z.object({ kind: z.literal('found'), data: z.unknown().transform(input => parseDataValue(input, DATA_LIMITS.detailBytes)), fetchedTime: z.number().finite(), schema: structure.optional(), writableFields: z.array(dataPointerSchema).max(16).optional() }).strict(),
   z.object({ kind: z.literal('not-found') }).strict(),
 ])
 export type DataSourceRef = z.infer<typeof dataSourceRefSchema>

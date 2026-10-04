@@ -1,5 +1,6 @@
 import type { DataRecordAction, NamedDataRecordAction } from '@acorn/protocol/dataActions.ts'
 import type { DataRecordRef } from '@acorn/protocol/dataSources.ts'
+import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import type { PlanRecordItem } from './plan'
 
 /** Dashboard-only projection types. Source plugins never register or return these shapes. */
@@ -32,6 +33,8 @@ export type DashboardDisplayRow = {
   action?: DataRecordAction
   actions?: NamedDataRecordAction[]
   records?: DataRecordRef[]
+  sourceFieldValues?: Record<string, Record<string, DataValue>>
+  sourceWritableFields?: Record<string, string[]>
   recordItems?: PlanRecordItem[]
   target?: { kind: string; item: string }
   partial?: Record<string, string>

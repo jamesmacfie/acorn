@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { runAuthoringTurn, type AuthoringTurnRequest } from '@acorn/protocol/authoring.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
-import { bindPanelRows, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
+import { bindPanelRows, describePanelPlan, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
 
 // Scripted cases exercise the actual model-response loop and plan validator. These are fixture
 // expectations; acceptance labels from people are collected separately.
@@ -65,6 +65,21 @@ const cases: Case[] = [
 ]
 
 describe('scripted dashboard authoring evaluation', () => {
+  it('requires a declared value for a requested board write and describes that exact mapping', () => {
+    const candidate = plan()
+    candidate.view = { kind: 'board' }
+    candidate.group = [{ column: 'state' }]
+    candidate.columns[1]!.choices = [{ id: 'done', label: 'Done', writeValues: { work: 'closed' } }]
+    candidate.requirements = [{ id: 'move', text: 'Move a pull request to Done', status: 'covered',
+      paths: ['/columns/state/choices/done/writeValues/work'] }]
+    const source = fixture(candidate)[0]!
+    const writable = { ...source, description: { ...source.description,
+      writable: [{ field: '/state', path: '/v1/p/fixture/write', risk: 'write' as const, values: ['open', 'closed'] }] } }
+    expect(validatePanelPlan(candidate, [writable])).toEqual([])
+    expect(describePanelPlan(candidate, [writable]).join(' ')).toContain('Dropping a Work record on Done sets State to "closed".')
+    candidate.columns[1]!.choices![0]!.writeValues = { work: 'unknown' }
+    expect(validatePanelPlan(candidate, [writable]).some(problem => problem.path.includes('/writeValues/'))).toBe(true)
+  })
   it.each(cases)('$id', async testCase => {
     const candidate = plan()
     if (testCase.requiredStages.includes('filter')) candidate.stages = [{ op: 'filter', where: {

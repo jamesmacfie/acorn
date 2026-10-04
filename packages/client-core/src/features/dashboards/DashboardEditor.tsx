@@ -26,6 +26,7 @@ import PanelBody from './views/PanelBody'
 import CompositionStageForm from './CompositionStageForm'
 import EquivalenceForm from './EquivalenceForm'
 import KeepHistory from './KeepHistory'
+import WriteValueControls from './WriteValueControls'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
 import { availableContentPresentations } from '../../host/registries/panes/contentLinks'
@@ -340,6 +341,16 @@ export default function DashboardEditor(props: {
                 <Input label="Choice name" assist={false} value={choice.label} onInput={label => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, label } : value) } : entry) }))} />
                 <Select label="Choice tone" size="sm" value={choice.tone ?? 'muted'} options={['ok', 'warn', 'bad', 'muted', 'accent'].map(value => ({ value, label: value }))} onChange={tone => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, tone: tone as NonNullable<typeof choice.tone> } : value) } : entry) }))} />
                 <Input label="Choice rank" assist={false} value={String(choice.rank ?? '')} onInput={rank => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: entry.choices?.map((value, at) => at === index() ? { ...value, rank: rank ? Number(rank) : undefined } : value) } : entry) }))} />
+                <WriteValueControls column={column} choice={choice} sources={plan().sources}
+                  descriptions={Object.fromEntries(Object.entries(states()).map(([id, state]) => [id, state?.description]))}
+                  onChange={(sourceId, value, present) => change(current => ({ ...current, columns: current.columns.map(entry =>
+                    entry.id === column.id ? { ...entry, choices: entry.choices?.map(candidate => {
+                      if (candidate.id !== choice.id) return candidate
+                      const writeValues = { ...candidate.writeValues }
+                      if (present) writeValues[sourceId] = value!
+                      else delete writeValues[sourceId]
+                      return { ...candidate, writeValues }
+                    }) } : entry) }))} />
               </Inline>}</For>
               <Button size="sm" onPress={() => change(current => ({ ...current, columns: current.columns.map(entry => entry.id === column.id ? { ...entry, choices: [...(entry.choices ?? []), { id: crypto.randomUUID(), label: 'New choice' }] } : entry) }))}>Add choice</Button>
             </Show>

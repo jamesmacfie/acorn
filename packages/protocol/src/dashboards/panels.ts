@@ -105,7 +105,10 @@ const rowButton = z.discriminatedUnion('kind', [
 const panelPlanViewSchema = dashboardViewSchema.omit({ field: true, x: true, series: true }).extend({
   field: columnId.optional(), x: columnId.optional(), series: columnId.optional(),
 }).strict()
-const choiceSchema = z.object({ id, label, tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(), rank: z.number().finite().optional() }).strict()
+const choiceSchema = z.object({ id, label, tone: z.enum(['ok', 'warn', 'bad', 'muted', 'accent']).optional(), rank: z.number().finite().optional(),
+  /** Query instance ID to exact value sent to that source. Null is a valid target. */
+  writeValues: z.record(columnId, dataValueSchema).optional(),
+}).strict()
 const bindingSchema = z.union([
   z.object({ field: pointer, values: z.record(id, z.array(id).max(100)).optional() }).strict(),
   z.object({ value: dataValueSchema }).strict(),

@@ -17,6 +17,8 @@ export const PANEL_CAPABILITIES = {
   precisions: ['instant', 'day'],
   buckets: ['value', 'day', 'week', 'month', 'relative'],
   groupOrders: ['declared', 'label', 'count', 'explicit'],
+  boardWrites: { path: '/columns/<columnId>/choices/<choiceId>/writeValues/<sourceId>',
+    description: 'A source-declared writable enum field may set one exact provider value per choice and source. A missing mapping leaves that drop unavailable.' },
   views: {
     stat: { needs: [], options: ['aggregate', 'field', 'trend', 'compare', 'good'] },
     list: { needs: [], options: [] },

@@ -54,6 +54,14 @@ record references, including account and scope. A row menu offers the same actio
 Group headers and stat measures open their underlying rows in a read-only side panel; **Add as panel**
 publishes the derived plan. See [panels](./dashboards/panels.md#provenance-and-what-a-row-may-not-claim).
 
+An enum choice can store one write value for each bound source. The column editor lists only values
+that the source declares writable. Dragging a board card to a choice, or choosing **Move to** in its
+row menu, uses that value. The host asks for confirmation before a risky change, moves the card while
+the request runs, and refreshes after success. Cancellation sends no request. A missing mapping,
+merged or summary row, changed source eligibility, or failed write shows a source-specific reason;
+a failed move returns the card to its previous column. Panel movement still starts from the panel
+header, leaving the card body for its own gesture.
+
 `POST /v1/core/dashboards/run` accepts a scoped published revision or a draft `PanelPlan`, `preview`
 or `execution` mode, and an optional viewer time zone. It returns the resolved plan, rows, groups,
 plain-language description, and diagnostics for sources, stages, and budgets. Dashboard authoring's

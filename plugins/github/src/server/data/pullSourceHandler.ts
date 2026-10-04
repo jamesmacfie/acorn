@@ -5,6 +5,7 @@ import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import { pullSourceDescription } from '../../shared/pullSource'
 import { pullSearch, selectPulls } from './pullQuery'
 import { readPullSelection, readRepositoryOptions } from './pullRead'
+import { pullStateDetails, writePullState } from './pullWrite'
 
 type Selection = { key: string; page: DataSourcePage; expires: number; bytes: number }
 
@@ -20,14 +21,16 @@ export function createPullSourceHandler(): PluginFetchHandler {
       if (context.principal.kind !== 'device' && !(context.principal.kind === 'internal' && context.principal.scope === 'service')) {
         return Response.json({ error: 'forbidden' }, { status: 403 })
       }
+      if (new URL(request.url).pathname.endsWith('/write')) return writePullState(request, context)
       const input = dataSourceRequestSchema.parse(await request.json())
       if (input.operation === 'describe') return Response.json(pullSourceDescription)
-      if (input.operation === 'details' || input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
+      if (input.operation === 'actions') return Response.json({ error: 'unsupported_operation' }, { status: 400 })
       const scope = input.operation === 'query' ? input.query.scope : input.scope
       if (!scope.connectionId) throw new Error('connection_required')
       if (!(await context.providers.connections('github')).some(connection => connection.id === scope.connectionId && connection.status === 'connected')) {
         throw new Error('connection_unavailable')
       }
+      if (input.operation === 'details') return pullStateDetails(input.ref, context)
       if (input.operation === 'options' && (input.target !== 'parameter' || input.pointer !== '/repository')) throw new Error('unsupported_options')
       sweep()
       const key = createHash('sha256').update(JSON.stringify({ owner: context.userId, scope,

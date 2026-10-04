@@ -14,6 +14,9 @@ export default function RowControls(props: {
   buttons?: ButtonPlan[]
   onButton?: (row: DashboardDisplayRow, button: ButtonPlan) => void
   onOpenRecord?: (row: DashboardDisplayRow, item: PlanRecordItem) => void
+  boardChoices?: { id: string; label: string }[]
+  boardMoveReason?: (row: DashboardDisplayRow, choiceId: string) => string | undefined
+  onBoardMove?: (row: DashboardDisplayRow, choiceId: string) => void
 }) {
   const task: ButtonPlan = { kind: 'createTask', label: 'Start task' }
   return <span class="dash-row-controls" data-dash-panel={props.panelId ?? ''} data-dash-row={props.row.id}>
@@ -22,6 +25,9 @@ export default function RowControls(props: {
       {menu => <>
         <Show when={(props.row.recordItems?.length ?? 0) > 1}><For each={props.row.recordItems}>{item => <Menu.Item context={menu} onSelect={() => props.onOpenRecord?.(props.row, item)}>Open {item.ref.pluginId} {item.ref.recordId}</Menu.Item>}</For></Show>
         <For each={props.buttons ?? []}>{button => <Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, button)}>{button.label}</Menu.Item>}</For>
+        <For each={props.boardChoices ?? []}>{choice => <Menu.Item context={menu} onSelect={() => props.onBoardMove?.(props.row, choice.id)}>
+          {props.boardMoveReason?.(props.row, choice.id) ? `Move to ${choice.label}: ${props.boardMoveReason(props.row, choice.id)}` : `Move to ${choice.label}`}
+        </Menu.Item>}</For>
         <Show when={!(props.buttons ?? []).some(button => button.kind === 'createTask')}><Menu.Item context={menu} onSelect={() => props.onButton?.(props.row, task)}>Start task</Menu.Item></Show>
       </>}
     </RowActions>

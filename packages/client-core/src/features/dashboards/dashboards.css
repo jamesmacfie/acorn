@@ -454,6 +454,11 @@
   min-width: 0;
   min-height: 0;
 }
+.dash-board-card { position: relative; }
+.dash-board-card[draggable='true'] { cursor: grab; }
+.dash-board-card[draggable='true']:active { cursor: grabbing; }
+.dash-board-card .dash-row-controls { display: flex; justify-content: flex-end; }
+.dash-board-refusal { color: var(--state-bad); font-size: var(--fs-sm); }
 
 /* A declared column with nothing in it still draws, so it needs something to be. */
 .dash-board-empty {

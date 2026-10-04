@@ -24,6 +24,7 @@ export type DataSourceDescription = {
   coverage?: { fromTime: number; toTime: number; kind: 'complete' | 'gap'; reason: string | null }[]
   starterPlans?: unknown[]
   actions?: { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute' }[]
+  writable?: { field: string; path: string; risk: 'read' | 'write' | 'execute'; values: DataValue[] }[]
   targets?: { kind: string }[]
 }
 export type DataSourceQuery = {
@@ -40,7 +41,7 @@ export type DataSourceRequest =
   | { operation: 'actions'; ref: DataRecordRef; scope: DataSourceScope }
 export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' | 'coverage-gap' }
 export type DataSourcePage = {
-  records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction; actions?: NamedDataRecordAction[]; target?: { kind: string; item: string } }[]
+  records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction; actions?: NamedDataRecordAction[]; writableFields?: string[]; target?: { kind: string; item: string } }[]
   revision: string; readTime: number; completeness: DataSourceCompleteness; incrementalBoundary?: DataValue
   eventCoverage?: { fromTime: number; toTime: number }[]
 }
@@ -57,7 +58,7 @@ export type DataSourceResponse<R extends DataSourceRequest> = R extends { operat
   : R extends { operation: 'options' } ? { options: { id: string; label: string }[]; nextCursor?: string; exhausted: boolean }
     : R extends { operation: 'query' } ? DataSourceResult
       : R extends { operation: 'actions' } ? { actions: NamedDataRecordAction[] }
-        : { kind: 'found'; data: DataValue; fetchedTime: number } | { kind: 'not-found' }
+        : { kind: 'found'; data: DataValue; fetchedTime: number; writableFields?: string[] } | { kind: 'not-found' }
 export type DataValue = DataPrimitive | DataValue[] | { [key: string]: DataValue }
 export type VersionedDataValue = { version: 1; value: DataValue }
 export type DataType = 'string' | 'number' | 'integer' | 'boolean' | 'null' | 'object' | 'array'

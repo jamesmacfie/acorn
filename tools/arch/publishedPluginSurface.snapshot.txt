@@ -417,6 +417,7 @@ acorn-plugin-types: member DataSourceDescription.revision
 acorn-plugin-types: member DataSourceDescription.schema
 acorn-plugin-types: member DataSourceDescription.starterPlans
 acorn-plugin-types: member DataSourceDescription.targets
+acorn-plugin-types: member DataSourceDescription.writable
 acorn-plugin-types: member DataSourceDescriptor.icon
 acorn-plugin-types: member DataSourceDescriptor.identityScope
 acorn-plugin-types: member DataSourceDescriptor.name

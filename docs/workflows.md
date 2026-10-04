@@ -54,6 +54,9 @@ requires a workflow-fed dataset there, validates the current schema version and 
 writes them transactionally. A scheduled workflow can use the same step; the step does not create or
 change dataset definitions.
 
+Dashboard board moves use source-declared field mutations through the Node's `act` route. They do not
+add a generic provider write-back step or change workflow data-source reads.
+
 ## Limits and capabilities
 
 The runtime enforces workspace and provider concurrency ceilings, per-step tool ceilings, time

@@ -69,7 +69,8 @@ and discovery ID. The other routes require a matching `operation` discriminator:
 | `details` | Exact record reference, scope, and projection. | Typed detail data and fetch time, or `not-found`. |
 | `actions` | Exact full record reference and matching scope. | Current named actions for that record. |
 
-Device and service principals can call these routes. Task principals cannot. Node consumers use
+Device and service principals can call read routes. Task principals cannot, and field moves require a
+device principal. Node consumers use
 `ctx.dataSources.invoke(request, { principal, signal })`; the host-created principal passes unchanged
 to the provider route. Loaded consumers can invoke only their own sources. The result type follows
 the request's operation, so consumers do not cast a union to access query records.
@@ -93,6 +94,17 @@ also include `navigate` and `createTask`; host navigation and task creation use 
 context. A source that declares no named actions needs no `actions` handler.
 For `runNodeAction`, the plugin receives the press's idempotency key and must deduplicate any side
 effect by that key; a transport failure after dispatch can be retried without a stored response.
+
+A source can also declare `writable` fields with an exact field pointer, its own confined plugin route,
+a write or execute risk tier, and a finite set of typed target values. A writable source must support
+`details`, which supplies the field's live value. Dashboard field moves use the same core `act` route
+as named actions. The request contains a full record reference, field pointer, expected value, target
+value, risk tier, and idempotency key. The Node checks the current declaration, account, exact scope,
+live value, target, and route before dispatch. The plugin receives the same idempotency key and must
+deduplicate a side effect if a transport failure occurs after dispatch. GitHub pull requests declare
+`/state` writable for `open` and `closed`; `merged` remains read-only. A record and its `details`
+response can narrow the declared writable fields, so the board refuses a move before dispatch and
+the Node rechecks that eligibility against the current record.
 
 ## Completeness and limits
 

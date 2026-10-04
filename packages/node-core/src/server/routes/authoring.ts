@@ -28,7 +28,7 @@ const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
   query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
-  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
+  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. Board writes need a source-declared writable bound field and an exact writeValues entry per choice and source; list them as requirements with paths into columns, choices, and writeValues. A missing mapping is unavailable, never guessed. Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
 } as const
 
 function message(error: unknown): string {
@@ -153,8 +153,10 @@ function checkRequirements(content: PanelPlan, previous: PanelPlan | undefined, 
   for (const [index, item] of (content.requirements ?? []).entries()) {
     if (['covered', 'partial'].includes(item.status) && !item.paths?.length) problems.push(`/requirements/${index}: ${item.text} needs a plan pointer.`)
     for (const path of item.paths ?? []) {
-      const [section, key] = path.slice(1).split('/')
-      const exists = section === 'columns' ? content.columns.some(column => column.id === key)
+      const [section, key, child, choiceId, map, sourceId] = path.slice(1).split('/')
+      const exists = section === 'columns' ? content.columns.some(column => column.id === key &&
+        (child === undefined || child === 'choices' && column.choices?.some(choice => choice.id === choiceId &&
+          (map === undefined || map === 'writeValues' && !!sourceId && Object.hasOwn(choice.writeValues ?? {}, sourceId)))))
         : section === 'sources' ? content.sources.some(source => source.id === key)
           : section === 'stages' ? !!content.stages[Number(key)]
             : section === 'view' ? key === undefined || key in content.view

@@ -1,4 +1,4 @@
-import { createMemo, createSignal, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useNavigate } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
@@ -23,6 +23,9 @@ import { placePanelAt, savePanel, type PlacementScope } from './persist'
 import { sizePresets } from './layout'
 import type { PanelDefinition } from './model'
 import PanelBody from './views/PanelBody'
+import { boardMove, type BoardMove } from './boardMoves'
+import { createBoardWrite } from './boardWrite'
+import { groupField } from './shaping'
 
 const RISK_CONFIRM: Record<string, { says: string; verb: string }> = {
   write: { says: 'change something', verb: 'Make this change?' },
@@ -56,7 +59,19 @@ export default function PublishedDashboardPanel(props: {
     refetchInterval: (published.data?.content.refresh ?? 0) * 1000 || false,
   }))
   const run = createMemo(() => loaded.data ? JSON.parse(JSON.stringify(loaded.data)) as NonNullable<typeof loaded.data> : undefined)
-  const display = createMemo(() => run() ? displayPlanRun(run()!.plan, run()!.rows) : undefined)
+  const [optimisticBoard, setOptimisticBoard] = createSignal<{ rowId: string; move: BoardMove; startedAt: number }>()
+  createEffect(() => {
+    const pending = optimisticBoard()
+    if (pending && loaded.dataUpdatedAt > pending.startedAt) setOptimisticBoard(undefined)
+  })
+  const display = createMemo(() => {
+    const current = run()
+    if (!current) return undefined
+    const result = displayPlanRun(current.plan, current.rows)
+    const moving = optimisticBoard()
+    return moving ? { ...result, rows: result.rows.map(row => row.id === moving.rowId
+      ? { ...row, values: { ...row.values, [moving.move.columnId]: moving.move.choiceId } } : row) } : result
+  })
   const navigate = useNavigate()
   const [pending, setPending] = createSignal<{ row: DashboardDisplayRow; action: DataRecordAction; actionId?: string }>()
   const [taskRow, setTaskRow] = createSignal<DashboardDisplayRow>()
@@ -138,6 +153,28 @@ export default function PublishedDashboardPanel(props: {
       else setOutcome('This action no longer applies.')
     }
   }
+  const moveReason = (row: DashboardDisplayRow, choiceId: string): string | undefined => {
+    const current = run()
+    const group = display() && groupField(display()!.schema, { groupBy: current?.plan.group?.[0]?.column })?.id
+    return current && group ? boardMove(current, row, group, choiceId).reason : 'This board has no grouped column.'
+  }
+  const boardWrite = createBoardWrite({
+    resolve: (row, choiceId) => {
+      const current = run()
+      const group = display() && groupField(display()!.schema, { groupBy: current?.plan.group?.[0]?.column })?.id
+      return current && group ? boardMove(current, row, group, choiceId) : { reason: 'This board has no grouped column.' }
+    },
+    send: async intent => {
+      const result = await writeJson<{ outcome: 'done' | 'stale' | 'not-writable' | 'invalid-target' }>('/v1/core/data-sources/act', {
+        method: 'POST', nodeId, headers: { 'Content-Type': 'application/json', 'Idempotency-Key': intent.key },
+        body: JSON.stringify({ ref: intent.move.ref, field: intent.move.field, expected: intent.move.expected,
+          target: intent.move.target, confirmedRisk: intent.move.risk }),
+      })
+      return result.outcome
+    },
+    refresh: async () => { const result = await loaded.refetch(); if (result.isError) throw new Error('Refresh failed') },
+    onOptimistic: setOptimisticBoard, onMessage: setOutcome, key: () => crypto.randomUUID(), now: Date.now,
+  })
   const openRecordItem = (row: DashboardDisplayRow, item: PlanRecordItem): void => {
     if (item.target && openNamedContentTarget(item.target.kind, item.target.item, { taskId: item.taskId, prefer: 'refPanel', navigate }) !== 'external') return
     if (opensRecord(item.action)) dispatch(row, item.action, undefined, 'refPanel')
@@ -262,6 +299,13 @@ export default function PublishedDashboardPanel(props: {
         </Alert></Show>
         <Show when={run()?.rows.some(row => row.partial && Object.keys(row.partial).length)}><Alert tone="warn">{[...new Set(run()!.rows.flatMap(row => Object.values(row.partial ?? {})))].join(' ')} Measures marked partial may leave out unknown values.</Alert></Show>
         <Show when={outcome()}>{message => <Alert tone="muted">{message()}</Alert>}</Show>
+        <Show when={boardWrite.retry()}>{intent => <Alert tone="warn" actions={<Button size="sm" onPress={() => void boardWrite.send(intent())}>Retry move</Button>}>
+          The {intent().move.sourceLabel} change could not be confirmed.
+        </Alert>}</Show>
+        <Show when={boardWrite.pending()}>{intent => <Alert tone="warn" actions={<>
+          <Button size="sm" variant="ghost" onPress={boardWrite.cancel}>Cancel</Button>
+          <Button size="sm" variant="solid" tone="danger" onPress={() => void boardWrite.send(intent())}>Confirm move</Button>
+        </>}>Change {intent().move.sourceLabel} to {String(intent().move.target)}?</Alert>}</Show>
         <Show when={correcting()}>{row => <Alert tone="muted" actions={<>
           <Button size="sm" variant="ghost" onPress={() => setCorrecting(undefined)}>Cancel</Button>
           <Button size="sm" onPress={() => void saveCorrection()}>Save correction</Button>
@@ -282,7 +326,9 @@ export default function PublishedDashboardPanel(props: {
             groups={displayPlanGroups(run()!.groups, value().rows)}
             {...(run()!.plan.group?.[0] ? { groupBy: run()!.plan.group![0]!.column } : {})}
             provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} onMeasureDrilldown={openMeasureDrilldown}
-            onCorrect={row => { setCorrecting(row); setCorrection('null') }} buttons={run()!.plan.actions?.buttons ?? []} />}
+            onCorrect={row => { setCorrecting(row); setCorrection('null') }} buttons={run()!.plan.actions?.buttons ?? []}
+            boardChoices={run()!.plan.columns.find(column => column.id === groupField(value().schema, { groupBy: run()!.plan.group?.[0]?.column })?.id)?.choices ?? []}
+            boardMoveReason={moveReason} onBoardMove={boardWrite.request} />}
         </Show>
       </Show>
     </div>

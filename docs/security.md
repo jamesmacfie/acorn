@@ -11,6 +11,11 @@ Dashboard named actions send an action ID and full source reference. The Node ch
 authority, current eligibility, and confined route ownership before dispatch. The host confirms write
 and execute risk before sending anything, and a device-scoped idempotency key replays a completed
 press. [Plugin routes](./security/plugin-secrets-and-routes.md) owns the dispatch boundary.
+Board moves use the same `act` gate with a source field, expected value, and target. The Node
+rechecks the registered source, account, field declaration, live value, target set, and plugin-owned
+route. A device principal and host confirmation are required before dispatch. One move intent keeps its device-scoped
+idempotency key across retries; a changed intent gets a new key. Plugin frames do not receive this
+capability.
 
 Datasets store copies of provider and workflow data at rest in core SQLite. Definition, version,
 correction, and deletion routes require a device principal and are absent from plugin frame

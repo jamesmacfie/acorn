@@ -92,7 +92,8 @@ export async function runDashboard(env: Env, args: {
       sources.push({ instanceId: entry.id, label: entry.label, query: resolved.query, description })
       sourceDiagnostics.push({ id: entry.id, label: entry.label, revision: description.revision,
         queryDigest: resolved.published?.digest ?? digest(entry.reference.kind === 'inline' ? entry.reference.content : null),
-        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverage: description.coverage })
+        parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverage: description.coverage,
+        writable: description.writable })
     } catch (error) {
       problems.push({ path: `/sources/${plan.sources.indexOf(entry)}`, message: runInvocation.signal.reason?.name === 'TimeoutError' ? 'Run time budget exceeded.' : `${entry.label}: ${describeError(error).message}`, severity: 'error' })
       sourceDiagnostics.push({ id: entry.id, label: entry.label })

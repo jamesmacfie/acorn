@@ -179,6 +179,7 @@ export function expandRows(plan: PanelPlan, rows: readonly PlanRow[], stage: Ext
         return [[column.id, value === MISSING ? null : value]]
       }))
       output.push({ ...row, id: `${row.id}:element:${child?.ref.recordId ?? index}`, values: { ...row.values, ...attached, [stage.output]: item },
+        sourceFieldValues: undefined, sourceWritableFields: undefined,
         records: child ? [...row.records, child.ref] : row.records,
         recordItems: child ? [...row.recordItems ?? [], { ref: child.ref, ...(child.action ? { action: child.action } : {}), ...(child.target ? { target: child.target } : {}), ...(child.actions ? { actions: child.actions } : {}) }] : row.recordItems })
     })

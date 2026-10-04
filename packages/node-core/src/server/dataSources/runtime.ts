@@ -114,6 +114,7 @@ async function describe(
     operation: 'describe', source: { pluginId: source.pluginId, sourceId: source.sourceId }, scope,
   }, invocation, DATA_LIMITS.detailBytes))
   validateDescription(result)
+  if (result.writable?.length) (await import('./fieldMove')).validateWritableDescription(result, source.pluginId)
   if (result.targets?.some(target => !target.kind.startsWith(`${source.pluginId}.`))) throw new DataSourceError('invalid-response')
   if (new Set(result.actions?.map(action => action.id)).size !== (result.actions?.length ?? 0)) throw new DataSourceError('invalid-response')
   return result
@@ -186,10 +187,13 @@ function validateRecordReference(ref: { connectionId?: string; scope?: DataSourc
 }
 
 /** Resolve an action at press time. The idempotency middleware stores the final response by device and key. */
-export async function actOnDataRecord(env: Env, input: unknown, key: string | undefined, invocation: DataSourceInvocation): Promise<{ outcome: 'done' | 'no-longer-available' } | { outcome: 'ready'; action: DataRecordAction }> {
+export async function actOnDataRecord(env: Env, input: unknown, key: string | undefined, invocation: DataSourceInvocation): Promise<{ outcome: 'done' | 'no-longer-available' | 'stale' | 'not-writable' | 'invalid-target' } | { outcome: 'ready'; action: DataRecordAction }> {
   const request = parse(dataSourceActSchema, { ...(typeof input === 'object' && input ? input : {}), idempotencyKey: key }, false)
   const scope = request.ref.scope
   if (!scope) throw new DataSourceError('invalid-request')
+  if ('field' in request) {
+    return (await import('./fieldMove')).moveDataRecordField(env, request, invocation)
+  }
   const current = await invokeDataSource(env, { operation: 'actions', ref: request.ref, scope }, invocation)
   const selected = current.actions.find(item => item.id === request.actionId)
   if (!selected) return { outcome: 'no-longer-available' }
@@ -254,6 +258,7 @@ async function querySource(
       }
       if (record.actions?.some(named => named.action.risk && named.action.risk !== named.risk
         || !description.actions?.some(declared => declared.id === named.id && declared.risk === named.risk))) throw new DataSourceError('invalid-response')
+      if (record.writableFields?.some(field => !description.writable?.some(declared => declared.field === field))) throw new DataSourceError('invalid-response')
       const { recordId, ...contents } = record
       result.records.push({
         ...contents,

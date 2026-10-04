@@ -52,6 +52,7 @@ export async function readPullSelection(token: string, q: string, signal: AbortS
       bytes += Buffer.byteLength(JSON.stringify(data))
       if (bytes > DATA_LIMITS.selectionBytes) return result({ kind: 'incomplete', cause: 'host-budget' })
       records.push({ recordId: node.id, data, display: { title: node.title, url: node.url }, action: { verb: 'openUrl', url: node.url },
+        writableFields: state === 'MERGED' ? [] : ['/state'],
         target: { kind: 'github.pull-request', item: `${repository.nameWithOwner}#${node.number}` } })
     }
     if (!search.pageInfo.hasNextPage) return result({ kind: 'complete' })

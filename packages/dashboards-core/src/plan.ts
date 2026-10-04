@@ -1,5 +1,5 @@
 import { compareDataValues, type DataBinding, type DataPredicate } from '@acorn/protocol/dataBindings.ts'
-import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
+import { MISSING, canonicalDataEncoding, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import type { PanelPlan, PanelPlanColumn } from '@acorn/protocol/dashboards.ts'
 import type { DataRecord, DataSourceDescription, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { PANEL_CAPABILITIES } from './capabilities'
@@ -12,7 +12,7 @@ import { dashboardFields } from './typedProjection'
 export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
 export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; result?: DataSourceResult }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
-export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>; correctableDatasetId?: string; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>> }
+export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>; correctableDatasetId?: string; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>>; sourceFieldValues?: Record<string, Record<string, DataValue>>; sourceWritableFields?: Record<string, string[]> }
 export type PlanGroup = { key: string; label: string; count: number; rows: PlanRow[]; children?: PlanGroup[] }
 export type PlanStageCount = { path: string; input: number; output: number; meaning?: string }
 export type DashboardRun = {
@@ -21,7 +21,7 @@ export type DashboardRun = {
   groups: PlanGroup[]
   diagnostics: {
     problems: PlanProblem[]
-    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null; completeness?: DataSourceResult['completeness']; readTime?: number; coverage?: DataSourceDescription['coverage'] }[]
+    sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null; completeness?: DataSourceResult['completeness']; readTime?: number; coverage?: DataSourceDescription['coverage']; writable?: DataSourceDescription['writable'] }[]
     stages: PlanStageCount[]
     evaluationTime: number
     plugins: string[]
@@ -94,6 +94,15 @@ export function validatePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
   for (const [index, column] of plan.columns.entries()) {
     if (column.precision && column.type !== 'datetime') add(`/columns/${index}/precision`, 'Only a date column has precision.')
     if (column.choices && column.type !== 'enum') add(`/columns/${index}/choices`, 'Only an enum column has choices.')
+    for (const [choiceIndex, choice] of (column.choices ?? []).entries()) for (const [sourceId, value] of Object.entries(choice.writeValues ?? {})) {
+      const path = `/columns/${index}/choices/${choiceIndex}/writeValues/${pathPart(sourceId)}`
+      const source = sources.find(candidate => candidate.instanceId === sourceId)
+      const binding = column.bind[sourceId]
+      if (!source || !binding || !('field' in binding)) { add(path, 'Choose a bound source field for this write value.'); continue }
+      const writable = source.description.writable?.find(field => field.field === binding.field)
+      if (!writable) add(path, `${source.label} does not declare ${binding.field} writable.`)
+      else if (!writable.values.some(allowed => canonicalDataEncoding(allowed) === canonicalDataEncoding(value))) add(path, `${source.label} no longer accepts this write value.`)
+    }
     for (const sourceId of column.precedence ?? []) if (!plan.sources.some(source => source.id === sourceId)) add(`/columns/${index}/precedence`, `Source ${sourceId} is not in this plan.`)
     if (typeof column.unit === 'object' && !columnAt(plan, column.unit.column)) add(`/columns/${index}/unit`, `Unit column ${column.unit.column} is missing.`)
     for (const [sourceId, binding] of Object.entries(column.bind)) {
@@ -294,6 +303,11 @@ export function bindPanelRows(plan: PanelPlan, sources: readonly PlanSource[]): 
     id: `${source.instanceId}:${record.ref.recordId}`,
     sourceRecords: { [source.instanceId]: record.ref },
     sourceValues: { [source.instanceId]: values },
+    sourceFieldValues: { [source.instanceId]: Object.fromEntries((source.description.writable ?? []).flatMap(field => {
+      const value = readDataPointer(record.data, field.field)
+      return value === MISSING ? [] : [[field.field, value]]
+    })) },
+    ...(record.writableFields ? { sourceWritableFields: { [source.instanceId]: record.writableFields } } : {}),
     values,
     records: [record.ref],
     ...(source.query.source.pluginId === 'core' && source.query.source.sourceId.startsWith('dataset:')
@@ -413,6 +427,8 @@ export function describePanelPlan(plan: PanelPlan, sources: readonly PlanSource[
     rowMeaning,
     ...sources.map(source => `${source.label} reaches ${source.description.consistency}; scope ${JSON.stringify(source.query.scope.parameters)}.`),
     `Columns: ${plan.columns.map(column => column.label).join(', ') || 'none'}.`,
+    ...plan.columns.flatMap(column => (column.choices ?? []).flatMap(choice => Object.entries(choice.writeValues ?? {}).map(([sourceId, value]) =>
+      `Dropping a ${sources.find(source => source.instanceId === sourceId)?.label ?? sourceId} record on ${choice.label} sets ${column.label} to ${JSON.stringify(value)}.`))),
     ...(plan.relations ?? []).map(relation => `${relation.kind === 'equivalence' ? 'Merge equivalent' : relation.cardinality === 'one-to-many' ? 'Attach children from' : 'Look up'} ${relation.to} through ${relation.id}${relation.unmatched === 'drop' ? '; drop unmatched rows' : '; keep unmatched rows'}.`),
     ...plan.stages.map(stage => stage.op === 'filter' ? `Keep rows where ${describePredicate(stage.where)}.`
       : stage.op === 'compute' ? `Compute ${stage.columns.map(column => column.label).join(', ')}.`
@@ -458,6 +474,8 @@ export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { sch
       sourceId: row.records[0]?.sourceId ?? '',
       sourceRowId: row.records[0]?.recordId,
       records: row.records,
+      ...(row.sourceFieldValues ? { sourceFieldValues: row.sourceFieldValues } : {}),
+      ...(row.sourceWritableFields ? { sourceWritableFields: row.sourceWritableFields } : {}),
       ...(row.recordItems ? { recordItems: row.recordItems } : {}),
       ...(row.taskId ? { taskId: row.taskId } : {}),
       ...(row.action ? { action: row.action } : {}),
