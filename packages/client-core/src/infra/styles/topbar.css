@@ -85,6 +85,7 @@
   font-size: var(--fs-sm);
 }
 .repo-picker-empty { color: var(--text-muted); font-size: var(--fs-sm); padding: var(--space-5); margin: 0; }
+.repo-picker-footer { padding: var(--space-2); border-top: var(--chrome-divider); }
 /* overflow-x: hidden is load-bearing: without it `overflow-y: auto` computes overflow-x to `auto`
    too, so long branch names get a horizontal scrollbar instead of ellipsizing (.repo-picker-name
    already clips). max-height tracks the viewport so the list runs near-full-height before scrolling. */

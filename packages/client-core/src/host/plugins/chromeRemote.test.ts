@@ -30,6 +30,7 @@ describe('chrome action boundary', () => {
 
   it('rejects node and route choices the topbar did not offer', () => {
     const pickNode = vi.fn()
+    const addProject = vi.fn()
     const navigate = vi.fn()
     const props: TopbarProps = {
       workspace: null, workspaces: [], project: null, projects: [],
@@ -37,9 +38,9 @@ describe('chrome action boundary', () => {
       breadcrumb: [{ label: 'Project', route: '/p/one' }],
       node: { id: 'n1', label: 'Local', state: 'online' },
       nodes: [{ id: 'n1', label: 'Local', state: 'online' }],
-      account: null, railCollapsed: false, slots: { right: slot },
+      account: null, railCollapsed: false, canAddProject: false, slots: { right: slot },
       pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode, openSettings: vi.fn(),
-      collapseRail: vi.fn(), navigate, clearCache: vi.fn(),
+      collapseRail: vi.fn(), navigate, clearCache: vi.fn(), addProject,
     }
     const remote = topbarRemote(props)
     expect(() => structuredClone(remote.data)).not.toThrow()
@@ -48,5 +49,7 @@ describe('chrome action boundary', () => {
     expect(() => remote.actions.pickNode?.('n2')).toThrow()
     expect(() => remote.actions.navigate?.('/settings')).toThrow()
     expect(navigate).not.toHaveBeenCalled()
+    expect(() => remote.actions.addProject?.(undefined)).toThrow()
+    expect(addProject).not.toHaveBeenCalled()
   })
 })

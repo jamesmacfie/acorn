@@ -7,7 +7,10 @@ provider projects from Linear and Rollbar map onto them. The data model is in
 ## Add a project
 
 You add folders from Settings → Projects, import repositories through the GitHub plugin, or add them
-in the first-run wizard. The `Default` workspace doesn't exist until the first project needs it:
+in the first-run wizard. Where the host has a folder picker, **Add project…** at the foot of the
+topbar's workspace switcher and **Add project** in the palette pick a folder and add it to the active
+workspace (`addProjectFromFolder`); the topbar reaches it through the `addProject` verb, gated by
+`canAddProject`, so a replacement topbar can offer the same thing. The `Default` workspace doesn't exist until the first project needs it:
 `createProject` and `createProjectRef` fall back to it when no workspace is named.
 
 The CLI registers a local folder only with an explicit workspace and an absolute path on the Node's
