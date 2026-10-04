@@ -12,6 +12,8 @@ of plugins. This page tells you where to look and how to check your work.
 - [docs/plugin-map.md](./docs/plugin-map.md) is the short way into the plugin system.
 - [docs/testing.md](./docs/testing.md) and
   [docs/local-development.md](./docs/local-development.md) hold the full test and dev workflows.
+- [docs/writing-docs.md](./docs/writing-docs.md) says where a doc goes, the house style, how to split
+  a long page, and how to cite a doc from code. Read it before you add or move a doc.
 - `docs/future/` holds designs for work that hasn't shipped. Its README lists every one.
 
 Before you change code, find the runtime that owns it. Trace the data from its source through the

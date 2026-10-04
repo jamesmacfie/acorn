@@ -81,14 +81,16 @@ The architecture suite's text checks are a fast first line. Neither keeps a file
 - Every `docs/<page>.md` they name has to exist, with no exceptions.
 - Every `§ Heading` after one has to start with a heading or an explicit anchor in that doc, after
   wrapped comment lines are joined.
-- Section citations that failed when the check landed sit in
-  `tools/arch/docCitations.allowlist.txt`. An entry that starts passing fails the test until you
-  delete it, so the list only shrinks.
-- The same file prints the docs longer than 200 lines as a report. It doesn't fail on them.
+- Section citations that failed when the check landed sat in
+  `tools/arch/docCitations.allowlist.txt`. The list is empty. An entry that starts passing fails
+  the test until you delete it, so the list only shrinks.
+- The same file fails on any in-scope doc longer than 200 lines. `docs/README.md` is the one
+  exception.
 
 The check reads tracked files only, so run `git add` on a new file before you trust a pass. Vitest
-hides `console.info` from passing tests when it detects an agent. To see the length report, run
-`env -u CLAUDECODE npx vitest run docCitations` in `tools/arch`.
+hides `console.info` from passing tests when it detects an agent. To see the citation counts, run
+`env -u CLAUDECODE -u AI_AGENT npx vitest run docCitations` in `tools/arch`. For the writing rules
+behind these checks, see [Write and maintain docs](../writing-docs.md).
 
 ## Non-vacuity
 

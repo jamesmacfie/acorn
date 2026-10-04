@@ -94,7 +94,7 @@ describe('source comments cite docs that exist', () => {
   })
 
   // A page past 200 lines mixes topics, so it gets split into a folder of topic pages
-  // (docs/future/documentation/style.md). `docs/future/` holds proposals, and `docs/testing/` and the
+  // (docs/writing-docs.md § Split a long page). `docs/future/` holds proposals, and `docs/testing/` and the
   // dated security review hold evidence, so none of them count.
   it('keeps every doc to 200 lines', () => {
     // The index lists every page by design, so it grows with the docs. Nothing else is exempt.

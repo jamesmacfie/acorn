@@ -13,6 +13,7 @@ Read these pages in order:
 3. [Frontend](./frontend.md) or [API reference](./api-reference.md), whichever side you're about to
    change.
 4. [Conventions](./conventions.md): where a file goes and what to call it.
+5. [Write and maintain docs](./writing-docs.md), before you add, move, or cite a doc.
 
 If your first task is a plugin, read the [plugin map](./plugin-map.md) instead of step 3. It covers
 the whole plugin system in one page.
@@ -293,15 +294,9 @@ Each feature landing page above has topic pages in a folder of the same name:
 
 ## Documentation ownership
 
-Keep one owning page for each contract. Link to it from other pages instead of copying its details.
-Group long references by topic in a subfolder. Keep the original landing page when source comments
-or external links depend on its path, and update relative links when moving a section.
-
-Describe implemented behavior in reference pages. Put proposed application changes in
-[Future work](./future/README.md), and label dated measurements as historical evidence.
-Update this index when adding a page. `tools/arch/docPaths.test.ts` checks file paths and relative
-links, and `tools/arch/docCitations.test.ts` checks the source comments that cite a doc. Review the
-implementation to verify API signatures and behavior.
+Keep one owning page for each contract, and add every new page to this index in the same commit.
+[Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
+long page, how to cite a doc from code, and the checks that enforce it.
 
 ## Plugin topic pages
 
