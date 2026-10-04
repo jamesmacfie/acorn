@@ -1,7 +1,8 @@
 # Phase 1: quick wins in the current editor
 
-Status: proposed, October 5, 2026. Depends on nothing. Read the [programme README](./README.md)
-first. The [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) has the
+Status: shipped, October 5, 2026, in commit `5cb399885`. [What shipped](#what-shipped) records
+the choices made while building it and what it left for later phases. Depends on nothing. Read the
+[programme README](./README.md) first. The [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) has the
 screenshots this phase fixes.
 
 ## Goal
@@ -172,3 +173,63 @@ Start `pnpm dev:agent -- --session panels`, then follow the steps in
 - `latestUnpublishedDashboard` has no caller other than `DashboardEditor.tsx`.
 - `SourceQueryEditor` has three callers: itself in tests, the dashboard editor, and
   `StepConfigurationFields.tsx`.
+
+## What shipped
+
+All 22 requirements shipped, and the behaviour was checked in a `dev:agent` session as well as by the
+tests listed above. The shipped behaviour is described in
+`docs/dashboards/mapping-and-editor.md` § The generated editor, which wins over this page.
+
+Where the code lives:
+
+- The label map is `packages/dashboards-core/src/labels.ts`. Besides the table in requirement 2, it
+  labels measures, views, aggregates, chart shapes, group buckets, week starts, arithmetic, duration
+  units, and the relative offset presets. It also holds `planPartLabel`, which names the part a
+  problem path points at, and `operationLabel`. Phase 2 can build the outline names on
+  `planPartLabel`.
+- `labels.test.ts` walks the zod schemas through their `def.type` rather than importing zod, because
+  `dashboards-core` doesn't depend on zod.
+- The default column rule is `defaultPlanColumns` in
+  `packages/client-core/src/features/dashboards/dashboardEditorModel.ts`. Workspace tasks starts with
+  three columns: Task, Status, and Updated.
+- `LabeledSelect` and `LabeledInput` in `packages/client-core/src/features/dashboards/fields.tsx`
+  wrap a kit control in a `Field` with a visible caption. The editor and `CompositionStageForm.tsx`
+  use them for every select and text box.
+- Adding `labels.ts` to the package's `exports` map raised the entrypoint count for
+  `@acorn/dashboards-core` in `tools/arch/boundaries.test.ts` from 14 to 15.
+
+Choices made while building it:
+
+- **Stages** is renamed **Steps**, with **Add step** and **Remove step**, to match the programme's
+  terms. Step folds read "Step 2 · Keep matching rows · 312 → 41".
+- The folds run in the order the README lists parts: title, **Data**, **Relations**, **Columns**,
+  **Steps**, **Arrange**, **Look**, **When a row is pressed**, **Row buttons**, and **Settings**.
+  **Settings** also holds the dashboard placement select.
+- **Arrange** shows the sort order only after a sort column is picked, and the group bucket only
+  after a group column is picked.
+- **Add another source** opens an empty source picker with a **Cancel** button. The source joins the
+  plan only when one is picked, so the `core/choose` placeholder is no longer written by the editor.
+- The offset list starts with **No offset**. Choosing it removes the stored offset, where the old
+  free text field couldn't clear one.
+- The time zone helper is copied from the workflow schedule dialog rather than shared. A plugin can
+  reach client-core only through `@acorn/plugin-api`, and the copy is three lines.
+- The save badge sits in its own row at the top of the form. The kit `Modal` takes only a string
+  title, so the badge can't go in the header itself without a kit change.
+- Problems are shown once per message, and the part name and message share one line, such as
+  "Column Status: …". **Publish** shows "Title is incomplete." style reasons for a schema failure,
+  using the first zod issue's path.
+- With no `dashboardId`, a device recovery copy for `new:<workspace>` still reopens silently. It
+  exists only when the Node never accepted a save, so it protects edits rather than resuming an
+  abandoned draft.
+- Relations now read "Source A blocks Source B" with source labels, where they showed source IDs.
+
+Left for later phases:
+
+- Any edit inside a step collapses that step's fold. The editor's `For` over `plan().stages`
+  remounts a step whenever its object changes, and the fold has no `defaultOpen`. The old editor did
+  the same. Phases 3 and 4 replace these forms, so they should keep each step's identity across
+  edits, as phase 2's derived part identity allows.
+- The plan description still prints schema values, such as "Keep rows where Updated eq -P30D from
+  now". It comes from `describePanelPlan` in `packages/dashboards-core/src/plan.ts`, which
+  [phase 2](./02-plan-outline-model.md) rebuilds on `labels.ts`.
+- The requirements checklist still gates **Publish**. [Phase 6](./06-docked-ai.md) removes it.

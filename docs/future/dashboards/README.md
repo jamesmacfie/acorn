@@ -1,8 +1,9 @@
 # Panel studio: creating, editing, and previewing dashboard panels
 
-Status: proposed, October 5, 2026. Nothing built. This programme replaces the dashboards programme
-that lived in this folder. Its workstreams 1 to 7 shipped by October 4, 2026, and its files were
-removed on October 5, 2026; git history keeps them (commit `1d8c37913`).
+Status: proposed, October 5, 2026. [Phase 1](./01-quick-wins.md) shipped on October 5, 2026, and
+the other phases aren't built. This programme replaces the dashboards programme that lived in this
+folder. Its workstreams 1 to 7 shipped by October 4, 2026, and its files were removed on October 5,
+2026; git history keeps them (commit `1d8c37913`).
 
 Read this page before any phase. It says what's wrong, what we're building, the decisions already
 made, the order of work, and how to check your work in the app. The
