@@ -62,6 +62,8 @@ export type PickerProps<T> = {
   leading?: (item: T) => JSX.Element // optional per-row leading control (e.g. pin)
   tools?: JSX.Element // optional extra toolbar control beside the filter (e.g. refresh)
   status?: JSX.Element // optional status line under the toolbar (e.g. refresh failed)
+  /** An action below the list, such as "Add project…". It receives `close` so pressing it can dismiss the picker. */
+  footer?: (close: () => void) => JSX.Element
   /** The trigger's size, as any Button's. A picker in a bar of `sm` buttons takes `sm` too, or it
    *  stands 6px taller than everything beside it. */
   size?: Extract<Size, 'sm' | 'md'>
@@ -198,6 +200,9 @@ export default function Picker<T>(props: PickerProps<T>) {
                   )}
                 </For>
               </ul>
+            </Show>
+            <Show when={props.footer}>
+              {(footer) => <div class="repo-picker-footer">{footer()(close)}</div>}
             </Show>
           </div>
         </Portal>

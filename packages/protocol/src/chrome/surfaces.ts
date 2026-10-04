@@ -48,6 +48,8 @@ export type TopbarData = {
   nodes: readonly { id: string; label: string; state: string }[]
   account: { label: string; avatar?: string } | null
   railCollapsed: boolean
+  /** Whether this host has a folder picker, which `addProject` needs. */
+  canAddProject: boolean
   slots: { right: SlotRef }
 }
 
@@ -59,4 +61,5 @@ export type TopbarProps = TopbarData & {
   collapseRail(): void
   navigate(route: string): void
   clearCache(): void | Promise<void>
+  addProject(): void
 }
