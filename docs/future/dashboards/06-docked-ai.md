@@ -1,6 +1,7 @@
 # Phase 6: docked AI and reviewing proposals
 
-Status: proposed, October 5, 2026. Depends on [phase 2](./02-plan-outline-model.md) and
+Status: shipped, October 5, 2026, in commit `6ecfc2c3b`. [What shipped](#what-shipped) records the choices made while
+building it and what it left for later. Depends on [phase 2](./02-plan-outline-model.md) and
 [phase 3](./03-studio-shell.md). Read the [programme README](./README.md) first. The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows a proposal under
 review in "AI creation and AI edits".
@@ -164,3 +165,57 @@ on the filter step and ask for 14 days.
   `AuthoringConversationProps` fields it records.
 - How `AuthoringConversation` reads its context entries, so the dock can draw past turns from them
   without a second store.
+
+## What shipped
+
+All 16 requirements shipped except one entry point in requirement 12, with the tests listed above.
+`docs/dashboards/mapping-and-editor.md` § The generated editor describes the shipped behaviour and
+wins over this page.
+
+Where the code lives:
+
+- `AuthoringConversation.tsx` gained `layout`, `focus`, `onProposal`, and `proposalDetail`. The dock
+  layout is `DockedConversation` in the same file. Its turns come from the context entries, so there's
+  no second store.
+- `packages/client-core/src/features/dataSources/authoringStorage.ts` owns the conversation's storage
+  key and `moveAuthoringConversation`. It sits apart from the component so `studioStore.ts`, which
+  tests in plain Node, can call it.
+- `studioStore.ts` holds review: `review`, `reviewProposal`, and `applyReview`. Undo and redo wait
+  during review.
+- `StudioOutline.tsx` takes `review` and marks rows. `StudioPreview.tsx` takes `review` for **Before**
+  and **After**. `PanelStudio.tsx` runs the proposed plan as a second draft preview.
+- `authoringFocusPrefix` in `packages/protocol/src/data/authoring.ts` builds the prefix. The dashboard
+  prompt in `packages/node-core/src/server/routes/authoring.ts` explains it.
+- `REQUIREMENT_STATUS_LABELS` in `packages/dashboards-core/src/labels.ts` names each status.
+- **Edit with AI…** is on the panel menu (`PanelGridItem.tsx`), through `withAi` on
+  `DashboardEditorSession`.
+
+Choices made while building it:
+
+- `AuthoringConversation` isn't in `tools/arch/publishedPluginSurface.snapshot.txt`. That snapshot
+  covers the npm SDK packages. The in-repo `@acorn/plugin-api` snapshot records names only, so the new
+  props changed neither.
+- The dock mounts on first open and stays mounted while closed, so a reply still on its way lands. A
+  proposal saved on this computer shows again only when the dock opens.
+- Sending a message while a proposal is under review sets it aside without telling the model it was
+  rejected, because the message is usually a request to change it.
+- The focus is sent once, with the next message, and a new **Ask AI about this** replaces it.
+- During review the outline has no **Add** and no row menu, and the inspector's forms are `inert`.
+- The whole dock column scrolls, composer included. The kit has no scroll region to pin the composer.
+- The composer stays enabled while the model list loads, so the dock can focus it as it opens. A
+  message sent in that moment is dropped.
+- The requirement icons and status words show in the dock only. The publish review lists the ones not
+  fully covered as text.
+
+Checked in a `dev:agent` session: the dock opening from **Ask AI**, its header with the model and the
+settings menu, **Ask AI about this** from the column list filling the box with "About Task: ", and a
+publish review with no requirement checkboxes. No turn was sent, because it would spend the owner's
+model. The tests cover review. The driver can't right-click or hover, so the outline's row menu and
+the panel menu's **Edit with AI…** weren't opened there. The test opens the studio with `withAi`.
+
+Left for later:
+
+- **Ask AI about this** on a column header's context menu in the preview. The views take no menu
+  prop, and the outline row and column list already offer it.
+- Proposal problems aren't marked on the outline during review.
+- Workflows still uses the modal (requirement 16).
