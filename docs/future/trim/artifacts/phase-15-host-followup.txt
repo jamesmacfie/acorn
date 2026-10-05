@@ -1,0 +1,34 @@
+2026-10-06, isolated desktop fixture trim-15-correction, tui-navigation.
+Driver: pnpm dev:agent:ui -- --session trim-15-correction snapshot/click/fill/stop.
+Native: exact Acorn Agent Test.app path from `target`, PID 11541.
+
+Imported session, Chats only after navigation back:
+  YOU / Turn 0 summary and subsequent AGENT messages visible.
+  No READ SRC or CHANGED tool cards in returned snapshot.
+
+Managed Codex session, live queue:
+  Working turn: `sleep 90`.
+  Before reorder: Queued A: reply QA. / Queued B: reply QB.
+  Controls: Move queued turn down / Move queued turn up / Edit queued prompt /
+            Remove queued prompt.
+  After moving B up: Queued B / Queued A.
+  After dispatch: B -> QB, then A -> QA in transcript.
+  Later working turn: `sleep 180`.
+  Edit: Queue edit target: original text. -> Queue edit target: revised text.
+  Remove: revised card disappeared while 1 agent working remained visible.
+  Stop: session returned ready; turn marked interrupted.
+
+Native task and keyboard:
+  Right-click Plan follow-up work -> Actions menu -> Rename.
+  Saved Plan follow-up verified; rail and breadcrumb updated.
+  Cmd+K -> Command palette, 38 results. Escape -> task view.
+
+Workflow editor:
+  New local Trim 15 workflow fixture -> Ask an agent -> Codex.
+  Prompt: Reply with exactly WORKFLOW_OK. Do not edit files.
+  Validation: 1 step, no problems.
+  State remained Saving… / Not published / Run… disabled; no run claimed.
+
+Teardown:
+  dev:agent:ui stop; status: session not running.
+  ps: no trim-15-correction process or sleep 180 child (only ps/rg probe).
