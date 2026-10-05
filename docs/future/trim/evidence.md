@@ -309,6 +309,13 @@ appropriate release runners; this Darwin-only run is not cross-platform runtime 
 
 Phase 04 should measure against the phase 03 staged inventory and leave this target policy intact.
 
+Review correction, October 6, 2026: the cross-target host-build fixture no longer assumes a Darwin
+arm64 host. It selects a supported triple with a different platform or architecture from the test
+host and writes that triple's native prebuild assets. This changes test setup only. Under Node
+24.21.0 and pnpm 11.0.0, `pnpm test:focus @acorn/desktop
+scripts/stage-runtime-dependencies.test.mjs` passed all 11 tests. The original package suites,
+build, and byte measurements remain the phase 03 results above.
+
 ## Future implementation record
 
 Add one dated section per later phase containing:

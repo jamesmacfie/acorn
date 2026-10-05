@@ -83,15 +83,26 @@ it('rejects missing target assets and unreviewed node-pty layouts', () => {
 })
 
 it('rejects an unqualified host build for a different target', () => {
+  const triple = targets.find((name) => {
+    const target = runtimeTarget(name)
+    return target.platform !== process.platform || target.arch !== process.arch
+  })
+  if (!triple) throw new Error('No supported cross target is available for this test')
+  const target = runtimeTarget(triple)
   const dir = mkdtempSync(join(tmpdir(), 'acorn-native-cross-test-'))
   scratch.push(dir)
   packageAt(dir, { name: 'desktop' })
   const source = join(dir, 'node_modules/node-pty')
   packageAt(source, { name: 'node-pty', version: '1.1.0' })
-  asset(source, 'prebuilds/darwin-x64/pty.node')
-  asset(source, 'prebuilds/darwin-x64/spawn-helper')
+  const prebuild = `prebuilds/${target.platform}-${target.arch}`
+  asset(source, `${prebuild}/pty.node`)
+  if (target.platform === 'win32') {
+    for (const file of ['conpty.node', 'conpty_console_list.node', 'conpty/conpty.dll', 'conpty/OpenConsole.exe', 'winpty.dll', 'winpty-agent.exe']) {
+      asset(source, `${prebuild}/${file}`)
+    }
+  } else asset(source, `${prebuild}/spawn-helper`)
   asset(source, 'build/Release/pty.node')
-  expect(() => stageRuntimeDependencies(dir, join(dir, 'helper'), runtimeTarget('x86_64-apple-darwin'), ['node-pty']))
+  expect(() => stageRuntimeDependencies(dir, join(dir, 'helper'), target, ['node-pty']))
     .toThrow('host-specific build')
 })
 
