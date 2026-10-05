@@ -1884,3 +1884,23 @@ it('reports cross-field errors in author-facing order with their descriptor path
     reason: 'acorn-plugin.json does not match the manifest schema — requires.plugins[0].id: a plugin cannot require itself; contributions.frames[0]: a webview surface needs a client bundle; declare `client` in the manifest; contributions.commands[0].action.pane: openPane names \'missing\', which this manifest does not declare as a task-scoped pane',
   })
 })
+
+describe('derived data sources', () => {
+  const source = (extra: Record<string, unknown>) => nodeManifest({ dataSources: [{ sourceId: 'readiness', name: 'Readiness',
+    singular: 'Issue', plural: 'Issues', identityScope: 'Linear issue', handler: '/v1/p/board/readiness', ...extra }] })
+
+  it('accepts declared inputs and refuses them beside a provider', () => {
+    const inputs = { issues: { source: 'linear:issues', label: 'Issues' }, pulls: { source: 'github:pull-requests', label: 'Pull requests', optional: true } }
+    expect(source({ inputs }).success).toBe(true)
+    const both = source({ inputs, providerId: 'linear' })
+    expect(both.success).toBe(false)
+    expect(both.error?.issues.map(issue => issue.message)).toContain("A source with inputs can't also own a provider.")
+  })
+
+  it('refuses a bad input name, a source without a plugin, and a ninth input', () => {
+    expect(source({ inputs: { Issues: { source: 'linear:issues', label: 'Issues' } } }).success).toBe(false)
+    expect(source({ inputs: { issues: { source: 'issues', label: 'Issues' } } }).success).toBe(false)
+    const nine = Object.fromEntries(Array.from({ length: 9 }, (_, i) => [`input${i}`, { source: 'linear:issues', label: 'Issues' }]))
+    expect(source({ inputs: nine }).success).toBe(false)
+  })
+})

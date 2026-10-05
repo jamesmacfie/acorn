@@ -6,6 +6,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 import { pluginManifestSchema } from './manifest'
 import { hostFunctionMode } from './hostCallModes'
 import { isolateNodePlugin } from './isolation'
+import { invocationOwned } from './rpcOwnership'
 import type { CompiledNodePluginContext, PluginFetchHandler } from '../pluginHost/types'
 import type { ModelProviderAdapter } from '../modelProviders/types'
 
@@ -21,6 +22,8 @@ it('classifies init and ready public paths and refuses an unclassified host meth
   expect(hostFunctionMode('plugin.init.args[0].providers.model')).toBe('sync')
   expect(hostFunctionMode('remote.sync.args[1].args[1].providers.items')).toBe('sync')
   expect(hostFunctionMode('remote.sync.args[1].args[1].providers.connections')).toBe('async')
+  // A derived source's input handles ride on a route's request context, so the worker reads them over async RPC.
+  expect(hostFunctionMode('remote.args[1].inputs.pulls.query')).toBe('async')
   expect(() => hostFunctionMode('plugin.init.args[0].core.tasks.newMethod')).toThrow('Unclassified host context method')
   expect(() => hostFunctionMode('plugin.init.args[0].newGroup.method')).toThrow('Unclassified host context method')
 })
@@ -33,6 +36,7 @@ it('keeps loaded worker calls in their declared modes across registration and di
   let listener: ((frame: unknown) => unknown) | undefined
   let modelAdapter: ModelProviderAdapter | undefined
   let integrationRoute: PluginFetchHandler | undefined
+  let fetchRoute: PluginFetchHandler | undefined
   const disposed = vi.fn()
   const registered = vi.fn()
   const ctx = {
@@ -40,7 +44,7 @@ it('keeps loaded worker calls in their declared modes across registration and di
     contextSections: { register: registered },
     nodeActions: { register: registered },
     harnesses: { register: registered },
-    routes: { fetch: registered, register: registered },
+    routes: { fetch: (route: PluginFetchHandler) => { registered(); fetchRoute = route }, register: registered },
     schedules: { register: registered, registerTarget: registered },
     dataSources: { register: registered },
     taskChecks: { register: registered },
@@ -101,6 +105,12 @@ it('keeps loaded worker calls in their declared modes across registration and di
       },
     } as never)
     expect(await response?.json()).toEqual(['ENG-42'])
+    // A derived source's input handle crosses as an async call on the request context.
+    const query = vi.fn(async (request: unknown) => ({ records: [], echo: request }))
+    const derived = await fetchRoute?.(new Request('https://acorn.invalid/derived'), invocationOwned({
+      userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {}, inputs: { records: { query } },
+    }) as never)
+    expect(await derived?.json()).toEqual({ records: [], echo: { take: 1, sort: [] } })
   } finally {
     await plugin.dispose?.()
   }

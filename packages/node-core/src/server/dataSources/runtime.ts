@@ -7,7 +7,8 @@ import {
 import { DATA_LIMITS, canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import type { Env } from '../bindings'
-import { authorizeDataSource, type DataSourceInvocation } from './authority'
+import { authorizeDataSource, authorizeSourceInputs, type DataSourceInvocation } from './authority'
+import { checkInputChain, composeDerivedRevision, finishDerivedResult, inputHandles, type DerivedReadState } from './inputs'
 import { dispatchSource } from './dispatch'
 import {
   registeredDataSource, registeredDataSources, registeredDataSourceDiscovery,
@@ -29,7 +30,7 @@ function parse<T>(schema: { parse(value: unknown): T }, input: unknown, response
 const bounded = (invocation: DataSourceInvocation, timeoutMs: number = DATA_LIMITS.queryMs): DataSourceInvocation => ({
   ...invocation, signal: AbortSignal.any([invocation.signal, AbortSignal.timeout(timeoutMs)]),
 })
-const publicSource = ({ handler: _handler, coreHandler: _coreHandler, ...source }: RegisteredDataSource) => source
+const publicSource = ({ handler: _handler, coreHandler: _coreHandler, loaded: _loaded, ...source }: RegisteredDataSource) => source
 
 const sourceRequestScheduler = new ProviderRequestScheduler()
 
@@ -39,13 +40,19 @@ const dispatchRegistered = async (
   request: DataSourceRequest,
   invocation: DataSourceInvocation,
   maxBytes?: number,
+  derived?: DerivedReadState,
 ) => {
-  const execute = () => source.coreHandler
+  const dispatch = () => source.coreHandler
     ? source.coreHandler(request, env, invocation.signal)
     : dispatchSource(env, source.pluginId, source.handler, request, invocation, maxBytes, {
       providerId: source.providerId,
       connectionId: request.operation === 'query' ? request.query.scope.connectionId : request.scope.connectionId,
+      ...(derived ? { inputs: inputHandles(env, source, request, invocation, derived, invokeDataSource) } : {}),
     })
+  // A derived handler that failed after an input read failed reports the input's error instead.
+  const execute = !derived ? dispatch : () => Promise.resolve(dispatch()).catch((error: unknown) => {
+    throw error instanceof DataSourceError && error.code === 'provider-failure' && derived.inputError ? derived.inputError : error
+  })
   const connectionId = request.operation === 'query' ? request.query.scope.connectionId : request.scope.connectionId
   const provider = source.providerId ? connectionProviderRegistry.get(source.providerId) : undefined
   if (request.operation !== 'query' || !provider || !connectionId) return execute()
@@ -112,10 +119,11 @@ async function describe(
   source: RegisteredDataSource,
   scope: DataSourceScope,
   invocation: DataSourceInvocation,
+  derived?: DerivedReadState,
 ): Promise<DataSourceDescription> {
   const result = parse(dataSourceDescriptionSchema, await dispatchRegistered(env, source, {
     operation: 'describe', source: { pluginId: source.pluginId, sourceId: source.sourceId }, scope,
-  }, invocation, DATA_LIMITS.detailBytes))
+  }, invocation, DATA_LIMITS.detailBytes, derived))
   validateDescription(result)
   if (result.writable?.length) (await import('./fieldMove')).validateWritableDescription(result, source.pluginId)
   if (result.targets?.some(target => !target.kind.startsWith(`${source.pluginId}.`))) throw new DataSourceError('invalid-response')
@@ -137,9 +145,14 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   }
   const source = registeredDataSource(ref)
   if (!source || !dataSourceAvailableInScope(source, scope)) throw new DataSourceError('unavailable')
+  checkInputChain(source, invocation)
   invocation = bounded(invocation, request.operation === 'query' ? request.timeoutMs : undefined)
   await authorizeDataSource(env, invocation, scope, source.pluginId, source.providerId)
-  const description = await describe(env, source, scope, invocation)
+  await authorizeSourceInputs(env, invocation, source, scope, request.operation)
+  const derived: DerivedReadState | undefined = source.inputs ? { droppedRecords: 0 } : undefined
+  const own = await describe(env, source, scope, invocation, derived)
+  // A derived page still carries the plugin's own revision; callers see the composed one.
+  const description = derived ? { ...own, revision: await composeDerivedRevision(env, source, own, scope, invocation, invokeDataSource) } : own
   if (registeredDataSource(ref) !== source) throw new DataSourceError('unavailable')
   if (request.operation === 'describe') return description
   if (request.operation === 'identity') {
@@ -148,18 +161,21 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
     if (!connection) throw new DataSourceError('forbidden')
     const cached = cachedSourceIdentity(source.pluginId, scope.connectionId, connection.updatedAt)
     if (cached) return cached
-    const answer = parse(dataSourceIdentitySchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes))
+    const answer = parse(dataSourceIdentitySchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes, derived))
     rememberSourceIdentity(source.pluginId, scope.connectionId, connection.updatedAt, answer)
     return answer
   }
-  if (request.operation === 'query') return querySource(env, source, request, description, invocation)
+  if (request.operation === 'query') {
+    const result = await querySource(env, source, request, description, invocation, own.revision, derived)
+    return derived ? finishDerivedResult(result, derived) : result
+  }
   if (request.operation === 'options') {
     const fields = request.target === 'field' ? description.fields : description.parameterFields
     if (!description.operations.options
       || !fields.some(field => field.pointer === request.pointer && field.choices?.kind === 'dynamic')) {
       throw new DataSourceError('unsupported-query')
     }
-    const page = parse(dataSourceOptionsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes))
+    const page = parse(dataSourceOptionsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes, derived))
     if (page.options.length > request.pageSize || page.exhausted === !!page.nextCursor
       || new Set(page.options.map(option => option.id)).size !== page.options.length) {
       throw new DataSourceError('invalid-response')
@@ -170,7 +186,7 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   if (request.operation === 'actions') {
     validateRecordReference(request.ref, scope, true)
     if (!description.actions?.length) return { actions: [] }
-    const result = parse(dataSourceActionsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes))
+    const result = parse(dataSourceActionsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes, derived))
     if (registeredDataSource(ref) !== source) throw new DataSourceError('unavailable')
     await authorizeDataSource(env, invocation, scope, source.pluginId, source.providerId)
     for (const item of result.actions) if (item.action.verb === 'runNodeAction') {
@@ -182,7 +198,7 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   }
   if (!description.operations.details || !description.detailSchema) throw new DataSourceError('unsupported-query')
   validateRecordReference(request.ref, scope)
-  const details = parse(dataSourceDetailsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes))
+  const details = parse(dataSourceDetailsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes, derived))
   if (registeredDataSource(ref) !== source) throw new DataSourceError('unavailable')
   await authorizeDataSource(env, invocation, scope, source.pluginId, source.providerId)
   if (details.kind === 'found') {
@@ -227,6 +243,8 @@ async function querySource(
   request: Extract<DataSourceRequest, { operation: 'query' }>,
   description: DataSourceDescription,
   invocation: DataSourceInvocation,
+  ownRevision: string,
+  derived?: DerivedReadState,
 ): Promise<DataSourceResult> {
   validateSourceQuery(request.query, description)
   if (request.mode === 'execution' && request.cursor) throw new DataSourceError('invalid-request')
@@ -247,15 +265,21 @@ async function querySource(
     if (registeredDataSource(source) !== source) throw new DataSourceError('unavailable')
     const pageSize = Math.min(request.pageSize, request.mode === 'preview' ? DATA_LIMITS.previewRecords : DATA_LIMITS.options)
     const page = parse(dataSourcePageSchema, await dispatchRegistered(
-      env, source, { ...request, cursor, pageSize }, invocation, DATA_LIMITS.selectionBytes,
+      env, source, { ...request, cursor, pageSize }, invocation, DATA_LIMITS.selectionBytes, derived,
     ))
     if (registeredDataSource(source) !== source) throw new DataSourceError('unavailable')
-    if (page.records.length > pageSize || page.revision !== description.revision) throw new DataSourceError('invalid-response')
+    if (page.records.length > pageSize || page.revision !== ownRevision) throw new DataSourceError('invalid-response')
     for (const record of page.records) {
       if (identities.has(record.recordId)) throw new DataSourceError('duplicate-record')
       identities.add(record.recordId)
       try { parseDataValue(record.data, DATA_LIMITS.recordBytes) } catch { throw new DataSourceError('oversize') }
-      try { validateDataValue(record.data, description.schema) } catch { throw new DataSourceError('invalid-response') }
+      try { validateDataValue(record.data, description.schema) } catch {
+        // A derived source builds records from data it doesn't control, so one bad record costs that
+        // record, counted, rather than the page. A source without inputs still fails whole.
+        if (!derived) throw new DataSourceError('invalid-response')
+        derived.droppedRecords++
+        continue
+      }
       bytes += new TextEncoder().encode(JSON.stringify(record)).byteLength
       if (bytes > DATA_LIMITS.selectionBytes || result.records.length >= DATA_LIMITS.selectionRecords) return result
       if (record.action?.verb === 'runNodeAction' && source.pluginId !== 'core') {
@@ -294,7 +318,7 @@ async function querySource(
       throw new DataSourceError('invalid-response')
     }
     if (page.completeness.kind === 'bounded' && (!request.query.take
-      || (request.mode === 'execution' && result.records.length !== request.query.take))) {
+      || (request.mode === 'execution' && result.records.length + (derived?.droppedRecords ?? 0) !== request.query.take))) {
       throw new DataSourceError('invalid-response')
     }
     if (request.query.take && result.records.length > request.query.take) throw new DataSourceError('invalid-response')

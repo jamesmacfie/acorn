@@ -1,4 +1,5 @@
 import { NODE_CORE_FACETS } from '../coreFacets'
+import { SOURCE_INPUTS_WITH_PROVIDER } from '@acorn/protocol/dataSources.ts'
 import type { IssueSink, ManifestInput, ManifestReferences } from './references'
 
 export function validateDependencies(manifest: ManifestInput, ctx: IssueSink): void {
@@ -59,7 +60,13 @@ export function validateRuntimeContributions(refs: ManifestReferences): void {
     route(entry.capture, ['contributions', 'agentContexts', i, 'capture'])
   })
   refResolvers.forEach((entry, i) => route(entry.resolve, ['contributions', 'refResolvers', i, 'resolve']))
-  manifest.contributions.dataSources?.forEach((entry, i) => route(entry.handler, ['contributions', 'dataSources', i, 'handler']))
+  manifest.contributions.dataSources?.forEach((entry, i) => {
+    route(entry.handler, ['contributions', 'dataSources', i, 'handler'])
+    // A derived source reads accounts only through its inputs (../../dataSources/inputs.ts).
+    if (entry.inputs && entry.providerId) {
+      ctx.addIssue({ code: 'custom', path: ['contributions', 'dataSources', i, 'inputs'], message: SOURCE_INPUTS_WITH_PROVIDER })
+    }
+  })
   manifest.contributions.dataSourceDiscoveries?.forEach((entry, i) => route(entry.handler, ['contributions', 'dataSourceDiscoveries', i, 'handler']))
   schedules.forEach((entry, i) => {
     const at = ['contributions', 'schedules', i] as (string | number)[]

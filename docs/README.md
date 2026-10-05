@@ -258,7 +258,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   boundaries](./integrations/provider-boundaries.md), [Rollbar](./integrations/rollbar.md),
   [Sentry](./integrations/sentry.md), [Connection settings](./integrations/settings.md).
 - [data-sources.md](./data-sources.md): [Data source authoring
-  controls](./data-sources/authoring-controls.md), [Provider data
+  controls](./data-sources/authoring-controls.md), [Derived
+  sources](./data-sources/derived-sources.md), [Provider data
   sources](./data-sources/provider-sources.md), [Workspace query
   library](./data-sources/query-library.md).
 - [github-integration.md](./github-integration.md): [The GitHub

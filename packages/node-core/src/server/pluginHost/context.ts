@@ -230,12 +230,15 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         await authorizeQueryScope(options.env, scope, invocation)
         queryStore(options.env.DB).setConsumer(scope, queryId, { ...consumer, pluginId: plugin }, remove)
       },
-      register: (source) => registerDataSource(plugin, source),
+      register: (source) => registerDataSource(plugin, source, { loaded: !!permissions }),
       discover: (discovery) => registerDataSourceDiscovery(plugin, discovery),
       invoke: (request, invocation) => {
         if (!options.env) throw new Error('Source invocation requires host bindings')
-        // Loaded code may only invoke its own sources. Cross-plugin workflow execution is a
-        // compiled host consumer; raw task principals remain refused by source admission.
+        // Loaded code may invoke its own sources here. It reads another plugin's source only as a
+        // declared input, through the `inputs` handle on a derived source's request context, so it
+        // can't read outside a request or with an account nobody chose (../dataSources/inputs.ts).
+        // Cross-plugin workflow execution is a compiled host consumer; raw task principals remain
+        // refused by source admission.
         const source = request.operation === 'query' ? request.query.source : request.operation === 'details' || request.operation === 'actions' ? request.ref : request.source
         if (permissions && source.pluginId !== plugin) throw new Error('Source belongs to another plugin')
         return invokeDataSource(options.env, request, invocation)

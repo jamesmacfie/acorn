@@ -14,5 +14,5 @@ export type { TaskConcern } from './taskChecks.ts'
 export type {
   CompiledPluginBroadcast, NodePlugin, NodePluginContext, PluginBroadcast,
   PluginFetchHandler, PluginHookHandler, PluginHookPoint, PluginHookRegistry,
-  PluginProviderResourceRequest, PluginRequestContext,
+  PluginProviderResourceRequest, PluginRequestContext, DataSourceInputHandle, DataSourceInputQuery, DataSourceInputOptionsRequest,
 } from './types.ts'

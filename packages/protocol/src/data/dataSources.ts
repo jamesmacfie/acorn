@@ -4,17 +4,24 @@ import { parseDataSchema } from './values/dataSchemas'
 import { DATA_LIMITS, parseDataValue } from './values/dataValues'
 import { dataRecordActionSchema, dataRecordTargetSchema, namedDataRecordActionSchema } from './dataActions'
 import {
+  DATA_SOURCE_INPUT_NAME,
   dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
+  dataSourceInputsSchema,
   type DataSourceDescriptor,
 } from './dataSourceContributions'
 
 export {
   dataSourceDescriptorSchema,
   dataSourceDiscoverySchema,
+  dataSourceInputSchema,
+  dataSourceInputsSchema,
   dataSourceRegistrationSchema,
+  parseDataSourceInputRef,
+  SOURCE_INPUTS_WITH_PROVIDER,
   type DataSourceDescriptor,
   type DataSourceDiscovery,
+  type DataSourceInput,
   type DataSourceRegistration,
 } from './dataSourceContributions'
 
@@ -44,11 +51,22 @@ const predicate = z.unknown().transform((input, ctx): DataPredicate => {
   }
 })
 export const dataSourceRefSchema = z.object({ pluginId: id, sourceId: id }).strict()
+const parameters = z.record(z.string(), value).default({})
+const inputBindings = <T extends z.ZodType>(binding: T) => z.record(z.string().regex(DATA_SOURCE_INPUT_NAME), binding)
+  .refine(inputs => Object.keys(inputs).length <= 8, 'At most eight input bindings')
+/** One derived-source input's account and parameters, the same shape a direct call's scope uses. When
+ *  the input is itself a derived source, `inputs` binds its inputs in turn: two derived levels at most. */
+export const dataSourceInputBindingSchema = z.object({
+  connectionId: id.optional(),
+  parameters,
+  inputs: inputBindings(z.object({ connectionId: id.optional(), parameters }).strict()).optional(),
+}).strict()
 export const dataSourceScopeSchema = z.object({
   workspaceId: id.optional(),
   projectId: id.optional(),
   connectionId: id.optional(),
-  parameters: z.record(z.string(), value).default({}),
+  parameters,
+  inputs: inputBindings(dataSourceInputBindingSchema).optional(),
 }).strict()
 export const dataSourceIdentitySchema = z.object({
   id: id.optional(), login: id.optional(), name: z.string().max(200).optional(),
@@ -176,7 +194,7 @@ export const dataSourceDiscoveryPageSchema = z.object({
   exhausted: z.boolean(),
 }).strict()
 export const dataSourceCatalogSchema = z.object({
-  sources: z.array(dataSourceDescriptorSchema.extend({ pluginId: id })).max(DATA_LIMITS.fields),
+  sources: z.array(dataSourceDescriptorSchema.extend({ pluginId: id, inputs: dataSourceInputsSchema.optional() })).max(DATA_LIMITS.fields),
   discoveries: z.array(dataSourceDiscoverySchema.omit({ handler: true }).extend({ pluginId: id })).max(DATA_LIMITS.fields),
 }).strict()
 export const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
@@ -185,7 +203,9 @@ export const dataSourceCompletenessSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('bounded') }).strict(),
   z.object({
     kind: z.literal('incomplete'),
-    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget', 'coverage-gap']),
+    cause: z.enum(['upstream-cap', 'provider-failure', 'host-budget', 'coverage-gap', 'invalid-records']),
+    /** With `invalid-records`: how many records a derived source returned that failed its schema. */
+    count: z.number().int().min(1).optional(),
   }).strict(),
 ])
 export const dataSourcePageSchema = z.object({
@@ -217,6 +237,7 @@ export const dataSourceDetailsSchema = z.discriminatedUnion('kind', [
 ])
 export type DataSourceRef = z.infer<typeof dataSourceRefSchema>
 export type DataSourceScope = z.infer<typeof dataSourceScopeSchema>
+export type DataSourceInputBinding = z.infer<typeof dataSourceInputBindingSchema>
 export type DataSourceDescription = z.infer<typeof dataSourceDescriptionSchema>
 export type DataSourceIdentity = z.infer<typeof dataSourceIdentitySchema>
 export type DataSourceQuery = z.infer<typeof dataSourceQuerySchema>

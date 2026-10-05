@@ -44,6 +44,15 @@ bounded reads, while core keeps the URL, driver, socket, and pools. Reads run in
 transaction with a host-side timeout and row cap. `data:write` is a separate high-risk grant and the
 only projection that accepts `{ readOnly: false }`.
 
+### Reading other plugins' data
+
+A loaded plugin's `ctx.dataSources.invoke` reaches only its own sources. It reads another plugin's
+source only as a declared input of a derived source, through the `inputs` handles on that source's
+request context. The host runs each read with the account the query bound, so the plugin never
+holds a credential and can't read outside a request. A handle refuses any input the person's input
+grant doesn't cover, and offers no actions or writes. Compiled plugins need no grant.
+[Derived sources](../data-sources/derived-sources.md) has the full rules.
+
 ### The broadcast namespace
 
 A loaded plugin's `ctx.events.send` is confined to `plugin:<its-id>:*`, and naming anything else

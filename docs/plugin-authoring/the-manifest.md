@@ -110,4 +110,6 @@ These rules catch a manifest that parses and then does nothing:
 - A `taskChecks` entry and a `schedules` entry need a `node` half.
 - A `harnesses` entry's `spawn` names exactly one of `command` and `entry`, may carry `requires` only
   beside an `entry`, and needs a `node` half if it declares `probes`.
+- A `dataSources` entry with `inputs` can't also declare `providerId`. It names at most eight
+  inputs, each a `<pluginId>:<sourceId>` ([derived sources](../data-sources/derived-sources.md)).
 - No id may repeat across contributions.

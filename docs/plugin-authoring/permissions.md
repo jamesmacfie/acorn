@@ -84,6 +84,11 @@ read-only transaction. Your plugin never sees the URL or opens a socket. `data:w
 `options.parameters`, never in the SQL text. Identifiers can't be parameters, so check them against
 `catalog()` before quoting them.
 
+A derived source's `inputs` work as a grant too, though they live on the source, not in
+`permissions`. The person approves the list of sources your plugin reads, and a handle refuses any
+input the grant doesn't cover. Each panel still picks the account for each input. For the rules, see
+[derived sources](../data-sources/derived-sources.md).
+
 ## Frame scopes
 
 `permissions.api` is enforced by an allowlist of path shapes and methods in

@@ -1,3 +1,5 @@
+import type { DataSourceInputHandle } from './data.js'
+
 // ── Routes ────────────────────────────────────────────────────────────────────────────────────────
 
 export type PluginRouteOptions = {
@@ -29,6 +31,8 @@ export type PluginRequestContext<Conn = unknown, Items = unknown> = {
   /** Whether an interactive device, an internal service, or a task-confined credential is calling. */
   readonly principal: Principal
   readonly providers: PluginProviderRuntime<Conn, Items>
+  /** Present only for an operation on a derived source: one handle per input the query bound. */
+  readonly inputs?: Readonly<Record<string, DataSourceInputHandle>>
 }
 
 /** `deviceId` is set only for `'device'`; `scope`, `taskId` and `sessionId` only for `'internal'`.

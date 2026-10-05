@@ -1,12 +1,23 @@
 export type DataPrimitive = string | number | boolean | null
 export type DataSourceRef = { pluginId: string; sourceId: string }
-export type DataSourceScope = { workspaceId?: string; projectId?: string; connectionId?: string; parameters: Record<string, DataValue> }
+export type DataSourceScope = {
+  workspaceId?: string; projectId?: string; connectionId?: string; parameters: Record<string, DataValue>
+  /** A derived source's account and parameters for each input, by input name. */
+  inputs?: Record<string, DataSourceInputBinding>
+}
+/** When the input is itself a derived source, `inputs` binds its inputs in turn: two derived levels at most. */
+export type DataSourceInputBinding = {
+  connectionId?: string; parameters: Record<string, DataValue>
+  inputs?: Record<string, { connectionId?: string; parameters: Record<string, DataValue> }>
+}
+/** One source a derived source reads. `source` is `<pluginId>:<sourceId>` and must be statically registered. */
+export type DataSourceInput = { source: string; label: string; optional?: boolean }
 export type DataSourceDescriptor = {
   sourceId: string; name: string; singular: string; plural: string; identityScope: string
   icon?: string; providerId?: string; titlePointer?: string; urlPointer?: string
 }
 export type DataSourceCatalog = {
-  sources: (DataSourceDescriptor & DataSourceRef)[]
+  sources: (DataSourceDescriptor & DataSourceRef & { inputs?: Record<string, DataSourceInput> })[]
   discoveries: { discoveryId: string; providerId?: string; pluginId: string }[]
 }
 export type DataSourceDiscoveryRequest = {
@@ -15,7 +26,8 @@ export type DataSourceDiscoveryRequest = {
 export type DataSourceDiscoveryPage = {
   sources: (DataSourceDescriptor & DataSourceRef)[]; nextCursor?: string; exhausted: boolean
 }
-export type DataSourceRegistration = DataSourceDescriptor & { handler: string }
+/** A source with `inputs` is a derived source. It may not also declare a `providerId`. At most eight. */
+export type DataSourceRegistration = DataSourceDescriptor & { handler: string; inputs?: Record<string, DataSourceInput> }
 export type DataSourceDescription = {
   schema: DataSchema; fields: DataField[]; parameters: DataSchema; parameterFields: DataField[]
   operations: { query: true; options: boolean; details: boolean; incremental: boolean; groups: ('all' | 'any')[]; identity?: boolean }
@@ -42,7 +54,7 @@ export type DataSourceRequest =
   | { operation: 'query'; query: DataSourceQuery; mode: 'preview' | 'execution'; evaluationTime: number; cursor?: string; pageSize: number; timeoutMs?: number }
   | { operation: 'details'; ref: DataRecordRef; scope: DataSourceScope; projection: string[] }
   | { operation: 'actions'; ref: DataRecordRef; scope: DataSourceScope }
-export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' | 'coverage-gap' }
+export type DataSourceCompleteness = { kind: 'more'; cursor: string } | { kind: 'complete' } | { kind: 'bounded' } | { kind: 'incomplete'; cause: 'upstream-cap' | 'provider-failure' | 'host-budget' | 'coverage-gap' | 'invalid-records'; count?: number }
 export type DataSourcePage = {
   records: { recordId: string; data: DataValue; display?: { title?: string; url?: string }; taskId?: string; action?: DataRecordAction; actions?: NamedDataRecordAction[]; writableFields?: string[]; target?: { kind: string; item: string } }[]
   revision: string; readTime: number; completeness: DataSourceCompleteness; incrementalBoundary?: DataValue
@@ -128,3 +140,15 @@ export type DataField = {
   choices?: { kind: 'static'; values: { id: string; label: string; tone?: 'ok' | 'warn' | 'bad' | 'muted' | 'accent'; rank?: number }[] } | { kind: 'dynamic'; dependsOn: string[] }
   viewerMatch?: string
 }
+
+/** A read-only handle on one input of a derived source, on its request context's `inputs`. Acorn runs
+ *  each read with the account the query bound. There is no actions handle and no write path. */
+export type DataSourceInputHandle = {
+  describe(): Promise<DataSourceDescription>
+  identity(): Promise<DataSourceIdentity>
+  /** The host fills in the source, the bound scope, the mode, and the evaluation time. */
+  query(query?: DataSourceInputQuery): Promise<DataSourceResult>
+  options(request: DataSourceInputOptionsRequest): Promise<{ options: { id: string; label: string }[]; nextCursor?: string; exhausted: boolean }>
+}
+export type DataSourceInputQuery = { predicate?: DataPredicate; sort?: DataSourceQuery['sort']; take?: number; cursor?: string; pageSize?: number }
+export type DataSourceInputOptionsRequest = { target: 'field' | 'parameter'; pointer: string; search?: string; cursor?: string; pageSize?: number }

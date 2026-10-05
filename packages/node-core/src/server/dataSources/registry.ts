@@ -1,23 +1,25 @@
-import { dataSourceDiscoverySchema, dataSourceRegistrationSchema, type DataSourceDiscovery, type DataSourceRegistration, type DataSourceRef, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
+import { SOURCE_INPUTS_WITH_PROVIDER, dataSourceDiscoverySchema, dataSourceRegistrationSchema, type DataSourceDiscovery, type DataSourceRegistration, type DataSourceRef, type DataSourceRequest } from '@acorn/protocol/dataSources.ts'
 import { confinePluginPath } from '../pluginHost/dispatch'
 import { canonicalDataEncoding } from '@acorn/protocol/dataValues.ts'
 import type { DataSourceScope } from '@acorn/protocol/dataSources.ts'
 
 export type CoreDataSourceHandler = (request: DataSourceRequest, env: import('../bindings').Env, signal: AbortSignal) => Promise<unknown> | unknown
-export type RegisteredDataSource = DataSourceRegistration & { pluginId: string; coreHandler?: CoreDataSourceHandler }
+/** `loaded` marks a source from a loaded plugin, whose input reads need the person's grant. */
+export type RegisteredDataSource = DataSourceRegistration & { pluginId: string; loaded?: boolean; coreHandler?: CoreDataSourceHandler }
 export type RegisteredDiscovery = DataSourceDiscovery & { pluginId: string }
 const sources = new Map<string, RegisteredDataSource>()
 const discoveries = new Map<string, RegisteredDiscovery>()
 const discoveryScopes = new Map<string, Set<string>>()
 const key = (pluginId: string, id: string) => `${pluginId}:${id}`
 
-export function registerDataSource(pluginId: string, input: DataSourceRegistration): void {
+export function registerDataSource(pluginId: string, input: DataSourceRegistration, options: { loaded?: boolean } = {}): void {
   const source = dataSourceRegistrationSchema.parse(input)
   confinePluginPath(pluginId, source.handler)
+  if (source.inputs && source.providerId) throw new Error(SOURCE_INPUTS_WITH_PROVIDER)
   const id = key(pluginId, source.sourceId)
   const old = sources.get(id)
   if (old && old.handler !== source.handler) throw new Error('Duplicate data source')
-  sources.set(id, { ...source, pluginId })
+  sources.set(id, { ...source, pluginId, ...(options.loaded ? { loaded: true } : {}) })
 }
 
 /** Core-owned data uses the same runtime without pretending core is a plugin route namespace. */
@@ -51,6 +53,8 @@ export function registerDiscoveredSource(pluginId: string, source: DataSourceReg
   scopes.add(canonicalDataEncoding(scope))
   discoveryScopes.set(id, scopes)
 }
+/** A discovered source exists only for the scopes that found it, so it can't be another source's input. */
+export const dataSourceDiscovered = (source: RegisteredDataSource) => discoveryScopes.has(key(source.pluginId, source.sourceId))
 export function dataSourceAvailableInScope(source: RegisteredDataSource, scope: DataSourceScope): boolean {
   const scopes = discoveryScopes.get(key(source.pluginId, source.sourceId))
   return !scopes || scopes.has(canonicalDataEncoding(scope))

@@ -78,10 +78,8 @@ panel plan. A starter's scope names no workspace or account. The panel launcher 
 inspector move it onto the scope the person picked, then the Node validates it before it's offered.
 Workspace tasks, Local worktrees, Agent usage records, and GitHub pull requests ship starters. Each
 sits next to its source's description, with a test that validates it against that description.
-Static field choices may declare a `tone` and
-numeric `rank`; panel columns inherit these until the author overrides them. The source query
-contract does not yet offer projection lists; source-side projection belongs to the later report
-volume milestone.
+Static field choices may declare a `tone` and numeric `rank`. Panel columns inherit these until the
+author overrides them. The query contract has no projection lists.
 
 A description may also declare `relations`: a named target source, relation kind (`implements`,
 `blocks`, `belongs-to`, `references`, or `equivalence`), cardinality, and exact pairs of scoped key
@@ -114,7 +112,8 @@ and discovery ID. The other routes require a matching `operation` discriminator:
 Device and service principals can call read routes. Task principals cannot, and field moves require a
 device principal. Node consumers use
 `ctx.dataSources.invoke(request, { principal, signal })`; the host-created principal passes unchanged
-to the provider route. Loaded consumers can invoke only their own sources. The result type follows
+to the provider route. Loaded consumers invoke only their own sources, and read another plugin's as a
+declared input of a [derived source](./data-sources/derived-sources.md). The result type follows
 the request's operation, so consumers do not cast a union to access query records.
 
 Query operands at this boundary are resolved literals. Left operands reference an item field.
@@ -153,7 +152,7 @@ the Node rechecks that eligibility against the current record.
 Execution reads at most 100 pages within 60 seconds. It stops at 5,000 records or 16 MiB of serialized
 record data. A record is limited to 256 KiB; details are limited to 1 MiB. Oversize values fail instead
 of being truncated. Callers can lower the timeout. Providers report their own lower bounds as
-`incomplete` with `upstream-cap` or `provider-failure`.
+`incomplete` with `upstream-cap` or `provider-failure`. A derived source can also report `invalid-records`.
 
 `more` includes a cursor. `complete` means exhaustion. `bounded` requires an explicitly sorted `take`
 whose exact count has been satisfied. Host budgets return `incomplete` with `host-budget`. The host
@@ -197,3 +196,4 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 
 - [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
   groups.
+- [Derived sources](./data-sources/derived-sources.md) covers sources that read other sources as inputs.

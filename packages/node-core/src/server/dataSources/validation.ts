@@ -4,8 +4,13 @@ import { validateDataValue, type DataSchema } from '@acorn/protocol/dataSchemas.
 import { MISSING, parseDataPointer, readDataPointer } from '@acorn/protocol/dataValues.ts'
 
 export type DataSourceErrorCode = 'unavailable' | 'forbidden' | 'invalid-request' | 'invalid-response' | 'unsupported-query' | 'connection-required' | 'cancelled' | 'timeout' | 'duplicate-record' | 'cursor-loop' | 'provider-failure' | 'rate-limited' | 'oversize'
+  | 'input-required' | 'input-unavailable'
+/** `input` names the derived-source input at fault, so a client can say which account to fix. */
+export type DataSourceErrorDetail = { input?: string; reason?: string }
 export class DataSourceError extends Error {
-  constructor(readonly code: DataSourceErrorCode) { super(code) }
+  constructor(readonly code: DataSourceErrorCode, readonly detail?: DataSourceErrorDetail) {
+    super([code, detail?.input && `input ${detail.input}`, detail?.reason].filter(Boolean).join(': '))
+  }
 }
 
 export function sourceFieldSchema(schema: DataSchema, pointer: string): DataSchema | undefined {

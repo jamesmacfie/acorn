@@ -8,7 +8,7 @@ import { createExternalItemStore } from '../integrations/itemStore'
 import { runProviderResource } from '../integrations/resourceRuntime'
 import type { AppEnv, Principal } from '../middleware/auth'
 import { principalMayUseProviderCredential } from '../middleware/requireUser'
-import type { PluginProviderRuntime, PluginRequestContext } from './types'
+import type { DataSourceInputHandle, PluginProviderRuntime, PluginRequestContext } from './types'
 import { invocationOwned } from '../plugins/rpcOwnership'
 
 const assertProviderAccess = (principal: Principal): void => {
@@ -40,7 +40,11 @@ const assertOwnedCredential = (pluginId: string, providerId: string): void => {
 // route (server/pluginHost/scheduleRun.ts). The two arguments are exactly what the Hono form read off `c`,
 // so the scheduled path gets the same runtime and the same ownership checks as an HTTP one, including
 // the provider-credential gate, which a background run passes as the node's own 'service' principal.
-export type PluginConnectionScope = { providerId?: string; connectionId?: string }
+//
+// `inputs` rides beside the connection: a derived source's handles, built by the source runtime for
+// this one request (../dataSources/inputs.ts). A derived source owns no provider, so its `providers`
+// runtime refuses every call, the same as any connectionless source.
+export type PluginConnectionScope = { providerId?: string; connectionId?: string; inputs?: Readonly<Record<string, DataSourceInputHandle>> }
 export function buildPluginRequestContext(env: Env, principal: Principal, pluginId: string, connectionScope?: PluginConnectionScope): PluginRequestContext {
   const assertConnectionScope = (providerId: string, connectionId?: string) => {
     if (connectionScope && (connectionScope.providerId !== providerId || (connectionId !== undefined && connectionScope.connectionId !== connectionId))) {
@@ -93,7 +97,7 @@ export function buildPluginRequestContext(env: Env, principal: Principal, plugin
     },
   }
 
-  return invocationOwned({ userId: principal.userId, principal, providers })
+  return invocationOwned({ userId: principal.userId, principal, providers, ...(connectionScope?.inputs ? { inputs: connectionScope.inputs } : {}) })
 }
 
 export function pluginRequestContext(c: Context<AppEnv>, pluginId: string): PluginRequestContext {

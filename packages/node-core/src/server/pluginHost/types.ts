@@ -33,6 +33,7 @@ export type PluginEventChannel = `plugin:${string}:${string}`
 import type { RouteResult } from '../sync/engine'
 import type { StoredConnection } from '../integrations/connections'
 import type { ExternalItemStore } from '../integrations/itemStore'
+import type { DataSourceDescription, DataSourceIdentity, DataSourceOptions, DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
 
 export type PluginRouteOptions = {
   // Path inside this plugin's namespace: '' for a router owning the whole namespace, '/tasks' for
@@ -54,7 +55,22 @@ export type PluginRequestContext = {
   // Bound to this request, owner and plugin. Core database and secret-service handles stay behind these
   // calls.
   readonly providers: PluginProviderRuntime
+  // Present only for an operation on a derived source: one handle per input the query bound. The host
+  // runs each read with the account the person chose, so the plugin never sees a credential and can't
+  // reach a source it didn't declare (../dataSources/inputs.ts).
+  readonly inputs?: Readonly<Record<string, DataSourceInputHandle>>
 }
+
+// Reads only. There is no actions handle and no write path through an input.
+export type DataSourceInputHandle = {
+  describe(): Promise<DataSourceDescription>
+  identity(): Promise<DataSourceIdentity>
+  query(query?: DataSourceInputQuery): Promise<DataSourceResult>
+  options(request: DataSourceInputOptionsRequest): Promise<DataSourceOptions>
+}
+// The host fills in the source, the bound scope, the mode, and the evaluation time.
+export type DataSourceInputQuery = Partial<Pick<DataSourceQuery, 'predicate' | 'sort' | 'take'>> & { cursor?: string; pageSize?: number }
+export type DataSourceInputOptionsRequest = { target: 'field' | 'parameter'; pointer: string; search?: string; cursor?: string; pageSize?: number }
 
 export type PluginProviderResourceRequest<TInput> = {
   providerId: string

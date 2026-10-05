@@ -3070,6 +3070,36 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 2048
+              },
+              "inputs": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string",
+                  "pattern": "^[a-z][a-zA-Z0-9]{0,31}$"
+                },
+                "additionalProperties": {
+                  "type": "object",
+                  "properties": {
+                    "source": {
+                      "type": "string",
+                      "maxLength": 401,
+                      "pattern": "^[^:]+:.+$"
+                    },
+                    "label": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 80
+                    },
+                    "optional": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "source",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
               }
             },
             "required": [

@@ -1,6 +1,7 @@
 # Phase 8: source inputs and host-mediated reads
 
-Status: proposed, October 5, 2026. Depends on nothing in the studio phases. It's the base for
+Status: shipped, October 5, 2026, except requirement 20. [What shipped](#what-shipped) records the
+choices made while building it. Depends on nothing in the studio phases. It's the base for
 phases 9 to 12. Read the [programme README](./README.md) first, especially
 [derived sources](./README.md#derived-sources). The
 [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) page shows the whole design,
@@ -161,3 +162,63 @@ has approved its inputs. Phase 9 draws that approval. This phase stores and enfo
   break an older client reading a newer Node's run. Check the desktop client and the terminal client.
 - How `PluginRequestContext` crosses the loaded-plugin worker boundary today for `providers`, so
   `inputs` follows the same path.
+
+## What shipped
+
+Requirements 1 to 19 shipped. Requirement 20 didn't, for the reason below.
+`docs/data-sources/derived-sources.md` describes the shipped behaviour and wins over this page.
+
+Where the code lives:
+
+- `packages/protocol/src/data/dataSourceContributions.ts` declares `inputs`, and `dataSources.ts`
+  adds `scope.inputs`, the catalog's `inputs`, and the `invalid-records` cause with its `count`.
+- `authorizeSourceInputs` in `authority.ts` checks bindings. `inputs.ts` builds the handles, checks
+  the chain, composes revisions, and folds completeness. It takes `invokeDataSource` as an argument,
+  so it has no import cycle with `runtime.ts`.
+- `PluginConnectionScope` in `requestContext.ts` carries the handles beside the connection, so
+  `dispatchSource` and `dispatchPluginRoute` needed no new parameter.
+- `packages/node-core/src/server/plugins/inputGrants.ts` is the grant store, beside
+  `disabled-plugins.json` as `input-grants.json`.
+
+Choices made while building it:
+
+- A binding can carry one nested `inputs` map, for an input that is itself a derived source. Without
+  it, requirement 12's second derived level could never bind its own inputs. One level matches the
+  depth limit, so the schema is two fixed levels rather than recursive.
+- A grant keys inputs by source id, then input name, because two sources in one plugin can share an
+  input name.
+- `DataSourceError` gained an optional `detail` with `input` and `reason`. The data source routes
+  return it as the error envelope's `details`. The error message appends both, so run problems read
+  "Label: input-unavailable: input pulls: Not approved".
+- A handle records the first input error. When the plugin's response then fails, the caller sees that
+  error instead of `provider-failure`. Without it, "Not approved" and the loop refusal were invisible.
+- `invalid-records` is the lowest priority: the plugin's own `incomplete` wins, then an input's
+  cause, then the dropped count. A `bounded` page counts dropped records toward `take`.
+- The composed revision is `derived.` plus a hash of the plugin's revision and each bound input's,
+  because eight raw revisions can pass the 200-character limit. `describe` reads each bound input's
+  description to build it.
+- Requirement 11 needed no table entry. Request context methods aren't under `plugin.init`, so
+  `hostFunctionMode` already sends them as async. `hostCallModes.test.ts` asserts the path and runs a
+  worker route that reads a handle.
+- The grant check reads `input-grants.json` on each read, so a grant written by phase 9 or 12 takes
+  effect without a restart. A comment in `inputs.ts` names the in-memory cache to add if that read
+  shows up in a profile.
+
+### Requirement 20 is open
+
+GitHub's local-branches source can't move onto inputs without breaking stored panels or loosening
+this phase's rules:
+
+- It owns the `github` provider and stamps the selected account on every record as
+  `githubConnectionId`, which its pull request relation matches on. Requirement 2 forbids a provider
+  beside inputs.
+- Stored panels put its GitHub account in `scope.connectionId` and its project in
+  `scope.parameters`. Requirement 6 refuses a top-level `connectionId` on a derived source, and the
+  local input's parameters would move to `scope.inputs.local`. Rewriting stored plans changes their
+  digests, which decision 2 rules out.
+
+Two ways forward, for the owner to choose:
+
+- Declare a second input bound to `github:pull-requests` for the account, give the handle a
+  read-only `connectionId`, and migrate stored queries in place, accepting the digest change.
+- Leave the branch source as a compiled exception and drop requirement 20.

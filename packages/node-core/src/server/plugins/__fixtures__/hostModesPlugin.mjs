@@ -9,7 +9,10 @@ export default {
     const immediate = (value, label) => {
       if (value instanceof Promise) throw new Error(`${label} crossed as a Promise`)
     }
-    immediate(ctx.routes.fetch(() => new Response('ok')), 'routes.fetch')
+    immediate(ctx.routes.fetch(async (_request, context) => {
+      if (!context.inputs) return new Response('ok')
+      return Response.json(await context.inputs.records.query({ take: 1, sort: [] }))
+    }), 'routes.fetch')
     immediate(ctx.schedules.register({ scheduleId: 'probe', name: 'Probe', cadence: { every: 300 }, run: async () => {} }), 'schedules.register')
     immediate(ctx.dataSources.register({ id: 'probe' }), 'dataSources.register')
     immediate(ctx.taskChecks.register({ id: 'probe' }), 'taskChecks.register')
