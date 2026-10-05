@@ -1,6 +1,17 @@
 # Phase 02: remove proven unused direct dependencies
 
-Date: 2026-10-04. Status: TODO. Risk: low to medium; install and packaging resolution can differ.
+Completion note, October 6, 2026: removed five unused production declarations across client-core,
+desktop, and TUI. Pnpm regenerated the lockfile; its unrelated browser-data version refresh was
+reverted, leaving only the two unneeded TanStack package entries removed. The custom query persister,
+Solid patches, root security overrides, peer policy, and public and persisted contracts are unchanged.
+The supported-runtime frozen install, focused persistence tests, package and consumer suites,
+architecture checks, build, pack, and independently installed CLI and TUI smoke passed. The TUI smoke
+reached the setup screen and a listening standalone Node. Installed desktop runtime bytes did not
+change because none of the removed declarations was a staging root. Phase 03 can use lockfile SHA-256
+`83bbf1f7c3927a7db252a15e571c5fc66111d77e69a7e3d07693c8e49f29c8b4` and the
+[phase 02 inventory](./artifacts/phase-02-inventory.json) as its starting dependency revision.
+
+Date: 2026-10-06. Status: DONE. Risk: low; standalone install tested on Darwin arm64.
 Prerequisite: accepted [phase 01](./01-baseline.md). Next: [phase 03](./03-native-payload.md).
 Planning revision: `2ae55abb5`; use phase 01's accepted revision and measurements as the baseline.
 

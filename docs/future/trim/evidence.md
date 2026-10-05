@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-05. Status: phase 01 complete; later phases remain TODO.
+Date: 2026-10-06. Status: phases 01–02 complete; phase 03 is next.
 
 ## Historical investigation
 
@@ -202,6 +202,71 @@ Target gates live in `.github/workflows/ci.yml` and `.github/workflows/build-des
 macOS arm64, and Windows x64 desktop bundles. This baseline covers local Darwin arm64 only.
 Phase 02 is next. Reuse the inventory definitions for later comparisons, and add characterization
 proof for the named gaps before changing their owners.
+
+## Phase 02: unused direct dependencies (2026-10-06)
+
+Started at accepted revision `8ee46e017` on Darwin arm64, Node 24.21.0, and pnpm 11.0.0.
+Search command: `rg -n 'query-async-storage-persister|solid-query-persist-client|seroval-plugins|seroval' apps packages plugins scripts tools package.json pnpm-workspace.yaml`.
+It found only five candidate manifest declarations. The source search also covered package exports,
+tests, build configs, generated-manifest inputs, and staging scripts. The staged and standalone
+consumers were checked separately:
+
+| Declaration | Consumer and resolution finding |
+| --- | --- |
+| `@tanstack/query-async-storage-persister` in client-core and desktop | `queryCacheLifecycle.ts` constructs a custom `Persister` and calls `persistQueryClientRestore` from the retained `@tanstack/query-persist-client-core`. No source or build import uses the async-storage package. |
+| `@tanstack/solid-query-persist-client` in desktop | `QueryCacheProvider.tsx` uses `IsRestoringProvider` and `QueryClientProvider` from `@tanstack/solid-query`. No source or build import uses the persist-client adapter. |
+| `seroval` and `seroval-plugins` in TUI | No TUI source, config, export, or dynamic import names either package. The TUI build bundles Solid reactive code, and the standalone packer derives external versions from the remaining TUI declarations. Both packages remain reachable transitively through Solid and remove zero lock entries. |
+
+The desktop manifest still owns service runtime versions, and the packer's generated manifest still
+declares the custom persister's core package. No runtime code, persisted schema, public export,
+security override, Solid patch, or peer policy changed. Pnpm's lockfile-only regeneration initially
+refreshed `caniuse-lite`, `electron-to-chromium`, and `node-releases`; restoring those unrelated
+versions left a lockfile with only the intended removals. The subsequent frozen install accepted it.
+
+Run `PATH=/private/tmp/acorn-trim-node-bin:$PATH node docs/future/trim/inventory.mjs --self-test`,
+then redirect the same command without `--self-test` to the [phase 02 inventory](./artifacts/phase-02-inventory.json).
+The inventory uses phase 01's graph and byte definitions. Direct external declarations fell from
+392 to 387, unique direct names from 79 to 75, locked package entries and snapshots from 566 to 564,
+and production closure snapshots from 285 to 283. The development closure stayed at 310 snapshots.
+Installed desktop runtime copies and bytes stayed at 112 and 343,706,024 B; staged helper copies and
+bytes stayed at 113 and 343,726,775 B. The two TanStack packages account for both removed lock
+entries; the two seroval names remain in the transitive graph. No unrelated locked version changed.
+
+All commands below used `PATH=/private/tmp/acorn-trim-node-bin:$PATH`. `TURBO_FORCE=true` bypassed
+shared Turbo results made under unsupported Node 24.11.0. The package suites and standalone TUI
+smoke used loopback permission. Logs are compressed under [artifacts](./artifacts/).
+
+| Command after the PATH prefix | Result | Retained log |
+| --- | --- | --- |
+| `pnpm install --frozen-lockfile` | Passed; first install reused 426 packages without downloads, final check reported already up to date. | [Final frozen install](./artifacts/phase-02-frozen-install.log.gz) |
+| `pnpm test:focus @acorn/client-core src/infra/persistence/queryCacheLifecycle.test.ts` | Passed, 14 tests; restore, expiry, and write ordering. | Focused output checked in session. |
+| `pnpm test:focus @acorn/client-core src/infra/node/fleet.test.ts` | Passed, 21 tests; partition switching and replacement. | Focused output checked in session. |
+| `TURBO_FORCE=true pnpm lint` | Passed, 37/37 tasks, zero cached. | [Lint](./artifacts/phase-02-lint.log.gz) |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/client-core --filter=@acorn/tui --filter=@acorn/desktop` | Passed, 3/3 tasks, zero cached: client-core 314 files and 2,400 tests; TUI 68 files and 673 tests with two skipped; desktop 28 shell files and 163 tests, 10 boot tests, and 62 Rust tests. | [Consumer suites](./artifacts/phase-02-consumers.log.gz) |
+| `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` | Passed after final doc edits, 12 files and 86 tests. | [Architecture](./artifacts/phase-02-arch.log.gz) |
+| `TURBO_FORCE=true pnpm build` | Passed, 6/6 tasks, zero cached; includes Node, CLI, TUI, and desktop. | [Build](./artifacts/phase-02-build.log.gz) |
+| `TURBO_FORCE=true pnpm pack:node` | Passed; nine migration chains, all artifact runtime imports declared. | [Pack](./artifacts/phase-02-pack.log.gz) |
+
+An earlier unrestricted architecture rerun hit three worker timeouts and found a doc path to the
+generated tarball, which is removed after inspection. Changing the citation to the release directory
+and bounding workers produced the passing final run. The local tarball produced under
+`apps/node/release/` was 2,096,648 B, SHA-256
+`cf0b81697ceed72f70dcea1e6d035fc752e211e0ca7b70e3fae27114c24e428b`. Its generated
+manifest has 27 runtime dependencies, including `@tanstack/query-persist-client-core`, and retains
+the Node engine range, root security overrides, keymap pin, and Solid peer override. It excludes
+the four removed package names. This archive digest is local evidence; archive timestamps can change it.
+
+For independent installation, the tarball was extracted to `/private/tmp/acorn-phase-02-standalone/acorn-node`.
+There, `PATH=/private/tmp/acorn-trim-node-bin:$PATH npm install --omit=dev --no-audit --no-fund`
+passed with 195 packages added. `node bin/acorn.mjs --help` exited zero. With
+`ACORN_DATA_DIR=/private/tmp/acorn-phase-02-standalone/data` and `TERM=xterm-256color`,
+`node bin/acorn.mjs` drew the setup screen, restored the cache, and started its supervised Node at a
+loopback URL; Ctrl-C exited zero. The first sandboxed TUI attempt hit `listen EPERM` at 127.0.0.1;
+the permitted rerun passed. No workspace `node_modules` was needed by the extracted tarball.
+
+The supported-runtime lockfile SHA-256 is
+`83bbf1f7c3927a7db252a15e571c5fc66111d77e69a7e3d07693c8e49f29c8b4`.
+Phase 03 is next; it should start from this dependency graph and keep the package-resolution policy.
 
 ## Future implementation record
 

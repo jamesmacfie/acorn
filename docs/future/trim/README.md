@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-05. Status: phase 01 complete; phase 02 is next.
+Date: 2026-10-06. Status: phases 01–02 complete; phase 03 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -25,7 +25,7 @@ There is no arbitrary package-count or file-length target. Read [refused approac
 
 ## Sequential assignments
 
-Phases 02–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
+Phases 03–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
 handoff. This order is an execution order; some assignments have no technical dependency on earlier
 changes. Phases 04, 05, and 14 permit a documented retention decision under their acceptance criteria.
 That is a completed investigation, never a claim that a reduction or migration shipped.
@@ -33,7 +33,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | Phase | Standalone task | Required handoff |
 | --- | --- | --- |
 | 01 DONE | [Baseline and ownership inventory](./01-baseline.md) | Node 24.21.0 baseline, repeatable inventory, ownership map, and four passing gates. See [evidence](./evidence.md#phase-01-implementation-baseline-2026-10-05). |
-| 02 | [Remove unused direct dependencies](./02-direct-dependencies.md) | Proven unused declarations removed; lockfile and standalone install verified. |
+| 02 DONE | [Remove unused direct dependencies](./02-direct-dependencies.md) | Five declarations removed; frozen lockfile, consumer suites, and independent CLI/TUI startup passed. See [evidence](./evidence.md#phase-02-unused-direct-dependencies-2026-10-06). |
 | 03 | [Stage native files for the target](./03-native-payload.md) | Explicit target policy and tested reduction of unrelated node-pty files. |
 | 04 | [Resolve the bundled Claude payload](./04-claude-payload.md) | Safe desktop-only omission, or evidence explaining why the binary must remain. |
 | 05 | [Resolve the keymap dependency branch](./05-keymap.md) | Supported narrower dependency, or a justified retention decision. |
