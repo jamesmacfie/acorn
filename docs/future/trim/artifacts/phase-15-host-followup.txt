@@ -29,6 +29,12 @@ Workflow editor:
   Validation: 1 step, no problems.
   State remained Saving… / Not published / Run… disabled; no run claimed.
 
+Approval probe after isolated host restart:
+  Codex permission setting: :read-only.
+  Prompt attempted `touch .trim-15-approval-probe` in generated fixture repo.
+  Provider reported automatic low-risk approval and created the marker.
+  No pending host approval card or host decision control appeared.
+
 Teardown:
   dev:agent:ui stop; status: session not running.
   ps: no trim-15-correction process or sleep 180 child (only ps/rg probe).

@@ -193,11 +193,16 @@ therefore not claimed from this host. The imported transcript showed completed `
 subagents, which are fixture history rather than a new live delegation. The full root gate's public
 runtime/capability tests remain deterministic workflow proof. The large-session fixture resolves
 each generated permission request before ending its imported session, so it cannot establish a
-host response to a pending approval. No safe live approval prompt was produced. Phase 07/08 live
+host response to a pending approval. On a restarted isolated host, managed Codex attempted
+`touch .trim-15-approval-probe` in the generated repository under its `:read-only` setting. The
+provider's automatic review allowed this low-risk operation and the turn completed; no pending
+approval card or host decision control appeared. This is an observed live limit, not approval-flow
+proof. Phase 07/08 live
 picker evidence remains applicable where implementation is unchanged; drag was not repeated.
 
-The desktop driver reported `trim-15-correction` not running after `stop`; a process-table check
-found no session-path process or `sleep 180` child. The session remained isolated and disposable.
+The desktop driver reported `trim-15-correction` not running after each `stop`; process-table
+checks found no session-path process or `sleep 180` child. The session remained isolated and
+disposable.
 
 ### Exact external runner follow-ups
 
