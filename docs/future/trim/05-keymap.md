@@ -6,9 +6,10 @@ Completion note, October 6, 2026: **retained** `@opentui/keymap` 0.5.9. Its supp
 0.5.12 retains that dependency. Narrow imports therefore leave the installed closure intact.
 Replacing the engine would require a separate parity and maintenance plan; no supported narrower
 entry or package was established. Corrected the TUI manifest's inaccurate claim that Core was gone.
-The TUI build and both emitted-graph checks passed; no keyboard implementation or public contract
-changed. Direct, locked, emitted, and installed savings are all zero. Phase 06 can proceed without
-changing keymap ownership. See [phase 05 evidence](./evidence.md#phase-05-keymap-dependency-branch-2026-10-06).
+The TUI build, both emitted-graph checks, and architecture suite passed; no keyboard implementation
+or public contract changed. Direct, locked, emitted, and installed savings are all zero. Phase 06
+can proceed without changing keymap ownership. See
+[phase 05 evidence](./evidence.md#phase-05-keymap-dependency-branch-2026-10-06).
 
 Date: 2026-10-06. Status: DONE (retention). Risk: medium to high; keyboard parity is required.
 Prerequisite: accepted [phase 04](./04-claude-payload.md). Next: [phase 06](./06-import-cycles.md).

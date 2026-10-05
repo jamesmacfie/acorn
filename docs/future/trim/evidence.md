@@ -438,18 +438,21 @@ from `node_modules`.
 | Emitted imports and bytes | 0 | No source or dependency changed; the TUI graph above is a retained baseline, not a before/after reduction. |
 | Installed package copies and bytes | 0 | Core remains installed through keymap; no installed closure was removed. |
 
-The worktree's offline frozen install lacked cached `@esbuild-kit/core-utils@3.3.2`; a sandboxed
-online attempt could not resolve npmjs.org. A copied identical-lock module tree let the emitted
-graph checks run, but pnpm's automatic dependency-status check then refused a noninteractive modules
-purge. The direct Vite and Node script commands above used the supported Node runtime. Since the
-retained implementation did not change behavior, focused keyboard tests, desktop build, outside
-install, and real desktop/TUI sessions were not repeated. Phase 15 still owns the combined gate.
+The worktree's first offline frozen install lacked cached `@esbuild-kit/core-utils@3.3.2`; a
+sandboxed online attempt could not resolve npmjs.org. A copied identical-lock module tree let the
+emitted graph checks run, but pnpm's automatic dependency-status check initially refused a
+noninteractive modules purge. The architecture runner invoked directly from those copied modules
+passed 11 files and 83 tests when `testFocus.test.ts` was excluded. Its full run passed 85 of 86
+tests; the focused-test integration case hit the same pnpm install issue. These were environment
+failures during the first attempts, not keyboard regressions.
 
-The architecture runner invoked directly from its copied `node_modules` passed 11 files and 83
-tests, including the document path and link checks. The remaining `testFocus.test.ts` integration
-case failed because its spawned pnpm command reached the same noninteractive modules-purge check;
-the full direct run reported 11 passing files, one failing file, and 85 passing tests out of 86.
-This is a copied-install verification limit, not a keyboard regression or a passing full gate.
+With `PATH=/private/tmp/acorn-trim-node-bin:$PATH` and `CI=true`, an escalated
+`pnpm install --frozen-lockfile` completed with the lockfile up to date and no dependency changes.
+Then `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` passed **12 files and
+86 tests** through pnpm on Node 24.21.0 and pnpm 11.0.0. The direct Vite and Node graph-check
+commands above also used the supported Node runtime. Since the retained implementation did not
+change behavior, focused keyboard tests, desktop build, outside install, and real desktop/TUI
+sessions were not repeated. Phase 15 still owns the combined gate.
 
 Phase 06 may proceed with the keymap dependency and keyboard seams unchanged.
 
