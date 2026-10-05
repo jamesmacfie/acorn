@@ -6,6 +6,19 @@ import { ghGraphQL, ghGraphQLResult } from '../githubApi'
 
 const pageInfo = z.object({ hasNextPage: z.boolean(), endCursor: z.string().nullable() })
 const timestamp = z.string().transform(value => Date.parse(value)).refine(Number.isFinite)
+// GitHub can ask a bot, such as Copilot, or a mannequin (an imported account's placeholder) for a
+// review as well as a person or a team. Each of those has a login, like a person.
+const reviewer = z.union([
+  z.object({ __typename: z.enum(['User', 'Bot', 'Mannequin']), login: z.string() }),
+  z.object({ __typename: z.literal('Team'), name: z.string(), slug: z.string() }),
+]).nullable()
+// How many of a commit's checks are in each state. Counts are exact however many checks a commit
+// runs, where a list of them stops at 100 a page, and a busy repository runs more than that.
+const stateCounts = z.array(z.object({ state: z.string(), count: z.number().int().nonnegative() }))
+// A check run's state is its conclusion once it has finished. Until then it is one of these, which the
+// source reports as PENDING.
+const UNFINISHED_RUNS = new Set(['QUEUED', 'IN_PROGRESS', 'WAITING', 'PENDING', 'REQUESTED'])
+const REVIEWER = '__typename ... on User { login } ... on Bot { login } ... on Mannequin { login } ... on Team { name slug }'
 const pull = z.object({
   id: z.string().min(1), number: z.number().int().positive(), title: z.string(), url: z.string().url(),
   state: z.enum(['OPEN', 'CLOSED', 'MERGED']), isDraft: z.boolean(),
@@ -15,24 +28,15 @@ const pull = z.object({
   mergeable: z.string(), mergeStateStatus: z.string(), autoMergeRequest: z.object({ mergeMethod: z.string() }).nullable(),
   reviewDecision: z.string().nullable(),
   latestCommit: z.object({ nodes: z.array(z.object({ commit: z.object({ committedDate: timestamp,
-    statusCheckRollup: z.object({ state: z.string(), contexts: z.object({ pageInfo: z.object({ hasNextPage: z.boolean() }),
-    nodes: z.array(z.union([
-      z.object({ __typename: z.literal('CheckRun'), status: z.string(), conclusion: z.string().nullable() }),
-      z.object({ __typename: z.literal('StatusContext'), state: z.string() }),
-    ])),
-  }) }).nullable() }) })) }),
+    statusCheckRollup: z.object({ state: z.string(), contexts: z.object({
+      checkRunCountsByState: stateCounts, statusContextCountsByState: stateCounts,
+    }) }).nullable() }) })) }),
   labels: z.object({ nodes: z.array(z.object({ name: z.string() })), pageInfo }),
-  reviewRequests: z.object({ nodes: z.array(z.object({ requestedReviewer: z.union([
-    z.object({ __typename: z.literal('User'), login: z.string() }),
-    z.object({ __typename: z.literal('Team'), name: z.string(), slug: z.string() }),
-  ]).nullable() })), pageInfo }),
+  reviewRequests: z.object({ nodes: z.array(z.object({ requestedReviewer: reviewer })), pageInfo }),
   latestComment: z.object({ nodes: z.array(z.object({ createdAt: timestamp })) }),
   latestReview: z.object({ nodes: z.array(z.object({ submittedAt: timestamp.nullable() })) }),
   reviewRequestEvents: z.object({ pageInfo: z.object({ hasPreviousPage: z.boolean() }), nodes: z.array(z.object({
-    createdAt: timestamp, requestedReviewer: z.union([
-      z.object({ __typename: z.literal('User'), login: z.string() }),
-      z.object({ __typename: z.literal('Team'), name: z.string(), slug: z.string() }),
-    ]).nullable(),
+    createdAt: timestamp, requestedReviewer: reviewer,
   })) }),
 })
 // GitHub gives a search query about 10 seconds. These nested fields make each match expensive, so
@@ -50,18 +54,14 @@ const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String)
       mergeable mergeStateStatus autoMergeRequest { mergeMethod }
       reviewDecision
       labels(first: 100) { pageInfo { hasNextPage endCursor } nodes { name } }
-      reviewRequests(first: 100) { pageInfo { hasNextPage endCursor } nodes { requestedReviewer { __typename ... on User { login } ... on Team { name slug } } } }
+      reviewRequests(first: 100) { pageInfo { hasNextPage endCursor } nodes { requestedReviewer { ${REVIEWER} } } }
       latestCommit: commits(last: 1) { nodes { commit { committedDate statusCheckRollup { state
-        contexts(first: 20) { pageInfo { hasNextPage } nodes {
-          __typename ... on CheckRun { status conclusion } ... on StatusContext { state }
-        } }
+        contexts(first: 0) { checkRunCountsByState { state count } statusContextCountsByState { state count } }
       } } } }
       latestComment: comments(last: 1) { nodes { createdAt } }
       latestReview: reviews(last: 1) { nodes { submittedAt } }
-      reviewRequestEvents: timelineItems(last: 20, itemTypes: [REVIEW_REQUESTED_EVENT]) {
-        pageInfo { hasPreviousPage } nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer {
-          __typename ... on User { login } ... on Team { name slug }
-        } } }
+      reviewRequestEvents: timelineItems(last: 100, itemTypes: [REVIEW_REQUESTED_EVENT]) {
+        pageInfo { hasPreviousPage } nodes { ... on ReviewRequestedEvent { createdAt requestedReviewer { ${REVIEWER} } } }
       }
     } }
   }
@@ -70,7 +70,9 @@ const SEARCH = `query AcornPullSource($q: String!, $first: Int!, $after: String)
 export async function githubData<T>(token: string, query: string, variables: Record<string, unknown>, schema: z.ZodType<T>, signal: AbortSignal): Promise<T> {
   signal.throwIfAborted()
   const result = await ghGraphQLResult<unknown>(await ghGraphQL(token, query, variables, signal))
-  if (!result.ok) throw new Error(result.kind === 'http' ? result.failure.error : 'github_query_failed')
+  // An organisation's SAML enforcement answers a GraphQL search with an error, not a 403.
+  if (!result.ok) throw new Error(result.kind === 'http' ? result.failure.error
+    : result.messages.some(text => /SAML enforcement/i.test(text)) ? 'sso' : 'github_query_failed')
   return schema.parse(result.data)
 }
 
@@ -90,7 +92,7 @@ export async function readPullSelection(token: string, q: string, connectionId: 
       seen.add(node.id)
       const statusCheckRollup = node.latestCommit.nodes[0]?.commit.statusCheckRollup ?? null
       if (node.labels.pageInfo.hasNextPage || node.reviewRequests.pageInfo.hasNextPage
-        || node.reviewRequestEvents.pageInfo.hasPreviousPage || statusCheckRollup?.contexts.pageInfo.hasNextPage) {
+        || node.reviewRequestEvents.pageInfo.hasPreviousPage) {
         return result({ kind: 'incomplete', cause: 'upstream-cap' })
       }
       const { author, repository, headRepository, headRefName, isDraft, state, autoMergeRequest, labels, reviewRequests,
@@ -102,8 +104,11 @@ export async function readPullSelection(token: string, q: string, connectionId: 
         const reviewer = event.requestedReviewer
         if (reviewer) requestTimes.set(`${reviewer.__typename}:${reviewer.__typename === 'Team' ? reviewer.slug : reviewer.login}`, event.createdAt)
       }
-      const checkStatuses = statusCheckRollup?.contexts.nodes.map(context => context.__typename === 'StatusContext'
-        ? context.state : context.status !== 'COMPLETED' ? 'PENDING' : context.conclusion ?? 'UNKNOWN') ?? []
+      const checkStatuses = [
+        ...(statusCheckRollup?.contexts.checkRunCountsByState ?? []).flatMap(({ state, count }) =>
+          Array<string>(count).fill(UNFINISHED_RUNS.has(state) ? 'PENDING' : state === 'COMPLETED' ? 'UNKNOWN' : state)),
+        ...(statusCheckRollup?.contexts.statusContextCountsByState ?? []).flatMap(({ state, count }) => Array<string>(count).fill(state)),
+      ]
       const data = { ...fields, author: author?.login ?? null, repository: repository.nameWithOwner,
         githubProvider: 'github', githubConnectionId: connectionId,
         headRepository: headRepository?.nameWithOwner.toLowerCase() ?? null, headBranch: headRefName,
@@ -148,6 +153,10 @@ const repositoriesPage = z.object({ viewer: z.object({ repositories: z.object({ 
 // one page of matches. Without this, a repository past the first page can never be found.
 const REPOSITORY_SEARCH_PAGES = 10
 
+// An option's id is the repository folded to lower case, and its label keeps GitHub's spelling. A
+// workspace's repositories come from its projects, which store the name folded (node-core
+// queries/sourceContext.ts), and the Node checks each chosen repository against these ids exactly.
+// GitHub ignores case in repository names, so a search reads the same pull requests either way.
 export async function readRepositoryOptions(token: string, input: { pageSize: number; cursor?: string; search: string }, signal: AbortSignal) {
   const search = input.search.toLowerCase()
   const options: { id: string; label: string }[] = []
@@ -158,7 +167,7 @@ export async function readRepositoryOptions(token: string, input: { pageSize: nu
       { first: input.pageSize - options.length, after }, repositoriesPage, signal)
     if (repositories.pageInfo.hasNextPage && !repositories.pageInfo.endCursor) throw new Error('github_invalid_cursor')
     options.push(...repositories.nodes.filter(repo => repo.nameWithOwner.toLowerCase().includes(search))
-      .map(repo => ({ id: repo.nameWithOwner, label: repo.nameWithOwner.slice(0, 80) })))
+      .map(repo => ({ id: repo.nameWithOwner.toLowerCase(), label: repo.nameWithOwner.slice(0, 80) })))
     after = repositories.pageInfo.hasNextPage ? repositories.pageInfo.endCursor : null
     if (!after || !search || options.length >= input.pageSize) break
   }

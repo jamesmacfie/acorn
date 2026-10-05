@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { dashboardPanelContentSchema, type DashboardPanelContent, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { SourceQueryEditorState } from '../dataSources/SourceQueryEditor'
 import {
-  addStatusColumns, applyCategoryColumns, availableDashboardViews, defaultPlanColumns, displaySchema, emptyDashboardContent, exactStatusOptions,
+  addStatusColumns, applyCategoryColumns, availableDashboardViews, bindColumnField, defaultPlanColumns, displaySchema, emptyDashboardContent, exactStatusOptions,
   mapExactStatus, setDashboardQuery, setFieldVisible, suggestRoleFields, unavailableViewReason, unbindMissingFields, unpublishedDashboards,
 } from './dashboardEditorModel'
 
@@ -161,6 +161,31 @@ describe('dashboard editor model', () => {
       // A source pointer on a mapped panel names nothing in its projected schema.
       expect(dashboardPanelContentSchema.safeParse({ ...combined, display: { ...combined.display, groupBy: '/state' } }).success).toBe(false)
     })
+  })
+})
+
+describe('bindColumnField', () => {
+  const fields = [
+    { id: '/title', name: 'Title', type: 'text' as const },
+    { id: '/files', name: 'Modified files', type: 'number' as const },
+    { id: '/state', name: 'State', type: 'enum' as const, values: [{ id: 'open', label: 'Open' }] },
+  ]
+  const fresh = { id: 'newColumn', label: 'New column', type: 'text' as const, bind: {} }
+
+  it('names and types a new column after the field it reads', () => {
+    expect(bindColumnField(fresh, 's', '/files', fields, 'New column')).toEqual({ id: 'newColumn', label: 'Modified files', type: 'number', bind: { s: { field: '/files' } } })
+    expect(bindColumnField(fresh, 's', '/state', fields, 'New column')).toMatchObject({ label: 'State', type: 'enum', choices: [{ id: 'open', label: 'Open' }] })
+  })
+
+  it('keeps a name the person chose, and follows a field switch only while the name was the field\'s', () => {
+    const renamed = { ...fresh, label: 'Files', type: 'number' as const, bind: { s: { field: '/files' } } }
+    expect(bindColumnField(renamed, 's', '/title', fields, 'New column')).toMatchObject({ label: 'Files', type: 'text' })
+    expect(bindColumnField({ ...renamed, label: 'Modified files' }, 's', '/title', fields, 'New column')).toMatchObject({ label: 'Title', type: 'text' })
+  })
+
+  it('leaves a column that another source feeds as it was, apart from the binding', () => {
+    const shared = { ...fresh, bind: { other: { field: '/name' } } }
+    expect(bindColumnField(shared, 's', '/files', fields, 'New column')).toEqual({ ...shared, bind: { other: { field: '/name' }, s: { field: '/files' } } })
   })
 })
 

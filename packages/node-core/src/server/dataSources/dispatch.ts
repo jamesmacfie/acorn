@@ -2,8 +2,35 @@ import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import { dispatchPluginRoute } from '../pluginHost/dispatch'
 import type { DataSourceInvocation } from './authority'
-import { DataSourceError } from './validation'
+import { DataSourceError, type DataSourceErrorDetail } from './validation'
 import type { PluginConnectionScope } from '../pluginHost/requestContext'
+
+const REASON_BYTES = 4096
+const REASON_CHARS = 300
+
+/** The sentence a source's failed reply gives in `reason`, for a panel to show. The rest of the body
+ *  stays out, because a plugin may have put a provider's own response there, and the read stops at
+ *  4 KiB so a large error body costs nothing. */
+async function failureReason(response: Response): Promise<DataSourceErrorDetail | undefined> {
+  const reader = response.body?.getReader()
+  if (!reader) return undefined
+  const chunks: Uint8Array[] = []
+  let size = 0
+  try {
+    while (size <= REASON_BYTES) {
+      const chunk = await reader.read()
+      if (chunk.done) break
+      chunks.push(chunk.value)
+      size += chunk.value.byteLength
+    }
+  } catch { return undefined } finally { void reader.cancel().catch(() => {}) }
+  if (size > REASON_BYTES) return undefined
+  try {
+    const body = JSON.parse(new TextDecoder().decode(Buffer.concat(chunks))) as { reason?: unknown }
+    const reason = typeof body.reason === 'string' ? body.reason.trim().slice(0, REASON_CHARS) : ''
+    return reason ? { reason } : undefined
+  } catch { return undefined }
+}
 
 /** Race the full body read as well as the callback: an uncooperative plugin cannot hold admission. */
 export async function dispatchSource(
@@ -27,7 +54,7 @@ export async function dispatchSource(
       env, pluginId, handler, { method: 'POST', body: JSON.stringify(body) }, signal,
       invocation.principal, connectionScope,
     )
-    if (!response.ok) throw new DataSourceError(response.status === 429 ? 'rate-limited' : 'provider-failure')
+    if (!response.ok) throw new DataSourceError(response.status === 429 ? 'rate-limited' : 'provider-failure', await failureReason(response))
     const reader = response.body?.getReader()
     if (!reader) throw new DataSourceError('invalid-response')
     let size = 0

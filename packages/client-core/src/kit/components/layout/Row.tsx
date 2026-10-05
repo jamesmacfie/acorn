@@ -24,6 +24,11 @@ const placement = (own: { offset?: number; height?: number }): JSX.CSSProperties
       ...(own.height === undefined ? {} : { height: `${own.height}px` }),
     }
 
+/** Did a slot draw anything? A fragment of `Show`s that all fail resolves to an array of nothing, and
+ *  an array is truthy, so the row drew an empty slot and its gap pushed the body sideways. */
+const drew = (slot: JSX.Element): boolean =>
+  Array.isArray(slot) ? slot.some(drew) : slot != null && typeof slot !== 'boolean' && slot !== ''
+
 /** A row's parts beside its body. Each slot is read once, through `children`: a prop is a getter, and
  *  reading it again runs the caller's JSX again, so a `Show` testing `props.leading` beside an insert
  *  of `props.leading` built every leading mark twice and kept the unused copy alive. A component of its
@@ -40,10 +45,10 @@ function RowParts(props: {
   const trailing = children(() => props.trailing)
   return (
     <>
-      <Show when={leading()}><span class="ui-row-leading">{leading()}</span></Show>
+      <Show when={drew(leading())}><span class="ui-row-leading">{leading()}</span></Show>
       <span class="ui-row-body">{props.children}</span>
-      <Show when={meta()}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{meta()}</span></Show>
-      <Show when={trailing()}><span class="ui-row-trailing">{trailing()}</span></Show>
+      <Show when={drew(meta())}><span class="ui-row-meta" data-fields={props.metaFields || undefined}>{meta()}</span></Show>
+      <Show when={drew(trailing())}><span class="ui-row-trailing">{trailing()}</span></Show>
     </>
   )
 }

@@ -1,4 +1,5 @@
 import type { Integration } from '@acorn/protocol/api.ts'
+import { connectionName } from '@acorn/protocol/integrations.ts'
 import type { QueryContent, QueryDraft, QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceCatalog, DataSourceInput, DataSourceQuery, DataSourceRef, DataSourceScope } from '@acorn/protocol/dataSources.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
@@ -9,7 +10,9 @@ import { pluginLabel } from './kit.ts'
 // list these, so the two read the same rows in the same words.
 
 export type CatalogSource = DataSourceCatalog['sources'][number]
-export type SourceEntry = { id: string; label: string; note?: string }
+/** `label` is the whole name on one line, for a flat picker and for search. A grouped list draws `name`
+ *  under its `group`, such as "Linear issues" under "Linear · Runn", so neither repeats the other. */
+export type SourceEntry = { id: string; label: string; group: string; name: string; icon?: string; note?: string; detail?: string }
   & ({ kind: 'saved'; query: QueryDraft } | { kind: 'source'; source: CatalogSource; connectionId?: string })
 
 export const sourceKey = (source: DataSourceRef) => `${source.pluginId}:${source.sourceId}`
@@ -53,6 +56,14 @@ export const unboundInputs = (source: CatalogSource | undefined, scope: DataSour
     return !input.optional && (!binding || (!!inputSourceOf(input, sources)?.providerId && !binding.connectionId))
   }).map(([name]) => name)
 
+/** Where an account's records come from: "GitHub · Work", or the account's own name when it already
+ *  starts with the plugin's, as a connection named "Linear · Runn" does. */
+export const accountGroup = (pluginId: string, connection: Pick<Integration, 'name' | 'label'>): string => {
+  const plugin = pluginLabel(pluginId)
+  const account = connectionName(connection)
+  return account.toLowerCase().startsWith(plugin.toLowerCase()) ? account : `${plugin} · ${account}`
+}
+
 /** Saved queries first, then sources. With `byAccount`, a source with a provider lists once per usable
  *  account, as "Pull requests · GitHub · Work", and not at all without one. A derived source lists once,
  *  as "Release readiness · Northwind · reads GitHub and Linear", and its accounts are chosen per input. */
@@ -62,15 +73,19 @@ export function sourceEntries(input: {
   saved: readonly QueryDraft[]
   byAccount?: boolean
 }): SourceEntry[] {
-  const saved = input.saved.map((query): SourceEntry => ({ kind: 'saved', id: `saved:${query.id}`, label: query.content.name, note: 'Saved query', query }))
+  const saved = input.saved.map((query): SourceEntry => ({
+    kind: 'saved', id: `saved:${query.id}`, label: query.content.name, name: query.content.name, group: 'Saved queries', note: 'Saved query', query,
+  }))
+  const shared = (source: CatalogSource) => ({ kind: 'source' as const, source, name: source.name, ...(source.icon ? { icon: source.icon } : {}) })
   const sources = input.sources.flatMap((source): SourceEntry[] => input.byAccount && source.providerId
-    ? usableConnections(input.connections, source.providerId).map(connection => ({
-      kind: 'source', id: `source:${sourceKey(source)}|${connection.id}`, source, connectionId: connection.id,
-      label: `${source.name} · ${pluginLabel(source.pluginId)} · ${connection.name ?? connection.label}`,
-    }))
+    ? usableConnections(input.connections, source.providerId).map(connection => {
+      const group = accountGroup(source.pluginId, connection)
+      return { ...shared(source), id: `source:${sourceKey(source)}|${connection.id}`, connectionId: connection.id, group, label: `${source.name} · ${group}` }
+    })
     : input.byAccount && source.inputs
-      ? [{ kind: 'source', id: `source:${sourceKey(source)}`, source, label: `${source.name} · ${pluginLabel(source.pluginId)} · reads ${readsFrom(source, input.sources)}` }]
-      : [{ kind: 'source', id: `source:${sourceKey(source)}`, label: source.name, source,
+      ? [{ ...shared(source), id: `source:${sourceKey(source)}`, group: pluginLabel(source.pluginId), detail: `Reads ${readsFrom(source, input.sources)}`,
+        label: `${source.name} · ${pluginLabel(source.pluginId)} · reads ${readsFrom(source, input.sources)}` }]
+      : [{ ...shared(source), id: `source:${sourceKey(source)}`, label: source.name, group: source.pluginId === 'core' ? 'Acorn' : pluginLabel(source.pluginId),
         ...(source.pluginId === 'core' ? {} : { note: pluginLabel(source.pluginId) }) }])
   return [...saved, ...sources]
 }

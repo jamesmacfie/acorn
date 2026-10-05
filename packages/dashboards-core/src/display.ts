@@ -18,6 +18,8 @@ export type DashboardDisplayField = {
   zone?: string
   list?: boolean
   values?: DashboardDisplayChoice[]
+  /** Table and list views skip it. Other views still read it. */
+  hidden?: boolean
 }
 export type DashboardDisplaySchema = { fields: DashboardDisplayField[] }
 export type DashboardDisplayCell = string | number | boolean | null | (string | number | boolean | null)[]

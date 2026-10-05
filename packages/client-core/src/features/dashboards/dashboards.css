@@ -96,6 +96,27 @@
   padding-bottom: var(--space-3);
   border-bottom: var(--chrome-divider);
 }
+/* The launcher's model choice: its caption, then the backend and model sharing one line, so choosing a
+   model reads as a setting of the request above rather than a step of its own. */
+.dash-launcher-model {
+  display: grid;
+  grid-auto-flow: column;
+  grid-template-columns: auto;
+  grid-auto-columns: minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-3);
+}
+/* The source the launcher's starting points are for: its icon, its name over where it comes from, and
+   the way back to the list, boxed so it reads as the choice already made. */
+.dash-launcher-picked {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: var(--chrome-divider);
+  border-radius: var(--radius-control);
+}
 /* A calculation inside a calculation, drawn one step in. */
 .dash-studio-nested {
   display: flex;
@@ -474,6 +495,23 @@
   min-width: 0;
   min-height: 0;
   overflow: auto;
+  /* A strip of the card's padding the body may draw into without clipping or scrolling sideways. Its
+     content box stays put, so only what reaches out with the matching margin below goes there. */
+  margin-inline: calc(var(--space-4) * -1);
+  padding-inline: var(--space-4);
+}
+/* Rows and tables start their text on the title's line, with the hover wash reaching out into that
+   strip. A row's own padding is the pane's, which a card's padding already covers. A small table's cells
+   are padded by the strip's width, so the table reaches out the same distance and needs nothing else.
+   The row selector has to outrank shell.css's rule that zeroes a carded row's margin, and this sheet
+   can load before that one, so it wins on specificity rather than order. Every Row sets `data-density`. */
+.ui-card .dash-panel-body .ui-row[data-density] {
+  width: auto;
+  margin-inline: calc(var(--space-4) * -1);
+  padding-inline: calc(var(--space-4) - var(--marker-w)) var(--space-4);
+}
+.dash-panel-body .ui-table-scroll {
+  margin-inline: calc(var(--space-4) * -1);
 }
 
 /* The panel's data, full height so a board can fill it. While a source can't answer, the last data stays

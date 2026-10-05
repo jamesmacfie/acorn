@@ -254,6 +254,7 @@ describe('panel plan', () => {
       const candidate = { ...base(), stages: [operation.example] }
       expect(panelPlanSchema.safeParse(candidate).success).toBe(true)
     }
+    expect(panelPlanSchema.safeParse({ ...base(), ...PANEL_CAPABILITIES.hiddenColumns.example }).success).toBe(true)
   })
 
   it('binds one row per primary record, filters missing values safely, and sorts across sources', () => {

@@ -4,6 +4,7 @@ import type { DashboardRun, PlanProblem, PlanStageCount } from '@acorn/dashboard
 import {
   availableOperations, columnLabel, countsByPart, planOutline, problemsByPart, type OutlineDiff, type PartChange, type PlanInputs, type PlanPart, type PlanPartKey,
 } from '@acorn/dashboards-core/outline.ts'
+import { OPERATION_HELP } from '@acorn/dashboards-core/labels.ts'
 import { Badge, Button, Row, SectionHeader } from '../../../kit/components/primitives'
 import { Rows } from '../../../kit/components/layout/Rows'
 import { Stack } from '../../../kit/components/layout/Stack'
@@ -72,7 +73,7 @@ export default function StudioOutline(props: {
   const counts = createMemo(() => countsByPart(props.plan, props.stageCounts, props.sourceCounts))
   const problems = createMemo(() => problemsByPart(props.plan, props.problems, props.inputs))
   const count = (part: PlanPart): string | undefined => {
-    if (part.key.startsWith('source:')) return counts().sourceTotal === undefined ? undefined : String(counts().sourceTotal)
+    if (part.key.startsWith('source:')) return counts().sourceTotal === undefined ? undefined : `${counts().sourceTotal} ${counts().sourceTotal === 1 ? 'row' : 'rows'}`
     if (part.key.startsWith('input:')) return counts().inputs[part.key] === undefined ? undefined : String(counts().inputs[part.key])
     const stage = counts().stages[part.key]
     return stage && `${stage.input} → ${stage.output}`
@@ -105,7 +106,7 @@ export default function StudioOutline(props: {
             <Menu.Separator />
             <Menu.Label>Steps</Menu.Label>
             <For each={availableOperations(props.plan)}>{operation => (
-              <Menu.Item context={context} disabled={!operation.available} title={operation.reason ?? operation.description}
+              <Menu.Item context={context} disabled={!operation.available} title={operation.reason ?? OPERATION_HELP[operation.id]}
                 onSelect={() => props.onAdd(operation.id)}>{operation.label}</Menu.Item>
             )}</For>
           </>}

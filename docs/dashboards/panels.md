@@ -65,8 +65,13 @@ Without a configured press, the source's default action still runs through `runC
 carry the full reference for every contributing record, including account and scope, along with
 task IDs, targets, and named actions. A record can name a plugin-owned target without a URL.
 
-The plan has up to three row buttons. Buttons and **Start task** also appear in the row menu, reached
-with the context-menu key or Shift+F10; Enter presses the row. A risky action first shows the host's
+The plan has up to three row buttons, shown as icons with their labels in tooltips. A configured icon
+takes precedence; without one, the button uses an icon for its action kind. These buttons stay visible.
+The three-dot row menu appears on hover or keyboard focus and contains the buttons and **Start task**.
+The context-menu key or Shift+F10 also opens it; Enter presses the row. **Start task** opens a dialog
+with the row's title and its linked project, without a project picker. The Node resolves that project
+from the record's repository or tracker project within the workspace and account. A record with no
+unique local project reports that a project link is needed. A risky action first shows the host's
 confirmation strip. Named actions send their ID and full reference to the Node, which asks the source
 for current eligibility before dispatching. A refusal appears beside the panel. Rows in the editor's
 preview remain noninteractive.

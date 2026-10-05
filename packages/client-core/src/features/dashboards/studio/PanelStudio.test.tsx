@@ -99,8 +99,9 @@ describe('PanelStudio', () => {
   it('opens a blank source with its Columns selected, without offering an old draft', async () => {
     mount(undefined, { kind: 'source', reference: tasks.reference })
     await settle()
-    // The Columns part, titled for what it holds until the source is described.
-    expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('No columns yet')
+    // The Columns part, with the picker that turns a field into a column.
+    expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('Columns')
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Add a field')
     expect(requests.mock.calls.some(([path]) => path.endsWith('/dashboards/list'))).toBe(false)
   })
 
@@ -110,6 +111,8 @@ describe('PanelStudio', () => {
     const turn = requests.mock.calls.find(([path]) => path.endsWith('/authoring/turn'))
     expect(turn && JSON.parse(turn[1]!.body!)).toMatchObject({ instruction: 'Tasks I touched today', context: [] })
     expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Tasks I touched today')
+    // With nothing selected, the inspector says how a panel's parts fit together.
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('A panel reads rows from a source')
     expect(button('Publish…')!.disabled).toBe(true)
   })
 
@@ -127,8 +130,9 @@ describe('PanelStudio', () => {
     await settle()
     row('List')!.click()
     await settle()
-    expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('List')
-    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Show as')
+    expect(document.querySelector('.dash-studio-inspector h3')?.textContent).toBe('Look')
+    // Each view by name, with what it's for.
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Each row as a title with a few details under it.')
   })
 
   it('marks a step that has a problem', async () => {

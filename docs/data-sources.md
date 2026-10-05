@@ -24,9 +24,13 @@ viewer relationships as ordinary fields when the provider can compute them.
 
 Scope parameters can be lists with dynamic choices. An omitted optional scope means the reach stated
 in `consistency`; a chosen list limits it. `workspaceLinks` resolves to external IDs linked to the
-query's selected workspace and account, including GitHub repository facets on local projects. Record
-identities must include their distinguishing scope (a repository with a repository-local number, for
-example). An account-wide source says so in its description rather than implying one project.
+query's workspace and account, including GitHub repositories of local projects. A panel's **Reach**
+chooses all workspace links or a subset, read through the resolve route. Account-wide reach is not
+offered. Record identities include their distinguishing scope, such as a repository with a local number.
+
+A source's optional `projectScope` maps each record's container to workspace projects. The Node
+restricts reads and options to workspace links and stamps a unique owner into `ref.projectId`.
+[Workspace project context](./data-sources/provider-sources.md#workspace-project-context) has the mapping rules.
 
 `context` bindings include `viewer`, `workspaceLinks`, `now`, and `calendar`. The Node resolves them
 once at the run's evaluation instant and time policy. `now` accepts ISO 8601 day or week offsets;
@@ -59,7 +63,8 @@ A compiled plugin calls `ctx.dataSources.register` with a `sourceId`, human labe
 and an owned handler path. A loaded manifest puts the same descriptor in `contributions.dataSources`.
 The host binds `pluginId` and sends both carriers through the same registry and response validation.
 Handlers remain private to the Node registry. Reload and disable clear registrations and discovered
-IDs through the plugin host's normal lifecycle.
+IDs through the plugin host's normal lifecycle. A failing handler answers non-2xx (429 for a rate
+limit) and may add `{ "reason": "<one sentence>" }`. The Node keeps 300 characters of it, no more.
 
 Optional `providerId` declares the source's connection provider. Each invocation selects one
 `connectionId`; no default account is inferred. The host checks provider ownership, active identity,
@@ -184,16 +189,12 @@ intents. [Record processing history](./workflows/record-history.md) has the tran
 
 <a id="client-cache-and-conformance"></a>
 <a id="shared-authoring-controls"></a>
+<a id="workspace-query-library"></a>
+<a id="linear-issues-and-rollbar-error-groups"></a>
 
 - [Authoring controls](./data-sources/authoring-controls.md) covers the client cache, the conformance
   fixture, and the shared source and query editor.
-
-<a id="workspace-query-library"></a>
-
 - [Workspace query library](./data-sources/query-library.md) covers saved queries.
-
-<a id="linear-issues-and-rollbar-error-groups"></a>
-
 - [Provider data sources](./data-sources/provider-sources.md) covers Linear issues and Rollbar error
   groups.
 - [Derived sources](./data-sources/derived-sources.md) covers sources that read other sources as inputs.

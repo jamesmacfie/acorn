@@ -52,23 +52,23 @@ control that opened it. Closing never loses work, because each change autosaves.
 The studio is laid out like the Workflows editor. The toolbar has a back button named for where the
 studio was opened from, the panel title (click it to rename in place), the save state, whether the
 panel is published or has unpublished changes, **Ask AI**, **Undo**, **Redo**, **Publish…**, and a
-menu with **Discard changes** and **Delete panel**. The **Plan** tab shows the plan as read-only
+menu with **Discard changes** and **Delete panel**. The **JSON** tab shows the plan as read-only
 JSON. The **Outline** tab shows the outline, the live preview, and an inspector. A status bar names
 the first problem as a link to its part, and the changes since the last publish.
 
-**Add panel** first opens the launcher (`studio/PanelLauncher.tsx`), a dialog that asks what the
-panel should show. **Edit** skips it. The launcher has three paths:
+**Add panel** first opens the launcher (`studio/PanelLauncher.tsx`), a dialog that says what a panel
+is and asks what it should show. **Edit** skips it. The launcher has three paths:
 
 - **Describe it.** Type a request and choose **Draft it**. The studio opens with the request as the
-  plan's `request` and the AI already asked. Up to four suggestions under the box are titles of
-  starter plans from sources described earlier in the session, because the source catalog carries no
-  starters. A suggestion fills the box and doesn't send it.
-- **Start from data.** Pick a source and account, such as "Pull requests · GitHub · Work", or a
-  saved query. A plugin region lists only the sources it accepts (`regionAllowsSource` in
-  `region.ts`). Picking a source lists its starter plans and **Blank**. Before listing a starter, the
-  launcher moves each of its sources that reads the picked source onto the picked workspace, account,
-  and reach, and the Node validates the result. **Blank** adds the source and selects **Columns**, so
-  you see the default columns it gets. A saved query has no starters and opens straight away.
+  plan's `request` and the AI already asked. The model it drafts with sits on one line under the box.
+  Up to four suggestions, after **Try**, are titles of starter plans from sources described earlier in
+  the session, because the source catalog carries no starters. A suggestion fills the box only.
+- **Start from data.** Pick a source or a saved query. Sources sit under where they come from, such
+  as "Acorn" or "GitHub · Work" (`group` in `sourceEntries.ts`). A plugin region lists only the
+  sources it accepts (`regionAllowsSource`). Picking one swaps the list for its starters and **Blank
+  panel**, under the source and **Change source**. A starter reads as its view, steps, and sort
+  (`planSummary`), moved onto the picked workspace, account, and reach, then validated by the Node.
+  **Blank panel** selects **Columns**. A saved query has no starters and opens straight away.
 - **Unfinished.** The workspace's unpublished drafts, newest first and three at a time, each with
   **Continue** and **Discard**.
 
@@ -109,14 +109,15 @@ The outline draws `planOutline` in the sections Data, Columns, Steps, Arrange, L
 Each row shows its row count, such as "312 → 41" for a step, and a warning mark when the part has a
 problem. **Add** adds a source, a column, or a step, and disables a step the plan can't take yet with
 the reason. A row's menu moves a step, removes a source or step, or asks the AI about the part.
-Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part).
-Every control has a visible caption, and every option reads as words from
-`packages/dashboards-core/src/labels.ts` rather than a schema value. Each form shows only what applies
-to its part. A column shows the settings for its type only. **Look** offers only the options the
-chosen view takes, and disables a view the plan or the region refuses, with the reason as its
-tooltip. A source's inspector lists its starter plans under **Start from**, moved onto the source's
-account and validated as in the launcher. **Keep history** can create a dataset from the chosen
-query.
+Selecting a row shows its form in the inspector (`studio/inspectors.tsx`, one form per kind of part),
+under a line saying what the part is for (a step's is `OPERATION_HELP`). With nothing selected, the
+inspector lists a panel's parts in the order they apply. Every control has a visible caption, and
+every option reads as words from `packages/dashboards-core/src/labels.ts` rather than a schema value.
+Each form shows only what applies to its part. A column shows the settings for its type only.
+**Look** lists each view with what it's for (`VIEW_HELP`), or why the plan or the region refuses it,
+and offers only the options the chosen view takes. A source's inspector lists its starter plans
+under **Start over from a starter panel**, which replaces the whole plan, moved onto the source's
+account and validated as in the launcher. **Keep history** can create a dataset from the query.
 
 Each step operation has its own form, registered in `studio/operationForms.ts`. The registry's type
 requires a form for every operation, and `operationForms.test.tsx` checks that each operation also
@@ -126,17 +127,18 @@ it. Conditions pick their value by the column's type: a choice from the column's
 a person field whose source declares `viewerMatch`, and relative dates such as **Start of this week**
 or **30 days ago** for a date. The filter form edits one level of **Match all** or **Match any**, and
 a calculation nests two levels deep. A deeper predicate or calculation shows in words, to edit in the
-**Plan** tab or with the AI. Each step's form ends with its row counts and its problems.
+**JSON** tab or with the AI. Each step's form ends with its row counts and its problems.
 
 No form asks for an ID. A calculated column, a measure, an expanded item, or a new column gets one
 from its label when it's created (`newColumnId` in `packages/dashboards-core/src/planColumns.ts`).
 The ID is lower camel case, unique within the plan, and at most 100 characters. Renaming the label
-keeps the ID, because later steps refer to the column by it. The **Plan** tab is the only place IDs
+keeps the ID, because later steps refer to the column by it. The **JSON** tab is the only place IDs
 show.
 
-The preview is the panel's own body in a placed panel's card, at the small, medium, or large size it
-would take on the dashboard. A placed panel starts at the size nearest its placed rectangle. Clicking
-a table's column header selects that column, and clicking a group header selects **Arrange**.
+The preview is the panel's body in a placed panel's card, at the size it would take on the dashboard,
+nearest its placed rectangle. A table's column header selects that column; a group header, **Arrange**.
+A preview with no rows says why: its first error, the source returning none, or the step that removed
+the last rows (`emptyRunReason`). A number still draws its 0.
 
 `studio/studioStore.ts` owns the plan, the selection, undo, redo, and autosave. Each change is one
 undo step, typing within 600 ms is one step, and the stack holds 60 steps. Each change writes a
@@ -144,14 +146,18 @@ device recovery copy, and a plan that passes its schema saves to the Node 750 ms
 change.
 
 The first source described creates one column per field with a display role (title, status,
-assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`). That
-change joins the undo step that picked the source. Rows are filtered by the panel's own filter step,
-which the Node pushes down to the source, so the source picker hides **Add condition** and its own
-preview. Conditions a query already has show read-only, because they change which records come back.
+assignee, url, updated), or its first six fields if it declares no roles (`defaultPlanColumns`), and a
+panel still called "New panel" takes the source's name. That change joins the undo step that picked
+the source. **Add a field**, in the Columns form, makes a column named and typed after a field no
+column reads yet. Choosing the field of a column that reads one source takes the field's type, and
+its name while it's still "New column" or the last field's name (`bindColumnField`). Rows are
+filtered by the panel's own filter step, which the Node pushes down to the source, so the source
+picker hides **Add condition** and its own preview. Conditions a query already has show read-only,
+because they change which records come back.
 
-**Publish…** opens a review that lists what changes since the last publish, where the panel goes (a
-Home tab for a new Home panel), the requirements warnings above, and anything blocking: a schema
-failure, a run error, or a region that wouldn't show the panel. `publishPanelPlan` in
+**Publish…** opens a review that lists what changes since the last publish, or what a new panel
+shows, where it goes (a Home tab for a new Home panel), the requirements warnings above, and anything
+blocking: a schema failure, a run error, or a region that wouldn't show the panel. `publishPanelPlan` in
 `panelPublish.ts` saves the draft, describes each source to find its `plugin:source` keys and field
 roles, checks them against the region, publishes, and refreshes every panel showing it.
 

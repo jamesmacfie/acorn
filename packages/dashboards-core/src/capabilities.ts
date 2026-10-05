@@ -19,6 +19,15 @@ export const PANEL_CAPABILITIES = {
   groupOrders: ['declared', 'label', 'count', 'explicit'],
   boardWrites: { path: '/columns/<columnId>/choices/<choiceId>/writeValues/<sourceId>',
     description: 'A source-declared writable enum field may set one exact provider value per choice and source. A missing mapping leaves that drop unavailable.' },
+  hiddenColumns: { path: '/columns/<index>/hidden',
+    description: 'Sort, group, filter, summarize, board, and chart read only declared columns. When the request orders or groups by a field it does not ask to see, or asks to hide one, declare the column with hidden: true. Table and list views leave it out; everything else still reads it.',
+    example: {
+      columns: [
+        { id: 'title', label: 'Title', type: 'text', bind: { pulls: { field: '/title' } } },
+        { id: 'priority', label: 'Priority', type: 'number', hidden: true, bind: { pulls: { field: '/priority' } } },
+      ],
+      sort: [{ column: 'priority', direction: 'desc' }],
+    } },
   views: {
     stat: { needs: [], options: ['aggregate', 'field', 'trend', 'compare', 'good'] },
     list: { needs: [], options: [] },

@@ -5,6 +5,28 @@ import RowControls from './RowControls'
 let dispose: (() => void) | undefined
 afterEach(() => { dispose?.(); document.body.replaceChildren() })
 
+it('shows a configured row action as an icon and keeps its label in the menu', () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const row = { id: 'one', pluginId: 'github', sourceId: 'pulls', values: {} }
+  const button = { kind: 'createTask' as const, label: 'Start a task', icon: 'plus' }
+  const onButton = vi.fn()
+  dispose = render(() => <RowControls row={row} buttons={[button]} onButton={onButton} />, host)
+
+  const action = host.querySelector<HTMLButtonElement>('[aria-label="Start a task"]')!
+  expect(action.querySelector('svg')).not.toBeNull()
+  expect(action.textContent).toBe('')
+  expect(action.dataset.tip).toBe('Start a task')
+  action.click()
+  expect(onButton).toHaveBeenCalledWith(row, button)
+
+  host.querySelector<HTMLButtonElement>('[aria-haspopup="menu"]')!.click()
+  const items = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+  expect(items.map(item => item.textContent)).toEqual(['Start a task'])
+  items[0].click()
+  expect(onButton).toHaveBeenCalledTimes(2)
+})
+
 it('offers focusable row-menu moves and names a refused choice', () => {
   const host = document.createElement('div')
   document.body.append(host)

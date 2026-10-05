@@ -1,13 +1,27 @@
 # Provider data sources
 
-This page covers the two provider-backed sources whose behavior goes past the shared contract:
-Linear issues and Rollbar error groups.
+This page covers workspace project context and the provider-specific behavior of Linear issues and
+Rollbar error groups.
+
+## Workspace project context
+
+A source's optional `projectScope` declares its container parameter and record pointer, with kind
+`repository` or `external-project`. GitHub uses `/repositories` and `/repository`; Linear uses
+`/project` and `/projectId`. The Node restricts workspace reads and parameter options to linked
+containers, including older queries with no repository selection. An empty set reads no records.
+It stamps the unique local owner into `ref.projectId`, independently of projected columns. Repository
+names match without case; tracker IDs match exactly within the selected account. Duplicate local
+clones and workspace-wide tracker links do not imply a unique task owner.
+
+The parameter must be a top-level string or string list; the record pointer must name a string.
+Plugins declare external identity. They cannot supply the host-stamped local project ID in a page.
 
 ## Linear issues and Rollbar error groups
 
 `linear/issues` requires an explicit connection and `/project` parameter. Project choices are
-paginated. `/state/id` choices come from the selected project's teams, with provider state IDs and
-labels preserved. The record keeps state name and category separately. Two states in the same
+paginated and restricted to the workspace's links by the host. `/state/id` choices come from the
+selected project's teams, with provider state IDs and labels preserved. The record keeps state name
+and category separately. Two states in the same
 category remain distinct choices. A state from another project's teams fails validation.
 Project, exact state, and created/updated date predicates narrow the Linear GraphQL query.
 The records include issue descriptions and archived issues. Dates use epoch milliseconds.

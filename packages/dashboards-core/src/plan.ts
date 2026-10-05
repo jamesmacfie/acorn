@@ -471,6 +471,7 @@ export function displayPlanRun(plan: PanelPlan, rows: readonly PlanRow[]): { sch
     ...(column.precision ? { precision: column.precision } : {}),
     ...(column.type === 'datetime' ? { zone: plan.time.mode === 'viewer' ? Intl.DateTimeFormat().resolvedOptions().timeZone : plan.time.zone } : {}),
     ...(column.list ? { list: true } : {}),
+    ...(column.hidden ? { hidden: true } : {}),
     ...(typeof column.unit === 'string' ? { unit: column.unit } : {}),
     ...(column.choices ? { values: column.choices.map(choice => ({ ...choice })) } : {}),
   }))

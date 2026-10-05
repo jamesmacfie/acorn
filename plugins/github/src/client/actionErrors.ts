@@ -2,6 +2,8 @@
 // answers with only its code, and the client used to print that code: "merge_failed", "reauth".
 // The codes are the ones server/routes/pulls/prActions.ts and server/githubApi.ts return.
 
+import { READ_SENTENCES } from '../shared/readFailures'
+
 const SENTENCES: Record<string, string> = {
   merge_failed: "GitHub wouldn't merge this pull request. Check its reviews and checks.",
   reauth: "GitHub turned down acorn's sign-in. Reconnect GitHub.",
@@ -12,18 +14,6 @@ const SENTENCES: Record<string, string> = {
   forbidden: "Your GitHub account can't do that on this repository.",
   sso: "GitHub needs you to authorise this token for your organisation's single sign-on.",
   github_unavailable: "GitHub didn't answer. Try again.",
-}
-
-// A read is a different question from a write: nothing was refused, the list just isn't there. The
-// codes are the ones server/routes/mirror/repoMirror.ts and server/githubApi.ts return for a list.
-const NO_ACCESS = "GitHub won't show this repository to your account. If an organisation owns it, an owner may need to approve acorn's GitHub app under Third-party access."
-const READ_SENTENCES: Record<string, string> = {
-  repo_not_found: NO_ACCESS,
-  forbidden: NO_ACCESS,
-  sso: "Authorise acorn's GitHub sign-in for your organisation's single sign-on, then try again.",
-  rate_limited: 'GitHub is limiting requests. Try again in a minute.',
-  github_unavailable: "GitHub didn't answer.",
-  reauth: "GitHub turned down acorn's sign-in.",
 }
 
 export type ActionFailure = { text: string; code?: string }
@@ -46,7 +36,9 @@ export function actionFailure(cause: unknown): ActionFailure {
   return { text: sentence, ...(code ? { code } : {}) }
 }
 
-/** Why a GitHub read failed, as a sentence, or undefined when there is nothing better than the title. */
+/** Why a GitHub read failed, as a sentence, or undefined when there is nothing better than the title.
+ *  A read is a different question from a write: nothing was refused, the list just isn't there. Its
+ *  sentences are shared with the pull requests data source (../shared/readFailures.ts). */
 export function readFailure(cause: unknown): string | undefined {
   if (cause == null) return undefined
   const code = codeOf(cause)

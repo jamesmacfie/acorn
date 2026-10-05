@@ -4,17 +4,19 @@ import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceDescription, DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
-import { describePanelPlan, newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
+import { newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import {
   AGGREGATE_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, EMPTY_SORT_LABELS, GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS,
   PRECISION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNIT_LABELS, UNMATCHED_LABELS, WEEK_START_LABELS,
-  labelOptions, sortDirectionLabel,
+  OPERATION_HELP, VIEW_HELP, labelOptions, sortDirectionLabel,
 } from '@acorn/dashboards-core/labels.ts'
-import { availableViews, countsByPart, problemsByPart, switchView, VIEW_ICONS, type PlanInputs, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import {
+  availableViews, countsByPart, planSummary, problemsByPart, SOURCE_ICON, switchView, VIEW_ICONS, type PlanInputs, type PlanPartKey,
+} from '@acorn/dashboards-core/outline.ts'
 import type { SourceQueryEditorState } from '../../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../../dataSources/SourceQueryEditor'
-import { Alert, Button, Card, Checkbox, Chip, Field, Row, SegmentedControl } from '../../../kit/components/primitives'
+import { Alert, Button, Card, Checkbox, Chip, Field, Row } from '../../../kit/components/primitives'
 import { Inline } from '../../../kit/components/layout/Inline'
 import { Rows } from '../../../kit/components/layout/Rows'
 import { RowActions } from '../../../kit/components/layout/RowActions'
@@ -22,19 +24,20 @@ import { Stack } from '../../../kit/components/layout/Stack'
 import Icon from '../../../kit/components/content/Icon'
 import { Text } from '../../../kit/components/content/Text'
 import IconPicker from '../../../kit/components/inputs/IconPicker'
+import Picker from '../../../kit/components/inputs/Picker'
 import { Menu } from '../../../kit/components/overlays/Menu'
 import { availableContentPresentations } from '../../../host/registries/panes/contentLinks'
 import EquivalenceForm from '../EquivalenceForm'
 import KeepHistory from '../KeepHistory'
 import WriteValueControls from '../WriteValueControls'
-import { defaultPlanColumns, unbindMissingFields } from '../dashboardEditorModel'
+import { bindColumnField, defaultPlanColumns, fieldColumn, unbindMissingFields } from '../dashboardEditorModel'
 import { LabeledInput, LabeledSelect } from '../fields'
 import { regionRefusal, type PanelRegion } from '../region'
 import type { FailureContext } from '../planInputs'
 import SourceFailureAlert, { openPluginSettings } from '../SourceFailureAlert'
 import { operationForms } from './operationForms'
 import { newComparison, wholeNumber, type Stage, type StageFormProps } from './stageFormParts'
-import type { StudioChangeOptions } from './studioStore'
+import { blankPlan, type StudioChangeOptions } from './studioStore'
 
 // The studio's inspector: one form per kind of plan part, keyed by the part's kind, and one form per
 // step operation through `operationForms` (docs/dashboards/mapping-and-editor.md § The generated
@@ -92,8 +95,9 @@ const without = <T extends object, K extends string>(value: T, key: K): T extend
 
 export const addSourceTo = (plan: PanelPlan, reference: QueryReference): PanelPlan =>
   ({ ...plan, sources: [...plan.sources, { id: crypto.randomUUID(), label: `Source ${plan.sources.length + 1}`, role: 'primary', reference }] })
+const NEW_COLUMN = 'New column'
 export const addColumnTo = (plan: PanelPlan): PanelPlan =>
-  ({ ...plan, columns: [...plan.columns, { id: newColumnId(plan, 'New column'), label: 'New column', type: 'text', bind: {} }] })
+  ({ ...plan, columns: [...plan.columns, { id: newColumnId(plan, NEW_COLUMN), label: NEW_COLUMN, type: 'text', bind: {} }] })
 /** The plan with a new step for `op` at the end, or the plan unchanged when the step needs columns it
  *  lacks. Ids for the columns a step makes come from their labels. */
 export const addStageTo = (plan: PanelPlan, op: Stage['op']): PanelPlan => {
@@ -131,6 +135,12 @@ export const moveColumnIn = (plan: PanelPlan, index: number, by: -1 | 1): PanelP
   const columns = swap(plan.columns, index, by)
   return columns ? { ...plan, columns } : plan
 }
+/** Drops the key when shown, so a column that was never hidden and one shown again save the same. */
+export const setColumnHidden = (plan: PanelPlan, id: string, hidden: boolean): PanelPlan => ({ ...plan, columns: plan.columns.map(column => {
+  if (column.id !== id) return column
+  const { hidden: _was, ...shown } = column
+  return hidden ? { ...shown, hidden: true } : shown
+}) })
 
 // ── Sources ────────────────────────────────────────────────────────────────────────────────────
 
@@ -191,7 +201,8 @@ export function createSourceTracking(input: {
       const sources = current.sources.map(entry => entry.id === id ? { ...entry, label } : entry)
       if (switched && current.sources.length > 1) return { ...current, sources, columns: unbindMissingFields(current.columns, id, available) }
       if (current.sources.length !== 1 || (current.columns.length && !switched)) return JSON.stringify(sources) === JSON.stringify(current.sources) ? current : { ...current, sources }
-      return { ...current, sources, columns: defaultPlanColumns(id, available) }
+      // A blank panel takes its first source's name, so it isn't published as "New panel".
+      return { ...current, sources, columns: defaultPlanColumns(id, available), ...(current.title === blankPlan().title ? { title: label } : {}) }
     }, { derived: true })
   }
   return { states, starters, report }
@@ -224,8 +235,8 @@ export function SourceInspector(props: InspectorProps) {
       <LabeledSelect label="How it joins" value={current().role} options={labelOptions(SOURCE_ROLE_LABELS)}
         onChange={role => context.change(plan => ({ ...plan, sources: plan.sources.map(entry => entry.id === id() ? { ...entry, role: role as typeof entry.role } : entry) }))} />
     </Show>
-    <Show when={starterPlans().length}><Field label="Start from" group><Inline gap="inline" wrap>
-      <For each={starterPlans()}>{starter => <Button size="sm" tip={describePanelPlan(starter)[0]} onPress={() => context.change(() => starter)}>{starter.title}</Button>}</For>
+    <Show when={starterPlans().length}><Field label="Start over from a starter panel" hint="Replaces everything in this panel. Undo brings it back." group><Inline gap="inline" wrap>
+      <For each={starterPlans()}>{starter => <Button size="sm" tip={planSummary(starter)} onPress={() => context.change(() => starter)}>{starter.title}</Button>}</For>
     </Inline></Field></Show>
     <Inline gap="inline" wrap>
       <Show when={state()?.query && state()?.description && state()?.source}>
@@ -298,22 +309,55 @@ function ColumnsInspector(props: InspectorProps) {
     return 'Not read from a source'
   }
   const items = () => plan().columns.map((column, index) => ({ key: column.id, column, index }))
+  const shownItems = () => items().filter(item => !item.column.hidden)
+  const hiddenItems = () => items().filter(item => item.column.hidden)
+  // Move up and down step through the plan's full column list, hidden ones included, so a step can pass
+  // a hidden column without anything moving in either section.
+  const columnRows = (id: string, label: string, rows: ReturnType<typeof items>) => <Rows id={id} ariaLabel={label} items={rows} selected={null}
+    onSelect={key => context.select(`column:${key}`)} onActivate={key => context.select(`column:${key}`)}>
+    {(item, itemProps, selected) => <Row item={itemProps} selected={selected()} density="compact" variant="stacked"
+      onPress={() => context.select(`column:${item.column.id}`)}
+      meta={<Text emphasis="muted">{item.column.list ? `List of ${COLUMN_TYPE_LABELS[item.column.type ?? 'text'].toLowerCase()}` : COLUMN_TYPE_LABELS[item.column.type ?? 'text']}</Text>}
+      trailing={<RowActions ariaLabel={`Actions for ${item.column.label}`}>{menu => <>
+        <Menu.Item context={menu} disabled={item.index === 0} onSelect={() => context.change(current => moveColumnIn(current, item.index, -1))}>Move up</Menu.Item>
+        <Menu.Item context={menu} disabled={item.index === plan().columns.length - 1} onSelect={() => context.change(current => moveColumnIn(current, item.index, 1))}>Move down</Menu.Item>
+        <Menu.Item context={menu} onSelect={() => context.change(current => setColumnHidden(current, item.column.id, !item.column.hidden))}>
+          {item.column.hidden ? 'Show' : 'Hide'}
+        </Menu.Item>
+        <Menu.Item context={menu} tone="danger" onSelect={() => context.change(current => removeColumnFrom(current, item.column.id))}>Remove</Menu.Item>
+        <Menu.Item context={menu} onSelect={() => context.askAi(`column:${item.column.id}`)}>Ask AI about this</Menu.Item>
+      </>}</RowActions>}>
+      <Stack gap="none"><Text>{item.column.label}</Text><Text emphasis="muted">{fieldLabel(item.column)}</Text></Stack>
+    </Row>}
+  </Rows>
+  /** Each source's fields that no column reads yet, so one pick makes a named, typed column. */
+  const unusedFields = () => plan().sources.flatMap(source => {
+    const description = context.sources.states()[source.id]?.description
+    const used = new Set(plan().columns.flatMap(column => boundField(column, source.id) ?? []))
+    return description ? dashboardFields(description).filter(field => !used.has(field.id)).map(field => ({ source, field })) : []
+  })
+  const addField = (id: string): void => {
+    const picked = unusedFields().find(entry => JSON.stringify([entry.source.id, entry.field.id]) === id)
+    if (!picked) {
+      context.change(addColumnTo)
+      context.select(`column:${plan().columns.at(-1)!.id}`)
+      return
+    }
+    context.change(current => ({ ...current, columns: [...current.columns, fieldColumn(picked.source.id, picked.field, newColumnId(current, picked.field.name))] }))
+  }
   return <Stack gap="row">
-    <Rows id="dashboards.studio.columns" ariaLabel="Columns" items={items()} selected={null}
-      onSelect={key => context.select(`column:${key}`)} onActivate={key => context.select(`column:${key}`)}>
-      {(item, itemProps, selected) => <Row item={itemProps} selected={selected()} density="compact" variant="stacked"
-        onPress={() => context.select(`column:${item.column.id}`)}
-        meta={<Text emphasis="muted">{item.column.list ? `List of ${COLUMN_TYPE_LABELS[item.column.type ?? 'text'].toLowerCase()}` : COLUMN_TYPE_LABELS[item.column.type ?? 'text']}</Text>}
-        trailing={<RowActions ariaLabel={`Actions for ${item.column.label}`}>{menu => <>
-          <Menu.Item context={menu} disabled={item.index === 0} onSelect={() => context.change(current => moveColumnIn(current, item.index, -1))}>Move up</Menu.Item>
-          <Menu.Item context={menu} disabled={item.index === plan().columns.length - 1} onSelect={() => context.change(current => moveColumnIn(current, item.index, 1))}>Move down</Menu.Item>
-          <Menu.Item context={menu} tone="danger" onSelect={() => context.change(current => removeColumnFrom(current, item.column.id))}>Remove</Menu.Item>
-          <Menu.Item context={menu} onSelect={() => context.askAi(`column:${item.column.id}`)}>Ask AI about this</Menu.Item>
-        </>}</RowActions>}>
-        <Stack gap="none"><Text>{item.column.label}</Text><Text emphasis="muted">{fieldLabel(item.column)}</Text></Stack>
-      </Row>}
-    </Rows>
-    <Inline><Button size="sm" onPress={() => { context.change(addColumnTo); context.select(`column:${plan().columns.at(-1)!.id}`) }}>Add column</Button></Inline>
+    {columnRows('dashboards.studio.columns', 'Columns', shownItems())}
+    <Inline><Picker label="Add a field" ariaLabel="Add a field as a column" size="sm" placeholder="Search fields" emptyText="Every field is already a column."
+      items={[...unusedFields().map(({ source, field }) => ({
+        id: JSON.stringify([source.id, field.id]), label: field.name,
+        note: plan().sources.length > 1 ? `${COLUMN_TYPE_LABELS[field.type]} · ${source.label}` : COLUMN_TYPE_LABELS[field.type],
+      })), { id: 'empty', label: 'Empty column', note: 'Name it and choose its field yourself' }]}
+      onPick={addField} /></Inline>
+    <Show when={hiddenItems().length}>
+      <Field label="Hidden" hint="Left out of tables and lists. Sort, group, boards, and charts can still use them." group>
+        {columnRows('dashboards.studio.columns.hidden', 'Hidden columns', hiddenItems())}
+      </Field>
+    </Show>
   </Stack>
 }
 
@@ -331,8 +375,10 @@ function ColumnInspector(props: InspectorProps) {
     editColumn(entry => ({ ...entry, choices: entry.choices?.map((choice, at) => at === index ? update(choice) : choice) }), options)
   const bindColumn = (sourceId: string, pointer: string): void => editColumn(entry => {
     if (!pointer) return { ...entry, bind: without(entry.bind, sourceId) }
-    return { ...entry, bind: { ...entry.bind, [sourceId]: { field: pointer } } }
+    const description = states()[sourceId]?.description
+    return bindColumnField(entry, sourceId, pointer, description ? dashboardFields(description) : [], NEW_COLUMN)
   })
+  const problems = () => problemsByPart(plan(), context.problems())[props.part] ?? []
   /** One source's fields, those of a compatible type first, each with its type. */
   const fieldOptions = (sourceId: string) => {
     const current = column()!
@@ -340,7 +386,7 @@ function ColumnInspector(props: InspectorProps) {
     const fits = (field: typeof fields[number]) => !current.type || fieldType(field) === current.type
     const pointer = boundField(current, sourceId)
     const missing = pointer && !fields.some(field => field.pointer === pointer) ? [{ value: pointer, label: `${pointer.slice(1).split('/').at(-1)} is missing, choose another` }] : []
-    return [{ value: '', label: 'Not from this source' }, ...missing,
+    return [{ value: '', label: plan().sources.length > 1 ? 'Not from this source' : 'Choose a field' }, ...missing,
       ...[...fields.filter(fits), ...fields.filter(field => !fits(field))].map(field => ({ value: field.pointer, label: field.label, description: COLUMN_TYPE_LABELS[fieldType(field) ?? 'text'] }))]
   }
   const suggestedBinding = (sourceId: string): { pointer: string; name: string } | undefined => {
@@ -376,8 +422,9 @@ function ColumnInspector(props: InspectorProps) {
   })
 
   return <Show when={column()}>{current => <Stack gap="row">
-    <LabeledInput label="Name" value={current().label} onInput={label => editColumn(entry => ({ ...entry, label }), { coalesce: true })} />
-    <Field label="From" group><Stack gap="row">
+    <For each={problems()}>{problem => <Alert tone="warn">{problem.message}</Alert>}</For>
+    {/* The field comes first, because picking it names and types a new column. */}
+    <Field label={plan().sources.length > 1 ? 'Read from' : undefined} group><Stack gap="row">
       <For each={plan().sources}>{source => <>
         <LabeledSelect label={plan().sources.length > 1 ? source.label : 'Field'} value={boundField(current(), source.id) ?? ''} options={fieldOptions(source.id)}
           onChange={pointer => bindColumn(source.id, pointer)} />
@@ -386,6 +433,7 @@ function ColumnInspector(props: InspectorProps) {
         </Inline>}</Show>
       </>}</For>
     </Stack></Field>
+    <LabeledInput label="Name" value={current().label} onInput={label => editColumn(entry => ({ ...entry, label }), { coalesce: true })} />
     <LabeledSelect label="Type" value={current().type ?? 'text'} options={labelOptions(COLUMN_TYPE_LABELS)}
       onChange={type => editColumn(entry => {
         // Settings for the old type don't apply to the new one, and the plan refuses some of them.
@@ -548,13 +596,20 @@ function LookInspector(props: InspectorProps) {
   const numberColumns = () => columns().filter(column => column.type === 'number')
   // The stat's number as one choice: a count of rows, or a calculation over a column.
   const statNumber = () => view().aggregate && view().aggregate !== 'count' ? view().aggregate! : 'count'
+  // Each view with what it's for, or why the panel can't use it yet, so the choice reads without hovering.
+  const viewItems = () => views().map(entry => ({ ...entry, key: entry.id, disabled: !entry.available && entry.id !== view().kind }))
+  const pickListed = (key: string): void => {
+    const entry = viewItems().find(item => item.key === key)
+    if (entry && !entry.disabled && entry.id !== view().kind) pickView(entry.id)
+  }
   return <Stack gap="row">
-    {/* Icons, with each view's name as its tooltip and for screen readers: five named segments don't
-        fit the inspector's 320 pixels, and the heading above names the chosen view. */}
     <Field label="Show as" group>
-      <SegmentedControl ariaLabel="Show as" size="sm" value={view().kind} onChange={pickView}
-        options={views().map(entry => ({ value: entry.id, label: <><Icon name={VIEW_ICONS[entry.id]} /><span class="sr-only">{entry.label}</span></>,
-          disabled: !entry.available && entry.id !== view().kind, title: entry.reason ? `${entry.label}: ${entry.reason}` : entry.label }))} />
+      <Rows id="dashboards.studio.views" ariaLabel="Show as" items={viewItems()} selected={view().kind} onSelect={pickListed} onActivate={pickListed}>
+        {(item, itemProps, selected) => <Row item={itemProps} selected={selected()} density="compact" variant="stacked" leading={<Icon name={VIEW_ICONS[item.id]} />}
+          onPress={() => pickListed(item.key)}>
+          <Stack gap="none"><Text>{item.label}</Text><Text emphasis="muted" wrap>{item.disabled ? item.reason : VIEW_HELP[item.id]}</Text></Stack>
+        </Row>}
+      </Rows>
     </Field>
     <Show when={view().kind === 'stat'}>
       <LabeledSelect label="Number" value={statNumber()}
@@ -610,7 +665,7 @@ function BehaviourInspector(props: InspectorProps) {
   return <Stack gap="stack">
     <Field label="When someone clicks a row" group><Stack gap="row">
       <LabeledSelect label="Click" value={pressChoice()}
-        options={[{ value: '', label: "Do the source's default" },
+        options={[{ value: '', label: "Use the source's default" },
           ...(run()?.rows.some(row => !!row.action || !!row.target) ? [{ value: 'record', label: 'Open the record' }] : []),
           ...(run()?.rows.some(row => !!row.taskId) ? [{ value: 'task', label: 'Open its task' }] : []),
           ...links().map(column => ({ value: `link:${column.id}`, label: `Open a link from ${column.label}` }))]}
@@ -663,8 +718,12 @@ function SettingsInspector(props: InspectorProps) {
   return <Stack gap="row">
     <LabeledSelect label="Refresh" value={plan().refresh === undefined ? '' : String(plan().refresh)} options={refreshOptions()}
       onChange={value => change(current => value ? { ...current, refresh: Number(value) } : without(current, 'refresh'))} />
-    <LabeledSelect label="Time zone" value={plan().time.zone} options={timezoneOptions(plan().time.zone)} onChange={zone => change(current => ({ ...current, time: { ...current.time, zone } }))} />
     <LabeledSelect label="Dates show in" value={plan().time.mode} options={labelOptions(TIME_MODE_LABELS)} onChange={mode => change(current => ({ ...current, time: { ...current.time, mode: mode as 'fixed' | 'viewer' } }))} />
+    {/* With each viewer's own zone, the stored zone only applies when nobody is looking, such as when
+        the Node records a number's history. */}
+    <LabeledSelect label="Time zone" value={plan().time.zone} options={timezoneOptions(plan().time.zone)}
+      {...(plan().time.mode === 'viewer' ? { hint: 'Used when Acorn records history in the background.' } : {})}
+      onChange={zone => change(current => ({ ...current, time: { ...current.time, zone } }))} />
     <LabeledSelect label="Weeks start on" value={plan().time.weekStart} options={labelOptions(WEEK_START_LABELS)} onChange={weekStart => change(current => ({ ...current, time: { ...current.time, weekStart: weekStart as PanelPlan['time']['weekStart'] } }))} />
   </Stack>
 }
@@ -672,6 +731,56 @@ function SettingsInspector(props: InspectorProps) {
 /** A part key's kind: `stage:2` is a `stage`. */
 export const partKind = (key: PlanPartKey) => key.split(':')[0] as PartKind
 type PartKind = 'source' | 'relations' | 'columns' | 'column' | 'stage' | 'arrange' | 'look' | 'behaviour' | 'settings'
+
+/** Each kind of part's heading in the inspector, and the line under it that says what the part is for.
+ *  A source, a column, and a step are headed by their own words; the rest by what they are, because
+ *  their outline titles are summaries such as "Updated, newest first". */
+const PART_GUIDE: Record<PartKind | 'input', { heading?: string; help: string }> = {
+  source: { help: 'Where the rows come from, and the account that reads them.' },
+  input: { help: 'A source this one reads for you. Choose the account it uses.' },
+  relations: { heading: 'How the sources join', help: 'How rows from each source match up, so their values end up on one row.' },
+  columns: { heading: 'Columns', help: 'The values each row shows. Steps, sorting, and the view all work with these.' },
+  column: { help: 'One value on each row, read from a field of the source.' },
+  stage: { help: '' },
+  arrange: { heading: 'Sort and group', help: 'Puts the rows in order, groups them, and limits how many show.' },
+  look: { heading: 'Look', help: 'How the rows are drawn on the dashboard.' },
+  behaviour: { heading: 'Clicks and buttons', help: 'What happens when someone clicks a row, and the buttons each row shows.' },
+  settings: { heading: 'Settings', help: 'How often the panel reads its data again, and how it shows dates.' },
+}
+
+/** The inspector's heading and help line for a part. A step's help is its operation's. */
+export function inspectorIntro(plan: PanelPlan, part: { key: PlanPartKey; title: string }): { heading: string; help: string } {
+  const kind = partKind(part.key) as keyof typeof PART_GUIDE
+  const stage = kind === 'stage' ? plan.stages[Number(part.key.slice('stage:'.length))] : undefined
+  return { heading: PART_GUIDE[kind].heading ?? part.title, help: stage ? OPERATION_HELP[stage.op] : PART_GUIDE[kind].help }
+}
+
+/** The inspector with nothing selected: a panel's parts in the order they apply, each opening its part,
+ *  so someone building their first panel learns the outline from one read. */
+export function PanelGuide(props: { plan: PanelPlan; onSelect: (key: PlanPartKey) => void }) {
+  const items = () => {
+    const firstSource = props.plan.sources[0]
+    const hasSteps = props.plan.stages.length > 0
+    return [
+      { key: firstSource ? `source:${firstSource.id}` : 'data', label: 'Data', icon: SOURCE_ICON, help: 'Where the rows come from.', disabled: !firstSource },
+      { key: 'columns', label: 'Columns', icon: 'columns-3', help: 'The values each row shows.' },
+      { key: hasSteps ? 'stage:0' : 'steps', label: 'Steps', icon: 'list-filter', disabled: !hasSteps,
+        help: hasSteps ? 'Filter, calculate, or summarize the rows.' : 'Optional. Use Add to filter, calculate, or summarize the rows.' },
+      { key: 'arrange', label: 'Arrange', icon: 'arrow-up-down', help: 'Sort, group, and limit the rows.' },
+      { key: 'look', label: 'Look', icon: VIEW_ICONS[props.plan.view.kind], help: 'A list, table, board, number, or chart, and what a click does.' },
+    ]
+  }
+  const open = (key: string): void => { if (items().some(item => item.key === key && !item.disabled)) props.onSelect(key as PlanPartKey) }
+  return <Stack gap="row">
+    <Text wrap>A panel reads rows from a source, then shapes them in this order. Select a part to change it.</Text>
+    <Rows id="dashboards.studio.guide" ariaLabel="Parts of a panel" items={items()} selected={null} onSelect={open} onActivate={open}>
+      {(item, itemProps) => <Row item={itemProps} density="compact" variant="stacked" leading={<Icon name={item.icon} />} onPress={() => open(item.key)}>
+        <Stack gap="none"><Text>{item.label}</Text><Text emphasis="muted" wrap>{item.help}</Text></Stack>
+      </Row>}
+    </Rows>
+    <Text emphasis="muted" wrap>Or choose Ask AI and say what you want to change.</Text>
+  </Stack>
+}
 
 /** The inspector for each kind of part. */
 export const INSPECTORS: Record<PartKind, Component<InspectorProps>> = {

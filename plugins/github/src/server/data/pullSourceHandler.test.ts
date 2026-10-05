@@ -16,7 +16,7 @@ const node = (id: string, overrides = {}) => ({ id, number: 1, title: 'A change'
   labels: { nodes: [{ name: 'bug' }], pageInfo: { hasNextPage: false, endCursor: null } },
   reviewRequests: { nodes: [{ requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }], pageInfo: { hasNextPage: false, endCursor: null } },
   latestCommit: { nodes: [{ commit: { committedDate: '2026-09-02T00:00:00Z', statusCheckRollup: { state: 'FAILURE', contexts: {
-    pageInfo: { hasNextPage: false }, nodes: [{ __typename: 'CheckRun', status: 'COMPLETED', conclusion: 'FAILURE' }],
+    checkRunCountsByState: [{ state: 'FAILURE', count: 1 }, { state: 'SUCCESS', count: 0 }], statusContextCountsByState: [],
   } } } }] }, latestComment: { nodes: [] }, latestReview: { nodes: [] },
   reviewRequestEvents: { pageInfo: { hasPreviousPage: false }, nodes: [{ createdAt: '2026-09-02T12:00:00Z',
     requestedReviewer: { __typename: 'Team', name: 'Reviewers', slug: 'reviewers' } }] }, ...overrides })
@@ -195,7 +195,7 @@ describe('GitHub typed pull source', () => {
   ])('fails closed on provider errors without leaking bodies', async response => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(response())
     const res = await call(createPullSourceHandler(), query())
-    expect(res.status).toBe(502)
+    expect(res.ok).toBe(false)
     expect(await res.text()).not.toContain('secret')
   })
 
@@ -205,6 +205,41 @@ describe('GitHub typed pull source', () => {
     expect((await call(createPullSourceHandler(), query())).ok).toBe(false)
     vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a'), node('a')]))
     expect((await call(createPullSourceHandler(), query())).ok).toBe(false)
+  })
+
+  it('reads every check state of a commit with more checks than one GitHub page holds', async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a', { latestCommit: { nodes: [{ commit: { committedDate: '2026-09-02T00:00:00Z',
+      statusCheckRollup: { state: 'PENDING', contexts: {
+        checkRunCountsByState: [{ state: 'SUCCESS', count: 120 }, { state: 'QUEUED', count: 2 }, { state: 'COMPLETED', count: 1 }],
+        statusContextCountsByState: [{ state: 'ERROR', count: 1 }],
+      } } } }] } })]))
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
+    const states = readDataPointer(page.records[0]!.data, '/checkStatuses') as string[]
+    expect(page.completeness.kind).toBe('complete')
+    expect(states).toHaveLength(124)
+    expect(states.slice(-4)).toEqual(['PENDING', 'PENDING', 'UNKNOWN', 'ERROR'])
+  })
+
+  it('reads a pull request whose review was requested from a bot', async () => {
+    const bot = { __typename: 'Bot', login: 'copilot-pull-request-reviewer' }
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a', {
+      reviewRequests: { nodes: [{ requestedReviewer: bot }], pageInfo: { hasNextPage: false, endCursor: null } },
+      reviewRequestEvents: { pageInfo: { hasPreviousPage: false }, nodes: [{ createdAt: '2026-09-02T12:00:00Z', requestedReviewer: bot }] },
+    })]))
+    const page = dataSourcePageSchema.parse(await (await call(createPullSourceHandler(), query())).json())
+    expect(page.records[0]?.data).toMatchObject({ requestedReviewers: [], requestedTeams: [],
+      reviewRequests: [{ kind: 'bot', name: 'copilot-pull-request-reviewer', requestedAt: Date.parse('2026-09-02T12:00:00Z') }] })
+  })
+
+  it("says why a read failed in the pull list's words, and never passes GitHub's own text on", async () => {
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ errors: [{ message: 'Resource protected by organization SAML enforcement. secret detail' }] }))
+    const blocked = await call(createPullSourceHandler(), query())
+    expect(blocked.status).toBe(502)
+    expect(await blocked.json()).toEqual({ error: 'github_source_failed', reason: "Authorise acorn's GitHub sign-in for your organisation's single sign-on, then try again." })
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(new Response('', { status: 429, headers: { 'retry-after': '30' } }))
+    expect((await call(createPullSourceHandler(), query())).status).toBe(429)
+    vi.mocked(ghGraphQL).mockResolvedValueOnce(upstream([node('a'), node('a')]))
+    expect(await (await call(createPullSourceHandler(), query())).json()).toEqual({ error: 'github_source_failed' })
   })
 
   it('binds continuation to owner, scope, and evaluation time, and expires it', async () => {
@@ -234,14 +269,14 @@ describe('GitHub typed pull source', () => {
     expect(await res.json()).toEqual({ options: [{ id: 'org/repo', label: 'org/repo' }], exhausted: false, nextCursor: 'repo-next' })
   })
 
-  it('walks repository pages until a search finds its match', async () => {
+  it("lists each repository by its folded name, which is how a workspace's projects name it", async () => {
     vi.mocked(ghGraphQL).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
       nodes: [{ nameWithOwner: 'acme/api' }, { nameWithOwner: 'acme/web' }], pageInfo: { hasNextPage: true, endCursor: 'page-2' },
     } } } })).mockResolvedValueOnce(Response.json({ data: { viewer: { repositories: {
       nodes: [{ nameWithOwner: 'Runn-Fast/runn' }], pageInfo: { hasNextPage: false, endCursor: null },
     } } } }))
     const res = await call(createPullSourceHandler(), { operation: 'options', source, scope, target: 'parameter', pointer: '/repositories', search: 'runn-fast/runn', pageSize: 25 })
-    expect(await res.json()).toEqual({ options: [{ id: 'Runn-Fast/runn', label: 'Runn-Fast/runn' }], exhausted: true })
+    expect(await res.json()).toEqual({ options: [{ id: 'runn-fast/runn', label: 'Runn-Fast/runn' }], exhausted: true })
     expect(vi.mocked(ghGraphQL).mock.calls[1]?.[2]).toMatchObject({ first: 25, after: 'page-2' })
   })
 })

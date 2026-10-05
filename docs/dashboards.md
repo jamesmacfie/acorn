@@ -51,6 +51,8 @@ data source error code, or `incomplete` with its cause, the `plugin:source` id, 
 fault. `message` keeps the Node's wording for older clients. `features/dashboards/sourceErrors.ts`
 turns a failure into a sentence and a fix, such as "Pull requests needs a GitHub account." with
 **Choose an account**, or "Northwind is waiting for you to approve what it reads." with **Review**.
+A failure with no sentence of its own adds the source's `reason`, so a GitHub panel blocked by an
+organisation's single sign-on says so in the pull list's words (`github/src/shared/readFailures.ts`).
 The studio, the placed panel, and the source picker all use it, so none shows a code or a JSON
 pointer. Every fix is host UI, because a loaded plugin can't open Settings. **Review** and **Turn it
 on** open the plugin's page, **Reconnect…** opens the account's page, **Choose an account** opens the

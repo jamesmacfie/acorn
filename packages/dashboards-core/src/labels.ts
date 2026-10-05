@@ -75,6 +75,25 @@ export const VIEW_LABELS: Record<PanelPlan['view']['kind'], string> = {
   stat: 'Number', list: 'List', table: 'Table', board: 'Board', chart: 'Chart',
 }
 
+/** What each view is good for, under its name where a person picks one. */
+export const VIEW_HELP: Record<PanelPlan['view']['kind'], string> = {
+  stat: 'One big number, such as a count or a total.',
+  list: 'Each row as a title with a few details under it.',
+  table: 'Every column side by side, one row per line.',
+  board: 'Cards in columns, one column per choice.',
+  chart: 'Bars or a line across dates or choices.',
+}
+
+/** What each step does, in the Add menu and at the top of its form. The capability list's own
+ *  descriptions are written for the AI author, so they aren't shown to people. */
+export const OPERATION_HELP: Record<Stage['op'], string> = {
+  filter: 'Keeps only the rows that match your conditions.',
+  compute: 'Adds a column worked out from other columns, such as a difference or a count of days.',
+  summarize: 'Turns many rows into one row per group, with counts or totals.',
+  expand: 'Turns each item in a list column into a row of its own.',
+  overlap: 'Makes one row for each pair of rows whose dates overlap.',
+}
+
 export const AGGREGATE_LABELS: Record<NonNullable<PanelPlan['view']['aggregate']>, string> = {
   count: 'Count', sum: 'Total', avg: 'Average', min: 'Smallest', max: 'Largest',
 }

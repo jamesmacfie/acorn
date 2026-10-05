@@ -25,11 +25,36 @@ const safeColumnId = (value: string): string => value.replace(/^\//, '').replace
  *  field made a column buried the few that matter under dozens of IDs. */
 export function defaultPlanColumns(sourceId: string, fields: ReturnType<typeof dashboardFields>): PanelPlan['columns'] {
   const roled = fields.filter(field => field.role)
-  return (roled.length ? roled : fields.slice(0, 6)).map(field => ({
-    id: safeColumnId(field.id), label: field.name, type: field.type, bind: { [sourceId]: { field: field.id } },
+  return (roled.length ? roled : fields.slice(0, 6)).map(field => fieldColumn(sourceId, field, safeColumnId(field.id)))
+}
+
+/** A column that reads one field, named and typed as the field is, with its unit, precision, and choices. */
+export function fieldColumn(sourceId: string, field: ReturnType<typeof dashboardFields>[number], id: string): PanelPlan['columns'][number] {
+  return {
+    id, label: field.name, type: field.type, bind: { [sourceId]: { field: field.id } },
     ...(field.unit ? { unit: field.unit } : {}), ...(field.precision ? { precision: field.precision } : {}),
     ...(field.list ? { list: true } : {}), ...(field.values ? { choices: field.values } : {}),
-  }))
+  }
+}
+
+/** A column that now reads `pointer` from one source. A column that reads only that source takes the
+ *  field's type, and its name too while it still has `placeholder` or the last field's name, so picking
+ *  a field for a new column doesn't leave it "New column", typed as text. A column several sources
+ *  feed keeps what was set, because the other sources' fields chose it. */
+export function bindColumnField(
+  column: PanelPlan['columns'][number],
+  sourceId: string,
+  pointer: string,
+  fields: ReturnType<typeof dashboardFields>,
+  placeholder: string,
+): PanelPlan['columns'][number] {
+  const bind = { ...column.bind, [sourceId]: { field: pointer } }
+  const field = fields.find(candidate => candidate.id === pointer)
+  if (!field || Object.keys(column.bind).some(id => id !== sourceId)) return { ...column, bind }
+  const binding = column.bind[sourceId]
+  const previous = binding && 'field' in binding ? fields.find(candidate => candidate.id === binding.field) : undefined
+  const label = column.label === placeholder || column.label === previous?.name ? field.name : column.label
+  return field.type === column.type ? { ...column, label, bind } : { ...fieldColumn(sourceId, field, column.id), label }
 }
 
 /** After a source switches, drops the column bindings the new source can't fill: a field it doesn't

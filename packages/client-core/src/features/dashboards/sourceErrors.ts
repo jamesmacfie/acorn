@@ -21,6 +21,14 @@ export type SourceFailureNames = {
 export type SourceFailureText = { message: string; fix?: SourceFix }
 
 const article = (word: string) => /^[aeiou]/i.test(word) ? 'an' : 'a'
+/** Words a person can read: not empty, not the code itself, not a bare HTTP status, and not another
+ *  code such as `github_unavailable`. The same rule as the GitHub plugin's `readFailure`
+ *  (plugins/github/src/client/actionErrors.ts), which core can't import. */
+const readable = (detail: string | undefined, code: string): string | undefined => {
+  const text = detail?.trim()
+  if (!text || text === code || /^\d{3}$/.test(text) || /^[a-z0-9]+(?:[_-][a-z0-9]+)*$/.test(text)) return undefined
+  return /[.!?]$/.test(text) ? text : `${text}.`
+}
 const needsAccount = (who: string, provider: string | undefined) => provider ? `${who} needs ${article(provider)} ${provider} account.` : `${who} needs an account.`
 
 /** The sentence and fix for one failure. */
@@ -51,7 +59,10 @@ export function describeSourceFailure(failure: SourceFailure, names: SourceFailu
       return { message: `${names.source} returned only part of its records, so some items may be missing.` }
     }
   }
-  return { message: `${names.source} couldn't answer.`, fix: 'retry' }
+  // No sentence for this code, so the source's own `reason` says why, when it gave one
+  // (docs/data-sources.md § Register a source).
+  const detail = readable(failure.reason, failure.code)
+  return { message: detail ? `${names.source} couldn't answer. ${detail}` : `${names.source} couldn't answer.`, fix: 'retry' }
 }
 
 /** A failure from a data source route's error, for the source picker. Undefined for any other error. */

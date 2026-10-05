@@ -1238,6 +1238,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-row:hover .ui-row-actions,
 .ui-row:focus-within .ui-row-actions,
 .ui-row[data-selected] .ui-row-actions,
+.ui-table tr:hover .ui-row-actions,
+.ui-table tr:focus-within .ui-row-actions,
 .ui-row-actions:has([aria-expanded='true']) { opacity: 1; }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────

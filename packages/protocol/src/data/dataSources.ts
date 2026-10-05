@@ -103,6 +103,9 @@ export const dataSourceDescriptionSchema = z.object({
   coverageWindows: z.array(z.object({ fromTime: z.number().finite(), toTime: z.number().finite(), kind: z.enum(['complete', 'gap']), reason: z.string().max(512).nullable() }).strict()).max(100).optional(),
   reach: z.object({ parameter: dataPointerSchema, itemPlural: z.string().min(1).max(80),
     default: z.string().min(1).max(300), empty: z.string().min(1).max(300) }).strict().optional(),
+  /** Maps the record's external container to host-owned workspace projects. */
+  projectScope: z.object({ kind: z.enum(['repository', 'external-project']),
+    parameter: dataPointerSchema, record: dataPointerSchema }).strict().optional(),
   coverage: dataSourceCoverageSchema.optional(),
   /** Optional host-validated plan suggestions; a source never draws the resulting panel. */
   starterPlans: z.array(z.unknown()).max(10).optional(),
@@ -135,7 +138,8 @@ export const dataSourceQuerySchema = z.object({
   ]).optional(),
 }).strict().refine(query => !query.take || query.sort.length > 0, 'Take requires explicit stable ordering')
   .refine(query => !(query.take && query.incremental), 'Incremental queries cannot use take')
-export const dataRecordRefSchema = dataSourceRefSchema.extend({ connectionId: id.optional(), recordId: id, scope: dataSourceScopeSchema.optional() })
+export const dataRecordRefSchema = dataSourceRefSchema.extend({ connectionId: id.optional(), recordId: id,
+  projectId: id.optional(), scope: dataSourceScopeSchema.optional() })
 export const dataSourceRequestSchema = z.discriminatedUnion('operation', [
   z.object({ operation: z.literal('identity'), source: dataSourceRefSchema, scope: dataSourceScopeSchema }).strict(),
   z.object({
