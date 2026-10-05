@@ -629,15 +629,17 @@ composer props.
 
 ### Phase 08 review correction (2026-10-06)
 
-The accepted installation gate uses the unmodified repository settings. On Darwin arm64,
+The accepted installation gate uses the unmodified repository settings. After moving all copied
+workspace `node_modules` trees aside, a clean Darwin arm64
 `PATH=/private/tmp/acorn-trim-node-bin:$PATH CI=true pnpm install --frozen-lockfile`
-completed with pnpm 11.0.0: the lockfile was up to date, resolution was skipped, and pnpm reported
-"Already up to date" and "Done in 824ms." This run used host permissions for cache and network
-access. Node reported v24.21.0. `pnpm lint` then passed 37/37 tasks with no cache, and
-`pnpm --filter @acorn/arch-tests test` passed 12 files/86 tests. Neither command used a pnpm status
-warning override. `git status --short` was empty after installation, and `git diff` showed no
-change to `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or root `package.json`. The earlier copied-tree
-and missing-tarball account describes the first sandboxed attempt, not the accepted install gate.
+completed with Node 24.21.0 and pnpm 11.0.0. Pnpm resolved and added 426 packages, reused all 426
+from its cache, downloaded none, and completed the `node-pty` install hooks in 3.5 seconds. The run
+used host permissions for cache access. Standard `pnpm lint` then passed 37/37 tasks with no cache,
+and `pnpm --filter @acorn/arch-tests test` passed 12 files/86 tests. Neither command used a pnpm
+status warning override. `git status --short` was empty after installation, and `git diff` showed
+no change to `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or root `package.json`. The moved module trees
+were removed after successful verification. The earlier copied-tree and missing-tarball account
+describes the first sandboxed attempt, not the accepted install gate.
 
 The isolated `trim-08` desktop fixture created an Acorn-managed interactive Claude session in
 **Plan follow-up work**, separate from the imported, externally controlled session in **Review
