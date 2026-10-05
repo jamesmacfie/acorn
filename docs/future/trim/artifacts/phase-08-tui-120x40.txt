@@ -1,0 +1,40 @@
+Default > repo · 2 tasks                                                                    ● Task: Review changed files
+┌─Menu───────────────────────────┐  [Agent]  Changes  Notes  Context  Editor
+│  Docker                        │Setup not started · Teardown not started
+│  Workflows                     │┌─List─────────────────────────┐┌─Detail─────────────────────────────────────────────┐
+│  Agents                        ││Agents 1                      ││Large-surface fixture (small)       ■ stopped [Stop]│
+│  Memory                        ││                              ││Session actions [Agent utilization] [ New ▾ ]       │
+│                                ││MANAGED SESSIOrder managed se ││▍──────────────────────────────────────────────────││
+└────────────────────────────────┘│  ■ Large-surface fixture (s  ││                                                   ││
+┌─Browse─────────────────────────┐│    claude · Fixture model ·  ││Turn complete · end_turn    20,170 / 200,000 contex││
+│Choose a source.                ││    ✓ Explore module 13       ││                                                   ││
+│                                ││      Completed · Explore · F ││▍──────────────────────────────────────────────────││
+│                                ││    ✓ Explore module 3        ││▍ YOU 8:06 AM                                      ││
+│                                ││      Completed · Explore · F ││▍ Turn 18: continue with the next file.            ││
+│                                ││                              ││▍──────────────────────────────────────────────────││
+│                                ││                              ││                                                   ││
+│                                ││                              ││▾ Thinking Provider reasoning                      ││
+│                                ││                              ││  Reading the diff for turn 18. Checking the queue ││
+│                                ││                              ││  bound before editing.                            ││
+│                                ││                              ││▸ Read src/pkg-18/module-18.ts ●                   ││
+│                                ││                              ││▸ Read src/pkg-19/module-18.ts ●                   ││
+│                                ││                              ││▸ Read src/pkg-20/module-18.ts ●                   ││
+│                                ││                              ││▸ Changed pkg-18/queue.ts ●                        ││
+│                                ││                              ││                                                   ││
+│                                ││                              ││▍──────────────────────────────────────────────────││
+│                                ││                              ││▍ AGENT 8:06 AM                 Copy this response ││
+│                                ││                              ││▍ Turn 18 summary. The change keeps the queue      ││
+│                                ││                              ││▍ bounded, and nothing else moved.                 ││
+│                                ││                              ││▍──────────────────────────────────────────────────││
+│                                ││                              ││                                                   ││
+│                                ││                              ││Turn complete · end_turn    20,180 / 200,000 contex█│
+│                                ││                              ││Mode Default▾ Model Fixture model▾ Effort high▾     │
+└────────────────────────────────┘│                              ││┌──────────────────────────────────────────────────┐│
+┌─Tasks──────────────────────────┐│                              │││This session is controlled by an external client a││
+│› Review changed files          ││                              │││                                                  ││
+│  Plan follow-up work           ││                              │││                                                  ││
+│                                ││                              ││└──────────────────────────────────────────────────┘│
+│                                ││                              ││[Attach] [ Context ▾ ] [ Insert ▾ ]   ⇧↩ for newline│
+│                                ││                              ││[Send]                                              │
+└────────────────────────────────┘└──────────────────────────────┘└────────────────────────────────────────────────────┘
+j/k move · enter open · esc back · ctrl+k commands · ? help · w switch workspace · p switch project · ctrl+b rail · n…

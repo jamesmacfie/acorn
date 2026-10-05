@@ -51,3 +51,22 @@ context ([reads and drafts](./client-surfaces.md#reads-and-drafts)). So stepping
 and back keeps typed text, and the Workflows run pane can draw a second composer on the same session.
 The queue shows each waiting turn's text and attachment tiles, and an attachment-only turn shows the
 tiles alone.
+
+## Draft and operation ownership
+
+`composerState.ts` owns one mutable draft for each Node and session. It holds text, attachment IDs,
+context, hydration, and the send, upload, replacement, and capture guards. A rendered composer holds
+that draft while it is visible and reads it again when navigation changes the session or Node.
+Presentation choices, including field height, context dismissal, and the open picker, stay in
+`AgentComposer.tsx`.
+
+`submitOperation.ts` assembles the captured text, file mentions, attachments, context, policy, and
+source before it enqueues a turn. The shared draft acknowledges the submitted revisions after the
+request succeeds, so edits made during the request remain. `attachmentOperations.ts` handles picker,
+paste, drop, removal, and replacement. It keeps successful uploads if another file fails, limits a
+turn to eight attachments and 25 MiB, and persists a replacement before deleting the old row.
+`contextOperations.ts` handles manual capture and the single-flight automatic task capture. Each
+operation receives the originating draft, session, and Node before its first await; completion uses
+that origin rather than whichever session the composer displays later. Automatic capture rejects a
+result after a Node switch. The composer closes a context picker only while it still shows the
+originating draft.

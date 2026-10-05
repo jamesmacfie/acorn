@@ -2,10 +2,16 @@ import { render } from 'solid-js/web'
 import { createSignal } from 'solid-js'
 import { afterEach, expect, it, vi } from 'vitest'
 import { setActiveNode } from '@acorn/plugin-api/testkit/client'
+import type { AgentContextContribution, AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import type { AgentAttachment, AgentSession } from '../../contract/wire.ts'
 import { composerDraftState, clearComposerDrafts } from './composerState'
 import { readComposerPayload } from './composerDraftStorage'
 
+const contextFixture = vi.hoisted(() => ({ contributions: [] as AgentContextContribution[] }))
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@acorn/plugin-api/client')>()),
+  agentContextContributions: () => contextFixture.contributions,
+}))
 vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
 const api = vi.hoisted(() => ({ attachment: vi.fn(), uploadAttachment: vi.fn(), enqueue: vi.fn(), removeAttachment: vi.fn() }))
 vi.mock('../sessions/managedClient', () => ({ managedAgentApi: api }))
@@ -26,7 +32,7 @@ const mount = (session: () => AgentSession) => {
   return host
 }
 const button = (host: HTMLElement, label: string) => [...host.querySelectorAll('button')].find(item => item.textContent?.includes(label))!
-afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); clearComposerDrafts(); localStorage.clear(); setActiveNode(null); vi.clearAllMocks(); delete window.acorn })
+afterEach(() => { disposals.splice(0).forEach(dispose => dispose()); clearComposerDrafts(); localStorage.clear(); setActiveNode(null); vi.clearAllMocks(); contextFixture.contributions = []; delete window.acorn })
 
 it('acknowledges the submitted draft while retaining edits and releasing only its shared send guard', async () => {
   setActiveNode('A')
@@ -146,4 +152,30 @@ it('does not reattach consumed fork context when an empty composer remounts', as
   await tick()
   expect(composerDraftState('fork').contexts()).toEqual([])
   expect(api.enqueue).toHaveBeenCalledTimes(1)
+})
+
+
+it('keeps a held automatic capture with its originating session and discards it after a Node switch', async () => {
+  setActiveNode('A')
+  const first = deferred<AgentContextSnapshot[]>()
+  const second = deferred<AgentContextSnapshot[]>()
+  const capture = vi.fn().mockReturnValueOnce(first.promise).mockReturnValueOnce(second.promise)
+  contextFixture.contributions = [{
+    id: 'acorn-task-context', source: 'context.task', label: 'Task context',
+    options: async () => [], capture,
+  }]
+  const [current, setCurrent] = createSignal({ ...row('first'), kind: 'interactive' as const })
+  mount(current)
+  expect(capture).toHaveBeenCalledWith({ taskId: 'task-first' })
+  setCurrent({ ...row('second'), kind: 'interactive' })
+  expect(capture).toHaveBeenCalledWith({ taskId: 'task-second' })
+  first.resolve([{ type: 'context', contextId: 'first', label: 'First', content: 'first', source: 'context.task', capturedAt: 1 }])
+  await tick()
+  expect(composerDraftState('first', 'A').contexts()).toHaveLength(1)
+  expect(composerDraftState('second', 'A').contexts()).toEqual([])
+  setActiveNode('B')
+  second.resolve([{ type: 'context', contextId: 'second', label: 'Second', content: 'second', source: 'context.task', capturedAt: 1 }])
+  await tick()
+  expect(composerDraftState('second', 'A').contexts()).toEqual([])
+  expect(composerDraftState('second', 'B').contexts()).toEqual([])
 })

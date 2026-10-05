@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-06. Status: phases 01–07 complete; phase 08 is next.
+Date: 2026-10-06. Status: phases 01–08 complete; phase 09 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -39,7 +39,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 05 DONE (retention) | [Resolve the keymap dependency branch](./05-keymap.md) | Keymap retained: its supported entries avoid Core at runtime, but the required package dependency remains; zero realized savings. See [evidence](./evidence.md#phase-05-keymap-dependency-branch-2026-10-06). |
 | 06 DONE | [Remove internal import cycles](./06-import-cycles.md) | Workflow and agent-selection SCCs removed; exact graph and passing gates in [evidence](./evidence.md#phase-06-internal-import-cycles-2026-10-06). |
 | 07 DONE | [Separate rail task editing](./07-tab-rail.md) | Dialog state, Node-scoped reads and writes, and held-request guard moved beside the rail. See [evidence](./evidence.md#phase-07-rail-task-editing-2026-10-06). |
-| 08 | [Separate composer operations](./08-agent-composer.md) | Submission, context capture, and attachments have explicit draft ownership. |
+| 08 DONE | [Separate composer operations](./08-agent-composer.md) | Shared draft custody retained; submission, capture, and attachment operations extracted. See [evidence](./evidence.md#phase-08-composer-operations-2026-10-06). |
 | 09 | [Thin workflow activation](./09-workflow-activation.md) | Feature-owned services and a readable plugin composition root. |
 | 10 | [Separate plugin contribution registration](./10-plugin-host.md) | Named adapters with unchanged lifecycle, rollback, and permission behavior. |
 | 11 | [Separate agent admission](./11-agent-admission.md) | A single queue coordinator with explicit policy and await-time guards. |

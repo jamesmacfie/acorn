@@ -1,9 +1,9 @@
 import { createEffect, createMemo, createSignal, For, on, onCleanup, Show, type JSX } from 'solid-js'
-import type { AgentAttachment, AgentConfigOption, AgentInputPart, AgentSession } from '../../contract/wire.ts'
+import type { AgentAttachment, AgentConfigOption, AgentSession } from '../../contract/wire.ts'
 import { agentContextBudget, type AgentContextContribution, type AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 import { AGENT_COMPOSER_ACTIONS_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { managedAgentApi } from '../sessions/managedClient'
-import { activeNodeId, agentContextContributions, formatChord, pickFiles } from '@acorn/plugin-api/client'
+import { activeNodeId, agentContextContributions, formatChord } from '@acorn/plugin-api/client'
 import {
   Alert, Button, Chip, ChipRow, CodeBlock, Field, Icon, IconButton, Inline, Kbd, MentionTextarea, Only, Picker,
   Popover, SectionHeader, Select, Stack, Text, Toolbar, type MentionSegment, type MentionSource,
@@ -14,27 +14,20 @@ import { composerDraftState, hydrateComposerDraft } from './composerState'
 import { sameAgentConfigOptions } from '../settings/agentConfigOptions'
 import { agentComposerDisabledMessage } from './agentComposerState'
 import { canStopAgent } from '../sessions/agentActivity'
-import { fileMentionSuggestions, formatFileMention, parseFileMentions } from './fileMentions'
+import { fileMentionSuggestions, formatFileMention } from './fileMentions'
 import { advertisedSuggestions, composerSegments, MAX_HIGHLIGHT_LENGTH } from './composerTokens'
 import { useWorktreeFiles } from './worktreeFiles'
 import AgentContextPickerModal from './AgentContextPickerModal'
 import { AttachmentSlot } from './AttachmentSlot'
 import TerminalComposerShortcut from './TerminalComposerShortcut'
-import { decideReplacement } from './replaceAttachment'
+import { addDraftFiles, pickDraftAttachments, removeDraftAttachment, replaceDraftAttachment } from './attachmentOperations'
+import { captureContext, contextBelongsTo, refreshAutomaticContext } from './contextOperations'
+import { submitTurn } from './submitOperation'
 import {
   AUTOMATIC_TASK_CONTEXT_SOURCE,
   TASK_CONTEXT_CONTRIBUTION_ID,
-  automaticTaskContextFor,
   automaticTaskContextPayload,
 } from './automaticTaskContext'
-
-// What the attach dialog offers, as bare extensions because that is what the platform seam takes.
-// Text the harnesses read, plus the image and document types they can look at.
-const ATTACHMENT_EXTENSIONS = [
-  'txt', 'md', 'json', 'yaml', 'yml', 'toml', 'xml', 'csv', 'ts', 'tsx', 'js', 'jsx', 'css', 'html',
-  'py', 'rb', 'go', 'rs', 'java', 'c', 'h', 'cpp', 'hpp', 'swift', 'sh', 'sql', 'diff', 'patch',
-  'jpg', 'jpeg', 'png', 'gif', 'webp', 'pdf',
-]
 
 type InsertChoice = {
   id: string
@@ -180,7 +173,10 @@ export default function AgentComposer(props: {
   // Two halves, because they have two owners. This composer's view state resets on every mount that
   // sees a new session; the session's own draft is read back once, however many composers asked, since
   // the read fetches attachment metadata. A second mount still resets its own view state.
+  let pickerTimer: ReturnType<typeof setTimeout> | undefined
+  onCleanup(() => clearTimeout(pickerTimer))
   createEffect(on(shared, (state) => {
+    clearTimeout(pickerTimer)
     const owner = capture()
     setExpanded(false)
     setContextPickerId('')
@@ -205,7 +201,8 @@ export default function AgentComposer(props: {
   createEffect(on(() => [shared(), automaticContextKey()], () => {
     const owner = capture()
     if (owner.session.kind !== 'interactive') return
-    void refreshAutomaticContext(owner).catch((caught) => {
+    void refreshAutomaticContext(owner, automaticContextKey(),
+      props.previousAutomaticContext, dismissedAutomaticPayload()).catch((caught) => {
       owner.state.setError(caught instanceof Error ? caught.message : 'Unable to attach task context.')
     })
   }))
@@ -218,76 +215,29 @@ export default function AgentComposer(props: {
     Object.fromEntries(configOptions().flatMap((option) =>
       option.currentValue == null ? [] : [[option.id === 'reasoning' ? 'effort' : option.id, option.currentValue]]))
 
-  async function refreshAutomaticContext(owner = capture()): Promise<AgentContextSnapshot[]> {
-    const { state, session } = owner
-    const key = automaticContextKey()
-    if (state.automaticCapture?.key === key) return state.automaticCapture.run
-    const run = (async () => {
-      const before = state.contexts()
-      if (state.capturing()) return before
-      if (session.kind !== 'interactive' || before.some((context) => context.source === 'context.task')) return before
-      const contribution = agentContextContributions().find((item) => item.id === TASK_CONTEXT_CONTRIBUTION_ID)
-      if (!contribution) return before
-      const revision = state.revisions()[2]
-      const captureVersion = state.captureRevision()
-      const previous = props.previousAutomaticContext
-      const dismissed = dismissedAutomaticPayload()
-      const captured = (await contribution.capture({ taskId: session.taskId }))[0]
-      if (!captured || activeNodeId() !== owner.nodeId || !state.captureCurrent(captureVersion)
-        || state.revisions()[2] !== revision) return before
-      const automatic = automaticTaskContextFor(captured, previous)
-      const next = before.filter((context) => context.source !== AUTOMATIC_TASK_CONTEXT_SOURCE)
-      if (automatic && automaticTaskContextPayload(automatic) !== dismissed) next.push(automatic)
-      state.setContexts(next)
-      return next
-    })().finally(() => { if (state.automaticCapture?.run === run) state.automaticCapture = undefined })
-    state.automaticCapture = { key, run }
-    return run
-  }
-
   const nothingToSend = () => !draft().trim() && !attachments().length && !contexts().length
 
   async function send() {
     const owner = capture()
-    const { state, session } = owner
-    const text = state.text().trim()
+    const text = owner.state.text().trim()
     if (props.onMcp && /^\/mcp$/.test(text)) {
       props.onMcp()
-      state.setText('')
+      owner.state.setText('')
       return
     }
-    if (nothingToSend() || !shared().hydrated() || sending() || uploading() || capturingContext() || replacing() || props.disabled || props.submitDisabled) return
-    const revisions = [...state.revisions()]
-    const submittedAttachments = state.attachments()
-    const paths = files.paths()
-    const policy = effectivePolicy()
-    state.setSending(true)
-    state.setError('')
-    try {
-      const turnContexts = await refreshAutomaticContext(owner)
-      if (!state.valid()) return
-      // Context refreshed by this send is acknowledged only if no concurrent edit replaced it.
-      if (state.contexts() === turnContexts) revisions[2] = state.revisions()[2]
-      if (agentContextBudget(turnContexts).overLimit) {
-        state.setError('Remove some context before sending; Acorn snapshots are limited to 512 KiB per turn.')
-        return
-      }
-      const input: AgentInputPart[] = [
-        ...(text ? [{ type: 'text' as const, text }] : []),
-        ...parseFileMentions(text, paths),
-        ...submittedAttachments.map((attachment): AgentInputPart => attachment.mediaType.startsWith('image/')
-          ? { type: 'image', attachmentId: attachment.id, alt: attachment.filename }
-          : { type: 'attachment', attachmentId: attachment.id }),
-        ...turnContexts,
-      ]
-      await managedAgentApi.enqueue(session.id, { input, source: 'interactive', effectivePolicy: policy }, undefined, owner)
-      state.acknowledge(revisions, submittedAttachments, turnContexts)
-      if (owner.visible()) props.onSent()
-    } catch (caught) {
-      state.setError(caught instanceof Error ? caught.message : 'Unable to queue this turn.')
-    } finally {
-      state.setSending(false)
-    }
+    if (nothingToSend() || !owner.state.hydrated() || owner.state.sending() || owner.state.uploading()
+      || owner.state.capturing() || owner.state.replacing() || props.disabled || props.submitDisabled) return
+    const automaticKey = automaticContextKey()
+    const previousAutomaticContext = props.previousAutomaticContext
+    const dismissedPayload = dismissedAutomaticPayload()
+    await submitTurn({
+      origin: owner,
+      paths: files.paths(),
+      policy: effectivePolicy(),
+      refreshContext: () => refreshAutomaticContext(owner, automaticKey,
+        previousAutomaticContext, dismissedPayload),
+      onSent: props.onSent,
+    })
   }
 
   // Escape in the composer, which is the same request as the header's Stop button and reaches the
@@ -322,116 +272,11 @@ export default function AgentComposer(props: {
     setDraft((current) => `${current}${current && !current.endsWith(' ') ? ' ' : ''}${value} `)
   }
 
-  // The dialog is the platform's, not the page's, so what comes back is bytes. `File` is the shape
-  // the drop and paste path already hands `addFiles` through the kit's `onFiles`, and the upload
-  // reads its bytes back out, so the two paths meet here rather than one layer down.
-  async function attach() {
-    const owner = capture()
-    if (owner.state.uploading()) return
-    owner.state.setUploading(true)
-    try {
-      const picked = await pickFiles({ accept: ATTACHMENT_EXTENSIONS })
-      await addFiles(picked.map((file) => new File([file.bytes as BlobPart], file.name, { type: file.type })), owner, true)
-    } catch (caught) {
-      owner.state.setError(caught instanceof Error ? caught.message : 'Unable to upload attachment.')
-    } finally { owner.state.setUploading(false) }
-  }
-
-  async function addFiles(files: File[], owner = capture(), picking = false) {
-    const { state, session } = owner
-    if (!state.valid() || !files.length || (!picking && state.uploading())) return
-    state.setUploading(true)
-    state.setError('')
-    try {
-      await state.hydration
-      if (!state.hydrated() || !state.valid()) return
-      if (state.attachments().length + files.length > 8) {
-        state.setError('A turn can include at most eight attachments.')
-        return
-      }
-      const aggregate = state.attachments().reduce((total, item) => total + item.byteSize, 0)
-        + files.reduce((total, file) => total + file.size, 0)
-      if (aggregate > 25 * 1024 * 1024) {
-        state.setError('Turn attachments are limited to 25 MiB in total.')
-        return
-      }
-      // Preserve each successful upload even when a sibling file fails.
-      const uploaded = await Promise.allSettled(files.map((file) => managedAgentApi.uploadAttachment(session.taskId, file, owner)))
-      state.setAttachments((current) => [...current, ...uploaded.flatMap(result =>
-        result.status === 'fulfilled' && !current.some(item => item.id === result.value.id) ? [result.value] : [])])
-      if (uploaded.some(result => result.status === 'rejected')) state.setError('Unable to upload attachment.')
-    } catch (caught) {
-      state.setError(caught instanceof Error ? caught.message : 'Unable to upload attachment.')
-    } finally { state.setUploading(false) }
-  }
-
-  function removeAttachment(attachment: AgentAttachment) {
-    const owner = capture()
-    owner.state.setAttachments((current) => current.filter((item) => item.id !== attachment.id))
-    void managedAgentApi.removeAttachment(attachment.id, owner).catch(() => undefined)
-  }
-
-  /**
-   * A contributor asking this composer to put a different attachment in one slot
-   * (docs/plugins/remote-points.md § Asking the owner; docs/managed-agents/attachments.md § Draft attachments).
-   *
-   * A compare-and-swap, because there is no transaction to be had. The draft is an array in this
-   * component and the replacement is a row on the node, so "atomic" here can only mean: either the id
-   * we were told to expect is still in that slot and it is replaced once, or nothing changes at all. A
-   * reader who removed the attachment, sent the turn, or switched sessions while an editor was open
-   * gets the second.
-   *
-   * The order at the end is load-bearing. The new id is written to the draft before the old one is
-   * cleaned up, so a crash in between leaves an extra unreferenced row for the garbage collector rather
-   * than a draft pointing at content that has been deleted.
-   */
-  async function replaceDraftAttachment(expected: AgentAttachment, payload: unknown): Promise<void> {
-    const { expectedAttachmentId, replacementAttachmentId } = (payload ?? {}) as {
-      expectedAttachmentId?: unknown
-      replacementAttachmentId?: unknown
-    }
-    if (typeof replacementAttachmentId !== 'string' || !replacementAttachmentId) {
-      throw new Error('A replacement needs an attachment id.')
-    }
-    if (replacing()) throw new Error('Another replacement is already in progress.')
-    if (!attachments().some((item) => item.id === expected.id)) {
-      throw new Error('That attachment is no longer in this draft.')
-    }
-    const owner = capture()
-    const { state, session } = owner
-    state.setReplacing(expected.id)
-    try {
-      const replacement = await managedAgentApi.attachment(replacementAttachmentId, owner)
-      if (!state.valid()) return
-      // The draft is re-read here rather than captured before the await: fetching the metadata gave the
-      // reader time to remove something. Every rule about whether the swap is allowed lives in the pure
-      // decision (./replaceAttachment.ts), where the cases that would lose an attachment are testable.
-      const decision = decideReplacement({
-        current: state.attachments(),
-        expectedId: expected.id,
-        claimedExpectedId: expectedAttachmentId,
-        replacement,
-        taskId: session.taskId,
-      })
-      if (decision.kind === 'noop') return
-      if (decision.kind === 'refuse') {
-        // The candidate the contributor created and this composer refused. Nobody references it, so
-        // the sweep would get it eventually; asking now keeps a rejected edit from leaving content
-        // behind. The decision never refuses when the candidate IS the source, so this cannot delete
-        // the reader's own attachment.
-        void managedAgentApi.removeAttachment(replacement.id, owner).catch(() => undefined)
-        throw new Error(decision.reason)
-      }
-      // The shared owner writes the replacement before source cleanup. A failed durable write keeps
-      // both blobs, so the stored draft still resolves after a reload.
-      if (!state.setAttachments(decision.next)) return
-      // Best effort, deliberately. The swap is already durable; a failure here leaves an unreferenced
-      // row that the store's own 24-hour sweep collects.
-      void managedAgentApi.removeAttachment(expected.id, owner).catch(() => undefined)
-    } finally {
-      state.setReplacing('')
-    }
-  }
+  const attach = () => pickDraftAttachments(capture())
+  const addFiles = (files: File[]) => addDraftFiles(capture(), files)
+  const removeAttachment = (attachment: AgentAttachment) => removeDraftAttachment(capture(), attachment)
+  const replaceAttachment = (expected: AgentAttachment, payload: unknown) =>
+    replaceDraftAttachment(capture(), expected, payload)
 
   function removeContext(context: AgentContextSnapshot) {
     if (context.source === AUTOMATIC_TASK_CONTEXT_SOURCE) {
@@ -440,36 +285,12 @@ export default function AgentComposer(props: {
     setContexts((current) => current.filter((item) => item.contextId !== context.contextId))
   }
 
-  const contextBelongsTo = (
-    context: AgentContextSnapshot,
-    contribution: AgentContextContribution,
-  ): boolean =>
-    context.source === contribution.source
-      || (contribution.id === TASK_CONTEXT_CONTRIBUTION_ID
-        && context.source === AUTOMATIC_TASK_CONTEXT_SOURCE)
-
   const selectedContextOptionIds = (contribution: AgentContextContribution): string[] =>
     contexts().flatMap((context) =>
       context.source === contribution.source && context.resourceId ? [context.resourceId] : [])
 
-  async function captureContext(contributionId: string, optionIds: readonly string[]) {
-    const contribution = agentContextContributions().find((item) => item.id === contributionId)
-    const owner = capture()
-    const { state, session } = owner
-    if (!contribution || state.capturing()) return
-    const revision = state.revisions()[2]
-    const operation = state.captureRevision()
-    state.setCapturing(contributionId)
-    state.setError('')
-    try {
-      const captured = await contribution.capture({ taskId: session.taskId }, optionIds)
-      if (!state.captureCurrent(operation) || activeNodeId() !== owner.nodeId || state.revisions()[2] !== revision) return
-      state.setContexts((current) => [...current.filter((item) => !contextBelongsTo(item, contribution)), ...captured])
-      if (owner.visible()) setContextPickerId('')
-    } catch (caught) {
-      state.setError(caught instanceof Error ? caught.message : 'Unable to capture Acorn context.')
-    } finally { state.setCapturing('') }
-  }
+  const captureSelectedContext = (contributionId: string, optionIds: readonly string[]) =>
+    captureContext(capture(), contributionId, optionIds, () => setContextPickerId(''))
 
   // Read when the field first takes focus, so the list is there by the time somebody types `@`. A
   // visit that never writes to the agent never pays for the worktree walk.
@@ -597,7 +418,7 @@ export default function AgentComposer(props: {
                   if (replacing() === attachment.id) return
                   removeAttachment(attachment)
                 }}
-                onReplace={(payload) => replaceDraftAttachment(attachment, payload)}
+                onReplace={(payload) => replaceAttachment(attachment, payload)}
               />
             )}
           </For>
@@ -694,7 +515,9 @@ export default function AgentComposer(props: {
             // worse than none (docs/tui/host-switch.md § Booting client-core under Node). Reaching through it
             // threw a TypeError out of a keymap handler and this row did nothing there. The global is
             // the same function on both hosts, and only the DOM has the delegation this defers past.
-            setTimeout(() => setContextPickerId(contribution.id), 0)
+            clearTimeout(pickerTimer)
+            const owner = capture()
+            pickerTimer = setTimeout(() => { if (owner.visible()) setContextPickerId(contribution.id) }, 0)
           }}
           disabled={props.disabled}
           placement="top-start"
@@ -766,7 +589,7 @@ export default function AgentComposer(props: {
             taskId={props.session.taskId}
             initialSelectedIds={selectedContextOptionIds(contribution())}
             attaching={capturingContext() === contribution().id}
-            onAttach={(optionIds) => void captureContext(contribution().id, optionIds)}
+            onAttach={(optionIds) => void captureSelectedContext(contribution().id, optionIds)}
             onClose={() => setContextPickerId('')}
           />
         )}

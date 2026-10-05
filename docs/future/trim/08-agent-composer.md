@@ -1,6 +1,18 @@
 # Phase 08: separate composer operations with explicit draft ownership
 
-Date: 2026-10-04. Status: TODO. Risk: high; multiple surfaces share asynchronous draft state.
+Completion note, October 6, 2026: **done**. `composerState.ts` remains the sole mutable draft
+owner per Node/session. `submitOperation.ts`, `attachmentOperations.ts`, and `contextOperations.ts`
+now own the asynchronous work through a captured `ComposerOrigin`; the component retains local
+presentation, focus, and effects. Submission acknowledges only submitted revisions, replacement
+persists the new slot before old-row cleanup, and automatic capture keeps its shared single-flight
+guard. A held automatic-capture test covers session and Node navigation. Focused composer tests,
+all-package lint/type checks, agents/Node/TUI/desktop consumers, and architecture passed. The host
+fixture showed the composer and task navigation on desktop and TUI at 120 by 40; its imported
+session disabled sending and attachment controls. [Phase 08 evidence](./evidence.md#phase-08-composer-operations-2026-10-06)
+records the exact limits, gates, artifacts, and module map. Phase 09 can use these owners without
+changing draft scope or public contracts.
+
+Date: 2026-10-04. Status: DONE. Risk: high; multiple surfaces share asynchronous draft state.
 Prerequisite: accepted [phase 07](./07-tab-rail.md). Next: [phase 09](./09-workflow-activation.md).
 Planning revision: `2ae55abb5`; inspect the accepted client state owners before extraction.
 

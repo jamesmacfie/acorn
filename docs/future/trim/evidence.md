@@ -571,3 +571,57 @@ Do not store credentials, provider prompts containing private project data, or h
 
 Check the current revision, supported runtime, and working tree. Read the numbered task's acceptance
 criteria before adding a completion record. A missing verification result is not a passing result.
+
+## Phase 08 composer operations (2026-10-06)
+
+Starting revision `f3176818c`, branch `phase-08-separate-composer-operations`. Runtime Node
+24.21.0 and pnpm 11.0.0 on Darwin arm64. This phase changed no package declaration, payload,
+route, wire contract, storage key, or plugin API major. Before and after dependency and staged
+payload measurements are therefore unchanged under the phase 01 definitions.
+
+`composerState.ts` remains the only mutable draft owner, keyed by Node and session. It still owns
+hydration, holds, revisions, acknowledgement, fork-context consumption, and shared operation guards.
+`composerOrigin.ts` describes the captured session, Node, draft, and visible-surface check.
+`submitOperation.ts` builds and enqueues the submitted input and acknowledges the captured revisions.
+`attachmentOperations.ts` owns picker, upload, removal, and replacement, including partial success,
+eight-item and 25 MiB limits, compare-and-swap, and durable write before old-row deletion.
+`contextOperations.ts` owns manual capture and shared single-flight automatic capture. The composer
+keeps its presentation state, focus, session-option control, and Solid effects. A deferred picker
+open now checks its captured visible origin and its timer is disposed with the view.
+
+The public component tests passed: `composerOwnership.test.tsx` 6, `AgentComposer.attach.test.tsx`
+8, `composerState.test.tsx` 3, and `replaceAttachment.test.ts` 9. The ownership test added a held
+automatic capture across session and Node changes: the same-Node result stays with its originating
+draft, while a result after a Node switch is discarded. Existing held send, upload, replacement,
+hydration, and fork-context proofs remain. `pnpm lint` initially failed because copied module trees
+triggered pnpm 11's dependency status install in Turbo children; the direct local Turbo lint command
+with `--env-mode=loose` passed 37/37 tasks, and root oxlint emitted only baseline warnings. A
+frozen offline install was attempted twice and failed because the pnpm store lacks
+`@esbuild-kit/core-utils` and other tarballs; registry DNS was unavailable. The identical-lockfile
+phase 07 module trees were copied for the gates, with `pnpm_config_verify_deps_before_run=warn`
+preventing the status hook from deleting them. The package lint still type-checked every package.
+
+The first four-filter consumer run failed only sandbox loopback (`listen EPERM`) and process-table
+visibility assertions. Re-running with host permissions passed agents 150 files/1,089 tests and
+one skipped, Node 39 files/272 tests, TUI 68 files/673 tests and two skipped, desktop 28 files/171
+tests plus boot 10 tests and 62 Rust unit tests. Commands used `TURBO_FORCE=true`, two Vitest workers,
+and two concurrent package jobs. The full root suite remains phase 15's gate.
+
+`pnpm --filter @acorn/arch-tests exec vitest run --maxWorkers=2` passed 12 files/86 tests
+after the evidence anchor was added. Desktop `trim-08` displayed the imported fixture composer,
+then navigated from Review changed files to Plan follow-up work and back. The returning composer
+and session were present. The inspected screenshot is
+[phase-08-desktop-composer.png](./artifacts/phase-08-desktop-composer.png). TUI `trim-08-tui`
+displayed the same imported session and composer after task navigation at 120 by 40; its captured
+screen is [phase-08-tui-120x40.txt](./artifacts/phase-08-tui-120x40.txt). Both sessions were stopped,
+and both drivers reported them as not running afterward. The fixture session is imported and
+externally controlled, so both hosts disabled the message field, Attach, Context, and Send. The
+host driver cannot perform native file picking, and these runs cannot establish held send, upload,
+replacement, or fork-context behavior in the running app. Those races are established by the
+public component fixture tests; no live provider turn was claimed. The desktop launcher initially
+closed after reporting ready; reopening the same isolated session with `--reuse` allowed the
+inspection. The TUI session was also reopened with `--reuse --fixture tui-navigation` to retain its
+screen capture, then stopped again.
+
+Phase 09 can use these feature-owned operation modules without changing draft scope or the public
+composer props.
