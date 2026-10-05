@@ -34,6 +34,14 @@ composition root releases the data-root lock on the way out. A plugin loaded fro
 instead: its registrations roll back, its roster row reads `failed`, and the other plugins reach
 `ready` ([failures are contained](./loaded-plugins.md#failures-are-contained)).
 
+`packages/node-core/src/server/pluginHost/host.ts` owns the boot passes, ready barrier, registration
+undo, storage handles, reload transaction, and reverse disposal. Manifest adapters in `manifestWork.ts`,
+`manifestCatalog.ts`, `manifestAgents.ts`, and `runtimeContributions.ts` translate declarations through
+the same owner-bound context methods that compiled plugins use. The host keeps per-plugin undo
+functions for schedules and subscriptions and clears the owner-bound registries on rollback. If a
+loaded manifest fails partway through registration, the host removes its
+earlier entries, closes its storage after disposal, and records an `init` failure.
+
 ## What a plugin registers
 
 A plugin can register:

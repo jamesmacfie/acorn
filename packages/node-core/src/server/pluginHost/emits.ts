@@ -10,24 +10,25 @@
 import { parsePluginChannel } from '@acorn/protocol/plugin/state.ts'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
 
-const producers = new Map<string, readonly PluginEmit[]>()
+const producers = new Map<string, { emits: readonly PluginEmit[] }>()
 
 /** Record what `pluginId` announces. Returns the undo, so the host can hang it on the plugin's
  *  registration undo list. */
 export function declareEmits(pluginId: string, emits: readonly PluginEmit[]): () => void {
-  producers.set(pluginId, emits)
-  return () => void producers.delete(pluginId)
+  const declaration = { emits }
+  producers.set(pluginId, declaration)
+  return () => { if (producers.get(pluginId) === declaration) producers.delete(pluginId) }
 }
 
 /** The declared verbs of a producer, or undefined when no such plugin is running. */
-export const declaredEmits = (pluginId: string): readonly PluginEmit[] | undefined => producers.get(pluginId)
+export const declaredEmits = (pluginId: string): readonly PluginEmit[] | undefined => producers.get(pluginId)?.emits
 
 /** Throw when `channel` names a running producer that did not declare the verb. Silent for an absent
  *  producer, and for the subscriber's own channel. */
 export function assertSubscribableVerb(channel: string, subscriber: string): void {
   const parsed = parsePluginChannel(channel)
   if (!parsed || parsed.pluginId === subscriber) return
-  const declared = producers.get(parsed.pluginId)
+  const declared = producers.get(parsed.pluginId)?.emits
   if (declared && !declared.some((emit) => emit.verb === parsed.verb)) {
     throw new Error(`plugin '${parsed.pluginId}' does not declare '${parsed.verb}' in its emits, so '${subscriber}' cannot subscribe to it`)
   }

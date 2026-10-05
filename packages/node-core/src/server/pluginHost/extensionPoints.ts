@@ -48,8 +48,9 @@ export function openExtensionPoint(ownerId: string, id: ExtensionPointId<unknown
   if (!ref) throw new Error(`Extension point '${id}' is not a '<pluginId>:<pointId>' id.`)
   if (ref.owner !== ownerId) throw new Error(`Plugin '${ownerId}' may only open points under '${ownerId}:', not '${id}'.`)
   if (points.has(id)) throw new Error(`Extension point already open: ${id}`)
-  points.set(id, { id, ownerId, label })
-  return { dispose: () => void points.delete(id) }
+  const point = { id, ownerId, label }
+  points.set(id, point)
+  return { dispose: () => { if (points.get(id) === point) points.delete(id) } }
 }
 
 /** Contribute one entry to somebody else's point (or your own). Registering before the point is open

@@ -13,7 +13,7 @@
 // Two carriers, one chain, the same rule the route registry follows: a built-in contributes a function
 // and a loaded plugin contributes a route, the host wraps both in the same `call` closure at
 // registration, and nothing below this line knows which it has. That is also why there is no `Env` in
-// this file — the closure that needs one was built where one was in scope (./host.ts).
+// this file — the closure that needs one is built by ./manifestWork.ts with the host's binding.
 import {
   isHookMode,
   matchesHookPayload,
@@ -160,7 +160,7 @@ const lastRun = new Map<string, HookRunRecord>()
 export function registerHookPoint(registration: HookPointRegistration): Disposable {
   if (points.has(registration.id)) throw new Error(`Hook point already declared: ${registration.id}`)
   points.set(registration.id, registration)
-  return { dispose: () => void points.delete(registration.id) }
+  return { dispose: () => { if (points.get(registration.id) === registration) points.delete(registration.id) } }
 }
 
 /** Register one handler on somebody else's point (or your own). Registering before the point is
@@ -168,7 +168,7 @@ export function registerHookPoint(registration: HookPointRegistration): Disposab
 export function registerHookHandler(registration: HookHandlerRegistration): Disposable {
   if (handlers.has(registration.id)) throw new Error(`Duplicate hook handler '${registration.id}'.`)
   handlers.set(registration.id, registration)
-  return { dispose: () => void handlers.delete(registration.id) }
+  return { dispose: () => { if (handlers.get(registration.id) === registration) handlers.delete(registration.id) } }
 }
 
 /** Drop everything this plugin declared and everything it registered. Both halves, because a plugin

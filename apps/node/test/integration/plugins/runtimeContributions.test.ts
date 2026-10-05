@@ -2,6 +2,7 @@ import { cpSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:f
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { Worker } from 'node:worker_threads'
 import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { mintInternalToken } from '@acorn/node-core/server/auth'
 import { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
@@ -148,6 +149,7 @@ describe('independently installed runtime contributions', () => {
   })
 
   it('assembles bounded reference data, then removes stale registrations on update and unload', async () => {
+    const terminate = vi.spyOn(Worker.prototype, 'terminate')
     const context = await call('/v1/core/tasks/task-1/context?include=issues,runtime-fixture:fixture', asTask())
     expect(context.status).toBe(200)
     const body = await context.json() as { sections: { id: string; compact: string; absent?: unknown; items: unknown[]; omitted: number }[] }
@@ -156,6 +158,26 @@ describe('independently installed runtime contributions', () => {
     expect(new TextEncoder().encode(fixture.compact).byteLength).toBeLessThanOrEqual(2048)
     expect(fixture.omitted).toBe(7)
     expect(fixture.items).toEqual([expect.objectContaining({ sources: [{ label: 'fixture source', uri: 'urn:fixture:reference-1' }] })])
+
+    const sourcePath = join(pluginDir(dataRoot, 'runtime-fixture'), 'node.js')
+    const originalSource = readFileSync(sourcePath, 'utf8')
+    writeFileSync(sourcePath, originalSource.replace('  init(ctx) {', "  ready() { throw new Error('candidate ready failed') },\n  init(ctx) {"))
+    const failedLoad = await loadExternalPlugins(dataRoot, { builtins: [], reimport: ['runtime-fixture'] })
+    expect(failedLoad.failures).toEqual([])
+    const failedCandidate = failedLoad.loaded[0]!
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    try {
+      expect(await running!.reload('runtime-fixture', { plugin: failedCandidate.plugin, binding: binding(failedCandidate) }))
+        .toEqual({ ok: false, error: 'candidate ready failed', retained: true })
+    } finally {
+      error.mockRestore()
+      writeFileSync(sourcePath, originalSource)
+    }
+    expect(terminate).toHaveBeenCalledTimes(1)
+    // The old worker and route still answer after a candidate has initialized and failed in ready.
+    const retained = await call('/v1/core/tasks/task-1/tools/runtime-fixture_echo', asTask({ message: 'retained' }))
+    expect(retained.status).toBe(200)
+    expect(await retained.json()).toMatchObject({ arguments: { message: 'retained' } })
 
     const manifestPath = join(pluginDir(dataRoot, 'runtime-fixture'), 'acorn-plugin.json')
     const manifest = JSON.parse(readFileSync(manifestPath, 'utf8')) as any
@@ -167,6 +189,7 @@ describe('independently installed runtime contributions', () => {
     const loaded = await loadExternalPlugins(dataRoot, { builtins: [], reimport: ['runtime-fixture'] })
     const next = loaded.loaded[0]!
     expect(await running!.reload('runtime-fixture', { plugin: next.plugin, binding: binding(next) })).toEqual({ ok: true })
+    expect(terminate).toHaveBeenCalledTimes(2)
 
     const after = await call('/v1/core/tasks/task-1/tools', asTask())
     expect((await after.json() as { tools: { name: string; description: string }[] }).tools.filter((tool) => tool.name.startsWith('runtime-fixture')))
@@ -178,7 +201,26 @@ describe('independently installed runtime contributions', () => {
 
     await running!.dispose()
     running = null
+    expect(terminate).toHaveBeenCalledTimes(3)
     expect(agentToolContributions().some((tool) => tool.name.startsWith('runtime-fixture'))).toBe(false)
     expect(getContextSections().some((section) => section.id === 'runtime-fixture:fixture')).toBe(false)
+
+    // Disabling on the next boot closes the newly loaded realm without registering its descriptors.
+    const disabledLoad = await loadExternalPlugins(dataRoot, { builtins: [], reimport: ['runtime-fixture'] })
+    expect(disabledLoad.failures).toEqual([])
+    const disabledEntry = disabledLoad.loaded[0]!
+    const disabled = await initPlugins([disabledEntry.plugin], {
+      capabilities: new CapabilityRegistry(),
+      core: createCoreServices({ db: core.db, secrets: core.secrets, activeIdentity: memoryIdentityStore(USER) }),
+      dataDir: dataRoot,
+      env,
+      disabled: ['runtime-fixture'],
+      loaded: new Map([[disabledEntry.manifest.id, binding(disabledEntry)]]),
+    })
+    expect(disabled.roster[0]).toMatchObject({ state: 'disabled', disabled: true })
+    expect(agentToolContributions().some((tool) => tool.name.startsWith('runtime-fixture'))).toBe(false)
+    await disabled.dispose()
+    expect(terminate).toHaveBeenCalledTimes(4)
+    terminate.mockRestore()
   })
 })

@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-06. Status: phases 01–09 complete; phase 10 is next.
+Date: 2026-10-06. Status: phases 01–10 complete; phase 11 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -25,7 +25,7 @@ There is no arbitrary package-count or file-length target. Read [refused approac
 
 ## Sequential assignments
 
-Phases 10–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
+Phases 11–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
 handoff. This order is an execution order; some assignments have no technical dependency on earlier
 changes. Phases 04, 05, and 14 permit a documented retention decision under their acceptance criteria.
 That is a completed investigation, never a claim that a reduction or migration shipped.
@@ -41,7 +41,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 07 DONE | [Separate rail task editing](./07-tab-rail.md) | Dialog state, Node-scoped reads and writes, and held-request guard moved beside the rail. See [evidence](./evidence.md#phase-07-rail-task-editing-2026-10-06). |
 | 08 DONE | [Separate composer operations](./08-agent-composer.md) | Shared draft custody retained; submission, capture, and attachment operations extracted. See [evidence](./evidence.md#phase-08-composer-operations-2026-10-06). |
 | 09 DONE | [Thin workflow activation](./09-workflow-activation.md) | Runner, control, definitions, and schedules moved to feature owners; the composition root and required gates passed. See [evidence](./evidence.md#phase-09-workflow-activation-2026-10-06). |
-| 10 | [Separate plugin contribution registration](./10-plugin-host.md) | Named adapters with unchanged lifecycle, rollback, and permission behavior. |
+| 10 DONE | [Separate plugin contribution registration](./10-plugin-host.md) | Manifest work, catalog, agent, and runtime adapters moved; host retains boot, rollback, storage, and reload. See [evidence](./evidence.md#phase-10-plugin-host-contributions-2026-10-06). |
 | 11 | [Separate agent admission](./11-agent-admission.md) | A single queue coordinator with explicit policy and await-time guards. |
 | 12 | [Separate provider process ownership](./12-agent-processes.md) | One owner for live generations, startup, retirement, and process timers. |
 | 13 | [Replace runtime inheritance](./13-agent-composition.md) | Product commands compose an engine through narrow operations. |

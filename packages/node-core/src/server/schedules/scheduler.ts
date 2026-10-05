@@ -183,8 +183,10 @@ export class Scheduler {
       dispose: () => {
         // The definition goes; the state row stays. That retention is what makes a plugin's lifecycle
         // non-destructive: its pause and its history are waiting when it comes back.
-        this.#declared.delete(entry.key)
-        if (this.#started) this.#arm()
+        if (this.#declared.get(entry.key) === entry) {
+          this.#declared.delete(entry.key)
+          if (this.#started) this.#arm()
+        }
       },
     }
   }
@@ -195,7 +197,7 @@ export class Scheduler {
     if (this.#targets.has(target.kind)) throw new Error(`Schedule target already registered: ${target.kind}`)
     this.#targets.set(target.kind, target)
     if (this.#started) void this.#sync()
-    return { dispose: () => void this.#targets.delete(target.kind) }
+    return { dispose: () => { if (this.#targets.get(target.kind) === target) this.#targets.delete(target.kind) } }
   }
 
   async start(): Promise<void> {

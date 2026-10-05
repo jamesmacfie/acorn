@@ -3,6 +3,7 @@ import {
   clearHooks,
   hookHandlers,
   hookHandlersFor,
+  hookPoints,
   registerHookHandler,
   registerHookPoint,
   runHook,
@@ -46,6 +47,24 @@ afterEach(() => {
 })
 
 describe('the chain', () => {
+  it('keeps replacement registrations when previous disposers run late', () => {
+    const previousPoint = point()
+    const previousHandler = handler('scan', 'observe', async () => null)
+    clearHooks('changes')
+    clearHooks('scan')
+    const nextPoint = point({ timeoutMs: 75 })
+    const nextHandler = handler('scan', 'observe', async () => null)
+    try {
+      previousPoint.dispose()
+      previousHandler.dispose()
+      expect(hookPoints().find(({ id }) => id === 'changes:before-push')?.timeoutMs).toBe(75)
+      expect(hookHandlersFor('changes:before-push').map(({ id }) => id)).toEqual(['scan:h'])
+    } finally {
+      nextHandler.dispose()
+      nextPoint.dispose()
+    }
+  })
+
   it('lets a push through when nobody has anything to say', async () => {
     point()
     await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({

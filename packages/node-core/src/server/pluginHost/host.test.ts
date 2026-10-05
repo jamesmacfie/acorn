@@ -21,6 +21,7 @@ import type { NodePermissions } from '../plugins/manifest'
 import type { CompiledNodePluginContext, NodePlugin } from './types'
 import { defaultBudgets, externalIdsFor, publicProvider } from '../integrations/providerShared'
 import { integrationProviderRegistry } from '../integrations/registry'
+import { hookPoints } from './hooks'
 
 const noop = (): void => {}
 
@@ -207,6 +208,14 @@ describe('plugin host', () => {
     warn.mockRestore()
   })
 
+  it('revokes a plugin context after shutdown so a held reference cannot register again', async () => {
+    let context: CompiledNodePluginContext | undefined
+    const result = await host([plugin('held-context', { init: (ctx) => void (context = ctx) })])
+    await result.dispose()
+    expect(() => context!.routes.fetch(() => new Response('late'))).toThrow(/previous load/)
+    expect(pluginRouteContributions().some(({ plugin: owner }) => owner === 'held-context')).toBe(false)
+  })
+
   it('rejects a duplicate plugin name before running any init', async () => {
     const started: string[] = []
     await expect(
@@ -233,6 +242,41 @@ describe('plugin host', () => {
     expect(started).toEqual(['after'])
   })
 
+  it('contains a loaded manifest that fails halfway through registration', async () => {
+    const binding: LoadedPluginBinding = {
+      permissions: { core: [], capabilities: [], secrets: false, exec: false, net: [], sockets: false },
+      storage: { open: () => { throw new Error('unused storage') } },
+      extensionPoints: [
+        { id: 'widget:before-save', kind: 'hook', label: 'Before save', payload: { id: 'string' }, allows: ['observe'] },
+        { id: 'widget:before-save', kind: 'hook', label: 'Duplicate', payload: { id: 'string' }, allows: ['observe'] },
+      ],
+    }
+    const error = vi.spyOn(console, 'error').mockImplementation(noop)
+    let disposed = 0
+    let neighbourReady = false
+    try {
+      const result = await initPlugins([
+        plugin('widget', { dispose: () => void disposed++ }),
+        plugin('neighbour', { ready: () => void (neighbourReady = true) }),
+      ], {
+        capabilities: new CapabilityRegistry(),
+        core: createCoreServices({ secrets: new SecretService('a'.repeat(64)), db: coreDb(), activeIdentity: memoryIdentityStore() }),
+        dataDir: '',
+        loaded: new Map([['widget', binding]]),
+      })
+      expect(result.roster[0]).toMatchObject({ state: 'failed', stage: 'init' })
+      expect(result.enabled).toEqual(['neighbour'])
+      expect(neighbourReady).toBe(true)
+      expect(disposed).toBe(1)
+      expect(hookPoints().some(({ id }) => id === 'widget:before-save')).toBe(false)
+      await result.dispose()
+      expect(disposed).toBe(1)
+    } finally {
+      error.mockRestore()
+      clearRegistrations('widget')
+    }
+  })
+
   it('disposes the plugins that DID initialize when a later init throws', async () => {
     // The caller cannot do this itself: it only gets the dispose closure from a resolved result. Without
     // it, the composition root's catch releases the data-root lock while WAL-mode SQLite handles, live
@@ -254,6 +298,19 @@ describe('plugin host', () => {
     // them now, because they all ran. Declaration order is what the dispose sequence reverses, not
     // completion order: a later plugin may depend on an earlier one's resources.
     expect(disposed).toEqual(['last', 'second', 'first'])
+  })
+
+  it('clears a failed compiled init after it registered a route', async () => {
+    let disposed = false
+    await expect(host([plugin('partial-compiled', {
+      init: (ctx) => {
+        ctx.routes.fetch(() => new Response('partial'))
+        throw new Error('compiled init failed')
+      },
+      dispose: () => void (disposed = true),
+    })])).rejects.toThrow('compiled init failed')
+    expect(disposed).toBe(true)
+    expect(pluginRouteContributions().some(({ plugin: owner }) => owner === 'partial-compiled')).toBe(false)
   })
 
   // The compiled tier's half of ctx.storage. See docs/data-layer/migrations.md § Migrations. All the host needs is

@@ -7,6 +7,22 @@ import { ToolError, type AgentToolContribution, type ToolContext } from '../agen
 import { ContextSectionAssemblyError, type PluginContextSection } from '../agentTools/contextSections'
 import { dispatchPluginRoute } from './dispatch'
 import type { Principal } from '../middleware/auth'
+import type { LoadedPluginBinding } from './context'
+import type { HostPluginContext } from './types'
+
+export function registerManifestRuntimeContributions(
+  ctx: Pick<HostPluginContext, 'tools' | 'contextSections'>,
+  name: string,
+  binding: LoadedPluginBinding | undefined,
+  requireEnv: (name: string) => Env,
+): void {
+  const tools = binding?.agentTools ?? []
+  const sections = binding?.contextSections ?? []
+  if (tools.length === 0 && sections.length === 0) return
+  const env = requireEnv(name)
+  for (const descriptor of tools) ctx.tools.register(manifestAgentTool(env, name, descriptor))
+  for (const descriptor of sections) ctx.contextSections.register(manifestContextSection(env, name, descriptor))
+}
 
 const sourceSchema = z.object({ label: z.string().min(1).max(200), uri: z.string().max(2_048).optional() }).strict()
 const itemSchema = z.object({

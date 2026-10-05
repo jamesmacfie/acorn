@@ -22,25 +22,20 @@ import { clearNodeProviders } from '../nodeProviders/registry'
 import { clearRunSources } from '../runs/registry'
 import { clearExtensionPoints } from './extensionPoints'
 import { clearAuditActions } from '../audit'
-import { resolveInRoot } from '../core/fs'
-import { dispatchPluginRoute } from './dispatch'
-import { qualifiedHarnessId, type ManifestHarnessSpawn } from './harnesses'
-import { runPluginScheduleRoute } from './scheduleRun'
-import { runPluginTaskApply, runPluginTaskCheck } from './taskCheckRun'
 import { disposeUnstartedPlugin } from '../plugins/isolation'
-import { clearHooks, isHookMode } from './hooks'
-import type { HookMode } from '@acorn/protocol/extensionPoints.ts'
+import { clearHooks } from './hooks'
 import type { PluginEmit } from '@acorn/protocol/plugin/contract.ts'
-import { runPluginHookRoute } from './hookRun'
 import { clearTaskChecks } from './taskChecks'
 import { clearSearchProviders } from './search'
 import { declareEmits } from './emits'
-import type { CompiledNodePluginContext, HostPluginContext, NodePlugin, NodePluginContext, PluginHookPoint, PluginStorage } from './types'
+import type { HostPluginContext, NodePlugin, PluginStorage } from './types'
 import { createLogger, describeError } from '../telemetry/logger'
 import { clearTelemetrySinks } from '../telemetry/collector'
-import { manifestAgentTool, manifestContextSection } from './runtimeContributions'
+import { registerManifestRuntimeContributions } from './runtimeContributions'
+import { registerManifestSchedules, registerManifestTaskChecks, registerManifestHooks } from './manifestWork'
+import { registerManifestHarnesses, registerManifestCustomAgents } from './manifestAgents'
+import { registerManifestDataSources, registerManifestNodeActions, registerManifestAuditActions } from './manifestCatalog'
 
-const harnessLog = createLogger('harness')
 // One logger per plugin, minted where the name is known, so a line still reads `[plugin:<id>] …`.
 const pluginLog = (name: string) => createLogger(`plugin:${name}`, name)
 
@@ -148,7 +143,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   const failed: PluginFailure[] = []
   const started: NodePlugin[] = []
   // Kept so the ready pass below hands each plugin the same context its init got.
-  const contexts = new Map<string, CompiledNodePluginContext>()
+  const contexts = new Map<string, HostPluginContext>()
   // Seeded from the boot options and replaced by a successful reload, so after a swap the running
   // instance takes its permissions and migrations chain from the fresh manifest. Membership also
   // answers "may this name be reloaded at all".
@@ -198,209 +193,16 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     }
   }
 
-  // What a loaded plugin's manifest declared as periodic work, put on the node's scheduler through the
-  // same `ctx.schedules` seam a built-in uses, so the lifecycle, the reload buffering and the undo come
-  // from the context.
-  //
-  // Registered before init: the runner resolves the plugin's route when the schedule fires, so ordering
-  // against the plugin's own route registration does not matter.
-  // What other plugins may hear from this one (./emits.ts). The manifest's declaration for a loaded
-  // plugin, the `NodePlugin.emits` field for a built-in, and the undo goes where every other
-  // registration's does, so unload takes the declaration with it.
+  // The host owns this undo alongside context registrations; declarations follow the binding
+  // generation and are removed with that instance.
   const registerEmits = (plugin: NodePlugin, binding: LoadedPluginBinding | undefined, onUndo: (undo: () => void) => void): void => {
     onUndo(declareEmits(plugin.name, binding ? (binding.emits ?? []) : (plugin.emits ?? [])))
-  }
-
-  const registerManifestSchedules = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
-    const declared = binding?.schedules ?? []
-    if (declared.length === 0) return
-    const env = requireEnv(name)
-    for (const descriptor of declared) {
-      ctx.schedules.register({
-        scheduleId: descriptor.id,
-        name: descriptor.name,
-        cadence: descriptor.cadence,
-        ...(descriptor.timeout === undefined ? {} : { timeout: descriptor.timeout }),
-        run: (signal) => runPluginScheduleRoute(env, name, descriptor, signal),
-      })
-    }
-  }
-
-  // The same for archive checks (./taskChecks.ts), with one difference: a check is asked while a person
-  // waits on a dialog. The env resolves eagerly here, so a package that declares a check on a node with
-  // no bindings fails at boot with the plugin named, rather than once per archive.
-  const registerManifestTaskChecks = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
-    const declared = binding?.taskChecks ?? []
-    if (declared.length === 0) return
-    const env = requireEnv(name)
-    for (const descriptor of declared) {
-      ctx.taskChecks.register({
-        id: descriptor.id,
-        check: (task, signal) => runPluginTaskCheck(env, name, descriptor, task, signal),
-        // Only when the manifest declared one. A check with no `apply` never draws a checkbox, the rule
-        // sanitizeConcern enforces on the answer. Bound here so the two cannot disagree.
-        ...(descriptor.apply === undefined
-          ? {}
-          : { apply: (task, signal) => runPluginTaskApply(env, name, descriptor.apply!, task, signal) }),
-      })
-    }
-  }
-
-  // Hooks, both halves (./hooks.ts). A manifest declares the points this package owns and the handlers
-  // it registers on other packages', and this is where each becomes a registration.
-  //
-  // A handler's carrier is the difference between the two tiers and the only difference: `ctx.hooks.handle`
-  // takes a function, and the closure built here calls a declared route instead. The env resolves
-  // eagerly for the same reason a task check's does — a package declaring a handler on a node with no
-  // bindings should fail at boot with the plugin named, not once per decision.
-  const registerManifestHooks = (ctx: NodePluginContext, name: string, binding?: LoadedPluginBinding): void => {
-    for (const point of binding?.extensionPoints ?? []) {
-      if (point.kind !== 'hook' || !point.payload || !point.allows) continue
-      ctx.hooks.declare({
-        id: point.id,
-        label: point.label,
-        payload: point.payload as PluginHookPoint['payload'],
-        // Narrowed here rather than believed: the wire projection widens `allows` to strings, because a
-        // roster row is bytes a node sent.
-        allows: point.allows.filter(isHookMode),
-        timeoutMs: point.timeoutMs,
-        onTimeout: point.onTimeout,
-        ...(point.order === 'priority' || point.order === 'install' ? { order: point.order } : {}),
-        collect: point.collect,
-      })
-    }
-    const handlers = (binding?.extensions ?? []).filter((entry) => entry.route !== undefined && isHookMode(entry.mode))
-    if (handlers.length === 0) return
-    const env = requireEnv(name)
-    for (const entry of handlers) {
-      ctx.hooks.handle(entry.point, {
-        id: entry.id,
-        mode: entry.mode as HookMode,
-        priority: entry.priority,
-        run: (payload, signal) => runPluginHookRoute(env, name, entry.route!, payload, signal),
-      })
-    }
-  }
-
-  // The same for audit verbs (../audit.ts). Nothing to dispatch and no env needed: the declaration is
-  // the whole contribution, and `ctx.audit.record` is refused for anything not in it.
-  const registerManifestAuditActions = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
-    for (const descriptor of binding?.auditActions ?? []) ctx.audit.declare(descriptor)
-  }
-
-  // Source and discovery descriptors share the same owner-bound runtime registry.
-  const registerManifestDataSources = (ctx: NodePluginContext, binding?: LoadedPluginBinding): void => {
-    for (const source of binding?.dataSources ?? []) ctx.dataSources.register(source)
-    for (const discovery of binding?.dataSourceDiscoveries ?? []) ctx.dataSources.discover(discovery)
-  }
-
-  // What a loaded plugin's manifest declared as managed agent harnesses, handed on to whichever plugin
-  // owns agent sessions (./harnesses.ts). Two things happen only here:
-  //
-  //   an adapter entry resolves against the plugin's installed package directory and is re-confined,
-  //     so the consumer never touches the filesystem to find a path a manifest wrote;
-  //   a probe route becomes a call, because the host is the only side that can dispatch one with no
-  //     client in sight (./dispatch.ts, shared with schedules and checks).
-  //
-  // A descriptor whose entry escapes its package is dropped with a warning rather than failing the boot.
-  // It is one harness of a package that may contribute other things.
-  const registerManifestHarnesses = (ctx: HostPluginContext, name: string, binding?: LoadedPluginBinding): void => {
-    const declared = binding?.harnesses ?? []
-    if (declared.length === 0) return
-    for (const descriptor of declared) {
-      let spawn: ManifestHarnessSpawn
-      if (descriptor.spawn.command !== undefined) {
-        spawn = { command: descriptor.spawn.command, args: descriptor.spawn.args }
-      } else {
-        const resolved = binding?.dir ? resolveInRoot(binding.dir, descriptor.spawn.entry!) : null
-        if (!resolved) {
-          pluginLog(name).warn(`harness '${descriptor.id}' declares an entry outside its package; skipped`)
-          continue
-        }
-        spawn = {
-          entry: resolved,
-          args: descriptor.spawn.args,
-          ...(descriptor.spawn.requires ? { requires: descriptor.spawn.requires } : {}),
-        }
-      }
-      // Resolved lazily inside the probe, so a node with no bindings can still register a harness whose
-      // transcript works. Only the probe has nothing to answer with.
-      const probe = (path: string) => async (signal: AbortSignal): Promise<unknown> => {
-        const response = await dispatchPluginRoute(requireEnv(name), name, path, { method: 'GET' }, signal)
-        if (!response.ok) {
-          harnessLog.warn(`${name}:${descriptor.id} answered ${response.status} from ${path}`)
-          return null
-        }
-        return await response.json().catch(() => null)
-      }
-      ctx.harnesses.register({
-        id: descriptor.id,
-        label: descriptor.label,
-        ...(descriptor.glyph ? { glyph: descriptor.glyph } : {}),
-        spawn,
-        envPassthrough: descriptor.envPassthrough,
-        quirks: descriptor.quirks,
-        ...(descriptor.terminal ? { terminal: descriptor.terminal } : {}),
-        ...(descriptor.oneShot ? { oneShot: descriptor.oneShot } : {}),
-        ...(descriptor.probes?.usage ? { probeUsage: probe(descriptor.probes.usage) } : {}),
-        ...(descriptor.probes?.auth ? { probeAuth: probe(descriptor.probes.auth) } : {}),
-      })
-    }
-  }
-
-  // What a loaded plugin's manifest declared as custom agents, handed on the same way (./customAgents.ts).
-  // A harness id that names one of this manifest's own harnesses is qualified here, because the plugin
-  // cannot know the id the host minted for it; any other id is passed on as written.
-  const registerManifestCustomAgents = (ctx: HostPluginContext, name: string, binding?: LoadedPluginBinding): void => {
-    const own = new Set((binding?.harnesses ?? []).map((harness) => harness.id))
-    for (const descriptor of binding?.customAgents ?? []) {
-      ctx.customAgents.register({
-        id: descriptor.id,
-        name: descriptor.name,
-        ...(descriptor.glyph ? { glyph: descriptor.glyph } : {}),
-        ...(descriptor.description ? { description: descriptor.description } : {}),
-        providerId: own.has(descriptor.harness) ? qualifiedHarnessId(name, descriptor.harness) : descriptor.harness,
-        options: descriptor.options,
-        ...(descriptor.instructions ? { instructions: descriptor.instructions } : {}),
-        ...(descriptor.maxToolRisk ? { maxToolRisk: descriptor.maxToolRisk } : {}),
-      })
-    }
-  }
-
-  // A loaded plugin's schedulable actions, synthesised from the manifest's commands whose verb is
-  // `runNodeAction`, the only verb that means anything with nobody watching.
-  //
-  // A command descriptor declares no tier, so `riskOf` pins these to `execute`, the strongest
-  // confirmation. If the descriptor grows a `risk` field, this is the line that reads it.
-  const registerManifestNodeActions = (ctx: HostPluginContext, binding?: LoadedPluginBinding): void => {
-    for (const command of binding?.commands ?? []) {
-      // Only a leaf action has a verb at all. A group holds children, and a search or an input needs a
-      // reader typing into it, so none of the three is a thing a schedule could run unattended.
-      if (command.kind !== undefined && command.kind !== 'action') continue
-      if (command.action.verb !== 'runNodeAction') continue
-      ctx.nodeActions.register({ actionId: command.id, name: command.title, path: command.action.path })
-    }
-  }
-
-  // Runtime descriptors are adapters, not parallel implementations. They land through the same two
-  // context registries as compiled contributions, inheriting collision, projection and cleanup rules.
-  const registerManifestRuntimeContributions = (
-    ctx: HostPluginContext,
-    name: string,
-    binding?: LoadedPluginBinding,
-  ): void => {
-    const tools = binding?.agentTools ?? []
-    const sections = binding?.contextSections ?? []
-    if (tools.length === 0 && sections.length === 0) return
-    const env = requireEnv(name)
-    for (const descriptor of tools) ctx.tools.register(manifestAgentTool(env, name, descriptor))
-    for (const descriptor of sections) ctx.contextSections.register(manifestContextSection(env, name, descriptor))
   }
 
   // Roll a contained plugin back to its pre-init state: undo everything it registered, let it release
   // what it opened, and record why. Boot continues, which is the difference between "one installed
   // plugin is broken" and "this node does not start".
-  const contain = async (plugin: NodePlugin, phase: 'init' | 'ready', error: unknown): Promise<void> => {
+  const contain = async (plugin: NodePlugin, ctx: ReturnType<typeof buildPluginContext>, phase: 'init' | 'ready', error: unknown): Promise<void> => {
     pluginLog(plugin.name).error(`${phase} failed; the plugin is disabled for this boot: ${describeError(error).message}`)
     clearRegistrations(plugin.name)
     try {
@@ -411,6 +213,8 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     // Including the database it opened before it threw. A contained failure that left a WAL handle on
     // the data root is the lock leak initPlugins' dispose contract exists to prevent.
     closeStorage(plugin.name)
+    revokePluginContext(ctx)
+    contexts.delete(plugin.name)
     failed.push({ name: plugin.name, error: error instanceof Error ? error.message : String(error), at: Date.now(), stage: phase })
   }
 
@@ -418,38 +222,53 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // registrations here are synchronous and independent, so doing them all first is what lets the init
   // pass below be concurrent without a plugin racing a neighbour's manifest declarations.
   const running: { plugin: NodePlugin; ctx: ReturnType<typeof buildPluginContext>; loaded: LoadedPluginBinding | undefined }[] = []
-  for (const plugin of plugins) {
-    // Clearing happens before the disabled check. These registries are module singletons, so a plugin
-    // disabled on the second boot of one process would otherwise keep the first boot's routes, tools
-    // and providers, served through a database handle its dispose already closed.
-    clearRegistrations(plugin.name)
-    if (disabled.has(plugin.name) && !plugin.required) {
-      if (options.loaded?.has(plugin.name)) await disposeUnstartedPlugin(plugin)
-      skipped.push(plugin.name)
-      continue
+  try {
+    for (const plugin of plugins) {
+      // Clearing happens before the disabled check. These registries are module singletons, so a
+      // disabled plugin on a later boot cannot keep closures over its previous, closed database.
+      clearRegistrations(plugin.name)
+      if (disabled.has(plugin.name) && !plugin.required) {
+        if (options.loaded?.has(plugin.name)) await disposeUnstartedPlugin(plugin)
+        skipped.push(plugin.name)
+        continue
+      }
+      const loaded = options.loaded?.get(plugin.name)
+      const storage = storageFor(plugin, loaded)
+      const ctx = buildPluginContext({
+        plugin: plugin.name,
+        capabilities: options.capabilities,
+        core: options.core,
+        env: options.env,
+        loaded,
+        ...(storage ? { storage } : {}),
+        onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
+      })
+      // Add the context before the first registration: any later adapter may throw after an earlier
+      // descriptor registered, and the catch below must take that partial manifest back.
+      running.push({ plugin, ctx, loaded })
+      try {
+        registerEmits(plugin, loaded, (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]))
+        registerManifestSchedules(ctx, plugin.name, loaded, requireEnv)
+        registerManifestTaskChecks(ctx, plugin.name, loaded, requireEnv)
+        registerManifestHooks(ctx, plugin.name, loaded, requireEnv)
+        registerManifestDataSources(ctx, loaded)
+        registerManifestNodeActions(ctx, loaded)
+        registerManifestAuditActions(ctx, loaded)
+        registerManifestRuntimeContributions(ctx, plugin.name, loaded, requireEnv)
+      } catch (error) {
+        if (!loaded) throw error
+        await contain(plugin, ctx, 'init', error)
+        running.pop()
+      }
     }
-    // Undefined for a built-in, the manifest's `permissions.node` block for a plugin loaded from disk.
-    // Its presence is what shapes the context (server/pluginHost/context.ts).
-    const loaded = options.loaded?.get(plugin.name)
-    const storage = storageFor(plugin, loaded)
-    const ctx = buildPluginContext({
-      plugin: plugin.name,
-      capabilities: options.capabilities,
-      core: options.core,
-      env: options.env,
-      loaded,
-      ...(storage ? { storage } : {}),
-      onUndo: (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]),
-    })
-    registerEmits(plugin, loaded, (undo) => undoRegistrations.set(plugin.name, [...(undoRegistrations.get(plugin.name) ?? []), undo]))
-    registerManifestSchedules(ctx, plugin.name, loaded)
-    registerManifestTaskChecks(ctx, plugin.name, loaded)
-    registerManifestHooks(ctx, plugin.name, loaded)
-    registerManifestDataSources(ctx, loaded)
-    registerManifestNodeActions(ctx, loaded)
-    registerManifestAuditActions(ctx, loaded)
-    registerManifestRuntimeContributions(ctx, plugin.name, loaded)
-    running.push({ plugin, ctx, loaded })
+  } catch (error) {
+    for (const { plugin, ctx, loaded } of [...running].reverse()) {
+      clearRegistrations(plugin.name)
+      closeStorage(plugin.name)
+      revokePluginContext(ctx)
+      if (loaded) await disposeUnstartedPlugin(plugin)
+    }
+    throw error
   }
 
   // The init pass, all at once. Nothing here consumes another plugin's contributions, which is what
@@ -489,13 +308,16 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       continue
     }
     if (loaded?.permissions) {
-      await contain(plugin, 'init', outcome.reason)
+      await contain(plugin, ctx, 'init', outcome.reason)
       continue
     }
     fatal ??= { error: outcome.reason }
   }
   if (fatal) {
-    await disposeStarted(started, closeStorage)
+    // A failed compiled init may already own a database, route, capability or process. Every init
+    // settled, so dispose every non-contained instance, including the one that threw.
+    await disposeStarted(running.filter(({ plugin }) => !failed.some((entry) => entry.name === plugin.name)).map(({ plugin }) => plugin), closeStorage, contexts)
+    for (const { ctx } of running) revokePluginContext(ctx)
     throw fatal.error
   }
 
@@ -507,8 +329,18 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
   // not run yet.
   for (const { plugin, ctx, loaded } of running) {
     if (!started.includes(plugin)) continue
-    registerManifestHarnesses(ctx, plugin.name, loaded)
-    registerManifestCustomAgents(ctx, plugin.name, loaded)
+    try {
+      registerManifestHarnesses(ctx, plugin.name, loaded, requireEnv)
+      registerManifestCustomAgents(ctx, plugin.name, loaded)
+    } catch (error) {
+      if (!loaded) {
+        await disposeStarted(started, closeStorage, contexts)
+        throw error
+      }
+      await contain(plugin, ctx, 'init', error)
+      started.splice(started.indexOf(plugin), 1)
+      enabled.splice(enabled.indexOf(plugin.name), 1)
+    }
   }
 
   // The second pass, after every init: a plugin that must read another plugin's contributions runs here
@@ -527,7 +359,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     if (outcome.status === 'fulfilled') continue
     const plugin = readying[index]
     if (options.loaded?.has(plugin.name)) {
-      await contain(plugin, 'ready', outcome.reason)
+      await contain(plugin, contexts.get(plugin.name)!, 'ready', outcome.reason)
       // Out of both lists: `contain` already disposed it, and leaving it in `started` would dispose it
       // again at shutdown.
       started.splice(started.indexOf(plugin), 1)
@@ -537,7 +369,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     fatal ??= { error: outcome.reason }
   }
   if (fatal) {
-    await disposeStarted(started, closeStorage)
+    await disposeStarted(started, closeStorage, contexts)
     throw fatal.error
   }
 
@@ -631,15 +463,15 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     try {
       // Buffered like everything else: the previous instance's schedules are still on the scheduler
       // under the same keys, and registering now throws on the duplicate.
-      registerManifestSchedules(candidateCtx, name, next.binding)
-      registerManifestTaskChecks(candidateCtx, name, next.binding)
-      registerManifestHooks(candidateCtx, name, next.binding)
-      registerManifestHarnesses(candidateCtx, name, next.binding)
+      registerManifestSchedules(candidateCtx, name, next.binding, requireEnv)
+      registerManifestTaskChecks(candidateCtx, name, next.binding, requireEnv)
+      registerManifestHooks(candidateCtx, name, next.binding, requireEnv)
+      registerManifestHarnesses(candidateCtx, name, next.binding, requireEnv)
       registerManifestCustomAgents(candidateCtx, name, next.binding)
       registerManifestDataSources(candidateCtx, next.binding)
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
-      registerManifestRuntimeContributions(candidateCtx, name, next.binding)
+      registerManifestRuntimeContributions(candidateCtx, name, next.binding, requireEnv)
       await next.plugin.init(candidateCtx)
       // Ready belongs to the candidate window too. If it throws after the old instance is disposed,
       // the host can no longer truthfully report that the old runtime is still active.
@@ -735,7 +567,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
     return { ok: true }
   }
 
-  return { enabled, skipped, failed, roster, reload, dispose: () => disposeStarted(started, closeStorage) }
+  return { enabled, skipped, failed, roster, reload, dispose: () => disposeStarted(started, closeStorage, contexts) }
 }
 
 // Everything one plugin contributed to the module-singleton registries, undone.
@@ -754,7 +586,7 @@ export function clearRegistrations(name: string): void {
   clearTelemetrySinks(name)
   // The WS hub's two module-singleton slots have no duplicate guard, so a stale handler closed over a
   // disposed engine keeps claiming the prefix silently.
-  for (const undo of undoRegistrations.get(name) ?? []) undo()
+  for (const undo of [...(undoRegistrations.get(name) ?? [])].reverse()) undo()
   undoRegistrations.delete(name)
   removeAgentTools(name)
   clearDataSources(name)
@@ -790,7 +622,11 @@ export function clearRegistrations(name: string): void {
 // Each plugin's storage closes right after its own dispose rather than in a second sweep, so each WAL
 // file drains inside the caller's `plugins` drain step, before `sqlite` and before the data-root lock
 // (apps/node/src/server/composition.ts § NODE_DRAIN_ORDER).
-async function disposeStarted(started: readonly NodePlugin[], closeStorage: (name: string) => void): Promise<void> {
+async function disposeStarted(
+  started: readonly NodePlugin[],
+  closeStorage: (name: string) => void,
+  contexts: Map<string, HostPluginContext>,
+): Promise<void> {
   for (const plugin of [...started].reverse()) {
     try {
       await plugin.dispose?.()
@@ -801,5 +637,8 @@ async function disposeStarted(started: readonly NodePlugin[], closeStorage: (nam
     // A host can be stopped and started again in one process (tests do this, and supervised reload may
     // eventually do the same). Teardown must revoke every live registry closure, not rely on process exit.
     clearRegistrations(plugin.name)
+    const ctx = contexts.get(plugin.name)
+    if (ctx) revokePluginContext(ctx)
+    contexts.delete(plugin.name)
   }
 }

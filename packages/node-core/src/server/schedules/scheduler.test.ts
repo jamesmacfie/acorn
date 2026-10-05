@@ -56,6 +56,18 @@ describe('scheduler', () => {
   const state = async (key: string) =>
     (await test.db.select().from(schema.scheduleState).where(eq(schema.scheduleState.key, key)))[0]
 
+  it('keeps a reloaded schedule when the previous registration disposes again', () => {
+    const scheduler = new Scheduler(test.db)
+    const entry = { key: 'widget:refresh', name: 'Refresh', cadence: { every: 60 }, run: async () => {} }
+    const previous = scheduler.register(entry)
+    previous.dispose()
+    const current = scheduler.register({ ...entry })
+    previous.dispose()
+    expect(() => scheduler.register({ ...entry })).toThrow(/already registered/)
+    current.dispose()
+    expect(() => scheduler.register({ ...entry })).not.toThrow()
+  })
+
   it('runs a due schedule, records the run, and re-times from now', async () => {
     const time = fakeClock()
     const scheduler = new Scheduler(test.db, { clock: time.clock })

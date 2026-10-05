@@ -1,6 +1,31 @@
 # Phase 10: separate plugin contribution registration from host lifecycle
 
-Date: 2026-10-04. Status: TODO. Risk: high; failure isolation and permission binding are contracts.
+Completion note, October 6, 2026: `host.ts` retains boot, the all-init-before-ready barrier,
+loaded containment, the reload transaction, storage handles, and reverse disposal. Manifest work
+routes moved to `manifestWork.ts`; data sources, node actions, and audit declarations moved to
+`manifestCatalog.ts`; harness and custom-agent translation moved to `manifestAgents.ts`; tool and
+context-section registration joined their existing `runtimeContributions.ts` owner. Each adapter
+receives the binding, a narrow context projection, and only the host binding it needs. Context
+registration methods bind the plugin identity and feed the host's undo or owner-scoped clear path.
+
+Lifetime map: `initPlugins` owns per-boot contexts, opened database handles, the mutable roster, and
+the active loaded binding map. Shutdown revokes held contexts after disposing each instance.
+`undoRegistrations` holds per-plugin schedule, event, and emits
+disposers for module-level registries; `clearRegistrations` removes those and the owner-bound registry
+entries. A loaded pre-init or post-init contribution failure follows the same contained `init`
+failure path as its plugin code. A compiled pre-init registration failure aborts boot after clearing
+partial declarations; an init or ready failure also disposes every instance that ran. The loaded
+reload buffer keeps the previous instance live through
+candidate `init` and `ready`; commit removes old registrations, disposes the old instance, closes its
+database, then replays the candidate. Hook, extension-point, schedule, and emits disposers check the
+registration instance before removal, so a late old disposer cannot remove a successor.
+
+No API, permission, task scope, provider scope, or migration contract changed. The reload replay
+window retains its documented limit: an invalid buffered registration fails after commit begins and
+cannot restore the previous instance. Phase 11 can start from the accepted host and adapter owners;
+phase 15 owns the combined root test, build, and pack gates.
+
+Date: 2026-10-06. Status: DONE. Risk: high; failure isolation and permission binding are contracts.
 Prerequisite: accepted [phase 09](./09-workflow-activation.md). Next: [phase 11](./11-agent-admission.md).
 Planning revision: `2ae55abb5`; verify the current plugin host and workflow integration handoff.
 

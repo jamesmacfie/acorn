@@ -1,6 +1,35 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–09 complete; phase 10 is next.
+Date: 2026-10-06. Status: phases 01–10 complete; phase 11 is next.
+
+## Phase 10: plugin host contributions (2026-10-06)
+
+Implementation base: `df22f225dcdbe712b269f2fbb9f19ff2b65bdbd5`, Darwin arm64,
+Node 24.21.0 from `/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. The frozen install passed with
+registry access after an initial sandbox attempt failed DNS resolution. It reused 426 package copies,
+downloaded none, and did not change the lockfile. This phase changes no plugin API, route, stored ID,
+database migration, or permission grant.
+
+The [phase 10 completion note](./10-plugin-host.md) maps adapters, lifetime state, and cleanup.
+`host.ts` shrank from 805 to 644 lines while retaining the boot and reload transaction. Registrations
+still use owner-bound contexts. A duplicate loaded hook in the pre-init registration pass is contained
+after its first hook is removed; a compiled init that registered a route fails boot and clears that
+route. Late hook, extension-point, schedule, and emits disposers preserve the successor registration.
+
+| Gate | Result |
+| --- | --- |
+| `pnpm test:focus @acorn/node-core src/server/pluginHost/host.test.ts` | Passed, 41 tests after compiled-failure and shutdown-context regressions. |
+| `pnpm test:focus @acorn/node-core src/server/pluginHost/schedules.test.ts` | Passed, 5 tests. |
+| Focused `taskChecks.test.ts`, `hooks.test.ts`, `search.test.ts`, and `extensionPoints.test.ts` | Passed, 13, 16, 2, and 6 tests. The package suite also ran scheduler generation and harness contributions. |
+| `pnpm test:focus @acorn/node test/integration/plugins/runtimeContributions.test.ts` | Passed, 4 tests. The real loaded worker served a scoped tool call, failed in candidate `ready` while the old worker served, reloaded successfully, disabled on the next boot, and shut down. Registry entries disappeared at disposal; four worker terminations were observed across failed candidate, retired old instance, shutdown, and disabled load. |
+| `TURBO_FORCE=true pnpm lint` | Passed, 37 tasks, zero cached, after correcting the test's branded extension-point ID and the host's context map type. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/node-core --filter=@acorn/node --filter=@acorn/cli --filter=@acorn/tui --filter=@acorn/desktop` | Passed with loopback and process permission: five packages, zero cached; desktop included 62 Rust tests. The first sandbox run encountered `listen EPERM` in Node, CLI, TUI, and desktop and was stopped before its remaining tasks ended. |
+| `pnpm --filter @acorn/arch-tests test` | Passed after staging the changed docs and source. |
+
+The loaded fixture has no migration chain; host tests cover loaded storage reuse, access during
+`dispose`, and closed handles afterward. The fixture does not assert an OS process ID because the
+loaded realm is a worker thread; termination calls and removed registrations are observable. This
+phase did not run the full root test, build, or pack gates assigned to phase 15.
 
 ## Phase 09: workflow activation (2026-10-06)
 

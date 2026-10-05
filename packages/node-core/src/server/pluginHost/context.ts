@@ -137,8 +137,8 @@ export type PluginContextOptions = {
 // quietly registers routes nothing serves and writes through a database handle the host has closed.
 const revokers = new WeakMap<NodePluginContext, () => void>()
 
-/** Invalidate a context the host has replaced. Called on the previous instance's context after a reload
- * commits (server/pluginHost/host.ts). Every registration, broadcast and `storage.open()` reached through
+/** Invalidate a context the host has retired after reload, containment, or shutdown
+ * (server/pluginHost/host.ts). Every registration, broadcast and `storage.open()` reached through
  * it throws from then on. `core` and `capabilities.get` stay live: they are host services that did not
  * go anywhere, and wrapping them would mean proxying two large surfaces to catch nothing. */
 export function revokePluginContext(ctx: NodePluginContext): void {
@@ -323,7 +323,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // back what it filed.
     //
     // A handler registered here is a function, not a route: this is the built-in carrier, and the host
-    // builds the route-carrying one from a loaded plugin's manifest (./host.ts). Nothing inside the
+    // builds the route-carrying one from a loaded plugin's manifest (./manifestWork.ts). Nothing inside the
     // chain runner can tell which it has.
     hooks: {
       declare: (point) => recordUndo(registerHookPoint({

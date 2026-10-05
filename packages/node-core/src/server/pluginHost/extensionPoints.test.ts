@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import { makeTestNodeContext } from '../../testkit/pluginContext'
 import { clearRegistrations } from './host'
-import { extensionPointId } from './extensionPoints'
+import { extensionPointId, openExtensionPoint, openExtensionPoints, clearExtensionPoints } from './extensionPoints'
 
 // The node's many-to-many seam, exercised through the real context builder rather than the registry
 // module: the owner binding is the part worth testing, and a plugin only ever sees the bound version.
 const POINT = extensionPointId<string>('owner:things')
+const OWNER_POINT = extensionPointId<unknown>('owner:things')
 
 const context = (name: string) => makeTestNodeContext({ plugin: { name } })
 
@@ -88,6 +89,18 @@ describe('node extension points', () => {
     } finally {
       owner.cleanup()
       other.cleanup()
+    }
+  })
+
+  it('keeps a replacement point when the previous generation disposes late', () => {
+    const previous = openExtensionPoint('owner', OWNER_POINT, 'Previous')
+    clearExtensionPoints('owner')
+    const replacement = openExtensionPoint('owner', OWNER_POINT, 'Replacement')
+    try {
+      previous.dispose()
+      expect(openExtensionPoints().find((point) => point.id === POINT)?.label).toBe('Replacement')
+    } finally {
+      replacement.dispose()
     }
   })
 })
