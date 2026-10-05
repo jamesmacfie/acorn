@@ -1,6 +1,35 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–08 complete; phase 09 is next.
+Date: 2026-10-06. Status: phases 01–09 complete; phase 10 is next.
+
+## Phase 09: workflow activation (2026-10-06)
+
+Implementation base: `b7c905cf7c24fcf4ef68293c6a6a8d3b3c786627`, branch
+`phase-09-thin-workflow-activation`, Darwin arm64, Node 24.21.0 from
+`/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. `CI=true pnpm install --frozen-lockfile`
+completed with registry access: 426 package copies were reused, none downloaded, and the lockfile
+stayed fixed. The initial sandbox install could not resolve npmjs.org and was cancelled before its
+network-enabled retry. This phase changes no manifest, public contract, migration, or stored ID.
+
+The activation closure map is in the [completion note](./09-workflow-activation.md#completion-note-2026-10-06).
+The runner's managed, GitHub, notes, and terminal capabilities are still read per call. Internal
+context fetch still uses service scope and returns an empty block on a failed response. Headless
+execution keeps the task-scoped tool ceiling and abort signal. The start/control barrier still waits
+for post-listener reconciliation; dispatch recovery precedes runner recovery, then schedule recovery.
+
+| Gate | Result |
+| --- | --- |
+| Focused Node `workflowRunner.test.ts`, `workflowTasks.test.ts`, `workflowFiles.test.ts` | Passed: 25, 1, and 5 tests. These suites exercise the runner and definition behavior but construct some owners directly. |
+| Focused workflow publication `service.test.ts` and `draftQueries.test.ts` | Passed: 10 and 4 tests. |
+| Focused schedule `service.test.ts`, processing `store.test.ts`, nested `workflowNestedDispatch.test.ts` | Passed: 19, 13, and 8 tests. The nested suite includes 500 descendants with four agent slots. |
+| Focused Node `workflowActivation.test.ts` | Passed: the activated plugin registered route capabilities, held a start behind reconciliation, used a late-provided managed session and real notes store, returned empty HTTP context on a failed fixture response, failed a policy gate with no GitHub provider, and propagated cancellation and plugin teardown to managed requests. No live network was used. |
+| `TURBO_FORCE=true pnpm lint` | Passed, 37/37 tasks, zero cached. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/plugin-workflows --filter=@acorn/node --filter=@acorn/tui --filter=@acorn/desktop` | Passed, 4/4 packages, zero cached, after enabling loopback/process access. The first sandbox run failed Node, TUI, and desktop socket tests with `listen EPERM`; it did not expose a workflow regression. |
+| `pnpm --filter @acorn/arch-tests test` | Passed, 12 files/86 tests. An initial test placement and an undeclared test-only import were corrected before the passing run. |
+
+The phase does not repeat the root test, build, or pack gates; phase 15 owns those combined checks.
+It did not launch a live provider or a desktop UI. The activation fixture checks schedule bridge
+defaults and registration; the schedule service suite checks occurrence deduplication and settlement.
 
 ## Phase 07: rail task editing (2026-10-06)
 

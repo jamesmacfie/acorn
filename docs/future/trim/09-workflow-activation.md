@@ -1,8 +1,41 @@
 # Phase 09: move workflow behavior out of activation
 
-Date: 2026-10-04. Status: TODO. Risk: medium to high; capabilities and readiness are order-sensitive.
+Date: 2026-10-04. Status: DONE on 2026-10-06. Risk: medium to high; capabilities and readiness are order-sensitive.
 Prerequisite: accepted [phase 08](./08-agent-composer.md). Next: [phase 10](./10-plugin-host.md).
 Planning revision: `2ae55abb5`; phase 06 changed definition helper owners.
+
+## Completion note (2026-10-06)
+
+The Node entrypoint composes services and registers their public seams. `server/runs/activation.ts`
+owns the runner adapters and guarded runner/dispatcher construction. `server/runs/startService.ts`
+owns start admission inputs; `server/runs/control.ts` owns run commands, projections, and gate reads.
+`server/definitions/activation.ts` owns file, row, and publication commands.
+`server/schedules/activation.ts` owns schedule source review, target and route behavior, and trigger
+sweeps. The integration fixture is `apps/node/test/integration/plugins/workflowActivation.test.ts`.
+
+| Closure | Captures and read time | Boundary and lifetime |
+| --- | --- | --- |
+| Runner adapters | Migrated store and core ports at construction; managed execution, GitHub checks, notes, and terminal capabilities per call; identity and task scope per call | Node service and public capability contracts; runner stops before storage closes |
+| Start and control | Connected runner/dispatcher and store at construction; task/project/data-source state per request; `reconciled` before mutations | Route and internal-start capabilities; no run admission before recovery |
+| Definition and publication | Store, validation catalog, and data-source ports at construction; owner identity, project scope, file bytes, and query revisions per request | Device-only definition routes; draft query references reconcile during init |
+| Schedule and trigger | Start service and core scheduler seam at construction; sources and capability values per review/tick; schedule recovery after `reconciled` | Core-owned clock and occurrence ledger; registration is removed by host teardown |
+| Composition and disposal | Registration handles and live runner for the plugin lifetime | Stop runner, then clear route capabilities before host storage close |
+
+Lifecycle order remains: the host opens and migrates storage; init declares extension points and the
+hook; construction connects runner and dispatcher before either is registered; init then constructs
+start and schedule services, registers targets, capabilities, routes, and trigger callbacks, and
+reconciles draft query references. After the listener binds, the host calls the runner capability's
+reconcile method, which recovers dispatches before runner state; dependent start/control commands wait
+for that barrier, and schedule recovery follows it. The Node drains its scheduler before plugins.
+Plugin disposal marks recovery closed, stops the runner's active work and timers, then clears route
+capabilities before the host closes storage.
+
+Managed execution, GitHub checks, notes, and terminal run targets still resolve capabilities when
+used. The guarded dispatcher connector is private to synchronous construction and returns only the
+connected pair. File/published provenance, fingerprints, trust, schedule deduplication, and database
+history did not change. Phase 10 can separate plugin host registration without changing this plugin's
+contracts or lifecycle. Rollback restores the entrypoint and these feature adapters together.
+Verification and its limits are in [phase 09 evidence](./evidence.md#phase-09-workflow-activation-2026-10-06).
 
 ## Task and context
 

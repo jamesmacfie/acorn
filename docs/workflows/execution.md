@@ -15,12 +15,19 @@ blindly repeats an external side effect with unknown outcome. Ambiguous work par
 recovery/gated state. Cancellation propagates to child sessions and process groups.
 
 The Node implementation follows those boundaries under `plugins/workflows/src/server/`.
-`definitions/` loads and resolves frozen definitions. `validation/` checks their graph, bindings,
-and destination. `runs/` coordinates graph ticks, start, retry, recovery, row writes, and termination.
+`definitions/` loads and resolves frozen definitions, and owns file, row, and publication commands.
+`validation/` checks their graph, bindings, and destination. `runs/` owns the managed and headless
+adapters, start and control commands, graph ticks, retry, recovery, row writes, and termination.
 Its `read/` folder projects persisted runs for the client. `steps/` renders handler inputs and records
 step outcomes. `dispatch/` reserves and waits for child workflows. `processing/` owns tracked record
-attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
-the Node capabilities without owning execution state.
+attempts and incremental checkpoints. `schedules/` owns scheduled admission and trigger sweeps.
+`routes/` exposes the Node capabilities without owning execution state.
+
+`plugins/workflows/src/node/index.ts` opens migrated storage, connects the runner and child dispatcher,
+registers capabilities and routes, then stops live execution and clears route capabilities on disposal.
+The Node resolves managed sessions, notes, GitHub checks, and run targets through capability contracts
+when a step uses them. The workflow start and control commands wait for post-listener reconciliation
+before mutating recovered run state.
 
 `definitions/builtinDefinitions.ts` owns the built-in kind and policy names and pure step validators;
 `steps/builtins.ts` attaches execution handlers to those names. The `decide` validator uses the
