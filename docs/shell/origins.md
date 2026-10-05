@@ -134,6 +134,20 @@ diagnostics.
 
 ### Navigation policy
 
+External anchor clicks and calls to `window.open` in the main renderer pass through
+`apps/desktop/src/shell/externalLinks.ts`. A click claimed by in-app content-link resolution stays
+inside Acorn. Other web and email links call the shell's `open_external_url` command in
+`apps/desktop/src-tauri/src/external_urls.rs`. It validates the URL, permits `http`, `https`, and
+`mailto`, and hands it to the operating system's default handler. App and plugin origins are refused,
+including their mapped forms on Windows. The main window denies creation of another app window.
+
+The bridge handles links before WebKit tries to navigate. On macOS, the navigation guard runs before
+the new-window handler, so a handoff in `on_new_window` alone cannot open an external link.
+
+The opener plugin's automatic click interceptor is disabled. The renderer has no opener plugin
+permission, so that interceptor would cancel the click and then fail its request. The shell calls
+the Rust opener through its own validated command. Child webviews keep their own new-window refusal.
+
 The window's `on_navigation` guard admits the exact `app://acorn` origin and hash-shaped
 `app-plugin://<hash>` origins, including Wry's mapped forms on Windows, and refuses everything else.
 It fires for subframes too, so a plugin origin can't become the whole window and a plugin frame can't

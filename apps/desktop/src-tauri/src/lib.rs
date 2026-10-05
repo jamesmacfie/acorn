@@ -3,6 +3,7 @@ mod commands;
 mod cli_install;
 mod crash;
 mod dev_server;
+mod external_urls;
 mod footprint;
 mod helper;
 mod keychain;
@@ -107,7 +108,9 @@ pub fn run() {
 
     builder
         .plugin(tauri_plugin_dialog::init())
-        .plugin(tauri_plugin_opener::init())
+        // The bridge handles external links itself. The plugin's default click interceptor
+        // invokes an opener command the renderer has no permission to call and cancels the link.
+        .plugin(tauri_plugin_opener::Builder::new().open_js_links_on_click(false).build())
         // The renderer never invokes this plugin's own commands — capabilities/default.json grants it
         // nothing — so it is here only to give src/commands.rs `app.notification()`.
         .plugin(tauri_plugin_notification::init())
@@ -144,6 +147,7 @@ pub fn run() {
             commands::pick_folder,
             commands::pick_files,
             commands::save_file,
+            external_urls::open_external_url,
             commands::reveal_data_folder,
             commands::open_config_file,
             commands::force_quit,
@@ -427,6 +431,9 @@ fn open_window(app: &tauri::AppHandle) -> tauri::Result<()> {
         // the shell mounts and the platform string the seam reads synchronously is already there. A
         // `<script>` tag in the HTML could only approximate both.
         .initialization_script(bridge_script(app))
+        // The bridge hands external links to open_external_url before WebKit's navigation guard.
+        // Any request left over must not create a second privileged app window.
+        .on_new_window(|_url, _features| tauri::webview::NewWindowResponse::Deny)
         // Main-frame navigation policy, plus the subframe guard: a plugin frame loads
         // `app-plugin://<hash>`, and nothing else does. GitHub connects by device flow against the
         // node, so nothing legitimate navigates this frame off its own origin. See docs/shell.md,
