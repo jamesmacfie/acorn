@@ -42,7 +42,10 @@ The roster separates the `installed` disk candidate from `active`, the declarati
 Node's loaded runtime started. `active` includes the version, permissions, contributions, API
 version, activation kind, and client hash. Installing, updating, or uninstalling changes the disk,
 not the running node half. A live reload commits a new active identity only after the replacement
-initializes, and a failed reload keeps the old one. The Node keeps active bundle bytes apart from the
+initializes and reaches `ready`. An `init` or `ready` failure before commit leaves the old instance
+serving. A buffered registration that fails during replay happens after the old instance is retired;
+the plugin is then unregistered and marked failed ([reload limits](./dev-loop.md#reloading-one-plugin-without-a-restart)).
+The Node keeps active bundle bytes apart from the
 package directory and serves `GET /v1/core/plugins/:id/bundles/:hash` for that identity, even after an
 update or uninstall on disk. A client-only package can replace its active identity without a restart,
 because it has no node half.

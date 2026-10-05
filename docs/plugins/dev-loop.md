@@ -42,15 +42,15 @@ The reload runs candidate, then commit. The new code's `init` runs against a buf
 set, not the live registries, because every registry rejects a duplicate and the previous instance is
 still in all of them. If `init` throws, nothing changes: the previous instance keeps serving and
 holding its database, and the roster row shows `state: 'failed'` with its `reason`. The route answers
-200 with `state: 'failed'`, because the request did nothing wrong. Only on success does the host
+200 with `state: 'failed'`, because the request did nothing wrong. After `init` and `ready` succeed, the host
 clear the previous registrations, run its `dispose`, close its database, revoke its context, and
 replay the buffer.
 
 The host owns every candidate. An unknown or disabled owner closes the unstarted realm. An
-initialization, replay, or `ready` failure disposes the candidate, closes its worker storage, ends
-its realm, and revokes its context, and keeps the reported failure if disposal also throws. An
-initialization failure leaves the previous instance serving. A replay or `ready` failure follows the
-contained-failure rules, because commit has begun.
+initialization, `ready`, or replay failure disposes the candidate, closes its worker storage, ends
+its realm, and revokes its context, and keeps the reported failure if disposal also throws.
+Initialization and `ready` run before commit, so those failures leave the previous instance serving.
+A replay failure follows the contained-failure rules after commit has begun.
 
 Four properties to know:
 
@@ -91,8 +91,10 @@ While it's on, the node does four things (`packages/node-core/src/server/plugins
    source fresh on every run instead of reusing the five-second shared read, because the plugin's
    logic can change without its revision changing.
 
-A failed reload keeps the previous version serving. If the node half threw, the roster row shows
-`state: 'failed'` with the reason, as it does for any reload. If the loader refused the new files,
+A loader, `init`, or `ready` failure before commit keeps the previous version serving. A buffered
+registration failure during replay can leave the plugin unregistered because the host has already
+retired the old instance ([reload limits](#reloading-one-plugin-without-a-restart)). The roster row shows
+`state: 'failed'` with the reason. If the loader refused the new files,
 such as a bundle that doesn't import, the reload never reaches the host, so development mode puts
 the same failure on the row. The row's status reads "In development. Reloads when its files change."
 

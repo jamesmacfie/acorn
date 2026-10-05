@@ -1,6 +1,139 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–14 complete; phase 15 is next.
+Date: 2026-10-06. Status: phases 01–14 complete; phase 15 combined gates passed, release acceptance open.
+
+## Phase 15 combined acceptance (2026-10-06)
+
+Audited branch `phase-15-verify-combined-trim-acceptance` at `4051445da` before this record.
+Its merge base with `main` is `9dfd29df7116d44b16f5bd81e4a18b39df0e32c7`, the phase 01
+source baseline. `main` had advanced to `121574adc`; the comparison here is merge base to this
+branch, not the changing main tip. The worktree was clean at the start. All measurements used
+Darwin arm64, Node 24.21.0 via `/private/tmp/acorn-trim-node-bin/node`, pnpm 11.0.0, the unchanged
+[inventory script](./inventory.mjs), all 37 lock importers, the phase 01 source exclusions, and
+the `aarch64-apple-darwin` staged target. The first sandboxed install could not resolve npmjs.org;
+with approved network/cache access, a genuine `CI=true pnpm install --frozen-lockfile` passed,
+reusing 426 packages and downloading none. It used no copied modules or pnpm warning override.
+
+### Combined dispositions and measurements
+
+Every phase 01–14 handoff has a dated disposition. Phases 04, 05, and 14 are completed retention
+investigations, each with **zero** savings: Claude ACP 0.54.1 can clear the managed policy override
+and SDK 0.3.197 can fall back to its bundled binary; keymap 0.5.9 requires OpenTUI Core in its
+installed graph although Acorn's selected emitted imports do not reach Core; and the GitHub-shaped
+core project/task pull model retains offline operational identity and Acorn-authored provenance
+without a present blocked consumer. Phase 11's monotonic scan-progress correction at `f40c391fb`
+is present (`started = started || dispatched` after the awaited dispatch) and its held-attachment,
+stale-generation regression ran in the full agents suite. The phase 10 reload limit remains: a
+failed `init` or `ready` candidate retains the old instance, while a bad buffered registration
+can fail during replay after retirement. The shipped plugin docs were corrected to say so.
+
+| Phase 01 measure | Baseline | Phase 15 | Programme attribution |
+| --- | ---: | ---: | --- |
+| External direct declarations, production / development | 205 / 187 | 200 / 187 | Five production declarations removed in phase 02. |
+| Unique direct external names, production / development / union | 61 / 22 / 79 | 57 / 22 / 75 | Four union names removed in phase 02. |
+| Locked package entries / snapshots / names | 566 / 566 / 528 | 564 / 564 / 526 | Two TanStack snapshots removed in phase 02; the two seroval names stay transitively reachable. |
+| Production / development / overlap / development-only snapshots | 285 / 310 / 29 / 281 | 283 / 310 / 29 / 281 | Only the two production snapshots changed. |
+| Installed Darwin desktop runtime copies / names / bytes | 112 / 111 / 343,706,024 | 112 / 111 / 343,706,024 | Zero installed savings; phase 03 changed staging only. |
+| Staged helper copies / names / package bytes | 113 / 111 / 343,726,775 | 113 / 111 / 283,230,607 | **60,496,168 uncompressed bytes** removed by phase 03's target-specific node-pty copy. |
+| Packed standalone tarball compressed bytes / paths | 2,096,529 / 576 | 2,105,396 / 588 | 8,867 B and 12 paths more. Bundled source changed; this is not a payload-saving claim. |
+
+The [phase 15 raw inventory](./artifacts/phase-15-inventory.json) retains package rows, graph
+closures, missing optional target packages, source counts, and all resolved value-import edges.
+The lock SHA-256 remains `83bbf1f7c3927a7db252a15e571c5fc66111d77e69a7e3d07693c8b4`
+from phase 02; no later programme phase changed dependency versions or target policy. The current
+standalone tarball SHA-256 is `2824b9bd6e8bf90a0343cd2d98a1a863781ad14abe5884080c838c435abff66d`.
+Archive timestamps and changed bundles limit compressed-byte comparability. Staged bytes are
+package files before compression, not installed or signed-artifact bytes. Retained Claude, keymap,
+and provider decisions add zero to every savings row.
+
+The same TypeScript-resolved internal value-import method finds workflow server 71 files and 160
+value edges, with no SCC or unresolved relative import; the agent client has 98 files and 204
+value edges, also with no SCC or unresolved relative import. Phase 01 had one six-file workflow
+SCC at 64 files/128 edges and one three-file agent SCC at 93 files/193 edges. The extra files and
+edges are feature-owned extraction and later code, not a graph-count target. `plugins/workflows/src/node/index.ts`
+registers the runner, control, definition, and schedule services; `packages/node-core/src/server/pluginHost/host.ts`
+owns registration lifetime while its adapters translate declarations. `plugins/agents/src/server/sessions/runtime.ts`
+composes one engine rather than inheriting from it. `queueCoordinator.ts` owns scans, fairness,
+delayed wake, and drain; `providerSessionLifecycle.ts` owns live generations, child retirement,
+callbacks, and process timers; `runtimeEngine.ts` owns durable event and dispatch outcomes; the
+facade owns product commands and session reservation. The composer has one Node/session draft owner
+and separate operations. No protocol, migration, database schema, plugin API major, or security
+override file changed from the merge base. Full tests and the owner maps in phases 06–14 are the
+behavioral evidence; this audit does not claim a formal proof of every implicit contract.
+
+### Four routine-change walks
+
+| Change | Start, owner, await/state boundary | Consumers and proof |
+| --- | --- | --- |
+| Task branch rule | Start in `packages/client-core/src/features/tabs/TaskDraftDialog.tsx` and `taskDraftStore.ts`; `packages/protocol/src/projects/branch.ts` supplies shared naming. The dialog captures Node/project identity, while Node core task/worktree creation serializes branch allocation and rechecks availability. | Desktop and TUI share the rail; core persists task/branch/worktree identity. `TabRail.test.tsx` covers typed conflict, derived suffix, held availability after close, setup, and descendants. The isolated desktop showed `main` conflict, accepted `trim-15-check`, and created its fixture worktree. |
+| Attachment/send rule | Start in `plugins/agents/src/client/composer/AgentComposer.tsx`, then `composerState.ts`, `submitOperation.ts`, `attachmentOperations.ts`, and `contextOperations.ts`. The Node/session draft owner captures revisions and origin before async enqueue, picker, upload, or capture; acknowledgments cannot erase concurrent edits. | Node agents routes and shared desktop/TUI composer consume the draft; attachment rows and blobs are durable Node data. `composerOwnership.test.tsx`, `AgentComposer.attach.test.tsx`, and replacement tests hold those awaits, hydration, limits, and fork consumption. Both live hosts sent context-bearing turns; desktop retained a later unsent draft across task navigation. |
+| Workflow capability adapter | Start in `plugins/workflows/src/server/runs/activation.ts`, with `runs/startService.ts` and `runs/control.ts` for admission and commands. The runner looks up managed execution, GitHub checks, notes, and terminal capabilities per call and waits for reconciliation before dependent mutations. | `plugins/workflows/src/node/index.ts` registers public routes/capabilities; Node and clients consume run state. `apps/node/test/integration/plugins/workflowActivation.test.ts` executes a late-bound managed provider through the real plugin/Node seam. Workflow-specific processing and schedule suites ran in the root gate. |
+| Agent admission/retirement | Start in `plugins/agents/src/server/sessions/runtime.ts` for durable enqueue and product commands, `queueCoordinator.ts` for scan policy, and `providerSessionLifecycle.ts` for generation and child lifetime. Startup, dispatch, event, and stop joins are separate awaits; durable heads are reread before send. | Agents routes, workflow, and delegation use the facade. `runtimeQueue.test.ts` covers held startup, stale dispatch progress, fairness, reorder, cancellation, and second boot; `runtimeIdleStop.test.ts` covers pending requests and idle sweep. The root gate also ran public runtime, process, and Node boot fixtures. |
+
+### Gates, delivery, and host limits
+
+| Command with pinned Node and `TURBO_FORCE=true` where relevant | Result and bounded evidence |
+| --- | --- |
+| `CI=true pnpm install --frozen-lockfile` | Passed, 426 reused, zero downloaded: [install](./artifacts/phase-15-install.log.gz). |
+| `pnpm lint` | Passed 37/37, zero cached: [lint](./artifacts/phase-15-lint.log.gz). |
+| `VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test` | Passed 36/36, zero cached, including architecture, desktop boot, and 62 Rust tests: [test](./artifacts/phase-15-test.log.gz). The root bounded wrapper ran, not unrestricted Turbo. |
+| `pnpm build` | Passed 6/6, zero cached: [build](./artifacts/phase-15-build.log.gz). Node service static graph 3,286,989/3,290,000 B; TUI startup 710,490/720,000 B. |
+| `pnpm pack:node` | Passed nine migration chains, runtime import checks, and 47 TUI external resolutions: [pack](./artifacts/phase-15-pack.log.gz). |
+| `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test` after the final doc edits | Passed 12 files and 86 tests, including links and citations: [architecture](./artifacts/phase-15-arch-final.log.gz). |
+
+The packed tarball was extracted outside the checkout to `/private/tmp/acorn-trim15-packed/acorn-node`.
+An independent `npm install --omit=dev --no-audit --no-fund` added 195 packages. `node bin/acorn.mjs
+--help` exited zero; an 80×24 PTY drew the TUI, and Ctrl-C exited zero. A separate copy of the
+staged helper under `/private/tmp/acorn-trim15-helper` loaded node-pty using the staged pinned
+Node 24.21.0, read `STAGED_PINNED_PTY_OK`, resized 80×24 to 100×30, and exited zero. The staged
+Darwin Claude binary remains in the installed helper graph; phase 04's ACP/SDK source, host auth
+probe, and driver tests prove why managed policy cannot safely omit it. Phase 08's isolated managed
+Claude host turn exercised the retained path in development, not an installed signed app. No
+binary-omission saving or final installed-Claude smoke is claimed.
+
+Desktop `trim-15` used the `tui-navigation` fixture. Live WebDriver showed the task setup modes,
+branch conflict, worktree creation, managed Codex options, context-bearing send, working state,
+`OK` response, and retained unsent draft after visiting another task. The inspected
+[desktop screenshot](./artifacts/phase-15-desktop.png) is from the returned session. TUI
+`trim-15-tui` used the same isolated fixture: [default 80×24](./artifacts/phase-15-tui-default.txt)
+showed the task roster, and [120×40](./artifacts/phase-15-tui-120x40.txt) showed managed Codex
+send, attached context, `OK`, and ready. The exact TUI focus path was task rail, Agent tab, managed
+session list, composer; `Ctrl+Return` sent. Both drivers then reported their sessions not running,
+and their launcher PIDs and path-owned children were absent from the process table. Neither fixture
+used the production data root.
+
+Live final-host coverage does **not** establish task rename, origin switch, existing-worktree or
+project-folder creation, drag/right-click menus, native picker, modal/focus shortcuts, concurrent
+held awaits, fork, Chats only, queue edit/reorder/cancel, approvals, idle stop, workflow/delegated
+turns, terminal handoff, or loaded-plugin reload/disable. The desktop WebDriver cannot right-click,
+drag, or reach native menus/dialogs. The host had no pending approval or queued turn to manipulate;
+disabled controls are not proof. Phase 07/08 fixture tests and phase 08's earlier live picker/send
+cover task and composer cases. The full root run includes public controlled fixtures for queue,
+request, retirement, second boot, workflow capability activation, and plugin startup/invocation,
+failed `init`/`ready` reload retaining old, successful reload, disable, and storage disposal.
+These are deterministic proofs, not phase 15 live-host observations. The phase 10 replay-after-
+commit failure remains a documented limit, not a retained-old-instance guarantee.
+
+The existing `verify:bundle` supports macOS `.app`/DMG/updater inventory and a separate Windows
+bundle branch; its default path has no Linux release bundle implementation. The local macOS
+`dist --prebuilt` first hit Tauri CLI's executable-name detection because the pinned `node` was a
+symlink to `node-v24.21.0-aarch64-apple-darwin`. Copying the same binary under the name `node`
+passed that boundary. The Rust 1.96.0 release build then repeatedly generated proc-macro dylibs
+that macOS rejected with `mis-aligned LINKEDIT string pool` (observed for `serde_derive` and
+`zerofrom_derive`), even after cleaning only this checkout's release outputs. The retained
+[release failure](./artifacts/phase-15-dist-failed.log.gz) is the final attempt. With no `.app` or
+DMG, `verify:bundle` failed at the missing `target/release/bundle/macos` directory
+([verifier log](./artifacts/phase-15-verify-bundle-failed.log.gz)). No signed or installed desktop
+artifact was verified, and the release signing key was unavailable locally. A CI macOS target
+runner must build the release artifact and run `verify:bundle`, then smoke the installed helper's
+PTY and Claude fallback path. The Windows x64 release runner must execute ConPTY read/resize/stop
+from its installed bundle and run the Windows inventory branch. Linux CI must execute its locally
+built node-pty addon under the pinned runtime; the release inventory verifier has no Linux artifact
+branch, so the runner must report the addon smoke separately. The repository has those macOS,
+Windows, and Linux jobs, but no run for this branch/commit was available as evidence. Darwin
+staging fixtures and PTY smoke do not prove those target executions. Keep release acceptance open
+until these exact runner results and the uncovered host interactions required by the phase are
+recorded; no deployment, package publication, or merge occurred.
 
 ## Phase 14 provider boundary (2026-10-06)
 

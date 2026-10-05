@@ -1,0 +1,42 @@
+$ pnpm --filter @acorn/tui agent:ui -- --session trim-15-tui snapshot
+$ node scripts/agent/ui.mjs -- --session trim-15-tui snapshot
+Default > repo · 2 tasks                                                                     ● Task: Plan follow-up work
+┌─Menu───────────────────────────┐  [Agent]  Changes  Notes  Context  Editor
+│  Docker                        │Setup not started · Teardown not started
+│  Workflows                     │┌─List─────────────────────────┐┌─Detail─────────────────────────────────────────────┐
+│  Agents                        ││Agents 1                      ││Isolated Trim 15 TUI Check            ✓ ready [Stop]│
+│  Memory                        ││                              ││Session actions [Agent utilization] [ New ▾ ]       │
+│                                ││MANAGED SESSIOrder managed se ││                                                    │
+└────────────────────────────────┘│  ✓ Isolated Trim 15 TUI Che  ││▍──────────────────────────────────────────────────┐│
+┌─Browse─────────────────────────┐│    codex · GPT-6-Sol · medi  ││▍ YOU 12:11 PM                                     ││
+│Choose a source.                ││                              ││▍ Reply with exactly OK. Isolated trim 15 TUI      ││
+│                                ││                              ││▍ check.                                           ││
+│                                ││                              ││▍                                                  ││
+│                                ││                              ││▍ [Context: Task context · attached]               ││
+│                                ││                              ││▍ ▸ Context manifest                               ││
+│                                ││                              ││▍──────────────────────────────────────────────────┘│
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││▍──────────────────────────────────────────────────┐│
+│                                ││                              ││▍ AGENT 12:11 PM                Copy this response ││
+│                                ││                              ││▍ OK                                               ││
+│                                ││                              ││▍──────────────────────────────────────────────────┘│
+│                                ││                              ││                                                    │
+│                                ││                              ││Turn complete · completed   21,434 / 258,400 context│
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││Mode Default▾ Model GPT-6-Sol▾ Effort medium▾       │
+└────────────────────────────────┘│                              ││┌──────────────────────────────────────────────────┐│
+┌─Tasks──────────────────────────┐│                              │││Ask the agent…  @file  /command  $skill           ││
+│  Review changed files          ││                              │││                                                  ││
+│  Plan follow-up work           ││                              │││                                                  ││
+│                                ││                              ││└──────────────────────────────────────────────────┘│
+│                                ││                              ││[Attach] [ Context ▾ ] [ Insert ▾ ]   ⇧↩ for newline│
+│                                ││                              ││[Send]                                              │
+└────────────────────────────────┘└──────────────────────────────┘└────────────────────────────────────────────────────┘
+esc back · ctrl+return send · tab next · ctrl+k commands · ? help · w switch workspace · p switch project · ctrl+b ra…

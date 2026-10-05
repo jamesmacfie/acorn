@@ -1,0 +1,26 @@
+$ pnpm --filter @acorn/tui agent:ui -- --session trim-15-tui snapshot
+$ node scripts/agent/ui.mjs -- --session trim-15-tui snapshot
+Default > repo · 2 tasks                                                       ●
+┌─Menu─────────────────┐
+│› Docker              │  Choose a container
+│  Workflows           │
+│  Agents              │
+│  Memory              │
+│                      │
+└──────────────────────┘
+┌─Browse───────────────┐
+│Nothing to list here. │
+│                      │
+│                      │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+┌─Tasks────────────────┐
+│  Review changed f  +1│
+│  Plan follow-up wor  │
+│                      │
+│                      │
+│                      │
+└──────────────────────┘
+j/k move · enter open · esc back · ctrl+k commands · ? help · w switch worksp…

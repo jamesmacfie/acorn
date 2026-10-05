@@ -1,10 +1,32 @@
 # Phase 15: verify the combined programme and publish its evidence
 
-Date: 2026-10-04. Status: TODO. Risk: medium; independent passes do not prove combined behavior.
+Date: 2026-10-06. Status: ACCEPTANCE OPEN. Risk: medium; independent passes do not prove combined behavior.
 Prerequisite: accepted [phase 14](./14-provider-boundary.md), with all earlier handoffs recorded.
 Planning revision: `2ae55abb5`; compare against phase 01 using the same measurement definitions.
 Phase 14 disposition: retain the GitHub-shaped shared core read model and provenance. Record it as
 remaining debt; no schema, protocol, or plugin-tier migration is an acceptance prerequisite.
+
+## Verification disposition (October 6, 2026)
+
+The combined branch passed a clean frozen install, 37 lint tasks, all 36 root test tasks including
+desktop and Rust, six build tasks, and standalone Node packing on Darwin arm64 with Node 24.21.0.
+The independent packed npm install, CLI help, TUI startup, and staged pinned-Node PTY read, resize,
+and exit also passed. The [combined evidence](./evidence.md#phase-15-combined-acceptance-2026-10-06)
+records comparable inventory, owner walkthroughs, host screens, logs, and retained decisions.
+
+The isolated desktop sent a live managed Codex turn and retained a draft after navigation. The
+isolated TUI sent a live managed Codex turn at 120×40, closing phase 13's host focus/send gap.
+Held requests, queue and process races, workflow adapters, and loaded-plugin rollback have
+deterministic public fixture proof in the full test run. The host drivers could not exercise every
+native menu, drag, picker, approval, queue, workflow, and loaded-plugin interaction live. Those
+limits are listed with the exact proof available in the combined evidence.
+
+Release acceptance remains open. The local macOS `dist --prebuilt` build failed because Rust 1.96.0
+generated a proc-macro dylib that macOS rejected with a misaligned `LINKEDIT` string pool. Cleaning
+only this checkout's release outputs and rebuilding reproduced it. No `.app`/DMG existed, so
+`verify:bundle` could not inspect an installed artifact. Windows ConPTY and Linux built-addon
+runtime smokes also need their target runners. Do not describe staged files or Darwin PTY behavior
+as those target results. This audit records those gaps without changing release policy or budgets.
 
 ## Task and context
 
@@ -80,7 +102,7 @@ snapshot/press/resize. Check default size and 120×40; use `stop` for both drive
   concurrent edits, fork context, streaming focus, and Chats only on return to a session.
 - Interactive, workflow, and delegated managed turns: queue edit/reorder/cancel, options/defaults,
   approvals, resume, idle stop, terminal handoff, and shutdown followed by another Node boot.
-- Loaded plugin contribution invocation, failed reload keeping the old instance, successful reload,
+- Loaded plugin contribution invocation, pre-commit failed reload keeping the old instance, successful reload,
   disabled cleanup, and storage closing after disposal. Use controlled fixtures, not production data.
 
 ## Acceptance and final handoff
