@@ -86,6 +86,13 @@ The pickers read the newest session that advertised options, because a provider 
 only once a session runs. A provider not run within the 50 latest sessions shows no pickers. Each pick
 saves. A failed write says so and refetches the row.
 
+## Generating text
+
+**Generate with**, under **Generating text**, sets the backend and model that every Generate dialog
+opens on, including commit messages, SQL, and workflow drafts. It reads available API keys and agent
+CLIs from the Node. The pick is a device preference and carries a **This device** chip.
+[State ownership](../state-ownership/scope-rules.md#scope-rules) covers its storage and fallback rules.
+
 ## Tool call display
 
 **Tool call display**, under a Transcript heading, is a device preference, not a session default, and

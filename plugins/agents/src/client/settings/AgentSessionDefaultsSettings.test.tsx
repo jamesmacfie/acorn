@@ -16,7 +16,10 @@ const mocks = vi.hoisted(() => ({
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { queryKey: readonly string[] }) => ({
     get data() {
-      return options().queryKey.includes('session-defaults') ? defaultAgentSessionDefaults() : mocks.prefs
+      const key = options().queryKey
+      if (key.includes('session-defaults')) return defaultAgentSessionDefaults()
+      if (key.includes('model-backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [{ id: 'opus', label: 'Opus' }], defaultModelId: 'opus' }], missing: [] }
+      return mocks.prefs
     },
   }),
   useQueryClient: () => ({}),
@@ -72,7 +75,9 @@ describe('the harnesses and defaults page', () => {
     expect(mocks.saveStartup).toHaveBeenCalledWith(expect.anything(), false)
   })
 
-  it('marks the tool call display as this device’s', () => {
+  it('marks generation and tool call defaults as this device’s', () => {
+    expect(row('Generate with')?.querySelector('.ui-setting-scope')?.textContent).toBe('This device')
+    expect(row('Generate with')?.textContent).toContain('Opus')
     expect(row('Tool call display')?.querySelector('.ui-setting-scope')?.textContent).toBe('This device')
     expect(row('Carry my last session')?.querySelector('.ui-setting-scope')).toBeFalsy()
   })

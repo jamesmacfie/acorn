@@ -6,7 +6,7 @@ import { saveJsonPref } from '../savePref'
 
 // The one "Generate with" default, shared by every Generate control in the app: the commit-message
 // wand, the SQL dialog, the workflow generator, and the Settings section that edits it on its own
-// (./AiModelsSettings.tsx).
+// (Settings > Agents > Harnesses and defaults).
 //
 // One default rather than one per dialog because with agent CLIs in the list, re-picking is the
 // common case: a person whose only backend is `claude` would otherwise choose it again in every

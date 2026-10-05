@@ -114,6 +114,7 @@ export const agentsClientPlugin: ClientPlugin = {
         { id: 'usage', label: 'Usage limits', rows: ['Continue when usage resets'] },
         { id: 'idle', label: 'Idle agents', rows: ['Stop idle agents after'], keywords: ['memory', 'stop'] },
         { id: 'archived', label: 'Archived tasks', rows: ['Keep agent history for archived tasks'], keywords: ['retention', 'delete history', 'disk'] },
+        { id: 'generate', label: 'Generating text', rows: ['Generate with'], keywords: ['default model', 'this device', 'commit message', 'sql generation', 'workflow drafts'] },
         // The switch's label reads "Send task context at startup", which a search for the words people
         // use for it would miss, so the section names them and search lands on the switch's section.
         { id: 'new-sessions', label: 'New sessions', rows: ["Carry my last session's settings forward", 'Send task context at startup', 'MCP servers'], keywords: ['startup context', 'task context'] },

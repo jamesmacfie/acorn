@@ -1,7 +1,7 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { createMemo, createResource, For, Show } from 'solid-js'
-import { createSettingSave, prefsOptions } from '@acorn/plugin-api/client'
-import { Alert, Badge, Checkbox, Inline, Link, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
+import { createSettingSave, effectiveModelPick, modelBackendsOptions, prefsOptions, readGeneratePick, saveGeneratePick } from '@acorn/plugin-api/client'
+import { Alert, Badge, Checkbox, Inline, Link, ModelBackendPicker, Select, SettingRow, SettingsSection, Text } from '@acorn/plugin-api/ui'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import {
   AGENT_ARCHIVED_HISTORY_CHOICES,
@@ -51,6 +51,9 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   // page down with it.
   const [providers] = createResource(() => managedAgentApi.providers().catch(() => undefined))
   const prefs = createQuery(() => prefsOptions(true))
+  const modelStatus = createQuery(() => modelBackendsOptions(true))
+  const backends = () => modelStatus.data?.backends ?? []
+  const generatePick = createMemo(() => effectiveModelPick(backends(), readGeneratePick(prefs.data)))
   const [recent] = createResource(() => managedAgentApi.sessions({}).catch(() => undefined))
 
   // Over the defaults rather than instead of them: a cached answer from an older node can lack a field
@@ -76,9 +79,10 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
   const inlineProviderSave = createSettingSave()
   const foldSave = createSettingSave()
   const startup = createSettingSave()
+  const generateSave = createSettingSave()
 
-  // A different store from everything above: the fold setting is this device's preference about how a
-  // transcript is drawn, not part of the record the node keeps of what a session launches with.
+  // Like the generation pick, the fold setting is a device preference. It controls how transcripts
+  // are drawn, separate from the defaults the Node keeps for launching sessions.
   const fold = () => readAgentToolFoldPrefs(prefs.data)
   const chooseFold = (mode: AgentToolFoldMode) => void foldSave.run(() => saveAgentToolFoldMode(queryClient, prefs.data, mode))
 
@@ -169,6 +173,27 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
             options={AGENT_ARCHIVED_HISTORY_CHOICES.map((choice) => ({ value: String(choice.days), label: choice.label }))}
             onChange={(value) => void archivedHistory.run(() => save({ keepArchivedHistoryDays: Number(value) }))}
           />
+        </SettingRow>
+      </SettingsSection>
+
+      <SettingsSection
+        id="generate"
+        label="Generating text"
+        help="acorn writes commit messages, SQL, and workflow drafts with the model you pick. An API key is billed to that key. An agent CLI uses its own sign-in."
+      >
+        {/* Stacked when there are two selects, which do not fit the control column side by side. */}
+        <SettingRow label="Generate with" scope="device" layout={backends().length > 1 ? 'stacked' : 'inline'} error={generateSave.error()}>
+          {/* The one place the default is changed outside a dialog. The picker hides its backend
+              select when there is a single choice: there is no choice to make, and the model select
+              beside it still is one. */}
+          <Show when={backends().length} fallback={<Text emphasis="muted">{modelStatus.isError ? "Couldn't ask this node what it can generate with." : modelStatus.isPending ? 'Reading what this node can generate with…' : 'Nothing to generate with. Add a key, or install an agent CLI.'}</Text>}>
+            <ModelBackendPicker
+              backends={backends()}
+              backendId={generatePick()?.backendId ?? ''}
+              modelId={generatePick()?.modelId ?? ''}
+              onChange={(next) => void generateSave.run(() => saveGeneratePick(queryClient, next))}
+            />
+          </Show>
         </SettingRow>
       </SettingsSection>
 

@@ -159,9 +159,10 @@ in `plugins/agents/src/client/settings/*.test.tsx`, `AgentToolsSettings.test.tsx
      Confirm that the workspace's page lists it under **Connections**, that the project's
      **Connections** tab lists it too, and that **Manage** there opens the connection's page. Search
      for the connection's name and confirm that Enter opens its page, not just Services.
-138. On **AI models**, confirm that **Generate with** carries the **This device** chip, that an
-     Anthropic key is listed under **API keys** and not on Services, and that an installed `claude`
-     is listed under **Agent CLIs**. Search `startup context` and confirm that Enter lands on
+138. On **AI models**, confirm that an Anthropic key is listed under **API keys** and not on Services,
+     and that an installed `claude` is listed under **Agent CLIs**. Search `Generate with` and confirm
+     that Enter lands on **Harnesses and defaults › Generating text**, where the row carries the
+     **This device** chip. Search `startup context` and confirm that Enter lands on
      **Harnesses and defaults › New sessions**.
 139. In the terminal client at 80 by 24, search `settings` in the palette and confirm that **Open
      settings** is the first row and opens the route on the nine groups. Open a page in each group and

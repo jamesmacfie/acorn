@@ -12,8 +12,8 @@ The **Connections** group has two pages. Each connection is on one of them, chos
   GitHub, Linear, Rollbar, the Sentry exporter, and any provider a plugin adds. Plugins and notices
   open it by that ID.
 - **AI models**, page ID `ai-models`, lists the model-provider keys beside the agent CLIs this machine
-  has, and holds **Generate with**. That pick belongs to this device, so its row carries a **This
-  device** chip ([model providers](./model-providers.md)).
+  has ([model providers](./model-providers.md)). Set **Generate with** under **Agents > Harnesses
+  and defaults > Generating text**. That pick belongs to this device and carries a **This device** chip.
 
 A connection with status `needs-auth` is listed first with an amber dot. Core's attention source
 `core.connectionsNeedAuth` (`connectionAttention.ts`) raises a bell row targeted at that page, which
