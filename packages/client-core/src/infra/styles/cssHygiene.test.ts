@@ -22,6 +22,7 @@ describe('no phantom tokens', () => {
       '--term-drawer-h', // TerminalPanel.tsx sets it on documentElement
       '--left', // reserved override hook for the left pane width
       '--l', '--r', // Shiki emits both syntax colours inline per token
+      '--lb', '--rb', // and a terminal background, on an `ansi` CodeBlock's runs
       '--state-color', '--label-color', // inline per-element props carrying live Linear API colours
       '--chip-color', // Chip's `color` prop — the shared successor to the two above
       // A brand's own colour and what sits on it, from brandStyle() in ui/brandMarks.ts. Third-party

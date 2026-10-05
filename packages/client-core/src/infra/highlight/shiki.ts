@@ -1,6 +1,7 @@
 import { measure, recordSample } from '../telemetry/emitter'
 import { createHighlighterCore, tokenizeAnsiWithTheme, type HighlighterCore } from 'shiki/core'
 import { createJavaScriptRegexEngine } from 'shiki/engine/javascript'
+import { keepAnsiColour } from '../../kit/lib/rendering/ansi'
 import { loadGrammar } from './langs'
 
 // The main-thread highlighter, for the callers a worker would not pay for: the terminal's ANSI
@@ -106,9 +107,46 @@ export { langFor, LANGS } from './langs'
 // token, rendered with the --l and --r CSS vars. ANSI token boundaries are theme-independent, so
 // the two passes zip 1:1. `ansi` is not a TextMate grammar, so this calls tokenizeAnsiWithTheme
 // directly and no grammar loads.
-export type AnsiTok = { content: string; light: string; dark: string }
+//
+// A colour is empty where the output set none, so the text keeps its surface's own colour rather
+// than the Shiki theme's. Every escape that is not a colour code goes first: Shiki leaves a charset
+// select such as `ESC ( B` in the text, and an OSC hyperlink stops it parsing the rest of the line.
+export type AnsiTok = {
+  content: string
+  light: string
+  dark: string
+  lightBg: string
+  darkBg: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+}
+// TextMate's FontStyle bits. Shiki types them as a const enum and exports no value for them.
+const ITALIC = 1
+const BOLD = 2
+const UNDERLINE = 4
 export function tokenizeAnsiLines(hl: HighlighterCore, text: string): AnsiTok[][] {
-  const light = tokenizeAnsiWithTheme(hl.getTheme('github-light'), text)
-  const dark = tokenizeAnsiWithTheme(hl.getTheme('github-dark'), text)
-  return light.map((line, i) => line.map((t, j) => ({ content: t.content, light: t.color ?? '', dark: dark[i]?.[j]?.color ?? '' })))
+  const clean = keepAnsiColour(text)
+  const [light, dark] = (['github-light', 'github-dark'] as const).map((name) => {
+    const theme = hl.getTheme(name)
+    return tokenizeAnsiWithTheme(theme, clean).map((line) => line.map((t) => ({
+      content: t.content,
+      color: t.color === theme.fg ? '' : t.color ?? '',
+      bg: t.bgColor ?? '',
+      fontStyle: t.fontStyle ?? 0,
+    })))
+  })
+  return light.map((line, i) => line.map((t, j) => {
+    const other = dark[i]?.[j]
+    return {
+      content: t.content,
+      light: t.color,
+      dark: other?.color ?? '',
+      lightBg: t.bg,
+      darkBg: other?.bg ?? '',
+      bold: (t.fontStyle & BOLD) !== 0,
+      italic: (t.fontStyle & ITALIC) !== 0,
+      underline: (t.fontStyle & UNDERLINE) !== 0,
+    }
+  }))
 }

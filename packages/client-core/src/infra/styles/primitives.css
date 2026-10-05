@@ -1116,6 +1116,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-code[data-wrap] { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Capped with its own scroll, for a preview that must not push the page down. */
 .ui-code[data-max='block'] { max-height: 240px; }
+/* Terminal colour from an `ansi` block. Both sides ride the run as custom properties and light-dark()
+   picks one, the same way a highlighted fence does (§ Markdown below). */
+.ui-code [data-fg] { color: light-dark(var(--l), var(--r)); }
+.ui-code [data-bg] { background: light-dark(var(--lb), var(--rb)); }
 /* CodeBlock's own copy button, reached by position for the same reason. A markdown fence's button
    is a CopyButton and styles/copy.css owns that one. */
 .ui-code-wrap > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }

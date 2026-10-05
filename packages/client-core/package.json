@@ -168,6 +168,7 @@
     "./kit/lib/savedSignal": "./src/kit/lib/controls/savedSignal.ts",
     "./kit/lib/graphLayout": "./src/kit/lib/layout/graphLayout.ts",
     "./kit/lib/markdown": "./src/kit/lib/rendering/markdown.ts",
+    "./kit/lib/ansi": "./src/kit/lib/rendering/ansi.ts",
     "./kit/lib/modelProviderFailure": "./src/kit/lib/rendering/modelProviderFailure.ts",
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
