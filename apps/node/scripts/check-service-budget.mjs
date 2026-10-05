@@ -27,7 +27,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // that small means the walk below stopped following imports, and a check that passes on that is blind.
 // 2026-10-04: dataset capture, storage, SQL reduction, and workflow writes are lazy; the remaining
 // core route, tool, source, and schema registration adds about 21 KB over the previous ceiling.
-const limits = { ceiling: 3_245_000, floor: 1_000_000 }
+// 2026-10-05: 3,277,281 B. Derived sources (dashboards phases 8 to 11) took the graph to 3,267,364 B,
+// which already stopped `pnpm dev:agent`, and the development mode of phase 12 adds about 10 KB. Both
+// are registration and checks a boot runs, so the ceiling moves rather than the code.
+const limits = { ceiling: 3_290_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
