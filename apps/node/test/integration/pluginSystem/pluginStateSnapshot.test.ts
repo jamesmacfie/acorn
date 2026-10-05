@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/api.ts'
-import { pluginDir, scanInstalled } from '@acorn/node-core/server/plugins'
+import { inputGrantsStore, pluginDir, scanInstalled } from '@acorn/node-core/server/plugins'
 import { pluginState } from '@acorn/node-core/server/pluginHost'
 import type { PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
@@ -60,5 +60,23 @@ describe('plugin state composition', () => {
     expect(uninstalled.installed).toBeUndefined()
     expect(new TextDecoder().decode((await bridge.clientBundle('widget', hash(oldBytes)))!.bytes)).toBe(oldBytes)
     expect(await bridge.clientBundle('widget', hash(newBytes))).toBeNull()
+  })
+
+  it('drops the input grant on uninstall, so a later package under the same id asks again', async () => {
+    root = mkdtempSync(join(tmpdir(), 'acorn-plugin-state-'))
+    putPackage('1.0.0', 'export default {}')
+    const bridge = await buildPluginStateBridge({
+      dataDir: root,
+      db: {} as AppDatabase,
+      roster: () => roster,
+      booted: () => [],
+      loadFailures: () => [],
+      disabled: () => [],
+      setDisabled: () => {},
+      reloadHost: { reload: async () => ({ ok: false, error: 'not wired in this test' }) },
+    })
+    bridge.inputGrants().set({ pluginId: 'widget', sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } }, grantedAt: 1, grantedBy: 'device:d1' })
+    await bridge.uninstall('widget', { purgeData: false })
+    expect(inputGrantsStore(root).get('widget')).toBeUndefined()
   })
 })

@@ -98,7 +98,12 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // Two halves, in this order: the package leaves disk, then the core database drops what the plugin
     // owned there. Disk first because a failure after it still leaves the plugin gone, where the reverse
     // leaves a running plugin whose state has been deleted underneath it.
+    //
+    // The input grant goes before both, whether or not the data stays. It's keyed by plugin id alone,
+    // so a package installed later under the same id would otherwise read without asking. Dropping it
+    // first means a failed uninstall leaves a plugin that asks again, never one that kept a grant.
     uninstall: async (id, options) => {
+      inputGrantsStore(dataDir).delete(id)
       const result = uninstallPlugin(dataDir, id, options)
       if (options.purgeData) await cascadeDeletePluginData(input.db, id)
       return result

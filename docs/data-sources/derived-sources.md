@@ -116,6 +116,8 @@ routes:
   dialog left open across an update can't approve something it never showed.
 - `DELETE` revokes the grant. The plugin's panels stay, and their reads fail with
   `input-unavailable` until the person approves again.
+- Uninstalling a plugin drops its grant too, because the grant is keyed by plugin id alone. A package
+  installed later under the same id asks again.
 
 Both writes broadcast `plugins:changed`. For the prompt, see
 [plugin distribution](../plugins/distribution.md#approving-what-a-plugin-reads).
