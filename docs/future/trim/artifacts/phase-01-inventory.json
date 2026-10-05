@@ -1,0 +1,3154 @@
+{
+  "schema": 1,
+  "inputs": [
+    "pnpm-lock.yaml",
+    "apps/*/package.json",
+    "packages/*/package.json",
+    "plugins/*/package.json",
+    "tools/*/package.json",
+    "installed apps/desktop/node_modules",
+    "source tsconfigs"
+  ],
+  "target": {
+    "platform": "darwin",
+    "architecture": "arm64",
+    "node": "v24.21.0"
+  },
+  "manifests": {
+    "manifests": 37,
+    "workspaceManifests": 36,
+    "pluginManifests": 21,
+    "declarations": {
+      "production": 205,
+      "development": 187
+    },
+    "productionNames": 61,
+    "developmentNames": 22,
+    "developmentOnlyNames": 18,
+    "unionNames": 79,
+    "names": {
+      "production": [
+        "@agentclientprotocol/claude-agent-acp",
+        "@agentclientprotocol/sdk",
+        "@anthropic-ai/sdk",
+        "@codemirror/autocomplete",
+        "@codemirror/lang-cpp",
+        "@codemirror/lang-css",
+        "@codemirror/lang-go",
+        "@codemirror/lang-html",
+        "@codemirror/lang-java",
+        "@codemirror/lang-javascript",
+        "@codemirror/lang-json",
+        "@codemirror/lang-markdown",
+        "@codemirror/lang-python",
+        "@codemirror/lang-rust",
+        "@codemirror/lang-sql",
+        "@codemirror/lang-xml",
+        "@codemirror/lang-yaml",
+        "@codemirror/language",
+        "@codemirror/legacy-modes",
+        "@codemirror/state",
+        "@codemirror/view",
+        "@hono/node-server",
+        "@lezer/highlight",
+        "@modelcontextprotocol/sdk",
+        "@opentui/keymap",
+        "@solidjs/router",
+        "@tanstack/query-async-storage-persister",
+        "@tanstack/query-persist-client-core",
+        "@tanstack/solid-query",
+        "@tanstack/solid-query-persist-client",
+        "@tanstack/solid-virtual",
+        "@tauri-apps/api",
+        "@vscode/ripgrep",
+        "@xterm/addon-fit",
+        "@xterm/addon-serialize",
+        "@xterm/addon-webgl",
+        "@xterm/headless",
+        "@xterm/xterm",
+        "codemirror",
+        "diff",
+        "drizzle-orm",
+        "entities",
+        "gitdiff-parser",
+        "hono",
+        "idb-keyval",
+        "jose",
+        "lucide-static",
+        "node-forge",
+        "node-pty",
+        "openai",
+        "pg",
+        "playwright-core",
+        "seroval",
+        "seroval-plugins",
+        "shiki",
+        "smol-toml",
+        "solid-js",
+        "tar",
+        "ws",
+        "yoga-layout",
+        "zod"
+      ],
+      "development": [
+        "@tauri-apps/cli",
+        "@types/better-sqlite3",
+        "@types/diff",
+        "@types/node",
+        "@types/node-forge",
+        "@types/pg",
+        "@types/ws",
+        "@vitest/coverage-v8",
+        "ajv",
+        "drizzle-kit",
+        "gitdiff-parser",
+        "jsdom",
+        "node-pty",
+        "oxlint",
+        "solid-js",
+        "tsx",
+        "turbo",
+        "typescript",
+        "vite",
+        "vite-plugin-solid",
+        "vitest",
+        "zod"
+      ]
+    }
+  },
+  "dependencyGraph": {
+    "importers": 37,
+    "direct": {
+      "productionNames": 62,
+      "developmentNames": 22,
+      "unionNames": 79,
+      "developmentOnlyNames": 17,
+      "names": {
+        "production": [
+          "@agentclientprotocol/claude-agent-acp",
+          "@agentclientprotocol/sdk",
+          "@anthropic-ai/sdk",
+          "@codemirror/autocomplete",
+          "@codemirror/lang-cpp",
+          "@codemirror/lang-css",
+          "@codemirror/lang-go",
+          "@codemirror/lang-html",
+          "@codemirror/lang-java",
+          "@codemirror/lang-javascript",
+          "@codemirror/lang-json",
+          "@codemirror/lang-markdown",
+          "@codemirror/lang-python",
+          "@codemirror/lang-rust",
+          "@codemirror/lang-sql",
+          "@codemirror/lang-xml",
+          "@codemirror/lang-yaml",
+          "@codemirror/language",
+          "@codemirror/legacy-modes",
+          "@codemirror/state",
+          "@codemirror/view",
+          "@hono/node-server",
+          "@lezer/highlight",
+          "@modelcontextprotocol/sdk",
+          "@opentui/keymap",
+          "@solidjs/router",
+          "@tanstack/query-async-storage-persister",
+          "@tanstack/query-persist-client-core",
+          "@tanstack/solid-query",
+          "@tanstack/solid-query-persist-client",
+          "@tanstack/solid-virtual",
+          "@tauri-apps/api",
+          "@types/node",
+          "@vscode/ripgrep",
+          "@xterm/addon-fit",
+          "@xterm/addon-serialize",
+          "@xterm/addon-webgl",
+          "@xterm/headless",
+          "@xterm/xterm",
+          "codemirror",
+          "diff",
+          "drizzle-orm",
+          "entities",
+          "gitdiff-parser",
+          "hono",
+          "idb-keyval",
+          "jose",
+          "lucide-static",
+          "node-forge",
+          "node-pty",
+          "openai",
+          "pg",
+          "playwright-core",
+          "seroval",
+          "seroval-plugins",
+          "shiki",
+          "smol-toml",
+          "solid-js",
+          "tar",
+          "ws",
+          "yoga-layout",
+          "zod"
+        ],
+        "development": [
+          "@tauri-apps/cli",
+          "@types/better-sqlite3",
+          "@types/diff",
+          "@types/node",
+          "@types/node-forge",
+          "@types/pg",
+          "@types/ws",
+          "@vitest/coverage-v8",
+          "ajv",
+          "drizzle-kit",
+          "gitdiff-parser",
+          "jsdom",
+          "node-pty",
+          "oxlint",
+          "solid-js",
+          "tsx",
+          "turbo",
+          "typescript",
+          "vite",
+          "vite-plugin-solid",
+          "vitest",
+          "zod"
+        ]
+      }
+    },
+    "lock": {
+      "packageEntries": 566,
+      "snapshots": 566,
+      "names": 528
+    },
+    "closure": {
+      "production": {
+        "snapshots": 285,
+        "names": 283
+      },
+      "development": {
+        "snapshots": 310,
+        "names": 276
+      },
+      "overlap": {
+        "snapshots": 29,
+        "names": 29
+      },
+      "developmentOnly": {
+        "snapshots": 281,
+        "names": 247,
+        "namesAbsentProduction": 245
+      },
+      "sharedNames": 31,
+      "union": {
+        "snapshots": 566,
+        "names": 528
+      }
+    },
+    "removableByRoot": {
+      "@agentclientprotocol/claude-agent-acp@0.54.1(@anthropic-ai/sdk@0.113.0(zod@4.4.3))(@modelcontextprotocol/sdk@1.29.0(zod@4.4.3))": 11,
+      "@agentclientprotocol/sdk@1.3.0(zod@4.4.3)": 1,
+      "@anthropic-ai/sdk@0.113.0(zod@4.4.3)": 0,
+      "@hono/node-server@2.0.11(hono@4.13.5)": 0,
+      "@modelcontextprotocol/sdk@1.29.0(zod@4.4.3)": 0,
+      "@solidjs/router@0.16.1(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))": 1,
+      "@tanstack/query-async-storage-persister@5.101.0": 1,
+      "@tanstack/solid-query@5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))": 0,
+      "@tanstack/solid-query-persist-client@5.101.0(@tanstack/solid-query@5.101.0(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)))(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))": 1,
+      "@tanstack/solid-virtual@3.13.40(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))": 2,
+      "@tauri-apps/api@2.11.1": 1,
+      "@vscode/ripgrep@1.18.0": 13,
+      "@xterm/addon-fit@0.10.0(@xterm/xterm@5.5.0)": 1,
+      "@xterm/addon-serialize@0.13.0(@xterm/xterm@5.5.0)": 1,
+      "@xterm/addon-webgl@0.18.0(@xterm/xterm@5.5.0)": 1,
+      "@xterm/headless@5.5.0": 1,
+      "@xterm/xterm@5.5.0": 0,
+      "diff@9.0.0": 0,
+      "drizzle-orm@0.45.2(@types/better-sqlite3@7.6.13)(@types/pg@8.20.0)(pg@8.22.0)": 1,
+      "gitdiff-parser@0.3.1": 1,
+      "hono@4.13.5": 0,
+      "idb-keyval@6.2.5": 1,
+      "jose@6.2.3": 0,
+      "lucide-static@1.27.0": 1,
+      "node-forge@1.4.0": 1,
+      "node-pty@1.1.0": 2,
+      "openai@6.48.0(ws@8.21.0)(zod@4.4.3)": 1,
+      "pg@8.22.0": 0,
+      "playwright-core@1.61.1": 1,
+      "shiki@4.2.0": 45,
+      "smol-toml@1.7.1": 1,
+      "solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)": 0,
+      "ws@8.21.0": 0,
+      "zod@4.4.3": 0,
+      "@codemirror/language@6.12.4": 0,
+      "@codemirror/state@6.7.1": 0,
+      "@codemirror/view@6.43.9": 0,
+      "@lezer/highlight@1.2.3": 0,
+      "@opentui/keymap@0.5.9(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(typescript@6.0.3)(web-tree-sitter@0.25.10)": 18,
+      "@tanstack/query-persist-client-core@5.101.0": 0,
+      "codemirror@6.0.2": 3,
+      "entities@7.0.1": 1,
+      "seroval@1.5.4": 0,
+      "seroval-plugins@1.5.4(seroval@1.5.4)": 0,
+      "yoga-layout@3.2.1": 1,
+      "@codemirror/autocomplete@6.20.3": 0,
+      "@codemirror/lang-cpp@6.0.3": 2,
+      "@codemirror/lang-css@6.3.1": 0,
+      "@codemirror/lang-go@6.0.1": 2,
+      "@codemirror/lang-html@6.4.12": 0,
+      "@codemirror/lang-java@6.0.2": 2,
+      "@codemirror/lang-javascript@6.2.5": 0,
+      "@codemirror/lang-json@6.0.2": 2,
+      "@codemirror/lang-markdown@6.5.2": 2,
+      "@codemirror/lang-python@6.2.1": 2,
+      "@codemirror/lang-rust@6.0.2": 2,
+      "@codemirror/lang-sql@6.10.0": 1,
+      "@codemirror/lang-xml@6.1.0": 2,
+      "@codemirror/lang-yaml@6.1.3": 2,
+      "@codemirror/legacy-modes@6.5.3": 1,
+      "tar@7.5.22": 6,
+      "@types/node@26.0.0": 0,
+      "drizzle-kit@0.31.10": 36,
+      "jsdom@30.0.1": 0,
+      "oxlint@1.77.0": 20,
+      "turbo@2.9.18": 7,
+      "vite-plugin-solid@2.11.12(solid-js@1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479))(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))": 45,
+      "ajv@8.20.0": 0,
+      "typescript@6.0.3": 0,
+      "vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4)": 0,
+      "vitest@4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))": 0,
+      "@tauri-apps/cli@2.11.4": 12,
+      "@types/diff@8.0.0": 1,
+      "@types/pg@8.20.0": 0,
+      "@types/ws@8.18.1": 1,
+      "tsx@4.22.4": 0,
+      "@vitest/coverage-v8@4.1.11(vitest@4.1.11)": 0,
+      "@types/better-sqlite3@7.6.13": 0,
+      "@types/node-forge@1.3.14": 1
+    },
+    "unresolved": []
+  },
+  "source": {
+    "files": 2276,
+    "lines": 262013,
+    "typescriptFiles": 2172,
+    "typescriptLines": 245143,
+    "testFiles": 1140,
+    "excluded": [
+      ".turbo",
+      "__generated__",
+      "build",
+      "dist",
+      "generated",
+      "migrations",
+      "node_modules",
+      "target",
+      "testkit",
+      "vendor",
+      "vendored"
+    ]
+  },
+  "installed": {
+    "roots": [
+      "node-pty",
+      "node-forge",
+      "@vscode/ripgrep",
+      "@agentclientprotocol/claude-agent-acp",
+      "playwright-core",
+      "@xterm/headless",
+      "@xterm/addon-serialize"
+    ],
+    "copies": 112,
+    "names": 111,
+    "bytes": 343706024,
+    "missingOptional": [
+      "@anthropic-ai/claude-agent-sdk-darwin-x64",
+      "@anthropic-ai/claude-agent-sdk-linux-arm64",
+      "@anthropic-ai/claude-agent-sdk-linux-arm64-musl",
+      "@anthropic-ai/claude-agent-sdk-linux-x64",
+      "@anthropic-ai/claude-agent-sdk-linux-x64-musl",
+      "@anthropic-ai/claude-agent-sdk-win32-arm64",
+      "@anthropic-ai/claude-agent-sdk-win32-x64",
+      "@cfworker/json-schema",
+      "@vscode/ripgrep-darwin-x64",
+      "@vscode/ripgrep-linux-arm",
+      "@vscode/ripgrep-linux-arm64",
+      "@vscode/ripgrep-linux-ia32",
+      "@vscode/ripgrep-linux-ppc64",
+      "@vscode/ripgrep-linux-riscv64",
+      "@vscode/ripgrep-linux-s390x",
+      "@vscode/ripgrep-linux-x64",
+      "@vscode/ripgrep-win32-arm64",
+      "@vscode/ripgrep-win32-ia32",
+      "@vscode/ripgrep-win32-x64"
+    ],
+    "branches": {
+      "node-pty": {
+        "copies": 2,
+        "bytes": 64760054
+      },
+      "node-forge": {
+        "copies": 1,
+        "bytes": 1647637
+      },
+      "@vscode/ripgrep": {
+        "copies": 2,
+        "bytes": 4534590
+      },
+      "@agentclientprotocol/claude-agent-acp": {
+        "copies": 103,
+        "bytes": 256702359
+      },
+      "playwright-core": {
+        "copies": 1,
+        "bytes": 12701224
+      },
+      "@xterm/headless": {
+        "copies": 1,
+        "bytes": 797576
+      },
+      "@xterm/addon-serialize": {
+        "copies": 2,
+        "bytes": 2562584
+      }
+    },
+    "platformDirectories": {
+      "@anthropic-ai/claude-agent-sdk-darwin-arm64": {},
+      "node-pty": {
+        "darwin-arm64": 135976,
+        "darwin-x64": 62112,
+        "win32-arm64": 29341768,
+        "win32-x64": 31092288
+      },
+      "@vscode/ripgrep": {
+        "lib": 630
+      }
+    },
+    "packages": [
+      {
+        "name": "@anthropic-ai/claude-agent-sdk-darwin-arm64",
+        "version": "0.3.197",
+        "path": "node_modules/.pnpm/@anthropic-ai+claude-agent-sdk-darwin-arm64@0.3.197/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64",
+        "bytes": 227252056
+      },
+      {
+        "name": "node-pty",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/node-pty@1.1.0/node_modules/node-pty",
+        "bytes": 64363742
+      },
+      {
+        "name": "playwright-core",
+        "version": "1.61.1",
+        "path": "node_modules/.pnpm/playwright-core@1.61.1/node_modules/playwright-core",
+        "bytes": 12701224
+      },
+      {
+        "name": "@anthropic-ai/sdk",
+        "version": "0.113.0",
+        "path": "node_modules/.pnpm/@anthropic-ai+sdk@0.113.0_zod@4.4.3/node_modules/@anthropic-ai/sdk",
+        "bytes": 6793510
+      },
+      {
+        "name": "zod",
+        "version": "4.4.3",
+        "path": "node_modules/.pnpm/zod@4.4.3/node_modules/zod",
+        "bytes": 4558122
+      },
+      {
+        "name": "@vscode/ripgrep-darwin-arm64",
+        "version": "1.18.0",
+        "path": "node_modules/.pnpm/@vscode+ripgrep-darwin-arm64@1.18.0/node_modules/@vscode/ripgrep-darwin-arm64",
+        "bytes": 4530213
+      },
+      {
+        "name": "@modelcontextprotocol/sdk",
+        "version": "1.29.0",
+        "path": "node_modules/.pnpm/@modelcontextprotocol+sdk@1.29.0_zod@4.4.3/node_modules/@modelcontextprotocol/sdk",
+        "bytes": 4268166
+      },
+      {
+        "name": "@anthropic-ai/claude-agent-sdk",
+        "version": "0.3.197",
+        "path": "node_modules/.pnpm/@anthropic-ai+claude-agent-sdk@0.3.197_@anthropic-ai+sdk@0.113.0_zod@4.4.3__@modelconte_4a8e276c69f8d682fb8ab391f6f42834/node_modules/@anthropic-ai/claude-agent-sdk",
+        "bytes": 3674832
+      },
+      {
+        "name": "@agentclientprotocol/sdk",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/@agentclientprotocol+sdk@1.1.0_zod@4.4.3/node_modules/@agentclientprotocol/sdk",
+        "bytes": 2634666
+      },
+      {
+        "name": "@xterm/xterm",
+        "version": "5.5.0",
+        "path": "node_modules/.pnpm/@xterm+xterm@5.5.0/node_modules/@xterm/xterm",
+        "bytes": 2400898
+      },
+      {
+        "name": "node-forge",
+        "version": "1.4.0",
+        "path": "node_modules/.pnpm/node-forge@1.4.0/node_modules/node-forge",
+        "bytes": 1647637
+      },
+      {
+        "name": "hono",
+        "version": "4.13.5",
+        "path": "node_modules/.pnpm/hono@4.13.5/node_modules/hono",
+        "bytes": 1386244
+      },
+      {
+        "name": "ajv",
+        "version": "8.20.0",
+        "path": "node_modules/.pnpm/ajv@8.20.0/node_modules/ajv",
+        "bytes": 1033496
+      },
+      {
+        "name": "@xterm/headless",
+        "version": "5.5.0",
+        "path": "node_modules/.pnpm/@xterm+headless@5.5.0/node_modules/@xterm/headless",
+        "bytes": 797576
+      },
+      {
+        "name": "node-addon-api",
+        "version": "7.1.1",
+        "path": "node_modules/.pnpm/node-addon-api@7.1.1/node_modules/node-addon-api",
+        "bytes": 396312
+      },
+      {
+        "name": "qs",
+        "version": "6.16.0",
+        "path": "node_modules/.pnpm/qs@6.16.0/node_modules/qs",
+        "bytes": 374851
+      },
+      {
+        "name": "ip-address",
+        "version": "10.7.1",
+        "path": "node_modules/.pnpm/ip-address@10.7.1/node_modules/ip-address",
+        "bytes": 364925
+      },
+      {
+        "name": "iconv-lite",
+        "version": "0.7.2",
+        "path": "node_modules/.pnpm/iconv-lite@0.7.2/node_modules/iconv-lite",
+        "bytes": 343635
+      },
+      {
+        "name": "@agentclientprotocol/claude-agent-acp",
+        "version": "0.54.1",
+        "path": "node_modules/.pnpm/@agentclientprotocol+claude-agent-acp@0.54.1_@anthropic-ai+sdk@0.113.0_zod@4.4.3__@mode_30845836cc6e1c22b6d2e2f8b7df6634/node_modules/@agentclientprotocol/claude-agent-acp",
+        "bytes": 332077
+      },
+      {
+        "name": "fast-uri",
+        "version": "4.1.5",
+        "path": "node_modules/.pnpm/fast-uri@4.1.5/node_modules/fast-uri",
+        "bytes": 281769
+      },
+      {
+        "name": "jose",
+        "version": "6.2.3",
+        "path": "node_modules/.pnpm/jose@6.2.3/node_modules/jose",
+        "bytes": 257736
+      },
+      {
+        "name": "@babel/runtime",
+        "version": "7.29.7",
+        "path": "node_modules/.pnpm/@babel+runtime@7.29.7/node_modules/@babel/runtime",
+        "bytes": 247667
+      },
+      {
+        "name": "mime-db",
+        "version": "1.54.0",
+        "path": "node_modules/.pnpm/mime-db@1.54.0/node_modules/mime-db",
+        "bytes": 225566
+      },
+      {
+        "name": "zod-to-json-schema",
+        "version": "3.25.2",
+        "path": "node_modules/.pnpm/zod-to-json-schema@3.25.2_zod@4.4.3/node_modules/zod-to-json-schema",
+        "bytes": 219264
+      },
+      {
+        "name": "json-schema-typed",
+        "version": "8.0.2",
+        "path": "node_modules/.pnpm/json-schema-typed@8.0.2/node_modules/json-schema-typed",
+        "bytes": 197188
+      },
+      {
+        "name": "@xterm/addon-serialize",
+        "version": "0.13.0",
+        "path": "node_modules/.pnpm/@xterm+addon-serialize@0.13.0_@xterm+xterm@5.5.0/node_modules/@xterm/addon-serialize",
+        "bytes": 161686
+      },
+      {
+        "name": "eventsource",
+        "version": "3.0.7",
+        "path": "node_modules/.pnpm/eventsource@3.0.7/node_modules/eventsource",
+        "bytes": 147304
+      },
+      {
+        "name": "express-rate-limit",
+        "version": "8.5.2",
+        "path": "node_modules/.pnpm/express-rate-limit@8.5.2_express@5.2.1/node_modules/express-rate-limit",
+        "bytes": 146332
+      },
+      {
+        "name": "eventsource-parser",
+        "version": "3.1.0",
+        "path": "node_modules/.pnpm/eventsource-parser@3.1.0/node_modules/eventsource-parser",
+        "bytes": 123218
+      },
+      {
+        "name": "json-schema-to-ts",
+        "version": "3.1.1",
+        "path": "node_modules/.pnpm/json-schema-to-ts@3.1.1/node_modules/json-schema-to-ts",
+        "bytes": 121555
+      },
+      {
+        "name": "@hono/node-server",
+        "version": "2.0.11",
+        "path": "node_modules/.pnpm/@hono+node-server@2.0.11_hono@4.13.5/node_modules/@hono/node-server",
+        "bytes": 120363
+      },
+      {
+        "name": "object-inspect",
+        "version": "1.13.4",
+        "path": "node_modules/.pnpm/object-inspect@1.13.4/node_modules/object-inspect",
+        "bytes": 102920
+      },
+      {
+        "name": "ts-algebra",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/ts-algebra@2.0.0/node_modules/ts-algebra",
+        "bytes": 101154
+      },
+      {
+        "name": "express",
+        "version": "5.2.1",
+        "path": "node_modules/.pnpm/express@5.2.1/node_modules/express",
+        "bytes": 75429
+      },
+      {
+        "name": "path-to-regexp",
+        "version": "8.4.2",
+        "path": "node_modules/.pnpm/path-to-regexp@8.4.2/node_modules/path-to-regexp",
+        "bytes": 59680
+      },
+      {
+        "name": "ajv-formats",
+        "version": "3.0.1",
+        "path": "node_modules/.pnpm/ajv-formats@3.0.1_ajv@8.20.0/node_modules/ajv-formats",
+        "bytes": 56763
+      },
+      {
+        "name": "router",
+        "version": "2.2.0",
+        "path": "node_modules/.pnpm/router@2.2.0/node_modules/router",
+        "bytes": 46851
+      },
+      {
+        "name": "get-intrinsic",
+        "version": "1.3.0",
+        "path": "node_modules/.pnpm/get-intrinsic@1.3.0/node_modules/get-intrinsic",
+        "bytes": 46542
+      },
+      {
+        "name": "@stablelib/base64",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/@stablelib+base64@1.0.1/node_modules/@stablelib/base64",
+        "bytes": 46052
+      },
+      {
+        "name": "debug",
+        "version": "4.4.3",
+        "path": "node_modules/.pnpm/debug@4.4.3/node_modules/debug",
+        "bytes": 42793
+      },
+      {
+        "name": "body-parser",
+        "version": "2.3.0",
+        "path": "node_modules/.pnpm/body-parser@2.3.0/node_modules/body-parser",
+        "bytes": 42536
+      },
+      {
+        "name": "safer-buffer",
+        "version": "2.1.2",
+        "path": "node_modules/.pnpm/safer-buffer@2.1.2/node_modules/safer-buffer",
+        "bytes": 42299
+      },
+      {
+        "name": "ipaddr.js",
+        "version": "1.9.1",
+        "path": "node_modules/.pnpm/ipaddr.js@1.9.1/node_modules/ipaddr.js",
+        "bytes": 42145
+      },
+      {
+        "name": "send",
+        "version": "1.2.1",
+        "path": "node_modules/.pnpm/send@1.2.1/node_modules/send",
+        "bytes": 32200
+      },
+      {
+        "name": "function-bind",
+        "version": "1.1.2",
+        "path": "node_modules/.pnpm/function-bind@1.1.2/node_modules/function-bind",
+        "bytes": 31427
+      },
+      {
+        "name": "negotiator",
+        "version": "1.0.0",
+        "path": "node_modules/.pnpm/negotiator@1.0.0/node_modules/negotiator",
+        "bytes": 28710
+      },
+      {
+        "name": "fast-sha256",
+        "version": "1.3.0",
+        "path": "node_modules/.pnpm/fast-sha256@1.3.0/node_modules/fast-sha256",
+        "bytes": 27246
+      },
+      {
+        "name": "depd",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/depd@2.0.0/node_modules/depd",
+        "bytes": 27117
+      },
+      {
+        "name": "has-symbols",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/has-symbols@1.1.0/node_modules/has-symbols",
+        "bytes": 23409
+      },
+      {
+        "name": "cookie",
+        "version": "0.7.2",
+        "path": "node_modules/.pnpm/cookie@0.7.2/node_modules/cookie",
+        "bytes": 23382
+      },
+      {
+        "name": "mime-types",
+        "version": "3.0.2",
+        "path": "node_modules/.pnpm/mime-types@3.0.2/node_modules/mime-types",
+        "bytes": 22871
+      },
+      {
+        "name": "side-channel",
+        "version": "1.1.1",
+        "path": "node_modules/.pnpm/side-channel@1.1.1/node_modules/side-channel",
+        "bytes": 22864
+      },
+      {
+        "name": "json-schema-traverse",
+        "version": "1.0.0",
+        "path": "node_modules/.pnpm/json-schema-traverse@1.0.0/node_modules/json-schema-traverse",
+        "bytes": 22220
+      },
+      {
+        "name": "type-is",
+        "version": "2.1.0",
+        "path": "node_modules/.pnpm/type-is@2.1.0/node_modules/type-is",
+        "bytes": 21269
+      },
+      {
+        "name": "content-type",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/content-type@2.0.0/node_modules/content-type",
+        "bytes": 20751
+      },
+      {
+        "name": "cors",
+        "version": "2.8.6",
+        "path": "node_modules/.pnpm/cors@2.8.6/node_modules/cors",
+        "bytes": 19956
+      },
+      {
+        "name": "content-disposition",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/content-disposition@1.1.0/node_modules/content-disposition",
+        "bytes": 19928
+      },
+      {
+        "name": "http-errors",
+        "version": "2.0.1",
+        "path": "node_modules/.pnpm/http-errors@2.0.1/node_modules/http-errors",
+        "bytes": 19064
+      },
+      {
+        "name": "raw-body",
+        "version": "3.0.2",
+        "path": "node_modules/.pnpm/raw-body@3.0.2/node_modules/raw-body",
+        "bytes": 18495
+      },
+      {
+        "name": "pkce-challenge",
+        "version": "5.0.1",
+        "path": "node_modules/.pnpm/pkce-challenge@5.0.1/node_modules/pkce-challenge",
+        "bytes": 18211
+      },
+      {
+        "name": "finalhandler",
+        "version": "2.1.1",
+        "path": "node_modules/.pnpm/finalhandler@2.1.1/node_modules/finalhandler",
+        "bytes": 18111
+      },
+      {
+        "name": "math-intrinsics",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/math-intrinsics@1.1.0/node_modules/math-intrinsics",
+        "bytes": 17323
+      },
+      {
+        "name": "call-bound",
+        "version": "1.0.4",
+        "path": "node_modules/.pnpm/call-bound@1.0.4/node_modules/call-bound",
+        "bytes": 17106
+      },
+      {
+        "name": "side-channel-list",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/side-channel-list@1.0.1/node_modules/side-channel-list",
+        "bytes": 16973
+      },
+      {
+        "name": "accepts",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/accepts@2.0.0/node_modules/accepts",
+        "bytes": 16917
+      },
+      {
+        "name": "cross-spawn",
+        "version": "7.0.6",
+        "path": "node_modules/.pnpm/cross-spawn@7.0.6/node_modules/cross-spawn",
+        "bytes": 16094
+      },
+      {
+        "name": "call-bind-apply-helpers",
+        "version": "1.0.2",
+        "path": "node_modules/.pnpm/call-bind-apply-helpers@1.0.2/node_modules/call-bind-apply-helpers",
+        "bytes": 15952
+      },
+      {
+        "name": "proxy-addr",
+        "version": "2.0.7",
+        "path": "node_modules/.pnpm/proxy-addr@2.0.7/node_modules/proxy-addr",
+        "bytes": 15399
+      },
+      {
+        "name": "side-channel-weakmap",
+        "version": "1.0.2",
+        "path": "node_modules/.pnpm/side-channel-weakmap@1.0.2/node_modules/side-channel-weakmap",
+        "bytes": 14667
+      },
+      {
+        "name": "serve-static",
+        "version": "2.2.1",
+        "path": "node_modules/.pnpm/serve-static@2.2.1/node_modules/serve-static",
+        "bytes": 14335
+      },
+      {
+        "name": "on-finished",
+        "version": "2.4.1",
+        "path": "node_modules/.pnpm/on-finished@2.4.1/node_modules/on-finished",
+        "bytes": 13679
+      },
+      {
+        "name": "side-channel-map",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/side-channel-map@1.0.1/node_modules/side-channel-map",
+        "bytes": 13348
+      },
+      {
+        "name": "dunder-proto",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/dunder-proto@1.0.1/node_modules/dunder-proto",
+        "bytes": 13003
+      },
+      {
+        "name": "fast-deep-equal",
+        "version": "3.1.3",
+        "path": "node_modules/.pnpm/fast-deep-equal@3.1.3/node_modules/fast-deep-equal",
+        "bytes": 12966
+      },
+      {
+        "name": "standardwebhooks",
+        "version": "1.0.0",
+        "path": "node_modules/.pnpm/standardwebhooks@1.0.0/node_modules/standardwebhooks",
+        "bytes": 12909
+      },
+      {
+        "name": "statuses",
+        "version": "2.0.2",
+        "path": "node_modules/.pnpm/statuses@2.0.2/node_modules/statuses",
+        "bytes": 12505
+      },
+      {
+        "name": "es-errors",
+        "version": "1.3.0",
+        "path": "node_modules/.pnpm/es-errors@1.3.0/node_modules/es-errors",
+        "bytes": 12324
+      },
+      {
+        "name": "bytes",
+        "version": "3.1.2",
+        "path": "node_modules/.pnpm/bytes@3.1.2/node_modules/bytes",
+        "bytes": 12270
+      },
+      {
+        "name": "es-object-atoms",
+        "version": "1.1.2",
+        "path": "node_modules/.pnpm/es-object-atoms@1.1.2/node_modules/es-object-atoms",
+        "bytes": 11967
+      },
+      {
+        "name": "isexe",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/isexe@2.0.0/node_modules/isexe",
+        "bytes": 10956
+      },
+      {
+        "name": "get-proto",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/get-proto@1.0.1/node_modules/get-proto",
+        "bytes": 10840
+      },
+      {
+        "name": "etag",
+        "version": "1.8.1",
+        "path": "node_modules/.pnpm/etag@1.8.1/node_modules/etag",
+        "bytes": 10809
+      },
+      {
+        "name": "content-type",
+        "version": "1.0.5",
+        "path": "node_modules/.pnpm/content-type@1.0.5/node_modules/content-type",
+        "bytes": 10471
+      },
+      {
+        "name": "hasown",
+        "version": "2.0.4",
+        "path": "node_modules/.pnpm/hasown@2.0.4/node_modules/hasown",
+        "bytes": 10332
+      },
+      {
+        "name": "parseurl",
+        "version": "1.3.3",
+        "path": "node_modules/.pnpm/parseurl@1.3.3/node_modules/parseurl",
+        "bytes": 10299
+      },
+      {
+        "name": "fresh",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/fresh@2.0.0/node_modules/fresh",
+        "bytes": 10289
+      },
+      {
+        "name": "es-define-property",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/es-define-property@1.0.1/node_modules/es-define-property",
+        "bytes": 10217
+      },
+      {
+        "name": "which",
+        "version": "2.0.2",
+        "path": "node_modules/.pnpm/which@2.0.2/node_modules/which",
+        "bytes": 9975
+      },
+      {
+        "name": "gopd",
+        "version": "1.2.0",
+        "path": "node_modules/.pnpm/gopd@1.2.0/node_modules/gopd",
+        "bytes": 9869
+      },
+      {
+        "name": "media-typer",
+        "version": "1.1.0",
+        "path": "node_modules/.pnpm/media-typer@1.1.0/node_modules/media-typer",
+        "bytes": 9256
+      },
+      {
+        "name": "range-parser",
+        "version": "1.3.0",
+        "path": "node_modules/.pnpm/range-parser@1.3.0/node_modules/range-parser",
+        "bytes": 8967
+      },
+      {
+        "name": "vary",
+        "version": "1.1.2",
+        "path": "node_modules/.pnpm/vary@1.1.2/node_modules/vary",
+        "bytes": 8747
+      },
+      {
+        "name": "encodeurl",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/encodeurl@2.0.0/node_modules/encodeurl",
+        "bytes": 6980
+      },
+      {
+        "name": "ms",
+        "version": "2.1.3",
+        "path": "node_modules/.pnpm/ms@2.1.3/node_modules/ms",
+        "bytes": 6721
+      },
+      {
+        "name": "ee-first",
+        "version": "1.1.1",
+        "path": "node_modules/.pnpm/ee-first@1.1.1/node_modules/ee-first",
+        "bytes": 6259
+      },
+      {
+        "name": "forwarded",
+        "version": "0.2.0",
+        "path": "node_modules/.pnpm/forwarded@0.2.0/node_modules/forwarded",
+        "bytes": 5876
+      },
+      {
+        "name": "object-assign",
+        "version": "4.1.1",
+        "path": "node_modules/.pnpm/object-assign@4.1.1/node_modules/object-assign",
+        "bytes": 5493
+      },
+      {
+        "name": "cookie-signature",
+        "version": "1.2.2",
+        "path": "node_modules/.pnpm/cookie-signature@1.2.2/node_modules/cookie-signature",
+        "bytes": 4993
+      },
+      {
+        "name": "toidentifier",
+        "version": "1.0.1",
+        "path": "node_modules/.pnpm/toidentifier@1.0.1/node_modules/toidentifier",
+        "bytes": 4685
+      },
+      {
+        "name": "path-key",
+        "version": "3.1.1",
+        "path": "node_modules/.pnpm/path-key@3.1.1/node_modules/path-key",
+        "bytes": 4553
+      },
+      {
+        "name": "@vscode/ripgrep",
+        "version": "1.18.0",
+        "path": "node_modules/.pnpm/@vscode+ripgrep@1.18.0/node_modules/@vscode/ripgrep",
+        "bytes": 4377
+      },
+      {
+        "name": "merge-descriptors",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/merge-descriptors@2.0.0/node_modules/merge-descriptors",
+        "bytes": 4373
+      },
+      {
+        "name": "unpipe",
+        "version": "1.0.0",
+        "path": "node_modules/.pnpm/unpipe@1.0.0/node_modules/unpipe",
+        "bytes": 4311
+      },
+      {
+        "name": "once",
+        "version": "1.4.0",
+        "path": "node_modules/.pnpm/once@1.4.0/node_modules/once",
+        "bytes": 4046
+      },
+      {
+        "name": "setprototypeof",
+        "version": "1.2.0",
+        "path": "node_modules/.pnpm/setprototypeof@1.2.0/node_modules/setprototypeof",
+        "bytes": 4025
+      },
+      {
+        "name": "inherits",
+        "version": "2.0.4",
+        "path": "node_modules/.pnpm/inherits@2.0.4/node_modules/inherits",
+        "bytes": 3958
+      },
+      {
+        "name": "escape-html",
+        "version": "1.0.3",
+        "path": "node_modules/.pnpm/escape-html@1.0.3/node_modules/escape-html",
+        "bytes": 3660
+      },
+      {
+        "name": "require-from-string",
+        "version": "2.0.2",
+        "path": "node_modules/.pnpm/require-from-string@2.0.2/node_modules/require-from-string",
+        "bytes": 3422
+      },
+      {
+        "name": "wrappy",
+        "version": "1.0.2",
+        "path": "node_modules/.pnpm/wrappy@1.0.2/node_modules/wrappy",
+        "bytes": 2961
+      },
+      {
+        "name": "is-promise",
+        "version": "4.0.0",
+        "path": "node_modules/.pnpm/is-promise@4.0.0/node_modules/is-promise",
+        "bytes": 2958
+      },
+      {
+        "name": "shebang-regex",
+        "version": "3.0.0",
+        "path": "node_modules/.pnpm/shebang-regex@3.0.0/node_modules/shebang-regex",
+        "bytes": 2828
+      },
+      {
+        "name": "shebang-command",
+        "version": "2.0.0",
+        "path": "node_modules/.pnpm/shebang-command@2.0.0/node_modules/shebang-command",
+        "bytes": 2556
+      }
+    ]
+  },
+  "staged": {
+    "available": true,
+    "copies": 113,
+    "names": 111,
+    "bytes": 343726775,
+    "packages": [
+      {
+        "name": "@anthropic-ai/claude-agent-sdk-darwin-arm64",
+        "version": "0.3.197",
+        "path": "apps/desktop/dist/helper/node_modules/@anthropic-ai/claude-agent-sdk-darwin-arm64",
+        "bytes": 227252056
+      },
+      {
+        "name": "node-pty",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/node-pty",
+        "bytes": 64363742
+      },
+      {
+        "name": "playwright-core",
+        "version": "1.61.1",
+        "path": "apps/desktop/dist/helper/node_modules/playwright-core",
+        "bytes": 12701224
+      },
+      {
+        "name": "@anthropic-ai/sdk",
+        "version": "0.113.0",
+        "path": "apps/desktop/dist/helper/node_modules/@anthropic-ai/sdk",
+        "bytes": 6793510
+      },
+      {
+        "name": "zod",
+        "version": "4.4.3",
+        "path": "apps/desktop/dist/helper/node_modules/zod",
+        "bytes": 4558122
+      },
+      {
+        "name": "@vscode/ripgrep-darwin-arm64",
+        "version": "1.18.0",
+        "path": "apps/desktop/dist/helper/node_modules/@vscode/ripgrep-darwin-arm64",
+        "bytes": 4530213
+      },
+      {
+        "name": "@modelcontextprotocol/sdk",
+        "version": "1.29.0",
+        "path": "apps/desktop/dist/helper/node_modules/@modelcontextprotocol/sdk",
+        "bytes": 4268166
+      },
+      {
+        "name": "@anthropic-ai/claude-agent-sdk",
+        "version": "0.3.197",
+        "path": "apps/desktop/dist/helper/node_modules/@anthropic-ai/claude-agent-sdk",
+        "bytes": 3674832
+      },
+      {
+        "name": "@agentclientprotocol/sdk",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/@agentclientprotocol/sdk",
+        "bytes": 2634666
+      },
+      {
+        "name": "@xterm/xterm",
+        "version": "5.5.0",
+        "path": "apps/desktop/dist/helper/node_modules/@xterm/xterm",
+        "bytes": 2400898
+      },
+      {
+        "name": "node-forge",
+        "version": "1.4.0",
+        "path": "apps/desktop/dist/helper/node_modules/node-forge",
+        "bytes": 1647637
+      },
+      {
+        "name": "hono",
+        "version": "4.13.5",
+        "path": "apps/desktop/dist/helper/node_modules/hono",
+        "bytes": 1386244
+      },
+      {
+        "name": "ajv",
+        "version": "8.20.0",
+        "path": "apps/desktop/dist/helper/node_modules/ajv",
+        "bytes": 1033496
+      },
+      {
+        "name": "@xterm/headless",
+        "version": "5.5.0",
+        "path": "apps/desktop/dist/helper/node_modules/@xterm/headless",
+        "bytes": 797576
+      },
+      {
+        "name": "node-addon-api",
+        "version": "7.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/node-addon-api",
+        "bytes": 396312
+      },
+      {
+        "name": "qs",
+        "version": "6.16.0",
+        "path": "apps/desktop/dist/helper/node_modules/qs",
+        "bytes": 374851
+      },
+      {
+        "name": "ip-address",
+        "version": "10.7.1",
+        "path": "apps/desktop/dist/helper/node_modules/ip-address",
+        "bytes": 364925
+      },
+      {
+        "name": "iconv-lite",
+        "version": "0.7.2",
+        "path": "apps/desktop/dist/helper/node_modules/iconv-lite",
+        "bytes": 343635
+      },
+      {
+        "name": "@agentclientprotocol/claude-agent-acp",
+        "version": "0.54.1",
+        "path": "apps/desktop/dist/helper/node_modules/@agentclientprotocol/claude-agent-acp",
+        "bytes": 332077
+      },
+      {
+        "name": "fast-uri",
+        "version": "4.1.5",
+        "path": "apps/desktop/dist/helper/node_modules/fast-uri",
+        "bytes": 281769
+      },
+      {
+        "name": "jose",
+        "version": "6.2.3",
+        "path": "apps/desktop/dist/helper/node_modules/jose",
+        "bytes": 257736
+      },
+      {
+        "name": "@babel/runtime",
+        "version": "7.29.7",
+        "path": "apps/desktop/dist/helper/node_modules/@babel/runtime",
+        "bytes": 247667
+      },
+      {
+        "name": "mime-db",
+        "version": "1.54.0",
+        "path": "apps/desktop/dist/helper/node_modules/mime-db",
+        "bytes": 225566
+      },
+      {
+        "name": "zod-to-json-schema",
+        "version": "3.25.2",
+        "path": "apps/desktop/dist/helper/node_modules/zod-to-json-schema",
+        "bytes": 219264
+      },
+      {
+        "name": "json-schema-typed",
+        "version": "8.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/json-schema-typed",
+        "bytes": 197188
+      },
+      {
+        "name": "@xterm/addon-serialize",
+        "version": "0.13.0",
+        "path": "apps/desktop/dist/helper/node_modules/@xterm/addon-serialize",
+        "bytes": 161686
+      },
+      {
+        "name": "eventsource",
+        "version": "3.0.7",
+        "path": "apps/desktop/dist/helper/node_modules/eventsource",
+        "bytes": 147304
+      },
+      {
+        "name": "express-rate-limit",
+        "version": "8.5.2",
+        "path": "apps/desktop/dist/helper/node_modules/express-rate-limit",
+        "bytes": 146332
+      },
+      {
+        "name": "eventsource-parser",
+        "version": "3.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/eventsource-parser",
+        "bytes": 123218
+      },
+      {
+        "name": "json-schema-to-ts",
+        "version": "3.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/json-schema-to-ts",
+        "bytes": 121555
+      },
+      {
+        "name": "@hono/node-server",
+        "version": "2.0.11",
+        "path": "apps/desktop/dist/helper/node_modules/@hono/node-server",
+        "bytes": 120363
+      },
+      {
+        "name": "object-inspect",
+        "version": "1.13.4",
+        "path": "apps/desktop/dist/helper/node_modules/object-inspect",
+        "bytes": 102920
+      },
+      {
+        "name": "ts-algebra",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/ts-algebra",
+        "bytes": 101154
+      },
+      {
+        "name": "express",
+        "version": "5.2.1",
+        "path": "apps/desktop/dist/helper/node_modules/express",
+        "bytes": 75429
+      },
+      {
+        "name": "path-to-regexp",
+        "version": "8.4.2",
+        "path": "apps/desktop/dist/helper/node_modules/path-to-regexp",
+        "bytes": 59680
+      },
+      {
+        "name": "ajv-formats",
+        "version": "3.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/ajv-formats",
+        "bytes": 56763
+      },
+      {
+        "name": "router",
+        "version": "2.2.0",
+        "path": "apps/desktop/dist/helper/node_modules/router",
+        "bytes": 46851
+      },
+      {
+        "name": "get-intrinsic",
+        "version": "1.3.0",
+        "path": "apps/desktop/dist/helper/node_modules/get-intrinsic",
+        "bytes": 46542
+      },
+      {
+        "name": "@stablelib/base64",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/@stablelib/base64",
+        "bytes": 46052
+      },
+      {
+        "name": "debug",
+        "version": "4.4.3",
+        "path": "apps/desktop/dist/helper/node_modules/debug",
+        "bytes": 42793
+      },
+      {
+        "name": "body-parser",
+        "version": "2.3.0",
+        "path": "apps/desktop/dist/helper/node_modules/body-parser",
+        "bytes": 42536
+      },
+      {
+        "name": "safer-buffer",
+        "version": "2.1.2",
+        "path": "apps/desktop/dist/helper/node_modules/safer-buffer",
+        "bytes": 42299
+      },
+      {
+        "name": "ipaddr.js",
+        "version": "1.9.1",
+        "path": "apps/desktop/dist/helper/node_modules/ipaddr.js",
+        "bytes": 42145
+      },
+      {
+        "name": "send",
+        "version": "1.2.1",
+        "path": "apps/desktop/dist/helper/node_modules/send",
+        "bytes": 32200
+      },
+      {
+        "name": "function-bind",
+        "version": "1.1.2",
+        "path": "apps/desktop/dist/helper/node_modules/function-bind",
+        "bytes": 31427
+      },
+      {
+        "name": "negotiator",
+        "version": "1.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/negotiator",
+        "bytes": 28710
+      },
+      {
+        "name": "fast-sha256",
+        "version": "1.3.0",
+        "path": "apps/desktop/dist/helper/node_modules/fast-sha256",
+        "bytes": 27246
+      },
+      {
+        "name": "depd",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/depd",
+        "bytes": 27117
+      },
+      {
+        "name": "has-symbols",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/has-symbols",
+        "bytes": 23409
+      },
+      {
+        "name": "cookie",
+        "version": "0.7.2",
+        "path": "apps/desktop/dist/helper/node_modules/cookie",
+        "bytes": 23382
+      },
+      {
+        "name": "mime-types",
+        "version": "3.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/mime-types",
+        "bytes": 22871
+      },
+      {
+        "name": "side-channel",
+        "version": "1.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/side-channel",
+        "bytes": 22864
+      },
+      {
+        "name": "json-schema-traverse",
+        "version": "1.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/json-schema-traverse",
+        "bytes": 22220
+      },
+      {
+        "name": "type-is",
+        "version": "2.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/type-is",
+        "bytes": 21269
+      },
+      {
+        "name": "content-type",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/body-parser/node_modules/content-type",
+        "bytes": 20751
+      },
+      {
+        "name": "content-type",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/type-is/node_modules/content-type",
+        "bytes": 20751
+      },
+      {
+        "name": "cors",
+        "version": "2.8.6",
+        "path": "apps/desktop/dist/helper/node_modules/cors",
+        "bytes": 19956
+      },
+      {
+        "name": "content-disposition",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/content-disposition",
+        "bytes": 19928
+      },
+      {
+        "name": "http-errors",
+        "version": "2.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/http-errors",
+        "bytes": 19064
+      },
+      {
+        "name": "raw-body",
+        "version": "3.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/raw-body",
+        "bytes": 18495
+      },
+      {
+        "name": "pkce-challenge",
+        "version": "5.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/pkce-challenge",
+        "bytes": 18211
+      },
+      {
+        "name": "finalhandler",
+        "version": "2.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/finalhandler",
+        "bytes": 18111
+      },
+      {
+        "name": "math-intrinsics",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/math-intrinsics",
+        "bytes": 17323
+      },
+      {
+        "name": "call-bound",
+        "version": "1.0.4",
+        "path": "apps/desktop/dist/helper/node_modules/call-bound",
+        "bytes": 17106
+      },
+      {
+        "name": "side-channel-list",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/side-channel-list",
+        "bytes": 16973
+      },
+      {
+        "name": "accepts",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/accepts",
+        "bytes": 16917
+      },
+      {
+        "name": "cross-spawn",
+        "version": "7.0.6",
+        "path": "apps/desktop/dist/helper/node_modules/cross-spawn",
+        "bytes": 16094
+      },
+      {
+        "name": "call-bind-apply-helpers",
+        "version": "1.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/call-bind-apply-helpers",
+        "bytes": 15952
+      },
+      {
+        "name": "proxy-addr",
+        "version": "2.0.7",
+        "path": "apps/desktop/dist/helper/node_modules/proxy-addr",
+        "bytes": 15399
+      },
+      {
+        "name": "side-channel-weakmap",
+        "version": "1.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/side-channel-weakmap",
+        "bytes": 14667
+      },
+      {
+        "name": "serve-static",
+        "version": "2.2.1",
+        "path": "apps/desktop/dist/helper/node_modules/serve-static",
+        "bytes": 14335
+      },
+      {
+        "name": "on-finished",
+        "version": "2.4.1",
+        "path": "apps/desktop/dist/helper/node_modules/on-finished",
+        "bytes": 13679
+      },
+      {
+        "name": "side-channel-map",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/side-channel-map",
+        "bytes": 13348
+      },
+      {
+        "name": "dunder-proto",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/dunder-proto",
+        "bytes": 13003
+      },
+      {
+        "name": "fast-deep-equal",
+        "version": "3.1.3",
+        "path": "apps/desktop/dist/helper/node_modules/fast-deep-equal",
+        "bytes": 12966
+      },
+      {
+        "name": "standardwebhooks",
+        "version": "1.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/standardwebhooks",
+        "bytes": 12909
+      },
+      {
+        "name": "statuses",
+        "version": "2.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/statuses",
+        "bytes": 12505
+      },
+      {
+        "name": "es-errors",
+        "version": "1.3.0",
+        "path": "apps/desktop/dist/helper/node_modules/es-errors",
+        "bytes": 12324
+      },
+      {
+        "name": "bytes",
+        "version": "3.1.2",
+        "path": "apps/desktop/dist/helper/node_modules/bytes",
+        "bytes": 12270
+      },
+      {
+        "name": "es-object-atoms",
+        "version": "1.1.2",
+        "path": "apps/desktop/dist/helper/node_modules/es-object-atoms",
+        "bytes": 11967
+      },
+      {
+        "name": "isexe",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/isexe",
+        "bytes": 10956
+      },
+      {
+        "name": "get-proto",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/get-proto",
+        "bytes": 10840
+      },
+      {
+        "name": "etag",
+        "version": "1.8.1",
+        "path": "apps/desktop/dist/helper/node_modules/etag",
+        "bytes": 10809
+      },
+      {
+        "name": "content-type",
+        "version": "1.0.5",
+        "path": "apps/desktop/dist/helper/node_modules/content-type",
+        "bytes": 10471
+      },
+      {
+        "name": "hasown",
+        "version": "2.0.4",
+        "path": "apps/desktop/dist/helper/node_modules/hasown",
+        "bytes": 10332
+      },
+      {
+        "name": "parseurl",
+        "version": "1.3.3",
+        "path": "apps/desktop/dist/helper/node_modules/parseurl",
+        "bytes": 10299
+      },
+      {
+        "name": "fresh",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/fresh",
+        "bytes": 10289
+      },
+      {
+        "name": "es-define-property",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/es-define-property",
+        "bytes": 10217
+      },
+      {
+        "name": "which",
+        "version": "2.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/which",
+        "bytes": 9975
+      },
+      {
+        "name": "gopd",
+        "version": "1.2.0",
+        "path": "apps/desktop/dist/helper/node_modules/gopd",
+        "bytes": 9869
+      },
+      {
+        "name": "media-typer",
+        "version": "1.1.0",
+        "path": "apps/desktop/dist/helper/node_modules/media-typer",
+        "bytes": 9256
+      },
+      {
+        "name": "range-parser",
+        "version": "1.3.0",
+        "path": "apps/desktop/dist/helper/node_modules/range-parser",
+        "bytes": 8967
+      },
+      {
+        "name": "vary",
+        "version": "1.1.2",
+        "path": "apps/desktop/dist/helper/node_modules/vary",
+        "bytes": 8747
+      },
+      {
+        "name": "encodeurl",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/encodeurl",
+        "bytes": 6980
+      },
+      {
+        "name": "ms",
+        "version": "2.1.3",
+        "path": "apps/desktop/dist/helper/node_modules/ms",
+        "bytes": 6721
+      },
+      {
+        "name": "ee-first",
+        "version": "1.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/ee-first",
+        "bytes": 6259
+      },
+      {
+        "name": "forwarded",
+        "version": "0.2.0",
+        "path": "apps/desktop/dist/helper/node_modules/forwarded",
+        "bytes": 5876
+      },
+      {
+        "name": "object-assign",
+        "version": "4.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/object-assign",
+        "bytes": 5493
+      },
+      {
+        "name": "cookie-signature",
+        "version": "1.2.2",
+        "path": "apps/desktop/dist/helper/node_modules/cookie-signature",
+        "bytes": 4993
+      },
+      {
+        "name": "toidentifier",
+        "version": "1.0.1",
+        "path": "apps/desktop/dist/helper/node_modules/toidentifier",
+        "bytes": 4685
+      },
+      {
+        "name": "path-key",
+        "version": "3.1.1",
+        "path": "apps/desktop/dist/helper/node_modules/path-key",
+        "bytes": 4553
+      },
+      {
+        "name": "@vscode/ripgrep",
+        "version": "1.18.0",
+        "path": "apps/desktop/dist/helper/node_modules/@vscode/ripgrep",
+        "bytes": 4377
+      },
+      {
+        "name": "merge-descriptors",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/merge-descriptors",
+        "bytes": 4373
+      },
+      {
+        "name": "unpipe",
+        "version": "1.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/unpipe",
+        "bytes": 4311
+      },
+      {
+        "name": "once",
+        "version": "1.4.0",
+        "path": "apps/desktop/dist/helper/node_modules/once",
+        "bytes": 4046
+      },
+      {
+        "name": "setprototypeof",
+        "version": "1.2.0",
+        "path": "apps/desktop/dist/helper/node_modules/setprototypeof",
+        "bytes": 4025
+      },
+      {
+        "name": "inherits",
+        "version": "2.0.4",
+        "path": "apps/desktop/dist/helper/node_modules/inherits",
+        "bytes": 3958
+      },
+      {
+        "name": "escape-html",
+        "version": "1.0.3",
+        "path": "apps/desktop/dist/helper/node_modules/escape-html",
+        "bytes": 3660
+      },
+      {
+        "name": "require-from-string",
+        "version": "2.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/require-from-string",
+        "bytes": 3422
+      },
+      {
+        "name": "wrappy",
+        "version": "1.0.2",
+        "path": "apps/desktop/dist/helper/node_modules/wrappy",
+        "bytes": 2961
+      },
+      {
+        "name": "is-promise",
+        "version": "4.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/is-promise",
+        "bytes": 2958
+      },
+      {
+        "name": "shebang-regex",
+        "version": "3.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/shebang-regex",
+        "bytes": 2828
+      },
+      {
+        "name": "shebang-command",
+        "version": "2.0.0",
+        "path": "apps/desktop/dist/helper/node_modules/shebang-command",
+        "bytes": 2556
+      }
+    ]
+  },
+  "imports": {
+    "plugins/workflows/src/server": {
+      "files": 64,
+      "valueEdges": 128,
+      "edges": [
+        [
+          "plugins/workflows/src/server/workflowGateForm.ts",
+          "plugins/workflows/src/server/dispatch/validation.ts"
+        ],
+        [
+          "plugins/workflows/src/server/workflowGateForm.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/conversation.ts",
+          "plugins/workflows/src/server/authoring/ground.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/conversation.ts",
+          "plugins/workflows/src/server/authoring/generate.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/conversation.ts",
+          "plugins/workflows/src/server/authoring/targetPrompt.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/conversation.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/targetPrompt.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/limits.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/forbiddenKeys.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/kinds.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/vocabulary.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/builtinExamples.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/workspaceExamples.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate.ts",
+          "plugins/workflows/src/server/authoring/generate/prompts.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generationRequest.ts",
+          "plugins/workflows/src/server/authoring/edit.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generationRequest.ts",
+          "plugins/workflows/src/server/authoring/generate.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generationRequest.ts",
+          "plugins/workflows/src/server/authoring/ground.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generationRequest.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/ground.ts",
+          "plugins/workflows/src/server/authoring/generate/forbiddenKeys.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/ground.ts",
+          "plugins/workflows/src/server/authoring/groundDispatch.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/ground.ts",
+          "plugins/workflows/src/server/workflowGateForm.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/ground.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/groundDispatch.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/kinds.ts",
+          "plugins/workflows/src/server/authoring/generate/limits.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/kinds.ts",
+          "plugins/workflows/src/server/authoring/generate/forbiddenKeys.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/edit.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/targetPrompt.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/limits.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/teaching.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/kinds.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/rules.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/vocabulary.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/builtinExamples.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/prompts.ts",
+          "plugins/workflows/src/server/authoring/generate/workspaceExamples.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/vocabulary.ts",
+          "plugins/workflows/src/server/authoring/generate/limits.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/workspaceExamples.ts",
+          "plugins/workflows/src/server/authoring/edit.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/workspaceExamples.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/authoring/generate/workspaceExamples.ts",
+          "plugins/workflows/src/server/authoring/generate/limits.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/catalog.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/catalog.ts",
+          "plugins/workflows/src/server/definitions/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/catalog.ts",
+          "plugins/workflows/src/server/definitions/files.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/files.ts",
+          "plugins/workflows/src/server/steps/builtins.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/files.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/resolution.ts",
+          "plugins/workflows/src/server/publication/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/resolution.ts",
+          "plugins/workflows/src/server/definitions/files.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/resolution.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/store.ts",
+          "plugins/workflows/src/server/publication/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/definitions/store.ts",
+          "plugins/workflows/src/server/definitions/files.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts",
+          "plugins/workflows/src/server/validation/bindings.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts",
+          "plugins/workflows/src/server/runs/read/readModel.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts",
+          "plugins/workflows/src/server/validation/treeSafety.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/dispatcher.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/dispatcher.ts",
+          "plugins/workflows/src/server/validation/treeSafety.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/dispatcher.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/dispatch/validation.ts",
+          "plugins/workflows/src/server/processing/rules.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/definitions/files.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/files/export.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/files/writes.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/definitions/toml.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/authoring.ts",
+          "plugins/workflows/src/server/files/review.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/export.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/export.ts",
+          "plugins/workflows/src/server/publication/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/export.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/export.ts",
+          "plugins/workflows/src/server/definitions/toml.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/export.ts",
+          "plugins/workflows/src/server/files/writes.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/review.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/files/review.ts",
+          "plugins/workflows/src/server/files/writes.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/incremental.ts",
+          "plugins/workflows/src/server/processing/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/incremental.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/incremental.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/readModel.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/reprocess.ts",
+          "plugins/workflows/src/server/processing/readModel.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/reprocess.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/retry.ts",
+          "plugins/workflows/src/server/processing/readModel.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/store.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/store.ts",
+          "plugins/workflows/src/server/processing/rules.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/store.ts",
+          "plugins/workflows/src/server/processing/readModel.ts"
+        ],
+        [
+          "plugins/workflows/src/server/processing/store.ts",
+          "plugins/workflows/src/server/processing/reprocess.ts"
+        ],
+        [
+          "plugins/workflows/src/server/publication/draftQueries.ts",
+          "plugins/workflows/src/server/definitions/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/publication/service.ts",
+          "plugins/workflows/src/server/definitions/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/publication/service.ts",
+          "plugins/workflows/src/server/publication/store.ts"
+        ],
+        [
+          "plugins/workflows/src/server/publication/service.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/publication/service.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/admission.ts",
+          "plugins/workflows/src/server/definitions/catalog.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/admission.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/admission.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/graph.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/processing/retry.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/steps/builtins.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/validation/treeSafety.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/dispatch/childLifecycle.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/runs/start.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/runs/termination.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/runs/graph.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/steps/execution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/runner.ts",
+          "plugins/workflows/src/server/runs/state.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/start.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/runs/start.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/model.ts",
+          "plugins/workflows/src/server/processing/rules.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/model.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/readModel.ts",
+          "plugins/workflows/src/server/schedules/model.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/service.ts",
+          "plugins/workflows/src/server/schedules/model.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/service.ts",
+          "plugins/workflows/src/server/schedules/readModel.ts"
+        ],
+        [
+          "plugins/workflows/src/server/schedules/service.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/builtins.ts",
+          "plugins/workflows/src/server/steps/data.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/builtins.ts",
+          "plugins/workflows/src/server/processing/incremental.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/builtins.ts",
+          "plugins/workflows/src/server/validation/bindings.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/builtins.ts",
+          "plugins/workflows/src/server/runs/deps.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/steps/tools.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/validation/treeSafety.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/runs/graph.ts"
+        ],
+        [
+          "plugins/workflows/src/server/steps/execution.ts",
+          "plugins/workflows/src/server/runs/semaphore.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/bindings.ts",
+          "plugins/workflows/src/server/validation/definition.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/bindings.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/bindings.ts",
+          "plugins/workflows/src/server/processing/rules.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/definition.ts",
+          "plugins/workflows/src/server/validation/dataSteps.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/definition.ts",
+          "plugins/workflows/src/server/workflowGateForm.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/definition.ts",
+          "plugins/workflows/src/server/dispatch/validation.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/definition.ts",
+          "plugins/workflows/src/server/steps/tools.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/definition.ts",
+          "plugins/workflows/src/server/validation/values.ts"
+        ],
+        [
+          "plugins/workflows/src/server/validation/treeSafety.ts",
+          "plugins/workflows/src/server/steps/tools.ts"
+        ]
+      ],
+      "typeOnly": 102,
+      "dynamic": 0,
+      "dynamicEdges": [],
+      "unresolved": [],
+      "components": [
+        [
+          "plugins/workflows/src/server/definitions/files.ts",
+          "plugins/workflows/src/server/definitions/resolution.ts",
+          "plugins/workflows/src/server/processing/incremental.ts",
+          "plugins/workflows/src/server/processing/reprocess.ts",
+          "plugins/workflows/src/server/processing/store.ts",
+          "plugins/workflows/src/server/steps/builtins.ts"
+        ]
+      ]
+    },
+    "plugins/agents/src/client": {
+      "files": 93,
+      "valueEdges": 193,
+      "edges": [
+        [
+          "plugins/agents/src/client/AgentCommands.tsx",
+          "plugins/agents/src/client/commands.ts"
+        ],
+        [
+          "plugins/agents/src/client/AgentCommands.tsx",
+          "plugins/agents/src/client/settings/customAgentsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/AgentCommands.tsx",
+          "plugins/agents/src/client/settings/sessionDefaultsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/AgentCommands.tsx",
+          "plugins/agents/src/client/sessions/toolFoldPrefs.ts"
+        ],
+        [
+          "plugins/agents/src/client/commands.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/commands.ts",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/commands.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/commands.ts",
+          "plugins/agents/src/client/sessions/newSessionChoices.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/inlineDiff/patchStatus.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/paneContribution.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/railMarkerContribution.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/referenceContribution.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sourceContribution.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/commands.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/AgentCommands.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/terminalProfileCommands.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/toolFoldPrefs.ts"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/sessionOrder.ts"
+        ],
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/agentPaneModel.ts"
+        ],
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/providersClient.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/railMarkerContribution.ts",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/railMarkerContribution.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/railMarkerContribution.ts",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/referenceContribution.ts",
+          "plugins/agents/src/client/sessions/managedDrafts.ts"
+        ],
+        [
+          "plugins/agents/src/client/referenceContribution.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/referenceContribution.ts",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/center/workflowRun.ts"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/center/AgentCenter.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/composerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/settings/agentConfigOptions.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/agentComposerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/fileMentions.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/composerTokens.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/worktreeFiles.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/AgentContextPickerModal.tsx"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/AttachmentSlot.tsx"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/TerminalComposerShortcut.tsx"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/replaceAttachment.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/AgentComposer.tsx",
+          "plugins/agents/src/client/composer/automaticTaskContext.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/QueuedAgentTurns.tsx",
+          "plugins/agents/src/client/settings/concurrencyClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/QueuedAgentTurns.tsx",
+          "plugins/agents/src/client/sessions/AgentAttachmentCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/composer/QueuedAgentTurns.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/composerState.ts",
+          "plugins/agents/src/client/composer/composerDraftStorage.ts"
+        ],
+        [
+          "plugins/agents/src/client/composer/composerTokens.ts",
+          "plugins/agents/src/client/composer/fileMentions.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/settings/sessionDefaultsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/conversationItems.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentArtifactCard.tsx",
+          "plugins/agents/src/client/sessions/agentMediaStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentArtifactCard.tsx",
+          "plugins/agents/src/client/sessions/downloadName.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentArtifactCard.tsx",
+          "plugins/agents/src/client/sessions/inlineImage.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentAttachmentCard.tsx",
+          "plugins/agents/src/client/sessions/agentMediaStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentAttachmentCard.tsx",
+          "plugins/agents/src/client/sessions/inlineImage.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/composer/AgentComposer.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/composer/QueuedAgentTurns.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/AgentMcpPanel.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/composer/agentComposerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/composer/automaticTaskContext.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentConversation.tsx",
+          "plugins/agents/src/client/sessions/TerminalConversationShortcuts.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/ManagedAgentMarkdown.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/toolRendererRegistry.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/subagentDisplay.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/conversationItems.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/copyFormats.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/AgentRequestCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/requestAnswers.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/appApproval.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/AgentArtifactCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/AgentAttachmentCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/turnSender.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/eventTime.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/patchFiles.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentMcpPanel.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/commands.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/AgentConversation.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/usage/AgentUsageIndicator.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/ProviderGlyph.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/newSessionChoices.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/pricingClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentPane.tsx",
+          "plugins/agents/src/client/sessions/sessionHeaderContext.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentRequestCard.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentRequestCard.tsx",
+          "plugins/agents/src/client/sessions/appApproval.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/paneContribution.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/settings/agentConfigOptions.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/ProviderGlyph.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/subagentDisplay.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/sessionRoster.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/sessionOrder.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/inlineDiff/patchStatus.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/eventTime.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/AgentEventCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/conversationItems.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/settings/agentConfigOptions.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/subagentDisplay.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/composer/agentComposerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/toolFoldPrefs.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/AgentTranscript.tsx",
+          "plugins/agents/src/client/sessions/readingPlaceStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx",
+          "plugins/agents/src/client/sessions/sessionRoster.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx",
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/ManagedChildRows.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/RuntimeStateIcon.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentMediaStore.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentMediaStore.ts",
+          "plugins/agents/src/client/sessions/inlineImage.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/composer/automaticTaskContext.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/composer/composerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/managedDrafts.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/downloadName.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/managedStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/sessionRoster.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/newSessionChoices.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/settings/customAgentsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/providersClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedClient.ts",
+          "plugins/agents/src/client/sessions/inlineImage.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedDrafts.ts",
+          "plugins/agents/src/client/composer/composerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedSelection.ts",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedSelection.ts",
+          "plugins/agents/src/client/paneContribution.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/sessions/agentTelemetry.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/sessions/wsChannel.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/sessions/managedSnapshot.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/composer/composerState.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/managedStore.ts",
+          "plugins/agents/src/client/sessions/readingPlaceStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/sessionOrder.ts",
+          "plugins/agents/src/client/sessions/agentActivity.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/toolRendererRegistry.tsx",
+          "plugins/agents/src/client/sessions/toolFoldPrefs.ts"
+        ],
+        [
+          "plugins/agents/src/client/sessions/toolRendererRegistry.tsx",
+          "plugins/agents/src/client/sessions/webToolCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sessions/toolRendererRegistry.tsx",
+          "plugins/agents/src/client/sessions/eventTime.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentConcurrencySettings.tsx",
+          "plugins/agents/src/client/settings/concurrencyClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentLimitsSettings.tsx",
+          "plugins/agents/src/client/settings/AgentConcurrencySettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentLimitsSettings.tsx",
+          "plugins/agents/src/client/settings/AgentPricingSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentMcpServersSettings.tsx",
+          "plugins/agents/src/client/settings/mcpServersClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentMcpServersSettings.tsx",
+          "plugins/agents/src/client/settings/mcpServerDraft.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentPricingSettings.tsx",
+          "plugins/agents/src/client/pricingClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentPricingSettings.tsx",
+          "plugins/agents/src/client/settings/pricingDraft.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentPricingSettings.tsx",
+          "plugins/agents/src/client/usage/usageStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/sessions/ProviderGlyph.tsx"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/settings/agentConfigOptions.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/settings/sessionDefaultsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/sessions/toolFoldPrefs.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/settings/startupContext.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx",
+          "plugins/agents/src/client/settings/SpawnedAgentDefaultsSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/settings/AgentStorageSection.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/CustomAgentsSettings.tsx",
+          "plugins/agents/src/client/sessions/managedClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/CustomAgentsSettings.tsx",
+          "plugins/agents/src/client/sessions/ProviderGlyph.tsx"
+        ],
+        [
+          "plugins/agents/src/client/settings/CustomAgentsSettings.tsx",
+          "plugins/agents/src/client/settings/agentConfigOptions.ts"
+        ],
+        [
+          "plugins/agents/src/client/settings/CustomAgentsSettings.tsx",
+          "plugins/agents/src/client/settings/customAgentsClient.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageIndicator.tsx",
+          "plugins/agents/src/client/usage/AgentUsageSection.tsx"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageIndicator.tsx",
+          "plugins/agents/src/client/usage/usageModel.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageIndicator.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageIndicator.tsx",
+          "plugins/agents/src/client/usage/usageStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageSection.tsx",
+          "plugins/agents/src/client/usage/usageStore.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageSection.tsx",
+          "plugins/agents/src/client/usage/usageModel.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/AgentUsageSection.tsx",
+          "plugins/agents/src/client/sessions/stateTone.ts"
+        ],
+        [
+          "plugins/agents/src/client/usage/usageStore.ts",
+          "plugins/agents/src/client/usage/usageClient.ts"
+        ]
+      ],
+      "typeOnly": 60,
+      "dynamic": 11,
+      "dynamicEdges": [
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/sessions/AgentConversation.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/inlineDiff/InlineDiffCard.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/settings/AgentLimitsSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/settings/AgentSessionDefaultsSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/settings/AgentMcpServersSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/settings/CustomAgentsSettings.tsx"
+        ],
+        [
+          "plugins/agents/src/client/index.ts",
+          "plugins/agents/src/client/settings/AgentStorageSection.tsx"
+        ],
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/AgentPane.tsx"
+        ],
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx"
+        ],
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/AgentTaskSidebar.tsx"
+        ],
+        [
+          "plugins/agents/src/client/sourceContribution.tsx",
+          "plugins/agents/src/client/center/AgentCenter.tsx"
+        ]
+      ],
+      "unresolved": [],
+      "components": [
+        [
+          "plugins/agents/src/client/paneContribution.ts",
+          "plugins/agents/src/client/sessions/agentPaneModel.ts",
+          "plugins/agents/src/client/sessions/managedSelection.ts"
+        ]
+      ]
+    }
+  }
+}

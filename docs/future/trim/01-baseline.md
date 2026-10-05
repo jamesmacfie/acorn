@@ -1,6 +1,16 @@
 # Phase 01: establish the baseline and ownership inventory
 
-Date: 2026-10-04. Status: TODO. Risk: low; measurement and characterization only.
+Completion note, October 5, 2026: retained the inventory script, dependency and source measurements,
+static import graphs, staged helper inventory, ownership map, and compressed gate logs in
+[evidence](./evidence.md). Baseline revision is `9dfd29df7`; all four required gates passed on
+Node 24.21.0 and pnpm 11.0.0 for Darwin arm64. No runtime refactor or dependency change landed.
+The frozen install could not reach npm, so this run copied modules from the identical-revision,
+identical-lockfile sibling checkout. The full test needed loopback permission and two package jobs
+with two Vitest workers after the default concurrency exposed two failures that passed in isolation.
+Later phases must reuse these measurement definitions, preserve the recorded contracts, and add
+proof for the three named characterization gaps before refactoring those owners. Phase 02 is next.
+
+Date: 2026-10-05. Status: DONE. Risk: low; measurement and characterization only.
 Prerequisite: none. Next: [phase 02](./02-direct-dependencies.md).
 Planning revision: `2ae55abb5`; historical audit: `5f2cec506`.
 
