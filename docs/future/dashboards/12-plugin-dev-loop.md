@@ -138,6 +138,12 @@ Choices made while building it:
   the SDK's revision changes only with the declaration, so a logic change would otherwise be hidden.
 - The preview's query key carries each plugin's last reload, so a save reruns the preview without
   pressing refresh.
+- Checking it in the app found that a reload dropped a loaded plugin's manifest data sources, because
+  boot and reload built the host binding separately and the reload's copy had none.
+  `loadedPluginBinding` in `packages/node-core/src/server/plugins/loader.ts` is the one binding both
+  use.
+- **Manage** opens a folder plugin's page even while it waits for input approval, because a new
+  derived source always waits and its page is where **Turn on** is.
 - The enum message reads `"needs-qa" isn't a declared choice` everywhere the validator runs,
   including `testDerivedSource`.
 

@@ -94,8 +94,10 @@ it through `pluginLabel` and falls back to the id when a Node sends no label. Th
 the **Status** line, in every trust prompt and review, and in the audit log.
 
 **Manage** opens the plugin's page. For a plugin waiting for you to approve what it reads, it opens
-that prompt instead ([approving what a plugin reads](./distribution.md#approving-what-a-plugin-reads)).
-The page has an **Enabled** switch, a status banner, and four tabs:
+that prompt instead ([approving what a plugin reads](./distribution.md#approving-what-a-plugin-reads)),
+unless the plugin was installed from a local folder, whose page offers development mode as the
+other answer.
+The page has an **Enabled** switch, a status banner, and these tabs:
 
 - **Overview**: what the plugin adds on this device, such as rail sources with their **Show in left
   rail** switch, command and shortcut counts, agent tools, the data sources it declares, and the event
@@ -107,8 +109,11 @@ The page has an **Enabled** switch, a status banner, and four tabs:
   The panel count is read from the Node only while this tab is open. Then the grant lines, a staged
   package's review with **Approve this package** and
   **Remove staged package**, each approval this device recorded with **Revoke approval** or **Review
-  again**, and development mode with **End dev mode**. A device plugin also offers **Dev trust**.
+  again**, and **Development mode** with **Turn on** or **Turn off**. **Turn on** is offered for a
+  device plugin and for a node plugin installed from a local folder
+  ([development mode for a folder plugin](./dev-loop.md#development-mode-for-a-folder-plugin)).
 - **Versions**: the installed and running versions, the source, and **Update**.
+- **Logs**: only while a node plugin is in development mode, its last 500 `ctx.log` lines.
 
 Uninstalling sits in a danger zone under the tabs, and each button asks through the shell's
 confirmation. A Node plugin has two buttons, **Keep its data** and **Delete its data**, not a checkbox,

@@ -130,8 +130,9 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   })
 
   // A plugin waiting to have what it reads approved opens that dialog, which is the one decision left.
+  // A folder install opens its page instead, because development mode there is the other answer.
   const manage = (plugin: InstalledPlugin) => {
-    if (plugin.kind === 'node' && awaitingInputApproval(plugin.row)) reviewPendingTrust(plugin.id)
+    if (plugin.kind === 'node' && awaitingInputApproval(plugin.row) && !plugin.row.development) reviewPendingTrust(plugin.id)
     else setOpen({ kind: 'plugin', id: plugin.id, pluginKind: plugin.kind })
   }
 

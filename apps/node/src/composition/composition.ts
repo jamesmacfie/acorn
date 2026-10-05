@@ -5,7 +5,7 @@ import { logStorageFootprint } from '@acorn/node-core/server/storage'
 import type { CapabilityRegistry } from '@acorn/node-core/server/pluginHost/capabilities.ts'
 import type { NodePlugin } from '@acorn/node-core/server/pluginHost'
 import type { LoadedPluginBinding } from '@acorn/node-core/server/pluginHost/host.ts'
-import { loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/server/plugins'
+import { loadedPluginBinding, loadExternalPlugins, type InstalledPlugin, type PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { reconcileBundledPlugins } from '@acorn/node-core/server/plugins'
 import { bundledPluginStatePath, userManagedPluginIds } from '@acorn/node-core/server/plugins'
 import { AGENTS_RUNTIME } from '@acorn/plugin-agents/contract/runtime.ts'
@@ -54,29 +54,7 @@ export async function assembleNodeGraph(dataDir: string, deps: NodePluginDeps): 
   const shadowed = new Set(loaded.filter((entry) => entry.shadowsBuiltin).map((entry) => entry.manifest.id))
   return {
     plugins: [...builtins.filter((plugin) => !shadowed.has(plugin.name)), ...loaded.map((entry) => entry.plugin)],
-    loaded: new Map(loaded.map((entry) => [
-      entry.manifest.id,
-      {
-        permissions: entry.manifest.permissions.node,
-        events: entry.manifest.permissions.events,
-        emits: entry.manifest.emits,
-        storage: entry.storage,
-        schedules: entry.manifest.contributions.schedules,
-        dataSources: entry.manifest.contributions.dataSources,
-        dataSourceDiscoveries: entry.manifest.contributions.dataSourceDiscoveries,
-        commands: entry.manifest.contributions.commands,
-        taskChecks: entry.manifest.contributions.taskChecks,
-        auditActions: entry.manifest.contributions.auditActions,
-        harnesses: entry.manifest.contributions.harnesses,
-        customAgents: entry.manifest.contributions.customAgents,
-        agentTools: entry.manifest.contributions.agentTools,
-        contextSections: entry.manifest.contributions.contextSections,
-        destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
-        // The package directory, for the one manifest path the host has to resolve on someone else's
-        // behalf: a harness's ACP adapter entry (node-core/server/pluginHost/host.ts).
-        dir: entry.dir,
-      },
-    ])),
+    loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
     installed,
     failures,
     drainOrder: NODE_DRAIN_ORDER,

@@ -7,7 +7,7 @@
 // Loaded plugins only. A built-in is compiled into this binary, so there is no second copy on disk
 // to swap in.
 import { broadcastPluginsChanged } from '../notify'
-import { loadExternalPlugins, snapshotActivePlugin, type ActivePluginSnapshot } from './loader'
+import { loadedPluginBinding, loadExternalPlugins, snapshotActivePlugin, type ActivePluginSnapshot } from './loader'
 import { disposeUnstartedPlugin } from './isolation'
 import type { PluginHostResult } from '../pluginHost/host'
 import type { PluginReloadResult } from '@acorn/protocol/api.ts'
@@ -51,25 +51,9 @@ export function createPluginReloader(options: {
       const snapshot = await snapshotActivePlugin(packageEntry)
       const outcome = await options.host.reload(id, {
         plugin: entry.plugin,
-        // The manifest contributions the host synthesises registrations from, alongside permissions
-        // and storage. A reload that dropped them would take away the plugin's schedules, checks,
-        // data sources, audit verbs, and harnesses until the next boot.
-        binding: {
-          permissions: entry.manifest.permissions.node,
-          events: entry.manifest.permissions.events,
-          emits: entry.manifest.emits,
-          storage: entry.storage,
-          schedules: entry.manifest.contributions.schedules,
-          commands: entry.manifest.contributions.commands,
-          taskChecks: entry.manifest.contributions.taskChecks,
-          auditActions: entry.manifest.contributions.auditActions,
-          harnesses: entry.manifest.contributions.harnesses,
-          customAgents: entry.manifest.contributions.customAgents,
-          agentTools: entry.manifest.contributions.agentTools,
-          contextSections: entry.manifest.contributions.contextSections,
-          destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
-          dir: entry.dir,
-        },
+        // The same binding a boot builds. A reload that dropped part of it would take away the
+        // plugin's schedules, checks, data sources, audit verbs, or harnesses until the next boot.
+        binding: loadedPluginBinding(entry),
       })
       // Broadcast either way. A failed reload still changed the roster row the settings page
       // renders, and the client's reconcile is a re-read of state it can already fetch.

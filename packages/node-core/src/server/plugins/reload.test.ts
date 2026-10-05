@@ -240,3 +240,40 @@ describe('plugin reload', () => {
     await host.dispose()
   })
 })
+
+// Boot and reload once built their bindings separately, and the reload's copy had no data sources, so
+// a reloaded derived source vanished from the catalog until the next restart.
+describe('a folder plugin through the loader, the host, and the reloader', () => {
+  it('still has its data source after a reload', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { installPlugin } = await import('./installer')
+    const { createPluginReloader } = await import('./reload')
+    const { loadExternalPlugins, loadedPluginBinding } = await import('./loader')
+    const { PLUGIN_API_MAJOR } = await import('./manifest')
+    const { registeredDataSource, registeredDataSources } = await import('../dataSources/registry')
+    const root = mkdtempSync(join(tmpdir(), 'acorn-reload-folder-'))
+    try {
+      const source = join(root, 'source')
+      mkdirSync(join(source, 'dist'), { recursive: true })
+      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
+        id: 'folder-fixture', name: 'Folder fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+        contributions: { dataSources: [{ sourceId: 'board', name: 'Board', singular: 'Card', plural: 'Cards', identityScope: 'card', handler: '/v1/p/folder-fixture/board', inputs: { tasks: { source: 'core:tasks', label: 'Tasks' } } }] },
+      }))
+      writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "folder-fixture", init(ctx) { ctx.routes.fetch(() => new Response("x"), { prefix: "/board" }) } }\n')
+      await installPlugin(root, { path: source })
+      const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+      const host = await initPlugins(loaded.map((entry) => entry.plugin), { ...hostOptions(), dataDir: root, loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])) })
+      const ref = { pluginId: 'folder-fixture', sourceId: 'board' }
+      expect(registeredDataSource(ref)).toBeDefined()
+      const reloader = createPluginReloader({ dataDir: root, builtins: [], host })
+      expect(await reloader.reload('folder-fixture')).toMatchObject({ state: 'reloaded' })
+      expect(registeredDataSources().map((entry) => entry.pluginId)).toContain('folder-fixture')
+      await host.dispose()
+    } finally {
+      clearRegistrations('folder-fixture')
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})

@@ -6,7 +6,7 @@ export { disabledPluginsStore } from './disabled.ts'
 export { inputGrantsStore } from './inputGrants.ts'
 export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin, withPluginPackage } from './installer.ts'
 export {
-  installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,
+  installedPluginInfo, loadedPluginBinding, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,
   scanInstalled,
 } from './loader.ts'
 export type { ActivePluginSnapshot, InstalledPlugin, LoadedPlugin, PluginLoadFailure } from './loader.ts'

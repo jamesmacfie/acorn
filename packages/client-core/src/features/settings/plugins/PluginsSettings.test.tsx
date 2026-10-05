@@ -146,13 +146,15 @@ describe('Installed', () => {
   it('turns on development mode for a folder plugin on both the node and this computer, then shows its logs', async () => {
     dispose?.()
     host.textContent = ''
-    const folder: NodePluginRow = { ...READINESS, installed: { ...READINESS.installed!, source: 'path:/src/readiness' }, development: { on: false } }
+    // Waiting for its inputs to be approved, which Manage would answer with the dialog for any other install.
+    const folder: NodePluginRow = { ...READINESS, installed: { ...READINESS.installed!, source: 'path:/src/readiness' }, development: { on: false },
+      inputs: { granted: false, inputs: READINESS.inputs!.inputs.map((input) => ({ ...input, approved: false })) } }
     const developing: NodePluginRow = { ...folder, development: { on: true } }
     slowReads.set('node-a', async () => ({ plugins: [folder], restartRequired: false }))
     vi.mocked(setNodePluginDevelopment).mockResolvedValue({ plugins: [developing], restartRequired: false })
     dispose = render(() => <PluginsSettings context={{ scope: { nodeId: 'node-a' }, navigate: () => {}, onWorkspaceDeleted: () => {} }} />, host)
     await vi.waitFor(() => expect(listed()).toContain('readiness'))
-    openPluginPage((_target, opened) => opened?.(), 'readiness', 'node')
+    host.querySelector<HTMLButtonElement>('button[aria-label="Manage readiness"]')!.click()
     await vi.waitFor(() => expect(host.querySelector('[role="tablist"]')).not.toBeNull())
     press('Permissions')
     await vi.waitFor(() => expect(host.querySelector('[data-settings-section="dev"]')?.textContent).toContain('reloads it when its built files change'))

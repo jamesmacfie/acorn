@@ -20,6 +20,7 @@ import { readBundledPluginState } from './bundledState'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
 import { hasPendingPluginReview } from './pendingReview'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
+import type { LoadedPluginBinding } from '../pluginHost/context'
 import { createLogger } from '../telemetry/logger'
 import type { PluginRuntimeIdentity } from '@acorn/protocol/api.ts'
 
@@ -41,6 +42,30 @@ export type LoadedPlugin = {
   migrationsFolder: string | null
   storage: PluginStorage
 }
+
+/** What the plugin host binds a loaded plugin's context to: its permissions, storage, and the manifest
+ *  contributions the host registers for it. One function for boot and reload, because two copies
+ *  drifted and a reload dropped the plugin's data sources (./reload.ts). */
+export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding => ({
+  permissions: entry.manifest.permissions.node,
+  events: entry.manifest.permissions.events,
+  emits: entry.manifest.emits,
+  storage: entry.storage,
+  schedules: entry.manifest.contributions.schedules,
+  dataSources: entry.manifest.contributions.dataSources,
+  dataSourceDiscoveries: entry.manifest.contributions.dataSourceDiscoveries,
+  commands: entry.manifest.contributions.commands,
+  taskChecks: entry.manifest.contributions.taskChecks,
+  auditActions: entry.manifest.contributions.auditActions,
+  harnesses: entry.manifest.contributions.harnesses,
+  customAgents: entry.manifest.contributions.customAgents,
+  agentTools: entry.manifest.contributions.agentTools,
+  contextSections: entry.manifest.contributions.contextSections,
+  destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
+  // The package directory, for the one manifest path the host has to resolve on someone else's
+  // behalf: a harness's ACP adapter entry (../pluginHost/host.ts).
+  dir: entry.dir,
+})
 
 // Every package on disk whose manifest parsed, whether or not it has a node half to run. This is the
 // list phase 2 distributes from: a client-only plugin has nothing to load in this process but its
