@@ -1436,6 +1436,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* A highlighted fence, coloured the way a diff row is (diff.css § Shiki dual-theme): both colours
    ride the token as --l/--r and light-dark() reads the side this theme's color-scheme asks for. */
 .ui-markdown .shiki, .ui-markdown .shiki span { color: light-dark(var(--l), var(--r)); }
+/* A ```mermaid fence drawn as a diagram (kit/lib/rendering/mermaid.ts), in the frame the fence had, so
+   it reads as the same block. Mermaid sizes the svg to its natural width; a wider one scrolls. */
+.ui-markdown .ui-mermaid {
+  padding: var(--space-4);
+  overflow-x: auto;
+  border: var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  text-align: center;
+}
 .ui-markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }

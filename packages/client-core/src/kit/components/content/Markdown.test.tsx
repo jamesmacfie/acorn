@@ -15,12 +15,22 @@ const highlighted = vi.fn(async (code: string, _lang: string) => `<pre class="hl
 vi.mock('../../../infra/highlight/shiki', () => ({
   highlightToHtml: (code: string, lang: string) => highlighted(code, lang),
 }))
+const diagrammed = vi.fn(async (source: string) => {
+  if (source.includes('broken')) throw new Error('Parse error')
+  const figure = document.createDocumentFragment()
+  figure.append(document.createElementNS('http://www.w3.org/2000/svg', 'svg'))
+  return figure
+})
+vi.mock('../../lib/rendering/mermaid', () => ({
+  renderMermaid: (source: string) => diagrammed(source),
+}))
 
 let dispose: (() => void) | undefined
 let host: HTMLElement
 
 beforeEach(() => {
   highlighted.mockClear()
+  diagrammed.mockClear()
   host = document.createElement('div')
   document.body.append(host)
 })
@@ -152,5 +162,37 @@ describe('a streaming markdown message', () => {
     expect(selection.rangeCount).toBe(1)
     expect(selection.toString()).toBe(selected)
     expect(blocks(root)[0]).toBe(first)
+  })
+})
+
+describe('a mermaid fence', () => {
+  const diagram = '```mermaid\nflowchart LR\n  A --> B\n```'
+
+  it('draws as a diagram and still copies its source', async () => {
+    const { root } = mount(diagram)
+    await vi.waitFor(() => expect(root.querySelector('.ui-mermaid svg')).not.toBeNull())
+    expect(diagrammed).toHaveBeenCalledWith('flowchart LR\n  A --> B')
+    expect(root.querySelector('pre')).toBeNull()
+    expect(highlighted).not.toHaveBeenCalled()
+    expect(root.querySelector('button')).not.toBeNull()
+  })
+
+  it('waits for the fence to close before drawing', async () => {
+    const { root, setText } = mount('```mermaid\nflowchart LR\n  A -')
+    setText('```mermaid\nflowchart LR\n  A --> B')
+    await Promise.resolve()
+    expect(diagrammed).not.toHaveBeenCalled()
+
+    setText(diagram)
+    await vi.waitFor(() => expect(root.querySelector('.ui-mermaid')).not.toBeNull())
+    expect(diagrammed).toHaveBeenCalledTimes(1)
+  })
+
+  it('stays as code when the diagram does not parse', async () => {
+    const { root } = mount('```mermaid\nbroken\n```')
+    await vi.waitFor(() => expect(diagrammed).toHaveBeenCalledTimes(1))
+    await Promise.resolve()
+    expect(root.querySelector('.ui-mermaid')).toBeNull()
+    expect(root.querySelector('pre')?.textContent).toBe('broken')
   })
 })

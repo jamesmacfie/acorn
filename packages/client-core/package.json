@@ -214,6 +214,7 @@
     "diff": "^9.0.0",
     "idb-keyval": "^6.2.5",
     "lucide-static": "^1.27.0",
+    "mermaid": "^12.1.0",
     "shiki": "^4.2.0",
     "solid-js": "catalog:"
   },
