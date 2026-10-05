@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-06. Status: phases 01–06 complete; phase 07 is next.
+Date: 2026-10-06. Status: phases 01–07 complete; phase 08 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -25,7 +25,7 @@ There is no arbitrary package-count or file-length target. Read [refused approac
 
 ## Sequential assignments
 
-Phases 07–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
+Phases 08–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
 handoff. This order is an execution order; some assignments have no technical dependency on earlier
 changes. Phases 04, 05, and 14 permit a documented retention decision under their acceptance criteria.
 That is a completed investigation, never a claim that a reduction or migration shipped.
@@ -38,7 +38,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 04 DONE (retention) | [Resolve the bundled Claude payload](./04-claude-payload.md) | Binary retained: adapter managed policy can clear Acorn's override and use the SDK fallback; zero realized savings. See [evidence](./evidence.md#phase-04-bundled-claude-payload-2026-10-06). |
 | 05 DONE (retention) | [Resolve the keymap dependency branch](./05-keymap.md) | Keymap retained: its supported entries avoid Core at runtime, but the required package dependency remains; zero realized savings. See [evidence](./evidence.md#phase-05-keymap-dependency-branch-2026-10-06). |
 | 06 DONE | [Remove internal import cycles](./06-import-cycles.md) | Workflow and agent-selection SCCs removed; exact graph and passing gates in [evidence](./evidence.md#phase-06-internal-import-cycles-2026-10-06). |
-| 07 | [Separate rail task editing](./07-tab-rail.md) | Task dialog state and commands owned outside the rail composition component. |
+| 07 DONE | [Separate rail task editing](./07-tab-rail.md) | Dialog state, Node-scoped reads and writes, and held-request guard moved beside the rail. See [evidence](./evidence.md#phase-07-rail-task-editing-2026-10-06). |
 | 08 | [Separate composer operations](./08-agent-composer.md) | Submission, context capture, and attachments have explicit draft ownership. |
 | 09 | [Thin workflow activation](./09-workflow-activation.md) | Feature-owned services and a readable plugin composition root. |
 | 10 | [Separate plugin contribution registration](./10-plugin-host.md) | Named adapters with unchanged lifecycle, rollback, and permission behavior. |

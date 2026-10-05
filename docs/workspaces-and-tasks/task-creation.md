@@ -19,6 +19,13 @@ The dialog offers three sources, one tab each:
 A project that isn't a Git checkout hides the branch options. Typing in **Branch name** keeps your
 value, and title changes stop updating it.
 
+The desktop rail opens `TaskDraftDialog` with the visible projects from its workspace and the selected
+Node captured at that moment. `taskDraftStore.ts` owns the unsaved fields, Git reads, availability
+request, and save state for that dialog. A workspace switch does not replace its project choices. A
+Node switch closes the dialog, and a response from a closed dialog cannot enable a later one. The
+task mutation carries the captured Node through creation, setup notification, or rename. The rail
+continues to own task rows, source selection, context menus, drag, and navigation.
+
 ## Branch names
 
 The Node adds `-2`, `-3`, and further suffixes to a title-derived branch until one is free. The

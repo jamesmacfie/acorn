@@ -29,13 +29,13 @@ export type TaskBridge = {
     // rejects into the caller: a node that cannot answer means no plugin rows, not no dialog.
     archiveConcerns(id: string): Promise<TaskArchiveConcern[]>
     restore(id: string, opts?: RestoreOpts): Promise<RestoreResult>
-    onCreated(id: string): Promise<void>
+    onCreated(id: string, nodeId?: string | null): Promise<void>
     statuses(): Promise<TaskStatus[]>
   }
 }
 
-const post = <T>(url: string, body?: unknown) =>
-  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body) })
+const post = <T>(url: string, body?: unknown, nodeId?: string | null) =>
+  writeJson<T>(url, { method: 'POST', headers: body === undefined ? undefined : { 'content-type': 'application/json' }, body: body === undefined ? undefined : JSON.stringify(body), nodeId })
 const put = <T>(url: string, body: unknown) =>
   writeJson<T>(url, { method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
 
@@ -59,7 +59,7 @@ export const taskBridge = (): TaskBridge => {
           return []
         }),
       restore: (id, opts) => post<RestoreResult>(taskRestoreRoute(id), opts ?? {}),
-      onCreated: (id) => post<{ ok: boolean }>(taskOnCreatedRoute(id)).then(() => undefined),
+      onCreated: (id, nodeId) => post<{ ok: boolean }>(taskOnCreatedRoute(id), undefined, nodeId).then(() => undefined),
       statuses: () => readJson<TaskStatus[]>(taskStatusesRoute),
     },
   }

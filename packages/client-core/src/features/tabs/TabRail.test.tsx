@@ -69,6 +69,7 @@ beforeEach(() => {
   createTaskMock.mockReset()
   readJsonMock.mockReset()
   readJsonMock.mockImplementation(async (url: string) => {
+    if (url.endsWith('/config')) return { config: { branchPrefix: null } }
     if (url.includes('worktree-availability')) return { available: true }
     if (url.endsWith('/worktrees')) return []
     if (url.endsWith('/branches')) return { current: 'main', tasks: [], other: [{ name: 'main', committedAt: 1 }] }
@@ -158,6 +159,17 @@ describe('hovering a task row', () => {
 })
 
 describe('dragging a task row', () => {
+  it('opens row actions on right-click without selecting or dragging that task', () => {
+    setActiveTaskId('t1')
+    const rows = mount()
+    rows[1]!.dispatchEvent(new MouseEvent('mousedown', { button: 2, bubbles: true }))
+    rows[1]!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+
+    expect(activeTaskId()).toBe('t1')
+    expect(host.querySelector('[data-dragging]')).toBeNull()
+    expect(document.querySelector('[role="menu"]')?.getAttribute('aria-label')).toBe('Actions for Second')
+  })
+
   it('moves a task after an adjacent row when dropped on its lower half', async () => {
     const rows = mount()
     vi.spyOn(rows[1]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
@@ -350,7 +362,7 @@ describe('new task setup choice', () => {
     expect(checkbox()?.checked).toBe(true)
     await vi.waitFor(() => expect([...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')?.disabled).toBe(false))
     ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true })))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ skipSetup: true }), null))
 
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     expect(checkbox()?.checked).toBe(false)
@@ -358,10 +370,57 @@ describe('new task setup choice', () => {
 })
 
 describe('new task worktree validation', () => {
+  it('does not accept a held availability answer from a closed dialog', async () => {
+    setActiveTaskId('t1')
+    mount(undefined, true)
+    const pending: Array<(value: { available: boolean }) => void> = []
+    readJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/config')) return { config: { branchPrefix: null } }
+      if (url.includes('worktree-availability')) {
+        return new Promise<{ available: boolean }>((resolve) => {
+          pending.push(resolve)
+        })
+      }
+      if (url.endsWith('/branches')) return { current: 'main', tasks: [], other: [{ name: 'main', committedAt: 1 }] }
+      if (url.endsWith('/worktrees')) return []
+      throw new Error('No live Node.')
+    })
+    const open = () => host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
+    const title = () => {
+      const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
+      return document.getElementById(label.htmlFor) as HTMLInputElement
+    }
+    const submit = () => [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
+    const fill = (value: string) => {
+      title().value = value
+      title().dispatchEvent(new InputEvent('input', { bubbles: true }))
+    }
+
+    open()
+    fill('Same title')
+    await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0))
+    const oldRequests = pending.splice(0)
+    ;[...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Cancel')!.click()
+    open()
+    fill('Same title')
+    await vi.waitFor(() => expect(pending.length).toBeGreaterThan(0))
+    for (const resolve of oldRequests) resolve({ available: true })
+    await Promise.resolve()
+    expect(submit().disabled).toBe(true)
+    submit().click()
+    title().dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+    expect(createTaskMock).not.toHaveBeenCalled()
+    for (const resolve of pending) resolve({ available: true })
+    await vi.waitFor(() => expect(submit().disabled).toBe(false))
+  })
+
   it('allows creation when the availability request fails', async () => {
     setActiveTaskId('t1')
     mount(undefined, true)
-    readJsonMock.mockRejectedValue(new Error('Worktree lookup is unavailable.'))
+    readJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/config')) return { config: { branchPrefix: null } }
+      throw new Error('Worktree lookup is unavailable.')
+    })
     createTaskMock.mockResolvedValue(task('created', 'Cannot check'))
     host.querySelector<HTMLButtonElement>('.tabrail-bottom')!.click()
     const label = [...document.querySelectorAll<HTMLLabelElement>('[role="dialog"] label')].find((field) => field.textContent === 'Title')!
@@ -372,13 +431,14 @@ describe('new task worktree validation', () => {
     await vi.waitFor(() => expect(submit.disabled).toBe(false))
     expect(document.querySelector('[role="dialog"] [role="alert"]')).toBeNull()
     submit.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' })))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'cannot-check' }), null))
   })
 
   it('keeps a typed branch, blocks click and Enter on a conflict, and clears the error after a rename', async () => {
     setActiveTaskId('t1')
     mount([{ ...task('t1', 'Taken'), branch: 'taken' }], true)
     readJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/config')) return { config: { branchPrefix: null } }
       if (url.includes('worktree-availability')) return new URL(url, 'http://acorn.test').searchParams.get('branch') === 'taken'
         ? { available: false, reason: 'This branch name already exists in another worktree' }
         : { available: true }
@@ -413,7 +473,7 @@ describe('new task worktree validation', () => {
     expect(document.querySelector('[role="dialog"]')?.textContent).not.toContain('This branch name already exists in another worktree')
     createTaskMock.mockResolvedValue(task('created', 'Taken'))
     submit().click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name', branchSource: 'exact' })))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'available-name', branchSource: 'exact' }), null))
   })
 })
 
@@ -423,6 +483,7 @@ describe('advanced task branch choices', () => {
     setActiveTaskId('t1')
     mount(undefined, true)
     readJsonMock.mockImplementation(async (url: string) => {
+      if (url.endsWith('/config')) return { config: { branchPrefix: null } }
       if (url.includes('worktree-availability')) return { available: true, branch: 'taken-2' }
       if (url.endsWith('/branches')) return { current: 'main', tasks: [{ branch: 'feature/parent', taskId: 't1', title: 'Parent work' }], other: [{ name: 'main', committedAt: 1 }] }
       if (url.endsWith('/worktrees')) return []
@@ -452,6 +513,6 @@ describe('advanced task branch choices', () => {
     const submit = [...document.querySelectorAll<HTMLButtonElement>('[role="dialog"] .ui-modal-actions button')].find((button) => button.textContent === 'Create task')!
     await vi.waitFor(() => expect(submit.disabled).toBe(false))
     submit.click()
-    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'taken', branchSource: 'derived', baseBranch: 'feature/parent' })))
+    await vi.waitFor(() => expect(createTaskMock).toHaveBeenCalledWith(expect.objectContaining({ branch: 'taken', branchSource: 'derived', baseBranch: 'feature/parent' }), null))
   })
 })

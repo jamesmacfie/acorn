@@ -1,6 +1,16 @@
 # Phase 07: separate task editing from rail composition
 
-Date: 2026-10-04. Status: TODO. Risk: medium; reactive scope and asynchronous validation matter.
+Completion note, October 6, 2026: **done**. `taskDraftStore.ts` owns one dialog's editable fields,
+resources, availability identity, mutation guard, and submission lifecycle. `TaskDraftDialog.tsx`
+renders that model. `TabRail.tsx` captures the origin Node and project options when opening it and
+keeps navigation, source/row menus, order, drag, hierarchy, and keyboard registration. Creation,
+its setup notification, and rename can target the captured Node through the existing task mutation
+path. The held-response and right-click integration tests passed. Live desktop verified folder,
+branch, and linked-worktree creation, rename, and conflict clearing; TUI verified its separate task
+setup and rail. [Phase 07 evidence](./evidence.md#phase-07-rail-task-editing-2026-10-06) records
+gates and host output. Phase 08 can proceed without changing task payloads or rail menu IDs.
+
+Date: 2026-10-04. Status: DONE. Risk: medium; reactive scope and asynchronous validation matter.
 Prerequisite: accepted [phase 06](./06-import-cycles.md). Next: [phase 08](./08-agent-composer.md).
 Planning revision: `2ae55abb5`; use current feature locations from the preceding handoff.
 

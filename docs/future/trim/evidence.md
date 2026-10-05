@@ -1,6 +1,50 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–06 complete; phase 07 is next.
+Date: 2026-10-06. Status: phases 01–07 complete; phase 08 is next.
+
+## Phase 07: rail task editing (2026-10-06)
+
+Implementation base: `6d6aefcbf`, Darwin arm64, Node 24.21.0 from
+`/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. The phase retains task routes, payload fields,
+menu IDs, preferences, and the one Node query cache. No database or public protocol migration.
+
+| Fact | Owner after extraction | Lifetime |
+| --- | --- | --- |
+| Visible tasks, sources, menus, drag, hierarchy, navigation, shortcuts | `TabRail.tsx` | Mounted rail |
+| New task project options and initial project, rename task, origin Node | `TaskDraft` passed by rail | Captured when dialog opens |
+| Title, icon, branch text/touched state, base, source mode, worktree pick, setup choice, errors, saving | `taskDraftStore.ts` | One dialog mount |
+| Project config, branches, free worktrees, availability answer | Dialog Solid resources, with explicit Node target | One dialog mount and request identity |
+| Task roster revision | Rail's existing TanStack query, read by dialog | Node cache scope |
+| Task create, setup notification, rename | Existing task mutation and bridge with optional captured Node | One submission |
+
+Availability identity includes Node, project, branch, base branch, and exact/derived source. A
+superseded or disposed request cannot enable submission. Creation and rename use the captured Node;
+post-write invalidation, activation, and navigation check that the dialog still exists and the Node
+has not changed. A workspace switch keeps the dialog's project list. Server validation remains the
+final branch authority, and a failed availability read still permits submission.
+
+| Gate | Result |
+| --- | --- |
+| `pnpm test:focus @acorn/client-core src/features/tabs/TabRail.test.tsx` | Passed, 18 tests. Held availability after reopen and right-click selection/drag cases added. |
+| `TURBO_FORCE=true pnpm lint` | Passed, 37/37 tasks. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/client-core --filter=@acorn/tui --filter=@acorn/desktop` | Final run passed with listener access, 3/3 packages, zero cached. Client-core: 314 files/2,402 tests. TUI: 68 files/673 passed, two skipped. Desktop: 28 files/171 tests, helper 10 tests, and 62 Rust tests passed. Initial sandbox run failed socket tests with `EPERM`. An intermediate run exposed a stale config mock in the held-request fixture; the corrected fixture and final combined run passed. |
+| `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` | Passed, 12 files/86 tests. |
+
+Desktop host: `trim-07-fixture`, generated `tui-navigation` Git fixture. Created a project-folder
+task, renamed it through the rail menu, created a new worktree from an exact branch after observing
+`main` conflict and disabled Create, and adopted a linked worktree created in the fixture. The
+resulting task routes, rail entries, and branch labels appeared in driver snapshots. Inspected the
+[rail screenshot](./artifacts/phase-07-rail-tasks.png) and [conflict screenshot](./artifacts/phase-07-conflict.png).
+The documented desktop driver handles click and fill, but not hover, right-click, drag, or native
+keyboard input. Native Computer Use could not bind this test window (`cgWindowNotFound`); focused
+rail tests cover those pointer behaviors. Both desktop sessions were stopped.
+
+TUI host: `trim-07-tui` used the same generated fixture, opened **New task** through Ctrl+K,
+entered a title, observed the derived branch, created the task, and saw the roster grow from two to
+three at 120×40. Ctrl+B hid the rail in a live snapshot. The fixed-roster navigation flow rejected
+the modified fixture's three tasks, so a fresh `trim-07-nav` fixture ran it successfully: agent and
+Changes panes, workspace picker and switch, help, and the [120×40 rail view](./artifacts/phase-07-tui-wide.txt).
+The TUI has a separate setup form and no task rename command. Both TUI sessions were stopped.
 
 ## Historical investigation
 

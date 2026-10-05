@@ -1,8 +1,8 @@
-import { createEffect, createMemo, createResource, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Project, type Task } from '../../infra/queries'
-import { archiveTask, createTask, patchTask } from '../tasks/taskMutations'
+import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../infra/queries'
+import { archiveTask } from '../tasks/taskMutations'
 import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
 import { activeTaskId, selectedSource, setActiveTaskId, setSelectedSource, type SourceId } from '../tasks/tasks'
@@ -23,7 +23,6 @@ import { unreadForTask } from '../notifications/notifications'
 import { toast } from '../notifications/toast'
 import { workspaceForProject } from '../workspaces/activeWorkspace'
 import { resolveProjectColor } from '@acorn/protocol/projectColor.ts'
-import { slugifyBranch, withBranchPrefix } from '@acorn/protocol/branch.ts'
 import { taskBridge } from '../tasks/taskBridge'
 import { registerCommands } from '../../host/registries/commands/commands'
 import { keybindingRegistry, registerKeybindings, resolveKeybindings } from '../../host/registries/commands/keybindings'
@@ -39,30 +38,20 @@ import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../.
 import { menuPoint } from '../../host/registries/panes/menuPoint'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { sourceRegistry } from '../../host/registries/sources/sources'
-import IconPicker, { randomIconName } from '../../kit/components/inputs/IconPicker'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
 import { RailTab } from './RailTab'
 import { localTaskGlyph, taskOriginAppearance } from '../tasks/origin'
-import { Alert, Button, Checkbox, Field, Input, Select } from '../../kit/components/primitives'
-import { Inline } from '../../kit/components/layout/Inline'
-import { FieldProvider, NO_FIELD } from '../../kit/components/inputs/controlAttrs'
 import { Menu } from '../../kit/components/overlays/Menu'
-import { Modal } from '../../kit/components/overlays/Modal'
-import { Tabs } from '../../kit/components/layout/Tabs'
-import { Text } from '../../kit/components/content/Text'
-import { readJson } from '../../infra/node/apiClient'
-import { projectBranchesRoute, projectWorktreeAvailabilityRoute, projectWorktreesRoute, type ProjectBranches, type ProjectWorktree, type WorktreeAvailability } from '@acorn/protocol/api.ts'
 import { workflowTaskHierarchy } from '../tasks/taskHierarchy'
 import { expandedWorkflowRoots, toggleWorkflowRoot } from '../tasks/taskTreeViewState'
 import { createRailDrag } from './createRailDrag'
-import { BranchOptions } from './BranchOptions'
+import { TaskDraftDialog } from './TaskDraftDialog'
+import type { TaskDraft } from './taskDraftStore'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
 import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
-
-type Draft = { mode: 'new' } | { mode: 'rename'; w: Task }
 
 export default function TabRail() {
   const navigate = useNavigate()
@@ -98,85 +87,7 @@ export default function TabRail() {
     items: () => visibleTasks(),
     onDrop: (id, targetId, position) => void commitDrop(id, targetId, position),
   })
-  const [draft, setDraft] = createSignal<Draft | null>(null)
-  const [text, setText] = createSignal('')
-  // Chosen icon for the task being created/renamed. null = let the origin derive it.
-  const [iconDraft, setIconDraft] = createSignal<string | null>(null)
-  const [newProject, setNewProject] = createSignal('')
-  // Project options are snapshotted when the modal opens rather than bound to activeWorkspace().
-  // A workspace switch mid-modal would repopulate the <select> while newRepo() stays on the repo
-  // already selected, and the task lands in the wrong workspace.
-  const [newProjectOptions, setNewProjectOptions] = createSignal<Project[]>([])
-  // Custom branch name (docs/workspaces-and-tasks/task-creation.md § Task creation and navigation). Defaults to
-  // a slug of the title until the user edits the field, then their value wins.
-  const [branchText, setBranchText] = createSignal('')
-  const [branchTouched, setBranchTouched] = createSignal(false)
-  const [baseChoice, setBaseChoice] = createSignal<{ projectId: string; branch: string } | null>(null)
-  // Where a git task's files come from, one tab each (docs/workspaces-and-tasks/task-creation.md § Task creation and
-  // navigation). `folder` opts out of the branch entirely: the task runs in the project folder on
-  // whatever is already checked out, no worktree. `worktree` adopts a linked worktree git already
-  // has. Non-git projects are always `folder`, so the tabs only show for git.
-  const [source, setSource] = createSignal<'new' | 'folder' | 'worktree'>('new')
-  const noBranch = () => source() === 'folder'
-  const [pickedWorktree, setPickedWorktree] = createSignal('')
-  const [skipSetup, setSkipSetup] = createSignal(false)
-  // The selected project's branch prefix. Desktop only, because project config sits behind the
-  // main-process bridge and the web build has no checkout. Read through taskBridge rather than the
-  // terminal plugin's client, because core must not import plugins (core/boundaries.test.ts).
-  const [prefixRow] = createResource(
-    () => (draft()?.mode === 'new' ? newProject() : undefined),
-    (id) => id ? taskBridge().project.get(id) : null,
-  )
-  const branchPrefix = () => prefixRow()?.config.branchPrefix ?? null
-
-  const selectedProject = () => projects.data?.find((project) => project.id === newProject())
-  // Fetched while the dialog is open on a git project, not only on the tab, so the tab can show a count.
-  const [freeWorktrees] = createResource(
-    () => (draft()?.mode === 'new' && selectedProject()?.vcs === 'git' ? newProject() : undefined),
-    // null on failure: a resource that errors throws on read and would take the dialog down with it.
-    (id) => readJson<ProjectWorktree[]>(projectWorktreesRoute(id)).catch(() => null),
-  )
-  const [branches] = createResource(
-    () => (draft()?.mode === 'new' && selectedProject()?.vcs === 'git' ? newProject() : undefined),
-    (id) => readJson<ProjectBranches>(projectBranchesRoute(id)).catch(() => null),
-  )
-  const baseBranch = () => baseChoice()?.projectId === newProject() ? baseChoice()?.branch : branches()?.current ?? undefined
-  // The pick if it is still in the list, else the first one, so a project switch never submits a
-  // worktree from the previous project.
-  const chosenWorktree = () => {
-    const list = freeWorktrees() ?? []
-    return list.find((wt) => wt.path === pickedWorktree()) ?? list[0]
-  }
-  const defaultBranch = (title: string) =>
-    withBranchPrefix(branchPrefix(), slugifyBranch(title))
-  const effectiveBranch = () => (branchTouched() ? branchText() : defaultBranch(text()))
-  const [availability] = createResource(
-    () => {
-      if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git' || source() !== 'new' || !effectiveBranch()) return undefined
-      // Recheck when another window creates or archives a task while this dialog is open.
-      query.data
-      return { projectId: newProject(), branch: effectiveBranch(), baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const }
-    },
-    async (request) => ({
-      ...request,
-      result: await readJson<WorktreeAvailability>(projectWorktreeAvailabilityRoute(request.projectId, request.branch, request))
-        .catch((): WorktreeAvailability => ({ available: true })),
-    }),
-  )
-  const branchAvailability = () => {
-    const checked = availability()
-    return checked?.projectId === newProject() && checked.branch === effectiveBranch() && checked.baseBranch === baseBranch() && checked.branchSource === (branchTouched() ? 'exact' : 'derived') ? checked.result : undefined
-  }
-  const branchError = () => {
-    const result = branchAvailability()
-    return !availability.loading && result && !result.available ? result.reason : ''
-  }
-  const [savingDraft, setSavingDraft] = createSignal(false)
-  // What the icon picker shows while no icon is chosen: the same default the rail row would derive.
-  const draftFallbackIcon = () => {
-    const d = draft()
-    return originIcon(d?.mode === 'rename' ? d.w.origin : 'local')
-  }
+  const [draft, setDraft] = createSignal<TaskDraft | null>(null)
 
   const invalidate = () => queryClient.invalidateQueries({ queryKey: tasksKey })
 
@@ -351,81 +262,22 @@ export default function TabRail() {
       return
     }
     const current = params.projectId
-    setNewProjectOptions(options)
-    setNewProject(options.some((project) => project.id === current) ? current! : options[0].id)
-    setText('')
-    setIconDraft(randomIconName())
-    setBranchText('')
-    setBranchTouched(false)
-    setBaseChoice(null)
-    setSource('new')
-    setPickedWorktree('')
-    setSkipSetup(false)
-    setDraftErr('')
-    setDraft({ mode: 'new' })
+    setDraft({ mode: 'new', nodeId: activeNodeId(), projects: options, projectId: options.some((project) => project.id === current) ? current! : options[0].id })
   }
 
-  function openRename(w: Task) {
+  function openRename(task: Task) {
     setMenuId(null)
-    setText(w.title)
-    setIconDraft(w.icon)
-    setDraft({ mode: 'rename', w })
+    setDraft({ mode: 'rename', nodeId: activeNodeId(), task })
   }
 
-  // Enter in a field and the footer button both land here, so it checks what the button's
-  // `disabled` checks.
-  const canSubmitDraft = () => {
-    if (savingDraft() || !text().trim()) return false
-    if (draft()?.mode !== 'new' || selectedProject()?.vcs !== 'git') return true
-    if (source() === 'worktree') return !!chosenWorktree()
-    return noBranch() || (!!effectiveBranch() && !prefixRow.loading && !branches.loading && !availability.loading && branchAvailability()?.available === true)
-  }
+  // A dialog belongs to the Node on which it opened. A fleet switch discards its local draft.
+  createEffect(() => {
+    const open = draft()
+    if (open && open.nodeId !== activeNodeId()) setDraft(null)
+  })
 
-  async function submitDraft() {
-    if (!canSubmitDraft()) return
-    setDraftErr('')
-    const d = draft()
-    const value = text().trim()
-    if (!d || !value) return setDraft(null)
-    setSavingDraft(true)
-    try {
-      if (d.mode === 'new') {
-        const project = selectedProject()
-        if (!project) return setDraft(null)
-        const git = project.vcs === 'git'
-        const worktreePath = git && source() === 'worktree' ? chosenWorktree()?.path : undefined
-        const branch = git && source() === 'new' ? effectiveBranch() : undefined
-        const seed = { ...(branch ? { baseBranch: baseBranch(), branchSource: branchTouched() ? 'exact' as const : 'derived' as const } : {}), origin: 'local' as const, projectId: project.id, branch, worktreePath, title: value, icon: iconDraft() ?? undefined, skipSetup: !!branch && skipSetup() }
-        const w = await createTask(seed)
-        await invalidate()
-        activateTaskSignals(w, { pane: 'pr' }) // fresh local task → start on the PR/default pane
-        navigate(pathForTask(w))
-      } else {
-        // One PATCH for whichever of title or icon changed. Nothing changed means no request.
-        const body: { title?: string; icon?: string | null } = {}
-        if (value !== d.w.title) body.title = value
-        if (iconDraft() !== d.w.icon) body.icon = iconDraft()
-        if (Object.keys(body).length) {
-          await patchTask(d.w.id, body)
-          await invalidate()
-        }
-      }
-      setDraft(null)
-    } catch (error) {
-      setDraftErr(error instanceof Error ? error.message : 'Could not save the task.')
-    } finally {
-      setSavingDraft(false)
-    }
-  }
-
-  // Archive confirm and error use the same modal shell as create and rename, because the webview
-  // has no window.prompt. With the bridge present the archive runs through the guarded teardown
-  // flow (docs/workspaces-and-tasks/archive.md § Archive a task); the plain HTTP flip is only for the
-  // browser dev build.
-  const [draftErr, setDraftErr] = createSignal('')
-  // The title, not the project picker above it, is where a person starts typing.
-  let draftTitle: HTMLInputElement | undefined
-
+  // Archive uses the guarded teardown flow when the bridge is available. The plain HTTP flip is
+  // for the browser dev build (docs/workspaces-and-tasks/archive.md § Archive a task).
   async function openArchive(w: Task) {
     setMenuId(null)
     const decision = await confirmTaskArchive(w)
@@ -661,87 +513,8 @@ export default function TabRail() {
         onClose={() => setSourceMenu(null)}
         returnFocus={() => sourceMenuReturnFocus?.isConnected ? sourceMenuReturnFocus : undefined}
       />
-      <Show when={draft()}>
-        {(d) => (
-          <Modal title={d().mode === 'new' ? 'New task' : 'Rename task'} autoFocus={() => draftTitle} onDismiss={() => setDraft(null)}>
-            <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
-              <Tabs
-                tabs={[
-                  { id: 'new', label: 'New worktree' },
-                  { id: 'folder', label: 'Project folder' },
-                  { id: 'worktree', label: 'Existing worktree', count: freeWorktrees()?.length },
-                ]}
-                active={source()}
-                onChange={(id) => setSource(id as 'new' | 'folder' | 'worktree')}
-                idPrefix="new-task"
-                ariaLabel="Where the task works"
-              />
-            </Show>
-            <Modal.Body>
-              <Show when={draftErr()}><Alert>{draftErr()}</Alert></Show>
-              <Show when={d().mode === 'new'}>
-                <Field label="Project">
-                  <Select value={newProject()} onChange={(value) => setNewProject(value)} options={[...newProjectOptions().map((project) => ({ value: project.id, label: project.name }))]} />
-                </Field>
-              </Show>
-              <Field label="Title">
-                <Inline gap="inline">
-                  {/* Kept out of the field, which would otherwise name the icon button "Title". It
-                      has its own name, "Task icon". */}
-                  <FieldProvider value={NO_FIELD}>
-                    <IconPicker ariaLabel="Task icon" value={iconDraft()} fallback={draftFallbackIcon()} onSelect={setIconDraft} />
-                  </FieldProvider>
-                  <Input
-                    ref={(el) => (draftTitle = el)}
-                    value={text()}
-                    onInput={(value) => setText(value)}
-                    onSubmit={() => void submitDraft()}
-                  />
-                </Inline>
-              </Field>
-              <Show when={d().mode === 'new' && selectedProject()?.vcs === 'git'}>
-                {/* The body's column gap, again, so the wrapper does not squash the fields inside it together. */}
-                <div id={`new-task-panel-${source()}`} role="tabpanel" aria-labelledby={`new-task-tab-${source()}`} style={{ display: 'flex', 'flex-direction': 'column', gap: 'var(--space-5)' }}>
-                  <Show when={source() === 'new'}>
-                    <BranchOptions
-                      branch={branchTouched() ? branchText() : branchAvailability()?.branch ?? effectiveBranch()}
-                      error={branchError()}
-                      checking={availability.loading}
-                      base={baseBranch() ?? ''}
-                      branches={branches()}
-                      onBranch={(value) => { setBranchTouched(true); setBranchText(value) }}
-                      onBase={(branch) => setBaseChoice({ projectId: newProject(), branch })}
-                      onSubmit={() => void submitDraft()}
-                    />
-                    <Checkbox size="sm" label="Skip setup script" checked={skipSetup()} onChange={setSkipSetup} />
-                  </Show>
-                  <Show when={source() === 'folder'}>
-                    <Text tone="muted" wrap>No new branch. The task uses whatever is checked out in the project folder.</Text>
-                  </Show>
-                  <Show when={source() === 'worktree'}>
-                    <Field
-                      label="Worktree"
-                      hint={freeWorktrees.loading ? 'Asking git for worktrees.' : freeWorktrees() === null ? 'Could not list the worktrees for this project.' : freeWorktrees()?.length ? 'The task uses this folder and its branch. Setup does not run.' : 'Every worktree git lists for this project is already a task.'}
-                    >
-                      <Select
-                        value={chosenWorktree()?.path ?? ''}
-                        onChange={setPickedWorktree}
-                        disabled={!freeWorktrees()?.length}
-                        options={(freeWorktrees() ?? []).map((wt) => ({ value: wt.path, label: wt.branch, description: wt.path }))}
-                      />
-                    </Field>
-                  </Show>
-                </div>
-              </Show>
-            </Modal.Body>
-            <Modal.Actions>
-              <Button variant="ghost" onPress={() => setDraft(null)}>Cancel</Button>
-              <Button variant="solid" disabled={!canSubmitDraft()} onPress={() => void submitDraft()}>
-                {d().mode === 'new' ? 'Create task' : 'Rename'}
-              </Button>
-            </Modal.Actions>
-          </Modal>
-        )}
+      <Show when={draft()} keyed>
+        {(open) => <TaskDraftDialog draft={open} tasks={() => query.data} onClose={() => setDraft(null)} />}
       </Show>
     </div>
   )
