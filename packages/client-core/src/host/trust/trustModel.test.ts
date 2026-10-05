@@ -20,7 +20,8 @@ vi.mock('../plugins/syncContributions', () => ({ syncPluginContributions: () => 
 vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
 
 const { bundleAccepted, pendingTrust, onPluginDistributionCommit, _resetPluginDistribution, _seedPluginDistribution, _seedPendingTrust } = await import('../plugins/distribution')
-const { recordTrustDecision, trustTiers } = await import('./trustModel')
+const { recordInputDecision, recordTrustDecision, trustTiers } = await import('./trustModel')
+const { writeJson } = await import('../../infra/node/apiClient')
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
@@ -186,7 +187,7 @@ describe('trustTiers', () => {
         }],
       },
     }))
-    expect(tiers.map((tier) => tier.key)).toEqual(['enforced', 'declared', 'web'])
+    expect(tiers.map((tier) => tier.key)).toEqual(['reads', 'provides', 'enforced', 'declared', 'web'])
     expect(keysIn(tiers, 'enforced')).toEqual(['core.tasks:read', 'node.secrets', 'node.core:git', 'keys:board-web:meta+shift+b'])
     expect(keysIn(tiers, 'declared')).toEqual([])
     expect(keysIn(tiers, 'web')).toEqual(['webview:board-web:board.example'])
@@ -238,6 +239,52 @@ describe('trustTiers', () => {
     const tiers = trustTiers(request({ contributions, previous: { navigationDestinations: [] } }))
     expect(keysIn(tiers, 'enforced')).toEqual(['destination:findings:memory-review:findings-candidate:memory-proposal'])
     expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added)).toHaveLength(1)
+  })
+})
+
+describe('what a plugin reads', () => {
+  const READINESS: Partial<PluginContributions> = {
+    dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/board/board' }],
+  }
+  const input = (name: string, over: Partial<NonNullable<NodePluginRow['inputs']>['inputs'][number]> = {}) => ({
+    sourceId: 'board', name, source: `github:${name}`, optional: false, label: `My ${name}`, plural: name === 'pulls' ? 'Pull requests' : 'Checks',
+    provider: 'GitHub', approved: false, ...over,
+  })
+  const reading = (inputs: NonNullable<NodePluginRow['inputs']>) => {
+    const base = request({ contributions: READINESS })
+    return { ...base, row: { ...base.row, inputs } }
+  }
+
+  it('says what it reads before the node grants, and what it provides, in acorn words', () => {
+    const tiers = trustTiers(reading({ granted: false, inputs: [input('pulls'), input('checks', { optional: true })] }))
+    expect(tiers.map((tier) => tier.key).slice(0, 3)).toEqual(['reads', 'provides', 'enforced'])
+    const reads = tiers.find((tier) => tier.key === 'reads')!.lines
+    expect(reads.map((line) => line.text)).toEqual(['Read pull requests from GitHub', 'Read checks from GitHub, if you choose an account'])
+    // The plugin's own label for the input never reaches the sentence.
+    expect(reads.some((line) => line.text.includes('My '))).toBe(false)
+    expect(tiers.find((tier) => tier.key === 'provides')!.lines.map((line) => line.text)).toEqual(['A data source, Release readiness'])
+    expect(tiers.flatMap((tier) => tier.lines).some((line) => line.added)).toBe(false)
+  })
+
+  it('leads an update with only the input the grant does not cover', () => {
+    const tiers = trustTiers(reading({ granted: true, inputs: [input('pulls', { approved: true }), input('checks')] }))
+    expect(tiers.flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.text)).toEqual(['Read checks from GitHub'])
+  })
+
+  it('accepts by posting the exact list shown, and rejects by turning the plugin off on its node', async () => {
+    const asked = reading({ granted: false, inputs: [input('pulls'), input('checks', { optional: true })] })
+    vi.mocked(writeJson).mockResolvedValue({ plugins: [], restartRequired: false })
+    await recordInputDecision(asked, 'accepted')
+    const [url, init] = vi.mocked(writeJson).mock.calls[0]!
+    expect(url).toBe('/v1/core/plugins/board/input-grant')
+    expect(init).toMatchObject({ method: 'POST', nodeId: 'node-a' })
+    expect(JSON.parse(String(init!.body))).toEqual({ sources: { board: { pulls: { source: 'github:pulls', optional: false }, checks: { source: 'github:checks', optional: true } } } })
+
+    vi.mocked(writeJson).mockClear()
+    await recordInputDecision(asked, 'rejected')
+    const [putUrl, putInit] = vi.mocked(writeJson).mock.calls[0]!
+    expect(putUrl).toBe('/v1/core/plugins')
+    expect(JSON.parse(String(putInit!.body))).toEqual({ disabled: ['board'] })
   })
 })
 

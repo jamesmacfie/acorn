@@ -1,7 +1,9 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
+import { clearDataSources, registerDataSource } from '../dataSources/registry'
 import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './state'
+import type { InputGrant } from '../plugins/inputGrants'
 
 // Objects in, rows out. This logic used to live inside the route, so reaching it meant a Hono app and a
 // nine-member fixture. The judgement calls it makes, what counts as stale, which gaps raise the restart
@@ -39,6 +41,7 @@ type Situation = {
   // resulting state, and every literal carrying an identical `at:` would only bury that.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   review?: Record<string, { reviewId: string; requestId: string; fingerprint: string; stagedAt: number } | { corrupt: true }>
+  grants?: InputGrant[]
 }
 
 // A fixed instant so a test can assert the row carries the loader's stamp rather than a fresh clock.
@@ -64,6 +67,7 @@ const bridge = (situation: Situation): PluginsBridge => {
     update: async () => ({ id: '', fromVersion: '', toVersion: '', state: 'installed-restart-required' }),
     uninstall: () => ({ restartRequired: true, dataPurged: false }),
     reload: async () => ({ id: '', version: '', state: 'reloaded' }),
+    inputGrants: () => ({ get: (id) => situation.grants?.find((grant) => grant.pluginId === id), set: () => {}, delete: () => {} }),
   }
 }
 
@@ -301,5 +305,48 @@ describe('pluginState', () => {
     }))
     expect(row(result, 'theme')).toMatchObject({ state: 'pending-restart', active: { version: '1.0.0', activation: 'node' }, installed: { version: '2.0.0' } })
     expect(result.restartRequired).toBe(true)
+  })
+})
+
+describe('what a loaded plugin reads', () => {
+  afterEach(() => clearDataSources('github'))
+  const readiness = installed('readiness', {
+    contributions: {
+      ...NO_CONTRIBUTIONS,
+      dataSources: [{
+        sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/readiness/board',
+        inputs: {
+          pulls: { source: 'github:pull-requests', label: 'Their pulls' },
+          issues: { source: 'linear:issues', label: 'Issues', optional: true },
+        },
+      }],
+    },
+  })
+
+  it('words each input from its source and owner, and marks what the grant covers', () => {
+    registerDataSource('github', {
+      sourceId: 'pull-requests', name: 'Pull requests', singular: 'Pull request', plural: 'Pull requests',
+      identityScope: 'pr', providerId: 'github', handler: '/v1/p/github/pulls',
+    })
+    const result = pluginState(bridge({
+      roster: [{ name: 'github', label: 'GitHub', required: false, disabled: false, state: 'active' }, { name: 'readiness', required: false, disabled: false, state: 'active' }],
+      installed: [readiness],
+      grants: [{ pluginId: 'readiness', sources: { board: { pulls: { source: 'github:pull-requests', optional: false } } }, grantedAt: 1, grantedBy: 'device:d1' }],
+    }))
+    expect(row(result, 'readiness')?.inputs).toEqual({
+      granted: true,
+      inputs: [
+        { sourceId: 'board', name: 'pulls', source: 'github:pull-requests', optional: false, label: 'Their pulls', plural: 'Pull requests', provider: 'GitHub', approved: true },
+        // Not registered on this node, so it has no plural, and its owner's id names it.
+        { sourceId: 'board', name: 'issues', source: 'linear:issues', optional: true, label: 'Issues', provider: 'linear', approved: false },
+      ],
+    })
+  })
+
+  it('reports nothing granted before the first approval, and nothing at all for a plugin without inputs', () => {
+    const result = pluginState(bridge({ installed: [readiness, installed('plain')] }))
+    expect(row(result, 'readiness')?.inputs?.granted).toBe(false)
+    expect(row(result, 'readiness')?.inputs?.inputs.every((input) => !input.approved)).toBe(true)
+    expect(row(result, 'plain')?.inputs).toBeUndefined()
   })
 })

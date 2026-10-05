@@ -58,6 +58,7 @@ export type PluginSelection = {
 
 export type PluginTrustRequest = {
   row: NodePluginRow
+  /** The client bundle asked about. Empty when the request is only about what the plugin reads. */
   hash: string
   nodeId: string
   sourceNodeIds: readonly string[]
@@ -82,6 +83,10 @@ export type PluginDistributionSnapshot = {
 }
 
 export const decisionKey = (pluginId: string, hash: string): string => JSON.stringify([pluginId, hash])
+
+/** The installed version reads a source the person's grant doesn't cover (docs/data-sources/derived-sources.md). */
+export const awaitingInputApproval = (row: NodePluginRow): boolean =>
+  !row.disabled && !row.pendingReview && !!row.inputs?.inputs.some((input) => !input.approved)
 
 // One acknowledgement covers one exact pair. If nodes attach different grants to the same bytes,
 // no selection or prompt may turn that single decision into authority for both declarations.
@@ -212,6 +217,20 @@ export function derivePluginDistribution(
       source: { kind: 'node', nodeId: first.nodeId },
       ...(previous ? { previous } : {}),
     })
+  }
+  // What a plugin's derived sources read is approved on its node, not per bundle, so a node-only plugin
+  // asks too. A plugin whose bundle already waits above asks once: that request's row carries `inputs`,
+  // and the dialog records both answers. An agent-staged package asks in its own review instead.
+  for (const observation of byNode.values()) {
+    if (!observation.reachable || observation.stale) continue
+    for (const row of observation.rows) {
+      if (!awaitingInputApproval(row) || selectedDevice.has(row.name)) continue
+      if (pendingTrust.some((request) => request.row.name === row.name && request.nodeId === observation.nodeId)) continue
+      pendingTrust.push({
+        row, hash: '', nodeId: observation.nodeId, sourceNodeIds: [observation.nodeId],
+        relation: 'installed', source: { kind: 'node', nodeId: observation.nodeId },
+      })
+    }
   }
   pendingTrust.sort((a, b) => Number(b.relation === 'active') - Number(a.relation === 'active') || a.row.name.localeCompare(b.row.name) || a.hash.localeCompare(b.hash))
   return {

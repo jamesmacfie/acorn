@@ -12,6 +12,12 @@ const ROWS: NodePluginRow[] = [
   { name: 'alpha', required: false, disabled: false, running: true, state: 'active' },
   { name: 'beta', required: false, disabled: false, running: false, state: 'pending-review', installed: installed('1.3.0'), pendingReview: { reviewId: 'r1', fingerprint: 'f', stagedAt: 1 } },
 ]
+// A loaded plugin with a derived source that reads GitHub pull requests, approved.
+const READINESS: NodePluginRow = {
+  name: 'readiness', required: false, disabled: false, running: true, state: 'active',
+  installed: { ...installed('1.0.0'), contributions: { frames: [], dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/readiness/board' }] } },
+  inputs: { granted: true, inputs: [{ sourceId: 'board', name: 'pulls', source: 'github:pull-requests', optional: false, label: 'Pull requests', plural: 'Pull requests', provider: 'GitHub', approved: true }] },
+}
 const DEVICE: DevicePluginEntry[] = [{
   hash: 'h1', sourceLabel: 'npm:gamma', nodeIds: [], sameHashNodeIds: [],
   row: { name: 'gamma', required: false, disabled: false, running: true, state: 'active', installed: { ...installed('0.1.0'), client: { hash: 'h1', bytes: 1 } } },
@@ -21,6 +27,8 @@ const slowReads = vi.hoisted(() => new Map<string, () => Promise<unknown>>())
 vi.mock('../../../infra/node/nodePlugins', () => ({
   refreshNodePlugins: async (nodeId: string) => (await slowReads.get(nodeId)?.()) ?? { plugins: ROWS, restartRequired: false },
   nodePlugins: () => null,
+  readPluginInputGrant: vi.fn(async () => ({ inputs: [], grant: null, usage: { board: { pulls: { panels: 2, connectionIds: ['work'] } } } })),
+  revokePluginInputs: vi.fn(),
   installNodePlugin: vi.fn(), reviewNodePlugin: vi.fn(), uninstallNodePlugin: vi.fn(), updateNodePlugin: vi.fn(), saveDisabledNodePlugins: vi.fn(),
 }))
 vi.mock('../../../host/plugins/host', () => ({
@@ -32,12 +40,12 @@ vi.mock('../../../host/plugins/distribution', async (original) => ({
   devicePlugins: () => DEVICE,
 }))
 vi.mock('../../agent/reference', () => ({ sendReferenceToAgent: vi.fn() }))
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }), useQueryClient: () => ({}) }))
-vi.mock('../../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['prefs'] }) }))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { integrations: [{ id: 'work', name: 'Work' }] } }), useQueryClient: () => ({}) }))
+vi.mock('../../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['prefs'] }), integrationsOptions: () => ({ queryKey: ['integrations'] }) }))
 
 import PluginsSettings from './PluginsSettings'
 import { openPluginPage } from './installed'
-import { saveDisabledNodePlugins } from '../../../infra/node/nodePlugins'
+import { readPluginInputGrant, saveDisabledNodePlugins } from '../../../infra/node/nodePlugins'
 
 let host: HTMLElement
 let dispose: (() => void) | undefined
@@ -102,6 +110,28 @@ describe('Installed', () => {
     toggle()!.click()
     // Built from B's rows, so A's disabled beta is not sent to B.
     await vi.waitFor(() => expect(saveDisabledNodePlugins).toHaveBeenCalledWith(['alpha'], 'node-b'))
+    slowReads.clear()
+  })
+
+  it('shows the data sources a plugin provides, and what it reads with a panel count', async () => {
+    dispose?.()
+    host.textContent = ''
+    slowReads.set('node-a', async () => ({ plugins: [READINESS], restartRequired: false }))
+    dispose = render(() => <PluginsSettings context={{ scope: { nodeId: 'node-a' }, navigate: () => {}, onWorkspaceDeleted: () => {} }} />, host)
+    await vi.waitFor(() => expect(listed()).toContain('readiness'))
+    openPluginPage((_target, opened) => opened?.(), 'readiness', 'node')
+    await vi.waitFor(() => expect(host.querySelector('[role="tablist"]')).not.toBeNull())
+    const adds = host.querySelector('[data-settings-section="adds"]')!
+    expect(adds.textContent).toContain('Data sources')
+    expect(adds.textContent).toContain('Release readiness')
+
+    // The count scans every published plan, so it's read only once the tab opens.
+    expect(readPluginInputGrant).not.toHaveBeenCalled()
+    press('Permissions')
+    await vi.waitFor(() => expect(host.querySelector('[data-settings-section="reads"]')?.textContent)
+      .toContain('Pull requests · GitHub · used by 2 panels with the Work account'))
+    expect(readPluginInputGrant).toHaveBeenCalledWith('readiness', 'node-a')
+    expect(host.querySelector('[data-settings-section="reads"]')!.textContent).toContain('Revoke')
     slowReads.clear()
   })
 })

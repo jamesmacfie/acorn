@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import type { NodePluginPermissions } from '@acorn/protocol/api.ts'
-import { agentToolGrants, agentToolPermissionLines, contextSectionGrants, contextSectionPermissionLines, extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
+import type { NodePluginPermissions, PluginContributions } from '@acorn/protocol/api.ts'
+import { inputPermissionLines, providedSourceLines, agentToolGrants, agentToolPermissionLines, contextSectionGrants, contextSectionPermissionLines, extensionPermissionLine, harnessGrants, harnessPermissionLines, keyClaimGrants, keyClaimPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, type PermissionLine, uiPermissionLines, webviewPermissionLines } from './permissions'
 import { EXTENSION_POINT_KINDS, HOOK_MODES } from '@acorn/protocol/extensionPoints.ts'
 
 // The update prompt diffs grant keys, not wording, so the key is what has to stay stable. This is a
@@ -405,5 +405,35 @@ describe('the cross-plugin grants', () => {
     const line = extensionPermissionLine({ kind: 'replaces', target: 'rail.taskList', label: 'Board task list' })
     expect(line.text).toBe('Draws the task list in the rail — you choose in Settings')
     expect(line.key).toBe('extension:replaces:rail.taskList')
+  })
+})
+
+describe('inputPermissionLines', () => {
+  const pulls = { sourceId: 'board', name: 'pulls', source: 'github:pull-requests', optional: false, plural: 'Pull requests', provider: 'GitHub' }
+
+  it('words a read from the input source and its provider, and keys it by source and optional flag', () => {
+    const [required] = inputPermissionLines([pulls])
+    expect(required).toMatchObject({
+      key: 'input:board:pulls:github:pull-requests:false',
+      text: 'Read pull requests from GitHub',
+      detail: "With the GitHub account you choose for each panel. It can only read, so it can't change anything.",
+    })
+    const [optional] = inputPermissionLines([{ ...pulls, optional: true }])
+    expect(optional).toMatchObject({ text: 'Read pull requests from GitHub, if you choose an account', detail: 'Optional. Panels work without it.' })
+    // Making an input optional or required changes the key, so the update prompt asks again.
+    expect(optional!.key).not.toBe(required!.key)
+  })
+
+  it('falls back to the source id for a source no running plugin registers, and drops "from" for one with no account', () => {
+    expect(texts(inputPermissionLines([{ ...pulls, plural: undefined, provider: 'linear', source: 'linear:issues' }]))).toEqual(['Read linear:issues from linear'])
+    const [local] = inputPermissionLines([{ ...pulls, source: 'core:local-branches', plural: 'Local branches', provider: undefined }])
+    expect(local).toMatchObject({ text: 'Read local branches', detail: "It can't change anything." })
+  })
+})
+
+describe('providedSourceLines', () => {
+  it('lists each registered data source by its name', () => {
+    const lines = providedSourceLines({ dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/r/board' }] } as PluginContributions)
+    expect(lines).toEqual([{ key: 'provides:board', text: 'A data source, Release readiness', detail: 'You can use it in panels, workflows, and datasets.', icon: 'table', high: false }])
   })
 })

@@ -1,6 +1,7 @@
 # Phase 9: approving what a plugin reads
 
-Status: proposed, October 5, 2026. Depends on [phase 8](./08-source-inputs.md). Read the
+Status: shipped, October 5, 2026. [What shipped](#what-shipped) records the choices made while
+building it. Depends on [phase 8](./08-source-inputs.md). Read the
 [programme README](./README.md) first. The
 [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) page shows the dialog and the
 plugin page in "Installing: saying what it reads, before it runs".
@@ -124,3 +125,50 @@ dialog.
   separate field.
 - That counting panels per input is cheap. If it isn't, show the count only on the **Permissions**
   tab and compute it when the tab opens.
+
+## What shipped
+
+Requirements 1 to 12 shipped. Requirement 13 holds: revoking keeps every panel, and their reads fail
+with `input-unavailable` until phase 10 draws the unavailable state.
+[Derived sources](../../data-sources/derived-sources.md#approve-inputs-for-loaded-plugins) and
+[plugin distribution](../../plugins/distribution.md#approving-what-a-plugin-reads) describe the
+shipped behaviour and win over this page.
+
+Where the code lives:
+
+- `NodePluginRow.inputs` in `packages/protocol/src/transport/api/pluginState.ts` carries each declared
+  input and whether the grant covers it. `pluginInputs` in
+  `packages/node-core/src/server/plugins/inputGrants.ts` builds it, and `pluginState` fills in the
+  words. The bridge gained `inputGrants()`, built from the data root in
+  `apps/node/src/composition/pluginState.ts`.
+- The routes are in `packages/node-core/src/server/routes/plugins/plugins.ts`. The panel count is
+  `pluginInputUsage` in `packages/node-core/src/server/dashboards/inputUsage.ts`.
+- `derivePluginDistribution` in `packages/client-core/src/host/plugins/distributionModel.ts` queues
+  input requests. `trustModel.ts` adds the two groups and `recordInputDecision`, and `permissions.ts`
+  words the lines.
+
+Choices made while building it:
+
+- The roster carries a separate `inputs` field, not an `inputs-awaiting-approval` state. `state` says
+  whether the code runs and drives the restart banner, and a plugin waiting for this approval still
+  runs. "Awaiting" is any input with `approved: false` on a row that isn't off or held for review.
+- The Node words each line, not the client. It reads the input source's `plural` from the registry,
+  and names the provider by the label of the plugin that owns the input source. A loaded owner's id
+  stands in for its label, because a loaded plugin writes its own label. A source with no
+  `providerId` gets no "from" clause, and an unregistered source shows its `<pluginId>:<sourceId>`.
+- An input-only request has an empty `hash`. It merges into a bundle request for the same plugin and
+  Node, so a plugin with both asks once. The dialog answers inputs first, because that answer
+  re-reads the roster, and then records the bundle answer.
+- **Reject** turns the plugin off on its Node through the disabled list. That takes effect at the next
+  restart, as every disable does.
+- The required detail reads "It can only read, so it can't change anything." rather than "It can't
+  comment, merge, or change anything.", which only fits GitHub.
+- The agent review dialog's **Turn on** also posts the grant for the list its review screen showed,
+  so an agent-written plugin doesn't ask twice.
+- Counting panels scans every published plan, so the plugin page reads it only while **Permissions**
+  is open. Account names come from the active Node's integrations, and an unknown account is left out
+  of the sentence.
+- The terminal client reads the queue through `pendingBundleTrust`, which leaves out input-only
+  requests. Its prompt says when a plugin also reads your data, and points to the desktop app.
+- The in-app check above wasn't run. Node route tests, model tests, and jsdom tests for the dialog
+  and plugin page cover the requirements.

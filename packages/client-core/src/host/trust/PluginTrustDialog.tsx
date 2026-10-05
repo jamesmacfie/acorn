@@ -4,7 +4,7 @@ import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
-import { recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
+import { recordInputDecision, recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
 import { Alert, Badge, Button, ToolbarSpacer } from '../../kit/components/primitives'
 import { HelpMark } from '../../kit/components/content/HelpMark'
@@ -43,6 +43,9 @@ export default function PluginTrustDialog() {
       .filter((tier) => tier.lines.length > 0),
   )
   const previousVersion = () => request()?.previous?.version
+  // A node-only plugin, or one whose bundle is already approved, asks only about what it reads.
+  const inputsOnly = () => !request()?.hash
+  const readsMore = () => inputsOnly() && !!request()?.row.inputs?.granted
   const sameBundleReview = () => request()?.previous?.hash === request()?.hash
   const changedDeclaration = () => sameBundleReview() && !!request()?.previous?.declaration
   const previousStillActive = () => {
@@ -55,6 +58,7 @@ export default function PluginTrustDialog() {
   const fallbackCopy = () => {
     const current = request()
     if (!current) return ''
+    if (inputsOnly()) return 'Until you decide, its other features keep working, and its data sources read only what you approved before.'
     if (current.source?.kind === 'device') return 'This device plugin stays unavailable until you accept this version.'
     if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
     if (current.relation === 'installed' && !current.previous) return 'Accepting now allows this interface to appear after the node starts this plugin.'
@@ -67,7 +71,10 @@ export default function PluginTrustDialog() {
     setSaving(true)
     setError('')
     try {
-      await recordTrustDecision(current, decision)
+      // Inputs first: their answer re-reads the node's roster, so the bundle's answer lands on a queue
+      // that no longer asks about them.
+      await recordInputDecision(current, decision)
+      if (current.hash) await recordTrustDecision(current, decision)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
     } finally {
@@ -111,17 +118,17 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title">{sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
+            <div class="overlay-title">{inputsOnly() ? readsMore() ? 'Plugin reads more' : 'Approve what this plugin reads' : sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
             <div class="overlay-body plugin-trust-body">
               <header class="plugin-trust-identity">
                 <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
                 <div>
                   <h2 id="plugin-trust-title">
                     <code>{current().row.name}</code>
-                    {sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
+                    {inputsOnly() ? readsMore() ? ' wants to read more of your data' : ' wants to read your data' : sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
                   </h2>
                   <p class="plugin-trust-meta">
-                    <Badge size="xs">{sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
+                    <Badge size="xs">{inputsOnly() ? current().row.installed?.version : sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
                     <Badge size="xs">
                       <Icon name="monitor" /> {current().source?.kind === 'device'
                         ? current().sourceLabel?.startsWith('path:')
@@ -129,7 +136,7 @@ export default function PluginTrustDialog() {
                           : `From ${current().sourceLabel ?? 'a package'}`
                         : `From ${current().sourceNodeIds.map(nodeLabel).join(', ')}`}
                     </Badge>
-                    <Show when={!previousVersion()}><Badge size="xs">New</Badge></Show>
+                    <Show when={!previousVersion() && !inputsOnly()}><Badge size="xs">New</Badge></Show>
                   </p>
                 </div>
               </header>
@@ -139,6 +146,9 @@ export default function PluginTrustDialog() {
                 <p class="muted plugin-trust-intro">A plugin from a folder isn't pinned to a version.</p>
               </Show>
               <p class="muted plugin-trust-intro">
+                <Show when={!inputsOnly()} fallback={readsMore()
+                  ? `This version reads ${addedLines().length === 1 ? 'one source' : `${addedLines().length} sources`} you haven't approved. It reads only with accounts you choose for each panel.`
+                  : 'It reads only with accounts you choose for each panel.'}>
                 <Show
                   when={previousVersion() && !sameBundleReview()}
                   fallback={sameBundleReview()
@@ -156,6 +166,7 @@ export default function PluginTrustDialog() {
                     </Show>
                   )}
                 </Show>
+                </Show>
               </p>
               <p class="muted plugin-trust-intro">{fallbackCopy()}</p>
 
@@ -169,7 +180,7 @@ export default function PluginTrustDialog() {
                       {(line) => (
                         <li class="added" classList={{ high: line.high }}>
                           <Icon name={line.icon} />
-                          <span>{line.text}</span>
+                          <LineText line={line} />
                           <Badge size="xs" tone={line.tier === 'declared' ? 'warn' : 'accent'}>
                             {TIER_LABEL[line.tier]}
                           </Badge>
@@ -188,15 +199,15 @@ export default function PluginTrustDialog() {
               >
                 <Show when={keptTiers().length}>
                   <details class="plugin-trust-unchanged">
-                    <summary>Everything {previousVersion()} already had — unchanged</summary>
+                    <summary>{previousVersion() ? `Everything ${previousVersion()} already had — unchanged` : 'Everything else — unchanged'}</summary>
                     <For each={keptTiers()}>{(tier) => <TierGroup tier={tier} />}</For>
                   </details>
                 </Show>
               </Show>
             </div>
             <div class="ui-modal-actions">
-              <Button variant="ghost" disabled={saving()} onPress={() => void decide('rejected')}>
-                {previousVersion() ? 'Reject update' : 'Reject plugin'}
+              <Button variant="ghost" tip={inputsOnly() ? 'Turns the plugin off on its node.' : undefined} disabled={saving()} onPress={() => void decide('rejected')}>
+                {previousVersion() && !inputsOnly() ? 'Reject update' : 'Reject plugin'}
               </Button>
               <ToolbarSpacer />
               <Button variant="ghost" tip="acorn asks again next time it starts." disabled={saving()} onPress={() => {
@@ -204,7 +215,7 @@ export default function PluginTrustDialog() {
                 if (pending) resolvePendingTrust(pending.row.name, pending.hash)
               }}>Not now</Button>
               <Button variant="solid" disabled={saving()} onPress={() => void decide('accepted')}>
-                {saving() ? 'Saving…' : previousVersion() ? 'Accept update' : 'Accept plugin'}
+                {saving() ? 'Saving…' : inputsOnly() ? 'Accept' : previousVersion() ? 'Accept update' : 'Accept plugin'}
               </Button>
             </div>
           </section>
@@ -217,12 +228,25 @@ export default function PluginTrustDialog() {
 
 // What each tier's word means, matching docs/security/plugin-storage-and-supply-chain.md § Design rules.
 const TIER_HELP: Record<TierKey, string> = {
+  reads: 'acorn blocks anything not listed.',
+  provides: 'What it adds that you can use elsewhere in acorn.',
   enforced: 'acorn blocks anything not listed.',
   declared: 'Jobs and checks the plugin runs. acorn controls when they run, not what they do.',
   web: "These load from the internet with their own cookies and logins. The plugin can't read them or type into them.",
 }
 
-function TierGroup(props: { tier: { key: TierKey; lines: readonly { text: string; icon: string; high: boolean }[] } }) {
+type ShownLine = { text: string; icon: string; high: boolean; detail?: string }
+
+function LineText(props: { line: ShownLine }) {
+  return (
+    <span>
+      {props.line.text}
+      <Show when={props.line.detail}>{(detail) => <span class="plugin-trust-detail">{detail()}</span>}</Show>
+    </span>
+  )
+}
+
+function TierGroup(props: { tier: { key: TierKey; lines: readonly ShownLine[] } }) {
   const titleId = createUniqueId()
   return (
     <section class="plugin-trust-group" data-tier={props.tier.key}>
@@ -236,7 +260,7 @@ function TierGroup(props: { tier: { key: TierKey; lines: readonly { text: string
           {(line) => (
             <li classList={{ high: line.high }}>
               <Icon name={line.icon} />
-              <span>{line.text}</span>
+              <LineText line={line} />
             </li>
           )}
         </For>

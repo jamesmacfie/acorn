@@ -1,7 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
-import { pendingTrust, resolvePendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
+import { pendingBundleTrust, resolvePendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { recordTrustDecision, TIER_LABEL, trustTiers } from '@acorn/client-core/host/trust/trustModel.ts'
 import { Modal, ModalBody, SectionHeader } from '../kit/grouping'
 import { Alert, Row, Rows } from '../kit/showing'
@@ -31,7 +31,7 @@ export function TrustPrompt() {
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
 
-  const request = () => pendingTrust()[0]
+  const request = () => pendingBundleTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
   const tiers = createMemo(() => trustTiers(request()))
   // What an update is actually about. Leading with it is the reason an update re-prompts at all.
@@ -84,6 +84,9 @@ export function TrustPrompt() {
                 </>
               )}
             </For>
+            <Show when={current().row.inputs?.inputs.some((input) => !input.approved)}>
+              <Line role="muted">It also reads your data through other sources. Approve that in the desktop app.</Line>
+            </Show>
             <Show when={error()}><Alert>{error()}</Alert></Show>
             <box flexDirection="column">
               <Rows id="plugins.trust" ariaLabel="Run this plugin?" items={[...CHOICES]} onActivate={decide}>

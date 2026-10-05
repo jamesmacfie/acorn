@@ -50,6 +50,9 @@ export type CoreAuditAction =
   // (docs/plugins/agent-install.md § Approval-mediated install).
   | 'plugins.request.decided'
   | 'plugins.review.decided'
+  // The person approved or revoked the list of sources a loaded plugin's derived sources read.
+  | 'plugins.inputs.granted'
+  | 'plugins.inputs.revoked'
   // Data leaving or entering the node.
   | 'backup.created'
 

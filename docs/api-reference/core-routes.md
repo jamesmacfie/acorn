@@ -23,12 +23,12 @@ Every route in this table is device-only.
 | `POST` | `/v1/core/plugins/install` | Install a package from GitHub, npm, a URL, or a folder. Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/:id/update` | Update an installed package. Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/:id/review` | Approve or remove a package held for review. Needs `Idempotency-Key` |
+| `GET`, `POST`, `DELETE` | `/v1/core/plugins/:id/input-grant` | Read, approve, or revoke what a loaded plugin's derived sources read ([derived sources](../data-sources/derived-sources.md#approve-inputs-for-loaded-plugins)) |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process. Needs `Idempotency-Key` |
 | `DELETE` | `/v1/core/plugins/:id` | Uninstall a package. Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent's install request, `approved` or `denied` |
 | `POST` | `/v1/core/plugins/:id/cli/:name` | Invoke one manifest CLI command with `{ input }` |
-| `GET` | `/v1/core/plugins/:id/bundles/:hash` | Read the exact client bundle with that hash, for device custody |
-| `GET` | `/v1/core/plugins/:id/client.js` | The installed client bundle, for clients older than the hash route |
+| `GET` | `/v1/core/plugins/:id/bundles/:hash`, `/client.js` | The client bundle with that hash, for device custody, or the installed one, for clients older than the hash route |
 | `GET` | `/v1/core/audit` | Read the audit trail |
 | `GET` | `/v1/core/security` | Read the Node's security posture |
 | `GET` | `/v1/core/storage` | Node memory and database, plugin database, and blob cache sizes |
@@ -42,11 +42,11 @@ Every route in this table is device-only.
 | `POST` | `/v1/core/backup` | Write a credential-scrubbed database archive to a path on the Node |
 
 Each roster row may carry `active`, the declaration and client hash of the running loaded runtime,
-beside `installed`, the package on disk. `active: null` says no loaded runtime is active. The bundle
-route resolves by hash, including retained active bytes after an on-disk update, so custody can check
-the hash before any trust decision. A task-scoped agent asks for an install through the
-`plugin_request` tool and reaches neither the roster nor the decision route
-([installing plugins](../security/plugin-install.md)).
+beside `installed`, the package on disk, and `inputs`, what its derived sources read. `active: null`
+says no loaded runtime is active. The bundle route resolves by hash, including retained active bytes
+after an on-disk update, so custody can check the hash before any trust decision. A task-scoped agent
+asks for an install through the `plugin_request` tool and reaches neither the roster nor the decision
+route ([installing plugins](../security/plugin-install.md)).
 
 CLI command discovery reads only `active.contributions.cliCommands` on a running loaded plugin. The
 invocation route resolves the descriptor again, rechecks the device, the declared core capability,

@@ -1,4 +1,4 @@
-import type { NodePluginPermissions, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginInputLine, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
@@ -21,6 +21,8 @@ export type PermissionLine = {
   text: string
   icon: string
   high: boolean
+  // A second, quieter sentence under the line, when the line alone would overstate or understate it.
+  detail?: string
 }
 
 /** What a description table holds for one grant: the copy plus how the prompt draws it. */
@@ -387,3 +389,34 @@ export const navigationDestinationPermissionLines = (
       icon: 'puzzle',
     },
   ))
+
+// What a plugin's derived sources read (docs/data-sources/derived-sources.md). The words come from the
+// input source's registration and its owner, which the node fills in, never from the reading plugin's
+// own label, so a plugin can't describe its reach more kindly than it is. The key carries the source and
+// the optional flag, because a grant covers exactly that pair and changing either asks again.
+export const inputPermissionLines = (inputs: readonly Pick<PluginInputLine, 'sourceId' | 'name' | 'source' | 'optional' | 'plural' | 'provider'>[]): PermissionLine[] =>
+  inputs.map((input) => {
+    const what = input.plural?.toLowerCase() ?? input.source
+    const from = input.provider ? ` from ${input.provider}` : ''
+    return {
+      key: `input:${input.sourceId}:${input.name}:${input.source}:${input.optional}`,
+      text: input.optional ? `Read ${what}${from}, if you choose an account` : `Read ${what}${from}`,
+      detail: input.optional
+        ? 'Optional. Panels work without it.'
+        : input.provider
+          ? `With the ${input.provider} account you choose for each panel. It can only read, so it can't change anything.`
+          : "It can't change anything.",
+      icon: 'database',
+      high: false,
+    }
+  })
+
+/** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by. */
+export const providedSourceLines = (contributions: PluginContributions): PermissionLine[] =>
+  (contributions.dataSources ?? []).map((source) => ({
+    key: `provides:${source.sourceId}`,
+    text: `A data source, ${source.name}`,
+    detail: 'You can use it in panels, workflows, and datasets.',
+    icon: 'table',
+    high: false,
+  }))

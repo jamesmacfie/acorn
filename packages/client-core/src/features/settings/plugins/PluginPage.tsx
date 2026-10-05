@@ -1,10 +1,12 @@
-import { createMemo, createSignal, For, Show } from 'solid-js'
-import { useQueryClient } from '@tanstack/solid-query'
-import type { NodePluginRow, NodePluginState } from '@acorn/protocol/api.ts'
-import { reviewNodePlugin, uninstallNodePlugin, updateNodePlugin } from '../../../infra/node/nodePlugins'
+import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
+import type { NodePluginRow, NodePluginState, PluginInputLine } from '@acorn/protocol/api.ts'
+import { readPluginInputGrant, revokePluginInputs, reviewNodePlugin, uninstallNodePlugin, updateNodePlugin } from '../../../infra/node/nodePlugins'
+import { integrationsOptions } from '../../../infra/queries'
 import type { PluginHostState } from '../../../infra/platform'
 import { forgetPluginTrust, installPluginOnDevice, setPluginDevGrant } from '../../../host/plugins/host'
-import { distribution, refreshPluginTrust, resolvePendingTrust } from '../../../host/plugins/distribution'
+import { distribution, refreshPluginTrust, resolvePendingTrust, reviewPendingTrust } from '../../../host/plugins/distribution'
+import { awaitingInputApproval } from '../../../host/plugins/distributionModel'
 import {
   agentToolGrants, agentToolPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines,
   scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines,
@@ -137,7 +139,7 @@ export function PluginPage(props: PluginPageProps) {
       </TabPanel>
       <TabPanel idPrefix={ID_PREFIX} id="permissions" active={tab()}>
         <Stack gap="section">
-          <Permissions {...props} busy={busy()} run={run} devGrant={devGrant()} />
+          <Permissions {...props} busy={busy()} run={run} devGrant={devGrant()} active={tab() === 'permissions'} />
         </Stack>
       </TabPanel>
       <TabPanel idPrefix={ID_PREFIX} id="versions" active={tab()}>
@@ -174,6 +176,8 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
     return declared ? agentToolGrants(declared).length : 0
   }
   const emits = () => pluginRow(props.plugin).emits ?? []
+  // Declared rather than registered: data sources live on the node, so this device has no registry to read.
+  const dataSources = () => contributions()?.dataSources ?? []
   const pages = () => settingsRegistry.entries().filter((page) => settingsRegistry.ownerOf(page.id) === props.plugin.id)
   const surfaces = () => CORE_EXCLUSIVE_SLOTS.flatMap((slot) => exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id))
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
@@ -225,6 +229,9 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
           <Button variant="ghost" size="sm" onPress={() => props.navigate('agent-tools')}>Tools and permissions</Button>
         </SettingRow>
       </Show>
+      <Show when={dataSources().length}>
+        <SettingRow label="Data sources" description={`${dataSources().map((source) => source.name).join(', ')}. You can use them in panels, workflows, and datasets.`} />
+      </Show>
       <Show when={emits().length}>
         <SettingRow label="Events it announces" help="Other plugins can react to these." layout="stacked">
           <ul class="plugin-emits">
@@ -232,7 +239,7 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
           </ul>
         </SettingRow>
       </Show>
-      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length}>
+      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length && !dataSources().length}>
         <Text emphasis="muted" wrap>It isn't adding anything right now. A plugin that's off or waiting for approval adds nothing.</Text>
       </Show>
     </SettingsSection>
@@ -241,7 +248,7 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
 
 // What the plugin may do, and every answer this device gave about it. The controls docs/security.md asks
 // the owner to be able to see and end, so they get a tab rather than a line of small buttons.
-function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostState['devGrants'][number] | undefined }) {
+function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostState['devGrants'][number] | undefined; active: boolean }) {
   const row = () => pluginRow(props.plugin)
   const pending = () => (props.plugin.kind === 'node' ? props.plugin.row.pendingReview : undefined)
   const lines = () => {
@@ -305,6 +312,9 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
           </SettingsSection>
         )}
       </Show>
+      <Show when={props.plugin.kind === 'node' && row().inputs}>
+        {(inputs) => <Reads {...props} inputs={inputs()} />}
+      </Show>
       <SettingsSection id="grants" label="What it may do">
         <For each={lines()} fallback={<Text emphasis="muted">{row().installed ? "It doesn't ask for any permissions." : 'A built-in plugin ships with acorn and runs with acorn\'s own access.'}</Text>}>
           {(line) => <SettingRow label={line.text}><Show when={line.high}><Badge tone="warn">Broad access</Badge></Show></SettingRow>}
@@ -341,6 +351,67 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
         </SettingsSection>
       </Show>
     </>
+  )
+}
+
+// What the plugin's derived sources read, which panels read through each input, and the approval that
+// covers them (docs/data-sources/derived-sources.md § Approve inputs for loaded plugins). The panel count
+// scans every published plan on the node, so it's read only while this tab is open.
+function Reads(props: PluginPageProps & Actions & { active: boolean; inputs: NonNullable<NodePluginRow['inputs']> }) {
+  const id = () => props.plugin.id
+  const [state] = createResource(
+    () => (props.active ? { id: id(), nodeId: props.nodeId, inputs: props.inputs } : false),
+    ({ id, nodeId }) => readPluginInputGrant(id, nodeId ?? undefined),
+  )
+  const integrations = createQuery(() => integrationsOptions(props.active))
+  const account = (connectionId: string) => {
+    const connection = integrations.data?.integrations.find((candidate) => candidate.id === connectionId)
+    return connection ? connection.name ?? connection.label : undefined
+  }
+  const used = (input: PluginInputLine): string | undefined => {
+    const loaded = state()
+    if (!loaded) return undefined
+    const usage = loaded.usage[input.sourceId]?.[input.name]
+    if (!usage) return 'not used by any panel'
+    const names = usage.connectionIds.map(account).filter((name): name is string => !!name)
+    const accounts = names.length ? ` with the ${names.join(' and ')} account${names.length === 1 ? '' : 's'}` : ''
+    return `used by ${usage.panels} panel${usage.panels === 1 ? '' : 's'}${accounts}`
+  }
+  const describe = (input: PluginInputLine) =>
+    [input.plural ?? input.source, input.provider, used(input), input.approved ? undefined : 'not approved yet']
+      .filter((part): part is string => !!part).join(' · ')
+  const revoke = () => props.run(async () => {
+    const name = pluginName(props.plugin)
+    const confirmed = await confirmAction({
+      title: `Revoke what ${name} reads`,
+      actionLabel: 'Revoke',
+      goes: `${name}'s data sources stop reading other sources on their next request.`,
+      stays: 'Its panels stay, and show as unavailable until you approve again.',
+      danger: true,
+    })
+    if (!confirmed) return
+    await revokePluginInputs(id(), props.nodeId ?? undefined)
+    await props.settleNode()
+  })
+  return (
+    <SettingsSection id="reads" label="Reads" help="Sources its data sources read, only with the account you choose for each panel.">
+      <For each={props.inputs.inputs}>
+        {(input) => <SettingRow label={input.label} description={describe(input)} />}
+      </For>
+      <SettingRow
+        label={awaitingInputApproval(pluginRow(props.plugin)) ? 'Waiting for your approval' : 'Approved'}
+        description={props.inputs.granted ? 'One approval covers this list. Panels still pick each account.' : undefined}
+      >
+        <Inline>
+          <Show when={awaitingInputApproval(pluginRow(props.plugin))}>
+            <Button size="sm" disabled={props.busy} onPress={() => reviewPendingTrust(id())}>Review…</Button>
+          </Show>
+          <Show when={props.inputs.granted}>
+            <Button size="sm" variant="ghost" tone="danger" disabled={props.busy} onPress={() => void revoke()}>Revoke</Button>
+          </Show>
+        </Inline>
+      </SettingRow>
+    </SettingsSection>
   )
 }
 

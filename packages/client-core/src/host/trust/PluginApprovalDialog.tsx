@@ -6,6 +6,7 @@ import { activeNodeId } from '../../infra/node/activeNode'
 import { nodes } from '../../infra/node/fleet'
 import {
   answerPluginRequest,
+  grantPluginInputs,
   installNodePlugin,
   refreshNodePlugins,
   reloadNodePlugin,
@@ -19,7 +20,8 @@ import { Modal } from '../../kit/components/overlays/Modal'
 import { closePluginApproval, describePluginRequest, pluginApprovalTask, pluginRequestOutcomeMessage } from './approval'
 import { syncPluginDistribution } from '../plugins/distribution'
 import { setPluginDevGrant } from '../plugins/host'
-import { navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
+import { inputPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines, providedSourceLines, scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines } from './permissions'
+import { shownInputs } from './trustModel'
 import './plugin-trust.css'
 
 // The owner's side of an agent's install request (docs/plugins/agent-install.md § Approval-mediated install and
@@ -65,6 +67,10 @@ export default function PluginApprovalDialog() {
     const installed = row?.installed
     if (!row || !installed) return []
     return [
+      // The same Reads your data and Provides lines the trust prompt shows, so a plugin an agent wrote
+      // can't reach anyone's accounts without saying so. Turning it on approves them.
+      ...inputPermissionLines(row.inputs?.inputs ?? []),
+      ...providedSourceLines(installed.contributions),
       ...nodePermissionLines(installed.permissions),
       // The node half is what this screen exists for, and a schedule is the part of it that acts with
       // nobody here, so it belongs on the one disclosure a node-only package ever gets.
@@ -151,6 +157,9 @@ export default function PluginApprovalDialog() {
       const pending = reviewRow()?.pendingReview
       if (!current || !target || !pending || !('reviewId' in pending)) return
       await reviewNodePlugin(target.pluginId, pending, 'approved', nodeId() ?? undefined)
+      // The review screen showed what it reads, so turning it on approves that exact list too.
+      const shown = reviewRow()
+      if (shown?.inputs?.inputs.some((input) => !input.approved)) await grantPluginInputs(target.pluginId, shownInputs(shown), nodeId() ?? undefined)
       // The dev grant is recorded before the distribution pass, because the pass is what fetches the
       // bundle and the helper applies the grant as the bytes land. The other order would
       // queue a trust prompt for the first bundle and auto-trust every one after it.
@@ -247,7 +256,10 @@ export default function PluginApprovalDialog() {
                   {(line) => (
                     <li classList={{ high: line.high }}>
                       <Icon name={line.icon} />
-                      <span>{line.text}</span>
+                      <span>
+                        {line.text}
+                        <Show when={line.detail}>{(detail) => <span class="plugin-trust-detail">{detail()}</span>}</Show>
+                      </span>
                     </li>
                   )}
                 </For>

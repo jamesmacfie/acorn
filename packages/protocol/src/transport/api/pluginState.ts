@@ -44,6 +44,48 @@ export type NodePluginRow = {
   active?: PluginRuntimeIdentity | null
   /** An agent-requested disk candidate held inert until the owner reviews these exact bytes. */
   pendingReview?: { reviewId: string; fingerprint: string; stagedAt: number } | { corrupt: true }
+  /** The sources this plugin's derived sources read, and whether the person's grant covers each. Present
+   * only for a loaded plugin whose installed version declares inputs. Separate from `state`, because a
+   * plugin waiting for this approval still runs (docs/data-sources/derived-sources.md). */
+  inputs?: PluginInputs
+}
+
+export type PluginInputs = {
+  /** A grant exists, so an input it doesn't cover is new or changed in this version. */
+  granted: boolean
+  inputs: PluginInputLine[]
+}
+
+/** One declared input, with the words acorn shows for it. `plural` and `provider` come from the input
+ * source's registration and its owner, never from the plugin that reads it. */
+export type PluginInputLine = {
+  /** The plugin's own source that reads this input. */
+  sourceId: string
+  name: string
+  /** `<pluginId>:<sourceId>` of the source it reads. */
+  source: string
+  optional: boolean
+  /** The plugin's own label for the input. Untrusted display text. */
+  label: string
+  /** The input source's plural, such as "Pull requests". Absent when no running plugin registers it. */
+  plural?: string
+  /** Whose account the read uses, such as "GitHub". Absent for a source that needs no account. */
+  provider?: string
+  approved: boolean
+}
+
+export type PluginInputGrant = {
+  /** Source id, then input name, exactly as the approved version declared them. */
+  sources: Record<string, Record<string, { source: string; optional: boolean }>>
+  grantedAt: number
+  grantedBy: string
+}
+
+/** What `GET /v1/core/plugins/:id/input-grant` returns. `usage` counts published panels per input. */
+export type PluginInputGrantState = {
+  inputs: PluginInputLine[]
+  grant: PluginInputGrant | null
+  usage: Record<string, Record<string, { panels: number; connectionIds: string[] }>>
 }
 
 export type InstalledPluginRow = {
@@ -145,6 +187,8 @@ export const corePluginRoute = (id: string) => `/v1/core/plugins/${encodeURIComp
 export const corePluginUpdateRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/update`
 export const corePluginReloadRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/reload`
 export const corePluginReviewRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/review`
+// The person's approval of what a loaded plugin's derived sources read. Device-only by the same mount.
+export const corePluginInputGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/input-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
 // an install route the agent can reach (client-core/host/frames/scopes.ts).

@@ -69,6 +69,8 @@
 .plugin-trust-permissions li.high { font-weight: var(--fw-medium); }
 .plugin-trust-permissions li.high svg { color: var(--warn); }
 .plugin-trust-permissions .ui-badge { margin-left: auto; flex: none; }
+/* The quieter second sentence under a line: whose account a read uses, or that an input is optional. */
+.plugin-trust-detail { display: block; color: var(--text-muted); font-weight: var(--fw-normal); }
 /* Only set on an update, for a permission the previously trusted version didn't declare. */
 .plugin-trust-permissions li.added::before { content: '+'; color: var(--danger-fg); font-weight: var(--fw-bold); }
 

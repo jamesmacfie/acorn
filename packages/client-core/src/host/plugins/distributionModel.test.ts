@@ -263,3 +263,26 @@ describe('fleet selection policy', () => {
     expect(selected(result, 'a', 'new')).toBeUndefined()
   })
 })
+
+describe('input approval requests', () => {
+  const pulls = { sourceId: 'board', name: 'pulls', source: 'github:pull-requests', optional: false, label: 'Pulls', approved: false }
+  const nodeOnly = (over: Partial<NodePluginRow> = {}): NodePluginRow => ({
+    ...row('readiness', { ...identity('1.0.0', ''), client: null }, { ...identity('1.0.0', ''), client: null }),
+    inputs: { granted: false, inputs: [pulls] }, ...over,
+  })
+  const pending = (rows: NodePluginRow[], state = host([])) =>
+    derivePluginDistribution(new Map([['a', observation('a', rows)]]), state, 1, PLUGIN_API_MAJOR).pendingTrust
+
+  it('asks about a node-only plugin with unapproved inputs, without a bundle hash', () => {
+    expect(pending([nodeOnly()]).map((request) => [request.row.name, request.hash, request.nodeId])).toEqual([['readiness', '', 'a']])
+    expect(pending([nodeOnly({ inputs: { granted: true, inputs: [{ ...pulls, approved: true }] } })])).toEqual([])
+    expect(pending([nodeOnly({ disabled: true })])).toEqual([])
+    expect(pending([nodeOnly({ pendingReview: { reviewId: 'r', fingerprint: 'f', stagedAt: 1 } })])).toEqual([])
+  })
+
+  it('asks once when the same plugin also has a bundle waiting', () => {
+    const runtime = identity('1.0.0', 'bundle-hash')
+    const both = { ...row('readiness', runtime, installed(runtime)), inputs: { granted: false, inputs: [pulls] } }
+    expect(pending([both], host(['bundle-hash'])).map((request) => request.hash)).toEqual(['bundle-hash'])
+  })
+})

@@ -13,7 +13,7 @@ import { clientEvents, registerCommands } from '@acorn/client-core/host/registri
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
-import { pendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
+import { pendingBundleTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { Dynamic } from '../tree/renderer'
 import { Line } from '../kit/cells'
@@ -134,7 +134,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // reader answers (../plugins/TrustPrompt.tsx). Escape drops the queue entry, which is what closes
   // this again.
   createEffect(() => {
-    if (pendingTrust().length) openOverlay('trust')
+    if (pendingBundleTrust().length) openOverlay('trust')
     else closeOverlay('trust')
   })
 

@@ -86,7 +86,9 @@ read-only transaction. Your plugin never sees the URL or opens a socket. `data:w
 
 A derived source's `inputs` work as a grant too, though they live on the source, not in
 `permissions`. The person approves the list of sources your plugin reads, and a handle refuses any
-input the grant doesn't cover. Each panel still picks the account for each input. For the rules, see
+input the grant doesn't cover. Each panel still picks the account for each input. The prompt words
+each input from the input source and its owner, such as "Read pull requests from GitHub", never from
+your `label`, and it lists each source you register under **Provides**. For the rules, see
 [derived sources](../data-sources/derived-sources.md).
 
 ## Frame scopes

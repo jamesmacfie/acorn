@@ -102,8 +102,23 @@ A grant covers inputs one at a time. When an installed version changes its input
 reading the inputs whose source and optional flag still match, and a new or changed input stays
 refused until a grant covers it.
 
-Acorn has no approval route or dialog for grants. Tests write them through `inputGrantsStore`.
-[Input consent](../future/dashboards/09-input-consent.md) proposes the dialog.
+The person approves the list in the trust prompt, under **Reads your data**. The Node puts each
+plugin's inputs on its roster row, worded from the input source's registration and its owner, with an
+`approved` flag per input. The prompt appears for any row with an input the grant doesn't cover, even
+for a plugin with no client half, and on an update it leads with only those inputs.
+`/v1/core/plugins/:id/input-grant` holds the grant, behind the same device gate as the other plugin
+routes:
+
+- `GET` returns the declared inputs, the stored grant, and `usage`: the published panels that bind
+  each input, with their account ids. It reads every published plan, so call it when someone asks.
+- `POST` carries the exact list the person saw, keyed by source id, then input name, with `source`
+  and `optional`. The Node answers 409 when that list doesn't match the installed version, so a
+  dialog left open across an update can't approve something it never showed.
+- `DELETE` revokes the grant. The plugin's panels stay, and their reads fail with
+  `input-unavailable` until the person approves again.
+
+Both writes broadcast `plugins:changed`. For the prompt, see
+[plugin distribution](../plugins/distribution.md#approving-what-a-plugin-reads).
 
 ## Revisions and completeness
 

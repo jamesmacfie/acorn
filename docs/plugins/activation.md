@@ -79,7 +79,8 @@ The list has three filters:
 
 - **All** shows every plugin.
 - **Needs you** shows what only the owner can settle: a bundle waiting for approval on this device, a
-  package waiting for review, a failed load, and a change that waits for a Node restart.
+  package waiting for review, inputs waiting for approval, a failed load, and a change that waits for
+  a Node restart.
 - **This device** shows the client-only plugins.
 
 Each row names the plugin and states its version, origin, and status in the words
@@ -92,14 +93,19 @@ A row shows the plugin's name, such as "GitHub", not its id. A compiled plugin s
 it through `pluginLabel` and falls back to the id when a Node sends no label. The id still shows on
 the **Status** line, in every trust prompt and review, and in the audit log.
 
-**Manage** opens the plugin's page. It has an **Enabled** switch, a status banner, and four tabs:
+**Manage** opens the plugin's page. For a plugin waiting for you to approve what it reads, it opens
+that prompt instead ([approving what a plugin reads](./distribution.md#approving-what-a-plugin-reads)).
+The page has an **Enabled** switch, a status banner, and four tabs:
 
 - **Overview**: what the plugin adds on this device, such as rail sources with their **Show in left
-  rail** switch, command and shortcut counts, agent tools, and the event verbs it declares in
-  `emits`.
+  rail** switch, command and shortcut counts, agent tools, the data sources it declares, and the event
+  verbs it declares in `emits`.
 - **Settings**: the plugin's own settings pages, each with **Open**, and any core surface it offers
   to draw.
-- **Permissions**: the grant lines, a staged package's review with **Approve this package** and
+- **Permissions**: **Reads**, one row per input its derived sources read, with the source, the
+  provider, and how many published panels use it with which accounts, plus **Review…** or **Revoke**.
+  The panel count is read from the Node only while this tab is open. Then the grant lines, a staged
+  package's review with **Approve this package** and
   **Remove staged package**, each approval this device recorded with **Revoke approval** or **Review
   again**, and development mode with **End dev mode**. A device plugin also offers **Dev trust**.
 - **Versions**: the installed and running versions, the source, and **Update**.

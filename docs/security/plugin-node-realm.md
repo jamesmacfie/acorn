@@ -53,6 +53,13 @@ holds a credential and can't read outside a request. A handle refuses any input 
 grant doesn't cover, and offers no actions or writes. Compiled plugins need no grant.
 [Derived sources](../data-sources/derived-sources.md) has the full rules.
 
+The person gives the grant in the trust prompt, which words each input from the input source's
+registration and its owner rather than from the plugin. Only a device principal can write or revoke
+it, through the device-gated plugin routes, and the Node refuses a grant for a list the installed
+version doesn't declare. The handle checks the grant at every read, so a revocation stops the next
+read without a restart. A grant never covers an account: each panel still picks the account for each
+input.
+
 ### The broadcast namespace
 
 A loaded plugin's `ctx.events.send` is confined to `plugin:<its-id>:*`, and naming anything else

@@ -5,6 +5,9 @@ import type { PluginRosterEntry } from './host'
 import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { ActivePluginSnapshot } from '../plugins/loader'
 import type { PendingPluginReview } from '../plugins/pendingReview'
+import { pluginInputs, type InputGrantsStore } from '../plugins/inputGrants'
+import { registeredDataSource } from '../dataSources/registry'
+import { parseDataSourceInputRef } from '@acorn/protocol/dataSources.ts'
 import type {
   InstalledPluginRow,
   NodePluginRow,
@@ -74,6 +77,9 @@ export type PluginsBridge = {
   // code fails to start resolves with `state: 'failed'`, because that is not an error in the request. The
   // previous instance is still serving and nothing was lost.
   reload(id: string): Promise<PluginReloadResult>
+  // The person's approvals of what loaded plugins' derived sources read (server/plugins/inputGrants.ts).
+  // A fresh read per call, as the input handles do, so a grant written elsewhere shows at once.
+  inputGrants(): InputGrantsStore
 }
 
 export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')
@@ -165,11 +171,25 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // This used to re-list all nine members, which made it a second projection of the same manifest kept in
   // step with the first by hand, the exact habit the one-declaration contract exists to end. What keeps
   // the spread honest is the exactness assertion at the top of this file.
-  const declared = (name: string): Pick<NodePluginRow, 'installed'> => {
+  const grants = bridge.inputGrants()
+  const roster = new Map(bridge.roster().map((entry) => [entry.name, entry]))
+  // An input names its source by the plugin that owns it. A compiled owner's label is acorn's own words;
+  // a loaded owner wrote its label itself, so the id stands in, as it does in the trust prompt.
+  const describeInput = (source: string): { plural?: string; provider?: string } => {
+    const ref = parseDataSourceInputRef(source)
+    const registered = registeredDataSource(ref)
+    const owner = ref.pluginId === 'core' ? 'Acorn' : installed.has(ref.pluginId) ? ref.pluginId : roster.get(ref.pluginId)?.label ?? ref.pluginId
+    return {
+      ...(registered ? { plural: registered.plural } : {}),
+      ...(!registered || registered.providerId ? { provider: owner } : {}),
+    }
+  }
+  const declared = (name: string): Pick<NodePluginRow, 'installed' | 'inputs'> => {
     const entry = installed.get(name)
     if (!entry) return {}
     const { id: _id, label: _label, hasNode: _hasNode, ...row } = entry satisfies InstalledPluginInfo
-    return { installed: row satisfies DeclaredRow }
+    const inputs = pluginInputs(entry.contributions.dataSources, grants.get(name), describeInput)
+    return { installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}) }
   }
   // The name a person reads. A package on disk names itself in its manifest, and that wins over a
   // compiled definition of the same id, because the disk copy is the one the owner installed.

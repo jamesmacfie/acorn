@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import {
+  corePluginInputGrantRoute,
   corePluginInstallRoute,
   corePluginReloadRoute,
   corePluginRequestRoute,
@@ -8,6 +9,8 @@ import {
   corePluginsRoute,
   corePluginUpdateRoute,
   type NodePluginState,
+  type PluginInputGrant,
+  type PluginInputGrantState,
   type PluginInstallResult,
   type PluginInstallSource,
   type PluginReloadResult,
@@ -115,6 +118,19 @@ export const reviewNodePlugin = async (
   nodeId?: string,
 ): Promise<void> => {
   await mutate(corePluginReviewRoute(id), 'POST', { ...review, decision }, nodeId)
+}
+
+// What a loaded plugin's derived sources read (docs/data-sources/derived-sources.md § Approve inputs for
+// loaded plugins). The read carries the panel count per input, which the node computes on each call.
+export const readPluginInputGrant = async (id: string, nodeId?: string): Promise<PluginInputGrantState> =>
+  await readJson<PluginInputGrantState>(corePluginInputGrantRoute(id), nodeId ? { nodeId } : {})
+
+export const grantPluginInputs = async (id: string, sources: PluginInputGrant['sources'], nodeId?: string): Promise<void> => {
+  await mutate(corePluginInputGrantRoute(id), 'POST', { sources }, nodeId)
+}
+
+export const revokePluginInputs = async (id: string, nodeId?: string): Promise<void> => {
+  await mutate(corePluginInputGrantRoute(id), 'DELETE', {}, nodeId)
 }
 
 // The owner's answer to one agent-raised approval request (docs/plugins/agent-install.md § Approval-mediated

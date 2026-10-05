@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from 'node
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { grantCoversInput, inputGrantsStore, type InputGrant } from './inputGrants'
+import { declaredInputs, grantCoversInput, inputGrantsStore, sameInputs, type InputGrant } from './inputGrants'
 
 const grant: InputGrant = {
   pluginId: 'release-readiness',
@@ -24,6 +24,8 @@ describe('inputGrantsStore', () => {
     inputGrantsStore(dir).set({ ...grant, sources: {}, grantedAt: 2 })
     expect(JSON.parse(readFileSync(file(), 'utf8'))).toHaveLength(1)
     expect(inputGrantsStore(dir).get(grant.pluginId)?.grantedAt).toBe(2)
+    inputGrantsStore(dir).delete(grant.pluginId)
+    expect(inputGrantsStore(dir).get(grant.pluginId)).toBeUndefined()
   })
 
   it('reads a corrupt file as no grants and skips malformed entries', () => {
@@ -46,5 +48,19 @@ describe('grantCoversInput', () => {
     expect(grantCoversInput(grant, 'readiness', 'issues', { source: 'jira:issues' })).toBe(false)
     expect(grantCoversInput(grant, 'other', 'issues', { source: 'linear:issues' })).toBe(false)
     expect(grantCoversInput(undefined, 'readiness', 'issues', { source: 'linear:issues' })).toBe(false)
+  })
+})
+
+describe('declaredInputs and sameInputs', () => {
+  const registration = { name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/r/board' }
+  it('keys a manifest the way a grant does, and compares lists in any order', () => {
+    const declared = declaredInputs([
+      { ...registration, sourceId: 'readiness', inputs: { pulls: { source: 'github:pull-requests', label: 'Pulls', optional: true }, issues: { source: 'linear:issues', label: 'Issues' } } },
+      { ...registration, sourceId: 'plain' },
+    ])
+    expect(declared).toEqual({ readiness: { pulls: { source: 'github:pull-requests', optional: true }, issues: { source: 'linear:issues', optional: false } } })
+    expect(sameInputs(declared, grant.sources)).toBe(true)
+    expect(sameInputs(declared, { readiness: { issues: grant.sources.readiness!.issues! } })).toBe(false)
+    expect(sameInputs(declared, { readiness: { ...grant.sources.readiness, pulls: { source: 'github:pull-requests', optional: false } } })).toBe(false)
   })
 })

@@ -1,5 +1,7 @@
 import { chmodSync, mkdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import type { PluginInputs } from '@acorn/protocol/api.ts'
+import type { DataSourceRegistration } from '@acorn/protocol/dataSources.ts'
 import { writePrivateAtomic } from '../storage/dataRoot'
 
 // The person's approval of the sources a loaded plugin's derived sources read. Compiled plugins need
@@ -19,6 +21,7 @@ export type InputGrant = {
 export type InputGrantsStore = {
   get(pluginId: string): InputGrant | undefined
   set(grant: InputGrant): void
+  delete(pluginId: string): void
 }
 
 const FILE_NAME = 'input-grants.json'
@@ -67,13 +70,17 @@ export function inputGrantsStore(dataDir: string): InputGrantsStore {
   } catch {
     current = new Map()
   }
+  const write = (next: Map<string, InputGrant>) => {
+    mkdirSync(dataDir, { recursive: true, mode: 0o700 })
+    writePrivateAtomic(file, `${JSON.stringify([...next.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId)))}\n`)
+    current = next
+  }
   return {
     get: (pluginId) => current.get(pluginId),
-    set(grant) {
-      const next = new Map(current).set(grant.pluginId, grant)
-      mkdirSync(dataDir, { recursive: true, mode: 0o700 })
-      writePrivateAtomic(file, `${JSON.stringify([...next.values()].sort((a, b) => a.pluginId.localeCompare(b.pluginId)))}\n`)
-      current = next
+    set: (grant) => write(new Map(current).set(grant.pluginId, grant)),
+    delete(pluginId) {
+      const next = new Map(current)
+      if (next.delete(pluginId)) write(next)
     },
   }
 }
@@ -82,4 +89,41 @@ export function inputGrantsStore(dataDir: string): InputGrantsStore {
 export function grantCoversInput(grant: InputGrant | undefined, sourceId: string, name: string, input: { source: string; optional?: boolean }): boolean {
   const granted = grant?.sources[sourceId]?.[name]
   return !!granted && granted.source === input.source && granted.optional === !!input.optional
+}
+
+/** The inputs a manifest's data sources declare, keyed the way a grant keys them. */
+export function declaredInputs(dataSources: readonly DataSourceRegistration[] | undefined): InputGrant['sources'] {
+  const sources: InputGrant['sources'] = {}
+  for (const source of dataSources ?? []) {
+    if (!source.inputs || !Object.keys(source.inputs).length) continue
+    sources[source.sourceId] = Object.fromEntries(Object.entries(source.inputs)
+      .map(([name, input]) => [name, { source: input.source, optional: !!input.optional }]))
+  }
+  return sources
+}
+
+/** True when two input lists name the same inputs with the same sources and optional flags, in any order. */
+export function sameInputs(left: InputGrant['sources'], right: InputGrant['sources']): boolean {
+  const flat = (sources: InputGrant['sources']) => Object.entries(sources)
+    .flatMap(([sourceId, inputs]) => Object.entries(inputs).map(([name, input]) => JSON.stringify([sourceId, name, input.source, input.optional])))
+    .sort().join('\n')
+  return flat(left) === flat(right)
+}
+
+/**
+ * The roster's account of what a plugin reads: each declared input in words acorn wrote, and whether the
+ * grant covers it. `describe` names the input source from its registration and its owner, so a plugin
+ * can't word its own disclosure. Undefined when the plugin declares no inputs.
+ */
+export function pluginInputs(
+  dataSources: readonly DataSourceRegistration[] | undefined,
+  grant: InputGrant | undefined,
+  describe: (source: string) => { plural?: string; provider?: string },
+): PluginInputs | undefined {
+  const inputs = (dataSources ?? []).flatMap((source) => Object.entries(source.inputs ?? {}).map(([name, input]) => ({
+    sourceId: source.sourceId, name, source: input.source, optional: !!input.optional, label: input.label,
+    ...describe(input.source),
+    approved: grantCoversInput(grant, source.sourceId, name, input),
+  })))
+  return inputs.length ? { granted: !!grant, inputs } : undefined
 }

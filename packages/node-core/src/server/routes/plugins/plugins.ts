@@ -12,6 +12,9 @@ import { validatePluginCliValue, PLUGIN_CLI_INPUT_MAX_BYTES, PLUGIN_CLI_OUTPUT_M
 import { getDb } from '../../db'
 import { projects, tasks, workspaces } from '../../db/schema'
 import { eq } from 'drizzle-orm'
+import type { PluginInputGrant, PluginInputGrantState } from '@acorn/protocol/api.ts'
+import { declaredInputs, sameInputs } from '../../plugins/inputGrants'
+import { pluginInputUsage } from '../../dashboards/inputUsage'
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
@@ -36,6 +39,11 @@ const requestDecisionBody = z.strictObject({
   message: z.string().min(1).max(400).optional(),
 })
 const bundleHash = /^[0-9a-f]{64}$/
+// The exact input list the person saw, keyed as a grant keys it (server/plugins/inputGrants.ts).
+const inputGrantBody = z.strictObject({
+  sources: z.record(z.string().min(1).max(200), z.record(z.string().min(1).max(32),
+    z.strictObject({ source: z.string().min(1).max(401), optional: z.boolean() }))),
+})
 
 // Every mutation here changes which code a node runs, and a client that retries a timed-out install
 // must not install twice. The global middleware (server/index.ts) replays a repeated key but does not
@@ -296,6 +304,46 @@ export const plugins = new Hono<AppEnv>()
       return { ok: true }
     })
   })
+  // The person's approval of what a loaded plugin's derived sources read
+  // (docs/data-sources/derived-sources.md § Approve inputs for loaded plugins). The grant is checked at
+  // each input read, so writing or removing it takes effect on the next request without a restart.
+  .get('/:id/input-grant', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => {
+    const id = c.req.param('id')
+    const inputs = pluginState(bridge).plugins.find((row) => row.name === id)?.inputs
+    if (!inputs) throw new BridgeError(404, 'not_found', `${id} reads no other sources.`)
+    const stored = bridge.inputGrants().get(id)
+    const grant: PluginInputGrant | null = stored ? { sources: stored.sources, grantedAt: stored.grantedAt, grantedBy: stored.grantedBy } : null
+    return { inputs: inputs.inputs, grant, usage: pluginInputUsage(getDb(c.env), id) } satisfies PluginInputGrantState
+  }))
+  // The body is the list the dialog showed. A list that no longer matches the installed version is
+  // refused, so a dialog left open across an update can't approve something it never showed.
+  .post('/:id/input-grant', async (c) => {
+    const parsed = inputGrantBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const id = c.req.param('id')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const declared = declaredInputs(bridge.installed().find((entry) => entry.id === id)?.contributions.dataSources)
+      if (!Object.keys(declared).length) throw new BridgeError(404, 'not_found', `${id} reads no other sources.`)
+      if (!sameInputs(declared, parsed.data.sources)) {
+        throw new BridgeError(409, 'bad_request', 'What this plugin reads changed. Refresh the plugin list.')
+      }
+      const principal = c.get('principal')
+      bridge.inputGrants().set({
+        pluginId: id, sources: declared, grantedAt: Date.now(),
+        grantedBy: principal?.kind === 'device' ? `device:${principal.deviceId ?? ''}` : principal?.kind ?? 'system',
+      })
+      auditRequest(c, { action: 'plugins.inputs.granted', subject: id })
+      broadcastPluginsChanged()
+      return { ok: true }
+    })
+  })
+  .delete('/:id/input-grant', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => {
+    const id = c.req.param('id')
+    bridge.inputGrants().delete(id)
+    auditRequest(c, { action: 'plugins.inputs.revoked', subject: id })
+    broadcastPluginsChanged()
+    return { ok: true }
+  }))
   // The one exception to "nothing here starts a plugin" (docs/plugins/dev-loop.md § The dev loop § Reloading
   // one plugin without a restart). Loaded plugins only. A built-in is refused with the installer's own
   // 400 shape.

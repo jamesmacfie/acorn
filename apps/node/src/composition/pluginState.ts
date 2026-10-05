@@ -7,7 +7,7 @@ import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { nodePluginNames } from './composition'
-import { approvePluginReview, hasPendingPluginReview, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
+import { approvePluginReview, hasPendingPluginReview, inputGrantsStore, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
 // Plugins). Building it once here is what stops the two roots drifting on which build allows
@@ -104,5 +104,6 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
       return result
     },
     reload: (id) => reloader.reload(id),
+    inputGrants: () => inputGrantsStore(dataDir),
   }
 }

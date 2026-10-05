@@ -48,6 +48,7 @@ beforeEach(async () => {
       throw new Error('not wired in this harness')
     },
     reload: () => Promise.reject(new Error('not wired in this harness')),
+    inputGrants: () => ({ get: () => undefined, set: () => {}, delete: () => {} }),
   })
   env = {
     DB: harness.db,

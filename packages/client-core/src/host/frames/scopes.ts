@@ -200,6 +200,7 @@ const RULES: readonly RouteRule[] = [
   // otherwise re-run a plugin's node half on its own timing.
   { path: shape(`/v1/core/plugins/${SEG}/reload`), scopes: {} },
   { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
+  { path: shape(`/v1/core/plugins/${SEG}/input-grant`), scopes: {}, note: 'Approves which of the owner’s data a plugin may read.' },
   // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
   // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
   // able to answer the very question that exists because an agent must not install code.

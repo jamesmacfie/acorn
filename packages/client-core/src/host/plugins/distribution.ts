@@ -37,8 +37,23 @@ export type { PluginTrustRequest }
 export const installedByNode = (): ReadonlyMap<string, readonly NodePluginRow[]> =>
   new Map([...distribution().byNode].map(([id, observation]) => [id, observation.rows]))
 export const devicePlugins = (): readonly DevicePluginEntry[] => distribution().devicePlugins
-export const pendingTrust = (): readonly PluginTrustRequest[] =>
-  distribution().pendingTrust.filter((request) => !dismissed.has(decisionKey(request.row.name, request.hash)))
+const [reviewFirst, setReviewFirst] = createSignal<string>()
+export const pendingTrust = (): readonly PluginTrustRequest[] => {
+  const first = reviewFirst()
+  return distribution().pendingTrust.filter((request) => !dismissed.has(decisionKey(request.row.name, request.hash)))
+    .sort((a, b) => Number(b.row.name === first) - Number(a.row.name === first))
+}
+
+/** Only the requests about a client bundle. The terminal client draws no dashboards, so it can't
+ *  approve what a plugin reads and leaves those to the desktop app. */
+export const pendingBundleTrust = (): readonly PluginTrustRequest[] => pendingTrust().filter((request) => request.hash)
+
+/** Bring a plugin's waiting request back to the front, even after "Not now", for a row's Manage. */
+export function reviewPendingTrust(pluginId: string): void {
+  for (const key of dismissed) if ((JSON.parse(key) as [string, string])[0] === pluginId) dismissed.delete(key)
+  setReviewFirst(pluginId)
+  setDistribution({ ...distribution() })
+}
 export const activeBundles = (): ReadonlyMap<string, { hash: string }> | null => {
   if (!initialized) return null
   const snapshot = distribution()

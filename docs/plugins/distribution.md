@@ -91,6 +91,28 @@ declaration describe an active package. Pending, failed, and disabled rows are w
 
 [Third-party plugin bundles](../security/plugin-bundles.md) owns the threat model behind these rules.
 
+### Approving what a plugin reads
+
+A loaded plugin whose derived sources declare inputs also asks the person which sources it reads.
+That answer lives on the Node, not on the device, and it's keyed by the input list, not by a bundle
+hash. Each roster row carries `inputs`: every declared input, worded by the Node from the input
+source's registration, with an `approved` flag from the Node's grant.
+
+- A row with an input its grant doesn't cover queues a trust request even when the plugin has no
+  client half. That request has an empty `hash`. A plugin that also has a bundle waiting asks once, and
+  answering records both decisions.
+- The prompt adds **Reads your data** and **Provides** groups before **Enforced**. On an update, only
+  the inputs the grant doesn't cover lead under "New in this version".
+- **Accept** posts the exact list shown to the input grant route. **Reject** turns the plugin off on
+  its Node. **Not now** records nothing.
+- The plugin shows under **Needs you** as "Waiting for you to approve what it reads." Its **Manage**
+  reopens the prompt.
+- The terminal client can't approve inputs. Its prompt asks only about bundles, and it says when a
+  plugin also reads your data so the person can approve that in the desktop app.
+
+[Derived sources](../data-sources/derived-sources.md#approve-inputs-for-loaded-plugins) owns the
+grant and when the Node checks it.
+
 ## One shared eligibility and trust check
 
 The frame and chrome registration passes need the same answer to "who may contribute, and what did

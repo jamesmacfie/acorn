@@ -3,8 +3,9 @@
 Status: proposed, October 5, 2026. [Phase 1](./01-quick-wins.md),
 [phase 2](./02-plan-outline-model.md), [phase 3](./03-studio-shell.md),
 [phase 4](./04-inspectors.md), [phase 5](./05-launcher.md), [phase 6](./06-docked-ai.md),
-[phase 7](./07-panel-menu.md), and [phase 8](./08-source-inputs.md) shipped on October 5, 2026,
-with phase 8's GitHub branch source move left open. The other phases aren't built. Phases 8 to 12, derived sources, were added the same day. This programme
+[phase 7](./07-panel-menu.md), [phase 8](./08-source-inputs.md), and
+[phase 9](./09-input-consent.md) shipped on October 5, 2026, with phase 8's GitHub branch source
+move left open. The other phases aren't built. Phases 8 to 12, derived sources, were added the same day. This programme
 replaces the dashboards programme that lived in this folder. Its workstreams 1 to 7 shipped by
 October 4, 2026, and its files were removed on October 5, 2026; git history keeps them (commit
 `1d8c37913`).

@@ -1,4 +1,7 @@
-import { refreshPluginTrust, type PluginTrustRequest } from '../plugins/distribution'
+import { distribution, refreshPluginTrust, syncPluginDistribution, type PluginTrustRequest } from '../plugins/distribution'
+import { awaitingInputApproval } from '../plugins/distributionModel'
+import { grantPluginInputs, saveDisabledNodePlugins } from '../../infra/node/nodePlugins'
+import { nextDisabledList } from '../../features/settings/plugins/pluginToggle'
 import {
   agentToolGrants,
   agentToolPermissionLines,
@@ -23,9 +26,12 @@ import {
   uiPermissionLines,
   webviewGrants,
   webviewPermissionLines,
+  inputPermissionLines,
+  providedSourceLines,
 } from './permissions'
 import { recordPluginTrust } from '../plugins/host'
 import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
+import type { NodePluginRow, PluginInputGrant } from '@acorn/protocol/api.ts'
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
 //
@@ -37,9 +43,11 @@ import { clientDeclaration } from '@acorn/protocol/plugin/declaration.ts'
 // three lists may never be merged. And `decide` is
 // where a stray keypress once permanently disabled a plugin with no undo surface anywhere in the UI.
 
-export type TierKey = 'enforced' | 'declared' | 'web'
+export type TierKey = 'reads' | 'provides' | 'enforced' | 'declared' | 'web'
 
-export const TIER_LABEL: Record<TierKey, string> = { enforced: 'Enforced', declared: 'Declared', web: 'Web pages' }
+export const TIER_LABEL: Record<TierKey, string> = {
+  reads: 'Reads your data', provides: 'Provides', enforced: 'Enforced', declared: 'Declared', web: 'Web pages',
+}
 
 export type TrustLine = PermissionLine & {
   tier: TierKey
@@ -62,7 +70,16 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
   const installed = request?.row.installed
   if (!request || !installed) return []
   const previous = request.previous?.partial ? undefined : request.previous
+  // What its derived sources read is approved on the node, input by input, so its "what is new" comes
+  // from the node's grant rather than from this device's last answer about a bundle.
+  const inputs = request.row.inputs
   const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
+    {
+      key: 'reads',
+      now: inputPermissionLines(inputs?.inputs ?? []),
+      was: inputs?.granted ? inputPermissionLines(inputs.inputs.filter((input) => input.approved)) : null,
+    },
+    { key: 'provides', now: providedSourceLines(installed.contributions), was: null },
     {
       key: 'enforced',
       now: [
@@ -178,4 +195,28 @@ export async function recordTrustDecision(request: PluginTrustRequest, decision:
   // The host's durable write succeeded. One snapshot read now changes the accepted selection and
   // pending queue together; its commit listener updates both contribution registries.
   await refreshPluginTrust()
+}
+
+/** The input list a grant covers, as the dialog showed it. The node refuses it if the installed version
+ *  has moved on since. */
+export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => {
+  const sources: PluginInputGrant['sources'] = {}
+  for (const input of row.inputs?.inputs ?? []) {
+    sources[input.sourceId] = { ...sources[input.sourceId], [input.name]: { source: input.source, optional: input.optional } }
+  }
+  return sources
+}
+
+/**
+ * Answer what a plugin reads, on its node. Accepting writes a grant for the list shown. Rejecting turns
+ * the plugin off on that node, as rejecting a bundle turns its interface off here. Not now goes through
+ * `resolvePendingTrust` and records nothing. Run it before `recordTrustDecision` when a request carries
+ * both, so the re-read roster no longer asks once the bundle answer lands.
+ */
+export async function recordInputDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+  if (!awaitingInputApproval(request.row)) return
+  const nodeId = request.nodeId
+  if (decision === 'accepted') await grantPluginInputs(request.row.name, shownInputs(request.row), nodeId)
+  else await saveDisabledNodePlugins(nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true), nodeId)
+  await syncPluginDistribution({ nodeIds: [nodeId] })
 }

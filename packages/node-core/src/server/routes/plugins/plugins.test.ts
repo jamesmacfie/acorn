@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { NodePluginState } from '@acorn/protocol/api.ts'
+import type { NodePluginState, PluginInputGrantState } from '@acorn/protocol/api.ts'
 import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../../plugins/loader'
 import type { AppEnv } from '../../middleware/auth'
 import { requireDevice } from '../../middleware/requireUser'
@@ -17,6 +17,7 @@ import { idempotency } from '../../middleware/idempotency'
 import { makeTestDb, testEnv } from '../../../testkit/db'
 import { schema } from '../../db'
 import { registerRoute, removePluginRoutes } from '../registry'
+import type { InputGrant, InputGrantsStore } from '../../plugins/inputGrants'
 
 const ROSTER: PluginRosterEntry[] = [
   { name: 'github', required: false, disabled: false, state: 'active' },
@@ -57,6 +58,12 @@ type WireOptions = {
   // Unstamped. The helper adds the clock, as in pluginState.test.ts.
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   pendingReview?: { reviewId: string; requestId: string; fingerprint: string; stagedAt: number }
+  grants?: InputGrantsStore
+}
+
+const memoryGrants = (): InputGrantsStore => {
+  const grants = new Map<string, InputGrant>()
+  return { get: (id) => grants.get(id), set: (grant) => { grants.set(grant.pluginId, grant) }, delete: (id) => { grants.delete(id) } }
 }
 
 // The bridge the composition roots fill (apps/node's service/runtime.ts and server/standalone.ts). The
@@ -65,6 +72,7 @@ type WireOptions = {
 const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
+  const grants = options.grants ?? memoryGrants()
   const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } = { install: [], update: [], uninstall: [], reload: [], approve: [] }
   setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
@@ -100,6 +108,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       calls.uninstall.push({ id, opts })
       return { restartRequired: true, dataPurged: opts.purgeData === true }
     },
+    inputGrants: () => grants,
     reload: async (id) => {
       calls.reload.push({ id })
       // The bridge's refusal for a name this node did not load from disk, which the route turns into a 400.
@@ -824,5 +833,74 @@ describe('the install, update and uninstall routes', () => {
     ]) {
       expect((await asDevice().fetch(attempt)).status, attempt.url).toBe(503)
     }
+  })
+})
+
+describe('the input grant routes', () => {
+  const readiness = (inputs: Record<string, { source: string; label: string; optional?: boolean }>) => installedEntry('readiness', {
+    contributions: {
+      ...installedEntry('readiness').contributions,
+      dataSources: [{ sourceId: 'board', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', handler: '/v1/p/readiness/board', inputs }],
+    },
+  })
+  const TWO = { pulls: { source: 'github:pull-requests', label: 'Pull requests' }, issues: { source: 'linear:issues', label: 'Issues', optional: true } }
+  const shown = { board: { pulls: { source: 'github:pull-requests', optional: false }, issues: { source: 'linear:issues', optional: true } } }
+  const roster = [{ name: 'readiness', required: false, disabled: false, state: 'active' as const }]
+  const env = () => {
+    const database = makeTestDb()
+    return testEnv({ DB: database.db })
+  }
+
+  it('reads the declared inputs and the grant, writes a grant for the exact list shown, and revokes it', async () => {
+    const grants = memoryGrants()
+    wire([], { roster, installed: [readiness(TWO)], grants })
+    const node = asDevice()
+    const read = async () => await (await node.request(at('/readiness/input-grant', 'GET'), undefined, env())).json() as PluginInputGrantState
+
+    const before = await read()
+    expect(before.grant).toBeNull()
+    expect(before.inputs.map((input) => [input.name, input.approved])).toEqual([['pulls', false], ['issues', false]])
+    expect(before.usage).toEqual({})
+
+    expect((await node.request(at('/readiness/input-grant', 'POST', { sources: shown }))).status).toBe(200)
+    expect(grants.get('readiness')).toMatchObject({ pluginId: 'readiness', sources: shown, grantedBy: 'device:d1' })
+    const after = await read()
+    expect(after.grant?.sources).toEqual(shown)
+    expect(after.inputs.every((input) => input.approved)).toBe(true)
+
+    expect((await node.request(at('/readiness/input-grant', 'DELETE'))).status).toBe(200)
+    expect(grants.get('readiness')).toBeUndefined()
+  })
+
+  it('refuses a list that does not match what the installed version declares', async () => {
+    const grants = memoryGrants()
+    wire([], { roster, installed: [readiness(TWO)], grants })
+    const node = asDevice()
+    const stale = { board: { pulls: shown.board.pulls } }
+    expect((await node.request(at('/readiness/input-grant', 'POST', { sources: stale }))).status).toBe(409)
+    const widened = { board: { ...shown.board, issues: { source: 'linear:issues', optional: false } } }
+    expect((await node.request(at('/readiness/input-grant', 'POST', { sources: widened }))).status).toBe(409)
+    expect((await node.request(at('/github/input-grant', 'POST', { sources: shown }))).status).toBe(404)
+    expect(grants.get('readiness')).toBeUndefined()
+  })
+
+  it('marks only the new input as waiting after an update adds one', async () => {
+    const grants = memoryGrants()
+    grants.set({ pluginId: 'readiness', sources: shown, grantedAt: 1, grantedBy: 'device:d1' })
+    wire([], { roster, installed: [readiness({ ...TWO, checks: { source: 'github:checks', label: 'Checks' } })], grants })
+    const state = await (await asDevice().request(request('GET'))).json() as NodePluginState
+    const row = state.plugins.find((entry) => entry.name === 'readiness')
+    expect(row?.state).not.toBe('failed')
+    expect(row?.inputs?.granted).toBe(true)
+    expect(row?.inputs?.inputs.filter((input) => !input.approved).map((input) => input.name)).toEqual(['checks'])
+  })
+
+  it('is out of reach of a task-scoped agent', async () => {
+    wire([], { roster, installed: [readiness(TWO)] })
+    const hono = new Hono<AppEnv>()
+    hono.use('/v1/*', async (c, next) => { c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' }); await next() })
+    hono.use('/v1/core/plugins/*', requireDevice)
+    hono.route('/v1/core/plugins', plugins)
+    expect((await hono.request(at('/readiness/input-grant', 'POST', { sources: shown }))).status).toBe(403)
   })
 })

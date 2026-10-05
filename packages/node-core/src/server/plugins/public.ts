@@ -3,6 +3,7 @@ export {
   bundledPluginStatePath, markPluginUserManaged, readBundledPluginState, userManagedPluginIds,
 } from './bundledState.ts'
 export { disabledPluginsStore } from './disabled.ts'
+export { inputGrantsStore } from './inputGrants.ts'
 export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin, withPluginPackage } from './installer.ts'
 export {
   installedPluginInfo, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,

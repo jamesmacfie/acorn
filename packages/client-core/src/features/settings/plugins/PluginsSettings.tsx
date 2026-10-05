@@ -5,7 +5,8 @@ import { nodes } from '../../../infra/node/fleet'
 import { restartLocalNode } from '../../../infra/node/fleetActions'
 import { installNodePlugin, refreshNodePlugins } from '../../../infra/node/nodePlugins'
 import { installPluginOnDevice, readPluginHostState } from '../../../host/plugins/host'
-import { devicePlugins, distribution, syncPluginDistribution } from '../../../host/plugins/distribution'
+import { devicePlugins, distribution, reviewPendingTrust, syncPluginDistribution } from '../../../host/plugins/distribution'
+import { awaitingInputApproval } from '../../../host/plugins/distributionModel'
 import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
 import { Alert, Badge, Button, SegmentedControl } from '../../../kit/components/primitives'
@@ -100,6 +101,12 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
     if (current?.kind !== 'plugin') return undefined
     return plugins().find((plugin) => plugin.id === current.id && (!current.pluginKind || plugin.kind === current.pluginKind))
   })
+
+  // A plugin waiting to have what it reads approved opens that dialog, which is the one decision left.
+  const manage = (plugin: InstalledPlugin) => {
+    if (plugin.kind === 'node' && awaitingInputApproval(plugin.row)) reviewPendingTrust(plugin.id)
+    else setOpen({ kind: 'plugin', id: plugin.id, pluginKind: plugin.kind })
+  }
 
   const run = async (work: () => Promise<void>) => {
     setError('')
@@ -208,7 +215,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
             <SettingRow label={pluginName(entry.plugin)} description={rowText(entry)}>
               <Inline>
                 <Badge tone={statusBadgeTone(entry.status)}>{statusWord(entry.status)}</Badge>
-                <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => setOpen({ kind: 'plugin', id: entry.plugin.id, pluginKind: entry.plugin.kind })}>
+                <Button size="sm" variant="ghost" label={`Manage ${pluginName(entry.plugin)}`} onPress={() => manage(entry.plugin)}>
                   Manage
                 </Button>
               </Inline>
