@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–03 complete; phase 04 is next.
+Date: 2026-10-06. Status: phases 01–04 complete; phase 05 is next.
 
 ## Historical investigation
 
@@ -315,6 +315,75 @@ host and writes that triple's native prebuild assets. This changes test setup on
 24.21.0 and pnpm 11.0.0, `pnpm test:focus @acorn/desktop
 scripts/stage-runtime-dependencies.test.mjs` passed all 11 tests. The original package suites,
 build, and byte measurements remain the phase 03 results above.
+
+## Phase 04: bundled Claude payload (2026-10-06)
+
+**Decision: retain.** Started at accepted revision `52872dafc` on Darwin arm64 with Node 24.21.0
+and pnpm 11.0.0. The frozen lockfile installs `@agentclientprotocol/claude-agent-acp` 0.54.1,
+`@anthropic-ai/claude-agent-sdk` 0.3.197, and the Darwin arm64 optional binary package at 0.3.197.
+The local host CLI reports Claude Code 2.1.289. The frozen install passed after package-cache access
+was permitted. An offline attempt lacked `resolve-pkg-maps@1.0.0` in the worktree's store; a sandboxed
+online attempt could not resolve npmjs.org. Neither attempt changed the lockfile.
+
+The first-party source path is `plugins/agents/src/server/drivers/claudeHarness.ts` →
+`AcpDriver.launch()` in `plugins/agents/src/server/drivers/acpDriver.ts` → `startAcpSession()` in
+`plugins/agents/src/server/drivers/acpSession.ts`.
+The harness keeps persisted `claude` and `claude-code` IDs, declares `claude` required, and resolves
+the adapter with `createRequire`. `launch()` checks the CLI on the service's `PATH`, returns a
+diagnostic when missing, and places the resolved path in `CLAUDE_CODE_EXECUTABLE` only when found.
+`start()` refuses a launch with diagnostics before spawning. The ACP child receives that override
+through the broker environment. The auth probe runs the same resolved host executable directly for
+`auth status --json`; it does not import the adapter. Each managed start, including a stored session
+reference, runs this resolution again. The session code sends `session/new`, `session/load`, or
+`session/resume` after ACP initialization, and passes Claude's stable session metadata on create and
+resume. Interactive, workflow, and delegated managed sessions enter the same runtime engine and
+driver; the workflow `agents.sessionExecute` capability and delegation service create their own
+session kinds and turns. The standalone workflow profile and terminal handoff run the host `claude`
+CLI through profile argv, outside this adapter. A contributed harness resolves its adapter inside
+its installed plugin package directory, then uses the same generic driver and its declared
+`requires` command; that seam does not imply every contributed adapter is the Claude SDK. The npm
+standalone manifest and optional dependency graph remain untouched.
+
+The installed adapter's `dist/acp-agent.js` returns `CLAUDE_CODE_EXECUTABLE` first in
+`claudeCliPath()`; its other branch resolves the SDK's platform optional binary. Its session query
+sets `pathToClaudeCodeExecutable` from that variable or `claudeCliPath()`. Logout and the `--cli`
+passthrough also call `claudeCliPath()`. The adapter's `dist/index.js` imports SDK settings before
+starting ACP and applies managed-policy `effective.env` to `process.env`. Its assignments can replace
+or clear Acorn's `CLAUDE_CODE_EXECUTABLE` after Acorn has validated the host CLI. An empty override
+selects `claudeCliPath()`'s bundled-binary branch, so removal would change this supported policy
+path. The SDK's installed `sdk.mjs` resolves a platform binary when
+`pathToClaudeCodeExecutable` is absent; when supplied, its query transport spawns that path. The
+adapter also imports SDK session inspection and deletion functions. This source trace does not
+replace isolated real SDK runtime
+proof of every supported path. The adapter declares Apache-2.0; the SDK declares its license in
+its README. Retention changes no license or distribution contents.
+
+The optional Darwin arm64 package contains 227,252,056 B of files, including a 227,251,472 B
+`claude` binary, in this install. Those bytes are an upper bound on prospective uncompressed staging
+savings, not a delivered reduction or compressed artifact estimate. The accepted phase 03 staged
+helper remains 283,230,607 B; phase 04 changed no staging inputs, so realized savings are **0 B**.
+No unchanged desktop artifact was rebuilt.
+
+The sandboxed `claude auth status --json` probe exited unsuccessfully; the same narrow probe outside
+the sandbox reported `loggedIn: true`. Authentication is available on this host. The managed-policy
+fallback makes omission unsafe under the present adapter contract, so no isolated closure without
+the binary or authenticated staged turn was attempted. Omission would also need validated external
+spawn, missing-command and cancellation fixtures, unattended metadata and cleanup, and authenticated
+staged resume. No omission policy or simulated fallback was introduced. These are requirements for
+a future change after the fallback is resolved, not failures of the retained product path.
+
+Baseline checks used `PATH=/private/tmp/acorn-trim-node-bin:$PATH`:
+
+| Command after the PATH prefix | Result |
+| --- | --- |
+| `pnpm test:focus @acorn/plugin-agents src/server/drivers/acpDriver.test.ts` | Passed 16 tests. |
+| `pnpm test:focus @acorn/plugin-agents src/server/drivers/processOwnership.test.ts` | Passed 15 tests. |
+| `pnpm test:focus @acorn/desktop scripts/stage-runtime-dependencies.test.mjs` | Passed 11 tests, including five target fixtures. |
+| `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` | Passed 12 files, 86 tests, including document paths and links. |
+
+Phase 05 may start with the phase 03 dependency graph and stage policy. An SDK or adapter upgrade
+requires reviewing executable selection, settings import, managed-policy environment mutation,
+session query, logout, and `--cli` before revisiting this retention decision.
 
 ## Future implementation record
 

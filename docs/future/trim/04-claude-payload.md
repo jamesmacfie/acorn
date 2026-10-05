@@ -1,6 +1,18 @@
 # Phase 04: resolve the bundled Claude executable payload
 
-Date: 2026-10-04. Status: TODO. Risk: high if omission is wrong; bounded decision allowed.
+Completion note, October 6, 2026: **retained** the SDK's optional Claude binary in desktop staging.
+The locked adapter normally selects Acorn's resolved host CLI, but it applies managed-policy
+environment values after receiving that path. A policy can clear the override and reach the SDK's
+bundled fallback, so omission would change a supported path. The local `claude` 2.1.289 auth probe
+reported `loggedIn: true` outside the sandbox; no staged turn was needed for this retention decision.
+No package, staging policy, lockfile, or shipped contract changed, and realized savings are zero.
+The source trace and baseline tests are recorded in
+[evidence](./evidence.md#phase-04-bundled-claude-payload-2026-10-06). Phase 05
+can proceed independently. A later omission needs real SDK closure and authenticated staged launch,
+resume, and cleanup evidence; recheck adapter executable selection and SDK path resolution at the
+locked versions before changing the package-specific staging policy.
+
+Date: 2026-10-06. Status: DONE (retention). Risk: high if omission is wrong; bounded decision used.
 Prerequisite: accepted [phase 03](./03-native-payload.md). Next: [phase 05](./05-keymap.md).
 Planning revision: `2ae55abb5`; use the current adapter/SDK versions from the accepted lockfile.
 
