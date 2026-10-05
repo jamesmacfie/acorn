@@ -1,8 +1,9 @@
 # Operations
 
 This page covers how the agents plugin queues and dispatches turns, waits out a plan limit, starts and
-stops provider processes, and recovers from failure. Most of it is in
-`plugins/agents/src/server/sessions/runtimeEngine.ts`.
+stops provider processes, and recovers from failure. `queueCoordinator.ts` owns queue scans,
+fairness, delayed wakeups, and drain. `runtimeEngine.ts` owns provider generations and dispatch
+outcomes; `runtime.ts` persists accepted turns before requesting a scan.
 
 ## The turn queue
 
@@ -24,7 +25,7 @@ reorder, edit, or deferred continuation can't dispatch a stale head. The earlies
 blocks later turns in its session. Workflow work gets a dispatch slot after five interactive or
 automation turns.
 
-The dispatcher runs on events. It scans when a turn is queued, a provider starts, or a turn settles. A
+The coordinator runs on events. It scans when a turn is queued, a provider starts, or a turn settles. A
 scan that started nothing runs again if a call arrived during it, and reconciliation runs one scan at
 boot. One plugin-database statement selects queue heads and their sessions through the partial
 queued-head index. Text frames don't trigger scans.

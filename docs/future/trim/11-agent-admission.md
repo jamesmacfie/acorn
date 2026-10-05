@@ -1,6 +1,23 @@
 # Phase 11: separate durable turn admission and queue coordination
 
-Date: 2026-10-04. Status: TODO. Risk: high; scheduling races can duplicate or strand work.
+Completion note, October 6, 2026: `queueCoordinator.ts` owns scan serialization, requested
+repumps, fairness streak, delayed wake, and drain waiters. It reads durable heads and current
+session/turn rows through typed ports. `runtime.ts` remains the durable acceptance owner.
+`runtimeEngine.ts` supplies fresh limits, live occupancy, workspace resolution, startup,
+generation ownership, dispatch, and shutdown ports. It retains provider events, accepted-response
+tracking, safe-transient retry and its three-attempt limit, and process retirement for phase 12.
+No schema, API, fairness, or retry policy changed. The added tests exercise a public enqueue during
+a held scan, workflow admission after five interactive dispatches, and repeated cancel/stop followed
+by a new runtime on the same fixture database.
+Two retry cases cover the accepted-response guard and the three-attempt ceiling.
+
+Phase 12 must replace the coordinator's engine-backed live accesses: `occupancy`, `live`,
+`ensureSession`, `ownsSession`, and `stopLive`, plus the engine dispatch outcome's `activeTurnId`,
+`acceptedResponse`, handle, driver, and controller checks. The durable read and preference ports
+remain tied to `AgentStore` and core preferences. The coordinator has no cached queue or provider
+event buffer.
+
+Date: 2026-10-06. Status: DONE. Risk: high; scheduling races can duplicate or strand work.
 Prerequisite: accepted [phase 10](./10-plugin-host.md). Next: [phase 12](./12-agent-processes.md).
 Planning revision: `2ae55abb5`; retain phase 01's runtime behavior inventory.
 

@@ -1,6 +1,48 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–10 complete; phase 11 is next.
+Date: 2026-10-06. Status: phases 01–11 complete; phase 12 is next.
+
+## Phase 11 agent admission (2026-10-06)
+
+Implementation base: `855494989`, branch `phase-11-separate-agent-turn-admission`, Darwin arm64,
+Node 24.21.0 from `/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. A frozen `CI=true pnpm install
+--frozen-lockfile` passed with cache and registry access: 426 packages reused, none downloaded.
+The initial sandbox attempt could not resolve the registry. No package declaration, lockfile,
+database history, route, wire contract, plugin API, or staged payload changed, so the phase 01
+dependency and payload measurements are unchanged.
+
+`queueCoordinator.ts` owns queue scans, requested repumps, fairness streak, delayed wake, and drain.
+Its ports call durable `queuedHeads`, `getSession`, `requireSession`, and `nextQueuedTurn` reads;
+fresh preference limits; live occupancy and workspace resolution; provider startup and generation
+ownership; dispatch; and shutdown. `runtime.ts` still accepts turns durably before requesting a
+scan. `runtimeEngine.ts` retains event buffering, accepted-response tracking, retry classification
+and the three-attempt ceiling, usage continuation, and provider retirement. Phase 12 must replace
+the engine-backed `occupancy`, `live`, `ensureSession`, `ownsSession`, and `stopLive` ports and the
+dispatch path's live handle, driver, controller, `activeTurnId`, and `acceptedResponse` accesses.
+
+Focused results on the supported runtime: `runtimeQueue.test.ts` 11, `runtimeStartup.test.ts` 12,
+`runtime.test.ts` 39, `sessionExecute.test.ts` 17, workflow
+`workflowAgentSession.test.ts` 7, and Node `workflowActivation.test.ts` 1 passed. The managed
+execution test runs `createSessionExecute` through `ManagedAgentRuntime`; the workflow tests cross
+the late-bound capability with a controlled provider. The runtime suite includes usage continuation
+with the same turn ID, safe retry, delayed wake, limits, and a fruitless-scan repump. Two added runtime
+cases prove that a classified transient failure does not retry after accepted output or after three
+attempts. The added queue cases
+prove a public enqueue during a held workspace read, workflow admission after five interactive
+dispatches, and two start/cancel cycles followed by stop and a new runtime on the same fixture
+database. The new runtime dispatched accepted work without the stopped runtime's callback.
+
+The first bounded five-package consumer run passed workflows, but sandbox restrictions caused
+`listen EPERM` in Node, TUI, and desktop and hid the current process from an agents footprint test.
+The same command passed with host permissions, `TURBO_FORCE=true`, two Vitest workers, and two
+concurrent package jobs: workflows 64 files/553 tests, agents 150 files/1,091 tests and one skipped
+before the final fairness and retry cases,
+TUI 68 files/673 tests and two skipped, Node 40 files/273 tests, and desktop 28 files/171 tests,
+10 boot tests, and 62 Rust tests. Zero package tasks used cache. Root `pnpm lint` passed 37/37
+tasks with zero cached after correcting an unused import, a test event type, and test type inference.
+The agents package was rerun after the final cases and passed 150 files/1,094 tests with one skipped.
+Architecture `pnpm --filter @acorn/arch-tests test` passed 12 files/86 tests after this evidence
+anchor was added. The full root test, build, and pack gates remain phase 15's work.
 
 ## Phase 10: plugin host contributions (2026-10-06)
 

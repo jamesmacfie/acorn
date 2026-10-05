@@ -27,6 +27,7 @@ describe('durable queue admission', () => {
   let starts: AgentDriverStartOptions[]
   let sends: string[]
   let stops: string[]
+  let registry: AgentDriverRegistry
   let launch: (options: AgentDriverStartOptions) => Promise<AgentDriverSession>
 
   beforeEach(() => {
@@ -44,7 +45,7 @@ describe('durable queue admission', () => {
         stop: async () => { stops.push(options.session.id) },
       }
     }
-    const registry = new AgentDriverRegistry()
+    registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => ({ providerId: 'fake', profileId: 'fake',
       probe: () => new FakeAgentDriver().probe(),
       start: async (options) => { starts.push(options); return launch(options) },
@@ -54,8 +55,9 @@ describe('durable queue admission', () => {
   })
   afterEach(async () => { await runtime.stop(); ctx.cleanup(); vi.restoreAllMocks() })
 
-  const session = async () => runtime.store.createSession({ taskId: randomUUID(), providerId: 'fake',
-    profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+  const session = async (kind: 'interactive' | 'workflow' = 'interactive') => runtime.store.createSession({
+    taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {},
+  }, await new FakeAgentDriver().probe())
   const enqueue = (sessionId: string, text = 'Synthetic') => runtime.enqueueTurn(sessionId, {
     input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
   })
@@ -101,6 +103,42 @@ describe('durable queue admission', () => {
     await new Promise((resolve) => setImmediate(resolve))
     expect(starts).toHaveLength(0)
     expect(sends).toHaveLength(0)
+  })
+
+  it('scans again for a public enqueue that arrives during a held workspace read', async () => {
+    const workspace = deferred<string>()
+    vi.mocked(ctx.core.tasks.workspaceId).mockReturnValueOnce(workspace.promise)
+    const first = await session(), second = await session()
+    const firstTurn = await enqueue(first.id)
+    await vi.waitFor(() => expect(ctx.core.tasks.workspaceId).toHaveBeenCalledOnce())
+    const secondTurn = await enqueue(second.id)
+    workspace.resolve('workspace')
+    await vi.waitFor(() => expect(sends).toEqual(expect.arrayContaining([firstTurn.id, secondTurn.id])))
+    expect(sends).toHaveLength(2)
+  })
+
+  it('admits workflow work after five interactive dispatches', async () => {
+    vi.mocked(ctx.core.prefs.read).mockResolvedValue(JSON.stringify({ provider: 1, workspace: 1 }))
+    const workspace = deferred<string>()
+    vi.mocked(ctx.core.tasks.workspaceId).mockReturnValueOnce(workspace.promise)
+    const interactive = await Promise.all(Array.from({ length: 6 }, () => session()))
+    const workflow = await session('workflow')
+    const turns = [await enqueue(interactive[0]!.id)]
+    await vi.waitFor(() => expect(ctx.core.tasks.workspaceId).toHaveBeenCalledOnce())
+    for (const item of interactive.slice(1)) turns.push(await enqueue(item.id))
+    const workflowTurn = await runtime.enqueueTurn(workflow.id, {
+      input: [{ type: 'text', text: 'Workflow' }], source: 'workflow',
+      effectivePolicy: {}, idempotencyKey: randomUUID(),
+    })
+    workspace.resolve('workspace')
+
+    for (let index = 0; index < 5; index++) {
+      await vi.waitFor(() => expect(sends[index]).toBe(turns[index]!.id))
+      const started = starts.find((options) => options.session.id === interactive[index]!.id)!
+      await started.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+    }
+    await vi.waitFor(() => expect(sends[5]).toBe(workflowTurn.id))
+    expect((await runtime.store.turn(turns[5]!.id))?.status).toBe('queued')
   })
 
   it('sends the edited durable input after a held startup', async () => {
@@ -174,5 +212,38 @@ describe('durable queue admission', () => {
     expect(sends).toEqual([])
     expect((await runtime.store.turn(turn.id))?.status).toBe('queued')
     expect(runtime.counts()).toEqual({ active: 0, reserved: 0 })
+  })
+
+  it('survives repeated start and cancel, then admits accepted work from a new runtime', async () => {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const held = deferred<void>(), start = launch
+      launch = async (options) => { await held.promise; return start(options) }
+      const item = await session(), turn = await enqueue(item.id)
+      await vi.waitFor(() => expect(starts).toHaveLength(attempt + 1))
+      const cancelling = runtime.cancelTurn(item.id, turn.id)
+      held.resolve()
+      await cancelling
+      expect((await runtime.store.turn(turn.id))?.status).toBe('cancelled')
+      launch = start
+    }
+
+    const held = deferred<void>(), start = launch
+    launch = async (options) => { await held.promise; return start(options) }
+    const item = await session(), accepted = await enqueue(item.id)
+    await vi.waitFor(() => expect(starts).toHaveLength(3))
+    const oldCallback = starts[2]!.onEvent
+    const stopping = runtime.stop()
+    held.resolve()
+    await stopping
+    expect((await runtime.store.turn(accepted.id))?.status).toBe('queued')
+
+    launch = start
+    runtime = new Runtime({ db: ctx.storage.open(), dataDir: ctx.dataDir, core: ctx.core, registry,
+      internalEnv: () => ({}), secrets: ctx.env.SECRETS, currentUserId: () => 'owner' })
+    await runtime.reconcile()
+    await vi.waitFor(() => expect(sends).toContain(accepted.id))
+    const sent = sends.length
+    await oldCallback({ type: 'assistant_message', text: 'stale' })
+    expect(sends).toHaveLength(sent)
   })
 })

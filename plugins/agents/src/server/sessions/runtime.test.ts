@@ -149,6 +149,8 @@ class SafeRetryDriver implements AgentDriver {
   readonly profileId = 'retry-test'
   attempts = 0
 
+  constructor(private readonly failure: 'once' | 'always' | 'after_response' = 'once') {}
+
   async probe(): Promise<AgentProviderDescriptor> {
     return descriptor(this.providerId)
   }
@@ -169,7 +171,13 @@ class SafeRetryDriver implements AgentDriver {
       },
       sendTurn: async () => {
         this.attempts++
-        if (this.attempts === 1) throw new Error('transient before provider acceptance')
+        if (this.failure === 'after_response') {
+          await options.onEvent({ type: 'assistant_message', text: 'Provider accepted input.' })
+          throw new Error('transient after provider acceptance')
+        }
+        if (this.failure === 'always' || this.attempts === 1) {
+          throw new Error('transient before provider acceptance')
+        }
         ready = false
         await options.onEvent({ type: 'assistant_message', text: 'Recovered safely.' })
         await options.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
@@ -1660,6 +1668,31 @@ describe('managed agent runtime conformance', () => {
     expect(snapshot.turns.find((candidate) => candidate.id === turn.id)?.attempt).toBe(2)
     expect(snapshot.events.some((record) =>
       record.event.type === 'diagnostic' && record.event.message.includes('retrying'))).toBe(true)
+  })
+
+  it.each([
+    { failure: 'after_response' as const, attempts: 1 },
+    { failure: 'always' as const, attempts: 3 },
+  ])('stops safe retry after $failure at $attempts attempt(s)', async ({ failure, attempts }) => {
+    const seed = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    const driver = new SafeRetryDriver(failure)
+    registry.registerNative(driver.providerId, () => driver)
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS,
+      currentUserId: () => null, registry,
+    })
+    const session = await runtime.createSession({
+      taskId: seed.taskId, providerId: driver.providerId, profileId: driver.profileId,
+      kind: 'interactive', config: {},
+    })
+    const turn = await runtime.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Retry only when safe.' }], source: 'interactive',
+      effectivePolicy: {}, idempotencyKey: randomUUID(),
+    })
+    await vi.waitFor(async () => expect((await runtime!.store.turn(turn.id))?.status).toBe('failed'))
+    expect(driver.attempts).toBe(attempts)
+    expect((await runtime.store.turn(turn.id))?.attempt).toBe(attempts)
   })
 
   it('keeps a usage-limited turn open and continues that same turn after the reset', async () => {
