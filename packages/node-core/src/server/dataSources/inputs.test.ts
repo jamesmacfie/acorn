@@ -14,6 +14,8 @@ import { clearRegistrations, initPlugins } from '../pluginHost/host'
 import type { NodePlugin, NodePluginContext, PluginFetchHandler } from '../pluginHost/types'
 import { pluginManifestSchema } from '../plugins/manifest'
 import { inputGrantsStore } from '../plugins/inputGrants'
+import { pluginListStore } from '../plugins/disabled'
+import { DEVELOPMENT_FILE } from '../plugins/developmentState'
 import { invokeDataSource } from './runtime'
 import { runDashboard } from '../dashboards/run'
 
@@ -214,4 +216,29 @@ it('runs a panel on a derived source with structured problems and per-input coun
     path: '/sources/0/reference/content/query/scope/inputs/records', severity: 'warning',
     failure: { code: 'incomplete', source: 'derived-test:derived', reason: 'upstream-cap', input: 'records' },
   }))
+})
+
+it('reports a development run\'s costs and first 20 dropped records only while the plugin is in development mode', async () => {
+  const copyWithBad: PluginFetchHandler = async (request, context) => {
+    const input = dataSourceRequestSchema.parse(await request.json())
+    if (input.operation === 'describe') return Response.json(description('own-1'))
+    const upstream = await context.inputs!.records!.query()
+    return page([...upstream.records.map(record => ({ recordId: record.ref.recordId, data: record.data })),
+      ...Array.from({ length: 22 }, (_, index) => ({ recordId: `bad-${index}`, data: { id: index } }))], 'own-1')
+  }
+  const { env } = await world({ loaded: copyWithBad })
+  inputGrantsStore(env.DATA_DIR).set({ pluginId: 'derived-loaded', grantedAt: 1, grantedBy: 'owner',
+    sources: { derived: { records: { source: 'upstream-test:records', optional: false } } } })
+  const read = () => invokeDataSource(env, query('derived-loaded', bound('selected')), invocation())
+  const plain = await read()
+  expect(plain.completeness).toEqual({ kind: 'incomplete', cause: 'invalid-records', count: 22 })
+  expect(plain.development).toBeUndefined()
+
+  pluginListStore(env.DATA_DIR, DEVELOPMENT_FILE).set(['derived-loaded'])
+  const developing = await read()
+  expect(developing.records).toHaveLength(2)
+  expect(developing.development?.dropped).toHaveLength(20)
+  expect(developing.development?.dropped[0]).toEqual({ recordId: 'bad-0', pointer: '/id', message: 'Value does not match string' })
+  expect(Object.keys(developing.development?.inputMs ?? {})).toEqual(['records'])
+  expect(developing.development?.pluginMs).toBeGreaterThanOrEqual(0)
 })

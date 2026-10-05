@@ -19,6 +19,12 @@ Each call writes a stderr line prefixed with your id, and when the owner has tel
 becomes a log record with `owner: <your id>`. Attributes are scalars, and an object is refused at the
 type level. Messages pass a scrubber.
 
+While a folder-installed plugin is in
+[development mode](../plugins/dev-loop.md#development-mode-for-a-folder-plugin), the Node also keeps
+its last 500 lines in memory, scrubbed the same way, and the plugin's page shows them on a **Logs**
+tab with the time and level. The Node writes none of them to disk and drops them when development
+mode ends. Stderr and telemetry get every line either way.
+
 `ctx.telemetry` carries the small verbs:
 
 ```js

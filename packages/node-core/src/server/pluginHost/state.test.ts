@@ -4,6 +4,7 @@ import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } fro
 import type { PluginRosterEntry } from './host'
 import { pluginState, type PluginsBridge } from './state'
 import type { InputGrant } from '../plugins/inputGrants'
+import type { PluginDevelopmentState } from '../plugins/development'
 
 // Objects in, rows out. This logic used to live inside the route, so reaching it meant a Hono app and a
 // nine-member fixture. The judgement calls it makes, what counts as stale, which gaps raise the restart
@@ -42,6 +43,7 @@ type Situation = {
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   review?: Record<string, { reviewId: string; requestId: string; fingerprint: string; stagedAt: number } | { corrupt: true }>
   grants?: InputGrant[]
+  development?: Record<string, PluginDevelopmentState>
 }
 
 // A fixed instant so a test can assert the row carries the loader's stamp rather than a fresh clock.
@@ -68,6 +70,7 @@ const bridge = (situation: Situation): PluginsBridge => {
     uninstall: () => ({ restartRequired: true, dataPurged: false }),
     reload: async () => ({ id: '', version: '', state: 'reloaded' }),
     inputGrants: () => ({ get: (id) => situation.grants?.find((grant) => grant.pluginId === id), set: () => {}, delete: () => {} }),
+    development: { state: (id) => situation.development?.[id], set: () => {}, logs: () => null, reload: () => Promise.reject(new Error('not under test')), dispose: () => {} },
   }
 }
 
@@ -348,5 +351,26 @@ describe('what a loaded plugin reads', () => {
     expect(row(result, 'readiness')?.inputs?.granted).toBe(false)
     expect(row(result, 'readiness')?.inputs?.inputs.every((input) => !input.approved)).toBe(true)
     expect(row(result, 'plain')?.inputs).toBeUndefined()
+  })
+})
+
+describe('development mode', () => {
+  const roster: PluginRosterEntry[] = [{ name: 'folder', required: false, disabled: false, state: 'active' }]
+
+  it('offers it only for a node plugin the development state answers for', () => {
+    const result = pluginState(bridge({
+      roster, installed: [installed('folder'), installed('client', { hasNode: false })],
+      development: { folder: { on: true, reloadedAt: 5 }, client: { on: false } },
+    }))
+    expect(row(result, 'folder')).toMatchObject({ state: 'active', development: { on: true, reloadedAt: 5 } })
+    expect(row(result, 'client')?.development).toBeUndefined()
+  })
+
+  it('shows a reload the loader refused as a failed load, while the old version keeps serving', () => {
+    const result = pluginState(bridge({
+      roster, installed: [installed('folder')], development: { folder: { on: true, failure: { reason: 'SyntaxError in dist/node.js', at: 9 } } },
+    }))
+    expect(row(result, 'folder')).toMatchObject({ state: 'failed', stage: 'load', failedAt: 9, reason: 'SyntaxError in dist/node.js', running: true })
+    expect(row(result, 'folder')?.development).toEqual({ on: true })
   })
 })

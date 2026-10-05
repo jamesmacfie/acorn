@@ -201,6 +201,10 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/plugins/${SEG}/reload`), scopes: {} },
   { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
   { path: shape(`/v1/core/plugins/${SEG}/input-grant`), scopes: {}, note: 'Approves which of the owner’s data a plugin may read.' },
+  // Development mode reloads a plugin on every save and approves what it reads, so a frame that could
+  // turn it on would get both without a prompt.
+  { path: shape(`/v1/core/plugins/${SEG}/development`), scopes: {}, note: 'Reloads a plugin on save and approves what it reads.' },
+  { path: shape(`/v1/core/plugins/${SEG}/logs`), scopes: {}, note: 'Another plugin’s log lines.' },
   // The owner's answer to an agent's install request. Unmappable for the same reason as the three above,
   // and it is the line that keeps the approval split honest: a frame that could POST an approval would be
   // able to answer the very question that exists because an agent must not install code.

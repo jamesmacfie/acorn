@@ -6,6 +6,7 @@ import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { ActivePluginSnapshot } from '../plugins/loader'
 import type { PendingPluginReview } from '../plugins/pendingReview'
 import { pluginInputs, type InputGrantsStore } from '../plugins/inputGrants'
+import type { PluginDevelopment } from '../plugins/development'
 import { registeredDataSource } from '../dataSources/registry'
 import { parseDataSourceInputRef } from '@acorn/protocol/dataSources.ts'
 import type {
@@ -80,6 +81,9 @@ export type PluginsBridge = {
   // The person's approvals of what loaded plugins' derived sources read (server/plugins/inputGrants.ts).
   // A fresh read per call, as the input handles do, so a grant written elsewhere shows at once.
   inputGrants(): InputGrantsStore
+  // Development mode for folder-installed node plugins: the watch, the reload, the log lines, and the
+  // development grant (server/plugins/development.ts).
+  development: PluginDevelopment
 }
 
 export const PLUGIN_STATE = routeCapability<PluginsBridge>('core.pluginStateRoute')
@@ -184,12 +188,23 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       ...(!registered || registered.providerId ? { provider: owner } : {}),
     }
   }
-  const declared = (name: string): Pick<NodePluginRow, 'installed' | 'inputs'> => {
+  const declared = (name: string): Pick<NodePluginRow, 'installed' | 'inputs' | 'development'> => {
     const entry = installed.get(name)
     if (!entry) return {}
     const { id: _id, label: _label, hasNode: _hasNode, ...row } = entry satisfies InstalledPluginInfo
     const inputs = pluginInputs(entry.contributions.dataSources, grants.get(name), describeInput)
-    return { installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}) }
+    const development = entry.hasNode ? bridge.development.state(name) : undefined
+    return {
+      installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}),
+      ...(development ? { development: { on: development.on, ...(development.reloadedAt ? { reloadedAt: development.reloadedAt } : {}) } } : {}),
+    }
+  }
+  // A reload in development mode that the loader refused never reached the host, so the roster entry
+  // still says active. It shows as a failed load does, while the previous version keeps serving.
+  const reloadFailure = (row: NodePluginRow): void => {
+    const failure = row.development?.on && row.state === 'active' ? bridge.development.state(row.name)?.failure : undefined
+    if (!failure) return
+    Object.assign(row, { state: 'failed', stage: 'load', failedAt: failure.at }, trimReason(failure.reason))
   }
   // The name a person reads. A package on disk names itself in its manifest, and that wins over a
   // compiled definition of the same id, because the disk copy is the one the owner installed.
@@ -312,6 +327,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   }
   // A crash after publishing a marker but before placing the package leaves no installed row.
   // Keep that gate visible so the owner can discard it without hand-editing the data root.
+  for (const row of rows) reloadFailure(row)
   const listed = new Set(rows.map((entry) => entry.name))
   for (const id of bridge.pendingReviewIds()) {
     if (listed.has(id)) continue

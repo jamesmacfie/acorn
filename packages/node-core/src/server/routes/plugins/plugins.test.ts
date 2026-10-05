@@ -59,6 +59,8 @@ type WireOptions = {
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   pendingReview?: { reviewId: string; requestId: string; fingerprint: string; stagedAt: number }
   grants?: InputGrantsStore
+  /** Plugins installed from a folder, the ones development mode is for. */
+  folders?: string[]
 }
 
 const memoryGrants = (): InputGrantsStore => {
@@ -73,6 +75,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
   const grants = options.grants ?? memoryGrants()
+  const developing = new Set<string>()
   const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } = { install: [], update: [], uninstall: [], reload: [], approve: [] }
   setRouteTestCapability(PLUGIN_STATE, {
     roster: () => options.roster ?? ROSTER,
@@ -109,6 +112,17 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       return { restartRequired: true, dataPurged: opts.purgeData === true }
     },
     inputGrants: () => grants,
+    development: {
+      state: (id) => (options.folders?.includes(id) ? { on: developing.has(id) } : undefined),
+      set: (id, on) => {
+        if (!options.folders?.includes(id)) throw new Error('Development mode is only for node plugins installed from a local folder.')
+        if (on) developing.add(id)
+        else developing.delete(id)
+      },
+      logs: (id) => (developing.has(id) ? [{ at: 1, level: 'info', message: 'refreshed 3 issues' }] : null),
+      reload: () => Promise.reject(new Error('not under test')),
+      dispose: () => {},
+    },
     reload: async (id) => {
       calls.reload.push({ id })
       // The bridge's refusal for a name this node did not load from disk, which the route turns into a 400.
@@ -605,10 +619,10 @@ describe('the device gate over /v1/core/plugins', () => {
     expect((await asTaskAgent().fetch(attempt)).status).toBe(200)
   })
 
-  it('403s a task-scoped agent on install, update, uninstall and reload', async () => {
+  it('403s a task-scoped agent on install, update, uninstall, reload, and development mode', async () => {
     // The sharpest case in this file. A prompt-injected agent that could POST here makes the node fetch
     // and run arbitrary code with the node's own access (docs/security.md).
-    wire([], { installed: [installedEntry('sparkline')] })
+    wire([], { installed: [installedEntry('sparkline')], folders: ['sparkline'] })
     const agent = gated({ kind: 'internal', userId: 'james', scope: 'task', taskId: 't1' })
     const attempts = [
       at('/install', 'POST', { source: { url: 'https://example.test/p.tgz' } }, KEY),
@@ -617,6 +631,7 @@ describe('the device gate over /v1/core/plugins', () => {
       // Reload is the sharpest of the four: it is how a prompt-injected agent makes code already on the
       // node run again on its own timing, with no bytes arriving to notice.
       at('/sparkline/reload', 'POST', undefined, KEY),
+      at('/sparkline/development', 'PUT', { on: true }),
     ]
     for (const attempt of attempts) expect((await agent.fetch(attempt.clone())).status, attempt.url).toBe(403)
     // And the ungated router would have answered. So the 403 is the gate, not the handler.
@@ -768,6 +783,23 @@ describe('the install, update and uninstall routes', () => {
     const res = await asDevice().fetch(at('/terminal/reload', 'POST', undefined, KEY))
     expect(res.status).toBe(400)
     expect(JSON.stringify(await res.json())).toContain('not a plugin this node loaded from disk')
+  })
+
+  it('turns development mode on and off for a folder plugin, and keeps logs only while it is on', async () => {
+    wire([], { installed: [installedEntry('ntfy')], folders: ['ntfy'] })
+    const on = await asDevice().fetch(at('/ntfy/development', 'PUT', { on: true }))
+    expect(on.status).toBe(200)
+    expect(((await on.json()) as NodePluginState).plugins.find((row) => row.name === 'ntfy')?.development).toEqual({ on: true })
+    expect(await (await asDevice().fetch(at('/ntfy/logs', 'GET'))).json()).toEqual({ lines: [{ at: 1, level: 'info', message: 'refreshed 3 issues' }] })
+    await asDevice().fetch(at('/ntfy/development', 'PUT', { on: false }))
+    expect((await asDevice().fetch(at('/ntfy/logs', 'GET'))).status).toBe(404)
+  })
+
+  it('400s development mode for a plugin not installed from a folder', async () => {
+    wire([], { installed: [installedEntry('ntfy')] })
+    const res = await asDevice().fetch(at('/ntfy/development', 'PUT', { on: true }))
+    expect(res.status).toBe(400)
+    expect(JSON.stringify(await res.json())).toContain('installed from a local folder')
   })
 
   it('demands an Idempotency-Key on a reload too', async () => {

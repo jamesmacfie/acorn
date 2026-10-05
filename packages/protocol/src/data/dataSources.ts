@@ -248,9 +248,19 @@ export type DataSourcePage = z.infer<typeof dataSourcePageSchema>
 /** What one derived-source query read from each input: records across every page it asked for, and the
  *  last page's completeness. The host adds it; a plugin's own page never carries it. */
 export type DataSourceInputRead = { records: number; completeness: DataSourcePage['completeness'] }
+/** What a derived source's query cost, while its plugin is in development mode. Times are in
+ *  milliseconds. `pluginMs` is the query's time less its input reads. `dropped` holds up to 20 of the
+ *  records that failed the declared fields: the field's pointer and what was wrong. */
+export type DataSourceDevelopment = {
+  inputMs: Record<string, number>
+  pluginMs: number
+  dropped: { recordId: string; pointer: string; message: string }[]
+}
 export type DataSourceResult = Omit<DataSourcePage, 'records'> & { records: DataRecord[]; mode: 'preview' | 'execution'; evaluationTime: number
   /** Present on a derived source's query, keyed by input name, for each input the plugin queried. */
-  inputs?: Record<string, DataSourceInputRead> }
+  inputs?: Record<string, DataSourceInputRead>
+  /** Present on a derived source's query while its plugin is in development mode. */
+  development?: DataSourceDevelopment }
 export type DataSourceOptions = z.infer<typeof dataSourceOptionsSchema>
 export type DataSourceDetails = z.infer<typeof dataSourceDetailsSchema>
 export type DataSourceActions = z.infer<typeof dataSourceActionsSchema>

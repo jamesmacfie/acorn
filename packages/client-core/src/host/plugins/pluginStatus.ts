@@ -39,6 +39,7 @@ export function nodePluginStatus(snapshot: PluginDistributionSnapshot, nodeId: s
     // It runs either way. Until the person answers, its derived sources read only what an earlier
     // grant covers, so this is something only they can settle.
     if (result.available && awaitingInputApproval(row)) return status('warn', 'Waiting for you to approve what it reads.', true, 'waiting')
+    if (result.available && row.development?.on) return status('accent', 'In development. Reloads when its files change.')
     if (result.available) return devMode ? status('accent', 'In development. Bundle changes are trusted without asking.') : status('ok', 'Active')
     switch (result.selection.kind) {
       case 'pending-trust': return status('warn', 'Waiting for approval on this device', true, 'waiting')

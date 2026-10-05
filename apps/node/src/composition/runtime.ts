@@ -237,19 +237,18 @@ export async function startServiceRuntime({ config, stateChanged }: RuntimeOptio
     )
     disposePlugins = plugins.dispose
     if (plugins.skipped.length) bootLog.info(`plugins disabled for this node: ${plugins.skipped.join(', ')}`)
-    pluginStateCapability = capabilities.provide(
-      PLUGIN_STATE,
-      await buildPluginStateBridge({
-        dataDir: config.dataDir,
-        db,
-        roster: () => plugins.roster,
-        booted: () => graph.installed,
-        loadFailures: () => graph.failures,
-        disabled,
-        setDisabled: (names) => disabledPlugins.set(names),
-        reloadHost: plugins,
-      }),
-    )
+    const pluginStateBridge = await buildPluginStateBridge({
+      dataDir: config.dataDir,
+      db,
+      roster: () => plugins.roster,
+      booted: () => graph.installed,
+      loadFailures: () => graph.failures,
+      disabled,
+      setDisabled: (names) => disabledPlugins.set(names),
+      reloadHost: plugins,
+    })
+    const provided = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
+    pluginStateCapability = { dispose: () => { provided.dispose(); pluginStateBridge.dispose() } }
 
     wireAgentTools({ db, secrets: runtime.SECRETS, env: runtime })
     mark('install')

@@ -36,7 +36,9 @@ export type DashboardRun = {
       completeness?: DataSourceResult['completeness']; readTime?: number; coverageWindows?: DataSourceDescription['coverageWindows'];
       coveredRange?: DataSourceResult['coveredRange']; observedAt?: number; writable?: DataSourceDescription['writable']
       /** A derived source's input reads in this run, by input name. */
-      inputs?: DataSourceResult['inputs'] }[]
+      inputs?: DataSourceResult['inputs']
+      /** What the run cost and which records it dropped, while the source's plugin is in development mode. */
+      development?: DataSourceResult['development'] }[]
     stages: PlanStageCount[]
     evaluationTime: number
     asOf?: number

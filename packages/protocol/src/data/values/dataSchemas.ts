@@ -70,7 +70,7 @@ export function parseDataSchema(input: unknown): DataSchema {
         || value.enum.some(item => item !== null && typeof item === 'object')
       ) throw new Error('Invalid primitive enum')
       schema.enum = value.enum as DataPrimitive[]
-      for (const item of schema.enum) validateNode(item, { ...schema, enum: undefined })
+      for (const item of schema.enum) validateNode(item, { ...schema, enum: undefined }, '')
       if (new Set(schema.enum.map(canonicalDataEncoding)).size !== schema.enum.length) throw new Error('Duplicate enum values')
     }
     return schema
@@ -78,30 +78,42 @@ export function parseDataSchema(input: unknown): DataSchema {
   return visit(raw, 0)
 }
 
-function validateNode(value: DataValue, schema: DataSchema): void {
+export function validateDataValue(value: unknown, schema: DataSchema, maxBytes: number = DATA_LIMITS.recordBytes): DataValue {
+  const parsedSchema = parseDataSchema(schema)
+  const parsed = parseDataValue(value, maxBytes)
+  validateNode(parsed, parsedSchema, '')
+  return parsed
+}
+
+/** A value that doesn't fit its schema, with the pointer of the field at fault, so a person can be
+ *  told which field to fix. */
+export class DataValueError extends Error {
+  readonly pointer: string
+  constructor(message: string, pointer: string) {
+    super(message)
+    this.pointer = pointer
+  }
+}
+
+const childPointer = (pointer: string, key: string | number): string => `${pointer}/${String(key).replace(/~/g, '~0').replace(/\//g, '~1')}`
+
+function validateNode(value: DataValue, schema: DataSchema, pointer: string): void {
   const types = Array.isArray(schema.type) ? schema.type : [schema.type]
   const type = value === null ? 'null' : Array.isArray(value) ? 'array' : typeof value
   const matchesType = types.some(expected => expected === type
     || (expected === 'integer' && typeof value === 'number' && Number.isInteger(value)))
-  if (!matchesType) throw new Error(`Value does not match ${types.join(' or ')}`)
-  if (schema.enum && !schema.enum.some(item => item === value)) throw new Error('Value is outside enum')
+  if (!matchesType) throw new DataValueError(`Value does not match ${types.join(' or ')}`, pointer)
+  if (schema.enum && !schema.enum.some(item => item === value)) throw new DataValueError(`${JSON.stringify(value)} isn't a declared choice`, pointer)
   if (value === null) return
   if (Array.isArray(value)) {
-    for (const item of value) validateNode(item, schema.items!)
+    for (const [index, item] of value.entries()) validateNode(item, schema.items!, childPointer(pointer, index))
     return
   }
   if (typeof value !== 'object') return
-  for (const key of schema.required ?? []) if (!Object.hasOwn(value, key)) throw new Error(`Missing required field: ${key}`)
+  for (const key of schema.required ?? []) if (!Object.hasOwn(value, key)) throw new DataValueError(`Missing required field: ${key}`, childPointer(pointer, key))
   for (const [key, item] of Object.entries(value)) {
     const property = Object.hasOwn(schema.properties ?? {}, key) ? schema.properties![key] : undefined
-    if (property) validateNode(item, property)
-    else if (schema.additionalProperties === false) throw new Error(`Unexpected field: ${key}`)
+    if (property) validateNode(item, property, childPointer(pointer, key))
+    else if (schema.additionalProperties === false) throw new DataValueError(`Unexpected field: ${key}`, childPointer(pointer, key))
   }
-}
-
-export function validateDataValue(value: unknown, schema: DataSchema, maxBytes: number = DATA_LIMITS.recordBytes): DataValue {
-  const parsedSchema = parseDataSchema(schema)
-  const parsed = parseDataValue(value, maxBytes)
-  validateNode(parsed, parsedSchema)
-  return parsed
 }

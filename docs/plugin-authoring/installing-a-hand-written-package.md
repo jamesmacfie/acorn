@@ -29,6 +29,13 @@ tables, and jobs wire at init, so the package isn't live until the Node runs it.
 Under the desktop, use **Restart node** in **Settings > Plugins > Installed**, which also reloads the
 renderer.
 
+To skip the restart while you work, turn on development mode on the plugin's page, under
+**Permissions > Development mode**. The Node reloads the plugin half a second after its built files
+change, keeps its log lines for the **Logs** tab, and lets its derived sources read their inputs
+without asking. A failed reload keeps the previous version running and shows the reason on the
+plugin's row. Turn it off when you finish, and the plugin asks to read its inputs again
+([development mode for a folder plugin](../plugins/dev-loop.md#development-mode-for-a-folder-plugin)).
+
 If the package has a client file, each device asks its own owner before running those bytes, keyed by
 `(pluginId, hash)`. Rewriting `client.js` changes the hash and prompts again. A package with no
 `client` has nothing to trust and registers its descriptors directly.

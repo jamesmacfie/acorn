@@ -5,10 +5,12 @@ import {
   type DataSourceDescription, type DataSourceDiscoveryPage, type DataSourceRequest, type DataSourceResult, type DataSourceScope, type DataSourceResponse,
 } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS, canonicalDataEncoding, parseDataValue } from '@acorn/protocol/dataValues.ts'
-import { validateDataValue } from '@acorn/protocol/dataSchemas.ts'
+import { DataValueError, validateDataValue } from '@acorn/protocol/dataSchemas.ts'
 import type { Env } from '../bindings'
 import { authorizeDataSource, authorizeSourceInputs, type DataSourceInvocation } from './authority'
-import { checkInputChain, composeDerivedRevision, finishDerivedResult, inputHandles, type DerivedReadState } from './inputs'
+import { checkInputChain, composeDerivedRevision, DEVELOPMENT_DROPPED_RECORDS, finishDerivedResult, inputHandles, type DerivedReadState } from './inputs'
+import { developmentPlugins } from '../plugins/developmentState'
+import { describeError } from '../telemetry/logger'
 import { dispatchSource } from './dispatch'
 import {
   registeredDataSource, registeredDataSources, registeredDataSourceDiscovery,
@@ -149,7 +151,11 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
   invocation = bounded(invocation, request.operation === 'query' ? request.timeoutMs : undefined)
   await authorizeDataSource(env, invocation, scope, source.pluginId, source.providerId)
   await authorizeSourceInputs(env, invocation, source, scope, request.operation)
-  const derived: DerivedReadState | undefined = source.inputs ? { droppedRecords: 0 } : undefined
+  // A loaded plugin in development mode gets the run's costs and its first dropped records back
+  // (docs/plugins/dev-loop.md § Development mode for a folder plugin).
+  const developing = !!source.inputs && !!source.loaded && developmentPlugins(env.DATA_DIR).includes(source.pluginId)
+  const derived: DerivedReadState | undefined = source.inputs
+    ? { droppedRecords: 0, ...(developing ? { development: { inputMs: {}, dropped: [] } } : {}) } : undefined
   const own = await describe(env, source, scope, invocation, derived)
   // A derived page still carries the plugin's own revision; callers see the composed one.
   const description = derived ? { ...own, revision: await composeDerivedRevision(env, source, own, scope, invocation, invokeDataSource) } : own
@@ -166,8 +172,9 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
     return answer
   }
   if (request.operation === 'query') {
+    const started = performance.now()
     const result = await querySource(env, source, request, description, invocation, own.revision, derived)
-    return derived ? finishDerivedResult(result, derived) : result
+    return derived ? finishDerivedResult(result, derived, performance.now() - started) : result
   }
   if (request.operation === 'options') {
     const fields = request.target === 'field' ? description.fields : description.parameterFields
@@ -273,11 +280,15 @@ async function querySource(
       if (identities.has(record.recordId)) throw new DataSourceError('duplicate-record')
       identities.add(record.recordId)
       try { parseDataValue(record.data, DATA_LIMITS.recordBytes) } catch { throw new DataSourceError('oversize') }
-      try { validateDataValue(record.data, description.schema) } catch {
+      try { validateDataValue(record.data, description.schema) } catch (error) {
         // A derived source builds records from data it doesn't control, so one bad record costs that
         // record, counted, rather than the page. A source without inputs still fails whole.
         if (!derived) throw new DataSourceError('invalid-response')
         derived.droppedRecords++
+        const dropped = derived.development?.dropped
+        if (dropped && dropped.length < DEVELOPMENT_DROPPED_RECORDS) {
+          dropped.push({ recordId: record.recordId, pointer: error instanceof DataValueError ? error.pointer : '', message: describeError(error).message })
+        }
         continue
       }
       bytes += new TextEncoder().encode(JSON.stringify(record)).byteLength

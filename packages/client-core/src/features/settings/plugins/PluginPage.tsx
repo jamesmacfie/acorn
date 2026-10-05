@@ -1,7 +1,7 @@
-import { createMemo, createResource, createSignal, For, Show } from 'solid-js'
+import { createMemo, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { NodePluginRow, NodePluginState, PluginInputLine } from '@acorn/protocol/api.ts'
-import { readPluginInputGrant, revokePluginInputs, reviewNodePlugin, uninstallNodePlugin, updateNodePlugin } from '../../../infra/node/nodePlugins'
+import { readNodePluginLogs, readPluginInputGrant, revokePluginInputs, reviewNodePlugin, setNodePluginDevelopment, uninstallNodePlugin, updateNodePlugin } from '../../../infra/node/nodePlugins'
 import { integrationsOptions } from '../../../infra/queries'
 import type { PluginHostState } from '../../../infra/platform'
 import { forgetPluginTrust, installPluginOnDevice, setPluginDevGrant } from '../../../host/plugins/host'
@@ -18,7 +18,7 @@ import { commandRegistry } from '../../../host/registries/commands/commands'
 import { keybindingRegistry } from '../../../host/registries/commands/keybindings'
 import { exclusiveSlotOffers } from '../../../host/registries/extensionPoints/exclusiveSlots'
 import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
-import { Alert, Badge, Button, Checkbox } from '../../../kit/components/primitives'
+import { Alert, Badge, Button, Checkbox, CodeBlock } from '../../../kit/components/primitives'
 import { Facts } from '../../../kit/components/content/Facts'
 import { Text } from '../../../kit/components/content/Text'
 import { Inline } from '../../../kit/components/layout/Inline'
@@ -44,7 +44,9 @@ const TABS = [
   { id: 'permissions', label: 'Permissions' },
   { id: 'versions', label: 'Versions' },
 ] as const
-type Tab = (typeof TABS)[number]['id']
+// Only while a node plugin is in development mode, because only then does the node keep its lines.
+const LOGS_TAB = { id: 'logs', label: 'Logs' } as const
+type Tab = (typeof TABS)[number]['id'] | typeof LOGS_TAB.id
 const ID_PREFIX = 'plugin-page'
 
 export type PluginPageProps = {
@@ -63,16 +65,20 @@ export type PluginPageProps = {
   settleDevice: () => Promise<void>
   /** The node's answer to a write, with the node it was sent to, which the header may have left since. */
   onNodeState: (state: NodePluginState, nodeId: string) => void
+  /** The tab to open on, such as Logs from the panel studio's development strip. */
+  initialTab?: 'logs' | undefined
 }
 
 export function PluginPage(props: PluginPageProps) {
   const qc = useQueryClient()
-  const [tab, setTab] = createSignal<Tab>('overview')
+  const [tab, setTab] = createSignal<Tab>(props.initialTab ?? 'overview')
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
   const hostDrawsBack = useSettingsDetail(() => pluginName(props.plugin), props.onBack)
   const row = () => pluginRow(props.plugin)
   const nodeRow = () => (props.plugin.kind === 'node' ? props.plugin.row : undefined)
+  const developing = () => !!nodeRow()?.development?.on
+  const tabs = () => (developing() ? [...TABS, LOGS_TAB] : TABS)
 
   const run = async (work: () => Promise<void>) => {
     setError('')
@@ -115,7 +121,7 @@ export function PluginPage(props: PluginPageProps) {
       </Show>
       <Show when={error()}><Alert>{error()}</Alert></Show>
 
-      <Tabs tabs={TABS} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${pluginName(props.plugin)}`} />
+      <Tabs tabs={tabs()} active={tab()} onChange={(id) => setTab(id as Tab)} idPrefix={ID_PREFIX} ariaLabel={`About ${pluginName(props.plugin)}`} />
       <TabPanel idPrefix={ID_PREFIX} id="overview" active={tab()}>
         <Stack gap="section">
           <SettingsSection id="plugin" label="Status">
@@ -145,6 +151,11 @@ export function PluginPage(props: PluginPageProps) {
       <TabPanel idPrefix={ID_PREFIX} id="versions" active={tab()}>
         <Stack gap="section"><Versions {...props} busy={busy()} run={run} /></Stack>
       </TabPanel>
+      <Show when={developing()}>
+        <TabPanel idPrefix={ID_PREFIX} id="logs" active={tab()}>
+          <Logs pluginId={props.plugin.id} nodeId={props.nodeId} active={tab() === 'logs'} />
+        </TabPanel>
+      </Show>
 
       <DangerZone {...props} busy={busy()} run={run} nodeRow={nodeRow()} />
     </>
@@ -278,8 +289,15 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
     await props.settleDevice()
   })
   // Ending development mode drops the grant and every approval it wrote, so the plugin goes back to
-  // being asked about each bundle, starting with the current one.
+  // being asked about each bundle, starting with the current one. A node plugin from a folder also has
+  // the node's half: the watch, the logs, and the development grant for what it reads.
+  const folder = () => (props.plugin.kind === 'node' ? props.plugin.row.development : undefined)
+  const developing = () => !!props.devGrant || !!folder()?.on
   const setDevMode = (grant: boolean) => props.run(async () => {
+    if (folder()) {
+      const nodeId = props.nodeId ?? ''
+      props.onNodeState(await setNodePluginDevelopment(row().name, grant, nodeId || undefined), nodeId)
+    }
     await setPluginDevGrant(props.plugin.kind === 'device'
       ? { pluginId: row().name, nodeId: '', source: { kind: 'device' }, grant }
       : { pluginId: row().name, nodeId: props.nodeId ?? '', grant })
@@ -334,16 +352,20 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
       <Show when={!row().installed?.bundled && (props.plugin.kind === 'device' || row().installed)}>
         <SettingsSection id="dev" label="Development mode">
           <SettingRow
-            label={props.devGrant ? 'In development' : 'Off'}
-            description={props.devGrant
-              ? 'This computer runs each new version of this plugin without asking. Turn it off when you finish working on the plugin.'
-              : props.plugin.kind === 'device'
-                ? "For a plugin you're writing: runs each new version without asking."
-                : "Runs each new version without asking. It turns on when you let an agent install a plugin it's writing."}
+            label={developing() ? 'In development' : 'Off'}
+            description={developing()
+              ? folder()?.on
+                ? 'The node reloads this plugin when its built files change, keeps its logs, and lets it read its sources without asking. This computer runs each new version without asking. Turn it off when you finish working on the plugin.'
+                : 'This computer runs each new version of this plugin without asking. Turn it off when you finish working on the plugin.'
+              : folder()
+                ? "For a plugin you're writing: reloads it when its built files change, keeps its logs, and runs each new version without asking."
+                : props.plugin.kind === 'device'
+                  ? "For a plugin you're writing: runs each new version without asking."
+                  : "Runs each new version without asking. It turns on when you let an agent install a plugin it's writing."}
           >
             <Show
-              when={props.devGrant}
-              fallback={<Show when={props.plugin.kind === 'device'}><Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>Turn on</Button></Show>}
+              when={developing()}
+              fallback={<Show when={props.plugin.kind === 'device' || folder()}><Button size="sm" variant="ghost" disabled={props.busy} onPress={() => void setDevMode(true)}>Turn on</Button></Show>}
             >
               <Button size="sm" disabled={props.busy} onPress={() => void setDevMode(false)}>Turn off</Button>
             </Show>
@@ -411,6 +433,28 @@ function Reads(props: PluginPageProps & Actions & { active: boolean; inputs: Non
           </Show>
         </Inline>
       </SettingRow>
+    </SettingsSection>
+  )
+}
+
+// The plugin's `ctx.log` lines, newest last, read again every few seconds while the tab is open. The node
+// keeps the last 500 in memory, and only in development mode (docs/plugin-authoring/telemetry.md).
+function Logs(props: { pluginId: string; nodeId: string | null; active: boolean }) {
+  const [lines, { refetch }] = createResource(
+    () => (props.active ? { id: props.pluginId, nodeId: props.nodeId } : false),
+    async ({ id, nodeId }) => (await readNodePluginLogs(id, nodeId ?? undefined)).lines,
+  )
+  const timer = setInterval(() => { if (props.active) void refetch() }, 3_000)
+  onCleanup(() => clearInterval(timer))
+  const text = () => (lines.latest ?? []).map((line) =>
+    `${new Date(line.at).toLocaleTimeString()}  ${line.level.toUpperCase().padEnd(5)}  ${line.message}`).join('\n')
+  return (
+    <SettingsSection id="logs" label="Logs" help="What the plugin wrote with ctx.log since development mode came on. The last 500 lines are kept until you turn it off.">
+      <Show when={!lines.error} fallback={<Alert>{lines.error instanceof Error ? lines.error.message : 'Couldn\'t read the logs.'}</Alert>}>
+        <Show when={text()} fallback={<Text emphasis="muted">{lines.loading ? 'Reading…' : 'Nothing logged yet.'}</Text>}>
+          {(value) => <CodeBlock copy>{value()}</CodeBlock>}
+        </Show>
+      </Show>
     </SettingsSection>
   )
 }

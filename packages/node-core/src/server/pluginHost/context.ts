@@ -45,6 +45,7 @@ import { buildPluginRequestContext } from './requestContext'
 import { telemetryFor } from '../telemetry/collector'
 import { telemetryServiceFor } from '../core/telemetry'
 import { createLogger } from '../telemetry/logger'
+import { recordPluginLog } from '../plugins/developmentState'
 
 // What the loader learned about a plugin it took off disk, and the one flag that separates a loaded
 // plugin from a built-in: its presence means "contain its failures" and "shape its context from the
@@ -426,7 +427,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // Both tiers and no grant. Writing telemetry about your own work reads nothing; the read side is
     // `ctx.core.telemetry` and it is a token (../plugins/permissions.ts).
     telemetry: telemetryFor(plugin),
-    log: createLogger(plugin, plugin),
+    log: createLogger(plugin, plugin, (level, line) => recordPluginLog(plugin, level, line)),
     // The broadcast surface, projected rather than re-implemented: these are server/notify.ts and
     // server/transport/wsHub.ts, reached through the context so a plugin does not deep-import them. `channel` and
     // `streams` return disposers, which the host records like any other contribution.

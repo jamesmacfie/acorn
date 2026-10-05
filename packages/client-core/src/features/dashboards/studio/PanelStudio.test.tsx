@@ -12,6 +12,8 @@ vi.mock('../../../infra/node/apiClient', () => ({
 
 const { default: PanelStudio } = await import('./PanelStudio')
 const { clientEvents } = await import('../../../host/registries/commands/clientEvents')
+const { _resetPluginDistribution, _seedPluginDistribution } = await import('../../../host/plugins/distribution')
+const { activeCacheId } = await import('../../../infra/node/activeNode')
 
 const tasks: PanelPlan['sources'][number] = { id: 'tasks', label: 'Tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
   name: 'Tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
@@ -44,6 +46,7 @@ let opened: PanelPlan
 let turnReply: () => Promise<unknown>
 let catalog: unknown[]
 let runProblems: unknown[]
+let runSources: unknown[]
 const onClose = vi.fn()
 const settle = async (times = 3) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
@@ -60,6 +63,7 @@ beforeEach(() => {
   turnReply = () => new Promise(() => {})
   catalog = []
   runProblems = [{ path: '/stages/0', message: 'Filter names an unavailable column: title.', severity: 'error' }]
+  runSources = []
   onClose.mockReset()
   requests.mockReset()
   requests.mockImplementation(async (path, options) => {
@@ -69,7 +73,7 @@ beforeEach(() => {
     // A copy, as from the wire: the query cache wraps what it's given, which would mark the fixtures.
     if (path.endsWith('/dashboards/run')) return {
       plan: structuredClone(opened), rows: [], groups: [],
-      diagnostics: { problems: runProblems, sources: [], stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
+      diagnostics: { problems: runProblems, sources: runSources, stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
     }
     if (path.endsWith('/data-sources/list')) return { sources: catalog, discoveries: [] }
     if (path.endsWith('/queries/list')) return []
@@ -85,6 +89,7 @@ beforeEach(() => {
   document.body.append(host)
 })
 afterEach(() => {
+  _resetPluginDistribution()
   dispose?.()
   client.clear()
   host.remove()
@@ -163,6 +168,50 @@ describe('PanelStudio', () => {
     await settle()
     expect([...document.querySelectorAll('[role="dialog"]')].at(-1)!.textContent).toContain('Fix these before publishing')
     expect(button('Publish')!.disabled).toBe(true)
+  })
+
+  it('shows a source in development: what it read, the records it dropped, and a warning before publishing', async () => {
+    const bound = structuredClone(readiness)
+    const reference = bound.sources[0]!.reference
+    if (reference.kind === 'inline') reference.content.query.scope.inputs = { pulls: { connectionId: 'c1', parameters: {} } }
+    opened = bound
+    catalog = derivedCatalog
+    runProblems = []
+    runSources = [{ id: 'ready', label: 'Release readiness', completeness: { kind: 'incomplete', cause: 'invalid-records', count: 3 },
+      inputs: { pulls: { records: 42, completeness: { kind: 'complete' } } },
+      development: { inputMs: { pulls: 120 }, pluginMs: 30, dropped: [{ recordId: 'ENG-1', pointer: '/status', message: '"needs-qa" isn\'t a declared choice' }] } }]
+    _seedPluginDistribution([[activeCacheId(), [{ name: 'northwind', required: false, disabled: false, running: true, state: 'active',
+      development: { on: true, reloadedAt: Date.now() } }]]])
+    const settingsTabs: string[] = []
+    const stop = clientEvents.on('presentation:open-settings', ({ tab }) => settingsTabs.push(tab))
+    mount('d1')
+    await settle(8)
+
+    expect(document.querySelector('.dash-studio [role="toolbar"]')!.textContent).toContain('Source in development')
+    const strip = document.querySelector('[aria-label="northwind in development"]')!
+    expect(strip.textContent).toContain('reloaded')
+    expect(strip.textContent).toContain('pulls read 42 records in 120 ms · the run took 150 ms')
+    expect(strip.textContent).toContain("3 records didn't match the declared fields")
+
+    button('Show records')!.click()
+    await settle()
+    const table = document.querySelector('.dash-studio-detail table')!
+    expect(table.textContent).toContain('ENG-1')
+    expect(table.textContent).toContain('/status')
+    expect(table.textContent).toContain('"needs-qa" isn\'t a declared choice')
+    button('Back to the preview')!.click()
+    await settle()
+    expect(document.querySelector('.dash-studio-detail table')).toBeNull()
+
+    button('Logs')!.click()
+    expect(settingsTabs).toEqual(['plugins'])
+    stop()
+
+    button('Publish…')!.click()
+    await settle()
+    const review = [...document.querySelectorAll('[role="dialog"]')].at(-1)!
+    expect(review.textContent).toContain('This panel reads a source in development. Others will see it change as you edit the plugin.')
+    expect(review.textContent).not.toContain('Fix these before publishing')
   })
 
   it('disables an operation the plan cannot take yet, with its reason', async () => {

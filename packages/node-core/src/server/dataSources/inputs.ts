@@ -8,7 +8,7 @@
 // description, validation, and provider scheduling as a direct read, and this module stays out of an
 // import cycle with ./runtime.ts.
 import { createHash } from 'node:crypto'
-import { DATA_SOURCE_PREVIEW_MODE, parseDataSourceInputRef, type DataSourceDescription, type DataSourceInputRead, type DataSourceRequest, type DataSourceResponse, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import { DATA_SOURCE_PREVIEW_MODE, parseDataSourceInputRef, type DataSourceDescription, type DataSourceDevelopment, type DataSourceInputRead, type DataSourceRequest, type DataSourceResponse, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInputHandle } from '../pluginHost/types'
@@ -29,7 +29,12 @@ export type DerivedReadState = {
   droppedRecords: number
   inputError?: DataSourceError
   inputReads?: Record<string, DataSourceInputRead>
+  /** Set while the plugin is in development mode: each input's read time, and the first dropped records. */
+  development?: Omit<DataSourceDevelopment, 'pluginMs'>
 }
+
+/** How many dropped records a development run reports. */
+export const DEVELOPMENT_DROPPED_RECORDS = 20
 
 const MAX_DERIVED_DEPTH = 2
 const sourceKey = (source: RegisteredDataSource) => `${source.pluginId}:${source.sourceId}`
@@ -87,12 +92,14 @@ export function inputHandles(
       options: ({ target, pointer, search, cursor, pageSize }) => read({ operation: 'options', source: ref, scope: bound,
         target, pointer, search: search ?? '', ...(cursor ? { cursor } : {}), pageSize: pageSize ?? DATA_LIMITS.options }),
       query: async ({ predicate, sort, take, cursor, pageSize } = {}) => {
+        const started = performance.now()
         const result = await read({ operation: 'query', ...timing,
           query: { source: ref, scope: bound, sort: sort ?? [], ...(predicate ? { predicate } : {}), ...(take ? { take } : {}) },
           ...(cursor ? { cursor } : {}), pageSize: pageSize ?? DATA_LIMITS.previewRecords })
         if (result.completeness.kind === 'incomplete') state.inputIncomplete ??= result.completeness.cause
         const reads = state.inputReads ??= {}
         reads[name] = { records: (reads[name]?.records ?? 0) + result.records.length, completeness: result.completeness }
+        if (state.development) state.development.inputMs[name] = (state.development.inputMs[name] ?? 0) + performance.now() - started
         return result
       },
     }
@@ -123,9 +130,16 @@ export async function composeDerivedRevision(
 }
 
 /** Fold what the input reads and record checks learned into the page the caller sees. The plugin's
- *  own `incomplete` wins, then an input's cause, then the count of records dropped for their shape. */
-export function finishDerivedResult(result: DataSourceResult, state: DerivedReadState): DataSourceResult {
-  const read = state.inputReads ? { ...result, inputs: state.inputReads } : result
+ *  own `incomplete` wins, then an input's cause, then the count of records dropped for their shape.
+ *  `queryMs` is the whole query's time, which development mode splits into input and plugin time. */
+export function finishDerivedResult(result: DataSourceResult, state: DerivedReadState, queryMs: number): DataSourceResult {
+  const development = state.development
+  const read = {
+    ...result,
+    ...(state.inputReads ? { inputs: state.inputReads } : {}),
+    ...(development ? { development: { ...development,
+      pluginMs: Math.max(0, queryMs - Object.values(development.inputMs).reduce((sum, ms) => sum + ms, 0)) } } : {}),
+  }
   if (result.completeness.kind !== 'complete' && result.completeness.kind !== 'bounded') return read
   if (state.inputIncomplete) return { ...read, completeness: { kind: 'incomplete', cause: state.inputIncomplete } }
   if (state.droppedRecords) return { ...read, completeness: { kind: 'incomplete', cause: 'invalid-records', count: state.droppedRecords } }

@@ -1,7 +1,9 @@
 import { createSignal } from 'solid-js'
 import {
+  corePluginDevelopmentRoute,
   corePluginInputGrantRoute,
   corePluginInstallRoute,
+  corePluginLogsRoute,
   corePluginReloadRoute,
   corePluginRequestRoute,
   corePluginReviewRoute,
@@ -13,6 +15,7 @@ import {
   type PluginInputGrantState,
   type PluginInstallResult,
   type PluginInstallSource,
+  type PluginLogs,
   type PluginReloadResult,
   type PluginUninstallResult,
   type PluginUpdateResult,
@@ -110,6 +113,15 @@ export const uninstallNodePlugin = async (
 // previous instance is still serving, so callers read the state rather than waiting for a rejection.
 export const reloadNodePlugin = async (id: string, nodeId?: string): Promise<PluginReloadResult> =>
   await mutate(corePluginReloadRoute(id), 'POST', {}, nodeId)
+
+// Development mode for a folder-installed node plugin (docs/plugins/dev-loop.md § Development mode for a
+// folder plugin). Answers the roster, so the page shows the new state without a second read.
+export const setNodePluginDevelopment = async (id: string, on: boolean, nodeId?: string): Promise<NodePluginState> =>
+  await mutate(corePluginDevelopmentRoute(id), 'PUT', { on }, nodeId)
+
+/** The plugin's kept log lines, oldest first. The node keeps them only in development mode. */
+export const readNodePluginLogs = async (id: string, nodeId?: string): Promise<PluginLogs> =>
+  await readJson<PluginLogs>(corePluginLogsRoute(id), nodeId ? { nodeId } : {})
 
 export const reviewNodePlugin = async (
   id: string,

@@ -46,3 +46,13 @@ it('enforces structural depth, described fields, enums, and value bytes at their
   expect(validateDataValue('x'.repeat(DATA_LIMITS.recordBytes - 2), { type: 'string' })).toHaveLength(DATA_LIMITS.recordBytes - 2)
   expect(() => validateDataValue('x'.repeat(DATA_LIMITS.recordBytes - 1), { type: 'string' })).toThrow()
 })
+
+it('names the field a value fails at', () => {
+  const schema = parseDataSchema({ type: 'object', properties: { status: { type: 'string', enum: ['ready', 'blocked'] },
+    'a/b': { type: 'array', items: { type: 'number' } } }, required: ['status'] })
+  const failure = (value: unknown) => { try { validateDataValue(value, schema) } catch (error) { return error } }
+  expect(failure({ status: 'needs-qa' })).toMatchObject({ pointer: '/status', message: '"needs-qa" isn\'t a declared choice' })
+  expect(failure({ status: 'ready', 'a/b': [1, 'x'] })).toMatchObject({ pointer: '/a~1b/1' })
+  expect(failure({})).toMatchObject({ pointer: '/status', message: 'Missing required field: status' })
+  expect(failure({ status: 'ready' })).toBeUndefined()
+})

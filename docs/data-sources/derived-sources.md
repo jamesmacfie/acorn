@@ -176,6 +176,15 @@ usable account for that provider. When more than one fits, it asks with a clarif
 are those accounts. `authoringAccountProblems` in `packages/dashboards-core/src/authoringAccounts.ts`
 applies the rule to every binding and refuses a missing required input.
 
+## Develop one against real data
+
+In [development mode](../plugins/dev-loop.md#development-mode-for-a-folder-plugin), a run also
+carries `development`: each input's read time, the plugin's own time, and up to 20 dropped records
+with the field's pointer and a message. The studio then shows **Source in development** and a strip
+with when the plugin last reloaded, what each input read, the run's time, and how many records
+didn't match the declared fields. **Show records** swaps the preview for those records, **Reload
+plugin** reloads it, and **Logs** opens its **Logs** tab. **Publish…** warns without blocking.
+
 ## Limits and known gaps
 
 - GitHub's local-branches source still owns the `github` provider and reads `core:local-branches`

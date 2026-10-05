@@ -77,11 +77,11 @@ const sourceKind = (source: string): string =>
 // plugin's page under Installed. The page is a detail of the Installed list rather than a page of its own,
 // so the link travels as a detail request (../settingsDetail.ts).
 export const INSTALLED_PAGE = 'plugins'
-const requests = createDetailRequest<{ id: string; kind?: InstalledPlugin['kind'] }>()
+const requests = createDetailRequest<{ id: string; kind?: InstalledPlugin['kind']; tab?: 'logs' }>()
 /** The plugin page waiting to open, taken so it opens once. */
 export const takePluginRequest = () => requests.take(INSTALLED_PAGE)
 
-/** Open one plugin's page under Installed, from anywhere inside settings. */
-export function openPluginPage(navigate: SettingsNavigate, id: string, kind?: InstalledPlugin['kind']): void {
-  requests.open(navigate, INSTALLED_PAGE, kind ? { id, kind } : { id })
+/** Open one plugin's page under Installed, from anywhere inside settings, on its Logs tab if asked. */
+export function openPluginPage(navigate: SettingsNavigate, id: string, kind?: InstalledPlugin['kind'], tab?: 'logs'): void {
+  requests.open(navigate, INSTALLED_PAGE, { id, ...(kind ? { kind } : {}), ...(tab ? { tab } : {}) })
 }

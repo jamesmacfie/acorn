@@ -17,6 +17,8 @@ import { ATTR_VALUE_MAX } from '@acorn/protocol/telemetry.ts'
 import { emitLog, onTelemetryBatch, PERF, flushTelemetry } from './collector'
 import { scrub, scrubAttrs, scrubLine } from './scrub'
 
+type LogLevel = 'debug' | 'info' | 'warn' | 'error'
+
 export type Logger = {
   debug(message: string, attrs?: TelemetryAttrs): void
   info(message: string, attrs?: TelemetryAttrs): void
@@ -49,17 +51,20 @@ const suffix = (attrs: TelemetryAttrs | undefined): string => {
  * `[schedules] github:refresh timed out`, which is what the hand-written prefix printed before.
  *
  * `owner` defaults to `core`. The plugin host passes the plugin id, which is what makes `ctx.log`
- * worth having.
+ * worth having, and a `tap` that keeps lines for a plugin in development mode.
  */
-export function createLogger(tag: string, owner = 'core'): Logger {
+export function createLogger(tag: string, owner = 'core', tap?: (level: LogLevel, line: string) => void): Logger {
   const logger = scrubLine(tag, 'logger', ATTR_VALUE_MAX)
-  const write = (level: 'debug' | 'info' | 'warn' | 'error', message: string, attrs?: TelemetryAttrs): void => {
+  const write = (level: LogLevel, message: string, attrs?: TelemetryAttrs): void => {
     const body = scrubLine(message)
     const { attrs: clean, truncated } = scrubAttrs(attrs)
     const line = boundedLine(`[${logger}] ${body}${suffix(clean)}`)
     if (level === 'warn') console.warn(line)
     else console.error(line)
     emitLog(owner, { at: Date.now(), level, logger, body, ...(attrs ? { attrs: clean } : {}) }, truncated)
+    // Beside stderr and telemetry, never instead of them: the in-app log view of a plugin in
+    // development mode (../plugins/development.ts). Gets the same scrubbed line, without the tag.
+    tap?.(level, boundedLine(`${body}${suffix(clean)}`))
   }
   return {
     debug: (message, attrs) => write('debug', message, attrs),

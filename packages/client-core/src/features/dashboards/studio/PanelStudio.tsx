@@ -8,11 +8,14 @@ import type { PlanProblem, SourceFailure } from '@acorn/dashboards-core/plan.ts'
 import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import { planPartLabel, REQUIREMENT_STATUS_LABELS } from '@acorn/dashboards-core/labels.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
+import { reloadNodePlugin } from '../../../infra/node/nodePlugins'
+import { distribution } from '../../../host/plugins/distribution'
 import { integrationsOptions } from '../../../infra/queries'
 import { dataSourceCatalogOptions } from '../../dataSources/queries'
 import { sourceKey, unboundInputs } from '../../dataSources/sourceEntries'
 import { failureContext, planInputs } from '../planInputs'
 import { describeSourceFailure } from '../sourceErrors'
+import { openPluginSettings } from '../SourceFailureAlert'
 import AuthoringConversation from '../../dataSources/AuthoringConversation'
 import {
   Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Field, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
@@ -42,6 +45,7 @@ import {
 } from './inspectors'
 import type { LaunchResult } from './PanelLauncher'
 import { createStudioStore } from './studioStore'
+import DevelopmentStrip, { DroppedRecords, type DevelopingPlugin } from './DevelopmentStrip'
 import { markPanelStudioOpen } from './studioOpen'
 import StudioOutline, { type OutlineAddition } from './StudioOutline'
 import StudioPreview, { type PreviewSide } from './StudioPreview'
@@ -150,11 +154,20 @@ export default function PanelStudio(props: {
       contextFor({ path: `/sources/${index}`, message: '', severity: 'error', failure: { code: 'input-required', source: sourceKey(query.source), input } }).names).message)
   }))
 
+  // ── Plugins in development ───────────────────────────────────────────────────────────────────
+  /** Plugins in development mode on this node, from its roster (docs/plugins/dev-loop.md). Each reload
+   *  moves `reloadedAt`, which is in the preview's key, so a save shows without pressing refresh. */
+  const developingOnNode = createMemo((): DevelopingPlugin[] => (distribution().byNode.get(nodeId)?.rows ?? [])
+    .filter(row => row.development?.on)
+    .map(row => ({ id: row.name, ...(row.development?.reloadedAt ? { reloadedAt: row.development.reloadedAt } : {}),
+      ...(row.state === 'failed' && row.reason ? { failure: row.reason } : {}) })))
+  const reloads = () => developingOnNode().map(plugin => `${plugin.id}:${plugin.reloadedAt ?? 0}:${plugin.failure ?? ''}`).join()
+
   // ── Runs and problems ────────────────────────────────────────────────────────────────────────
   const parsed = createMemo(() => panelPlanSchema.safeParse(plan()))
   /** A draft preview run of a plan, while it has a source and parses. */
   const previewRun = (content: () => PanelPlan | undefined) => createQuery(() => ({
-    queryKey: ['dashboard-preview', nodeId, scope.workspaceId, JSON.stringify(content() ?? null)],
+    queryKey: ['dashboard-preview', nodeId, scope.workspaceId, JSON.stringify(content() ?? null), reloads()],
     queryFn: ({ signal }: { signal: AbortSignal }) => client.run({ kind: 'draft', content: copy(content()!) }, 'preview', Intl.DateTimeFormat().resolvedOptions().timeZone, signal),
     enabled: !!content()?.sources.length && panelPlanSchema.safeParse(content()).success,
     staleTime: 0,
@@ -179,6 +192,26 @@ export default function PanelStudio(props: {
       ? describeSourceFailure(entry.failure, contextFor({ ...entry, failure: entry.failure }).names).message
       : `${planPartLabel(plan(), entry.path)}: ${entry.message}` }))]
   })
+  /** The plugins in development mode this panel reads, and the last run's numbers for their sources. */
+  const developing = createMemo(() => {
+    const read = new Set([...plan().sources.flatMap(source => source.reference.kind === 'inline' ? [source.reference.content.query.source.pluginId] : []),
+      ...run()?.diagnostics.plugins ?? []])
+    return developingOnNode().filter(plugin => read.has(plugin.id))
+  })
+  const developmentSources = createMemo(() => (run()?.diagnostics.sources ?? []).filter(source => source.development))
+  const [showingRecords, setShowingRecords] = createSignal(false)
+  /** Show records swaps the preview for the dropped records, except while a proposal is under review. */
+  const recordsShown = () => showingRecords() && !review() && developing().length > 0
+  const [reloadingPlugin, setReloadingPlugin] = createSignal(false)
+  const reloadPlugin = async (pluginId: string): Promise<void> => {
+    setReloadingPlugin(true)
+    try {
+      const result = await reloadNodePlugin(pluginId)
+      if (result.state === 'failed') store.setProblem(`${pluginId} didn't reload: ${result.reason ?? 'its new version failed to start'}. The previous version is still running.`)
+    } catch (error) {
+      store.setProblem(`${pluginId} didn't reload: ${error instanceof Error ? error.message : String(error)}`)
+    } finally { setReloadingPlugin(false) }
+  }
   const selectPath = (path: string, inPlan = plan()): void => {
     const key = partForPath(inPlan, path, inPlan === plan() ? inputs() : outlineInputs())
     if (key) select(key)
@@ -389,6 +422,7 @@ export default function PanelStudio(props: {
       <Badge tone={store.saveState() === "Couldn't save" ? 'warn' : undefined}>{store.saveState()}</Badge>
       <Badge>{publishBadge()}</Badge>
       <Show when={review()}><Badge tone="accent">Reviewing AI proposal</Badge></Show>
+      <Show when={developing().length}><Badge tone="warn">Source in development</Badge></Show>
       <ToolbarSpacer />
       <Button size="sm" onPress={() => dockOpen() ? setDockOpen(false) : openAi()}><Icon name="sparkles" /> Ask AI</Button>
       <IconButton icon="undo-2" label="Undo" disabled={!store.canUndo()} onPress={store.undo} />
@@ -458,6 +492,8 @@ export default function PanelStudio(props: {
   return (
     <div ref={root} class="dash-studio" role="dialog" aria-modal="true" aria-labelledby={titleId} tabindex="-1" onKeyDown={onKeyDown}>
       {header}
+      <DevelopmentStrip plugins={developing()} sources={developmentSources()} showingRecords={showingRecords()} reloading={reloadingPlugin()}
+        onShowRecords={() => setShowingRecords(!showingRecords())} onReload={id => void reloadPlugin(id)} onLogs={id => openPluginSettings(id, 'logs')} />
       <Tabs idPrefix="dashboards-studio" ariaLabel="Studio view" active={tab()} onChange={id => setTab(id as 'outline' | 'plan')}
         tabs={[{ id: 'outline', label: 'Outline' }, { id: 'plan', label: 'Plan' }]} />
       <Show when={store.problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
@@ -473,13 +509,17 @@ export default function PanelStudio(props: {
             </ListColumn>
             <DetailColumn>
               <div class="dash-studio-detail">
-                <Show when={previewPlan().sources.length || review()} fallback={<div class="dash-studio-preview">{empty}</div>}>
-                  <StudioPreview plan={previewPlan()} run={previewData()} loading={review() && showing() === 'after' ? proposedPreview.isFetching : preview.isFetching}
-                    {...(props.placed ? { placed: props.placed } : {})}
-                    onRefresh={() => void (review() && showing() === 'after' ? proposedPreview : preview).refetch()}
-                    onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
-                    onEditTitle={() => setEditingTitle(true)}
-                    {...(review() ? { review: { showing: showing(), onShow: setShowing, ...(run() ? { beforeRows: run()!.rows.length } : {}) } } : {})} />
+                <Show when={recordsShown()} fallback={
+                  <Show when={previewPlan().sources.length || review()} fallback={<div class="dash-studio-preview">{empty}</div>}>
+                    <StudioPreview plan={previewPlan()} run={previewData()} loading={review() && showing() === 'after' ? proposedPreview.isFetching : preview.isFetching}
+                      {...(props.placed ? { placed: props.placed } : {})}
+                      onRefresh={() => void (review() && showing() === 'after' ? proposedPreview : preview).refetch()}
+                      onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
+                      onEditTitle={() => setEditingTitle(true)}
+                      {...(review() ? { review: { showing: showing(), onShow: setShowing, ...(run() ? { beforeRows: run()!.rows.length } : {}) } } : {})} />
+                  </Show>
+                }>
+                  <DroppedRecords sources={developmentSources()} onClose={() => setShowingRecords(false)} />
                 </Show>
                 {inspector}
                 <Show when={dockStarted()}>
@@ -512,6 +552,9 @@ export default function PanelStudio(props: {
             <Show when={props.scope.surface === 'home' && store.draft()?.publishedRevision == null && tabs().length > 1}
               fallback={<Field label="Where it goes"><Text>{props.returnLabel}</Text></Field>}>
               <LabeledSelect label="Where it goes" value={placement()} options={tabs().map(entry => ({ value: entry.id, label: entry.name }))} onChange={setPlacement} />
+            </Show>
+            <Show when={developing().length}>
+              <Alert tone="warn">This panel reads a source in development. Others will see it change as you edit the plugin.</Alert>
             </Show>
             <Show when={notCovered().length}>
               <Alert tone="warn" title="Not fully covered"><Stack gap="none"><For each={notCovered()}>{item => <Text wrap>{item}</Text>}</For></Stack></Alert>

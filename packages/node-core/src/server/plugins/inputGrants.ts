@@ -16,6 +16,8 @@ export type InputGrant = {
   sources: Record<string, Record<string, GrantedInput>>
   grantedAt: number
   grantedBy: string
+  /** Written by development mode rather than by the person, and removed when it ends (./development.ts). */
+  development?: true
 }
 
 export type InputGrantsStore = {
@@ -41,7 +43,7 @@ const parseGrant = (value: unknown): InputGrant | undefined => {
       sources[sourceId][name] = { source: input.source, optional: input.optional }
     }
   }
-  return { pluginId: value.pluginId, sources, grantedAt: value.grantedAt, grantedBy: value.grantedBy }
+  return { pluginId: value.pluginId, sources, grantedAt: value.grantedAt, grantedBy: value.grantedBy, ...(value.development === true ? { development: true as const } : {}) }
 }
 
 // Anything unparseable reads as "no grants", as disabled.ts does. Here that fails closed as well as

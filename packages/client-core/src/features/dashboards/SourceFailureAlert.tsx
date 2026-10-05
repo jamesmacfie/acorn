@@ -24,8 +24,8 @@ const openSettingsAt: SettingsNavigate = (target, opened) => {
   opened?.()
 }
 
-/** A plugin's page in Settings, for About this source and the plugin fixes. */
-export const openPluginSettings = (pluginId: string): void => openPluginPage(openSettingsAt, pluginId, 'node')
+/** A plugin's page in Settings, for About this source and the plugin fixes, or its Logs tab. */
+export const openPluginSettings = (pluginId: string, tab?: 'logs'): void => openPluginPage(openSettingsAt, pluginId, 'node', tab)
 
 export default function SourceFailureAlert(props: {
   failure: SourceFailure

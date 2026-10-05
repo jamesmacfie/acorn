@@ -25,6 +25,7 @@ Every route in this table is device-only.
 | `POST` | `/v1/core/plugins/:id/review` | Approve or remove a package held for review. Needs `Idempotency-Key` |
 | `GET`, `POST`, `DELETE` | `/v1/core/plugins/:id/input-grant` | Read, approve, or revoke what a loaded plugin's derived sources read ([derived sources](../data-sources/derived-sources.md#approve-inputs-for-loaded-plugins)) |
 | `POST` | `/v1/core/plugins/:id/reload` | Swap a loaded plugin's node half in the running process. Needs `Idempotency-Key` |
+| `PUT`, `GET` | `/v1/core/plugins/:id/development`, `/logs` | Turn [development mode](../plugins/dev-loop.md#development-mode-for-a-folder-plugin) on or off with `{ on }`, and read the last 500 log lines it keeps |
 | `DELETE` | `/v1/core/plugins/:id` | Uninstall a package. Needs `Idempotency-Key` |
 | `POST` | `/v1/core/plugins/requests/:requestId` | Answer an agent's install request, `approved` or `denied` |
 | `POST` | `/v1/core/plugins/:id/cli/:name` | Invoke one manifest CLI command with `{ input }` |
@@ -41,11 +42,11 @@ Every route in this table is device-only.
 | `GET` | `/v1/core/backup` | Suggest a destination path for a backup |
 | `POST` | `/v1/core/backup` | Write a credential-scrubbed database archive to a path on the Node |
 
-Each roster row may carry `active`, the declaration and client hash of the running loaded runtime,
-beside `installed`, the package on disk, and `inputs`, what its derived sources read. `active: null`
-says no loaded runtime is active. The bundle route resolves by hash, including retained active bytes
-after an on-disk update, so custody can check the hash before any trust decision. A task-scoped agent
-asks for an install through the `plugin_request` tool and reaches neither the roster nor the decision
+A roster row may carry `active`, the running loaded runtime's declaration and client hash, or `null`
+for none. It may also carry `installed`, the package on disk, `inputs`, what its derived sources
+read, and `development`, only for a folder-installed node plugin. The bundle route resolves by hash,
+retained active bytes included, so custody checks the hash before any trust decision. A task-scoped
+agent asks for an install with `plugin_request` and reaches neither the roster nor the decision
 route ([installing plugins](../security/plugin-install.md)).
 
 CLI command discovery reads only `active.contributions.cliCommands` on a running loaded plugin. The
@@ -56,8 +57,7 @@ calls only the plugin's reserved `/v1/p/<id>/cli/<name>` path and returns `{ res
 
 ## Schedules
 
-Device-only, because a schedule is code the Node runs unattended. [Schedules](../schedules.md) owns
-the model.
+Device-only, because a schedule is code the Node runs unattended. See [schedules](../schedules.md).
 
 | Method | Path | Purpose |
 | --- | --- | --- |

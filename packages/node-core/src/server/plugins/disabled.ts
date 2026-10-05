@@ -23,7 +23,13 @@ const parse = (raw: string): string[] => {
 }
 
 export function disabledPluginsStore(dataDir: string): DisabledPluginsStore {
-  const file = join(dataDir, FILE_NAME)
+  return pluginListStore(dataDir, FILE_NAME)
+}
+
+/** A sorted list of plugin ids in one private file in the data root. Also holds which plugins are in
+ *  development mode (./development.ts). */
+export function pluginListStore(dataDir: string, fileName: string): DisabledPluginsStore {
+  const file = join(dataDir, fileName)
   let current: readonly string[] = []
   try {
     current = parse(readFileSync(file, 'utf8'))

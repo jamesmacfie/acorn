@@ -1,6 +1,6 @@
 import { installPlugin, pluginDir, uninstallPlugin, updatePlugin } from '@acorn/node-core/server/plugins'
 import { installedPluginInfo, readClientBundle, scanInstalled, snapshotActivePlugin, type ActivePluginSnapshot, type InstalledPlugin } from '@acorn/node-core/server/plugins'
-import { createPluginReloader } from '@acorn/node-core/server/plugins'
+import { createPluginDevelopment, createPluginReloader } from '@acorn/node-core/server/plugins'
 import { cascadeDeletePluginData } from '@acorn/node-core/server/db/cascade.ts'
 import type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
@@ -45,12 +45,16 @@ export type PluginStateInput = {
   reloadHost: Pick<PluginHostResult, 'reload'>
 }
 
-export async function buildPluginStateBridge(input: PluginStateInput): Promise<PluginsBridge> {
+/** The bridge, plus the one thing it holds open: development mode's file watches. */
+export async function buildPluginStateBridge(input: PluginStateInput): Promise<PluginsBridge & { dispose(): void }> {
   const { dataDir } = input
   // Built here, not in each root, so the two cannot drift the way install/uninstall once did. The
   // built-in names come from the build (composition.ts), not the assembled graph: they only warn when
   // a disk package shadows a compiled one.
   const reloader = createPluginReloader({ dataDir, builtins: nodePluginNames(), host: input.reloadHost })
+  // Development mode wraps the reloader, and the route reloads through it too, so a watched save and
+  // POST /reload take turns and both update the development state.
+  const development = createPluginDevelopment({ dataDir, reload: (id) => reloader.reload(id) })
   // Only a service that survived init and ready can claim a running identity. Keep its bytes in this
   // process even if the package is updated or removed on disk before the next restart.
   const serving = new Set(input.roster().filter((row) => row.state === 'active' && !row.disabled).map((row) => row.name))
@@ -102,13 +106,17 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // The input grant goes before both, whether or not the data stays. It's keyed by plugin id alone,
     // so a package installed later under the same id would otherwise read without asking. Dropping it
     // first means a failed uninstall leaves a plugin that asks again, never one that kept a grant.
+    // Development mode ends first of all, so its watch doesn't outlive the package.
     uninstall: async (id, options) => {
+      development.set(id, false)
       inputGrantsStore(dataDir).delete(id)
       const result = uninstallPlugin(dataDir, id, options)
       if (options.purgeData) await cascadeDeletePluginData(input.db, id)
       return result
     },
-    reload: (id) => reloader.reload(id),
+    reload: (id) => development.reload(id),
     inputGrants: () => inputGrantsStore(dataDir),
+    development,
+    dispose: development.dispose,
   }
 }

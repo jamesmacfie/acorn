@@ -12,7 +12,7 @@ import { validatePluginCliValue, PLUGIN_CLI_INPUT_MAX_BYTES, PLUGIN_CLI_OUTPUT_M
 import { getDb } from '../../db'
 import { projects, tasks, workspaces } from '../../db/schema'
 import { eq } from 'drizzle-orm'
-import type { PluginInputGrant, PluginInputGrantState } from '@acorn/protocol/api.ts'
+import type { PluginInputGrant, PluginInputGrantState, PluginLogs } from '@acorn/protocol/api.ts'
 import { declaredInputs, sameInputs } from '../../plugins/inputGrants'
 import { pluginInputUsage } from '../../dashboards/inputUsage'
 
@@ -29,6 +29,7 @@ const installSource = z.union([
 const installBody = z.strictObject({ source: installSource, allowDowngrade: z.boolean().optional(), reviewRequestId: z.uuid().optional() })
 const updateBody = z.strictObject({ allowDowngrade: z.boolean().optional(), reviewRequestId: z.uuid().optional() })
 const uninstallBody = z.strictObject({ purgeData: z.boolean().optional() })
+const developmentBody = z.strictObject({ on: z.boolean() })
 const reviewBody = z.strictObject({ reviewId: z.uuid(), fingerprint: z.string().regex(/^[a-f0-9]{64}$/), decision: z.enum(['approved', 'denied']) })
 const sameSource = (left: unknown, right: unknown): boolean =>
   !!left && !!right && JSON.stringify(Object.entries(left as Record<string, unknown>).sort()) === JSON.stringify(Object.entries(right as Record<string, unknown>).sort())
@@ -359,6 +360,27 @@ export const plugins = new Hono<AppEnv>()
       return result
     })
   })
+  // Development mode for a node plugin installed from a local folder (docs/plugins/dev-loop.md §
+  // Development mode for a folder plugin). On, the node reloads the plugin when its built files change,
+  // keeps its log lines, and approves its inputs with a development grant. Off undoes all three.
+  // Audited, because it decides which code runs and what it reads without a prompt.
+  .put('/:id/development', async (c) => {
+    const parsed = developmentBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const id = c.req.param('id')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      await asBadRequest(() => bridge.development.set(id, parsed.data.on))
+      auditRequest(c, { action: parsed.data.on ? 'plugins.development.started' : 'plugins.development.stopped', subject: id })
+      broadcastPluginsChanged()
+      return pluginState(bridge)
+    })
+  })
+  // The plugin's last 500 `ctx.log` lines, kept only while it's in development mode.
+  .get('/:id/logs', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => {
+    const lines = bridge.development.logs(c.req.param('id'))
+    if (!lines) throw new BridgeError(404, 'not_found', 'Logs are kept only while a plugin is in development mode.')
+    return { lines } satisfies PluginLogs
+  }))
   .delete('/:id', async (c) => {
     const missing = requireIdempotencyKey(c)
     if (missing) return missing

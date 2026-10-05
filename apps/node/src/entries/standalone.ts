@@ -113,19 +113,17 @@ const graph = await assembleNodeGraph(root.dir, buildPluginDeps({ capabilities, 
 const scheduler = createScheduler(runtime.DB, { env: runtime })
 const schedulerCapability = capabilities.provide(SCHEDULER, scheduler)
 const plugins = await initPlugins(graph.plugins, { capabilities, core, env: runtime, dataDir: root.dir, disabled: disabled(), loaded: graph.loaded })
-const pluginStateCapability = capabilities.provide(
-  PLUGIN_STATE,
-  await buildPluginStateBridge({
-    dataDir: root.dir,
-    db: runtime.DB,
-    roster: () => plugins.roster,
-    booted: () => graph.installed,
-    loadFailures: () => graph.failures,
-    disabled,
-    setDisabled: (names) => disabledPlugins.set(names),
-    reloadHost: plugins,
-  }),
-)
+const pluginStateBridge = await buildPluginStateBridge({
+  dataDir: root.dir,
+  db: runtime.DB,
+  roster: () => plugins.roster,
+  booted: () => graph.installed,
+  loadFailures: () => graph.failures,
+  disabled,
+  setDisabled: (names) => disabledPlugins.set(names),
+  reloadHost: plugins,
+})
+const pluginStateCapability = capabilities.provide(PLUGIN_STATE, pluginStateBridge)
 
 // Core's own six agent tools and the config-trust bridge, matching service/runtime.ts. Both are pure
 // functions over the database; neither needs a window.
@@ -188,7 +186,7 @@ const shutdown = async (signal: NodeJS.Signals): Promise<void> => {
       schedulerCapability.dispose()
       await scheduler.stop()
     },
-    pluginState: async () => pluginStateCapability.dispose(),
+    pluginState: async () => { pluginStateCapability.dispose(); pluginStateBridge.dispose() },
     plugins: () => plugins.dispose(),
     sqlite: async () => runtime.DB.close(),
     dataRoot: async () => root.release(),

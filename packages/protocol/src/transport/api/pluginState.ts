@@ -48,7 +48,17 @@ export type NodePluginRow = {
    * only for a loaded plugin whose installed version declares inputs. Separate from `state`, because a
    * plugin waiting for this approval still runs (docs/data-sources/derived-sources.md). */
   inputs?: PluginInputs
+  /** Present only for a node plugin installed from a local folder, the one kind development mode is
+   * for (docs/plugins/dev-loop.md § Development mode for a folder plugin). `on` while the node watches its
+   * files, and `reloadedAt` is the last reload that worked since then, in epoch millis. */
+  development?: { on: boolean; reloadedAt?: number }
 }
+
+/** One line a plugin wrote with `ctx.log` while in development mode. `message` is scrubbed, as it is
+ *  on stderr. */
+export type PluginLogLine = { at: number; level: 'debug' | 'info' | 'warn' | 'error'; message: string }
+/** What `GET /v1/core/plugins/:id/logs` returns: the last 500 lines, oldest first. */
+export type PluginLogs = { lines: PluginLogLine[] }
 
 export type PluginInputs = {
   /** A grant exists, so an input it doesn't cover is new or changed in this version. */
@@ -187,6 +197,9 @@ export const corePluginRoute = (id: string) => `/v1/core/plugins/${encodeURIComp
 export const corePluginUpdateRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/update`
 export const corePluginReloadRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/reload`
 export const corePluginReviewRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/review`
+// Development mode for a folder-installed node plugin, and the log lines it keeps. Device-only by the same mount.
+export const corePluginDevelopmentRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/development`
+export const corePluginLogsRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/logs`
 // The person's approval of what a loaded plugin's derived sources read. Device-only by the same mount.
 export const corePluginInputGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/input-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable

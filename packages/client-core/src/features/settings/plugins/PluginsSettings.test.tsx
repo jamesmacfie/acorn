@@ -30,10 +30,11 @@ vi.mock('../../../infra/node/nodePlugins', () => ({
   readPluginInputGrant: vi.fn(async () => ({ inputs: [], grant: null, usage: { board: { pulls: { panels: 2, connectionIds: ['work'] } } } })),
   revokePluginInputs: vi.fn(),
   installNodePlugin: vi.fn(), reviewNodePlugin: vi.fn(), uninstallNodePlugin: vi.fn(), updateNodePlugin: vi.fn(), saveDisabledNodePlugins: vi.fn(),
+  setNodePluginDevelopment: vi.fn(), readNodePluginLogs: vi.fn(async () => ({ lines: [{ at: 0, level: 'warn', message: 'refreshed 3 issues' }] })),
 }))
 vi.mock('../../../host/plugins/host', () => ({
   readPluginHostState: async () => ({ cached: {}, acks: [], devGrants: [] }),
-  installPluginOnDevice: vi.fn(), removePluginFromDevice: vi.fn(), forgetPluginTrust: vi.fn(), setPluginDevGrant: vi.fn(),
+  installPluginOnDevice: vi.fn(), removePluginFromDevice: vi.fn(), forgetPluginTrust: vi.fn(), setPluginDevGrant: vi.fn(), pluginHostAvailable: () => false,
 }))
 vi.mock('../../../host/plugins/distribution', async (original) => ({
   ...(await original<typeof import('../../../host/plugins/distribution')>()),
@@ -50,7 +51,8 @@ vi.mock('../../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['pr
 
 import PluginsSettings from './PluginsSettings'
 import { openPluginPage } from './installed'
-import { readPluginInputGrant, saveDisabledNodePlugins } from '../../../infra/node/nodePlugins'
+import { readPluginInputGrant, saveDisabledNodePlugins, setNodePluginDevelopment } from '../../../infra/node/nodePlugins'
+import { setPluginDevGrant } from '../../../host/plugins/host'
 import { sendReferenceToAgent } from '../../agent/reference'
 
 let host: HTMLElement
@@ -138,6 +140,28 @@ describe('Installed', () => {
       .toContain('Pull requests · GitHub · used by 2 panels with the Work account'))
     expect(readPluginInputGrant).toHaveBeenCalledWith('readiness', 'node-a')
     expect(host.querySelector('[data-settings-section="reads"]')!.textContent).toContain('Revoke')
+    slowReads.clear()
+  })
+
+  it('turns on development mode for a folder plugin on both the node and this computer, then shows its logs', async () => {
+    dispose?.()
+    host.textContent = ''
+    const folder: NodePluginRow = { ...READINESS, installed: { ...READINESS.installed!, source: 'path:/src/readiness' }, development: { on: false } }
+    const developing: NodePluginRow = { ...folder, development: { on: true } }
+    slowReads.set('node-a', async () => ({ plugins: [folder], restartRequired: false }))
+    vi.mocked(setNodePluginDevelopment).mockResolvedValue({ plugins: [developing], restartRequired: false })
+    dispose = render(() => <PluginsSettings context={{ scope: { nodeId: 'node-a' }, navigate: () => {}, onWorkspaceDeleted: () => {} }} />, host)
+    await vi.waitFor(() => expect(listed()).toContain('readiness'))
+    openPluginPage((_target, opened) => opened?.(), 'readiness', 'node')
+    await vi.waitFor(() => expect(host.querySelector('[role="tablist"]')).not.toBeNull())
+    press('Permissions')
+    await vi.waitFor(() => expect(host.querySelector('[data-settings-section="dev"]')?.textContent).toContain('reloads it when its built files change'))
+    press('Turn on')
+    await vi.waitFor(() => expect(setPluginDevGrant).toHaveBeenCalledWith({ pluginId: 'readiness', nodeId: 'node-a', grant: true }))
+    expect(setNodePluginDevelopment).toHaveBeenCalledWith('readiness', true, 'node-a')
+    await vi.waitFor(() => expect([...host.querySelectorAll('[role="tab"]')].map((tab) => tab.textContent)).toContain('Logs'))
+    press('Logs')
+    await vi.waitFor(() => expect(host.querySelector('[data-settings-section="logs"]')?.textContent).toContain('WARN   refreshed 3 issues'))
     slowReads.clear()
   })
 

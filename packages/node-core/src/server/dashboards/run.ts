@@ -14,6 +14,8 @@ import { dashboardStore } from './store'
 import { getDb } from '../db'
 import { describeError } from '../telemetry/logger'
 import { dashboardSharedRead } from './readCache'
+import { developmentPlugins } from '../plugins/developmentState'
+import { registeredDataSource } from '../dataSources/registry'
 import { sourceCoverageProblem } from './coverage'
 import { getConnection } from '../integrations/connections'
 
@@ -120,10 +122,14 @@ async function resolvePlanContexts(env: Env, plan: PanelPlan, sources: PlanSourc
 async function sharedRead(env: Env, source: PlanSource, mode: 'preview' | 'execution', evaluationTime: number, invocation: DataSourceInvocation): Promise<DataSourceResult> {
   const window = Math.floor(evaluationTime / SHARED_READ_MS)
   const key = digest({ principal: invocation.principal.userId, query: source.query, revision: source.description.revision, mode, window })
-  return dashboardSharedRead(key, () => invokeDataSource(env, {
+  const read = () => invokeDataSource(env, {
     operation: 'query', query: source.query, mode, evaluationTime,
     pageSize: mode === 'preview' ? DATA_LIMITS.previewRecords : DATA_LIMITS.options,
-  }, invocation))
+  }, invocation)
+  // A loaded plugin in development mode can change its logic without changing its revision, so its
+  // source is read fresh each run and a save shows on the next one.
+  const developing = !!registeredDataSource(source.query.source)?.loaded && developmentPlugins(env.DATA_DIR).includes(source.query.source.pluginId)
+  return developing ? read() : dashboardSharedRead(key, read)
 }
 
 export async function runDashboard(env: Env, args: {
@@ -233,6 +239,7 @@ export async function runDashboard(env: Env, args: {
         diagnostic.coveredRange = source.result.coveredRange
         diagnostic.observedAt = source.result.observedAt
         if (source.result.inputs) diagnostic.inputs = source.result.inputs
+        if (source.result.development) diagnostic.development = source.result.development
         const index = plan.sources.findIndex(entry => entry.id === source.instanceId)
         const coverageProblem = sourceCoverageProblem(plan, source, evaluationTime)
         if (coverageProblem) {

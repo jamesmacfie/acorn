@@ -77,7 +77,7 @@ const rowText = (entry: { plugin: InstalledPlugin; status: PluginStatus }): stri
   return sentence(`${version}${pluginOrigin(entry.plugin)}.${detail ? ` ${stop(detail)}` : ''}`)
 }
 
-type Open = { kind: 'install' } | { kind: 'plugin'; id: string; pluginKind?: InstalledPlugin['kind'] }
+type Open = { kind: 'install' } | { kind: 'plugin'; id: string; pluginKind?: InstalledPlugin['kind']; tab?: 'logs' }
 
 export default function PluginsSettings(props: { context: SettingsPageContext }) {
   const nodeId = () => props.context.scope.nodeId
@@ -117,8 +117,12 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   createEffect(() => {
     const asked = takePluginRequest()
     if (!asked) return
-    setOpen({ kind: 'plugin', id: asked.id, ...(asked.kind ? { pluginKind: asked.kind } : {}) })
+    setOpen({ kind: 'plugin', id: asked.id, ...(asked.kind ? { pluginKind: asked.kind } : {}), ...(asked.tab ? { tab: asked.tab } : {}) })
   })
+  const openTab = () => {
+    const current = open()
+    return current?.kind === 'plugin' ? current.tab : undefined
+  }
   const openPlugin = createMemo((): InstalledPlugin | undefined => {
     const current = open()
     if (current?.kind !== 'plugin') return undefined
@@ -282,6 +286,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
           {(plugin) => (
             <PluginPage
               plugin={plugin()}
+              initialTab={openTab()}
               nodeId={nodeId()}
               rows={rows()}
               custody={custody()}

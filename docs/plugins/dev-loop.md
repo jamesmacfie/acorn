@@ -1,7 +1,7 @@
 # The dev loop
 
 This page covers how to see a change to a repository plugin run: rebuilding, reloading one plugin
-without a restart, and trust prompts during development. It's part of the
+without a restart, development mode for a folder plugin, and trust prompts during development. It's part of the
 [plugin reference](../plugins.md). A hand-written package has no build step and is installed as a
 link, so its loop is in [plugin authoring](../plugin-authoring.md).
 
@@ -69,6 +69,46 @@ frame, and the shell re-reads that Node's roster and re-runs both contribution p
 bypassed: consent is keyed to a hash, so a plugin whose active hash moved to bytes this device hasn't
 accepted comes back untrusted and the usual prompt is queued. A frame's origin is its bundle hash, so
 a new hash is a new origin and a new document.
+
+## Development mode for a folder plugin
+
+A node plugin installed from a local folder can run in development mode. Turn it on under
+**Settings > Plugins > Installed**, on the plugin's **Permissions** tab, in **Development mode**. The
+switch is offered only for a folder install with a node half, because a downloaded version should
+always be reviewed. The node refuses `PUT /v1/core/plugins/:id/development` for anything else.
+
+While it's on, the node does four things (`packages/node-core/src/server/plugins/development.ts`):
+
+1. It polls the manifest and the built `node` and `client` files every 250 ms. Half a second after
+   the last change, it reloads the plugin through the reload path above. Reloads of one plugin run
+   one at a time, whether a save or the reload route asked.
+2. It keeps the plugin's last 500 `ctx.log` lines in memory. The plugin page gains a **Logs** tab
+   that reads them from `GET /v1/core/plugins/:id/logs`.
+3. It approves what the plugin's derived sources read with a development grant, written again before
+   each reload so a changed input list doesn't ask on every save.
+4. It adds diagnostics to each run of the plugin's derived sources: each input's read time, the
+   plugin's own time, and up to 20 dropped records with the field and the problem. A panel reads the
+   source fresh on every run instead of reusing the five-second shared read, because the plugin's
+   logic can change without its revision changing.
+
+A failed reload keeps the previous version serving. If the node half threw, the roster row shows
+`state: 'failed'` with the reason, as it does for any reload. If the loader refused the new files,
+such as a bundle that doesn't import, the reload never reaches the host, so development mode puts
+the same failure on the row. The row's status reads "In development. Reloads when its files change."
+
+Turning it on also sets this device's dev grant for the plugin on that node, so a rebuilt client
+bundle is trusted without a prompt ([trust prompts in development](#trust-prompts-in-development)).
+Turning it off stops the watch, drops the log lines, and removes the development grant. The person
+then approves what the plugin reads again, even if they had approved it before development mode
+replaced their grant.
+
+The list of plugins in development mode lives in `development-plugins.json` in the data root, so a
+restarted node watches again. An uninstall ends development mode first. Turning it on and off is
+audited as `plugins.development.started` and `plugins.development.stopped`. The reloads it runs on
+each save aren't audited one by one.
+
+In the panel studio, a panel that reads a source in development shows a strip with what the last run
+read and dropped ([develop one against real data](../data-sources/derived-sources.md#develop-one-against-real-data)).
 
 ## Trust prompts in development
 

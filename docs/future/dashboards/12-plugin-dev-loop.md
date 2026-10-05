@@ -1,6 +1,7 @@
 # Phase 12: developing a derived source against real data
 
-Status: proposed, October 5, 2026. Depends on [phase 8](./08-source-inputs.md) and
+Status: shipped, October 5, 2026. [What shipped](#what-shipped) records the choices made while
+building it. Depends on [phase 8](./08-source-inputs.md) and
 [phase 11](./11-derived-source-sdk.md), and on [phase 3](./03-studio-shell.md) for the studio
 strip. Read the [programme README](./README.md) first. The
 [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) page shows the development strip
@@ -94,3 +95,49 @@ few seconds and **Show records** names the field.
 - How the Node watches files elsewhere, if anywhere, so the folder watch reuses it.
 - That `reload.ts` can be called repeatedly in quick succession without leaking workers.
 - That keeping log lines in memory doesn't change the telemetry path when telemetry is on.
+
+## What shipped
+
+Requirements 1 to 9 shipped, with the departures below.
+[Development mode for a folder plugin](../../plugins/dev-loop.md#development-mode-for-a-folder-plugin)
+and [develop one against real data](../../data-sources/derived-sources.md#develop-one-against-real-data)
+describe the shipped behaviour and win over this page.
+
+Where the code lives:
+
+- `packages/node-core/src/server/plugins/development.ts` is the watch, the reload queue, and the
+  development grant. `developmentState.ts` beside it holds the list of plugins in development mode
+  and the log lines, so the plugin context and the source runtime read them without importing the
+  loader.
+- The routes are `PUT /v1/core/plugins/:id/development` and `GET /v1/core/plugins/:id/logs` in
+  `routes/plugins/plugins.ts`. The roster row's `development` field says whether the mode is offered
+  and on.
+- `dataSources/runtime.ts` and `inputs.ts` collect the run's numbers. `DataValueError` in
+  `@acorn/protocol/dataSchemas.ts` carries the pointer of the field a record fails at.
+- The studio's strip and record table are `studio/DevelopmentStrip.tsx`. The **Logs** tab is in
+  `PluginPage.tsx`.
+
+Choices made while building it:
+
+- The Node didn't watch files anywhere, so there was nothing to reuse. It polls the manifest and the
+  built `node` and `client` files every 250 ms with `fs.watchFile`. A directory watch dies when a
+  build empties `dist/`, and a recursive watch on Linux walks `node_modules`.
+- `reload.ts` disposes every candidate it doesn't commit, but two reloads of one plugin at once could
+  commit out of order. Every reload of a loaded plugin, from a save or from the reload route, goes
+  through one queue per plugin. A reload from the route also updates "reloaded *time*".
+- A reload the loader refuses, such as a bundle with a syntax error, never reaches the host, so the
+  roster didn't show it. Development mode keeps that failure and the roster shows it as a failed load.
+- **Turn on** also sets this device's dev grant, so a rebuilt client bundle doesn't prompt. Turning
+  it off removes both.
+- The development grant replaces a grant the person gave. Turning development mode off deletes it,
+  so the person approves the list again, which is the normal approval requirement 3 asks for.
+- Logs are a **Logs** tab rather than a section, shown only while the plugin is in development mode,
+  and they refresh every three seconds while the tab is open. `ctx.log` writes to the buffer beside
+  stderr and telemetry, never instead of them.
+- A run reads a source in development fresh rather than from the five-second shared read, because
+  the SDK's revision changes only with the declaration, so a logic change would otherwise be hidden.
+- The preview's query key carries each plugin's last reload, so a save reruns the preview without
+  pressing refresh.
+- The enum message reads `"needs-qa" isn't a declared choice` everywhere the validator runs,
+  including `testDerivedSource`.
+

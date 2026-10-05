@@ -60,6 +60,11 @@ version doesn't declare. The handle checks the grant at every read, so a revocat
 read without a restart. A grant never covers an account: each panel still picks the account for each
 input.
 
+Development mode writes a grant itself, marked `development`, for a plugin installed from a local
+folder. Only a device principal can turn it on, the switch is audited, and turning it off deletes
+that grant, so the person approves the list again
+([development mode](../plugins/dev-loop.md#development-mode-for-a-folder-plugin)).
+
 ### The broadcast namespace
 
 A loaded plugin's `ctx.events.send` is confined to `plugin:<its-id>:*`, and naming anything else
