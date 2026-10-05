@@ -44,6 +44,33 @@ The agents package was rerun after the final cases and passed 150 files/1,094 te
 Architecture `pnpm --filter @acorn/arch-tests test` passed 12 files/86 tests after this evidence
 anchor was added. The full root test, build, and pack gates remain phase 15's work.
 
+### Scan progress correction (2026-10-06)
+
+Correction base: `cdd2fc506366b78d48dd8e1c3102eb91353b3390`. The extracted scan assigned
+`started` from each dispatch result. When an earlier dispatch succeeded and a later held preparation
+lost its provider generation, the later `false` erased the earlier `true`; without another pump
+request, the scan ended before it read the first session's next durable head. The coordinator now
+awaits every dispatch and retains `started` once any dispatch in the pass returned `true`.
+
+The added `ManagedAgentRuntime` case prestarts two sessions, queues two turns for the first and an
+attachment turn for the second, then requests one scan. It holds the second turn's attachment read
+after the first turn dispatches. Public `stopTaskSessions` calls retire both generations without a
+queue trigger; releasing the read makes the second dispatch return `false`. The first session's next
+durable head requires the follow-up scan. The focused test failed on the original assignment with
+only the first send observed, then passed with the monotonic assignment. It uses held promises and
+observable sends, not a delay or coordinator-private state.
+
+The supported-runtime focused gates passed: `runtimeQueue.test.ts` 12 tests,
+`runtimeStartup.test.ts` 12 tests, and `runtime.test.ts` 39 tests. Architecture passed 12 files/86
+tests through `pnpm --filter @acorn/arch-tests test`. This correction changes no dependency,
+payload, schema, API, fairness, or retry measurement.
+
+Root `TURBO_FORCE=true pnpm lint` passed 37/37 tasks with zero cached. The first agents package run
+overlapped lint and had one timeout in the unchanged 2,500-event workflow capture case; the new
+queue test passed in that run. The capture case passed alone in 2.1 seconds, and the bounded agents
+suite passed without competing lint: 150 files, 1,095 tests passed, one skipped, zero cached.
+The correction did not rerun desktop, TUI, the full root suite, build, or pack.
+
 ## Phase 10: plugin host contributions (2026-10-06)
 
 Implementation base: `df22f225dcdbe712b269f2fbb9f19ff2b65bdbd5`, Darwin arm64,

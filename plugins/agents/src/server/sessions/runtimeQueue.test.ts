@@ -117,6 +117,46 @@ describe('durable queue admission', () => {
     expect(sends).toHaveLength(2)
   })
 
+  it('keeps a completed dispatch scan after a later preparation loses its provider generation', async () => {
+    const open = () => runtime.createSession({
+      taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {},
+    })
+    const first = await open(), later = await open()
+    const queued = (sessionId: string, input: Array<{ type: 'text'; text: string } | { type: 'attachment'; attachmentId: string }>) =>
+      runtime.store.enqueueTurn(sessionId, {
+        input, source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
+      })
+    const firstTurn = await queued(first.id, [{ type: 'text', text: 'First' }])
+    const pending = await queued(first.id, [{ type: 'text', text: 'Next' }])
+    const attachmentId = randomUUID()
+    const db = ctx.storage.open()
+    await db.insert(schema.agentAttachments).values({
+      id: attachmentId, taskId: later.taskId, storageKey: attachmentId, contentHash: attachmentId,
+      filename: 'held.txt', mediaType: 'text/plain', byteSize: 1, createdAt: 1,
+    })
+    const stale = await queued(later.id, [{ type: 'attachment', attachmentId }])
+    await db.update(schema.agentTurns).set({ createdAt: 1 }).where(eq(schema.agentTurns.id, firstTurn.turn.id))
+    await db.update(schema.agentTurns).set({ createdAt: 2 }).where(eq(schema.agentTurns.id, stale.turn.id))
+
+    const held = deferred<void>()
+    const resolveAttachment = vi.spyOn(runtime.attachments, 'resolve').mockImplementation(async () => {
+      await held.promise
+      return {
+        id: attachmentId, taskId: later.taskId, filename: 'held.txt', mediaType: 'text/plain',
+        byteSize: 1, createdAt: 1, localPath: '/held.txt',
+      }
+    })
+    runtime.drainQueue()
+    await vi.waitFor(() => expect(sends).toEqual([firstTurn.turn.id]))
+    await vi.waitFor(() => expect(resolveAttachment).toHaveBeenCalledOnce())
+    await runtime.stopTaskSessions(first.taskId)
+    await runtime.stopTaskSessions(later.taskId)
+    held.resolve()
+
+    await vi.waitFor(() => expect(sends).toEqual([firstTurn.turn.id, pending.turn.id]))
+    expect((await runtime.store.turn(stale.turn.id))?.status).toBe('interrupted')
+  })
+
   it('admits workflow work after five interactive dispatches', async () => {
     vi.mocked(ctx.core.prefs.read).mockResolvedValue(JSON.stringify({ provider: 1, workspace: 1 }))
     const workspace = deferred<string>()

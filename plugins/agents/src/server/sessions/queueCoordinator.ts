@@ -148,7 +148,8 @@ export class QueueCoordinator<Generation extends QueueGeneration> {
             workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
             providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
             this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
-            started = await this.ports.dispatch(item.session, item.turn, live)
+            const dispatched = await this.ports.dispatch(item.session, item.turn, live)
+            started = started || dispatched
           } finally {
             if (owner?.admissionTurnId === item.turn.id) owner.admissionTurnId = null
           }

@@ -11,6 +11,13 @@ a held scan, workflow admission after five interactive dispatches, and repeated 
 by a new runtime on the same fixture database.
 Two retry cases cover the accepted-response guard and the three-attempt ceiling.
 
+Correction, October 6, 2026: a later stale dispatch returned `false` after an earlier dispatch
+returned `true` in the same scan, which erased the pass's progress and could strand another durable
+head. The coordinator now awaits each dispatch and combines its result monotonically with the
+pass's prior result. A `ManagedAgentRuntime` regression holds attachment resolution, retires that
+provider generation through the public task stop path, and checks that the earlier session's next
+queued head dispatches on the follow-up scan. The test failed before this correction and passed after.
+
 Phase 12 must replace the coordinator's engine-backed live accesses: `occupancy`, `live`,
 `ensureSession`, `ownsSession`, and `stopLive`, plus the engine dispatch outcome's `activeTurnId`,
 `acceptedResponse`, handle, driver, and controller checks. The durable read and preference ports
