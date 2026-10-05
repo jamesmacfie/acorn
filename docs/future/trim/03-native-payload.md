@@ -1,6 +1,16 @@
 # Phase 03: stage native package files for the explicit target
 
-Date: 2026-10-04. Status: TODO. Risk: medium; omitted files can break installed processes.
+Completion note, October 6, 2026: desktop staging resolves a supported target before copying the
+runtime dependency graph. A policy beside staging checks node-pty 1.1.0's loader assets and retains
+only the selected prebuild directory, while preserving licenses, executables, optional dependencies,
+hoisting, and nested conflicts. On Darwin arm64, staged helper package bytes fell from 343,726,775
+to 283,230,607, a reduction of 60,496,168 B. Five target fixtures, affected suites, architecture,
+the desktop build budgets, and an outside-checkout PTY launch under pinned Node passed. Runtime smoke
+ran only on Darwin arm64; Windows ConPTY and Linux runtime execution still require their target runners.
+Linux 1.1.0 has no distributed prebuild and must be staged from a matching Linux build. Review the
+policy if node-pty's version or layout changes. Phase 04 can use this staged inventory as its baseline.
+
+Date: 2026-10-06. Status: DONE. Risk: medium; target runner smoke remains for release acceptance.
 Prerequisite: accepted [phase 02](./02-direct-dependencies.md). Next: [phase 04](./04-claude-payload.md).
 Planning revision: `2ae55abb5`; measure against the preceding accepted staging inventory.
 

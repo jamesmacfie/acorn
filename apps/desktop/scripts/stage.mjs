@@ -2,7 +2,7 @@
 import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { stageNodeRuntime, targetTriple } from './node-runtime.mjs'
+import { runtimeTarget, stageNodeRuntime, targetTriple } from './node-runtime.mjs'
 import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
 
 // Everything the Rust shell needs on disk before `tauri dev` or `tauri build` runs: the bundled Node
@@ -15,6 +15,7 @@ import { stageRuntimeDependencies } from './stage-runtime-dependencies.mjs'
 const PKG = resolve(dirname(fileURLToPath(import.meta.url)), '..')
 const ROOT = resolve(PKG, '../..')
 const HELPER = resolve(PKG, 'dist/helper')
+const target = runtimeTarget(targetTriple())
 
 const need = (path, hint) => {
   if (!existsSync(path)) throw new Error(`${path} is missing — ${hint}`)
@@ -32,7 +33,7 @@ need(resolve(HELPER, 'helper.js'), 'run `pnpm run build:helper` first.')
 // ones. Cleared first, or each old chunk stays beside the helper and ships as a resource.
 rmSync(resolve(HELPER, 'chunks'), { recursive: true, force: true })
 cpSync(dist, HELPER, { recursive: true })
-stageRuntimeDependencies(PKG, HELPER)
+stageRuntimeDependencies(PKG, HELPER, target)
 
 // The installed command runs the headless CLI under the same pinned Node runtime as the desktop.
 // Its chunks must stay beside cli.js, and Node needs this package boundary to parse them as ESM.
@@ -62,8 +63,7 @@ for (const chain of chains) {
 // process.arch spells itself. The runtime is fetched from nodejs.org and checksum-verified, so the
 // developer's own Node no longer has to be the pinned one — see scripts/node-runtime.mjs.
 const pin = JSON.parse(readFileSync(resolve(ROOT, 'node-runtime.json'), 'utf8')).version
-const triple = targetTriple()
-const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple })
+const { source } = await stageNodeRuntime({ pkg: PKG, version: pin, triple: target.triple })
 
 // The plugin frame's stylesheet, as one file the `app-plugin://` handler serves at `/ui.css`
 // (src-tauri/src/plugin_scheme.rs). The renderer gets these modules through Vite; the Rust handler
@@ -99,5 +99,5 @@ mkdirSync(resolve(PKG, 'dist/bridge'), { recursive: true })
 writeFileSync(resolve(PKG, 'dist/bridge/plugin-frame.css'), frameStyles.join('\n'))
 
 console.log(
-  `[stage] node ${pin} (${source}) -> binaries/node-${triple}; service + ${chains.length} migration chain(s) -> dist/helper; ${frameStyles.length} frame stylesheet(s) -> dist/bridge`,
+  `[stage] node ${pin} (${source}) -> binaries/node-${target.triple}; service + ${chains.length} migration chain(s) -> dist/helper; ${frameStyles.length} frame stylesheet(s) -> dist/bridge`,
 )

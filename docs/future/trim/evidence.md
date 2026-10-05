@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–02 complete; phase 03 is next.
+Date: 2026-10-06. Status: phases 01–03 complete; phase 04 is next.
 
 ## Historical investigation
 
@@ -267,6 +267,47 @@ the permitted rerun passed. No workspace `node_modules` was needed by the extrac
 The supported-runtime lockfile SHA-256 is
 `83bbf1f7c3927a7db252a15e571c5fc66111d77e69a7e3d07693c8e49f29c8b4`.
 Phase 03 is next; it should start from this dependency graph and keep the package-resolution policy.
+
+## Phase 03: target native files (2026-10-06)
+
+Started from accepted phase 02 revision `fa5b0f9a1` on Darwin arm64, Node 24.21.0, pnpm 11.0.0,
+and node-pty 1.1.0. The installed package's `lib/utils.js` searches `build/Release`, `build/Debug`,
+then `prebuilds/<platform>-<arch>`. `lib/unixTerminal.js` loads `pty.node` and `spawn-helper`.
+Windows loads `conpty.node` or `pty.node` and uses ConPTY and winpty DLL and executable assets.
+The installed 1.1.0 package has Darwin arm64/x64 and Windows arm64/x64 prebuild directories, but
+no Linux prebuild. Its install script builds Linux locally when no prebuild is present. The policy
+retains complete selected directories and rejects missing assets, unknown layouts, and unqualified
+local builds for a different target. The package graph, version, optional edges, and lockfile did not
+change.
+
+Run `PATH=/private/tmp/acorn-trim-node-bin:$PATH node docs/future/trim/inventory.mjs` to reproduce
+the [phase 03 inventory](./artifacts/phase-03-inventory.json). It reports 112 installed copies at
+343,706,024 B, unchanged from phase 02. The staged helper has 113 copies at 283,230,607 B, down
+60,496,168 B from phase 02's 343,726,775 B. Staged node-pty fell from 64,363,742 B to 3,867,574 B.
+These are uncompressed package-file bytes and do not predict DMG or installer compression.
+
+All commands below used `PATH=/private/tmp/acorn-trim-node-bin:$PATH`. `TURBO_FORCE=true` bypassed
+cache results from unsupported Node 24.11.0. The package suites needed loopback permission; the
+first sandboxed run failed at `listen EPERM 127.0.0.1`, and its permitted rerun passed.
+
+| Command after the PATH prefix | Result | Retained log |
+| --- | --- | --- |
+| `pnpm test:focus @acorn/desktop scripts/stage-runtime-dependencies.test.mjs` | Passed 11 tests, including five target fixtures, source-build handling, and graph behavior. | Focused output checked in session. |
+| `TURBO_FORCE=true pnpm lint` | Passed, 37/37 tasks, zero cached. | [Lint](./artifacts/phase-03-lint.log.gz) |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/desktop --filter=@acorn/node --filter=@acorn/plugin-terminal` | Passed, 3/3 tasks, zero cached. Desktop: 169 shell, 10 boot, 62 Rust tests. Node: 272 tests. Terminal: 194 tests. | [Consumer suites](./artifacts/phase-03-consumers.log.gz) |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/desktop` | Passed again after the source-build policy check, one task, zero cached. | [Final desktop suite](./artifacts/phase-03-desktop-final.log.gz) |
+| `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` | Passed after final evidence edit; 12 files, 86 tests. | [Architecture](./artifacts/phase-03-arch.log.gz) |
+| `TURBO_FORCE=true pnpm --filter @acorn/desktop build` | Passed staging, renderer budget, and syntax checks; startup scripts 756,895 B. | [Build](./artifacts/phase-03-build.log.gz) |
+
+The outside-checkout smoke copied `apps/desktop/dist/helper` to a temporary directory under
+`/private/tmp` and launched a shell with `apps/desktop/src-tauri/binaries/node-aarch64-apple-darwin`.
+The installed helper resolved node-pty without checkout links, read `PHASE03_PTY_OK`, resized from
+80×24 to 100×30, and exited with code zero. Fixtures cover all five supported triples and check
+licenses, selected native files, executable modes, rejected layouts, hoisting, and nested versions.
+They do not execute Windows ConPTY or Linux addons. Those target runtime checks remain for the
+appropriate release runners; this Darwin-only run is not cross-platform runtime acceptance.
+
+Phase 04 should measure against the phase 03 staged inventory and leave this target policy intact.
 
 ## Future implementation record
 

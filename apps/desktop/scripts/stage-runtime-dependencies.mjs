@@ -2,6 +2,8 @@ import { cpSync, existsSync, mkdirSync, readFileSync, realpathSync, rmSync, writ
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
 import { requiredRuntimePackages } from '../../../scripts/nodeRuntimePackages.ts'
+import { nativePackageFilter } from './native-package-files.mjs'
+import { runtimeTarget } from './node-runtime.mjs'
 
 function installedPackage(name, require, optional = false) {
   // Resolve directories rather than package.json exports, which some dependencies hide.
@@ -15,7 +17,11 @@ function installedPackage(name, require, optional = false) {
 
 // Materialize the installed dependency graph without pnpm symlinks. Tauri's resource walker skips
 // directory links, and an installed app cannot resolve into the checkout's virtual store.
-export function stageRuntimeDependencies(pkg, helper, names = requiredRuntimePackages) {
+export function stageRuntimeDependencies(pkg, helper, stageTarget, names = requiredRuntimePackages) {
+  const selected = runtimeTarget(stageTarget?.triple)
+  if (selected.platform !== stageTarget.platform || selected.arch !== stageTarget.arch) {
+    throw new Error('A supported desktop target descriptor is required for dependency staging.')
+  }
   const modules = join(helper, 'node_modules')
   rmSync(modules, { recursive: true, force: true })
   const require = createRequire(join(pkg, 'package.json'))
@@ -28,11 +34,12 @@ export function stageRuntimeDependencies(pkg, helper, names = requiredRuntimePac
       copiedRoots.add(name)
     }
     const target = join(directory, name)
+    const includeNativeFile = nativePackageFilter(name, source, stageTarget)
     mkdirSync(target, { recursive: true })
     cpSync(source, target, {
       recursive: true,
       dereference: true,
-      filter: (path) => path !== join(source, 'node_modules'),
+      filter: (path) => path !== join(source, 'node_modules') && includeNativeFile(path),
     })
     const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
     const localRequire = createRequire(join(source, 'package.json'))

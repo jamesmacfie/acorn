@@ -12,6 +12,15 @@ bundled into them, and into the helper, except the native addons and run-time pa
 `dist/helper/node_modules` without pnpm links, so the installed helper and service resolve them from
 app resources. Shared dependencies are hoisted to keep NSIS paths under Windows' legacy limit.
 `scripts/nodeRuntimePackages.ts` owns the shared runtime package list.
+The stage script resolves one supported target triple before copying packages. For `node-pty` 1.1.0,
+`apps/desktop/scripts/native-package-files.mjs` keeps the selected `prebuilds/<platform>-<arch>`
+directory and omits the other reviewed prebuild directories. It checks the selected addon, Unix
+`spawn-helper`, and Windows ConPTY and winpty assets before copying. Licenses and executable modes
+remain in the package. Other package graphs retain their installed files and dependency edges.
+Linux has no prebuild in the installed 1.1.0 package, so Linux staging requires a local Linux build
+with `build/Release/pty.node` and `spawn-helper`. A cross-target stage with an unqualified local addon
+fails because node-pty's loader would choose it before a target prebuild. A node-pty version or layout
+change requires review of the policy and its target fixtures.
 `apps/node/scripts/check-service-budget.mjs` runs after the Node build and fails it when `service.js`
 and its static imports pass a byte ceiling. Both builds write the license text of every bundled
 package beside their output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`.

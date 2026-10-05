@@ -24,6 +24,13 @@ const DIST_NAMES = new Map([
   ['x86_64-pc-windows-msvc', 'win-x64'],
 ])
 
+export const runtimeTarget = (triple) => {
+  const dist = DIST_NAMES.get(triple)
+  if (!dist) throw new Error(`Unsupported desktop target triple: ${triple}`)
+  const [system, arch] = dist.split('-')
+  return { triple, platform: system === 'win' ? 'win32' : system, arch }
+}
+
 export const sha256 = (path) => createHash('sha256').update(readFileSync(path)).digest('hex')
 
 export const runtimeBinaryName = (triple) => `node-${triple}${triple.includes('-windows-') ? '.exe' : ''}`
