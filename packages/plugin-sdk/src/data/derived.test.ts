@@ -19,9 +19,10 @@ const result = (records: { id: string; data: Record<string, unknown>; url?: stri
 const handle = (query: DataSourceInputHandle['query']): DataSourceInputHandle => ({
   describe: async () => { throw new Error('unused') }, identity: async () => ({}), options: async () => ({ options: [], exhausted: true }), query,
 })
-const context = (inputs: Record<string, DataSourceInputHandle>) => ({ userId: 'owner', principal: { kind: 'device', userId: 'owner' }, providers: {}, inputs }) as unknown as PluginRequestContext
-const call = async (source: { fetch: (request: Request, context: PluginRequestContext) => Response | Promise<Response> }, body: unknown, inputs: Record<string, DataSourceInputHandle> = {}) => {
-  const response = await source.fetch(new Request('http://plugin.test/', { method: 'POST', body: JSON.stringify(body) }), context(inputs))
+const device = { kind: 'device', userId: 'owner' }
+const context = (inputs: Record<string, DataSourceInputHandle>, principal: unknown = device) => ({ userId: 'owner', principal, providers: {}, inputs }) as unknown as PluginRequestContext
+const call = async (source: { fetch: (request: Request, context: PluginRequestContext) => Response | Promise<Response> }, body: unknown, inputs: Record<string, DataSourceInputHandle> = {}, principal?: unknown) => {
+  const response = await source.fetch(new Request('http://plugin.test/', { method: 'POST', body: JSON.stringify(body) }), context(inputs, principal))
   return { status: response.status, body: await response.json() as Record<string, unknown> }
 }
 const query = (pageSize = 25, cursor?: string) => ({ operation: 'query', mode: 'execution', evaluationTime: 5, pageSize, ...(cursor ? { cursor } : {}),
@@ -123,9 +124,12 @@ it('drops records that fail the declared fields, counts them, and pages the rest
   const cursor = (first.body.completeness as { cursor: string }).cursor
   const second = await call(mixed, query(1, cursor), { items: handle(async () => result([])) })
   expect(second.body).toMatchObject({ records: [{ recordId: '3' }], completeness: { kind: 'incomplete', cause: 'invalid-records', count: 1 } })
-  // `details` answers from the newest run.
-  expect((await call(mixed, { operation: 'details', ref: { pluginId: 'mine', sourceId: 'rows', recordId: '3' }, scope: { parameters: {} }, projection: [] })).body)
-    .toEqual({ kind: 'found', data: { title: 'Three', state: 'ready', labels: [], due: 7 }, fetchedTime: 5 })
+  // `details` answers from the newest run for the same scope, and only to the principals the host uses.
+  const details = (scope: unknown, principal?: unknown) => call(mixed, { operation: 'details',
+    ref: { pluginId: 'mine', sourceId: 'rows', recordId: '3' }, scope, projection: [] }, {}, principal)
+  expect((await details({ parameters: {} })).body).toEqual({ kind: 'found', data: { title: 'Three', state: 'ready', labels: [], due: 7 }, fetchedTime: 5 })
+  expect((await details({ parameters: {}, inputs: { items: { connectionId: 'other', parameters: {} } } })).body).toEqual({ kind: 'not-found' })
+  expect((await details({ parameters: {} }, { kind: 'internal', scope: 'task', userId: 'owner', taskId: 't' })).status).toBe(403)
 
   const twice = defineDerivedSource({ ...readiness.definition, query: () => [
     { id: '1', data: { title: 'One', state: 'ready', labels: [], due: null } }, { id: '1', data: { title: 'One', state: 'ready', labels: [], due: null } }] })

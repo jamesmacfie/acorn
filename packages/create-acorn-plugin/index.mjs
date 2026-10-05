@@ -591,6 +591,9 @@ export function toInputName(source, taken = new Set()) {
   return name
 }
 
+/** `<pluginId>:<sourceId>`, with nothing that could break out of a string in the generated code. */
+export const SOURCE_REF = /^[a-z][a-z0-9-]{1,31}:[A-Za-z0-9._:-]{1,200}$/
+
 const plural = (word) => /(s|x|ch|sh)$/i.test(word) ? `${word}es` : /[^aeiou]y$/i.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`
 const literal = (text) => `'${text.replace(/[\\']/g, '\\$&')}'`
 const read = (key) => /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${literal(key)}]`
@@ -601,6 +604,8 @@ const read = (key) => /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${literal(k
  */
 export function dataSourceFiles(id, name, { row, inputs }) {
   if (!inputs.length || inputs[0].optional) throw new Error('A derived source reads at least one source, and the first is required')
+  const bad = inputs.find((input) => !SOURCE_REF.test(input.source))
+  if (bad) throw new Error(`"${bad.source}" isn't a source id. Write it as <pluginId>:<sourceId>.`)
   const taken = new Set()
   const named = inputs.map((input) => {
     const known = KNOWN_SOURCES.find((candidate) => candidate.source === input.source)
@@ -698,18 +703,18 @@ function dataSourceModule(definition, inputs) {
   const [first, ...rest] = inputs
   const title = first.known?.title
   const inputLines = inputs.map((input) =>
-    `    ${input.name}: { source: '${input.source}', label: ${literal(input.label)}${input.optional ? ', optional: true' : ''} },`)
+    `    ${input.name}: { source: ${literal(input.source)}, label: ${literal(input.label)}${input.optional ? ', optional: true' : ''} },`)
   const reads = rest.map((input) => input.optional
     ? `    // Optional, so it's undefined when the person skipped it.\n    const ${input.name} = await inputs.${input.name}?.all()\n`
     : `    const ${input.name} = await inputs.${input.name}.all()\n`)
   return `import { defineDerivedSource, field } from 'acorn-plugin-sdk/data'
 
 export const source = defineDerivedSource({
-  id: '${definition.sourceId}',
+  id: ${literal(definition.sourceId)},
   name: ${literal(definition.name)},
   singular: ${literal(definition.singular)},
   plural: ${literal(definition.plural)},
-  handler: '${definition.handler}',
+  handler: ${literal(definition.handler)},
   // Acorn reads these for you, with the accounts the person picks for each panel.
   inputs: {
 ${inputLines.join('\n')}
@@ -740,11 +745,11 @@ function dataSourceTest(row, inputs) {
     if (!input.known) {
       const [pluginId] = input.source.split(':')
       const sourceId = input.source.slice(pluginId.length + 1)
-      return `[${values.map((value, index) => `{ ref: { pluginId: '${pluginId}', sourceId: '${sourceId}', recordId: '${index + 1}' }, data: { title: ${literal(value)} } }`).join(', ')}]`
+      return `[${values.map((value, index) => `{ ref: { pluginId: ${literal(pluginId)}, sourceId: ${literal(sourceId)}, recordId: '${index + 1}' }, data: { title: ${literal(value)} } }`).join(', ')}]`
     }
     const key = input.known.title
     const prop = key && (/^[A-Za-z_$][\w$]*$/.test(key) ? key : literal(key))
-    return `fixtures('${input.source}', [${values.map((value) => (prop ? `{ ${prop}: ${literal(value)} }` : '{}')).join(', ')}])`
+    return `fixtures(${literal(input.source)}, [${values.map((value) => (prop ? `{ ${prop}: ${literal(value)} }` : '{}')).join(', ')}])`
   }
   const [first, ...rest] = inputs
   return `import { expect, it } from 'vitest'
@@ -864,7 +869,7 @@ async function askDataSource(ask) {
   const pick = (answer) => answer.split(',').map((part) => part.trim()).filter(Boolean)
     .map((part) => KNOWN_SOURCES[Number(part) - 1]?.source ?? part)
   const reads = pick(await ask('Which does it read? Numbers or <pluginId>:<sourceId>, separated by commas. The first is required: '))
-  if (!reads.length || reads.some((source) => !/^[^:]+:.+$/.test(source))) throw new Error('Name at least one source, as a number from the list or as <pluginId>:<sourceId>.')
+  if (!reads.length || reads.some((source) => !SOURCE_REF.test(source))) throw new Error('Name at least one source, as a number from the list or as <pluginId>:<sourceId>.')
   const optional = new Set(reads.length > 1 ? pick(await ask('Which of the others are optional? (none): ')) : [])
   return { row, inputs: reads.map((source, index) => ({ source, ...(index && optional.has(source) ? { optional: true } : {}) })) }
 }

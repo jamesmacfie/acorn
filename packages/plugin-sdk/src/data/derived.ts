@@ -196,10 +196,11 @@ export function defineDerivedSource<const I extends InputSpecs, const F extends 
   const generic = definition as unknown as DerivedSourceDefinition<InputSpecs, FieldSpecs, FieldSpecs>
 
   // A query runs the logic once and pages its result, because the host asks for a page at a time.
-  // `details` answers from the newest run's records.
+  // `details` answers from the newest run for the same scope, so a record read with one account is
+  // never returned for a request bound to another. A scope the cache doesn't hold reads as not found.
   type Selection = { key: string; run: DerivedRun; expires: number }
   const selections = new Map<string, Selection>()
-  let newest: { records: Map<string, PageRecord>; readTime: number } = { records: new Map(), readTime: 0 }
+  const newest = new Map<string, { records: Map<string, PageRecord>; readTime: number }>()
 
   async function query(body: QueryBody, context: { inputs?: Readonly<Record<string, DataSourceInputHandle>> }, signal: AbortSignal) {
     for (const [id, entry] of selections) if (entry.expires <= Date.now()) selections.delete(id)
@@ -218,7 +219,10 @@ export function defineDerivedSource<const I extends InputSpecs, const F extends 
         { parameters: body.query.scope.parameters, evaluationTime: body.evaluationTime, mode: body.mode, signal })
       selection = { key, run, expires: Date.now() + SELECTION_MS }
       id = hash(`${key}${Math.random()}`)
-      newest = { records: new Map(run.records.map(record => [record.recordId, record])), readTime: body.evaluationTime }
+      const scope = JSON.stringify(body.query.scope)
+      newest.delete(scope)
+      if (newest.size >= SELECTIONS) newest.delete(newest.keys().next().value!)
+      newest.set(scope, { records: new Map(run.records.map(record => [record.recordId, record])), readTime: body.evaluationTime })
     }
     const records = selection.run.records.slice(offset, offset + body.pageSize)
     const next = offset + records.length
@@ -236,6 +240,12 @@ export function defineDerivedSource<const I extends InputSpecs, const F extends 
     description,
     fetch: async (request, context) => {
       if (request.method !== 'POST') return Response.json({ error: 'method_not_allowed' }, { status: 405 })
+      // The host invokes a source for a device or its own service. A task-confined agent credential
+      // that reaches this route directly gets nothing it read.
+      const { principal } = context
+      if (principal.kind !== 'device' && !(principal.kind === 'internal' && principal.scope === 'service')) {
+        return Response.json({ error: 'forbidden' }, { status: 403 })
+      }
       try {
         const body = await request.json() as { operation?: string }
         switch (body.operation) {
@@ -243,8 +253,10 @@ export function defineDerivedSource<const I extends InputSpecs, const F extends 
           case 'actions': return Response.json({ actions: [] })
           case 'query': return Response.json(await query(body as QueryBody, context, request.signal))
           case 'details': {
-            const found = newest.records.get((body as { ref: DataRecordRef }).ref.recordId)
-            return Response.json(found ? { kind: 'found', data: found.data, fetchedTime: newest.readTime } : { kind: 'not-found' })
+            const { ref, scope } = body as { ref: DataRecordRef; scope: unknown }
+            const run = newest.get(JSON.stringify(scope))
+            const found = run?.records.get(ref.recordId)
+            return Response.json(found ? { kind: 'found', data: found.data, fetchedTime: run!.readTime } : { kind: 'not-found' })
           }
           default: return Response.json({ error: 'unsupported_operation' }, { status: 400 })
         }

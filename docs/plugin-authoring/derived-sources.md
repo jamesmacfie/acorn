@@ -190,7 +190,10 @@ template, the inputs, and the testing helpers.
   with each input's revision.
 - `query`, by running your logic once and paging the result to the host. A page's records are checked
   against the fields with the host's own validator. A record that fails is dropped and counted.
-- `details`, from the newest run's records by id.
+- `details`, from the newest run with the same scope, by id. A request bound to other accounts gets
+  `not-found` rather than another account's row.
+- Only a device or the Node's own service may call the route, as the host does. A task-confined agent
+  credential that reaches it directly gets `403`.
 - `actions` is always empty, and `identity` is unsupported. A derived source can't write through its
   inputs.
 

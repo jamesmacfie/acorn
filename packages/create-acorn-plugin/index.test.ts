@@ -427,6 +427,11 @@ it('emits a data source manifest the host parses, with the inputs it reads', () 
     pullRequests: { source: 'github:pull-requests', label: 'GitHub pull requests', optional: true },
   })
   expect(files['src/source.ts']).toContain('await inputs.pullRequests?.all()')
+  // A typed answer lands in generated code, so anything that could break out of a string is refused.
+  expect(() => scaffoldFiles('x-y', 'X', { dataSource: { row: 'Row', inputs: [{ source: "a:b'); process.exit(1); ('" }] } }))
+    .toThrow("isn't a source id")
+  expect((scaffoldFiles('x-y', "Bob's view", { dataSource: { row: "Bob's row", inputs: [{ source: 'acme:deploys' }] } }) as Record<string, string>)['src/source.ts'])
+    .toContain("name: 'Bob\\'s view'")
 })
 
 it('builds, tests, and loads a data source package from the packed SDK outside the repository', async () => {

@@ -173,7 +173,9 @@ Choices made while building it:
   empty, as planned, and the host never dispatches either for this description.
 - The fields advertise no filter operators, so a panel's filter steps run on the Node after the
   source answers. The SDK runs the logic once per query and pages its result, keeping 16 selections
-  for a minute, as `createDataSelectionPager` does.
+  for a minute, as `createDataSelectionPager` does. `details` reads the newest run for the same scope,
+  and the handler refuses principals other than a device or the Node's service, as the GitHub branch
+  source does.
 - `all` stops at 5,000 records, the host's cap on one query, and marks the page `incomplete` with
   `host-budget`. A record the SDK drops is counted as `invalid-records`. A shared id still fails the
   query, as it does in the host.
