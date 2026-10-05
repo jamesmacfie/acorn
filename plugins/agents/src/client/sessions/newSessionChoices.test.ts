@@ -21,4 +21,11 @@ describe('new session choices', () => {
     expect(choiceDescription(choices[2]!)).toBe('Not on PATH')
     expect(choiceDescription({ provider: provider('codex'), agent: agent('Reviewer', 'codex') })).toBe('Codex · high')
   })
+
+  it('leaves out a hidden harness and the agents built on it', () => {
+    const choices = newSessionChoices([provider('claude'), provider('codex')], [
+      agent('Reviewer', 'codex'), agent('Writer', 'claude'),
+    ], ['codex'])
+    expect(choices.map((choice) => choice.agent?.name ?? choice.provider.id)).toEqual(['claude', 'Writer'])
+  })
 })

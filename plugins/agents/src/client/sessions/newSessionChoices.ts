@@ -13,11 +13,13 @@ export type NewSessionChoice = { provider: AgentProviderDescriptor; agent?: Cust
 export function newSessionChoices(
   providers: readonly AgentProviderDescriptor[],
   agents: readonly CustomAgent[],
+  hiddenProviders: readonly string[] = [],
 ): NewSessionChoice[] {
+  const shown = providers.filter((provider) => !hiddenProviders.includes(provider.id))
   return [
-    ...providers.map((provider) => ({ provider })),
+    ...shown.map((provider) => ({ provider })),
     ...agents.flatMap((agent) => {
-      const provider = providers.find((candidate) => candidate.id === agent.providerId)
+      const provider = shown.find((candidate) => candidate.id === agent.providerId)
       return provider ? [{ provider, agent }] : []
     }),
   ]

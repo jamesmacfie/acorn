@@ -85,6 +85,15 @@ describe('stored defaults', () => {
     expect(validateAgentSessionDefaults([]).ok).toBe(false)
   })
 
+  it('keeps hidden harnesses as a de-duplicated list of ids, and refuses anything else', () => {
+    expect(validateAgentSessionDefaults({ hiddenProviders: ['codex', 'codex'] }))
+      .toEqual({ ok: true, value: { hiddenProviders: ['codex'] } })
+    expect(validateAgentSessionDefaults({ hiddenProviders: 'codex' }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ hiddenProviders: [''] }).ok).toBe(false)
+    expect(validateAgentSessionDefaults({ hiddenProviders: Array.from({ length: 21 }, (_, i) => `p${i}`) }).ok).toBe(false)
+    expect(parseAgentSessionDefaults('{"followLastSession":false}').hiddenProviders).toEqual([])
+  })
+
   it('drops an empty choice rather than storing it as a value', () => {
     const result = validateAgentSessionDefaults({ pinned: { codex: { model: '' } } })
     expect(result.ok && result.value.pinned).toEqual({})

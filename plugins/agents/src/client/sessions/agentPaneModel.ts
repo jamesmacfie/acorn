@@ -22,6 +22,7 @@ import { agentSessionRoster } from './sessionRoster'
 import { newSessionChoices, type NewSessionChoice } from './newSessionChoices'
 import { customAgentsOptions } from '../settings/customAgentsClient'
 import { agentProvidersOptions, refreshAgentProviders } from '../providersClient'
+import { agentSessionDefaultsOptions } from '../settings/sessionDefaultsClient'
 
 // Everything the Agent pane's two regions have to agree on.
 //
@@ -71,6 +72,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   const queryClient = useQueryClient()
   const providersQuery = createQuery(() => agentProvidersOptions())
   const customAgents = createQuery(() => customAgentsOptions())
+  const sessionDefaults = createQuery(() => agentSessionDefaultsOptions())
   // `.data` is read only once there is some. On an empty cache solid-query suspends the boundary above
   // whoever reads it, and this model is built inside the first region that asks for it, which is the
   // list header. Reading it bare held "Agents" off the screen for the whole providers probe. The New
@@ -79,7 +81,11 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
     providersQuery.isPending ? undefined : providersQuery.data
   const providersLoading = () => providersQuery.isPending
   const choices = createMemo(() =>
-    newSessionChoices(providers() ?? [], customAgents.isPending ? [] : customAgents.data ?? []))
+    newSessionChoices(
+      providers() ?? [],
+      customAgents.isPending ? [] : customAgents.data ?? [],
+      sessionDefaults.isPending ? [] : sessionDefaults.data?.hiddenProviders ?? [],
+    ))
 
   const taskSessions = createMemo(() =>
     managedAgentStore.sessionsForTask(task.id)

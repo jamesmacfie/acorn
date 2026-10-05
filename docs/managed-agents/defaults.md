@@ -23,6 +23,7 @@ One `prefs` row, `agents:session-defaults:v1`, holds these fields:
 | `continueAfterUsageLimit` | On | Resumes after a plan limit resets ([operations](./operations.md#plan-usage-limits)) |
 | `stopIdleAfterMinutes` | 30 | **Stop idle agents after**: 15, 30, 120, or 0 for never ([idle stop](./operations.md#idle-stop)) |
 | `keepArchivedHistoryDays` | 0 | **Keep agent history for archived tasks**: 30, 90, 365, or 0 for forever ([history retention](./history-retention.md)) |
+| `hiddenProviders` | None | Harnesses switched off under Settings > Harnesses and defaults. New, the empty state and the palette leave them and their custom agents out. Sessions already on one, workflows and `agent_spawn` still run it, and the last harness on offer can't be switched off |
 
 Neither writer sends the other's field, and the server merges each write, so the Settings page can't
 undo a switch made while it was open.
