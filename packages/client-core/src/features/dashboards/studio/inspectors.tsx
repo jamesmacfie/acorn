@@ -11,7 +11,7 @@ import {
   PRECISION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNIT_LABELS, UNMATCHED_LABELS, WEEK_START_LABELS,
   labelOptions, sortDirectionLabel,
 } from '@acorn/dashboards-core/labels.ts'
-import { availableViews, countsByPart, problemsByPart, VIEW_ICONS, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import { availableViews, countsByPart, problemsByPart, switchView, VIEW_ICONS, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import type { SourceQueryEditorState } from '../../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../../dataSources/SourceQueryEditor'
 import { Alert, Button, Card, Checkbox, Chip, Field, Row, SegmentedControl } from '../../../kit/components/primitives'
@@ -528,14 +528,7 @@ function LookInspector(props: InspectorProps) {
     const refused = region ? regionRefusal(region, entry.id, {}) : undefined
     return { ...entry, available: entry.available && !refused, reason: entry.reason ?? refused }
   })
-  // Options the new view also has carry over; the rest belong to the old view and go.
-  const pickView = (kind: PanelPlan['view']['kind']) => change(current => {
-    const summary = [...current.stages].reverse().find(stage => stage.op === 'summarize')
-    const options: readonly string[] = PANEL_CAPABILITIES.views[kind].options
-    const kept = Object.fromEntries(Object.entries(current.view).filter(([key]) => options.includes(key)))
-    return { ...current, view: { ...kept, kind, ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart')
-      ? { aggregate: 'sum' as const, ...(summary.measures[0] ? { field: summary.measures[0].id } : {}), ...(kind === 'chart' && summary.by[0] ? { x: summary.by[0].column } : {}) } : {}) } }
-  })
+  const pickView = (kind: PanelPlan['view']['kind']) => change(current => switchView(current, kind))
   const numberColumns = () => columns().filter(column => column.type === 'number')
   // The stat's number as one choice: a count of rows, or a calculation over a column.
   const statNumber = () => view().aggregate && view().aggregate !== 'count' ? view().aggregate! : 'count'

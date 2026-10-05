@@ -3,7 +3,7 @@ import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { describePanelPlan, type PlanSource } from './plan'
-import { availableOperations, availableViews, columnParts, countsByPart, diffOutline, partForPath, planOutline, problemsByPart } from './outline'
+import { availableOperations, availableViews, columnParts, countsByPart, diffOutline, partForPath, planOutline, problemsByPart, switchView } from './outline'
 
 const description = dataSourceDescriptionSchema.parse({
   schema: { type: 'object', properties: {
@@ -220,6 +220,12 @@ describe('what can be added', () => {
     expect(views(joined())).toEqual({ stat: undefined, list: undefined, table: undefined, board: undefined, chart: undefined })
     expect(views({ ...joined(), group: [{ column: 'title' }] }).board).toBe('Group by a Choice column first.')
     expect(views({ ...joined(), columns: joined().columns.filter(column => column.id === 'title') }).chart).toBe('Needs a date or Choice column.')
+  })
+
+  it('switches view, keeping the options the new view has and starting a chart on the summary', () => {
+    expect(switchView({ ...pulls(), view: { kind: 'chart', shape: 'line', x: 'repo' } }, 'chart').view).toEqual({ kind: 'chart', shape: 'line', x: 'repo', aggregate: 'sum', field: 'count' })
+    expect(switchView({ ...pulls(), view: { kind: 'chart', shape: 'line', x: 'repo' } }, 'list').view).toEqual({ kind: 'list' })
+    expect(switchView({ ...pulls(), stages: [] }, 'stat').view).toEqual({ kind: 'stat' })
   })
 })
 

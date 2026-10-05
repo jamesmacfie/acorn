@@ -1,9 +1,9 @@
 # Phase 7: quick edits from the panel menu
 
-Status: proposed, October 5, 2026. Depends on [phase 2](./02-plan-outline-model.md) for
-**About this panel**, and on [phase 3](./03-studio-shell.md) for **Edit…** and **Edit with AI…**.
-**Rename**, **View as**, **Sort by**, and **Duplicate** depend on nothing and can ship first. Read
-the [programme README](./README.md) first. The
+Status: shipped, October 5, 2026. [What shipped](#what-shipped) records the choices made while
+building it. Depends on [phase 2](./02-plan-outline-model.md) for **About this panel**, and on
+[phase 3](./03-studio-shell.md) for **Edit…** and **Edit with AI…**. Read the
+[programme README](./README.md) first. The
 [Panel Editor Review](https://claude.ai/artifact/EA1H3DdvVEUd9WTNg5MWyf) shows the menu in
 "Editing a placed panel".
 
@@ -143,3 +143,44 @@ the studio, and check that **Rename** refuses with the unpublished-edits message
   that still holds, draw **View as** and **Sort by** the same way, as labelled groups.
 - That the kit `Drawer` can host the outline without a new kit node.
 - That the toast host accepts an action button.
+
+## What shipped
+
+All 11 requirements shipped. `docs/dashboards/placements.md` § The panel menu describes the shipped
+behaviour and wins over this page.
+
+Where the code lives:
+
+- `panelPublish.ts` gained `hasUnpublishedEdits`, `publishQuickEdit`, `publishNewPanel`, and
+  `publishFailureMessage`. All of them go through `publishPanelPlan`. The studio uses the failure
+  message too.
+- `PanelGridItem.tsx` draws the menu. `PanelGrid.tsx` runs the quick edits and **Duplicate**, then
+  saves the panel definition the way the studio host does.
+- `PublishedDashboardPanel.tsx` passes its published revision to the menu, draws the rename field, and
+  publishes **Add as panel** through `publishNewPanel`.
+- `PanelAbout.tsx` is the **About this panel** dialog.
+- `switchView` in `packages/dashboards-core/src/outline.ts` is the view change the studio's **Show
+  as** used to do inline. The menu and the studio share it.
+- `TitleField` moved from `PanelStudio.tsx` to `fields.tsx`, so the studio toolbar and the panel
+  header share it.
+- `toast()` takes one optional `action`, drawn as a button beside the message.
+
+Choices made while building it:
+
+- `Menu` still has no submenu, so **View as** and **Sort by** are labelled groups, as **Move to** is.
+  The final menu has separators between the groups.
+- **About this panel** is a kit `Modal`, not the kit `Drawer`. The drawer is the bottom dock between
+  the rails, not a side panel. The outline uses `planOutline(plan)` without source data, as the
+  studio does, because a run's diagnostics carry account IDs rather than the `PlanSource` the
+  outline reads.
+- The direction toggle is two radio items, such as **Oldest first** and **Newest first**, so the
+  current direction is visible. They're disabled when the panel has no sort.
+- Picking a sort column makes it the first sort and keeps the others behind it.
+- A quick edit also refuses when this device holds a studio copy that differs from the published
+  revision. Publishing would otherwise discard that copy.
+- **View as** disables a view the region refuses, as the studio's **Show as** does. The publish
+  check still refuses it as well.
+- **Duplicate** places the copy to the right when the row has room and below the original when it
+  doesn't. It's disabled when a region is full.
+- The unpublished-edits refusal is tested in `panelPublish.test.ts` rather than
+  `PanelGridItem.test.tsx`, because `publishQuickEdit` owns it and the menu only shows its toast.

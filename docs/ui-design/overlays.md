@@ -49,6 +49,8 @@ The toast stack sits at the top right in every view, under the top bar and one p
 and clear of the right rail. Panes keep primary controls at the bottom right, such as the agent
 composer's **Send**, so a toast at the top covers only content you can read past. The stack ignores
 pointer events, and each toast takes its own back. A toast's dismiss is `IconButton icon="x"`.
+A toast can carry one action, such as **Edit…** after a panel is duplicated. The action is a
+shortcut, so ignoring it must be fine. Pressing it dismisses the toast.
 
 ### Floating surface tokens
 

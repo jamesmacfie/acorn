@@ -1,7 +1,10 @@
 import { createMemo, createSignal, For, onCleanup, Show, type JSX } from 'solid-js'
+import { useQueryClient } from '@tanstack/solid-query'
+import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { Button, SectionHeader } from '../../kit/components/primitives'
 import Icon from '../../kit/components/content/Icon'
 import { toast } from '../notifications/toast'
+import { activeCacheId } from '../../infra/node/activeNode'
 import {
   applyMove,
   applyResize,
@@ -11,7 +14,15 @@ import {
   type PanelLayout,
   type Rect,
 } from './layout'
-import type { PanelId } from './model'
+import type { PanelDefinition, PanelId } from './model'
+import { dashboardRecoveryStore } from './dashboardRecovery'
+import {
+  PanelHasUnpublishedEdits,
+  publishFailureMessage,
+  publishNewPanel,
+  publishQuickEdit,
+  type PublishedPanel,
+} from './panelPublish'
 import DashboardPanelHost, { deletePanelDefinition, type DashboardEditorSession } from './DashboardPanelHost'
 import PanelGridItem, { type PanelGridGestureKind } from './PanelGridItem'
 import { panelGridHeight, panelPlaceholderStyle, panelSlotStyle } from './panelGridGeometry'
@@ -28,6 +39,7 @@ import {
   panelDefinition,
   panelsAt,
   placePanelAt,
+  savePanel,
   setLayoutAt,
   unplacePanel,
   type PlacementScope,
@@ -345,6 +357,49 @@ export default function PanelGrid(props: {
     placePanelAt(homeTabScope(tabId, props.scope.workspaceId), id, sizePresets(panelDefinition(id)?.view.kind ?? 'list').m)
   }
 
+  // ── Publishing from the menu ────────────────────────────────────────────────────────────────
+  //
+  // Quick edits and Duplicate publish straight away, through the studio's publish path
+  // (docs/dashboards/placements.md § The panel menu).
+
+  const queryClient = useQueryClient()
+  const publishing = () => ({
+    nodeId: activeCacheId(),
+    scope: { workspaceId: props.scope.workspaceId ?? '' },
+    ...(props.region ? { region: props.region } : {}),
+    queryClient,
+    recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage),
+  })
+  const openStudio = (dashboardId: string) => setTypedEditing({ dashboardId })
+
+  /** The device's definition follows each publication, as the studio host's does. */
+  const recordPublication = (published: PublishedPanel) => savePanel({
+    id: published.id, title: published.plan.title, shaping: {}, view: published.plan.view,
+    publication: { dashboardId: published.id, sources: published.sources, fieldRoles: published.fieldRoles },
+  })
+
+  const quickEdit = (definition: PanelDefinition, edit: (plan: PanelPlan) => PanelPlan) => {
+    const dashboardId = definition.publication!.dashboardId
+    publishQuickEdit({ ...publishing(), dashboardId, edit }).then(recordPublication, (error: unknown) => {
+      if (error instanceof PanelHasUnpublishedEdits) toast(error.message, { durationMs: 8000, action: { label: 'Open', onPress: () => openStudio(dashboardId) } })
+      else toast(publishFailureMessage(error, "Couldn't update this panel."), { tone: 'danger' })
+    })
+  }
+
+  /** A copy beside the original, at its size: to the right when the row has room, else below. */
+  const duplicate = (definition: PanelDefinition, plan: PanelPlan) => {
+    publishNewPanel({ ...publishing(), plan: { ...plan, title: `${plan.title} copy` } }).then((published) => {
+      recordPublication(published)
+      const original = committed().rects[definition.id]
+      placePanelAt(props.scope, published.id, original ?? sizePresets(plan.view.kind).m)
+      if (original) {
+        const beside = original.x + 2 * original.w <= COLS ? { ...original, x: original.x + original.w } : { ...original, y: original.y + original.h }
+        setLayoutAt(props.scope, applyMove(layoutAt(props.scope), published.id, beside, sizeOf))
+      }
+      toast('Duplicated', { action: { label: 'Edit…', onPress: () => openStudio(published.id) } })
+    }, (error: unknown) => toast(publishFailureMessage(error, "Couldn't duplicate this panel."), { tone: 'danger' }))
+  }
+
   const tabPanel = () => (props.panelAria
     ? { id: props.panelAria.id, role: 'tabpanel' as const, 'aria-labelledby': props.panelAria.labelledBy }
     : {})
@@ -397,6 +452,7 @@ export default function PanelGrid(props: {
                   definition={definition}
                   workspaceId={props.scope.workspaceId}
                   scope={props.scope}
+                  {...(props.region ? { region: props.region } : {})}
                   layout={{
                     collapsed,
                     style: () => slotStyle(definition.id),
@@ -413,6 +469,10 @@ export default function PanelGrid(props: {
                   actions={{
                     edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
                     editWithAi: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId, withAi: true }),
+                    openStudio,
+                    quickEdit: (edit) => quickEdit(definition, edit),
+                    canDuplicate: hasRoom,
+                    duplicate: (plan) => duplicate(definition, plan),
                     beginLayout: () => enterLayoutMode(definition.id),
                     canMove: (delta) => canMove(definition.id, delta),
                     move: (delta) => moveTo(definition.id, delta),

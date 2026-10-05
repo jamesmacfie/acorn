@@ -254,6 +254,16 @@ export function availableViews(plan: PanelPlan): Availability<PanelPlan['view'][
   })
 }
 
+/** The plan shown as another view. Options the new view also has carry over, and the rest go. After a
+ *  summary, a number or chart starts on its first measure, so it shows the summary rather than a count. */
+export function switchView(plan: PanelPlan, kind: PanelPlan['view']['kind']): PanelPlan {
+  const summary = [...plan.stages].reverse().find(stage => stage.op === 'summarize')
+  const options: readonly string[] = PANEL_CAPABILITIES.views[kind].options
+  const kept = Object.fromEntries(Object.entries(plan.view).filter(([key]) => options.includes(key)))
+  return { ...plan, view: { ...kept, kind, ...(summary?.op === 'summarize' && (kind === 'stat' || kind === 'chart')
+    ? { aggregate: 'sum' as const, ...(summary.measures[0] ? { field: summary.measures[0].id } : {}), ...(kind === 'chart' && summary.by[0] ? { x: summary.by[0].column } : {}) } : {}) } }
+}
+
 export type PartChange = 'added' | 'removed' | 'changed' | 'same'
 export type OutlineDiff = {
   /** Every part key in either plan. Step keys are the after plan's; removed steps are in `removed`. */

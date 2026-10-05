@@ -8,10 +8,9 @@ import type { PlanProblem } from '@acorn/dashboards-core/plan.ts'
 import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import { planPartLabel, REQUIREMENT_STATUS_LABELS } from '@acorn/dashboards-core/labels.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
-import { ApiError } from '../../../infra/node/apiClient'
 import AuthoringConversation from '../../dataSources/AuthoringConversation'
 import {
-  Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Field, Input, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
+  Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Field, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
 } from '../../../kit/components/primitives'
 import { Heading } from '../../../kit/components/content/Heading'
 import Icon from '../../../kit/components/content/Icon'
@@ -27,9 +26,9 @@ import { createDismissable } from '../../../kit/lib/controls/dismissable'
 import { restoreFocusOnCleanup } from '../../../kit/keys/trap'
 import { dashboardClient } from '../dashboardClient'
 import { dashboardRecoveryStore } from '../dashboardRecovery'
-import { LabeledSelect } from '../fields'
+import { LabeledSelect, TitleField } from '../fields'
 import type { Rect } from '../layout'
-import { describePanelSources, PanelRegionRefusal, publishPanelPlan } from '../panelPublish'
+import { describePanelSources, publishFailureMessage, publishPanelPlan } from '../panelPublish'
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from '../persist'
 import { regionRefusal, type PanelRegion } from '../region'
 import {
@@ -299,8 +298,7 @@ export default function PanelStudio(props: {
       props.onPublished(published.id, plan().title, destination(), plan().view, published.sources, published.fieldRoles)
       props.onClose()
     } catch (error) {
-      store.setProblem(error instanceof PanelRegionRefusal ? error.message
-        : error instanceof ApiError && error.code === 'invalid-dashboard' ? error.message : "Couldn't publish this panel.")
+      store.setProblem(publishFailureMessage(error, "Couldn't publish this panel."))
     } finally { setPublishing(false) }
   }
   const remove = async (): Promise<void> => {
@@ -503,22 +501,4 @@ export default function PanelStudio(props: {
       </Show>
     </div>
   )
-}
-
-/** The toolbar title, edited in place. Enter or leaving the field commits; Escape cancels. */
-function TitleField(props: { value: string; onDone: (title: string | undefined) => void }) {
-  const [value, setValue] = createSignal(props.value)
-  let done = false
-  const finish = (title: string | undefined) => {
-    if (done) return
-    done = true
-    props.onDone(title?.trim() ? title : undefined)
-  }
-  return <Input label="Panel title" value={value()} onInput={setValue}
-    ref={element => queueMicrotask(() => { element.focus(); element.select() })}
-    onBlur={() => finish(value())}
-    onKeyDown={event => {
-      if (event.key === 'Enter') { event.preventDefault(); finish(value()) }
-      if (event.key === 'Escape') { event.preventDefault(); finish(undefined) }
-    }} />
 }

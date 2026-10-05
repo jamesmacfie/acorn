@@ -13,13 +13,16 @@ import { createSignal } from 'solid-js'
 // re-exports `toast()` and that barrel may not reach a .tsx module: one Solid component on it
 // makes the whole entrypoint unloadable from a plugin's node-environment tests.
 //
-// Minimal by design: no actions, no promise tracking, no custom JSX bodies. A toast that needs a
-// button is an Alert (the user must act) or a notification-bell entry (it must persist). Toasts
-// are for "you may now stop wondering whether that worked".
+// Minimal by design: no promise tracking, no custom JSX bodies, and at most one action. The action is
+// a shortcut to the next step, such as Edit… after a panel is duplicated, and ignoring it must be
+// fine. A toast the user must act on is an Alert, and one that must persist is a notification-bell
+// entry. Toasts are for "you may now stop wondering whether that worked".
 
 export type ToastTone = 'neutral' | 'success' | 'danger'
 
-export type Toast = { id: number; message: string; tone: ToastTone; durationMs: number }
+export type ToastAction = { label: string; onPress: () => void }
+
+export type Toast = { id: number; message: string; tone: ToastTone; durationMs: number; action?: ToastAction }
 
 const [toasts, setToasts] = createSignal<Toast[]>([])
 let nextId = 0
@@ -27,7 +30,7 @@ let nextId = 0
 /** Default lifetimes. A failure gets longer because it is the one you might need to read twice. */
 const DEFAULT_MS: Record<ToastTone, number> = { neutral: 4000, success: 4000, danger: 8000 }
 
-export function toast(message: string, opts?: { tone?: ToastTone; durationMs?: number }): void {
+export function toast(message: string, opts?: { tone?: ToastTone; durationMs?: number; action?: ToastAction }): void {
   if (!message) return
   const tone = opts?.tone ?? 'neutral'
   setToasts((current) => [...current, {
@@ -35,6 +38,7 @@ export function toast(message: string, opts?: { tone?: ToastTone; durationMs?: n
     message,
     tone,
     durationMs: opts?.durationMs ?? DEFAULT_MS[tone],
+    ...(opts?.action ? { action: opts.action } : {}),
   }])
 }
 

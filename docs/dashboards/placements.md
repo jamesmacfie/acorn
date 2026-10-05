@@ -56,6 +56,34 @@ update. A refused panel isn't drawn there and nothing is deleted.
 **Remove from this dashboard** unplaces a panel. **Delete panel** destroys the definition and asks first. A
 region whose plugin is disabled disappears, and its panels survive to return with it.
 
+## The panel menu
+
+Each placed panel has a menu in its header (`PanelGridItem.tsx`). It reads top to bottom:
+
+- **Edit…** opens the studio on the panel. **Edit with AI…** opens it with the AI docked and its box
+  focused.
+- **Rename** makes the header title editable. Enter saves and Escape cancels.
+- **View as** lists the views from `availableViews`. A view the plan can't use, or the region
+  refuses, is disabled and shows the reason. Switching keeps the options the new view also has, as
+  the studio's **Show as** does (`switchView`).
+- **Sort by** lists the plan's output columns with the first sort ticked, then the two directions.
+  Picking a column makes it the first sort and keeps the others behind it.
+- **About this panel** opens a read-only dialog with the outline in the studio's words, the original
+  request, the requirements, and the published revision.
+- **Duplicate** publishes a copy titled "_title_ copy" and places it beside the original at its size.
+  A toast offers **Edit…**. It's disabled when the region is full.
+- **Move or resize**, **Move up**, **Move down**, and **Move to** arrange the panel, then **Remove
+  from this dashboard** and **Delete panel**.
+
+`Menu` has no submenu, so **View as**, **Sort by**, and **Move to** are flat labelled groups.
+
+Rename, **View as**, and **Sort by** are quick edits. Each publishes a revision straight away
+through `publishPanelPlan` in `panelPublish.ts`, the path the studio and **Add as panel** use, and
+updates the panel definition on this device. A quick edit refuses when the draft differs from the
+published revision, or when this device holds a studio copy the Node doesn't have yet, because
+publishing would ship those edits unseen. The refusal is a toast with **Open**. Quick edits have no
+undo. **Edit…** can change a panel back.
+
 ## The grid
 
 A placement is 12 columns of square cells (`COLS`), each panel at an explicit `{x, y, w, h}`. Twelve

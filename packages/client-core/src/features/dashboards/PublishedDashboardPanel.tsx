@@ -1,11 +1,11 @@
-import { createEffect, createMemo, createSignal, Show, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, Show, type Accessor, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useNavigate } from '@solidjs/router'
-import { createQuery } from '@tanstack/solid-query'
+import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { deriveDrilldownPlan, displayPlanGroups, displayPlanRun, type DisplayPlanGroup, type DashboardRun } from '@acorn/dashboards-core/plan.ts'
 import type { DashboardDisplayRow } from '@acorn/dashboards-core/render'
 import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
-import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
 import { runChromeAction } from '../../host/chrome/actions'
 import { availableContentPresentations, openInAppUrl, openNamedContentTarget } from '../../host/registries/panes/contentLinks'
@@ -19,6 +19,10 @@ import { Alert, Button, Card, EmptyState, Select, Textarea } from '../../kit/com
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
+import { dashboardRecoveryStore } from './dashboardRecovery'
+import { TitleField } from './fields'
+import { publishNewPanel } from './panelPublish'
+import { toast } from '../notifications/toast'
 import { placePanelAt, savePanel, type PlacementScope } from './persist'
 import { sizePresets } from './layout'
 import type { PanelDefinition } from './model'
@@ -38,9 +42,13 @@ export default function PublishedDashboardPanel(props: {
   definition: PanelDefinition
   workspaceId?: string
   placement: PlacementScope
-  actions?: JSX.Element
+  /** The header's actions, given the live published revision so a menu can offer edits to it. */
+  actions?: (published: Accessor<DashboardRevision | undefined>) => JSX.Element
   headProps?: JSX.HTMLAttributes<HTMLDivElement>
-  onEdit?: () => void
+  /** Present while the title is being renamed in place. */
+  rename?: { onDone: (title: string | undefined) => void }
+  /** Opens the studio on a panel, such as one just added from a drill-down. */
+  onEditPanel?: (dashboardId: string) => void
 }) {
   const nodeId = activeCacheId()
   const scope = () => ({ workspaceId: props.workspaceId ?? '' })
@@ -73,6 +81,7 @@ export default function PublishedDashboardPanel(props: {
       ? { ...row, values: { ...row.values, [moving.move.columnId]: moving.move.choiceId } } : row) } : result
   })
   const navigate = useNavigate()
+  const queryClient = useQueryClient()
   const [pending, setPending] = createSignal<{ row: DashboardDisplayRow; action: DataRecordAction; actionId?: string }>()
   const [taskRow, setTaskRow] = createSignal<DashboardDisplayRow>()
   const [taskProject, setTaskProject] = createSignal('')
@@ -249,13 +258,13 @@ export default function PublishedDashboardPanel(props: {
     const value = drill()
     if (!value?.result || value.result.diagnostics.problems.some(problem => problem.severity === 'error')) return
     try {
-      const saved = await client.create(value.plan)
-      await client.publish(saved.id, saved.draftRevision)
+      const saved = await publishNewPanel({ nodeId, scope: scope(), plan: value.plan, queryClient,
+        recovery: dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage) })
       savePanel({ id: saved.id, title: value.plan.title, shaping: {}, view: value.plan.view,
-        publication: { dashboardId: saved.id, sources: props.definition.publication?.sources, fieldRoles: props.definition.publication?.fieldRoles } })
+        publication: { dashboardId: saved.id, sources: saved.sources, fieldRoles: saved.fieldRoles } })
       placePanelAt(props.placement, saved.id, sizePresets(value.plan.view.kind).m)
       setDrill(undefined)
-      setOutcome('Panel added.')
+      toast('Panel added.', props.onEditPanel ? { action: { label: 'Edit…', onPress: () => props.onEditPanel!(saved.id) } } : {})
     } catch { setOutcome('Could not add the panel.') }
   }
   const startTaskFromRow = async (row: DashboardDisplayRow): Promise<void> => {
@@ -288,9 +297,11 @@ export default function PublishedDashboardPanel(props: {
 
   return <Card>
     <div class="dash-panel-head" {...props.headProps}>
-      <Heading level={3}>{published.data?.content.title ?? props.definition.title}</Heading>
+      <Show when={props.rename} fallback={<Heading level={3}>{published.data?.content.title ?? props.definition.title}</Heading>}>
+        {rename => <TitleField value={published.data?.content.title ?? props.definition.title} onDone={rename().onDone} />}
+      </Show>
       <Button size="xs" variant="ghost" iconOnly busy={loaded.isFetching} label={`Refresh ${props.definition.title}`} onPress={() => void loaded.refetch()}><Icon name="refresh-cw" /></Button>
-      {props.actions}
+      {props.actions?.(() => published.data)}
     </div>
     <div class="dash-panel-body">
       <Show when={!loaded.error || loaded.data} fallback={<EmptyState align="start" size="sm" title="Couldn't load this panel" action={<Button size="sm" onPress={() => void loaded.refetch()}>Try again</Button>}>Edit the panel to repair its source or column.</EmptyState>}>

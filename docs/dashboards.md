@@ -53,7 +53,13 @@ interval. The Node shares identical authorized reads briefly across panels.
 The plan can choose a row press destination and up to three trailing buttons. Runs keep full source
 record references, including account and scope. A row menu offers the same actions from the keyboard.
 Group headers and stat measures open their underlying rows in a read-only side panel; **Add as panel**
-publishes the derived plan. See [panels](./dashboards/panels.md#provenance-and-what-a-row-may-not-claim).
+publishes the derived plan, with its own sources and field roles, and a toast offers **Edit…**. See
+[panels](./dashboards/panels.md#provenance-and-what-a-row-may-not-claim).
+
+The panel menu renames a panel, switches its view, and changes its sort without the studio. Each of
+these quick edits publishes a revision, and refuses while the panel has unpublished studio edits.
+**About this panel** shows what a panel does without opening an editor. See
+[placements](./dashboards/placements.md#the-panel-menu).
 
 An enum choice can store one write value for each bound source. The column editor lists only values
 that the source declares writable. Dragging a board card to a choice, or choosing **Move to** in its

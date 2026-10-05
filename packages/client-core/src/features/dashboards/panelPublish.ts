@@ -1,14 +1,15 @@
 import type { QueryClient } from '@tanstack/solid-query'
-import type { DashboardDraft, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { DashboardDraft, DashboardRevision, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataSourceDescription } from '@acorn/protocol/dataSources.ts'
-import { writeJson } from '../../infra/node/apiClient'
+import { ApiError, writeJson } from '../../infra/node/apiClient'
 import { queriesClient } from '../queries/queriesClient'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import type { dashboardRecoveryStore } from './dashboardRecovery'
 import { regionRefusal, type PanelRegion } from './region'
 
-// Publishing a panel plan, shared by the studio and the panel menu's quick edits
-// (docs/dashboards/placements.md § Placements). The caller keeps the panel definition and its placement.
+// Publishing a panel plan, shared by the studio, the panel menu's quick edits and Duplicate, and the
+// drill-down's Add as panel (docs/dashboards/placements.md § The panel menu). The caller keeps the panel
+// definition and its placement.
 
 export type PanelPublicationMetadata = { sources: string[]; fieldRoles: string[] }
 
@@ -27,6 +28,10 @@ export async function describePanelSources(nodeId: string, scope: DashboardScope
 }
 
 export class PanelRegionRefusal extends Error {}
+
+/** What to say when publishing fails: the region's or the Node's reason when there is one. */
+export const publishFailureMessage = (error: unknown, fallback: string): string =>
+  error instanceof PanelRegionRefusal || (error instanceof ApiError && error.code === 'invalid-dashboard') ? error.message : fallback
 
 /** Saves the plan, checks it against the region, publishes it, and refreshes every panel showing it. */
 export async function publishPanelPlan(input: {
@@ -49,4 +54,34 @@ export async function publishPanelPlan(input: {
   void input.queryClient.invalidateQueries({ queryKey: ['dashboard-revision', nodeId, scope.workspaceId, saved.id] }).catch(() => {})
   input.recovery.discard(nodeId, saved.id)
   return { id: saved.id, ...metadata }
+}
+
+type PublishContext = Omit<Parameters<typeof publishPanelPlan>[0], 'plan' | 'flush'>
+export type PublishedPanel = { plan: PanelPlan } & Awaited<ReturnType<typeof publishPanelPlan>>
+
+/** True when the draft holds edits the published revision doesn't, or was never published. */
+export function hasUnpublishedEdits(draft: Pick<DashboardDraft, 'content' | 'publishedRevision'>, published: Pick<DashboardRevision, 'content'> | undefined): boolean {
+  return draft.publishedRevision == null || !published || JSON.stringify(draft.content) !== JSON.stringify(published.content)
+}
+
+export class PanelHasUnpublishedEdits extends Error {
+  constructor() { super('This panel has unpublished edits. Open it to finish or discard them.') }
+}
+
+/** Makes one change to a published panel and publishes it. Refuses when the studio left edits behind,
+ *  on the Node or in the device copy it keeps until the Node has them, because publishing would ship
+ *  them unseen or, for the device copy, throw them away. */
+export async function publishQuickEdit(input: PublishContext & { dashboardId: string; edit: (plan: PanelPlan) => PanelPlan }): Promise<PublishedPanel> {
+  const client = dashboardClient(input.nodeId, input.scope)
+  const [draft, published] = await Promise.all([client.get(input.dashboardId), client.published(input.dashboardId)])
+  const local = input.recovery.read(input.nodeId, input.dashboardId)
+  if (hasUnpublishedEdits(draft, published) || (local && JSON.stringify(local.content) !== JSON.stringify(published.content))) throw new PanelHasUnpublishedEdits()
+  const plan = input.edit(published.content)
+  return { plan, ...await publishPanelPlan({ ...input, plan, flush: next => client.save(draft.id, draft.draftRevision, next) }) }
+}
+
+/** Publishes a plan as a new panel, such as a copy of another or a drill-down's rows. */
+export async function publishNewPanel(input: PublishContext & { plan: PanelPlan }): Promise<PublishedPanel> {
+  const client = dashboardClient(input.nodeId, input.scope)
+  return { plan: input.plan, ...await publishPanelPlan({ ...input, flush: client.create }) }
 }
