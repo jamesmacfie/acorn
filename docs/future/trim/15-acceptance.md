@@ -3,6 +3,8 @@
 Date: 2026-10-04. Status: TODO. Risk: medium; independent passes do not prove combined behavior.
 Prerequisite: accepted [phase 14](./14-provider-boundary.md), with all earlier handoffs recorded.
 Planning revision: `2ae55abb5`; compare against phase 01 using the same measurement definitions.
+Phase 14 disposition: retain the GitHub-shaped shared core read model and provenance. Record it as
+remaining debt; no schema, protocol, or plugin-tier migration is an acceptance prerequisite.
 
 ## Task and context
 

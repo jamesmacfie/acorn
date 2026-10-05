@@ -1,6 +1,37 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–13 complete; phase 14 is next.
+Date: 2026-10-06. Status: phases 01–14 complete; phase 15 is next.
+
+## Phase 14 provider boundary (2026-10-06)
+
+Base `3d137b949`, branch `phase-14-resolve-provider-coupling`, Darwin arm64, Node 24.21.0 from
+`/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. Decision: **retain**. No schema, route, protocol,
+plugin-tier, or runtime code changed. [Phase 14](./14-provider-boundary.md#delivery-ownership-and-entity-invariants)
+records the complete entity-invariant map, writer/consumer map, compatibility cost, and revisit
+triggers. No present blocked or repeatedly complicated consumer was found. The [compiled-tier
+design](../compiled-tier.md#the-four-couplings-that-need-a-designed-seam-the-actual-work) names a
+possible loaded-tier GitHub move, but no approved move or second provider exercises a general repo
+contract.
+
+Core `projects` keeps the nullable, non-unique repository facet, `tasks.pull_number` keeps the
+operational primary, and `task_pulls` keeps multiple Acorn-authored pulls with managed-agent
+provenance. Their source contracts are `packages/node-core/src/server/db/schema.ts`,
+`server/projects.ts`, `server/core/tasks.ts`, and `server/routes/projects/tasks.ts` under node-core.
+GitHub's user-scoped mirror and refresh live in `plugins/github/src/node/schema.ts` and
+`server/routes/mirror/` under that plugin. The generic connection, external-project, external-item,
+and task-link models are connection-scoped; `packages/node-core/src/server/db/cascade.ts` deletes
+them on disconnect but does not delete the local project, primary pull, or agent provenance.
+Core-to-plugin queries use `CoreServices`; neither side joins the other's database. Public and
+plugin projections, UI, workflows, agent tools, archive, and backup consumers are cited in the
+phase's [consumer map](./14-provider-boundary.md#delivery-writer-and-consumer-map).
+
+Phase 15 records retention as remaining coupling and runs combined acceptance. A migration task is
+deferred until a named consumer meets the phase's revisit conditions. Documentation-only scope
+requires the architecture doc-link gate; no unchanged production suite was run. The first frozen
+install could not resolve npm from the sandbox and was interrupted. The approved retry of
+`CI=true pnpm install --frozen-lockfile` passed with 426 reused packages, zero downloads, and no
+lockfile edit. `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test` passed: 12 files and 86
+tests on Node 24.21.0 and pnpm 11.0.0. `git diff --check` passed.
 
 ## Phase 13 agent composition (2026-10-06)
 

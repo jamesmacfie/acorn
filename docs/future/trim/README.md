@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-06. Status: phases 01–13 complete; phase 14 is next.
+Date: 2026-10-06. Status: phases 01–14 complete; phase 15 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -25,7 +25,7 @@ There is no arbitrary package-count or file-length target. Read [refused approac
 
 ## Sequential assignments
 
-Phases 14–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
+Phase 15 remains TODO. Start the next phase only after the preceding phase's acceptance and
 handoff. This order is an execution order; some assignments have no technical dependency on earlier
 changes. Phases 04, 05, and 14 permit a documented retention decision under their acceptance criteria.
 That is a completed investigation, never a claim that a reduction or migration shipped.
@@ -45,7 +45,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 11 DONE | [Separate agent admission](./11-agent-admission.md) | A single coordinator owns durable scans, fairness, delayed wake, and drain; runtime retains provider generations and retry outcomes. See [evidence](./evidence.md#phase-11-agent-admission-2026-10-06). |
 | 12 DONE | [Separate provider process ownership](./12-agent-processes.md) | A private lifecycle owner holds live generations, child retirement, callbacks, and process timers; engine and queue retain their distinct duties. See [evidence](./evidence.md#phase-12-provider-processes-2026-10-06). |
 | 13 DONE | [Replace runtime inheritance](./13-agent-composition.md) | Product commands compose one engine through explicit operations; API parity and gates in [evidence](./evidence.md#phase-13-agent-composition-2026-10-06). |
-| 14 | [Resolve provider coupling debt](./14-provider-boundary.md) | A consumer map and a concrete migration decision; no speculative schema rewrite. |
+| 14 DONE (retention) | [Resolve provider coupling debt](./14-provider-boundary.md) | Retained shared-core repository and task pull state; writer/consumer and invariant maps find no present blocked consumer. No migration approved. See [evidence](./evidence.md#phase-14-provider-boundary-2026-10-06). |
 | 15 | [Combined acceptance](./15-acceptance.md) | Comparable measurements, complete gates, host evidence, and final dispositions. |
 
 ## Rules that apply to each handoff
