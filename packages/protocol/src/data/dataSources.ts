@@ -245,7 +245,12 @@ export type DataSourceRequest = z.infer<typeof dataSourceRequestSchema>
 export type DataRecordRef = z.infer<typeof dataRecordRefSchema>
 export type DataRecord = Omit<z.infer<typeof dataSourcePageSchema>['records'][number], 'recordId'> & { ref: DataRecordRef }
 export type DataSourcePage = z.infer<typeof dataSourcePageSchema>
-export type DataSourceResult = Omit<DataSourcePage, 'records'> & { records: DataRecord[]; mode: 'preview' | 'execution'; evaluationTime: number }
+/** What one derived-source query read from each input: records across every page it asked for, and the
+ *  last page's completeness. The host adds it; a plugin's own page never carries it. */
+export type DataSourceInputRead = { records: number; completeness: DataSourcePage['completeness'] }
+export type DataSourceResult = Omit<DataSourcePage, 'records'> & { records: DataRecord[]; mode: 'preview' | 'execution'; evaluationTime: number
+  /** Present on a derived source's query, keyed by input name, for each input the plugin queried. */
+  inputs?: Record<string, DataSourceInputRead> }
 export type DataSourceOptions = z.infer<typeof dataSourceOptionsSchema>
 export type DataSourceDetails = z.infer<typeof dataSourceDetailsSchema>
 export type DataSourceActions = z.infer<typeof dataSourceActionsSchema>

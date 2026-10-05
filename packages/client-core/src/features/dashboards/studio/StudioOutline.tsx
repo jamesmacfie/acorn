@@ -1,7 +1,9 @@
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
-import type { PlanProblem, PlanStageCount } from '@acorn/dashboards-core/plan.ts'
-import { availableOperations, columnLabel, countsByPart, planOutline, problemsByPart, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import type { DashboardRun, PlanProblem, PlanStageCount } from '@acorn/dashboards-core/plan.ts'
+import {
+  availableOperations, columnLabel, countsByPart, planOutline, problemsByPart, type OutlineDiff, type PartChange, type PlanInputs, type PlanPart, type PlanPartKey,
+} from '@acorn/dashboards-core/outline.ts'
 import { Badge, Button, Row, SectionHeader } from '../../../kit/components/primitives'
 import { Rows } from '../../../kit/components/layout/Rows'
 import { Stack } from '../../../kit/components/layout/Stack'
@@ -36,7 +38,10 @@ const columnChangeWords = (diff: OutlineDiff, before: PanelPlan, after: PanelPla
 
 export default function StudioOutline(props: {
   plan: PanelPlan
+  /** Each derived source's inputs, listed under it with what each read in the last run. */
+  inputs: PlanInputs
   stageCounts: readonly PlanStageCount[]
+  sourceCounts: DashboardRun['diagnostics']['sources']
   problems: readonly PlanProblem[]
   selected?: PlanPartKey
   onSelect: (key: PlanPartKey) => void
@@ -48,7 +53,7 @@ export default function StudioOutline(props: {
    *  `before`, the plan as it is. Adding, moving, and removing wait until review ends. */
   review?: { diff: OutlineDiff; before: PanelPlan }
 }) {
-  const parts = createMemo(() => planOutline(props.plan))
+  const parts = createMemo(() => planOutline(props.plan, [], props.inputs))
   const rows = createMemo((): OutlineRow[] => {
     const review = props.review
     if (!review) return parts()
@@ -64,10 +69,11 @@ export default function StudioOutline(props: {
     }
     return marked
   })
-  const counts = createMemo(() => countsByPart(props.plan, props.stageCounts))
-  const problems = createMemo(() => problemsByPart(props.plan, props.problems))
+  const counts = createMemo(() => countsByPart(props.plan, props.stageCounts, props.sourceCounts))
+  const problems = createMemo(() => problemsByPart(props.plan, props.problems, props.inputs))
   const count = (part: PlanPart): string | undefined => {
     if (part.key.startsWith('source:')) return counts().sourceTotal === undefined ? undefined : String(counts().sourceTotal)
+    if (part.key.startsWith('input:')) return counts().inputs[part.key] === undefined ? undefined : String(counts().inputs[part.key])
     const stage = counts().stages[part.key]
     return stage && `${stage.input} → ${stage.output}`
   }

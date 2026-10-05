@@ -15,6 +15,7 @@ import type { NodePlugin, NodePluginContext, PluginFetchHandler } from '../plugi
 import { pluginManifestSchema } from '../plugins/manifest'
 import { inputGrantsStore } from '../plugins/inputGrants'
 import { invokeDataSource } from './runtime'
+import { runDashboard } from '../dashboards/run'
 
 // A derived source end to end: an upstream provider source, a derived source that reads it through
 // its request context's `inputs`, and a loaded copy that needs the person's grant.
@@ -100,6 +101,7 @@ async function world(options: { derived?: PluginFetchHandler; loaded?: PluginFet
     await db.db.insert(schema.integrations).values({ id, userId: 'owner', provider: providerId, label: 'Tracker',
       encryptedCredentials: await secrets.seal(`${id}-token`), authKind: 'api-key', status, createdAt: 1, updatedAt: 1 })
   }
+  await db.db.insert(schema.workspaces).values({ id: 'w', name: 'Workspace', isDefault: true, sort: 0, createdAt: 1, updatedAt: 1 })
   return { env, upstream, loadedContext: () => loadedContext! }
 }
 
@@ -129,6 +131,7 @@ it('reads bound inputs through the request context and composes the revision', a
   const result = await invokeDataSource(env, query('derived-test', bound('selected')), invocation())
   expect(result.records.map(record => record.ref.recordId)).toEqual(['1', '2'])
   expect(result.completeness).toEqual({ kind: 'complete' })
+  expect(result.inputs).toEqual({ records: { records: 2, completeness: { kind: 'complete' } } })
   // The optional input wasn't bound, so it has no handle.
   expect(seen).toEqual([['records']])
   const before = (await invokeDataSource(env, describeSource('derived-test', bound('selected')), invocation())).revision
@@ -140,8 +143,9 @@ it('reads bound inputs through the request context and composes the revision', a
 it('marks the page incomplete for an incomplete input, and drops invalid records with a count', async () => {
   const incomplete = await world()
   incomplete.upstream.completeness = { kind: 'incomplete', cause: 'upstream-cap' }
-  expect((await invokeDataSource(incomplete.env, query('derived-test', bound('selected')), invocation())).completeness)
-    .toEqual({ kind: 'incomplete', cause: 'upstream-cap' })
+  const partial = await invokeDataSource(incomplete.env, query('derived-test', bound('selected')), invocation())
+  expect(partial.completeness).toEqual({ kind: 'incomplete', cause: 'upstream-cap' })
+  expect(partial.inputs?.records?.completeness).toEqual({ kind: 'incomplete', cause: 'upstream-cap' })
   for (const id of plugins) clearRegistrations(id)
 
   const { env } = await world({ derived: copyInput({ bad: true }) })
@@ -183,4 +187,31 @@ it('lets a loaded plugin read only the inputs its grant covers, and never invoke
   expect((await invokeDataSource(env, query('derived-loaded', bound('selected')), invocation())).records).toHaveLength(2)
   expect(() => loadedContext().dataSources.invoke(query('upstream-test', { connectionId: 'selected', parameters: {} }, 'records'), invocation()))
     .toThrow('Source belongs to another plugin')
+})
+
+it('runs a panel on a derived source with structured problems and per-input counts', async () => {
+  const { env, upstream } = await world()
+  const panel = (scope: DataSourceScope, evaluationTime = 1_000_000) => runDashboard(env, { scope: { workspaceId: 'w' }, mode: 'execution', evaluationTime, target: { kind: 'draft', content: {
+    version: 2, title: 'Derived', time: { zone: 'UTC', mode: 'fixed', weekStart: 'monday' },
+    sources: [{ id: 'rows', label: 'Derived', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+      name: 'Derived', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+      query: { source: { pluginId: 'derived-test', sourceId: 'derived' }, scope: { workspaceId: 'w', ...scope }, sort: [] },
+    } } }],
+    columns: [{ id: 'id', label: 'ID', type: 'text', bind: { rows: { field: '/id' } } }], stages: [], view: { kind: 'table' },
+  } } }, invocation())
+  // An unbound input names itself and points at its own binding, so the studio marks the input's row.
+  // The fixture describes no fields, so the column also warns; these assertions look only at the source.
+  expect((await panel({ parameters: {} })).diagnostics.problems).toContainEqual(expect.objectContaining({
+    path: '/sources/0/reference/content/query/scope/inputs/records', severity: 'error',
+    failure: { code: 'input-required', source: 'derived-test:derived', input: 'records' },
+  }))
+  const ran = await panel(bound('selected'))
+  expect(ran.rows).toHaveLength(2)
+  expect(ran.diagnostics.sources[0]?.inputs).toEqual({ records: { records: 2, completeness: { kind: 'complete' } } })
+  upstream.completeness = { kind: 'incomplete', cause: 'upstream-cap' }
+  // A later evaluation time, so the run doesn't reuse the shared read from a moment ago.
+  expect((await panel(bound('selected'), 2_000_000)).diagnostics.problems).toContainEqual(expect.objectContaining({
+    path: '/sources/0/reference/content/query/scope/inputs/records', severity: 'warning',
+    failure: { code: 'incomplete', source: 'derived-test:derived', reason: 'upstream-cap', input: 'records' },
+  }))
 })

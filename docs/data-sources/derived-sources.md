@@ -135,6 +135,45 @@ A derived record that fails the description's schema is dropped rather than fail
 page reports `incomplete` with cause `invalid-records` and a `count` of the dropped records. Sources
 without inputs keep the whole-page `invalid-response` failure.
 
+## Use one in a panel
+
+The panel launcher lists a derived source once, as "Release readiness · Northwind · reads GitHub and
+Linear", rather than once per account. Picking it shows an account picker for each input that reads
+through a provider, with "(optional)" after an optional one. An input whose provider has exactly one
+usable account starts on it, and an input that needs no account is bound as it is
+(`defaultInputBindings` in `packages/client-core/src/features/dataSources/sourceEntries.ts`). An
+optional input offers **Skip**. Starter plans and **Blank** stay disabled until each required input
+has an account. In a plugin region, the region's rules apply to the derived source's own id.
+
+In the studio, the source's inspector shows the same pickers under "From *Plugin*. Reads the inputs
+below with the accounts you choose here." Once an input has an account, its source's reach and
+parameters follow, drawn by a nested source picker in input mode (`inputBinding` on
+`SourceQueryEditor`). Input mode leaves out **Workspace links**, because a binding can't carry it. The
+derived source's own parameters follow under **Its own settings**, and **About this source** opens the
+plugin's page in Settings. The plugin never draws UI here.
+
+With no account for an input's provider, the picker says "No GitHub account is connected." and offers
+**Connect GitHub…**, which opens the integrations page in Settings, and **Skip this input** for an
+optional input. The picker refetches accounts when the window regains focus, so an account connected
+in a browser appears without a reload.
+
+The outline lists each input under its source, keyed `input:<sourceId>:<name>`, with its provider,
+its account, and the records it read in the last run. A problem with an input's binding marks the
+input's row, not the source's. **Publish…** is blocked while a required input has no account, with a
+reason such as "Pull requests needs a GitHub account." Input rows don't show reach, as source rows
+don't. The inspector does.
+
+A derived source's query result carries `inputs`: for each input the plugin queried, the records it
+read and the last page's completeness. A dashboard run copies it to `diagnostics.sources[].inputs`.
+**About this panel** names the chain under the source: "Release readiness (Northwind), reading Pull
+requests (GitHub · Work) and Cycle issues (Linear · Acme)".
+
+The AI author reads each source's `inputs` from the catalog. It binds inputs under the account rule
+for plain sources: an account the plan the turn started from already uses, or the person's only
+usable account for that provider. When more than one fits, it asks with a clarification whose choices
+are those accounts. `authoringAccountProblems` in `packages/dashboards-core/src/authoringAccounts.ts`
+applies the rule to every binding and refuses a missing required input.
+
 ## Limits and known gaps
 
 - GitHub's local-branches source still owns the `github` provider and reads `core:local-branches`

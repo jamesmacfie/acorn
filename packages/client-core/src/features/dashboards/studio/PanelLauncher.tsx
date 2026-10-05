@@ -8,7 +8,10 @@ import { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
 import { integrationsOptions, modelBackendsOptions, prefsOptions } from '../../../infra/queries'
 import { dataSourceCatalogOptions, dataSourceQueryKey, dataSourceQueryOptions } from '../../dataSources/queries'
-import { sourceEntries, sourceKey, sourceReference, type SourceEntry } from '../../dataSources/sourceEntries'
+import {
+  defaultInputBindings, inputProviderLabel, inputSourceOf, sourceEntries, sourceKey, sourceReference, unboundInputs, usableConnections, type SourceEntry,
+} from '../../dataSources/sourceEntries'
+import InputAccountField from '../../dataSources/InputAccountField'
 import { queriesClient, queriesKey } from '../../queries/queriesClient'
 import { effectiveModelPick, readGeneratePick, saveGeneratePick, type ModelPick } from '../../settings/models/generatePick'
 import ModelBackendPicker from '../../settings/models/ModelBackendPicker'
@@ -67,16 +70,18 @@ export default function PanelLauncher(props: {
 
   // ── Start from data ──────────────────────────────────────────────────────────────────────────
   const catalog = createQuery(() => dataSourceCatalogOptions(nodeId, baseScope))
-  const integrations = createQuery(() => integrationsOptions(true))
+  // Refetched when the window regains focus, so an account connected in a browser shows up in the
+  // input pickers without a reload.
+  const integrations = createQuery(() => ({ ...integrationsOptions(true), refetchOnWindowFocus: 'always' as const }))
   const library = createQuery(() => ({ queryKey: queriesKey(nodeId, scope), queryFn: ({ signal }: { signal: AbortSignal }) => queriesClient(nodeId, scope).list(signal) }))
   const entries = createMemo(() => sourceEntries({
     sources: catalog.data?.sources ?? [], connections: integrations.data?.integrations ?? [], saved: library.data ?? [], byAccount: true,
   }).filter(entry => !props.region || regionAllowsSource(props.region, sourceKey(entry.kind === 'saved' ? entry.query.content.query.source : entry.source))))
   const [search, setSearch] = createSignal('')
   const shown = createMemo(() => entries().filter(entry => entry.label.toLowerCase().includes(search().trim().toLowerCase())))
-  const referenceFor = (entry: SourceEntry): QueryReference => entry.kind === 'saved'
+  const referenceFor = (entry: SourceEntry, inputs?: DataSourceScope['inputs']): QueryReference => entry.kind === 'saved'
     ? { kind: 'saved', queryId: entry.query.id, bindings: {} }
-    : sourceReference(entry.source, { ...baseScope, ...(entry.connectionId ? { connectionId: entry.connectionId } : {}) })
+    : sourceReference(entry.source, { ...baseScope, ...(entry.connectionId ? { connectionId: entry.connectionId } : {}), ...(inputs ? { inputs } : {}) })
 
   /** Starter titles from sources this session has already described, because the catalog carries no
    *  starters. Read once per list, so the chips don't move while the person reads them. */
@@ -90,7 +95,16 @@ export default function PanelLauncher(props: {
   }))].slice(0, SUGGESTIONS))
 
   const [picked, setPicked] = createSignal<SourceEntry>()
-  const pickedReference = createMemo(() => picked() && referenceFor(picked()!))
+  /** A picked derived source's input bindings, one account per input. */
+  const [inputBindings, setInputBindings] = createSignal<DataSourceScope['inputs']>()
+  const pickedReference = createMemo(() => picked() && referenceFor(picked()!, inputBindings()))
+  const pickedSource = () => { const entry = picked(); return entry?.kind === 'source' ? entry.source : undefined }
+  /** Required inputs still waiting for an account. Starters stay disabled until there are none. */
+  const unbound = createMemo(() => unboundInputs(pickedSource(), { ...baseScope, ...(inputBindings() ? { inputs: inputBindings() } : {}) }, catalog.data?.sources ?? []))
+  const bindInput = (name: string, connectionId: string | undefined): void => {
+    const { [name]: _previous, ...others } = inputBindings() ?? {}
+    setInputBindings(connectionId ? { ...others, [name]: { connectionId, parameters: {} } } : others)
+  }
   const description = createQuery(() => {
     const described = describeRequest(pickedReference())
     return { ...dataSourceQueryOptions(nodeId, described ?? { operation: 'describe', source: { pluginId: 'unavailable', sourceId: 'unavailable' }, scope: baseScope }), enabled: !!described }
@@ -104,17 +118,20 @@ export default function PanelLauncher(props: {
     if (!entry) return
     // A saved query has no starters of its own, so it opens straight away.
     if (entry.kind === 'saved') props.onLaunch({ kind: 'source', reference: referenceFor(entry) })
-    else setPicked(entry)
+    else {
+      setInputBindings(defaultInputBindings(entry.source, catalog.data?.sources ?? [], integrations.data?.integrations ?? []))
+      setPicked(entry)
+    }
   }
   const startFrom = (key: string): void => {
     const reference = pickedReference()
-    if (!reference) return
+    if (!reference || unbound().length) return
     const starter = key === BLANK ? undefined : starters()?.[Number(key)]
     props.onLaunch({ kind: 'source', reference, ...(starter ? { starter } : {}) })
   }
   const starterRows = () => [
-    ...(starters() ?? []).map((starter, index) => ({ key: String(index), label: starter.title, detail: describePanelPlan(starter)[0] })),
-    { key: BLANK, label: 'Blank', detail: 'Start with the source and its main fields.' },
+    ...(starters() ?? []).map((starter, index) => ({ key: String(index), label: starter.title, detail: describePanelPlan(starter)[0], disabled: unbound().length > 0 })),
+    { key: BLANK, label: 'Blank', detail: 'Start with the source and its main fields.', disabled: unbound().length > 0 },
   ]
 
   // ── Drafts ───────────────────────────────────────────────────────────────────────────────────
@@ -158,8 +175,22 @@ export default function PanelLauncher(props: {
             )}
           </Rows>
         </Show>
+        <Show when={pickedSource()?.inputs}>{inputs => (
+          <Field label="Choose an account for each input" group>
+            <For each={Object.keys(inputs())}>{name => {
+              const input = () => inputs()[name]!
+              const providerId = () => inputSourceOf(input(), catalog.data?.sources ?? [])?.providerId
+              return <Show when={providerId()}>
+                <InputAccountField label={input().label} optional={input().optional} provider={inputProviderLabel(input(), catalog.data?.sources ?? [])}
+                  connections={usableConnections(integrations.data?.integrations ?? [], providerId())}
+                  value={inputBindings()?.[name]?.connectionId} bound={!!inputBindings()?.[name]} onChange={connectionId => bindInput(name, connectionId)} />
+              </Show>
+            }}</For>
+          </Field>
+        )}</Show>
         <Show when={picked()?.kind === 'source' && picked()}>{entry => (
           <Field label={`Start ${entry().label} from`} group>
+            <Show when={unbound().length}><Text emphasis="muted" wrap>Choose an account for each input to start.</Text></Show>
             <Show when={description.isError}><Alert tone="warn">This source couldn't describe its fields, so it has no starter panels.</Alert></Show>
             <Show when={!description.isPending && !starters.loading} fallback={<Text emphasis="muted">Looking for starter panels…</Text>}>
               <Rows id="dashboards.launcher.starters" ariaLabel="Starter panels" items={starterRows()} selected={null} onSelect={startFrom}>

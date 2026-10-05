@@ -1,6 +1,7 @@
 # Phase 10: choosing inputs in the launcher and the studio
 
-Status: proposed, October 5, 2026. Depends on [phase 8](./08-source-inputs.md), and on phases
+Status: shipped, October 5, 2026. [What shipped](#what-shipped) records the choices made while
+building it. Depends on [phase 8](./08-source-inputs.md), and on phases
 [3](./03-studio-shell.md), [4](./04-inspectors.md), and [5](./05-launcher.md) for the surfaces it
 extends. Read the [programme README](./README.md) first. The
 [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) page shows the launcher, the
@@ -158,3 +159,53 @@ Disconnect the GitHub account in Settings and check the panel names the input an
   tab. If not, open the tab.
 - Whether per-input counts fit in `diagnostics.sources` without breaking the run's response size
   limit for panels with many sources.
+
+## What shipped
+
+Requirements 1 to 21 shipped, with the departures below.
+[Derived sources](../../data-sources/derived-sources.md#use-one-in-a-panel) and
+[published panels](../../dashboards.md#published-panels) describe the shipped behaviour and win over
+this page.
+
+Where the code lives:
+
+- `SourceFailure` and `PlanProblem.failure` are in `packages/dashboards-core/src/plan.ts`. The run
+  builds them in `sourceProblem` and `incompleteProblem` in
+  `packages/node-core/src/server/dashboards/run.ts`.
+- Input rows are `input:<sourceId>:<name>` parts from `planOutline`, given a `PlanInputs` map that
+  `planInputs` in `packages/client-core/src/features/dashboards/planInputs.ts` builds from the catalog
+  and the person's accounts. `partForPath`, `problemsByPart`, and `countsByPart` take the same map.
+- `sourceErrors.ts` holds the sentences, and `SourceFailureAlert.tsx` draws one with its fix.
+  `InputAccountField.tsx` in `features/dataSources` is the per-input account picker the launcher and
+  the source picker share.
+- The account rule is `authoringAccountProblems` in `packages/dashboards-core/src/authoringAccounts.ts`,
+  exported through `plan.ts`. It moved out of the authoring route so the evaluation suite runs the
+  real rule.
+
+Choices made while building it:
+
+- Per-input counts ride on the query result as `inputs`, which the host adds after the plugin
+  answers. The Node's shared read cache keeps them with the records, and a run with eight derived
+  sources adds at most 64 small entries, far inside the response limit.
+- A failure on an input points its problem at the input's binding, so the studio marks the input's
+  row. A saved query has no inline binding, so its problem stays on the source.
+- `presentation:open-settings` takes a page, not a connection. **Review**, **Turn it on**, and
+  **Reconnect…** still reach the plugin's or the account's page, through the detail requests Settings
+  already has (`openPluginPage`, `openConnectionPage`) and a navigate that emits the event first.
+  **Connect *Provider*…** opens the integrations page.
+- **Turn it on** opens the plugin's page rather than flipping the switch, because turning a plugin on
+  takes effect at the next restart and the page says so.
+- `unavailable` reads "comes from *Plugin*, which is off" only when the Node lists the plugin as
+  disabled. Otherwise it's the general "couldn't answer" with **Try again**. An input whose source
+  isn't installed reads "*Input* can't be read, because its source isn't installed." with no fix.
+- Input rows show provider and account but not reach, because source rows in the studio outline don't
+  show reach either. The inspector shows it.
+- The launcher draws no brand mark on a derived source's row. Launcher rows draw no marks for any
+  source.
+- The source picker shows a failure's sentence but no fix button other than **Connect**, because the
+  terminal client shares it and has no Settings to open.
+- The placed panel keeps the last answered run in memory while it's mounted. A panel opened after its
+  source failed, with nothing cached, shows the message without data.
+
+The in-app check above wasn't run. Node tests cover structured problems and per-input counts, outline
+and error tests cover the words, and jsdom tests cover the launcher and studio.

@@ -36,6 +36,12 @@ const settle = async (times = 4) => { for (let index = 0; index < times; index +
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
 const row = (text: string) => [...document.querySelectorAll<HTMLElement>('.ui-row')].find(entry => entry.textContent?.includes(text))
 const bodies = (operation: string) => requests.mock.calls.flatMap(([path, options]) => path.endsWith(`/${operation}`) && options?.body ? [JSON.parse(options.body) as Record<string, unknown>] : [])
+const select = (label: string) => document.querySelector<HTMLButtonElement>(`button.ui-select[aria-label="${label}"]`)
+const choose = (label: string, value: string) => {
+  const native = select(label)!.previousElementSibling as HTMLSelectElement
+  native.value = value
+  native.dispatchEvent(new Event('change', { bubbles: true }))
+}
 const mount = (region?: PanelRegion) => {
   dispose = render(() => <QueryClientProvider client={client}>
     <PanelLauncher workspaceId="w" {...(region ? { region } : {})} onLaunch={onLaunch} onDismiss={() => {}} />
@@ -51,8 +57,18 @@ beforeEach(() => {
     if (path.endsWith('/data-sources/list')) return { discoveries: [], sources: [
       { pluginId: 'core', sourceId: 'tasks', name: 'Workspace tasks', singular: 'Task', plural: 'Tasks', identityScope: 'task' },
       { pluginId: 'github', sourceId: 'pull-requests', name: 'Pull requests', singular: 'Pull request', plural: 'Pull requests', identityScope: 'pull', providerId: 'github' },
+      { pluginId: 'linear', sourceId: 'issues', name: 'Issues', singular: 'Issue', plural: 'Issues', identityScope: 'issue', providerId: 'linear' },
+      { pluginId: 'northwind', sourceId: 'readiness', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue', inputs: {
+        pulls: { source: 'github:pull-requests', label: 'Pull requests' },
+        cycle: { source: 'linear:issues', label: 'Cycle issues' },
+        backlog: { source: 'linear:issues', label: 'Backlog', optional: true },
+      } },
     ] }
-    if (path.endsWith('/core/integrations')) return { providers: [], integrations: [{ id: 'work', providerId: 'github', name: 'Work', label: 'GitHub', status: 'connected' }] }
+    if (path.endsWith('/core/integrations')) return { providers: [], integrations: [
+      { id: 'work', providerId: 'github', name: 'Work', label: 'GitHub', status: 'connected' },
+      { id: 'acme', providerId: 'linear', name: 'Acme', label: 'Linear', status: 'connected' },
+      { id: 'beta', providerId: 'linear', name: 'Beta', label: 'Linear', status: 'connected' },
+    ] }
     if (path.endsWith('/models/backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
     if (path.endsWith('/core/prefs')) return {}
     if (path.endsWith('/queries/list')) return []
@@ -127,6 +143,32 @@ describe('PanelLauncher', () => {
     row('Blank')!.click()
     expect(onLaunch).toHaveBeenCalledWith({ kind: 'source', reference: expect.objectContaining({ kind: 'inline' }) })
     expect((onLaunch.mock.calls[0]![0] as { starter?: PanelPlan }).starter).toBeUndefined()
+  })
+
+  it('picks an account per input, starting on the only one, and holds the starters until each required input has one', async () => {
+    mount()
+    await settle()
+    row('Release readiness · northwind · reads github and linear')!.click()
+    await settle(8)
+    // GitHub has one account, so its input starts on it. Linear has two, so the person picks.
+    expect(select('Pull requests')!.textContent).toContain('Work')
+    expect(select('Cycle issues')!.textContent).toContain('Choose an account…')
+    expect(select('Backlog (optional)')!.textContent).toContain('Skip')
+    expect(document.body.textContent).toContain('Choose an account for each input to start.')
+    row('Blank')!.click()
+    expect(onLaunch).not.toHaveBeenCalled()
+
+    choose('Cycle issues', 'acme')
+    // Skip takes an optional input back out.
+    choose('Backlog (optional)', 'beta')
+    choose('Backlog (optional)', '')
+    await settle(8)
+    row('Blank')!.click()
+    const result = onLaunch.mock.calls[0]![0] as Extract<LaunchResult, { kind: 'source' }>
+    const reference = result.reference
+    expect(reference.kind === 'inline' && reference.content.query.scope).toEqual({ workspaceId: 'w', parameters: {}, inputs: {
+      pulls: { connectionId: 'work', parameters: {} }, cycle: { connectionId: 'acme', parameters: {} },
+    } })
   })
 
   it("lists only a plugin region's own sources", async () => {

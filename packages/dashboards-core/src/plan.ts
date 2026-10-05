@@ -12,8 +12,15 @@ import { bucketBounds } from './planBuckets'
 import { columnLabel, describePredicate, pressTarget, sourceReach } from './outline'
 
 export { PANEL_CAPABILITIES } from './capabilities'
+export { authoringAccountProblems } from './authoringAccounts'
 
-export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning' }
+/** Why a source couldn't answer, as data, so a client can word it and offer the fix
+ *  (client-core's dashboards/sourceErrors.ts). `code` is a data source error code, or `incomplete` for a
+ *  partial read with its cause in `reason`. `source` is `<pluginId>:<sourceId>` when it's known, and
+ *  `input` names the derived-source input at fault. */
+export type SourceFailure = { code: string; source?: string; input?: string; reason?: string; count?: number }
+/** `message` is the Node's own wording, kept for clients that predate `failure`. */
+export type PlanProblem = { path: string; message: string; severity: 'error' | 'warning'; failure?: SourceFailure }
 export type PlanSource = { instanceId: string; label: string; query: DataSourceQuery; description: DataSourceDescription; accountLabel?: string; result?: DataSourceResult }
 export type PlanRecordItem = Pick<DataRecord, 'ref' | 'taskId' | 'action' | 'actions' | 'target'>
 export type PlanRow = { id: string; values: Record<string, DataValue>; records: DataRecord['ref'][]; recordItems?: PlanRecordItem[]; taskId?: string; action?: DataRecord['action']; actions?: DataRecord['actions']; target?: DataRecord['target']; representedRows?: PlanRow[]; measureRows?: Record<string, PlanRow[]>; partial?: Record<string, string>; childRecords?: Record<string, DataRecord[]>; summaryStage?: number; datasetGroups?: Record<string, { groupValues: Record<string, DataValue>; measureId: string }>; correctableDatasetId?: string; sourceRecords?: Record<string, DataRecord['ref']>; sourceValues?: Record<string, Record<string, DataValue>>; sourceFieldValues?: Record<string, Record<string, DataValue>>; sourceWritableFields?: Record<string, string[]> }
@@ -27,7 +34,9 @@ export type DashboardRun = {
     problems: PlanProblem[]
     sources: { id: string; label: string; revision?: string; queryDigest?: string; parameters?: Record<string, DataValue>; account?: string | null;
       completeness?: DataSourceResult['completeness']; readTime?: number; coverageWindows?: DataSourceDescription['coverageWindows'];
-      coveredRange?: DataSourceResult['coveredRange']; observedAt?: number; writable?: DataSourceDescription['writable'] }[]
+      coveredRange?: DataSourceResult['coveredRange']; observedAt?: number; writable?: DataSourceDescription['writable']
+      /** A derived source's input reads in this run, by input name. */
+      inputs?: DataSourceResult['inputs'] }[]
     stages: PlanStageCount[]
     evaluationTime: number
     asOf?: number

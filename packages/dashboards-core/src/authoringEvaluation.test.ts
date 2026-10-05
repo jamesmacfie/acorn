@@ -6,6 +6,7 @@ import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { bindPanelRows, describePanelPlan, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
 import { PANEL_CAPABILITIES } from './capabilities'
 import { diffOutline } from './outline'
+import { authoringAccountProblems } from './authoringAccounts'
 
 // Scripted cases exercise the actual model-response loop and plan validator. These are fixture
 // expectations; acceptance labels from people are collected separately.
@@ -238,5 +239,60 @@ describe('a focused request', () => {
     if (result.state !== 'proposal') throw new Error(`Expected a proposal, got ${result.state}`)
     const changed = Object.entries(diffOutline(base, panelPlanSchema.parse(result.candidate)).parts).filter(([, change]) => change !== 'same')
     expect(changed).toEqual([['stage:1', 'changed']])
+  })
+})
+
+// A derived source reads GitHub through an input. With two GitHub accounts and none chosen, a proposal
+// that picks one is a guess, so the validator refuses it and the repaired reply asks which account.
+describe('a derived source with two GitHub accounts', () => {
+  const catalog = [
+    { pluginId: 'github', sourceId: 'pull-requests', name: 'Pull requests', singular: 'Pull request', plural: 'Pull requests', identityScope: 'GitHub', providerId: 'github' },
+    { pluginId: 'northwind', sourceId: 'readiness', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'Issue',
+      inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } } },
+  ]
+  const accounts = [{ id: 'github-acme', provider: 'github' }, { id: 'github-personal', provider: 'github' }]
+  // The turn starts from a plan that chose neither GitHub account.
+  const base = () => plan('pulls', 'tracker-1')
+  const readiness = (binding?: { connectionId: string; parameters: Record<string, never> }) => panelPlanSchema.parse({ ...plan(), request: 'Release readiness',
+    requirements: [{ id: 'ready', text: 'Release readiness', status: 'covered', paths: ['/sources/work'] }],
+    sources: [{ id: 'work', label: 'Release readiness', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+      name: 'readiness', parameters: { type: 'object', additionalProperties: false }, sourceParameters: {},
+      query: { source: { pluginId: 'northwind', sourceId: 'readiness' }, scope: { workspaceId: 'w', parameters: {}, ...(binding ? { inputs: { pulls: binding } } : {}) }, sort: [] },
+    } } }] })
+
+  it('refuses a guessed or missing input account', () => {
+    expect(authoringAccountProblems(readiness({ connectionId: 'github-acme', parameters: {} }), base(), catalog, accounts))
+      .toEqual(["/sources/0/reference/content/query/scope/inputs/pulls: Choose one of the person's real github accounts for Pull requests before using it."])
+    expect(authoringAccountProblems(readiness(), base(), catalog, accounts))
+      .toEqual(['/sources/0/reference/content/query/scope/inputs/pulls: Bind the required input pulls (Pull requests) in scope.inputs.'])
+    // The only usable account, or one the plan already chose, isn't a guess.
+    expect(authoringAccountProblems(readiness({ connectionId: 'github-acme', parameters: {} }), base(), catalog, [accounts[0]!])).toEqual([])
+    const chosen = readiness({ connectionId: 'github-personal', parameters: {} })
+    expect(authoringAccountProblems(chosen, chosen, catalog, accounts)).toEqual([])
+  })
+
+  it('asks which account after the guess is refused', async () => {
+    const replies = [
+      { kind: 'proposal', candidate: readiness({ connectionId: 'github-acme', parameters: {} }), summary: 'Guessed an account.' },
+      { kind: 'clarification', question: 'Which GitHub account should Pull requests read?',
+        choices: accounts.map(account => ({ id: account.id, label: account.id })) },
+    ]
+    const repairs: string[] = []
+    const request: AuthoringTurnRequest = { target: 'dashboard', scope: { workspaceId: 'w' }, targetId: 'derived', baseRevision: 0, base: base(),
+      backendId: 'scripted:fixture', instruction: 'Release readiness', context: [], samplesEnabled: false }
+    const result = await runAuthoringTurn({ request, system: 'Only described capabilities.', facts: { sources: catalog, accounts },
+      generate: async input => {
+        if (input.prompt.includes('failed validation')) repairs.push(input.prompt)
+        return { text: JSON.stringify(replies.shift()), providerId: 'scripted', modelId: 'fixture' }
+      },
+      metadata: async () => ({}),
+      validate: async value => {
+        const parsed = panelPlanSchema.parse(value)
+        return { candidate: parsed, problems: authoringAccountProblems(parsed, base(), catalog, accounts) }
+      },
+    })
+    expect(repairs).toHaveLength(1)
+    expect(result.state).toBe('clarification')
+    if (result.state === 'clarification') expect(result.choices.map(choice => choice.id)).toEqual(['github-acme', 'github-personal'])
   })
 })

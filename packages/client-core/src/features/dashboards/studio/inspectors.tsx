@@ -4,14 +4,14 @@ import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceDescription, DataSourceQuery } from '@acorn/protocol/dataSources.ts'
 import { dashboardFields } from '@acorn/dashboards-core/projection'
-import { describePanelPlan, newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem } from '@acorn/dashboards-core/plan.ts'
+import { describePanelPlan, newColumnId, outputPlanColumns, type DashboardRun, type PlanProblem, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
 import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/capabilities.ts'
 import {
   AGGREGATE_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, EMPTY_SORT_LABELS, GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS,
   PRECISION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNIT_LABELS, UNMATCHED_LABELS, WEEK_START_LABELS,
   labelOptions, sortDirectionLabel,
 } from '@acorn/dashboards-core/labels.ts'
-import { availableViews, countsByPart, problemsByPart, switchView, VIEW_ICONS, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import { availableViews, countsByPart, problemsByPart, switchView, VIEW_ICONS, type PlanInputs, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import type { SourceQueryEditorState } from '../../dataSources/SourceQueryEditor'
 import SourceQueryEditor from '../../dataSources/SourceQueryEditor'
 import { Alert, Button, Card, Checkbox, Chip, Field, Row, SegmentedControl } from '../../../kit/components/primitives'
@@ -30,6 +30,8 @@ import WriteValueControls from '../WriteValueControls'
 import { defaultPlanColumns, unbindMissingFields } from '../dashboardEditorModel'
 import { LabeledInput, LabeledSelect } from '../fields'
 import { regionRefusal, type PanelRegion } from '../region'
+import type { FailureContext } from '../planInputs'
+import SourceFailureAlert, { openPluginSettings } from '../SourceFailureAlert'
 import { operationForms } from './operationForms'
 import { newComparison, wholeNumber, type Stage, type StageFormProps } from './stageFormParts'
 import type { StudioChangeOptions } from './studioStore'
@@ -49,6 +51,10 @@ export type InspectorContext = {
   /** The plan's problems, from the schema and the last run. */
   problems: () => readonly PlanProblem[]
   sources: SourceTracking
+  /** Each derived source's inputs, by plan source id. */
+  inputs: () => PlanInputs
+  /** The names and fix targets for a source's failure. */
+  failureContext: (problem: PlanProblem & { failure: SourceFailure }) => FailureContext
   /** The plugin area the panel will show in, which can refuse some views. */
   region?: PanelRegion
   /** Opens the AI about a part of the panel: named in the request, and its paths sent as the focus. */
@@ -202,7 +208,16 @@ export function SourceInspector(props: InspectorProps) {
     ? { ...current, sources: current.sources.map(entry => entry.id === id() ? { ...entry, reference } : entry) }
     : removeSourceFrom(current, id()))
   const starterPlans = () => context.sources.starters()[id()] ?? []
+  // The source's own problems and its inputs', each in plain words with its fix. Choosing an account
+  // happens in the picker below, so that fix isn't repeated here.
+  const failures = createMemo(() => {
+    const grouped = problemsByPart(context.plan(), context.problems(), context.inputs())
+    return Object.entries(grouped).flatMap(([key, problems]) => key === `source:${id()}` || key.startsWith(`input:${id()}:`) ? problems ?? [] : [])
+  })
   return <Show when={source()}>{current => <Stack gap="row">
+    <For each={failures()}>{problem => <Show when={problem.failure} fallback={<Alert tone="warn">{problem.message}</Alert>}>{failure => (
+      <SourceFailureAlert failure={failure()} context={context.failureContext({ ...problem, failure: failure() })} severity={problem.severity} />
+    )}</Show>}</For>
     <SourceQueryEditor workspaceId={context.workspaceId} value={current().reference} hideAuthoring hideConditions hidePreview pickSourceAccount
       onChange={setReference} onStateChange={next => context.sources.report(id(), next)} />
     <Show when={context.plan().sources.length > 1}>
@@ -216,6 +231,7 @@ export function SourceInspector(props: InspectorProps) {
       <Show when={state()?.query && state()?.description && state()?.source}>
         <KeepHistory query={state()!.query!} description={state()!.description!} sourceName={state()!.source!.name} onCreated={context.refreshQueries} />
       </Show>
+      <Show when={state()?.source?.inputs && state()!.source!.pluginId}>{plugin => <Button size="sm" variant="ghost" onPress={() => openPluginSettings(plugin())}>About this source</Button>}</Show>
       <Button size="sm" variant="ghost" onPress={() => setReference(undefined)}>Remove source</Button>
     </Inline>
   </Stack>}</Show>

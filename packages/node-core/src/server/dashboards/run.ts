@@ -1,13 +1,14 @@
 import { createHash } from 'node:crypto'
 import { canonicalDataEncoding, DATA_LIMITS, MISSING, parseDataValue, readDataPointer } from '@acorn/protocol/dataValues.ts'
 import type { DashboardContent, DashboardScope, PanelPlan } from '@acorn/protocol/dashboards.ts'
-import type { DataSourceQuery, DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import type { DataSourceQuery, DataSourceRef, DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { resolveDataBinding } from '@acorn/protocol/dataQueryResolution.ts'
-import { bindPanelRows, describePanelPlan, groupPlanRows, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type DashboardRun, type PlanProblem, type PlanSource } from '@acorn/dashboards-core/plan.ts'
+import { bindPanelRows, describePanelPlan, groupPlanRows, relatePanelRows, resolvePlanColumns, runPlanStages, sortPlanRows, upgradePanelContent, validatePanelPlan, type DashboardRun, type PlanProblem, type PlanSource, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInvocation } from '../dataSources/authority'
 import { invokeDataSource } from '../dataSources/runtime'
+import { DataSourceError } from '../dataSources/validation'
 import { authorizeQueryScope, resolveQuery } from '../queries/runtime'
 import { dashboardStore } from './store'
 import { getDb } from '../db'
@@ -59,6 +60,35 @@ function plannedQuery(query: DataSourceQuery, plan: PanelPlan, source: PlanSourc
     if (sort.length === plan.sort.length) next = { ...next, sort, take: plan.limit }
   }
   return next
+}
+
+/** Where a source's problem points: at the input's binding when an input is at fault and the plan
+ *  holds the query inline, so the studio marks the input's row, and at the source otherwise. */
+const sourcePath = (plan: PanelPlan, index: number, input?: string): string =>
+  input && plan.sources[index]?.reference.kind === 'inline' ? `/sources/${index}/reference/content/query/scope/inputs/${input}` : `/sources/${index}`
+
+/** A source that couldn't answer, as a problem. `message` keeps the Node's wording for older clients,
+ *  and `failure` carries the code, source, and input so a client can word it and offer the fix. */
+function sourceProblem(plan: PanelPlan, index: number, label: string, error: unknown, timedOut: boolean, source?: DataSourceRef): PlanProblem {
+  const failure: SourceFailure = {
+    code: timedOut ? 'timeout' : error instanceof DataSourceError ? error.code : 'source-error',
+    ...(source ? { source: `${source.pluginId}:${source.sourceId}` } : {}),
+    ...(!timedOut && error instanceof DataSourceError && error.detail?.input ? { input: error.detail.input } : {}),
+    ...(!timedOut && error instanceof DataSourceError && error.detail?.reason ? { reason: error.detail.reason } : {}),
+  }
+  return { path: sourcePath(plan, index, failure.input), message: timedOut ? 'Run time budget exceeded.' : `${label}: ${describeError(error).message}`, severity: 'error', failure }
+}
+
+/** A partial read, as a warning. An input's own partial read names the input, so the client can say
+ *  which provider held back. */
+function incompleteProblem(plan: PanelPlan, index: number, source: PlanSource, result: DataSourceResult): PlanProblem | undefined {
+  if (result.completeness.kind !== 'incomplete') return undefined
+  const { cause, count } = result.completeness
+  const input = cause === 'invalid-records' ? undefined
+    : Object.entries(result.inputs ?? {}).find(([, read]) => read.completeness.kind === 'incomplete')?.[0]
+  return { path: sourcePath(plan, index, input), message: `${source.label} returned incomplete data (${cause}).`, severity: 'warning',
+    failure: { code: 'incomplete', source: `${source.query.source.pluginId}:${source.query.source.sourceId}`, reason: cause,
+      ...(count ? { count } : {}), ...(input ? { input } : {}) } }
 }
 
 const digest = (value: unknown): string => createHash('sha256').update(canonicalDataEncoding(parseDataValue(value))).digest('hex')
@@ -127,7 +157,8 @@ export async function runDashboard(env: Env, args: {
         parameters: resolved.parameters, account: resolved.query.scope.connectionId ?? null, coverageWindows: description.coverageWindows,
         writable: description.writable })
     } catch (error) {
-      problems.push({ path: `/sources/${plan.sources.indexOf(entry)}`, message: runInvocation.signal.reason?.name === 'TimeoutError' ? 'Run time budget exceeded.' : `${entry.label}: ${describeError(error).message}`, severity: 'error' })
+      problems.push(sourceProblem(plan, plan.sources.indexOf(entry), entry.label, error, runInvocation.signal.reason?.name === 'TimeoutError',
+        entry.reference.kind === 'inline' ? entry.reference.content.query.source : undefined))
       sourceDiagnostics.push({ id: entry.id, label: entry.label })
     }
   }
@@ -201,15 +232,19 @@ export async function runDashboard(env: Env, args: {
         diagnostic.readTime = source.result.readTime
         diagnostic.coveredRange = source.result.coveredRange
         diagnostic.observedAt = source.result.observedAt
+        if (source.result.inputs) diagnostic.inputs = source.result.inputs
+        const index = plan.sources.findIndex(entry => entry.id === source.instanceId)
         const coverageProblem = sourceCoverageProblem(plan, source, evaluationTime)
         if (coverageProblem) {
           uncoveredWindow = true
-          problems.push({ path: `/sources/${plan.sources.findIndex(entry => entry.id === source.instanceId)}`, message: coverageProblem, severity: 'warning' })
+          problems.push({ path: `/sources/${index}`, message: coverageProblem, severity: 'warning' })
         }
-        if (source.result.completeness.kind === 'incomplete') problems.push({ path: `/sources/${plan.sources.findIndex(entry => entry.id === source.instanceId)}`, message: `${source.label} returned incomplete data (${source.result.completeness.cause}).`, severity: 'warning' })
+        const incomplete = incompleteProblem(plan, index, source, source.result)
+        if (incomplete) problems.push(incomplete)
         if (sources.reduce((sum, entry) => sum + (entry.result?.records.length ?? 0), 0) > MAX_TOTAL_RECORDS) { problems.push({ path: '/sources', message: 'Total record budget exceeded.', severity: 'error' }); break }
       } catch (error) {
-        problems.push({ path: `/sources/${plan.sources.findIndex(entry => entry.id === source.instanceId)}`, message: runInvocation.signal.reason?.name === 'TimeoutError' ? 'Run time budget exceeded.' : `${source.label}: ${describeError(error).message}`, severity: 'error' })
+        problems.push(sourceProblem(plan, plan.sources.findIndex(entry => entry.id === source.instanceId), source.label, error,
+          runInvocation.signal.reason?.name === 'TimeoutError', source.query.source))
       }
     }
   }

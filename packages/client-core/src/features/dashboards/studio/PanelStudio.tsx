@@ -4,10 +4,15 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { panelPlanSchema, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
-import type { PlanProblem } from '@acorn/dashboards-core/plan.ts'
+import type { PlanProblem, SourceFailure } from '@acorn/dashboards-core/plan.ts'
 import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import { planPartLabel, REQUIREMENT_STATUS_LABELS } from '@acorn/dashboards-core/labels.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
+import { integrationsOptions } from '../../../infra/queries'
+import { dataSourceCatalogOptions } from '../../dataSources/queries'
+import { sourceKey, unboundInputs } from '../../dataSources/sourceEntries'
+import { failureContext, planInputs } from '../planInputs'
+import { describeSourceFailure } from '../sourceErrors'
 import AuthoringConversation from '../../dataSources/AuthoringConversation'
 import {
   Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Field, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
@@ -128,6 +133,23 @@ export default function PanelStudio(props: {
     store.restoreLocal()
   })
 
+  // ── Sources, inputs, and accounts ───────────────────────────────────────────────────────────
+  const catalog = createQuery(() => dataSourceCatalogOptions(nodeId, { ...scope, parameters: {} }))
+  const integrations = createQuery(() => integrationsOptions(true))
+  const catalogSources = () => catalog.data?.sources ?? []
+  const connections = () => integrations.data?.integrations ?? []
+  /** Each derived source's inputs in the outline's words. */
+  const inputs = createMemo(() => planInputs(plan(), catalogSources(), connections()))
+  const contextFor = (problem: PlanProblem & { failure: SourceFailure }) => failureContext(problem, plan(), catalogSources(), connections())
+  /** "Pull requests needs a GitHub account.", for each required input without one, before a run says so. */
+  const missingAccounts = createMemo(() => plan().sources.flatMap((source, index) => {
+    if (source.reference.kind !== 'inline') return []
+    const query = source.reference.content.query
+    const entry = catalogSources().find(candidate => sourceKey(candidate) === sourceKey(query.source))
+    return unboundInputs(entry, query.scope, catalogSources()).map(input => describeSourceFailure({ code: 'input-required', input },
+      contextFor({ path: `/sources/${index}`, message: '', severity: 'error', failure: { code: 'input-required', source: sourceKey(query.source), input } }).names).message)
+  }))
+
   // ── Runs and problems ────────────────────────────────────────────────────────────────────────
   const parsed = createMemo(() => panelPlanSchema.safeParse(plan()))
   /** A draft preview run of a plan, while it has a source and parses. */
@@ -152,10 +174,13 @@ export default function PanelStudio(props: {
       return { path, severity: 'error' as const, message: `${planPartLabel(plan(), path)} is incomplete.` }
     })
     const reported = [...new Map((run()?.diagnostics.problems ?? []).map(entry => [entry.message, entry])).values()]
-    return [...schema, ...reported.map(entry => ({ ...entry, message: `${planPartLabel(plan(), entry.path)}: ${entry.message}` }))]
+    // A source's failure reads in the words the placed panel uses; anything else names its part.
+    return [...schema, ...reported.map(entry => ({ ...entry, message: entry.failure
+      ? describeSourceFailure(entry.failure, contextFor({ ...entry, failure: entry.failure }).names).message
+      : `${planPartLabel(plan(), entry.path)}: ${entry.message}` }))]
   })
   const selectPath = (path: string, inPlan = plan()): void => {
-    const key = partForPath(inPlan, path)
+    const key = partForPath(inPlan, path, inPlan === plan() ? inputs() : outlineInputs())
     if (key) select(key)
   }
 
@@ -171,7 +196,7 @@ export default function PanelStudio(props: {
   const unpublished = createMemo(() => diff() ? diffSummary(diff()!) : [])
 
   // ── Selection and edits ──────────────────────────────────────────────────────────────────────
-  const parts = createMemo((): PlanPart[] => [...planOutline(plan()), ...columnParts(plan())])
+  const parts = createMemo((): PlanPart[] => [...planOutline(plan(), [], inputs()), ...columnParts(plan())])
   /** The selected part, while the plan still has it. A removed step leaves nothing selected. */
   const selectedPart = () => parts().find(part => part.key === store.selected())
   const select = (key: PlanPartKey | undefined): void => {
@@ -215,7 +240,7 @@ export default function PanelStudio(props: {
   }
   if (props.withAi) openAi()
   const inspectorContext: InspectorContext = {
-    plan, change: store.apply, select, workspaceId: scope.workspaceId, run, problems, sources,
+    plan, change: store.apply, select, workspaceId: scope.workspaceId, run, problems, sources, inputs, failureContext: contextFor,
     ...(props.region ? { region: props.region } : {}),
     askAi: key => { const part = parts().find(entry => entry.key === key); if (part) askAbout(part) },
     refreshQueries: () => void queryClient.invalidateQueries(),
@@ -238,6 +263,7 @@ export default function PanelStudio(props: {
   const reviewDiff = createMemo(() => review() ? diffOutline(plan(), review()!.merged) : undefined)
   /** What the outline and the preview draw: the proposed plan while one is under review. */
   const outlinePlan = () => review()?.merged ?? plan()
+  const outlineInputs = createMemo(() => review() ? planInputs(outlinePlan(), catalogSources(), connections()) : inputs())
   const previewPlan = () => review() && showing() === 'after' ? review()!.merged : plan()
   const previewData = () => review() && showing() === 'after' ? proposedRun() : run()
   const onProposal = (proposal: Parameters<typeof store.reviewProposal>[0]): void => {
@@ -284,11 +310,13 @@ export default function PanelStudio(props: {
     () => reviewing() && props.region && parsed().success ? JSON.stringify(plan()) : undefined,
     async () => regionRefusal(props.region!, plan().view.kind, await describePanelSources(nodeId, scope, plan())),
   )
-  const blockers = createMemo(() => [
+  // A missing input account is also a run error once the preview runs, so each message shows once.
+  const blockers = createMemo(() => [...new Set([
     ...(plan().sources.length ? [] : ['Pick data first.']),
+    ...missingAccounts(),
     ...problems().filter(problem => problem.severity === 'error').map(problem => problem.message),
     ...(regionCheck.error ? [] : regionCheck() ? [regionCheck()!] : []),
-  ])
+  ])])
   const publish = async (): Promise<void> => {
     const result = parsed()
     if (!result.success) return
@@ -409,12 +437,12 @@ export default function PanelStudio(props: {
           {/* Every source's picker stays mounted, hidden unless selected, because the column and step
               forms read each source's described fields from what its picker reports. */}
           <For each={sourceIds()}>{id => (
-            <div class="dash-studio-source" hidden={addingSource() || store.selected() !== `source:${id}`}>
+            <div class="dash-studio-source" hidden={addingSource() || (store.selected() !== `source:${id}` && !store.selected()?.startsWith(`input:${id}:`))}>
               <SourceInspector context={inspectorContext} part={`source:${id}`} />
             </div>
           )}</For>
           <Show when={!addingSource() && selectedPart()?.key} keyed>{key => (
-            <Show when={partKind(key) !== 'source'}><Dynamic component={INSPECTORS[partKind(key)]} context={inspectorContext} part={key} /></Show>
+            <Show when={!key.startsWith('source:') && !key.startsWith('input:')}><Dynamic component={INSPECTORS[partKind(key)]} context={inspectorContext} part={key} /></Show>
           )}</Show>
           <Show when={!addingSource() && !selectedPart()}>
             <Show when={plan().request}>{request => <Text wrap>{request()}</Text>}</Show>
@@ -437,7 +465,8 @@ export default function PanelStudio(props: {
         <Show when={tab() === 'outline'} fallback={<div class="dash-studio-code"><CodeBlock copy>{JSON.stringify(plan(), null, 2)}</CodeBlock></div>}>
           <ListDetail split listLabel="Outline">
             <ListColumn>
-              <StudioOutline plan={outlinePlan()} stageCounts={(review() ? proposedRun() : run())?.diagnostics.stages ?? []}
+              <StudioOutline plan={outlinePlan()} inputs={outlineInputs()} stageCounts={(review() ? proposedRun() : run())?.diagnostics.stages ?? []}
+                sourceCounts={(review() ? proposedRun() : run())?.diagnostics.sources ?? []}
                 problems={review() ? [] : problems()} selected={store.selected()}
                 onSelect={select} onAdd={addPart} onMoveStage={moveStage} onRemove={removePart} onAskAi={askAbout}
                 {...(reviewDiff() ? { review: { diff: reviewDiff()!, before: plan() } } : {})} />

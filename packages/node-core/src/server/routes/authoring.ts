@@ -18,7 +18,7 @@ import { ProviderOperationError } from '../integrations/types'
 import { resolveQuery } from '../queries/runtime'
 import { respondError } from '../respond'
 import { createLogger } from '../telemetry/logger'
-import { PANEL_CAPABILITIES } from '@acorn/dashboards-core/plan.ts'
+import { authoringAccountProblems, PANEL_CAPABILITIES } from '@acorn/dashboards-core/plan.ts'
 import { listConnections } from '../integrations/connections'
 import { invokeDataSource, listDataSources } from '../dataSources/runtime'
 import { eq } from 'drizzle-orm'
@@ -28,7 +28,7 @@ const log = createLogger('authoring')
 
 const TARGET_PROMPTS = {
   query: 'The candidate must be one QueryContent object. Keep typed predicates and exact source option ids. Ask for metadata before naming a source, field, operator, connection, or option.',
-  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. Board writes need a source-declared writable bound field and an exact writeValues entry per choice and source; list them as requirements with paths into columns, choices, and writeValues. A missing mapping is unavailable, never guessed. Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. An instruction that starts with [Focus: <paths> "<title>"] is about those plan paths; change other parts only when the request needs it. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
+  dashboard: `The candidate must be one PanelPlan version 2 object. Start with list-sources and list-accounts metadata. Primary sources supply rows; lookup and children sources need declared exact-key relations. Only equivalence merges mirrored records. Use the supported operations and bounds. Account names are choices, never guesses. A source whose catalog entry lists inputs is a derived source: give it no connectionId, bind every required input in scope.inputs by name with { connectionId, parameters }, and choose each input's account under the same rule. When more than one of the person's accounts fits an input, ask with a clarification whose choices are those accounts. Board writes need a source-declared writable bound field and an exact writeValues entry per choice and source; list them as requirements with paths into columns, choices, and writeValues. A missing mapping is unavailable, never guessed. Propose a dataset only when the request needs history that live sources cannot provide; say which mode and coverage are needed. The person's request and requirements checklist belong in the plan; partial and unavailable items need reasons. An instruction that starts with [Focus: <paths> "<title>"] is about those plan paths; change other parts only when the request needs it. Capabilities: ${JSON.stringify(PANEL_CAPABILITIES)}.`,
 } as const
 
 function message(error: unknown): string {
@@ -80,16 +80,7 @@ export async function handleAuthoringTurn(c: Context<AppEnv>) {
       const base = panelPlanSchema.safeParse(request.base)
       const originalRequest = base.success && base.data.request ? base.data.request : request.instruction
       if (content.request !== originalRequest) problems.push('/request: Preserve the person\'s original request exactly.')
-      const chosen = new Set(base.success ? base.data.sources.flatMap(source => source.reference.kind === 'inline' && source.reference.content.query.scope.connectionId ? [source.reference.content.query.scope.connectionId] : []) : [])
-      for (const [index, source] of content.sources.entries()) {
-        const inline = source.reference.kind === 'inline' ? source.reference.content.query : undefined
-        if (!inline) continue
-        const provider = sourceCatalog?.sources.find(entry => entry.pluginId === inline.source.pluginId && entry.sourceId === inline.source.sourceId)?.providerId
-        const eligible = accounts.filter(account => account.provider === provider)
-        if (provider && (!inline.scope.connectionId || (!chosen.has(inline.scope.connectionId) && !(eligible.length === 1 && eligible[0]?.id === inline.scope.connectionId)))) {
-          problems.push(`/sources/${index}/reference: Choose one of the person's real ${provider} accounts before using it.`)
-        }
-      }
+      problems.push(...authoringAccountProblems(content, base.success ? base.data : undefined, sourceCatalog?.sources ?? [], accounts))
       problems.push(...checkRequirements(content, base.success ? base.data : undefined, request.instruction))
       // The same check publication runs, so the AI can't propose a panel that publish would refuse.
       return problems.length ? { problems } : { candidate: content, problems }

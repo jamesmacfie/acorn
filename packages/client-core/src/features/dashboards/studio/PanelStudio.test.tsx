@@ -11,6 +11,7 @@ vi.mock('../../../infra/node/apiClient', () => ({
 }))
 
 const { default: PanelStudio } = await import('./PanelStudio')
+const { clientEvents } = await import('../../../host/registries/commands/clientEvents')
 
 const tasks: PanelPlan['sources'][number] = { id: 'tasks', label: 'Tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
   name: 'Tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
@@ -23,6 +24,17 @@ const filtered: PanelPlan = {
   columns: [{ id: 'title', label: 'Title', type: 'text', bind: { tasks: { field: '/title' } } }],
   stages: [{ op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/title' } }, operator: 'eq', right: { address: { from: 'literal', value: 'x' } } } }],
 }
+// A derived source whose one input reads GitHub, with no binding yet.
+const readiness: PanelPlan = { ...filtered, title: 'Release readiness', stages: [], columns: [{ id: 'title', label: 'Title', type: 'text', bind: { ready: { field: '/title' } } }],
+  sources: [{ id: 'ready', label: 'Release readiness', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+    name: 'Release readiness', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+    query: { source: { pluginId: 'northwind', sourceId: 'readiness' }, scope: { workspaceId: 'w', parameters: {} }, sort: [] },
+  } } }] }
+const derivedCatalog = [
+  { pluginId: 'github', sourceId: 'pull-requests', name: 'Pull requests', singular: 'Pull request', plural: 'Pull requests', identityScope: 'pull', providerId: 'github' },
+  { pluginId: 'northwind', sourceId: 'readiness', name: 'Release readiness', singular: 'Issue', plural: 'Issues', identityScope: 'issue',
+    inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } } },
+]
 const draft = (content: PanelPlan): DashboardDraft => ({ id: 'd1', workspaceId: 'w', content, draftRevision: 1, basePublishedRevision: null, publishedRevision: null, updatedAt: Date.now() } as DashboardDraft)
 
 let host: HTMLDivElement
@@ -30,6 +42,8 @@ let dispose: (() => void) | undefined
 let client: QueryClient
 let opened: PanelPlan
 let turnReply: () => Promise<unknown>
+let catalog: unknown[]
+let runProblems: unknown[]
 const onClose = vi.fn()
 const settle = async (times = 3) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
@@ -44,6 +58,8 @@ const mount = (dashboardId?: string, start?: Parameters<typeof PanelStudio>[0]['
 beforeEach(() => {
   opened = invalid
   turnReply = () => new Promise(() => {})
+  catalog = []
+  runProblems = [{ path: '/stages/0', message: 'Filter names an unavailable column: title.', severity: 'error' }]
   onClose.mockReset()
   requests.mockReset()
   requests.mockImplementation(async (path, options) => {
@@ -53,9 +69,9 @@ beforeEach(() => {
     // A copy, as from the wire: the query cache wraps what it's given, which would mark the fixtures.
     if (path.endsWith('/dashboards/run')) return {
       plan: structuredClone(opened), rows: [], groups: [],
-      diagnostics: { problems: [{ path: '/stages/0', message: 'Filter names an unavailable column: title.', severity: 'error' }], sources: [], stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
+      diagnostics: { problems: runProblems, sources: [], stages: [], evaluationTime: 0, plugins: [], accounts: [], complete: true },
     }
-    if (path.endsWith('/data-sources/list')) return { sources: [], discoveries: [] }
+    if (path.endsWith('/data-sources/list')) return { sources: catalog, discoveries: [] }
     if (path.endsWith('/queries/list')) return []
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
     if (path.endsWith('/models/backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
@@ -117,6 +133,36 @@ describe('PanelStudio', () => {
     const step = row('Keep where Title is')!
     expect(step.querySelector('[aria-label="Has a problem"]')).not.toBeNull()
     expect(row('List')!.querySelector('[aria-label="Has a problem"]')).toBeNull()
+  })
+
+  it("marks a derived source's input for its missing account, offers to connect one, and blocks publishing", async () => {
+    opened = readiness
+    catalog = derivedCatalog
+    runProblems = [{ path: '/sources/0/reference/content/query/scope/inputs/pulls', message: 'Release readiness: input-required: input pulls', severity: 'error',
+      failure: { code: 'input-required', source: 'northwind:readiness', input: 'pulls' } }]
+    const settingsTabs: string[] = []
+    const stop = clientEvents.on('presentation:open-settings', ({ tab }) => settingsTabs.push(tab))
+    mount('d1')
+    await settle(8)
+    // The input has its own row under the source, and the problem marks it rather than the source.
+    const input = row('no account chosen')!
+    expect(input.textContent).toContain('Pull requests')
+    expect(input.querySelector('[aria-label="Has a problem"]')).not.toBeNull()
+    expect(row('Release readiness')!.querySelector('[aria-label="Has a problem"]')).toBeNull()
+    expect(document.body.textContent).toContain('Pull requests needs a github account.')
+    expect(document.body.textContent).not.toContain('input-required')
+
+    input.click()
+    await settle()
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('No github account is connected.')
+    button('Connect github…')!.click()
+    expect(settingsTabs).toEqual(['integrations'])
+    stop()
+
+    button('Publish…')!.click()
+    await settle()
+    expect([...document.querySelectorAll('[role="dialog"]')].at(-1)!.textContent).toContain('Fix these before publishing')
+    expect(button('Publish')!.disabled).toBe(true)
   })
 
   it('disables an operation the plan cannot take yet, with its reason', async () => {

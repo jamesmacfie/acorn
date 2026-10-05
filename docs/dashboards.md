@@ -46,6 +46,17 @@ Missing plugins, connections, publications, or fields are unavailable states. Th
 silently replaced with an empty result or a guessed schema. Source identity is
 `(pluginId, sourceId)`; record identity and provenance remain the source contract's responsibility.
 
+A run reports a source that couldn't answer, or answered in part, as a problem with a `failure`: the
+data source error code, or `incomplete` with its cause, the `plugin:source` id, and the input at
+fault. `message` keeps the Node's wording for older clients. `features/dashboards/sourceErrors.ts`
+turns a failure into a sentence and a fix, such as "Pull requests needs a GitHub account." with
+**Choose an account**, or "Northwind is waiting for you to approve what it reads." with **Review**.
+The studio, the placed panel, and the source picker all use it, so none shows a code or a JSON
+pointer. Every fix is host UI, because a loaded plugin can't open Settings. **Review** and **Turn it
+on** open the plugin's page, **Reconnect…** opens the account's page, **Choose an account** opens the
+studio, and **Try again** runs the panel again. When a source fails after the panel has shown data,
+the panel keeps the last data on screen, greyed out and inert, under the message.
+
 A placed panel caches a Node run by Node, scope, panel, revision, and viewer time zone. It refetches
 after a reported account or plugin changes, when the window regains focus, and at the plan's refresh
 interval. The Node shares identical authorized reads briefly across panels.

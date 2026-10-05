@@ -72,6 +72,10 @@ panel should show. **Edit** skips it. The launcher has three paths:
 - **Unfinished.** The workspace's unpublished drafts, newest first and three at a time, each with
   **Continue** and **Discard**.
 
+A derived source lists once and asks for an account per input before its starters open. The studio
+lists its inputs under it in the outline and draws their account pickers in its inspector. See
+[derived sources](../data-sources/derived-sources.md#use-one-in-a-panel).
+
 The launcher's choice is where editing starts, so undo never goes back past it. The source and
 account list is `sourceEntries` in `features/dataSources/sourceEntries.ts`, which the source picker
 uses too. In the studio, a source joins the plan only once it's picked, so nothing is reported before

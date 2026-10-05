@@ -476,6 +476,17 @@
   overflow: auto;
 }
 
+/* The panel's data, full height so a board can fill it. While a source can't answer, the last data stays
+   on screen greyed out, and inert because its rows may no longer be true. */
+.dash-panel-data {
+  height: 100%;
+  min-height: 0;
+}
+.dash-panel-data[data-stale] {
+  opacity: 0.5;
+  filter: grayscale(1);
+}
+
 /* ── Board ───────────────────────────────────────────────────────────────────────────────── */
 
 /* Columns are the values of the grouped field, so their count is data. An auto-flow grid takes whatever

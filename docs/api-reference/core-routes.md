@@ -190,9 +190,9 @@ releases the wait without cancelling the process.
 
 | Method | Path | Gate | Purpose |
 | --- | --- | --- | --- |
-| `POST` | `/v1/core/data-sources/:operation` | Provider access | `list`, `discover`, `describe`, `options`, `query`, `details`, `actions`, and `act` over typed sources |
+| `POST` | `/v1/core/data-sources/:operation` | Provider access | `list`, `discover`, `describe`, `options`, `query`, `details`, `actions`, and `act` over typed sources. A derived source's `query` result counts what it read from each input ([derived sources](../data-sources/derived-sources.md#use-one-in-a-panel)) |
 | `POST` | `/v1/core/queries/:operation` | Provider access | The workspace query library |
-| `POST` | `/v1/core/dashboards/:operation` | Device, in the handler | `list`, `get`, `create`, `save`, `validate`, `publish`, `published`, `run`, and `delete` |
+| `POST` | `/v1/core/dashboards/:operation` | Device, in the handler | `list`, `get`, `create`, `save`, `validate`, `publish`, `published`, `run`, and `delete`. A `run` problem from a source carries a `failure` with its code, source, and input ([published panels](../dashboards.md#published-panels)) |
 | `GET` | `/v1/core/dashboards/history` | Open | The measure series a history panel draws |
 | `POST` | `/v1/core/authoring/turn` | Device | One AI authoring turn for a query or dashboard. An instruction that starts with `[Focus: <paths> "<title>"] ` is about those plan paths. No execution or publication |
 

@@ -8,7 +8,7 @@
 // description, validation, and provider scheduling as a direct read, and this module stays out of an
 // import cycle with ./runtime.ts.
 import { createHash } from 'node:crypto'
-import { DATA_SOURCE_PREVIEW_MODE, parseDataSourceInputRef, type DataSourceDescription, type DataSourceRequest, type DataSourceResponse, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
+import { DATA_SOURCE_PREVIEW_MODE, parseDataSourceInputRef, type DataSourceDescription, type DataSourceInputRead, type DataSourceRequest, type DataSourceResponse, type DataSourceResult } from '@acorn/protocol/dataSources.ts'
 import { DATA_LIMITS } from '@acorn/protocol/dataValues.ts'
 import type { Env } from '../bindings'
 import type { DataSourceInputHandle } from '../pluginHost/types'
@@ -22,8 +22,14 @@ type IncompleteCause = Extract<DataSourceResult['completeness'], { kind: 'incomp
 
 /** What one invocation of a derived source learned from its input reads and its own records.
  *  `inputError` is the first input read that failed, so a handler that fails because of it reports
- *  the input's cause rather than a bare provider failure. */
-export type DerivedReadState = { inputIncomplete?: IncompleteCause; droppedRecords: number; inputError?: DataSourceError }
+ *  the input's cause rather than a bare provider failure. `inputReads` counts each input's records, so
+ *  a panel can show them under the source. */
+export type DerivedReadState = {
+  inputIncomplete?: IncompleteCause
+  droppedRecords: number
+  inputError?: DataSourceError
+  inputReads?: Record<string, DataSourceInputRead>
+}
 
 const MAX_DERIVED_DEPTH = 2
 const sourceKey = (source: RegisteredDataSource) => `${source.pluginId}:${source.sourceId}`
@@ -85,6 +91,8 @@ export function inputHandles(
           query: { source: ref, scope: bound, sort: sort ?? [], ...(predicate ? { predicate } : {}), ...(take ? { take } : {}) },
           ...(cursor ? { cursor } : {}), pageSize: pageSize ?? DATA_LIMITS.previewRecords })
         if (result.completeness.kind === 'incomplete') state.inputIncomplete ??= result.completeness.cause
+        const reads = state.inputReads ??= {}
+        reads[name] = { records: (reads[name]?.records ?? 0) + result.records.length, completeness: result.completeness }
         return result
       },
     }
@@ -117,8 +125,9 @@ export async function composeDerivedRevision(
 /** Fold what the input reads and record checks learned into the page the caller sees. The plugin's
  *  own `incomplete` wins, then an input's cause, then the count of records dropped for their shape. */
 export function finishDerivedResult(result: DataSourceResult, state: DerivedReadState): DataSourceResult {
-  if (result.completeness.kind !== 'complete' && result.completeness.kind !== 'bounded') return result
-  if (state.inputIncomplete) return { ...result, completeness: { kind: 'incomplete', cause: state.inputIncomplete } }
-  if (state.droppedRecords) return { ...result, completeness: { kind: 'incomplete', cause: 'invalid-records', count: state.droppedRecords } }
-  return result
+  const read = state.inputReads ? { ...result, inputs: state.inputReads } : result
+  if (result.completeness.kind !== 'complete' && result.completeness.kind !== 'bounded') return read
+  if (state.inputIncomplete) return { ...read, completeness: { kind: 'incomplete', cause: state.inputIncomplete } }
+  if (state.droppedRecords) return { ...read, completeness: { kind: 'incomplete', cause: 'invalid-records', count: state.droppedRecords } }
+  return read
 }

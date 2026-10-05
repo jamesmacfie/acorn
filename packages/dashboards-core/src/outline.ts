@@ -7,7 +7,7 @@ import {
   WEEK_START_LABELS, calendarLabel, offsetLabel, operatorLabel, sortDirectionLabel,
 } from './labels'
 import { outputPlanColumns, pointerColumn } from './planColumns'
-import type { PlanProblem, PlanSource, PlanStageCount } from './plan'
+import type { DashboardRun, PlanProblem, PlanSource, PlanStageCount } from './plan'
 
 /** A plan as the named parts the studio selects, in plain words. The plan schema has no ids for
  *  steps or settings, so each part's key is derived here: a source and a column by their ids, a step
@@ -15,6 +15,7 @@ import type { PlanProblem, PlanSource, PlanStageCount } from './plan'
 
 export type PlanPartKey =
   | `source:${string}`
+  | `input:${string}:${string}`
   | 'relations'
   | 'columns'
   | `column:${string}`
@@ -33,6 +34,24 @@ export type PlanPart = {
   icon: string
   /** The JSON pointers this part owns, such as `/stages/0`. */
   paths: string[]
+}
+
+/** One derived-source input as the outline names it. The plan holds only the binding, so the client
+ *  builds these from the source catalog and the person's accounts. */
+export type PlanInput = { name: string; label: string; optional?: boolean; provider?: string; account?: string; reach?: string }
+/** Each derived source's inputs, keyed by the plan source's id. */
+export type PlanInputs = Readonly<Record<string, readonly PlanInput[]>>
+
+/** The pointer to an input's binding in a plan source's inline query. */
+export const inputBindingPath = (index: number, name: string): string => `/sources/${index}/reference/content/query/scope/inputs/${name}`
+
+/** "Pull requests (GitHub · Work) and Cycle issues (Linear · Acme)", for About this panel. */
+export const inputChain = (inputs: readonly PlanInput[]): string => {
+  const named = inputs.map(input => {
+    const where = [input.provider, input.account].filter(Boolean).join(' · ')
+    return where ? `${input.label} (${where})` : input.label
+  })
+  return named.length > 1 ? `${named.slice(0, -1).join(', ')} and ${named.at(-1)}` : named[0] ?? ''
 }
 
 type Stage = PanelPlan['stages'][number]
@@ -125,20 +144,25 @@ const refreshWords = (seconds: number): string => seconds % 3600 === 0 ? plural(
   : seconds % 60 === 0 ? plural(seconds / 60, 'minute') : plural(seconds, 'second')
 
 /** The top-level parts, in outline order. Column parts come from `columnParts`. Pass `sources` after
- *  a run to name each source's account and reach; before one, a source is named by its own label. */
-export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = []): PlanPart[] {
+ *  a run to name each source's account and reach; before one, a source is named by its own label.
+ *  Pass `inputs` to list a derived source's inputs under it, one part each. */
+export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = [], inputs: PlanInputs = {}): PlanPart[] {
   const finalColumn = (id: string) => outputPlanColumns(plan).find(column => column.id === id)
   const press = pressTarget(plan, sources)
   const buttons = plan.actions?.buttons.length ?? 0
   const { view } = plan
   return [
-    ...plan.sources.map((source, index): PlanPart => {
+    ...plan.sources.flatMap((source, index): PlanPart[] => {
       const resolved = sources.find(candidate => candidate.instanceId === source.id)
-      return {
+      return [{
         key: `source:${source.id}`, section: 'data', icon: 'database', paths: [`/sources/${index}`],
         title: resolved?.accountLabel ? `${source.label} · ${resolved.accountLabel}` : source.label,
         detail: resolved ? sourceReach(resolved) : plan.sources.length > 1 ? SOURCE_ROLE_LABELS[source.role] : undefined,
-      }
+      }, ...(inputs[source.id] ?? []).map((input): PlanPart => ({
+        key: `input:${source.id}:${input.name}`, section: 'data', icon: 'plug', paths: [inputBindingPath(index, input.name)],
+        title: input.optional ? `${input.label} (optional)` : input.label,
+        detail: sentence(input.provider, input.account ?? (input.provider ? 'no account chosen' : undefined), input.reach),
+      }))]
     }),
     ...(plan.sources.length > 1 || plan.relations?.length ? [{
       key: 'relations', section: 'data', icon: 'link-2', paths: ['/relations'],
@@ -190,27 +214,32 @@ function ownerOf(parts: readonly PlanPart[], path: string): PlanPartKey | undefi
   return owner?.key
 }
 
-const allParts = (plan: PanelPlan): PlanPart[] => [...planOutline(plan), ...columnParts(plan)]
+const allParts = (plan: PanelPlan, inputs?: PlanInputs): PlanPart[] => [...planOutline(plan, [], inputs), ...columnParts(plan)]
 
-/** The key of the part that owns a JSON pointer, or undefined for a path no part owns, such as `/sources`. */
-export const partForPath = (plan: PanelPlan, path: string): PlanPartKey | undefined => ownerOf(allParts(plan), path)
+/** The key of the part that owns a JSON pointer, or undefined for a path no part owns, such as `/sources`.
+ *  An input's binding maps to its own part when `inputs` lists it, and to its source otherwise. */
+export const partForPath = (plan: PanelPlan, path: string, inputs?: PlanInputs): PlanPartKey | undefined => ownerOf(allParts(plan, inputs), path)
 
 /** Problems grouped by the part they belong to. A problem no part owns goes under `plan`, for the status bar. */
-export function problemsByPart(plan: PanelPlan, problems: readonly PlanProblem[]): Partial<Record<PlanPartKey | 'plan', PlanProblem[]>> {
-  const parts = allParts(plan)
+export function problemsByPart(plan: PanelPlan, problems: readonly PlanProblem[], inputs?: PlanInputs): Partial<Record<PlanPartKey | 'plan', PlanProblem[]>> {
+  const parts = allParts(plan, inputs)
   const grouped: Partial<Record<PlanPartKey | 'plan', PlanProblem[]>> = {}
   for (const problem of problems) (grouped[ownerOf(parts, problem.path) ?? 'plan'] ??= []).push(problem)
   return grouped
 }
 
-/** Each step's row counts by its part key. With one source, the first step's input is the source's total. */
-export function countsByPart(plan: PanelPlan, stages: readonly PlanStageCount[]): { stages: Partial<Record<PlanPartKey, PlanStageCount>>; sourceTotal?: number } {
+/** Each step's row counts by its part key. With one source, the first step's input is the source's total.
+ *  Pass the run's source diagnostics to count what each derived source read from each input. */
+export function countsByPart(plan: PanelPlan, stages: readonly PlanStageCount[], sources: DashboardRun['diagnostics']['sources'] = []): {
+  stages: Partial<Record<PlanPartKey, PlanStageCount>>; sourceTotal?: number; inputs: Partial<Record<PlanPartKey, number>>
+} {
   const byPart = Object.fromEntries(stages.flatMap(count => {
     const index = /^\/stages\/(\d+)$/.exec(count.path)?.[1]
     return index === undefined ? [] : [[`stage:${index}`, count]]
   }))
+  const inputs = Object.fromEntries(sources.flatMap(source => Object.entries(source.inputs ?? {}).map(([name, read]) => [`input:${source.id}:${name}`, read.records])))
   const first = stages.find(count => count.path === '/stages/0')
-  return { stages: byPart, ...(plan.sources.length === 1 && first ? { sourceTotal: first.input } : {}) }
+  return { stages: byPart, inputs, ...(plan.sources.length === 1 && first ? { sourceTotal: first.input } : {}) }
 }
 
 export type Availability<Id extends string> = { id: Id; label: string; description?: string; available: boolean; reason?: string }

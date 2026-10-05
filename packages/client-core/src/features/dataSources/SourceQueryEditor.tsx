@@ -3,14 +3,13 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { Integration } from '@acorn/protocol/api.ts'
 import type { DataField, DataOperator, DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { queryContentSchema, type QueryContent, type QueryDraft, type QueryReference, type QuerySaveState, type QueryScope } from '@acorn/protocol/dataQueries.ts'
-import type { DataSourceDescription, DataSourceDescriptor, DataSourceQuery, DataSourceRef, DataSourceResult, DataSourceScope } from '@acorn/protocol/dataSources.ts'
+import type { DataSourceDescription, DataSourceQuery, DataSourceResult, DataSourceScope } from '@acorn/protocol/dataSources.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { ApiError } from '../../infra/node/apiClient'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, SegmentedControl, Select, Stack, Text } from './kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, SegmentedControl, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -23,18 +22,19 @@ import {
 } from './queries'
 import AuthoringConversation from './AuthoringConversation'
 import { mergeAuthoringCandidate } from './authoringMerge'
-import { blankContent, sourceEntries, sourceKey, sourceReference, usableConnections, type CatalogSource } from './sourceEntries'
+import {
+  blankContent, defaultInputBindings, inputProviderLabel, inputSourceOf, sourceEntries, sourceKey, sourceReference, usableConnections, type CatalogSource,
+} from './sourceEntries'
+import InputAccountField from './InputAccountField'
+import { describeSourceFailure, failureFromError } from '../dashboards/sourceErrors'
 
 const plainContent = (content: QueryContent): QueryContent => queryContentSchema.parse(JSON.parse(JSON.stringify(content)))
-const errorMessage = (error: unknown): string => {
-  if (error instanceof ApiError) {
-    if (error.code === 'unavailable') return 'This source is unavailable. Reconnect its provider or choose another source.'
-    if (error.code === 'connection-required') return 'Choose a connection before continuing.'
-    if (error.code === 'forbidden') return 'This connection is not available in the selected workspace.'
-    return "The source couldn't answer."
-  }
-  return error instanceof Error ? error.message : 'The source could not be read.'
-}
+type InputBinding = NonNullable<DataSourceScope['inputs']>[string]
+/** An input's binding, read back from the scope its own editor emits. */
+const bindingOf = (scope: DataSourceScope): InputBinding => ({
+  ...(scope.connectionId ? { connectionId: scope.connectionId } : {}), parameters: scope.parameters,
+  ...(scope.inputs ? { inputs: scope.inputs as InputBinding['inputs'] } : {}),
+})
 
 function TypedOperand(props: {
   label: string
@@ -212,7 +212,7 @@ function PredicateEditor(props: {
 
 export type SourceQueryEditorState = {
   query?: DataSourceQuery
-  source?: DataSourceDescriptor & DataSourceRef
+  source?: CatalogSource
   description?: DataSourceDescription
   preview?: DataSourceResult
   stale: boolean
@@ -236,6 +236,9 @@ export default function SourceQueryEditor(props: {
    *  `previewOnOpen` off. */
   hidePreview?: boolean
   pickSourceAccount?: boolean
+  /** Draws only the reach and parameters, for one input of a derived source: the parent picks the
+   *  source and draws the account, and a binding can't carry workspace links. */
+  inputBinding?: boolean
   onChange(value: QueryReference | undefined): void
   /** Lets consumers project the shared editor's exact described fields and retained preview. It is
    * observational only: display changes never flow back into query semantics. */
@@ -246,7 +249,9 @@ export default function SourceQueryEditor(props: {
   const baseScope = createMemo<DataSourceScope>(() => ({ ...scope(), parameters: {} }))
   const queryClient = useQueryClient()
   const catalog = createQuery(() => dataSourceCatalogOptions(nodeId(), baseScope()))
-  const integrations = createQuery(() => integrationsOptions(true))
+  // Refetched when the window regains focus, so an account connected in a browser shows up without a
+  // reload. Settings refreshes this query itself after an in-app connect.
+  const integrations = createQuery(() => ({ ...integrationsOptions(true), refetchOnWindowFocus: 'always' as const }))
   const library = createQuery(() => ({ queryKey: queriesKey(nodeId(), scope()), queryFn: ({ signal }: { signal: AbortSignal }) => queriesClient(nodeId(), scope()).list(signal) }))
   const [editingShared, setEditingShared] = createSignal<QueryDraft>()
   const [sharedContent, setSharedContent] = createSignal<QueryContent>()
@@ -283,6 +288,24 @@ export default function SourceQueryEditor(props: {
     scope: query()?.scope ?? baseScope(),
   })
   const description = createQuery(() => ({ ...dataSourceQueryOptions(nodeId(), describeRequest()), enabled: canDescribe() }))
+  const connectionName = (id: string | undefined) => {
+    const connection = integrations.data?.integrations.find(entry => entry.id === id)
+    return connection && (connection.name ?? connection.label)
+  }
+  /** A failure in the words the panel uses (../dashboards/sourceErrors.ts), naming the input at fault. */
+  const errorMessage = (error: unknown): string => {
+    const failure = failureFromError(error)
+    if (!failure) return error instanceof Error ? error.message : 'The source could not be read.'
+    const current = source()
+    const input = failure.input ? current?.inputs?.[failure.input] : undefined
+    return describeSourceFailure(failure, {
+      source: current?.name ?? 'This source',
+      ...(current && current.pluginId !== 'core' ? { plugin: pluginLabel(current.pluginId) } : {}),
+      ...(current?.providerId ? { provider: pluginLabel(current.pluginId) } : {}),
+      ...(input ? { input: { label: input.label, provider: inputProviderLabel(input, sources()), plural: inputSourceOf(input, sources())?.plural,
+        account: connectionName(query()?.scope.inputs?.[failure.input!]?.connectionId) } } : {}),
+    }).message
+  }
 
   const emitContent = (next: QueryContent): void => {
     const draft = editingShared()
@@ -336,9 +359,10 @@ export default function SourceQueryEditor(props: {
   const selectSource = (next: CatalogSource, chosenConnectionId?: string): void => {
     const matches = usableConnections(integrations.data?.integrations ?? [], next.providerId)
     const connectionId = chosenConnectionId ?? (matches.length === 1 ? matches[0]!.id : undefined)
+    const inputs = defaultInputBindings(next, sources(), integrations.data?.integrations ?? [])
     setEditingShared(undefined)
     setSharedContent(undefined)
-    props.onChange(sourceReference(next, { ...baseScope(), ...(connectionId ? { connectionId } : {}) }))
+    props.onChange(sourceReference(next, { ...baseScope(), ...(connectionId ? { connectionId } : {}), ...(inputs ? { inputs } : {}) }))
   }
   const selectSaved = (id: string): void => {
     setEditingShared(undefined)
@@ -386,6 +410,15 @@ export default function SourceQueryEditor(props: {
       ...withoutPredicate,
       scope: { ...scopeWithoutConnection, ...(connectionId ? { connectionId } : {}), parameters: {} },
     })
+  }
+  /** Binds one input, or unbinds it with undefined. A new account starts the input's parameters over. */
+  const setInputBinding = (name: string, binding: InputBinding | undefined): void => {
+    const current = query()
+    if (!current) return
+    const { [name]: _previous, ...others } = current.scope.inputs ?? {}
+    const inputs = binding ? { ...others, [name]: binding } : others
+    const { inputs: _inputs, ...scopeWithoutInputs } = current.scope
+    emitQuery({ ...current, scope: { ...scopeWithoutInputs, ...(Object.keys(inputs).length ? { inputs } : {}) } })
   }
   const updateParameter = (field: DataField, value: DataValue): void => {
     if (!query() || !description.data) return
@@ -448,7 +481,7 @@ export default function SourceQueryEditor(props: {
     : !!source() && sourceKey(entry.source) === sourceKey(source()!) && (!entry.connectionId || query()?.scope.connectionId === entry.connectionId)
 
   return <Stack gap="stack">
-    <Field label="Source or saved query" group>
+    <Show when={!props.inputBinding}><Field label="Source or saved query" group>
       <Picker
         label={selectedSaved()?.content.name ?? source()?.name ?? 'Choose records…'}
         ariaLabel="Source or saved query"
@@ -462,7 +495,7 @@ export default function SourceQueryEditor(props: {
           else if (entry) selectSource(entry.source, entry.connectionId)
         }}
       />
-    </Field>
+    </Field></Show>
     <Show when={catalog.isError}><Alert tone="danger">Sources could not be loaded. Retry after reconnecting the Node.</Alert></Show>
     <Show when={props.value?.kind === 'saved' && selectedSaved()}>
       <Stack gap="row">
@@ -501,7 +534,7 @@ export default function SourceQueryEditor(props: {
       /></Show>
       <Show when={aiUndo()}>{previous => <Button size="sm" variant="bare" onPress={() => { emitContent(previous()); setAiUndo(undefined) }}>Undo AI edit</Button>}</Show>
       {/* The combined picker already names the account, so a panel asks again only when there's a choice. */}
-      <Show when={source()?.providerId && (!props.pickSourceAccount || connections().length > 1)}>
+      <Show when={!props.inputBinding && source()?.providerId && (!props.pickSourceAccount || connections().length > 1)}>
         <Field label={props.pickSourceAccount ? 'Account' : 'Connection'} hint={props.pickSourceAccount ? undefined : 'The account scope is always explicit.'} group>
           <Select size="sm" label={props.pickSourceAccount ? 'Account' : 'Connection'} disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())}
             value={current().scope.connectionId ?? ''}
@@ -509,19 +542,51 @@ export default function SourceQueryEditor(props: {
             onChange={updateConnection} />
         </Field>
       </Show>
+      <Show when={source()?.inputs}>{inputs => <Stack gap="row">
+        <Text emphasis="muted" wrap>{`From ${pluginLabel(source()!.pluginId)}. Reads the inputs below with the accounts you choose here.`}</Text>
+        <For each={Object.keys(inputs())}>{name => {
+          const input = () => inputs()[name]!
+          const inputSource = () => inputSourceOf(input(), sources())
+          const binding = () => current().scope.inputs?.[name]
+          const label = () => input().optional ? `${input().label} (optional)` : input().label
+          return <Stack gap="row">
+            <Show when={inputSource()?.providerId} fallback={<Inline gap="inline" wrap>
+              <Text emphasis="strong">{label()}</Text>
+              <Show when={input().optional}>
+                <Button size="sm" variant="ghost" disabled={props.disabled} onPress={() => setInputBinding(name, binding() ? undefined : { parameters: {} })}>
+                  {binding() ? 'Skip this input' : 'Use this input'}
+                </Button>
+              </Show>
+            </Inline>}>
+              <InputAccountField label={input().label} optional={input().optional} provider={inputProviderLabel(input(), sources())}
+                connections={usableConnections(integrations.data?.integrations ?? [], inputSource()?.providerId)}
+                value={binding()?.connectionId} bound={!!binding()} disabled={props.disabled}
+                onChange={connectionId => setInputBinding(name, connectionId ? { connectionId, parameters: {} } : undefined)} />
+            </Show>
+            {/* The input's own reach and parameters, from its source's description, once it has an account. */}
+            <Show when={binding() && (!inputSource()?.providerId || binding()!.connectionId) ? inputSource() : undefined}>{target => (
+              <SourceQueryEditor workspaceId={props.workspaceId} {...(props.projectId ? { projectId: props.projectId } : {})} disabled={props.disabled}
+                value={sourceReference(target(), { ...baseScope(), ...binding()! })} inputBinding pickSourceAccount hideAuthoring hideConditions hidePreview
+                onChange={next => { if (next?.kind === 'inline') setInputBinding(name, bindingOf(next.content.query.scope)) }} />
+            )}</Show>
+          </Stack>
+        }}</For>
+      </Stack>}</Show>
       <Show when={description.isPending && canDescribe()}><Text emphasis="muted">Loading source fields…</Text></Show>
       <Show when={description.isError}><Alert tone="danger">{errorMessage(description.error)}</Alert></Show>
       <Show when={description.data}>{described => <>
-        <Show when={props.pickSourceAccount && !described().reach}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
+        <Show when={props.pickSourceAccount && !props.inputBinding && !described().reach}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
+        <Show when={source()?.inputs && described().parameterFields.length}><Text emphasis="strong">Its own settings</Text></Show>
         <For each={described().parameterFields}>{field => <Show when={!isReachChoice(described(), field)} fallback={<Field label="Reach" group><Stack gap="row">
-          <SegmentedControl ariaLabel="Reach" size="sm" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field, mode)}
-            options={[{ value: 'account', label: 'Everything this account can see' }, { value: 'workspace', label: 'Workspace links' }, { value: 'chosen', label: `Chosen ${described().reach!.itemPlural}` }]} />
+          <SegmentedControl ariaLabel="Reach" size="sm" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field, mode as 'account' | 'workspace')}
+            options={[{ value: 'account', label: 'Everything this account can see' },
+              ...(props.inputBinding ? [] : [{ value: 'workspace', label: 'Workspace links' }]), { value: 'chosen', label: `Chosen ${described().reach!.itemPlural}` }]} />
           <Show when={reachMode(field) === 'chosen'}>
             <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           </Show>
         </Stack></Field>}><Field label={field.label} hint={field.description} group>
-          <Show when={parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
+          <Show when={!props.inputBinding && parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
             <Button size="sm" variant="bare" onPress={() => setListReach(field, 'account')}>Everywhere this account can see</Button>
             <Button size="sm" variant="bare" onPress={() => setListReach(field, 'workspace')}>Workspace links</Button>
           </Inline></Show>

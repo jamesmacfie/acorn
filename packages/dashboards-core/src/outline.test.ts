@@ -3,7 +3,7 @@ import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { describePanelPlan, type PlanSource } from './plan'
-import { availableOperations, availableViews, columnParts, countsByPart, diffOutline, partForPath, planOutline, problemsByPart, switchView } from './outline'
+import { availableOperations, availableViews, columnParts, countsByPart, diffOutline, inputChain, partForPath, planOutline, problemsByPart, switchView, type PlanInputs } from './outline'
 
 const description = dataSourceDescriptionSchema.parse({
   schema: { type: 'object', properties: {
@@ -192,8 +192,46 @@ describe('mapping onto parts', () => {
 
   it('maps step counts and takes the source total from the first step', () => {
     const counts = [{ path: '/stages/0', input: 40, output: 12 }, { path: '/stages/1', input: 12, output: 3 }]
-    expect(countsByPart(pulls(), counts)).toEqual({ stages: { 'stage:0': counts[0], 'stage:1': counts[1] }, sourceTotal: 40 })
+    expect(countsByPart(pulls(), counts)).toEqual({ stages: { 'stage:0': counts[0], 'stage:1': counts[1] }, sourceTotal: 40, inputs: {} })
     expect(countsByPart(joined(), counts).sourceTotal).toBeUndefined()
+  })
+})
+
+describe('derived source inputs', () => {
+  const inputs: PlanInputs = { prs: [
+    { name: 'pulls', label: 'Pull requests', provider: 'GitHub', account: 'Work', reach: 'Everything Work can see' },
+    { name: 'issues', label: 'Cycle issues', provider: 'Linear', optional: true },
+  ] }
+
+  it('lists each input under its source, keyed by source and name', () => {
+    expect(planOutline(pulls(), [], inputs).slice(0, 3).map(({ key, title, detail, paths }) => ({ key, title, detail, paths }))).toEqual([
+      { key: 'source:prs', title: 'Pull requests', detail: undefined, paths: ['/sources/0'] },
+      { key: 'input:prs:pulls', title: 'Pull requests', detail: 'GitHub · Work · Everything Work can see',
+        paths: ['/sources/0/reference/content/query/scope/inputs/pulls'] },
+      { key: 'input:prs:issues', title: 'Cycle issues (optional)', detail: 'Linear · no account chosen',
+        paths: ['/sources/0/reference/content/query/scope/inputs/issues'] },
+    ])
+    expect(planOutline(pulls()).some(part => part.key.startsWith('input:'))).toBe(false)
+  })
+
+  it('maps an input pointer to its own part, and to the source without the input list', () => {
+    const path = '/sources/0/reference/content/query/scope/inputs/issues'
+    expect(partForPath(pulls(), path, inputs)).toBe('input:prs:issues')
+    expect(partForPath(pulls(), `${path}/connectionId`, inputs)).toBe('input:prs:issues')
+    expect(partForPath(pulls(), path)).toBe('source:prs')
+    const problem = { path, message: 'Cycle issues needs a Linear account.', severity: 'error' as const }
+    expect(problemsByPart(pulls(), [problem], inputs)).toEqual({ 'input:prs:issues': [problem] })
+  })
+
+  it("counts each input's records from the run's source diagnostics", () => {
+    expect(countsByPart(pulls(), [], [{ id: 'prs', label: 'Pull requests', inputs: {
+      pulls: { records: 12, completeness: { kind: 'complete' } },
+    } }]).inputs).toEqual({ 'input:prs:pulls': 12 })
+  })
+
+  it('names the chain for About this panel', () => {
+    expect(inputChain(inputs.prs!)).toBe('Pull requests (GitHub · Work) and Cycle issues (Linear)')
+    expect(inputChain([inputs.prs![0]!])).toBe('Pull requests (GitHub · Work)')
   })
 })
 

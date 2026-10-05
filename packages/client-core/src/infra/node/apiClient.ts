@@ -21,13 +21,17 @@ export class ApiError extends Error {
   readonly code?: string
   readonly requestId?: string
   readonly retryable: boolean
-  constructor(message: string, status: number, code?: string, meta?: { requestId?: string; retryable?: boolean }) {
+  /** The envelope's `details`, such as the input a data source error names. Unparsed: each caller
+   *  reads the shape its route documents. */
+  readonly details?: unknown
+  constructor(message: string, status: number, code?: string, meta?: { requestId?: string; retryable?: boolean; details?: unknown }) {
     super(message)
     this.name = 'ApiError'
     this.status = status
     this.code = code
     this.requestId = meta?.requestId
     this.retryable = meta?.retryable ?? false
+    this.details = meta?.details
   }
 }
 
@@ -256,6 +260,7 @@ const raise = (res: ApiResponse, fallback: string): never => {
   throw new ApiError(errorText(error, fallback), res.status, error?.code, {
     requestId: error?.requestId,
     retryable: error?.retryable,
+    details: error?.details,
   })
 }
 

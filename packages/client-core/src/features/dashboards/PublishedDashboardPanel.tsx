@@ -1,4 +1,4 @@
-import { createEffect, createMemo, createSignal, Show, type Accessor, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, Show, type Accessor, type JSX } from 'solid-js'
 import { Portal } from 'solid-js/web'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -7,6 +7,11 @@ import type { DashboardDisplayRow } from '@acorn/dashboards-core/render'
 import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
 import type { DashboardRevision, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
+import { planPartLabel } from '@acorn/dashboards-core/labels.ts'
+import { integrationsOptions } from '../../infra/queries'
+import { dataSourceCatalogOptions } from '../dataSources/queries'
+import { failureContext } from './planInputs'
+import SourceFailureAlert from './SourceFailureAlert'
 import { runChromeAction } from '../../host/chrome/actions'
 import { availableContentPresentations, openInAppUrl, openNamedContentTarget } from '../../host/registries/panes/contentLinks'
 import { taskById } from '../tasks/taskLookup'
@@ -66,7 +71,17 @@ export default function PublishedDashboardPanel(props: {
     staleTime: 30_000,
     refetchInterval: (published.data?.content.refresh ?? 0) * 1000 || false,
   }))
-  const run = createMemo(() => loaded.data ? JSON.parse(JSON.stringify(loaded.data)) as NonNullable<typeof loaded.data> : undefined)
+  const fresh = createMemo(() => loaded.data ? JSON.parse(JSON.stringify(loaded.data)) as NonNullable<typeof loaded.data> : undefined)
+  // A source that can't answer now, such as a derived source whose plugin is off, keeps the last data
+  // the panel got on screen, greyed out under the reason and its fix (docs/dashboards.md § Published
+  // panels), rather than emptying the panel.
+  const sourceFailed = (value: DashboardRun) => value.diagnostics.problems.some(problem => problem.severity === 'error' && problem.failure)
+  const [lastAnswered, setLastAnswered] = createSignal<DashboardRun>()
+  createEffect(() => { const current = fresh(); if (current && !sourceFailed(current)) setLastAnswered(current) })
+  const stale = createMemo(() => !!fresh() && sourceFailed(fresh()!) && !!lastAnswered())
+  const run = createMemo(() => stale() ? lastAnswered() : fresh())
+  const catalog = createQuery(() => ({ ...dataSourceCatalogOptions(nodeId, { ...scope(), parameters: {} }), enabled: !!fresh()?.diagnostics.problems.some(problem => problem.failure) }))
+  const integrations = createQuery(() => integrationsOptions(true))
   const [optimisticBoard, setOptimisticBoard] = createSignal<{ rowId: string; move: BoardMove; startedAt: number }>()
   createEffect(() => {
     const pending = optimisticBoard()
@@ -306,7 +321,13 @@ export default function PublishedDashboardPanel(props: {
     <div class="dash-panel-body">
       <Show when={!loaded.error || loaded.data} fallback={<EmptyState align="start" size="sm" title="Couldn't load this panel" action={<Button size="sm" onPress={() => void loaded.refetch()}>Try again</Button>}>Edit the panel to repair its source or column.</EmptyState>}>
         <Show when={loaded.error && loaded.data}><Alert tone="warn">Couldn't refresh. Showing the last data we got.</Alert></Show>
-        <Show when={run()?.diagnostics.problems.length}><Alert tone="warn">{run()!.diagnostics.problems.map(problem => `${problem.path}: ${problem.message}`).join(' ')}</Alert></Show>
+        <For each={fresh()?.diagnostics.problems ?? []}>{problem => <Show when={problem.failure}
+          fallback={<Alert tone="warn">{`${planPartLabel(fresh()!.plan, problem.path)}: ${problem.message}`}</Alert>}>{failure => (
+          <SourceFailureAlert failure={failure()} severity={problem.severity}
+            context={failureContext({ ...problem, failure: failure() }, fresh()!.plan, catalog.data?.sources ?? [], integrations.data?.integrations ?? [])}
+            onRetry={() => void loaded.refetch()}
+            {...(props.onEditPanel ? { onChooseAccount: () => props.onEditPanel!(props.definition.publication!.dashboardId) } : {})} />
+        )}</Show>}</For>
         <Show when={run()?.diagnostics.asOf}>{time => <span>{`As of ${new Date(time()).toLocaleString()}`}</span>}</Show>
         <Show when={run()?.diagnostics.sources.some(source => source.coverageWindows?.length)}><Alert tone="muted">
           {run()!.diagnostics.sources.flatMap(source => (source.coverageWindows ?? []).slice(0, 3).map(window =>
@@ -337,13 +358,13 @@ export default function PublishedDashboardPanel(props: {
           <Button size="sm" variant="solid" tone="danger" onPress={() => { setPending(undefined); dispatch(item().row, item().action, item().actionId) }}>{RISK_CONFIRM[item().action.risk ?? '']?.verb ?? 'Continue?'}</Button>
         </>}>{`This asks ${pluginLabel(item().row.pluginId)} to ${RISK_CONFIRM[item().action.risk ?? '']?.says ?? 'act'}.`}</Alert>}</Show>
         <Show when={display()} fallback={<EmptyState align="start" size="sm" busy={loaded.isPending}>Loading…</EmptyState>}>
-          {value => <PanelBody view={run()!.plan.view} panelId={props.definition.id} schema={value().schema} fields={value().fields} rows={value().rows}
+          {value => <div class="dash-panel-data" data-stale={stale() ? '' : undefined} inert={stale()}><PanelBody view={run()!.plan.view} panelId={props.definition.id} schema={value().schema} fields={value().fields} rows={value().rows}
             groups={displayPlanGroups(run()!.groups, value().rows)}
             {...(run()!.plan.group?.[0] ? { groupBy: run()!.plan.group![0]!.column } : {})}
             provenance={run()!.plan.sources.length > 1} onActivate={activate} canActivate={canActivate} pressConfigured={!!press()} onButton={activateButton} onOpenRecord={openRecordItem} onDrilldown={openDrilldown} onMeasureDrilldown={openMeasureDrilldown}
             onCorrect={row => { setCorrecting(row); setCorrection('null') }} buttons={run()!.plan.actions?.buttons ?? []}
             boardChoices={run()!.plan.columns.find(column => column.id === groupField(value().schema, { groupBy: run()!.plan.group?.[0]?.column })?.id)?.choices ?? []}
-            boardMoveReason={moveReason} onBoardMove={boardWrite.request} />}
+            boardMoveReason={moveReason} onBoardMove={boardWrite.request} /></div>}
         </Show>
       </Show>
     </div>
