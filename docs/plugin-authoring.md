@@ -100,6 +100,8 @@ for an exact record reference before a Node action runs.
 - [Storage and migrations](./plugin-authoring/storage.md): owning tables and changing them.
 - [Telemetry and logging](./plugin-authoring/telemetry.md).
 - [Testing a plugin](./plugin-authoring/testing.md): test environments and the testkit.
+- [Derived sources](./plugin-authoring/derived-sources.md): a data source built from other sources
+  with `acorn-plugin-sdk/data`, from the scaffold to a panel.
 - [The client half](./plugin-authoring/the-client-half.md): two ways to draw, trees, and the frame
   path.
 - [The bridge](./plugin-authoring/the-bridge.md): the handshake, the verbs, and telemetry from a

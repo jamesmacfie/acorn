@@ -12,13 +12,16 @@ organization that doesn't exist.
 | Package | What it is |
 | --- | --- |
 | `create-acorn-plugin` | The scaffold, in `packages/create-acorn-plugin`. It emits the no-bundler profile and depends on nothing |
-| `acorn-plugin-sdk` | The sandbox bridge, in `packages/plugin-sdk`: `connect`, `mountFrame`, `mountTree`, `openLinkOnClick`, `AcornBridgeError`, and the `AcornBridge` type. Its `/remote` subpath carries the tree nodes and Solid adapter |
+| `acorn-plugin-sdk` | The sandbox bridge, in `packages/plugin-sdk`: `connect`, `mountFrame`, `mountTree`, `openLinkOnClick`, `AcornBridgeError`, and the `AcornBridge` type. Its `/remote` subpath carries the tree nodes and Solid adapter. Its `/data` and `/testing` subpaths are for a node half: `defineDerivedSource` and the field builders, then `testDerivedSource` and `fixtures` ([derived sources](../plugin-authoring/derived-sources.md)) |
 | `acorn-plugin-types` | The node-side API as declarations, in `packages/plugin-types`, plus the generated manifest schema. No runtime, and `@types/node` is its only peer |
 
 Only the bridge and the declarations are published. The private facade re-exports node-core and
 client-core, with Hono, Drizzle, Solid, and CodeMirror behind them, and a plugin doesn't want a
 second copy of any of those. It uses the host's through `ctx` and through the document its frame is
-served in. The bridge is the one thing an outside author can't get any other way. A test imports
+served in. The bridge is the one thing an outside author can't get any other way. The derived source helpers
+are the exception on the node side: they inline the host's record validator, so a record the SDK
+keeps is one the host keeps, and they depend on nothing but `acorn-plugin-types` for their
+declarations. A test imports
 the SDK in a bare Node environment, so a re-exported component fails here and not in a stranger's
 bundler.
 
@@ -50,12 +53,13 @@ and search.
 Three checks hold the published names to the host:
 
 - `tools/arch/publishedPluginSurface.snapshot.txt` pins the published names and declared members of
-  `acorn-plugin-sdk`, `acorn-plugin-sdk/remote`, and `acorn-plugin-types`. Regenerate it with
+  `acorn-plugin-sdk` and its `/remote`, `/data`, and `/testing` subpaths, and `acorn-plugin-types`. Regenerate it with
   `UPDATE_PUBLISHED_PLUGIN_SURFACE=1 pnpm --filter @acorn/arch-tests test`. The regeneration refuses
   removals while `PLUGIN_API_MAJOR` stays the same. The test also compares SDK runtime exports with
   the hand-written declarations.
-- `packages/plugin-sdk/src/contract.test.ts` holds the SDK's declarations to the implementation with
-  assignability checks in both directions, so `tsc --noEmit` fails when an upstream shape moves under
+- `packages/plugin-sdk/src/contract.test.ts`, and the `derived.test.ts` and `testing.test.ts` beside
+  `/data` and `/testing`, hold the SDK's declarations to the implementation with assignability checks
+  in both directions, so `tsc --noEmit` fails when an upstream shape moves under
   a stable name.
 - `packages/plugin-types/src/contract.test.ts` does the same for the node context and core facets,
   member for member.

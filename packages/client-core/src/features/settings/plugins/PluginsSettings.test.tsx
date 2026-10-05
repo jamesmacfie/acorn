@@ -40,12 +40,18 @@ vi.mock('../../../host/plugins/distribution', async (original) => ({
   devicePlugins: () => DEVICE,
 }))
 vi.mock('../../agent/reference', () => ({ sendReferenceToAgent: vi.fn() }))
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { integrations: [{ id: 'work', name: 'Work' }] } }), useQueryClient: () => ({}) }))
+// One answer stands in for every query: the integrations the plugin page reads, and the node's source catalog.
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ isPending: false, isError: false, data: {
+  integrations: [{ id: 'work', name: 'Work' }],
+  sources: [{ pluginId: 'linear', sourceId: 'issues', name: 'Linear issues' }, { pluginId: 'github', sourceId: 'pull-requests', name: 'GitHub pull requests' }],
+} }), useQueryClient: () => ({}) }))
+vi.mock('../../tasks/tasks', async (original) => ({ ...(await original<typeof import('../../tasks/tasks')>()), activeTaskId: () => 'task-1' }))
 vi.mock('../../../infra/queries', () => ({ prefsOptions: () => ({ queryKey: ['prefs'] }), integrationsOptions: () => ({ queryKey: ['integrations'] }) }))
 
 import PluginsSettings from './PluginsSettings'
 import { openPluginPage } from './installed'
 import { readPluginInputGrant, saveDisabledNodePlugins } from '../../../infra/node/nodePlugins'
+import { sendReferenceToAgent } from '../../agent/reference'
 
 let host: HTMLElement
 let dispose: (() => void) | undefined
@@ -133,5 +139,26 @@ describe('Installed', () => {
     expect(readPluginInputGrant).toHaveBeenCalledWith('readiness', 'node-a')
     expect(host.querySelector('[data-settings-section="reads"]')!.textContent).toContain('Revoke')
     slowReads.clear()
+  })
+
+  it('asks what a row is and which data it reads, then drafts the data source prompt for the agent', async () => {
+    vi.mocked(sendReferenceToAgent).mockResolvedValue({ ok: true })
+    press('Start')
+    const dialog = () => document.querySelector<HTMLElement>('[role="dialog"]')!
+    await vi.waitFor(() => expect(dialog()?.textContent).toContain('What should one row be?'))
+    const start = () => [...dialog().querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Start')!
+    expect(start().disabled).toBe(true)
+    const row = dialog().querySelector<HTMLInputElement>('input:not([type="checkbox"])')!
+    row.value = 'An issue with its pull request'
+    row.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    for (const box of dialog().querySelectorAll<HTMLInputElement>('input[type="checkbox"]')) box.click()
+    start().click()
+    await vi.waitFor(() => expect(sendReferenceToAgent).toHaveBeenCalled())
+    const [taskId, prompt] = vi.mocked(sendReferenceToAgent).mock.calls.at(-1)!
+    expect(taskId).toBe('task-1')
+    expect(prompt).toContain('One row is: An issue with its pull request')
+    expect(prompt).toContain('- Linear issues (`linear:issues`)\n- GitHub pull requests (`github:pull-requests`)')
+    expect(prompt).toContain('--data-source')
+    expect(document.querySelector('[role="dialog"]')).toBeNull()
   })
 })

@@ -40,6 +40,7 @@ export function toDisplayName(id) {
 /** The whole package, as a path → contents map. Exported so the repository's own suite can parse the
  * manifest with the host's parser instead of trusting this file. */
 export function scaffoldFiles(id, name = toDisplayName(id), options = {}) {
+  if (options.dataSource) return dataSourceFiles(id, name, options.dataSource)
   // A tree unless the author asked for pixels. The default is what most plugins want and the one that
   // gets the shell's keyboard handling, focus, ARIA and style pack for free; a rectangle is the
   // deliberate choice you make when the surface owns its own pixels.
@@ -552,18 +553,280 @@ function mount(slot, props, context, bridgePort) {
 `
 }
 
+// ── The data source template ─────────────────────────────────────────────────────────────────────
+// `--data-source` writes a derived source: a plugin whose node half builds records from sources acorn
+// already reads. See docs/plugin-authoring/derived-sources.md.
+
+/**
+ * The SDK release that has `acorn-plugin-sdk/data` and `/testing`. Hardcoded for the same reason as
+ * API_VERSION; index.test.ts compares it with the SDK's own version.
+ */
+export const SDK_VERSION = '1.1.0'
+
+/**
+ * The built-in and first-party sources a derived source can read, with the field that names a record.
+ * A copy, because this package has no dependencies. index.test.ts holds it to the SDK's field lists.
+ */
+export const KNOWN_SOURCES = [
+  { source: 'agents:sessions', name: 'Managed agent sessions', title: 'title' },
+  { source: 'agents:usage-records', name: 'Agent usage records' },
+  { source: 'core:local-branches', name: 'Local branches', title: 'name' },
+  { source: 'core:local-worktrees', name: 'Local worktrees', title: 'path' },
+  { source: 'core:tasks', name: 'Workspace tasks', title: 'title' },
+  { source: 'github:actions-jobs', name: 'GitHub Actions jobs', title: 'job' },
+  { source: 'github:local-branches', name: 'Local branches with pull requests', title: 'name' },
+  { source: 'github:pull-requests', name: 'GitHub pull requests', title: 'title' },
+  { source: 'linear:issues', name: 'Linear issues', title: 'title' },
+  { source: 'rollbar:error-groups', name: 'Rollbar error groups', title: 'title' },
+]
+
+/** An input name from a source id: `github:pull-requests` → `pullRequests`. */
+export function toInputName(source, taken = new Set()) {
+  const words = source.slice(source.indexOf(':') + 1).toLowerCase().split(/[^a-z0-9]+/).filter(Boolean)
+  let base = words.map((word, index) => (index ? word.charAt(0).toUpperCase() + word.slice(1) : word)).join('').slice(0, 28)
+  if (!/^[a-z]/.test(base)) base = `input${base}`
+  let name = base
+  for (let count = 2; taken.has(name); count++) name = `${base}${count}`
+  taken.add(name)
+  return name
+}
+
+const plural = (word) => /(s|x|ch|sh)$/i.test(word) ? `${word}es` : /[^aeiou]y$/i.test(word) ? `${word.slice(0, -1)}ies` : `${word}s`
+const literal = (text) => `'${text.replace(/[\\']/g, '\\$&')}'`
+const read = (key) => /^[A-Za-z_$][\w$]*$/.test(key) ? `.${key}` : `[${literal(key)}]`
+
+/**
+ * `row` is what one record represents, such as "Issue". `inputs` lists `{ source, optional? }`, the
+ * first of them required: the starter returns one row per record of it.
+ */
+export function dataSourceFiles(id, name, { row, inputs }) {
+  if (!inputs.length || inputs[0].optional) throw new Error('A derived source reads at least one source, and the first is required')
+  const taken = new Set()
+  const named = inputs.map((input) => {
+    const known = KNOWN_SOURCES.find((candidate) => candidate.source === input.source)
+    return { ...input, name: toInputName(input.source, taken), label: known?.name ?? input.source, known }
+  })
+  const definition = {
+    sourceId: id, name, singular: row, plural: plural(row), identityScope: 'Built from its inputs', handler: `/v1/p/${id}/source`,
+    titlePointer: '/title',
+    inputs: Object.fromEntries(named.map((input) => [input.name, { source: input.source, label: input.label, ...(input.optional ? { optional: true } : {}) }])),
+  }
+  return {
+    'acorn-plugin.json': JSON.stringify({
+      $schema: SCHEMA_URL, id, name, version: '1.0.0', baseline: BASELINE, apiVersion: API_VERSION,
+      node: './dist/node.js',
+      permissions: { api: [], events: [], node: { core: [], capabilities: [], secrets: false, exec: false, net: [] } },
+      // `npm run build` rewrites this entry from src/source.ts, so the two can't disagree.
+      contributions: { dataSources: [definition] },
+    }, null, 2) + '\n',
+    'package.json': JSON.stringify({
+      name: id, version: '1.0.0', private: true, type: 'module',
+      scripts: { build: 'vite build && node scripts/manifest.mjs', test: 'vitest run' },
+      devDependencies: { 'acorn-plugin-sdk': `^${SDK_VERSION}`, 'acorn-plugin-types': '^1.0.0', vite: '^8.0.16', vitest: '^4.1.11' },
+    }, null, 2) + '\n',
+    'tsconfig.json': JSON.stringify({
+      compilerOptions: { target: 'ES2023', module: 'ESNext', moduleResolution: 'bundler', lib: ['ES2023', 'DOM'], strict: true, noEmit: true, skipLibCheck: true },
+      include: ['src'],
+    }, null, 2) + '\n',
+    'vite.config.ts': dataSourceViteConfig(),
+    'scripts/manifest.mjs': dataSourceManifestScript(),
+    'src/index.ts': dataSourceIndex(id),
+    'src/source.ts': dataSourceModule(definition, named),
+    'src/source.test.ts': dataSourceTest(row, named),
+    'README.md': dataSourceReadme(id, name, row, named),
+  }
+}
+
+function dataSourceViteConfig() {
+  return `import { builtinModules } from 'node:module'
+import { defineConfig } from 'vite'
+
+// The node half, as one ESM file with every dependency inlined. An installed plugin is a bare
+// directory with no node_modules beside it, so a bare import left in the bundle fails on every
+// machine but this one.
+export default defineConfig({
+  ssr: { noExternal: true, target: 'node' },
+  build: {
+    ssr: true,
+    target: 'node22',
+    outDir: 'dist',
+    emptyOutDir: true,
+    minify: false,
+    reportCompressedSize: false,
+    rollupOptions: {
+      input: 'src/index.ts',
+      external: (id) => builtinModules.includes(id.replace(/^node:/, '')),
+      output: { format: 'es', entryFileNames: 'node.js', codeSplitting: false },
+    },
+  },
+})
+`
+}
+
+function dataSourceManifestScript() {
+  return `// The build's last step: rewrite the manifest's data source entry from the built source, so the
+// inputs acorn asks the person to approve are the ones the code reads.
+import { readFileSync, writeFileSync } from 'node:fs'
+import { derivedSourceManifest } from 'acorn-plugin-sdk/data'
+import { source } from '../dist/node.js'
+
+const manifest = JSON.parse(readFileSync('acorn-plugin.json', 'utf8'))
+manifest.contributions = { ...manifest.contributions, dataSources: [derivedSourceManifest(source)] }
+writeFileSync('acorn-plugin.json', JSON.stringify(manifest, null, 2) + '\\n')
+`
+}
+
+function dataSourceIndex(id) {
+  return `import type { NodePlugin } from 'acorn-plugin-types'
+import { source } from './source'
+
+// scripts/manifest.mjs reads the source from the build to write the manifest entry.
+export { source }
+
+export default {
+  // Must equal the manifest id.
+  name: '${id}',
+  init(ctx) {
+    // The source owns the whole /v1/p/${id}/ namespace, which is where the manifest's handler points.
+    ctx.routes.fetch(source.fetch)
+  },
+} satisfies NodePlugin
+`
+}
+
+function dataSourceModule(definition, inputs) {
+  const [first, ...rest] = inputs
+  const title = first.known?.title
+  const inputLines = inputs.map((input) =>
+    `    ${input.name}: { source: '${input.source}', label: ${literal(input.label)}${input.optional ? ', optional: true' : ''} },`)
+  const reads = rest.map((input) => input.optional
+    ? `    // Optional, so it's undefined when the person skipped it.\n    const ${input.name} = await inputs.${input.name}?.all()\n`
+    : `    const ${input.name} = await inputs.${input.name}.all()\n`)
+  return `import { defineDerivedSource, field } from 'acorn-plugin-sdk/data'
+
+export const source = defineDerivedSource({
+  id: '${definition.sourceId}',
+  name: ${literal(definition.name)},
+  singular: ${literal(definition.singular)},
+  plural: ${literal(definition.plural)},
+  handler: '${definition.handler}',
+  // Acorn reads these for you, with the accounts the person picks for each panel.
+  inputs: {
+${inputLines.join('\n')}
+  },
+  // What one row carries. Add a field here, then set it in every record below.
+  fields: {
+    title: field.text({ label: ${literal(definition.singular)}, role: 'title' }),
+  },
+  // One row per record of ${first.label}. Replace this with your own rules.
+  async query({ inputs }) {
+    const { records } = await inputs.${first.name}.all()
+${reads.join('')}    return records.map((record) => ({
+      id: record.ref.recordId,
+      // Pressing the row opens the record it came from.
+      opens: record.ref,
+      data: { title: String(${title ? `record.data${read(title)} ?? ` : ''}record.ref.recordId) },
+    }))
+  },
+})
+`
+}
+
+function dataSourceTest(row, inputs) {
+  // A known source's records come from its real field list. Another plugin's source has no list in
+  // the SDK, so its records are written out.
+  const records = (input, count) => {
+    const values = Array.from({ length: count }, (_, index) => `${input.label} ${index + 1}`)
+    if (!input.known) {
+      const [pluginId] = input.source.split(':')
+      const sourceId = input.source.slice(pluginId.length + 1)
+      return `[${values.map((value, index) => `{ ref: { pluginId: '${pluginId}', sourceId: '${sourceId}', recordId: '${index + 1}' }, data: { title: ${literal(value)} } }`).join(', ')}]`
+    }
+    const key = input.known.title
+    const prop = key && (/^[A-Za-z_$][\w$]*$/.test(key) ? key : literal(key))
+    return `fixtures('${input.source}', [${values.map((value) => (prop ? `{ ${prop}: ${literal(value)} }` : '{}')).join(', ')}])`
+  }
+  const [first, ...rest] = inputs
+  return `import { expect, it } from 'vitest'
+import { fixtures, testDerivedSource } from 'acorn-plugin-sdk/testing'
+import { source } from './source'
+
+// \`fixtures\` builds records from each source's real fields, so a typo in a field name fails here
+// the way it would in the app.
+it(${literal(`returns one ${row.toLowerCase()} per record of ${first.label}`)}, async () => {
+  const result = await testDerivedSource(source, {
+${[`    ${first.name}: ${records(first, 2)},`, ...rest.map((input) => `    ${input.name}: ${records(input, 1)},`)].join('\n')}
+  })
+  expect(result.rows).toHaveLength(2)
+  expect(result.dropped).toEqual([])
+})
+`
+}
+
+function dataSourceReadme(id, name, row, inputs) {
+  return `# ${name}
+
+An acorn plugin with one derived source: rows built by your own logic from data acorn already reads.
+Each row is one ${row.toLowerCase()}.
+
+\`\`\`text
+acorn-plugin.json      the manifest, with the data source and the inputs it reads
+src/source.ts          the source: its inputs, its fields, and the logic that builds each row
+src/source.test.ts     a test of that logic against realistic records
+src/index.ts           the node entry, which serves the source
+scripts/manifest.mjs   rewrites the manifest's source entry from src/source.ts on each build
+\`\`\`
+
+It reads:
+
+${inputs.map((input) => `- \`${input.name}\`: ${input.label} (\`${input.source}\`)${input.optional ? ', optional' : ''}`).join('\n')}
+
+## Build and test
+
+\`\`\`sh
+npm install
+npm test
+npm run build
+\`\`\`
+
+## Install it
+
+**Settings › Plugins › Install… › Local folder**, with this directory. Acorn asks you to approve what
+the plugin reads before it reads anything. Then pick it as a source in a panel, and choose an account
+for each input.
+
+The full guide is \`docs/plugin-authoring/derived-sources.md\` in the acorn repository.
+`
+}
+
 // ── CLI ───────────────────────────────────────────────────────────────────────────────────────────
 
 async function main(argv) {
-  // One flag, and it picks the render path. A tree by default; see docs/plugin-authoring/the-client-half.md § Two ways
-  // to draw for when a rectangle is the right answer.
+  // `--rectangle` picks the render path. A tree by default; see docs/plugin-authoring/the-client-half.md § Two ways
+  // to draw for when a rectangle is the right answer. `--data-source` writes a derived source instead.
   const rectangle = argv.includes('--rectangle')
+  const wantsDataSource = argv.includes('--data-source')
+  // Opened only when there's something to ask. Answers come off the line iterator rather than
+  // `question`, so answers piped in ahead of the prompts aren't dropped.
+  let rl
+  let lines
+  const ask = async (prompt) => {
+    if (!rl) {
+      const { createInterface } = await import('node:readline')
+      rl = createInterface({ input: process.stdin, output: process.stdout })
+      lines = rl[Symbol.asyncIterator]()
+    }
+    process.stdout.write(prompt)
+    const { value, done } = await lines.next()
+    return done ? '' : String(value).trim()
+  }
   let requested = argv.find((arg) => !arg.startsWith('--'))
-  if (!requested) {
-    const { createInterface } = await import('node:readline/promises')
-    const rl = createInterface({ input: process.stdin, output: process.stdout })
-    requested = (await rl.question('Plugin name: ')).trim() || 'my-acorn-plugin'
-    rl.close()
+  let dataSource
+  try {
+    if (!requested) requested = (await ask('Plugin name: ')) || 'my-acorn-plugin'
+    if (wantsDataSource) dataSource = await askDataSource(ask)
+  } finally {
+    rl?.close()
   }
 
   const id = toPluginId(requested)
@@ -581,7 +844,7 @@ async function main(argv) {
     return
   }
 
-  const files = scaffoldFiles(id, toDisplayName(id), { rectangle })
+  const files = scaffoldFiles(id, toDisplayName(id), { rectangle, dataSource })
   for (const [path, contents] of Object.entries(files)) {
     const target = join(dir, path)
     mkdirSync(dirname(target), { recursive: true })
@@ -591,6 +854,19 @@ async function main(argv) {
   console.log(`Created ${id}/`)
   for (const path of Object.keys(files)) console.log(`  ${path}`)
   console.log(`\nNext: cd ${id} && read README.md — it has the install steps.`)
+}
+
+/** The three questions behind `--data-source`. A source can be picked by number or typed as an id. */
+async function askDataSource(ask) {
+  const row = (await ask('What does one row represent? (for example, Issue): ')) || 'Row'
+  console.log('\nSources acorn reads:')
+  KNOWN_SOURCES.forEach((known, index) => console.log(`  ${index + 1}. ${known.name} (${known.source})`))
+  const pick = (answer) => answer.split(',').map((part) => part.trim()).filter(Boolean)
+    .map((part) => KNOWN_SOURCES[Number(part) - 1]?.source ?? part)
+  const reads = pick(await ask('Which does it read? Numbers or <pluginId>:<sourceId>, separated by commas. The first is required: '))
+  if (!reads.length || reads.some((source) => !/^[^:]+:.+$/.test(source))) throw new Error('Name at least one source, as a number from the list or as <pluginId>:<sourceId>.')
+  const optional = new Set(reads.length > 1 ? pick(await ask('Which of the others are optional? (none): ')) : [])
+  return { row, inputs: reads.map((source, index) => ({ source, ...(index && optional.has(source) ? { optional: true } : {}) })) }
 }
 
 // Importable from a test without running.

@@ -45,6 +45,18 @@ npm create acorn-plugin my-widget -- --rectangle
 A tree names shared components the host renders on the desktop and in the terminal. A frame renders
 its own DOM in a desktop iframe ([two ways to draw](./the-client-half.md#two-ways-to-draw)).
 
+For a data source whose rows your own code builds from sources acorn already reads, generate a
+derived source instead:
+
+```sh
+npm create acorn-plugin release-readiness -- --data-source
+```
+
+It asks what one row represents and which sources it reads, then writes a Vite and Vitest package
+with `src/source.ts`, a passing test, and a build step that bundles `dist/node.js` and rewrites the
+manifest's inputs. This is the one template with dependencies and a build
+([derived sources](./derived-sources.md)).
+
 To extend another plugin's UI after your own pane works, add an `extensions` entry for one of its
 published points. For example, `agents:tool-card` accepts a tree, and `changes:diff-line` accepts
 route-backed annotations ([extensions](./extensions.md)).
@@ -83,7 +95,8 @@ route reload in a fresh worker, and both client handshakes. It runs the packed s
 type-checks its node files outside the repository against the packed declaration package, which
 catches dependencies that resolve only inside the workspace. It also type-checks the
 [complete example](./complete-example.md) and checks that the manifest examples on these pages speak
-the current API major.
+the current API major. For `--data-source`, it installs the packed SDK into a generated package
+outside the repository, then runs its test, type-checks it, builds it, and loads it.
 
 On October 4, 2026, running the scaffold with `node packages/create-acorn-plugin/index.mjs my-widget`
 produced the five files above with `"apiVersion": "3"`, and its manifest passed the Node's manifest

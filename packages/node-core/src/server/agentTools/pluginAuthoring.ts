@@ -217,6 +217,19 @@ handshake already inlined — as a directory with no dependencies and no build s
 run it, run it and edit what it wrote; the rest of this is what to change and why. If it cannot, write the
 files by hand from the layout below.
 
+## A derived data source has a build step
+
+A derived source builds rows by your own rules from sources acorn already reads, such as Linear issues
+and their GitHub pull requests. It's the one profile with a bundler.
+\`npm create acorn-plugin <name> -- --data-source\` writes it. \`src/source.ts\` calls
+\`defineDerivedSource\` from \`acorn-plugin-sdk/data\`, which answers every source operation from the
+fields you declare and hands your \`query\` one read-only handle per input. \`src/source.test.ts\` uses
+\`testDerivedSource\` and \`fixtures\` from \`acorn-plugin-sdk/testing\`. \`fixtures\` builds records from
+each built-in source's real fields and fails on a field it doesn't have. Call \`data_source_describe\`
+for an input's fields. \`npm run build\` bundles \`dist/node.js\` with the SDK inlined and rewrites the
+manifest's \`inputs\` from the code. The owner approves those inputs before the plugin reads anything,
+and an optional input the person skipped is \`undefined\` in \`inputs\`.
+
 ## The layout
 
     <dir>/acorn-plugin.json    the manifest; the only fixed filename

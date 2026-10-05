@@ -5,6 +5,8 @@ inputs on its behalf, with the accounts each query binds, and the plugin returns
 shape it describes. Read this page to build one, or to change how the host checks and reads its
 inputs. It extends the [typed data sources](../data-sources.md) contract.
 
+A third-party plugin usually builds one with `acorn-plugin-sdk/data`, which wraps these handles and
+checks records the same way the host does ([derived sources for authors](../plugin-authoring/derived-sources.md)).
 The code lives in `packages/node-core/src/server/dataSources/inputs.ts` (handles, revisions, and
 completeness), `authority.ts` (binding checks), and `packages/node-core/src/server/plugins/inputGrants.ts`
 (approval for loaded plugins).

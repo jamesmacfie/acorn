@@ -94,12 +94,12 @@ For each contribution's availability, see [Contribution kinds](./contribution-ki
 | `acorn-plugin-types` | Standalone node declarations, with no runtime import |
 | `acorn-plugin-sdk` | Bridge helpers for a bundled third-party client |
 | `acorn-plugin-sdk/remote` | Shared tree nodes and Solid adapter for a bundled client |
+| `acorn-plugin-sdk/data`, `/testing` | A derived source for a bundled node half, and its test helpers |
 | `@acorn/plugin-api/node` | Repository node facade |
 | `@acorn/plugin-api/client` | Repository client contracts and services |
 | `@acorn/plugin-api/ui` | Repository component kit |
 | `@acorn/plugin-api/ui/host` | Components that depend on host context |
-| `@acorn/plugin-api/ui/tree` | Remote-tree nodes for repository bundles |
-| `@acorn/plugin-api/ui/sdk` | Repository bridge helpers |
+| `@acorn/plugin-api/ui/tree`, `ui/sdk` | Remote-tree nodes and bridge helpers for repository bundles |
 | `@acorn/plugin-api/ui/editor` | CodeMirror themes, language selection, view state, and embedded editors |
 | `@acorn/plugin-api/ui/diff`, `ui/tokens` | Diff tools and component role tokens |
 | `@acorn/plugin-api/testkit`, `testkit/client` | Repository test helpers |

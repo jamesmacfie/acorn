@@ -1,0 +1,16 @@
+{
+  // `./data` and `./testing` run in a plugin's node half, and their declarations name the published
+  // `acorn-plugin-types`, whose process types assume @types/node. The mappings point both package
+  // names at source, for the same reason tsconfig.json maps `acorn-plugin-sdk`: a consumer resolves
+  // them to the published declarations, and this checkout has no built copy to resolve to.
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["node"],
+    "resolveJsonModule": true,
+    "paths": {
+      "acorn-plugin-sdk/data": ["./src/data/public.ts"],
+      "acorn-plugin-types": ["../plugin-types/src/public.ts"]
+    }
+  },
+  "include": ["src/data", "src/testing"]
+}

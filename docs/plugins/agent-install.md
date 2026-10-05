@@ -110,4 +110,8 @@ so approval ends in a reload.
 **Settings > Plugins > Installed > Create a plugin** drafts that starting prompt into the current
 task's agent composer through `sendReferenceToAgent`, the seam the editor and Changes panes use. It's
 a draft, not a send. It doesn't open a new task, because `TaskSeed` has no prompt field and Settings
-has no project in scope.
+has no project in scope. **Build a data source from your connections** beside it asks what one row is
+and which of the Node's sources it reads, then drafts `dataSourceStarterPrompt` the same way. That
+prompt names the `--data-source` template, each input by id, and the testing helpers, and has the
+agent read each input's fields with `data_source_describe`
+([derived sources](../plugin-authoring/derived-sources.md)).

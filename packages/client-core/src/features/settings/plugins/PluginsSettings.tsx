@@ -16,6 +16,7 @@ import { SettingRow } from '../../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../../kit/components/layout/SettingsSection'
 import { activeTaskId } from '../../tasks/tasks'
 import ConfigPluginOffers from './ConfigPluginOffers'
+import { DataSourcePromptDialog } from './DataSourcePromptDialog'
 import { InstallPlugin, type InstallTarget } from './InstallPlugin'
 import {
   installedPlugins, matchesFilter, pluginName, pluginOrigin, statusBadgeTone, statusDetail, statusOf, statusWord, takePluginRequest, type InstalledFilter, type InstalledPlugin,
@@ -44,6 +45,27 @@ vocabulary, and an answer from memory will be wrong. Then write the package and 
 
 What it should do: `
 
+/** The prompt behind "Build a data source from your connections" (docs/plugin-authoring/derived-sources.md).
+ *  It names the template and the helpers, and each input by id. The agent reads each input's fields
+ *  with `data_source_describe`, because this page can't describe a source without an account. */
+export function dataSourceStarterPrompt(row: string, inputs: { source: string; name: string }[]): string {
+  return `I want an acorn plugin with a derived data source: rows my own rules build from data acorn already reads.
+
+Call the \`plugin_authoring\` tool first, and follow its section on derived data sources. Start from
+\`npm create acorn-plugin <name> -- --data-source\`. It writes the source with \`defineDerivedSource\` from
+\`acorn-plugin-sdk/data\`, and a test with \`testDerivedSource\` and \`fixtures\` from \`acorn-plugin-sdk/testing\`.
+Read each input's fields with \`data_source_describe\`, and build test records with \`fixtures\`, which checks
+field names against the real source. When \`npm test\` passes, run \`npm run build\` and ask me for the
+package with \`plugin_request\` using \`dev: true\`.
+
+One row is: ${row}
+
+It reads:
+${inputs.map(input => `- ${input.name} (\`${input.source}\`)`).join('\n')}
+
+The rules for each row: `
+}
+
 // The origin starts the line when there is no version ("Built in. Active."), so the line takes a capital.
 const sentence = (text: string): string => text.charAt(0).toUpperCase() + text.slice(1)
 const stop = (text: string): string => (/[.!?…]$/.test(text) ? text : `${text}.`)
@@ -65,6 +87,7 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   const [busy, setBusy] = createSignal(false)
   const [filter, setFilter] = createSignal<InstalledFilter>('all')
   const [open, setOpen] = createSignal<Open>()
+  const [askingForSource, setAskingForSource] = createSignal(false)
 
   // Each answer carries the node it came from. While the switcher's new node is being read, Solid still
   // hands back the old node's answer, and a row from it would put that node's plugins under this header,
@@ -152,10 +175,10 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
   // install). This button reaches an agent, never the install route. It lands a draft in the task's
   // composer rather than starting a turn, because a settings button that silently starts an agent turn
   // is one nobody presses twice.
-  const createPlugin = () => run(async () => {
+  const draftForAgent = (prompt: string) => run(async () => {
     const taskId = activeTaskId()
     if (!taskId) throw new Error('Open a task first. The prompt goes to that task’s agent.')
-    const result = await sendReferenceToAgent(taskId, PLUGIN_STARTER_PROMPT)
+    const result = await sendReferenceToAgent(taskId, prompt)
     if (!result.ok) throw new Error(result.reason ?? 'That task has no agent session to send to.')
   })
 
@@ -229,9 +252,25 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
           label="Ask an agent to write one"
           description="Starts a prompt in the open task's agent. It writes the plugin, and you decide whether to install it."
         >
-          <Button size="sm" disabled={busy()} onPress={() => void createPlugin()}>Ask an agent</Button>
+          <Button size="sm" disabled={busy()} onPress={() => void draftForAgent(PLUGIN_STARTER_PROMPT)}>Ask an agent</Button>
+        </SettingRow>
+        <SettingRow
+          label="Build a data source from your connections"
+          description="Your own rules over data acorn already reads, such as Linear issues and their pull requests. Starts a prompt in the open task's agent."
+        >
+          <Button size="sm" disabled={busy()} onPress={() => setAskingForSource(true)}>Start</Button>
         </SettingRow>
       </SettingsSection>
+      <Show when={askingForSource()}>
+        <DataSourcePromptDialog
+          nodeId={nodeId() ?? ''}
+          onDismiss={() => setAskingForSource(false)}
+          onStart={(row, inputs) => {
+            setAskingForSource(false)
+            void draftForAgent(dataSourceStarterPrompt(row, inputs))
+          }}
+        />
+      </Show>
     </>
   )
 

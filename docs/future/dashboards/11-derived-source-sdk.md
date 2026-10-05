@@ -1,6 +1,7 @@
 # Phase 11: the derived source SDK and scaffold
 
-Status: proposed, October 5, 2026. Depends on [phase 8](./08-source-inputs.md). Read the
+Status: shipped, October 5, 2026. [What shipped](#what-shipped) records the choices made while
+building it. Depends on [phase 8](./08-source-inputs.md). Read the
 [programme README](./README.md) first. The
 [Derived Sources](https://claude.ai/artifact/W8vHKDojobsSD4GYi5xPxK) page shows the scaffold, the
 manifest, the code, and the test in "Building one".
@@ -132,3 +133,60 @@ and an agent prompt produce a working package in one step.
   separate package instead.
 - The external example at `~/Source/acorn-machine-stats` builds its node half with Vite and inlines
   dependencies. Confirm the SDK inlines cleanly the same way.
+
+## What shipped
+
+Requirements 1 to 15 shipped, with the departures below.
+[Derived sources](../../plugin-authoring/derived-sources.md) describes the shipped behaviour and wins
+over this page.
+
+Where the code lives:
+
+- `packages/plugin-sdk/src/data/derived.ts` is the handler, the field builders, the input handles, and
+  the record check. `src/testing/index.ts` is `testDerivedSource` and `fixtures`. Each entry's
+  declaration is a hand-written `public.ts` copied to `dist`, as the frame entries' are, and the
+  `derived.test.ts` and `testing.test.ts` beside them hold the two together.
+- `src/testing/sourceFields.json` is the field lists. `tools/arch/sourceFields.test.ts` writes it
+  from each source's description and fails when it's stale.
+- `src/data/runtime.test.ts` is the integration test. It serves a `defineDerivedSource` handler from
+  a `makeTestNodeContext` plugin and reads it through `invokeDataSource`.
+- The template is `dataSourceFiles` in `packages/create-acorn-plugin/index.mjs`. The settings dialog
+  is `DataSourcePromptDialog.tsx`, and its prompt is `dataSourceStarterPrompt` beside
+  `PLUGIN_STARTER_PROMPT` in `PluginsSettings.tsx`.
+
+Choices made while building it:
+
+- `./data` and `./testing` stay in `acorn-plugin-sdk`. They're separate entries that share no module
+  with `.` or `./remote`, so a frame-only plugin's bundle never carries them. They inline the host's
+  validator from `@acorn/protocol`, which imports nothing, and the built files carry no Zod. The
+  package gained `acorn-plugin-types` as a dependency, for the declarations only, and moved to 1.1.0.
+  They compile under their own `tsconfig.node.json`, because the frame entries may assume only the DOM.
+- The Vite build the external example uses inlines the SDK cleanly. The scaffold test bundles a
+  generated package against the packed SDK and checks that `dist/node.js` imports no package.
+- `defineDerivedSource` returns `{ definition, description, fetch }` rather than a bare handler, so
+  `derivedSourceManifest` and `testDerivedSource` take the same value the node entry serves. The
+  definition carries the descriptor and `handler` too, because the manifest entry needs them.
+- `query` gets `inputs`, `parameters`, `evaluationTime`, `mode`, and `signal`, but no `identity`.
+  Each input handle has `identity()`, which is the account a read uses.
+- `options` isn't answered. The host serves static choices from the description and calls `options`
+  only for dynamic choices, which the builders don't make. `identity` is unsupported and `actions` is
+  empty, as planned, and the host never dispatches either for this description.
+- The fields advertise no filter operators, so a panel's filter steps run on the Node after the
+  source answers. The SDK runs the logic once per query and pages its result, keeping 16 selections
+  for a minute, as `createDataSelectionPager` does.
+- `all` stops at 5,000 records, the host's cap on one query, and marks the page `incomplete` with
+  `host-budget`. A record the SDK drops is counted as `invalid-records`. A shared id still fails the
+  query, as it does in the host.
+- `opens` copies the upstream record's `openUrl` or `openTask` action. A `target` can't be copied,
+  because the host accepts only targets in the plugin's own namespace.
+- Field builders take `nullable` as well, because a derived row often has no value for a field, such
+  as an issue with no pull request.
+- The scaffold writes the manifest entry itself, so an unbuilt package is valid. `npm run build`
+  rewrites it from `derivedSourceManifest` by importing the built `dist/node.js`, which exports
+  `source` beside its default export.
+- **Build a data source from your connections** drafts into the open task's agent, as **Ask an agent**
+  does, rather than into a new task. Settings has no project in scope, and `TaskSeed` has no prompt
+  field (`docs/plugins/agent-install.md`). The prompt names each input by id and has the agent read
+  its fields with `data_source_describe`, because Settings can't describe a provider source without
+  an account. The `plugin_authoring` brief gained a section on derived sources for the prompt to
+  point at.

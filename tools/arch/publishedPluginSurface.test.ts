@@ -100,23 +100,30 @@ function surface(entry: string, file: string): Surface {
 function publishedSurface(): string[] {
   const sdkExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-sdk/package.json'), 'utf8')) as { exports: Record<string, unknown> }
   const typesExports = JSON.parse(readFileSync(join(ROOT, 'packages/plugin-types/package.json'), 'utf8')) as { exports: Record<string, unknown> }
-  expect(Object.keys(sdkExports.exports).sort()).toEqual(['.', './remote'])
+  expect(Object.keys(sdkExports.exports).sort()).toEqual(['.', './data', './remote', './testing'])
   expect(Object.keys(typesExports.exports)).toEqual(['.'])
 
   const sdk = surface('acorn-plugin-sdk', 'packages/plugin-sdk/src/index.ts')
   const sdkTypes = surface('acorn-plugin-sdk', 'packages/plugin-sdk/src/public.ts')
   const remote = surface('acorn-plugin-sdk/remote', 'packages/plugin-sdk/src/remote/solid.ts')
   const remoteTypes = surface('acorn-plugin-sdk/remote', 'packages/plugin-sdk/src/remote/public.ts')
+  const data = surface('acorn-plugin-sdk/data', 'packages/plugin-sdk/src/data/index.ts')
+  const dataTypes = surface('acorn-plugin-sdk/data', 'packages/plugin-sdk/src/data/public.ts')
+  const testing = surface('acorn-plugin-sdk/testing', 'packages/plugin-sdk/src/testing/index.ts')
+  const testingTypes = surface('acorn-plugin-sdk/testing', 'packages/plugin-sdk/src/testing/public.ts')
   const nodeTypes = surface('acorn-plugin-types', 'packages/plugin-types/src/public.ts')
 
   // A declaration-only omission would strand a TypeScript consumer even when the runtime still exports
   // the name. The inverse would advertise a value the bundle cannot provide.
   expect(new Set(sdk.values)).toEqual(new Set(sdkTypes.values))
   expect(new Set(remote.values)).toEqual(new Set(remoteTypes.values))
+  expect(new Set(data.values)).toEqual(new Set(dataTypes.values))
+  expect(new Set(testing.values)).toEqual(new Set(testingTypes.values))
   expect(sdkTypes.names).toContain('acorn-plugin-sdk: member AcornBridge.api.get')
   expect(nodeTypes.names).toContain('acorn-plugin-types: member NodePluginContext.routes')
 
-  const names = [...sdk.names, ...sdkTypes.names, ...remote.names, ...remoteTypes.names, ...nodeTypes.names]
+  const names = [...sdk.names, ...sdkTypes.names, ...remote.names, ...remoteTypes.names,
+    ...data.names, ...dataTypes.names, ...testing.names, ...testingTypes.names, ...nodeTypes.names]
   expect(names.length).toBeGreaterThan(300)
   return [...new Set(names)].sort()
 }

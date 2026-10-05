@@ -329,7 +329,8 @@ Each plugin landing page above has topic pages in a folder of the same name:
 - [plugin-authoring.md](./plugin-authoring.md): [CLI command
   authoring](./plugin-authoring/cli-commands.md), [A complete
   example](./plugin-authoring/complete-example.md), [Contributions](./plugin-authoring/contributions.md),
-  [Custom agents](./plugin-authoring/custom-agents.md), [Events and
+  [Custom agents](./plugin-authoring/custom-agents.md), [Derived
+  sources](./plugin-authoring/derived-sources.md), [Events and
   capabilities](./plugin-authoring/events-and-capabilities.md),
   [Extensions](./plugin-authoring/extensions.md), [Harnesses](./plugin-authoring/harnesses.md),
   [Install a hand-written package](./plugin-authoring/installing-a-hand-written-package.md),

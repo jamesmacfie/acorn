@@ -64,3 +64,17 @@ with your other registrations.
 A hand-written package can't import the testkit. Check its manifest by running it through a Node, and
 check its node half against `acorn-plugin-types` with `tsc` ([start from the
 scaffold](./start-from-the-scaffold.md)).
+
+## Test a derived source
+
+A hand-written package with a derived source tests its logic with `acorn-plugin-sdk/testing`, which
+runs under any test runner. `testDerivedSource(source, inputs)` runs the source's `query` against fake
+inputs and applies the record checks the app applies. It returns the rows, the records it dropped
+with their reasons, and the completeness a panel would show. `fixtures('<pluginId>:<sourceId>', records)`
+builds input records from a built-in or first-party source's real field list, and throws on a field
+the source doesn't have ([derived sources](./derived-sources.md#test-it)).
+
+`tools/arch/sourceFields.test.ts` writes those field lists into
+`packages/plugin-sdk/src/testing/sourceFields.json` from each source's own description, and fails when
+the checked-in copy is stale. Regenerate it with
+`UPDATE_SOURCE_FIELDS=1 pnpm --filter @acorn/arch-tests test sourceFields`.

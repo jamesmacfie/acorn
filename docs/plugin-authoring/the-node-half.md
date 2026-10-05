@@ -72,6 +72,11 @@ Declare in the manifest when you can, because that's the copy the owner reads at
 `projects:read` exposes `ctx.core.projects.byWorkspace(workspaceId)` beside the project and checkout
 readers. Use it to check that a task-scoped record names a project in the same workspace.
 
+To serve a derived source, build its handler with `defineDerivedSource` from `acorn-plugin-sdk/data`
+and register it with `ctx.routes.fetch(source.fetch)`. The SDK answers every source operation from
+the fields you declare and calls your `query` with one handle per input
+([derived sources](./derived-sources.md)).
+
 Node actions and harnesses have no `ctx` member. The manifest is the only way in: a command whose verb
 is `runNodeAction`, and `contributions.harnesses`.
 

@@ -1,0 +1,2170 @@
+{
+  "agents:sessions": {
+    "name": "Managed agent sessions",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "state": {
+          "type": "string"
+        },
+        "attention": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "title",
+        "state",
+        "attention",
+        "provider",
+        "model",
+        "taskId",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne",
+            "contains"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/state",
+        "label": "State",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/attention",
+        "label": "Attention",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/provider",
+        "label": "Provider",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/model",
+        "label": "Model",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne",
+            "missing",
+            "present"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      }
+    ]
+  },
+  "agents:usage-records": {
+    "name": "Agent usage records",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "at": {
+          "type": "number"
+        },
+        "sessionId": {
+          "type": "string"
+        },
+        "turnId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "taskId": {
+          "type": "string"
+        },
+        "provider": {
+          "type": "string"
+        },
+        "model": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "inputTokens": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "outputTokens": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cacheReadTokens": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "cacheWriteTokens": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "costUsd": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "costSource": {
+          "type": "string",
+          "enum": [
+            "reported",
+            "estimated",
+            "unknown"
+          ]
+        },
+        "priceName": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "at",
+        "sessionId",
+        "turnId",
+        "taskId",
+        "provider",
+        "model",
+        "inputTokens",
+        "outputTokens",
+        "cacheReadTokens",
+        "cacheWriteTokens",
+        "costUsd",
+        "costSource",
+        "priceName"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/at",
+        "label": "Usage time",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/sessionId",
+        "label": "Session",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "label": "Task",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/provider",
+        "label": "Provider",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/model",
+        "label": "Model",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/inputTokens",
+        "label": "inputTokens",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/outputTokens",
+        "label": "outputTokens",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheReadTokens",
+        "label": "cacheReadTokens",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/cacheWriteTokens",
+        "label": "cacheWriteTokens",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "tokens"
+        }
+      },
+      {
+        "pointer": "/costUsd",
+        "label": "Cost",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "USD"
+        }
+      },
+      {
+        "pointer": "/costSource",
+        "label": "Cost provenance",
+        "origin": "declared",
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "reported",
+              "label": "Provider reported"
+            },
+            {
+              "id": "estimated",
+              "label": "Estimated"
+            },
+            {
+              "id": "unknown",
+              "label": "Unknown"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/priceName",
+        "label": "Price used",
+        "origin": "declared"
+      }
+    ]
+  },
+  "core:local-branches": {
+    "name": "Local branches",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "githubRepository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aheadUpstream": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "behindUpstream": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "aheadDefault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "behindDefault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lastCommitAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "observedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "projectId",
+        "name",
+        "upstream",
+        "githubRepository",
+        "aheadUpstream",
+        "behindUpstream",
+        "aheadDefault",
+        "behindDefault",
+        "lastCommitAt",
+        "observedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "label": "Branch",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/upstream",
+        "label": "Upstream",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/githubRepository",
+        "label": "GitHub remote repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/aheadUpstream",
+        "label": "aheadUpstream",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/behindUpstream",
+        "label": "behindUpstream",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/aheadDefault",
+        "label": "aheadDefault",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/behindDefault",
+        "label": "behindDefault",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/lastCommitAt",
+        "label": "Last commit",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/observedAt",
+        "label": "Observed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      }
+    ]
+  },
+  "core:local-worktrees": {
+    "name": "Local worktrees",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string"
+        },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "detachedHead": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modifiedCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "untrackedCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lastCommitAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "taskId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "projectId",
+        "path",
+        "branch",
+        "detachedHead",
+        "modifiedCount",
+        "untrackedCount",
+        "lastCommitAt",
+        "taskId",
+        "observedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/path",
+        "label": "Worktree path",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/branch",
+        "label": "Branch",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/detachedHead",
+        "label": "Detached head",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/modifiedCount",
+        "label": "Modified files",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/untrackedCount",
+        "label": "Untracked files",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/lastCommitAt",
+        "label": "Last commit",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/taskId",
+        "label": "Task",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/observedAt",
+        "label": "Observed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      }
+    ]
+  },
+  "core:tasks": {
+    "name": "Workspace tasks",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "title": {
+          "type": "string"
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "project": {
+          "type": "string"
+        },
+        "workspaceId": {
+          "type": "string"
+        },
+        "workspace": {
+          "type": "string"
+        },
+        "origin": {
+          "type": "string"
+        },
+        "branch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string"
+        },
+        "worktreeChanged": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "worktreePath": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "modifiedCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "untrackedCount": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "title",
+        "projectId",
+        "project",
+        "workspaceId",
+        "workspace",
+        "origin",
+        "branch",
+        "status",
+        "worktreeChanged",
+        "worktreePath",
+        "modifiedCount",
+        "untrackedCount",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Task",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne",
+            "contains"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/project",
+        "label": "Project",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/workspace",
+        "label": "Workspace",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/origin",
+        "label": "Origin",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/branch",
+        "label": "Branch",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq",
+            "ne",
+            "missing",
+            "present"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/status",
+        "label": "Status",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq",
+            "ne"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "active",
+              "label": "Active"
+            },
+            {
+              "id": "archived",
+              "label": "Archived"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/worktreeChanged",
+        "label": "Uncommitted changes",
+        "description": "Null when the Node has not inspected the worktree.",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        }
+      },
+      {
+        "pointer": "/worktreePath",
+        "label": "Worktree path",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/modifiedCount",
+        "label": "Modified files",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/untrackedCount",
+        "label": "Untracked files",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime",
+          "role": "updated"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      }
+    ]
+  },
+  "github:actions-jobs": {
+    "name": "GitHub Actions jobs",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string"
+        },
+        "runId": {
+          "type": "number"
+        },
+        "attempt": {
+          "type": "number"
+        },
+        "workflow": {
+          "type": "string"
+        },
+        "job": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "conclusion": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "startedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "completedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "durationMs": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "pullRequests": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          }
+        },
+        "url": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "repository",
+        "runId",
+        "attempt",
+        "workflow",
+        "job",
+        "status",
+        "conclusion",
+        "startedAt",
+        "completedAt",
+        "durationMs",
+        "pullRequests",
+        "url"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/repository",
+        "label": "Repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/workflow",
+        "label": "Workflow",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/job",
+        "label": "Job",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/runId",
+        "label": "Run ID",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/attempt",
+        "label": "Attempt",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/status",
+        "label": "Status",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/conclusion",
+        "label": "Conclusion",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "success",
+              "label": "Success",
+              "tone": "ok"
+            },
+            {
+              "id": "failure",
+              "label": "Failure",
+              "tone": "bad"
+            },
+            {
+              "id": "cancelled",
+              "label": "Cancelled",
+              "tone": "muted"
+            },
+            {
+              "id": "skipped",
+              "label": "Skipped",
+              "tone": "muted"
+            },
+            {
+              "id": "neutral",
+              "label": "Neutral",
+              "tone": "muted"
+            },
+            {
+              "id": "timed_out",
+              "label": "Timed out",
+              "tone": "bad"
+            },
+            {
+              "id": "action_required",
+              "label": "Action required",
+              "tone": "warn"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/startedAt",
+        "label": "Started",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/completedAt",
+        "label": "Finished",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/durationMs",
+        "label": "Duration",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "unit": "ms"
+        }
+      },
+      {
+        "pointer": "/pullRequests",
+        "label": "Pull requests",
+        "origin": "declared",
+        "display": {
+          "kind": "number",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/url",
+        "label": "Job URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      }
+    ]
+  },
+  "github:local-branches": {
+    "name": "Local branches with pull requests",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "projectId": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "upstream": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "githubRepository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "aheadUpstream": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "behindUpstream": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "aheadDefault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "behindDefault": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lastCommitAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "observedAt": {
+          "type": "number"
+        },
+        "githubProvider": {
+          "type": "string"
+        },
+        "githubConnectionId": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "projectId",
+        "name",
+        "upstream",
+        "githubRepository",
+        "aheadUpstream",
+        "behindUpstream",
+        "aheadDefault",
+        "behindDefault",
+        "lastCommitAt",
+        "observedAt",
+        "githubProvider",
+        "githubConnectionId"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/name",
+        "label": "Branch",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/upstream",
+        "label": "Upstream",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/githubRepository",
+        "label": "GitHub remote repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/aheadUpstream",
+        "label": "aheadUpstream",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/behindUpstream",
+        "label": "behindUpstream",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/aheadDefault",
+        "label": "aheadDefault",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/behindDefault",
+        "label": "behindDefault",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/lastCommitAt",
+        "label": "Last commit",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/observedAt",
+        "label": "Observed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/githubProvider",
+        "label": "Provider",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/githubConnectionId",
+        "label": "GitHub account connection",
+        "origin": "declared"
+      }
+    ]
+  },
+  "github:pull-requests": {
+    "name": "GitHub pull requests",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "number": {
+          "type": "number"
+        },
+        "title": {
+          "type": "string"
+        },
+        "repository": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "githubProvider": {
+          "type": "string"
+        },
+        "githubConnectionId": {
+          "type": "string"
+        },
+        "headRepository": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "headBranch": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "state": {
+          "type": "string",
+          "enum": [
+            "open",
+            "closed",
+            "merged"
+          ]
+        },
+        "author": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "draft": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        },
+        "closedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mergedAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "mergeable": {
+          "type": "string"
+        },
+        "mergeStateStatus": {
+          "type": "string"
+        },
+        "autoMergeEnabled": {
+          "type": "boolean"
+        },
+        "reviewDecision": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "checks": {
+          "type": "string"
+        },
+        "checkStatuses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedReviewers": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "requestedTeams": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "reviewRequests": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "kind": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "requestedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "kind",
+              "name",
+              "requestedAt"
+            ]
+          }
+        },
+        "reviewRequestedFromViewer": {
+          "type": [
+            "boolean",
+            "null"
+          ]
+        },
+        "lastActivityAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "number",
+        "title",
+        "repository",
+        "url",
+        "githubProvider",
+        "githubConnectionId",
+        "headRepository",
+        "headBranch",
+        "state",
+        "author",
+        "draft",
+        "createdAt",
+        "updatedAt",
+        "closedAt",
+        "mergedAt",
+        "mergeable",
+        "mergeStateStatus",
+        "autoMergeEnabled",
+        "reviewDecision",
+        "checks",
+        "checkStatuses",
+        "labels",
+        "requestedReviewers",
+        "requestedTeams",
+        "reviewRequests",
+        "reviewRequestedFromViewer",
+        "lastActivityAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/number",
+        "label": "Number",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        },
+        "query": {
+          "operators": [],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/repository",
+        "label": "Repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/githubProvider",
+        "label": "Provider",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/githubConnectionId",
+        "label": "GitHub account connection",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/headRepository",
+        "label": "Head repository",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/headBranch",
+        "label": "Head branch",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/state",
+        "label": "State",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "open",
+              "label": "Open"
+            },
+            {
+              "id": "closed",
+              "label": "Closed without merge"
+            },
+            {
+              "id": "merged",
+              "label": "Merged"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/author",
+        "label": "Author login",
+        "origin": "declared",
+        "display": {
+          "kind": "person"
+        },
+        "viewerMatch": "/login",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/reviewRequestedFromViewer",
+        "label": "Review requested from you",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/requestedReviewers",
+        "label": "Requested reviewers",
+        "origin": "declared",
+        "display": {
+          "kind": "person",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/requestedTeams",
+        "label": "Requested teams",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/reviewRequests",
+        "label": "Review requests with times",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/reviewDecision",
+        "label": "Review decision",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "APPROVED",
+              "label": "Approved",
+              "tone": "ok"
+            },
+            {
+              "id": "CHANGES_REQUESTED",
+              "label": "Changes requested",
+              "tone": "bad"
+            },
+            {
+              "id": "REVIEW_REQUIRED",
+              "label": "Review required",
+              "tone": "warn"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/checks",
+        "label": "Head checks",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "SUCCESS",
+              "label": "Passed",
+              "tone": "ok"
+            },
+            {
+              "id": "FAILURE",
+              "label": "Failed",
+              "tone": "bad"
+            },
+            {
+              "id": "PENDING",
+              "label": "Pending",
+              "tone": "warn"
+            },
+            {
+              "id": "EXPECTED",
+              "label": "Missing",
+              "tone": "muted"
+            },
+            {
+              "id": "CANCELLED",
+              "label": "Cancelled",
+              "tone": "muted"
+            },
+            {
+              "id": "SKIPPED",
+              "label": "Skipped",
+              "tone": "muted"
+            },
+            {
+              "id": "NEUTRAL",
+              "label": "Neutral",
+              "tone": "muted"
+            },
+            {
+              "id": "UNKNOWN",
+              "label": "Unknown",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/checkStatuses",
+        "label": "Individual head check states",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/labels",
+        "label": "Labels",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "list": true
+        }
+      },
+      {
+        "pointer": "/lastActivityAt",
+        "label": "Last activity",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/draft",
+        "label": "Draft",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        },
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/closedAt",
+        "label": "Closed",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/mergedAt",
+        "label": "Merged",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        }
+      },
+      {
+        "pointer": "/mergeable",
+        "label": "Mergeability",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/mergeStateStatus",
+        "label": "Merge readiness",
+        "origin": "declared",
+        "display": {
+          "kind": "status"
+        },
+        "choices": {
+          "kind": "static",
+          "values": [
+            {
+              "id": "CLEAN",
+              "label": "Ready",
+              "tone": "ok"
+            },
+            {
+              "id": "BEHIND",
+              "label": "Behind base",
+              "tone": "warn"
+            },
+            {
+              "id": "BLOCKED",
+              "label": "Blocked",
+              "tone": "bad"
+            },
+            {
+              "id": "DIRTY",
+              "label": "Conflicts",
+              "tone": "bad"
+            },
+            {
+              "id": "DRAFT",
+              "label": "Draft",
+              "tone": "muted"
+            },
+            {
+              "id": "HAS_HOOKS",
+              "label": "Merge hooks",
+              "tone": "warn"
+            },
+            {
+              "id": "UNSTABLE",
+              "label": "Unstable",
+              "tone": "warn"
+            },
+            {
+              "id": "UNKNOWN",
+              "label": "Unknown",
+              "tone": "muted"
+            }
+          ]
+        }
+      },
+      {
+        "pointer": "/autoMergeEnabled",
+        "label": "Auto-merge enabled",
+        "origin": "declared",
+        "display": {
+          "kind": "boolean"
+        }
+      }
+    ]
+  },
+  "linear:issues": {
+    "name": "Linear issues",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "identifier": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "description": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "projectId": {
+          "type": "string"
+        },
+        "state": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            },
+            "category": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "id",
+            "name",
+            "category"
+          ]
+        },
+        "createdAt": {
+          "type": "number"
+        },
+        "updatedAt": {
+          "type": "number"
+        }
+      },
+      "required": [
+        "id",
+        "identifier",
+        "title",
+        "url",
+        "description",
+        "projectId",
+        "state",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/identifier",
+        "label": "Identifier",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/description",
+        "label": "Description",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/state/id",
+        "label": "State",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        },
+        "choices": {
+          "kind": "dynamic",
+          "dependsOn": [
+            "/project"
+          ]
+        }
+      },
+      {
+        "pointer": "/state/name",
+        "label": "State name",
+        "origin": "declared",
+        "display": {
+          "kind": "status",
+          "role": "status"
+        }
+      },
+      {
+        "pointer": "/state/category",
+        "label": "State category",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/createdAt",
+        "label": "Created",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/updatedAt",
+        "label": "Updated",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      }
+    ]
+  },
+  "rollbar:error-groups": {
+    "name": "Rollbar error groups",
+    "schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "counter": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "url": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "level": {
+          "type": "string"
+        },
+        "status": {
+          "type": "string"
+        },
+        "environment": {
+          "type": "string"
+        },
+        "totalOccurrences": {
+          "type": "number"
+        },
+        "firstOccurrenceAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        },
+        "lastOccurrenceAt": {
+          "type": [
+            "number",
+            "null"
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "counter",
+        "title",
+        "url",
+        "level",
+        "status",
+        "environment",
+        "totalOccurrences",
+        "firstOccurrenceAt",
+        "lastOccurrenceAt"
+      ]
+    },
+    "fields": [
+      {
+        "pointer": "/title",
+        "label": "Title",
+        "origin": "declared",
+        "display": {
+          "kind": "text",
+          "role": "title"
+        }
+      },
+      {
+        "pointer": "/counter",
+        "label": "Counter",
+        "origin": "declared"
+      },
+      {
+        "pointer": "/url",
+        "label": "URL",
+        "origin": "declared",
+        "display": {
+          "kind": "link",
+          "role": "url"
+        }
+      },
+      {
+        "pointer": "/level",
+        "label": "Level",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/status",
+        "label": "Status",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/environment",
+        "label": "Environment",
+        "origin": "declared",
+        "query": {
+          "operators": [
+            "eq"
+          ],
+          "sortable": false
+        }
+      },
+      {
+        "pointer": "/totalOccurrences",
+        "label": "Occurrences",
+        "origin": "declared",
+        "display": {
+          "kind": "number"
+        }
+      },
+      {
+        "pointer": "/firstOccurrenceAt",
+        "label": "First seen",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      },
+      {
+        "pointer": "/lastOccurrenceAt",
+        "label": "Last seen",
+        "origin": "declared",
+        "display": {
+          "kind": "datetime"
+        },
+        "query": {
+          "operators": [
+            "gt",
+            "gte",
+            "lt",
+            "lte"
+          ],
+          "sortable": true
+        }
+      }
+    ]
+  }
+}

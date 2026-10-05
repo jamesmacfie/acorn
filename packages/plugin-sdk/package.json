@@ -1,7 +1,7 @@
 {
   "name": "acorn-plugin-sdk",
-  "version": "1.0.0",
-  "description": "Client helpers for sandboxed acorn plugin trees and frames.",
+  "version": "1.1.0",
+  "description": "Helpers for acorn plugins: the sandbox bridge for frames and trees, and derived data sources for the node half.",
   "type": "module",
   "sideEffects": false,
   "exports": {
@@ -12,6 +12,14 @@
     "./remote": {
       "types": "./dist/remote.d.ts",
       "default": "./dist/remote.js"
+    },
+    "./data": {
+      "types": "./dist/data.d.ts",
+      "default": "./dist/data.js"
+    },
+    "./testing": {
+      "types": "./dist/testing.d.ts",
+      "default": "./dist/testing.js"
     }
   },
   "files": [
@@ -24,13 +32,19 @@
   ],
   "license": "MIT",
   "scripts": {
-    "build": "vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts",
+    "build": "vite build && cp src/public.ts dist/sdk.d.ts && cp src/remote/public.ts dist/remote.d.ts && cp src/data/public.ts dist/data.d.ts && cp src/testing/public.ts dist/testing.d.ts",
     "prepack": "pnpm build",
-    "lint": "tsc --noEmit",
+    "lint": "tsc --noEmit && tsc --noEmit -p tsconfig.node.json",
     "test": "vitest run"
   },
+  "dependencies": {
+    "acorn-plugin-types": "workspace:^"
+  },
   "devDependencies": {
+    "@acorn/node-core": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
+    "@acorn/protocol": "workspace:*",
+    "@types/node": "^26.0.0",
     "solid-js": "catalog:",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

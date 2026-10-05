@@ -49,6 +49,32 @@ it is an optional peer dependency because frame-only plugins do not need it. See
 [tree authoring guide](https://github.com/jamesmacfie/acorn/blob/main/docs/plugins/frames.md) for the
 manifest and build setup.
 
+## Derived data sources
+
+`acorn-plugin-sdk/data` is for a plugin's node half. `defineDerivedSource` builds a data source from
+sources acorn already reads, such as Linear issues and GitHub pull requests. You declare the inputs
+and the fields, and write one `query` function. Acorn reads the inputs with the accounts the person
+picked, and the SDK answers every source operation and checks each record:
+
+```ts
+import { defineDerivedSource, field } from 'acorn-plugin-sdk/data'
+
+export const source = defineDerivedSource({
+  id: 'open-pulls', name: 'Open pull requests', singular: 'Pull request', plural: 'Pull requests',
+  handler: '/v1/p/my-plugin/source',
+  inputs: { pulls: { source: 'github:pull-requests', label: 'Pull requests' } },
+  fields: { title: field.text({ label: 'Title', role: 'title' }) },
+  async query({ inputs }) {
+    const { records } = await inputs.pulls.all({ where: { state: 'open' } })
+    return records.map((pull) => ({ id: pull.ref.recordId, opens: pull.ref, data: { title: String(pull.data.title) } }))
+  },
+})
+```
+
+`acorn-plugin-sdk/testing` runs that `query` against `fixtures('github:pull-requests', [...])`, records
+built from the real source's fields. `npm create acorn-plugin <name> -- --data-source` writes a working
+package with both. See `docs/plugin-authoring/derived-sources.md` in the acorn repository.
+
 ## You need a bundler for this
 
 Your plugin's client half is served as **exactly one file**, so a bare specifier has nothing to resolve

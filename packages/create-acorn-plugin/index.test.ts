@@ -10,7 +10,7 @@ import { parsePluginManifest } from '@acorn/node-core/server/plugins'
 import { loadExternalPlugins, pluginInstallDir } from '@acorn/node-core/server/plugins'
 // @ts-expect-error: the scaffold is published standalone with zero dependencies, so it's plain
 // JavaScript with no declarations. This suite is the only thing in the repository that imports it.
-import { API_VERSION, BASELINE, SCHEMA_URL, scaffoldFiles, toPluginId } from './index.mjs'
+import { API_VERSION, BASELINE, KNOWN_SOURCES, SCHEMA_URL, SDK_VERSION, scaffoldFiles, toInputName, toPluginId } from './index.mjs'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
 const PACKAGES = join(HERE, '..')
@@ -399,4 +399,96 @@ it('scaffolds an owned tree pane by default', () => {
   const contributions = manifest.contributions as { frames?: { regions?: Record<string, unknown> }[]; extensions?: unknown[] }
   expect(contributions.frames?.[0]?.regions).toEqual({ body: { kind: 'remote', entry: 'pane' } })
   expect(contributions.extensions).toBeUndefined()
+})
+
+// ── --data-source ─────────────────────────────────────────────────────────────────────────────────
+
+const readiness = { row: 'Issue', inputs: [{ source: 'linear:issues' }, { source: 'github:pull-requests', optional: true }] }
+
+it('lists the sources the SDK has field lists for, and depends on the SDK release that has them', () => {
+  const lists = JSON.parse(readFileSync(join(PACKAGES, 'plugin-sdk/src/testing/sourceFields.json'), 'utf8')) as
+    Record<string, { name: string; fields: { pointer: string; display?: { role?: string } }[] }>
+  expect(KNOWN_SOURCES).toEqual(Object.entries(lists).map(([source, list]) => {
+    const title = list.fields.find((field) => field.display?.role === 'title')?.pointer.slice(1)
+    return { source, name: list.name, ...(title ? { title } : {}) }
+  }))
+  expect(SDK_VERSION).toBe(JSON.parse(readFileSync(join(PACKAGES, 'plugin-sdk/package.json'), 'utf8')).version)
+  expect(toInputName('github:pull-requests')).toBe('pullRequests')
+  const taken = new Set<string>()
+  expect([toInputName('core:local-branches', taken), toInputName('github:local-branches', taken)]).toEqual(['localBranches', 'localBranches2'])
+})
+
+it('emits a data source manifest the host parses, with the inputs it reads', () => {
+  const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<string, string>
+  const result = parsePluginManifest(JSON.parse(files['acorn-plugin.json']!))
+  expect(result.ok ? null : result.reason).toBe(null)
+  expect(JSON.parse(files['acorn-plugin.json']!).contributions.dataSources[0].inputs).toEqual({
+    issues: { source: 'linear:issues', label: 'Linear issues' },
+    pullRequests: { source: 'github:pull-requests', label: 'GitHub pull requests', optional: true },
+  })
+  expect(files['src/source.ts']).toContain('await inputs.pullRequests?.all()')
+})
+
+it('builds, tests, and loads a data source package from the packed SDK outside the repository', async () => {
+  // The acceptance test for `--data-source`: the generated package passes its own test against the
+  // packed SDK, builds, writes the manifest entry the scaffold already wrote, and loads.
+  const root = mkdtempSync(join(tmpdir(), 'scaffold-data-'))
+  try {
+    const files = scaffoldFiles('release-readiness', 'Release readiness', { dataSource: readiness }) as Record<string, string>
+    const dir = join(root, 'release-readiness')
+    for (const [path, contents] of Object.entries(files)) {
+      mkdirSync(dirname(join(dir, path)), { recursive: true })
+      writeFileSync(join(dir, path), contents)
+    }
+    unpackPublishedPackage('plugin-sdk', join(dir, 'node_modules', 'acorn-plugin-sdk'))
+    unpackPublishedPackage('plugin-types', join(dir, 'node_modules', 'acorn-plugin-types'))
+    // The build tools come from the workspace store. The two packages under test are tarball bytes.
+    for (const tool of ['vite', 'vitest']) {
+      symlinkSync(realpathSync(join(PACKAGES, 'plugin-sdk', 'node_modules', tool)), join(dir, 'node_modules', tool), 'dir')
+    }
+    const run = (...args: string[]) => {
+      try {
+        return execFileSync(process.execPath, args, { cwd: dir, encoding: 'utf8', stdio: 'pipe', env: { ...process.env, CI: '1' } })
+      } catch (error) {
+        throw new Error(`${args.join(' ')}: ${String((error as { stdout?: string }).stdout ?? '')}${String((error as { stderr?: string }).stderr ?? error)}`)
+      }
+    }
+    expect(run('node_modules/vitest/vitest.mjs', 'run')).toMatch(/1 passed/)
+    // The typed handles are the point of the SDK, so the starter has to compile against the packed
+    // declarations, the optional input's `?.` included.
+    try {
+      execFileSync(TSC, ['--noEmit'], { cwd: dir, stdio: 'pipe' })
+    } catch (error) {
+      throw new Error(String((error as { stdout?: Buffer }).stdout ?? error))
+    }
+    run('node_modules/vite/bin/vite.js', 'build')
+    run('scripts/manifest.mjs')
+    expect(readFileSync(join(dir, 'acorn-plugin.json'), 'utf8')).toBe(files['acorn-plugin.json'])
+    // The bundle has to stand alone: an installed plugin has no node_modules beside it.
+    expect(readFileSync(join(dir, 'dist/node.js'), 'utf8')).not.toMatch(/from ['"]acorn-plugin-sdk/)
+
+    const dataRoot = join(root, 'data')
+    const installed = join(pluginInstallDir(dataRoot), 'release-readiness')
+    mkdirSync(installed, { recursive: true })
+    cpSync(join(dir, 'acorn-plugin.json'), join(installed, 'acorn-plugin.json'))
+    cpSync(join(dir, 'dist'), join(installed, 'dist'), { recursive: true })
+    const { loaded, failures } = await loadExternalPlugins(dataRoot, { builtins: [] })
+    expect(failures).toEqual([])
+    expect(loaded[0]?.manifest.contributions.dataSources?.[0]?.inputs).toMatchObject({ issues: { source: 'linear:issues' } })
+    await loaded[0]?.plugin.dispose?.()
+  } finally {
+    rmSync(root, { recursive: true, force: true })
+  }
+}, 120_000)
+
+it('asks what a row is and what it reads under --data-source', () => {
+  const cwd = mkdtempSync(join(tmpdir(), 'acorn scaffold-'))
+  try {
+    execFileSync(process.execPath, [CLI, 'readiness', '--data-source'], { cwd, input: 'Issue\n9, 8\n8\n', stdio: 'pipe' })
+    const manifest = JSON.parse(readFileSync(join(cwd, 'readiness', 'acorn-plugin.json'), 'utf8'))
+    expect(manifest.contributions.dataSources[0]).toMatchObject({ singular: 'Issue', plural: 'Issues', inputs: {
+      issues: { source: 'linear:issues' }, pullRequests: { source: 'github:pull-requests', optional: true } } })
+  } finally {
+    rmSync(cwd, { recursive: true, force: true })
+  }
 })

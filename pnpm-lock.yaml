@@ -826,10 +826,23 @@ importers:
         version: 4.1.11(@types/node@26.0.0)(@vitest/coverage-v8@4.1.11)(jsdom@30.0.1)(vite@8.0.16(@types/node@26.0.0)(esbuild@0.28.1)(tsx@4.22.4))
 
   packages/plugin-sdk:
+    dependencies:
+      acorn-plugin-types:
+        specifier: workspace:^
+        version: link:../plugin-types
     devDependencies:
+      '@acorn/node-core':
+        specifier: workspace:*
+        version: link:../node-core
       '@acorn/plugin-api':
         specifier: workspace:*
         version: link:../plugin-api
+      '@acorn/protocol':
+        specifier: workspace:*
+        version: link:../protocol
+      '@types/node':
+        specifier: ^26.0.0
+        version: 26.0.0
       solid-js:
         specifier: 'catalog:'
         version: 1.9.13(patch_hash=65a8d83856d2c02cbed39d9499e6a6a38bc83fabe4ae6e25703608a8b9134479)

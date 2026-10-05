@@ -5,7 +5,7 @@ import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 const localSource = { pluginId: 'core', sourceId: 'local-branches' }
 type SourceInvoker = Parameters<NodePlugin['init']>[0]['dataSources']['invoke']
 
-function branchDescription(base: DataSourceDescription): DataSourceDescription {
+export function branchDescription(base: DataSourceDescription): DataSourceDescription {
   return {
     ...base,
     revision: `${base.revision}.github.1`,
