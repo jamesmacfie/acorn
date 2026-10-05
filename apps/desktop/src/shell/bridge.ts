@@ -1,5 +1,6 @@
 import type { OverlayPresentation } from '@acorn/client-core/infra/platform'
 import { invoke } from '@tauri-apps/api/core'
+import { installExternalLinks } from './externalLinks'
 import { listen } from '@tauri-apps/api/event'
 import { evictPreviews, evictWebview, onWebviewState, webviewOperation, type WebviewState } from './webviewTransport'
 import type { NodeTransportError } from '@acorn/protocol/broker.ts'
@@ -438,6 +439,7 @@ function followThemeBackground(): void {
 // This runs before any page script, so there is no `body` to measure yet. The `document` guard is for
 // the seam-contract suite, which imports this file in a node environment and has no page at all.
 if (typeof document !== 'undefined') {
+  installExternalLinks(window, (url) => invoke<void>('open_external_url', { url }))
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', followThemeBackground, { once: true })
   else followThemeBackground()
 }
