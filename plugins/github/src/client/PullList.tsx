@@ -18,6 +18,7 @@ import { filterPulls } from './pullList/model'
 import { prFilterFor, setPrFilter } from './pullList/filterStore'
 import { githubBrowsePath } from './clientRoutes'
 import { activeTaskForPull, promotePullToTask } from './pullTasks'
+import { readFailure } from './actionErrors'
 
 // Draft / open / closed, as one glyph. The list route only ever reports `open` or `closed`: GitHub's
 // REST list calls a merged PR closed and the closed page carries no merged_at, so a merged PR wears
@@ -87,6 +88,7 @@ export default function PullList() {
     const code = (error as { code?: unknown } | null)?.code
     return typeof code === 'string' ? code : undefined
   }
+  const listFailure = () => readFailure(tab() === 'open' ? openPulls.error : closedPulls.error)
   const retry = () => (tab() === 'open' ? openPulls.refetch() : closedPulls.refetch())
   // Whether this node holds a GitHub credential at all. The list already reads the integrations query
   // for the Linear seeding, so this costs nothing extra.
@@ -256,7 +258,9 @@ export default function PullList() {
                       </Button>
                     </Show>
                   }
-                />
+                >
+                  {listFailure()}
+                </EmptyState>
               </Show>
             }
           >

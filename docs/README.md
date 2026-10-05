@@ -288,8 +288,7 @@ Each feature landing page above has topic pages in a folder of the same name:
 
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file,
-  including the [documentation overhaul](./future/documentation/README.md) and
-  [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
+  including the [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
   in an owning doc above.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.

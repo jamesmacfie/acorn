@@ -1,7 +1,6 @@
 # Workflow gaps
 
-Date: October 4, 2026. Status: proposed. Moved from the shipped workflows doc during the
-[documentation overhaul](./documentation/05-features.md), because a gap list is proposal material.
+Date: October 4, 2026. Status: proposed.
 
 These are known gaps in workflows:
 

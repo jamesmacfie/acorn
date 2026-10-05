@@ -28,6 +28,7 @@ import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPluginsReady } from './activate'
 import { clearCache } from './clearCache'
+import { topbarBreadcrumb } from './breadcrumb'
 import TaskView from './TaskView'
 import Acorn from '@acorn/client-core/kit/components/content/Acorn.tsx'
 import { clientEvents } from '@acorn/client-core/host/registries/commands'
@@ -465,20 +466,15 @@ export default function App() {
   const topbarProps = (): TopbarProps => {
     const active = activeNodeId()
     const project = scopedProjects().find((candidate) => candidate.id === contextProjectId())
-    const breadcrumb: { label: string; route?: string }[] = []
-    const projectName = (id: string) => projects.data?.find((candidate) => candidate.id === id)?.name ?? id
-    // A crumb links only to somewhere else. The one naming the page you are on is plain text.
-    const routeUnlessHere = (route: string) => (route === location.pathname ? undefined : route)
-    const task = inTaskView() ? activeTask() : null
-    if (task) {
-      // `/t/:taskId` carries no project, so the task names it: the project, then the task itself.
-      breadcrumb.push({ label: projectName(task.projectId), route: projectPath(task.projectId) })
-      breadcrumb.push({ label: task.title })
-    } else if (params.projectId) {
-      breadcrumb.push({ label: projectName(params.projectId), route: routeUnlessHere(projectPath(params.projectId)) })
-      if (params.number) breadcrumb.push({ label: `#${params.number}` })
-      if (isNew()) breadcrumb.push({ label: 'new' })
-    }
+    const breadcrumb = topbarBreadcrumb({
+      task: inTaskView() ? activeTask() ?? null : null,
+      params: { projectId: params.projectId, number: params.number },
+      isNew: isNew(),
+      projectScoped: sourceIsProjectScoped(selectedSource()),
+      pathname: location.pathname,
+      projectName: (id) => projects.data?.find((candidate) => candidate.id === id)?.name ?? id,
+      projectRoute: projectPath,
+    })
     return {
       workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
