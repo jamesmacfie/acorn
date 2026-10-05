@@ -290,6 +290,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   delivery records kept while acceptance is open. Its README indexes every programme and single file,
   including the [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
   in an owning doc above.
+- [Prompt caching analysis](./future/cache.md): Codex and Claude caching behavior, Acorn's protections,
+  proposed MCP and usage improvements, and verification before implementation.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
