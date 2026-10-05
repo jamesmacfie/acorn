@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–05 complete; phase 06 is next.
+Date: 2026-10-06. Status: phases 01–06 complete; phase 07 is next.
 
 ## Historical investigation
 
@@ -455,6 +455,51 @@ change behavior, focused keyboard tests, desktop build, outside install, and rea
 sessions were not repeated. Phase 15 still owns the combined gate.
 
 Phase 06 may proceed with the keymap dependency and keyboard seams unchanged.
+
+## Phase 06: internal import cycles (2026-10-06)
+
+Start revision: `20538e8bf649de17763f9033961cd813a488d0af`, clean worktree. Darwin arm64,
+Node 24.21.0 via `PATH=/private/tmp/acorn-trim-node-bin:$PATH`, pnpm 11.0.0. `CI=true pnpm
+install --frozen-lockfile` succeeded without lock changes. An offline attempt first reported a
+missing cached `source-map@0.6.1` tarball.
+
+The unchanged `node docs/future/trim/inventory.mjs` measured TypeScript-resolved relative static
+value imports before and after the extraction. The bounded [graph record](./artifacts/phase-06-import-graph.json)
+retains every edge, dynamic edge, unresolved import, and SCC for both areas. There were no unresolved
+relative imports in either run.
+
+| Area | Before | After | Removed SCC |
+| --- | --- | --- | --- |
+| Workflow server | 64 files, 128 value edges, one six-file SCC | 66 files, 130 value edges, no SCC | `definitions/files.ts`, `definitions/resolution.ts`, `processing/incremental.ts`, `processing/reprocess.ts`, `processing/store.ts`, `steps/builtins.ts` |
+| Agents client | 93 files, 193 value edges, one three-file SCC | 94 files, 194 value edges, no SCC | `paneContribution.ts`, `sessions/agentPaneModel.ts`, `sessions/managedSelection.ts` |
+
+`definitions/builtinDefinitions.ts` owns the built-in kinds, policies, and pure validators, using
+the existing shared `stepIdentity` and validation's graph-aware `precedes` callback. The handler
+registry stays in `steps/builtins.ts`. `definitions/fingerprint.ts` owns the same recursive JSON
+normalization and SHA-256 digest. Resolution still re-exports it for existing consumers; processing,
+dispatch, and schedules import the pure owner directly. Fixed digest assertions cover omitted
+undefined object fields and ordered arrays alongside existing key-order proof. Client
+`paneIdentity.ts` owns the one pane ID; `paneContribution.ts` re-exports it. Selection signals,
+including per-session **Chats only**, remain in `sessions/managedSelection.ts`. The selection test
+also checks returning to a session after selecting and clearing another. No route, schema, wire
+type, persisted ID, or fingerprint version changed.
+
+All five specified focused files passed: resolution 7, catalog 3, processing store 13, managed
+selection 4, and pane model 5 tests. `TURBO_FORCE=true pnpm lint` passed 37 of 37 tasks with no
+cache. The specified five-filter `TURBO_FORCE=true VITEST_MAX_WORKERS=2
+ACORN_TEST_CONCURRENCY=2 pnpm test` passed workflow 64 files/553 tests, agents 150 files/1,086
+tests with one skipped, Node 39 files/272 tests, TUI 68 files/673 tests with two skipped, and
+desktop 28 files/171 tests plus boot 10 tests and 62 Rust unit tests. The first sandboxed run
+failed loopback and process-table tests with `listen EPERM` and invisible process rows; the same
+gate passed with host permissions. After the selection tests, the agents suite passed again
+with 1,088 tests and one skipped. `pnpm --filter @acorn/arch-tests exec vitest run
+--maxWorkers=2` passed 12 files/86 tests. The existing architecture scanner checks package and
+source boundaries but does not form internal value-import SCCs; this phase retains the repeatable
+graph and behavioral tests instead of adding a separate file-text rule. The full root suite remains
+the phase 15 gate.
+
+Phase 07 can use the new pure definition and pane identity owners without changing their IDs or
+selection custody.
 
 ## Future implementation record
 

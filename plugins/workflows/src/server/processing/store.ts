@@ -7,7 +7,7 @@ import type { WorkflowCheckpoint, WorkflowProcessingScope, WorkflowRepeatPolicy 
 import type { WorkflowDef } from '../../shared/workflowContracts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import type { WorkflowDispatcher, WorkflowDispatchRequest, WorkflowTransaction } from '../dispatch/dispatcher'
-import { workflowContentFingerprint } from '../definitions/resolution'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { processingDecision, processingFields, processingProjection } from './rules'
 import { processingAttemptActive } from './readModel'
 import { resolveWorkflowReprocess } from './reprocess'

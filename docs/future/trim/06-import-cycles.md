@@ -1,6 +1,16 @@
 # Phase 06: remove the identified internal value-import cycles
 
-Date: 2026-10-04. Status: TODO. Risk: low to medium; identity and fingerprints must remain stable.
+Completion note, October 6, 2026: removed the six-module workflow and three-module agents
+value-import SCCs. `definitions/builtinDefinitions.ts` owns pure built-in kinds, policies, and
+validators; `definitions/fingerprint.ts` owns the unchanged persisted hash; and client
+`paneIdentity.ts` owns `AGENT_PANE_ID`. Runtime handlers and mutable selection remain with their
+existing owners. Compatibility exports remain in `steps/builtins.ts`, `definitions/resolution.ts`,
+and `paneContribution.ts`. The retained [graph](./artifacts/phase-06-import-graph.json) has no
+SCC in either area. The existing architecture scanner does not analyze internal TS value-import
+cycles, so this phase retains reproducible graph evidence rather than adding a file-text rule.
+Phase 07 can treat these owners as stable and need not change workflow identity or agent selection.
+
+Date: 2026-10-06. Status: DONE. Risk: low to medium; identity and fingerprints must remain stable.
 Prerequisite: accepted [phase 05](./05-keymap.md). Next: [phase 07](./07-tab-rail.md).
 Planning revision: `2ae55abb5`; resolve moved paths through earlier handoffs.
 

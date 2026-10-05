@@ -24,7 +24,7 @@ import {
   type ScheduleSourceDescriber,
 } from './model'
 import { workflowScheduleView } from './readModel'
-import { workflowContentFingerprint } from '../definitions/resolution'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 import type { WorkflowStartService } from '../runs/admission'
 
 const ACTIVE_RUN = ['running', 'gated', 'cancelling'] as const

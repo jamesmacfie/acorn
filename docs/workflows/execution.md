@@ -22,6 +22,13 @@ step outcomes. `dispatch/` reserves and waits for child workflows. `processing/`
 attempts and incremental checkpoints. `schedules/` owns scheduled admission. `routes/` exposes
 the Node capabilities without owning execution state.
 
+`definitions/builtinDefinitions.ts` owns the built-in kind and policy names and pure step validators;
+`steps/builtins.ts` attaches execution handlers to those names. The `decide` validator uses the
+graph's predecessor relation supplied by `validation/`, including implicit linear predecessors.
+`definitions/fingerprint.ts` owns the stable SHA-256 digest used by resolution, processing, and
+schedules. It sorts object keys with locale comparison, omits undefined object fields, and keeps
+array order; persisted digests depend on those bytes.
+
 Run lists and task navigation select scalar fields from SQLite. Navigation retains every historical
 descendant when choosing the latest run per task. Equal update timestamps keep insertion order.
 Reprocess roots use the source dispatch's original root when that lineage remains available.

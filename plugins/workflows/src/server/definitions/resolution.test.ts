@@ -196,4 +196,11 @@ describe('scoped workflow resolution', () => {
     expect(workflowContentFingerprint({ a: 1, b: { c: 2, d: 3 } }))
       .toBe(workflowContentFingerprint({ b: { d: 3, c: 2 }, a: 1 }))
   })
+
+  it('keeps persisted bytes when undefined object fields are omitted and arrays stay ordered', () => {
+    const value = { z: { omitted: undefined, b: 2 }, a: [2, 1] }
+    expect(workflowContentFingerprint(value)).toBe('3b5cc773ff0224d8008a6fa1f3489d79e5e798615c5cc8309d587bdda8667f3e')
+    expect(workflowContentFingerprint({ a: [1, 2], z: { b: 2 } }))
+      .toBe('28e8b268b5dd568b3eaf446e54a6b8db3401e5f47ff4ad4cb78c0b8848d26444')
+  })
 })

@@ -7,7 +7,7 @@ import { parse as parseToml } from 'smol-toml'
 import { z } from 'zod'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { agentProfileRegistry, resolveInRoot } from '@acorn/plugin-api/node'
-import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../steps/builtins'
+import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './builtinDefinitions'
 import type {
   ChildWorkflowConfig,
   ToolCeiling,

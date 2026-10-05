@@ -19,7 +19,7 @@ import {
   resolveWorkflowMapRoster,
   type WorkflowMapRoster,
 } from '../validation/bindings'
-import { workflowContentFingerprint } from '../definitions/resolution'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { workflowRunUsage } from '../runs/read/readModel'
 import { WorkflowSafetyRailError } from '../validation/treeSafety'
 import type { WorkflowSelectionRequest } from '../processing/store'

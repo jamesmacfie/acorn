@@ -1,38 +1,16 @@
 import { workflowDataHandlers } from './data'
 import { workflowIncrementalQuery } from '../processing/incremental'
+import { BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../definitions/builtinDefinitions'
 import { type HeadlessResult, type PluginDatabase } from '@acorn/plugin-api/node'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
 import type { GateFormOutput, GateFormProposal } from '../../shared/gateForm'
 import { resolveGateFormProposal } from '../validation/bindings'
-import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, StepValidator, WorkflowStepDef, WorkflowStepRow } from '../../shared/workflowContracts'
+import type { PolicyEvaluator, StepHandler, StepHandlerContext, StepHandlerOutcome, StepKindContribution, WorkflowStepDef, WorkflowStepRow } from '../../shared/workflowContracts'
 import { inlinePrompt, type RunnerDeps, type StepContextItem, type StepRunRequest } from '../runs/deps'
 
 export const MAX_STEP_TURNS = 8
 
-// The single source of truth for what ships built in. Registration below is keyed off these, and
-// workflowFiles' default validation catalog reuses them.
-export const BUILTIN_STEP_KINDS = ['agent', 'gate-human', 'gate-policy', 'ci-loop', 'decide', 'find-records', 'get-record-details', 'write-dataset', 'if'] as const
-export const BUILTIN_POLICIES = ['checks-green'] as const
-
-export const BUILTIN_STEP_VALIDATORS: Partial<Record<(typeof BUILTIN_STEP_KINDS)[number], StepValidator>> = {
-  'gate-policy': (step, { label, policies }) => {
-    if (!step.policy) return [`${label} has no policy`]
-    return policies.has(step.policy) ? [] : [`${label} names unknown policy '${step.policy}'`]
-  },
-  decide: (step, { label, indexes, precedes }) => {
-    const errors: string[] = []
-    if (!step.branches || !Object.keys(step.branches).length) errors.push(`${label} has no branches`)
-    for (const [verdict, target] of Object.entries(step.branches ?? {})) {
-      // The edges, not the list position. A target has to wait on the decision, directly or through
-      // the steps between them, or it would start beside it and the verdict would arrive too late to
-      // matter. "Through the steps between them" is what a plain list of steps has always meant, so a
-      // file written before the graph existed still passes.
-      if (!indexes.has(target)) errors.push(`${label} branch '${verdict}' has invalid target '${target}'`)
-      else if (!precedes(stepIdentity(step), target)) errors.push(`${label} branch '${verdict}' target '${target}' does not wait on ${label}`)
-    }
-    return errors
-  },
-}
+export { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from '../definitions/builtinDefinitions'
 
 type BuiltinServices = {
   db: PluginDatabase
@@ -240,4 +218,3 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
   }
 
 }
-import { stepIdentity } from '../../shared/workflowIdentity'

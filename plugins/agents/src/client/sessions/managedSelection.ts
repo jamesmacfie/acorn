@@ -1,7 +1,7 @@
 import { agentTelemetry, markAgentSelection, startAgentView } from './agentTelemetry'
 import { createSignal } from 'solid-js'
 import { clientEvents, consumePaneIntent, dispatchLayout, registerNoticeTargetHandler } from '@acorn/plugin-api/client'
-import { AGENT_PANE_ID } from '../paneContribution'
+import { AGENT_PANE_ID } from '../paneIdentity'
 
 const [selectedByTask, setSelectedByTask] = createSignal<Record<string, string | undefined>>({})
 const [focusedRequestBySession, setFocusedRequestBySession] = createSignal<Record<string, string | undefined>>({})

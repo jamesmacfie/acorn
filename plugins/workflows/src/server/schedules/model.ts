@@ -7,7 +7,7 @@ import type { ResolvedWorkflowGraph, ResolvedWorkflowNode, WorkflowBudget, Workf
 import { stepIdentity } from '../../shared/workflowIdentity'
 import type { WorkflowScheduleDraftInput, WorkflowScheduleLimits, WorkflowScheduleLoop, WorkflowScheduleLoopSetting } from '../../shared/workflowSchedules'
 import { processingFields } from '../processing/rules'
-import { workflowContentFingerprint } from '../definitions/resolution'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 
 export type ScheduleSourceDescription = {
   label: string

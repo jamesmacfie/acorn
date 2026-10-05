@@ -5,7 +5,7 @@ import type { WorkflowDef, WorkflowStepDef } from '../../shared/workflowContract
 import * as schema from '../../node/schema'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { workflowProcessingScopeKey } from './store'
-import { workflowContentFingerprint } from '../definitions/resolution'
+import { workflowContentFingerprint } from '../definitions/fingerprint'
 import { workflowAncestors, workflowEdges } from '../validation/definition'
 
 export function incrementalConsumer(def: WorkflowDef, query: WorkflowStepDef): WorkflowStepDef {

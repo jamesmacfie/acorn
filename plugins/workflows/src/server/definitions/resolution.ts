@@ -3,7 +3,8 @@ import { stepIdentity } from '../../shared/workflowIdentity'
 import { eq } from 'drizzle-orm'
 import { workflowFileOperations } from '../../node/schema'
 import type { WorkflowFileOperation } from '../../shared/workflowFileAuthoring'
-import { createHash } from 'node:crypto'
+import { workflowContentFingerprint } from './fingerprint'
+export { workflowContentFingerprint } from './fingerprint'
 import { isDir, type CoreServices, type PluginDatabase, type ProjectRef, type TaskRef } from '@acorn/plugin-api/node'
 import type {
   WorkflowDef,
@@ -62,21 +63,6 @@ type ResolvedDefinition = {
 }
 
 const runtimeKind = (step: WorkflowStepDef): boolean => step.kind === 'workflow' || step.kind === 'workflow-map'
-
-const stableValue = (value: unknown): unknown => {
-  if (Array.isArray(value)) return value.map(stableValue)
-  if (!value || typeof value !== 'object') return value
-  return Object.fromEntries(
-    Object.entries(value as Record<string, unknown>)
-      .filter(([, item]) => item !== undefined)
-      .sort(([left], [right]) => left.localeCompare(right))
-      .map(([key, item]) => [key, stableValue(item)]),
-  )
-}
-
-export function workflowContentFingerprint(value: unknown): string {
-  return createHash('sha256').update(JSON.stringify(stableValue(value))).digest('hex')
-}
 
 const provenanceKey = (provenance: WorkflowDefinitionProvenance): string => {
   if (provenance.source === 'inline') return 'inline'

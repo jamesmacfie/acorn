@@ -2,9 +2,9 @@ import { lazy } from 'solid-js'
 import { createAgentPaneModel, type AgentPaneModel } from './sessions/agentPaneModel'
 import { managedAgentStore } from './sessions/managedStore'
 import type { PaneLayoutContribution } from '@acorn/plugin-api/client'
+import { AGENT_PANE_ID } from './paneIdentity'
 
-/** The pane id, spelled once: the source record action and the pane-intent listener both name it. */
-export const AGENT_PANE_ID = 'agents'
+export { AGENT_PANE_ID } from './paneIdentity'
 
 const AgentPaneDetail = lazy(() => import('./sessions/AgentPane'))
 const AgentTaskSidebar = lazy(() => import('./sessions/AgentTaskSidebar'))
