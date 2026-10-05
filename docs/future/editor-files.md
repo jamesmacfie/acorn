@@ -58,7 +58,7 @@ The owner side, for a compiled pane:
 The contributor side:
 
 - A compiled plugin calls `ctx.extensions.register({ point, matches, component })`.
-  `plugins/memory/src/client/index.ts` fills `context:section` this way.
+  `plugins/memory/src/client/index.ts` fills `agents:tool-card` this way.
 - A loaded plugin declares an `extensions` entry with a `remote` carrier in its manifest, and its tree
   runs in the plugin worker. Or it declares an `inline` frame for a rectangle point.
 - The binary bridge, `bridge.api.getBytes`, capped at `MAX_PLUGIN_BYTES` (12 MiB) in
@@ -86,7 +86,7 @@ Props, in the editor's words:
 | --- | --- |
 | `taskId`, `path` | Which file. The contributor passes both back when it asks its own node route for bytes. |
 | `text` | The editor's live buffer for text files, so a preview follows typing without a read. Absent for binary files. |
-| `revision` | A counter the editor bumps when the file changes on disk or the window regains focus. A contributor cannot see either event, and the image preview already rereads on focus for this reason. |
+| `revision` | A monotonic counter for this mounted document. Bump it when live text changes, the file changes on disk, or focus triggers a reread. A contributor can discard work started for an earlier revision. |
 
 The editor draws a **Source** and **Preview** toggle outside the slot while `occupied` reports
 `true`, so the reader can always get back to the text. A rendered view is read-only and never enters
@@ -143,6 +143,27 @@ the image preview does in the terminal.
   preference ("always open markdown as preview") can come later.
 - **Side-by-side preview.** A preview next to the source is a different point, `editor:beside`, with a
   different layout. It is out of scope for the first version.
+
+## Prepare for later UI extensions
+
+The [UI extension programme](./ui-extension/README.md) follows this work. Keep these contracts usable
+by file actions, annotations, selections, and document language services:
+
+- Keep `path` as the canonical worktree-relative path used by Editor reads. The lowercased basename
+  is only the renderer matching key. Do not replace identity with that key or lowercase the real path.
+- Bind Node identity through the host mount. `{ taskId, path }` identifies a file within that Node;
+  neither a renderer key nor a supplied Node id grants access.
+- Export the read-only capability's input and result types from the Editor contract. Other Node
+  plugins consume that capability and expose their own routes. Keep worktree and symlink confinement
+  inside Editor, including reads after a task closes or changes worktree.
+- Document that capability reads return disk bytes. `text` is the live buffer and can include unsaved
+  changes. Switching to a preview must not save, discard, or replace that buffer.
+- Keep selection, language services, file actions, and tab controls owned by Editor outside the
+  replacement. Renderers receive data, not CodeMirror objects, DOM references, or filesystem grants.
+- Add no action, annotation, language-service, or generic nested-slot API in this work. The later
+  phases add their own bounded contracts. Frames and side-by-side rendering retain their deferrals.
+
+Revised October 6, 2026, to prepare for those consumers. The implementation status remains unchanged.
 
 ## Renderer catalogue
 

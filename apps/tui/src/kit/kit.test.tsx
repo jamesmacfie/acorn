@@ -555,10 +555,12 @@ const CASES: Case[] = [
   {
     node: 'CodeBlock',
     draws: 'monospace lines, a dim rule above and below',
-    render: () => <CodeBlock>{'first\nsecond'}</CodeBlock>,
+    // `ansi` output keeps its words and loses its escape codes.
+    render: () => <CodeBlock ansi>{'first\n\x1b(B\x1b[m\x1b[31msecond\x1b[0m'}</CodeBlock>,
     check: (frame) => {
       expect(rowOf(frame, 'second')).toBe(rowOf(frame, 'first') + 1)
       expect(rowOf(frame, 'first')).toBeGreaterThan(rowOf(frame, '───'))
+      expect(lineWith(frame, 'second').trim()).toBe('second')
     },
   },
   {

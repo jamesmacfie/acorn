@@ -124,7 +124,7 @@ paint containment would clip a card's focus ring.
 | `Grid` | collection | Reduced: as `Table`, with a row-range indicator instead of a scrollbar |
 | `Graph` | collection | Reduced: the indented list, one line per card: label, `⇐ n` where the card waits on more than one, detail at the far end, indented by rank and capped at four levels. No positions and no wires: a picture is what this host cannot draw, and the ranks are what the picture was saying. Where an edge can be authored, a picker under the list draws one out of the selected card |
 | `Meter` | none | `████░░░░ 62%`; `mark` takes over the cell it falls in, as `███▲░░░░`, rather than a row of its own |
-| `CodeBlock` | none | Monospace lines, a grey rule above and below |
+| `CodeBlock` | none | Monospace lines, a grey rule above and below. `ansi` output drops its escape codes and draws without colour |
 | `Log` | stop | Monospace lines, find as a bottom line |
 | `Markdown` | none | Reduced: headings bold, lists as `•`, code in a `CodeBlock`, no images, no wide tables, and a link as its text with the URL beside it in grey |
 | `DiffPane` | none | Reduced: unified only, `+`/`-` in colour, annotations as indented lines under their row. Windowed, so a long patch draws the rows around the viewport and not all of them |

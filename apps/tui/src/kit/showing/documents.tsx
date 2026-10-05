@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, For, Show, type JSX } from 'solid-js'
+import { stripAnsi } from '@acorn/client-core/kit/lib/ansi'
 import { flatten, Line, Run, slot } from '../cells'
 import { markdownLines, type Line as MarkdownLine } from '../markdown'
 import { rule } from '../roles'
@@ -13,13 +14,17 @@ export function CodeBlock(props: {
   wrap?: boolean
   size?: 'xs' | 'sm'
   maxHeight?: 'none' | 'block'
+  ansi?: boolean
   children: JSX.Element
 }) {
   const RULE = 40
+  // Terminal output loses its colour here: this host draws in roles, and a raw escape code written
+  // into a cell would reach the real terminal underneath.
+  const text = () => (props.ansi ? stripAnsi(flatten(props.children)) : flatten(props.children))
   return (
     <box flexDirection="column">
       <Line role="muted">{rule(RULE)}</Line>
-      <For each={flatten(props.children).split('\n')}>
+      <For each={text().split('\n')}>
         {(line) => <Line role="mono" wrap={props.wrap}>{line}</Line>}
       </For>
       <Line role="muted">{rule(RULE)}</Line>

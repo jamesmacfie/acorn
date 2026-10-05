@@ -617,8 +617,9 @@ describe('architecture boundaries', () => {
       // Storage and memory (settings/StorageSettings.tsx), a lazy chunk the desktop registers like the
       // others, merged in from perf the same day. One more on 2026-10-02 for `kit/lib/formatChord`, so a
       // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
-      // `features/editor/documentCustody.ts`, merged in from perf.
-      '@acorn/client-core': 168, // Includes the host-owned Datasets settings page and the panel studio's open flag.
+      // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
+      // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
+      '@acorn/client-core': 169, // Includes the host-owned Datasets settings page and the panel studio's open flag.
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.

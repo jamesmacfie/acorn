@@ -138,7 +138,7 @@ const AgentToolFold: Component<AgentToolRendererProps> = (props) => {
             <Show when={props.tool.input}>{(input) => <CodeBlock wrap maxHeight="block">{input()}</CodeBlock>}</Show>
             <Text emphasis="muted">Started {started()}</Text>
             <Show when={output()}>
-              {(output) => <CodeBlock wrap maxHeight="block">{output()}</CodeBlock>}
+              {(output) => <CodeBlock wrap maxHeight="block" ansi>{output()}</CodeBlock>}
             </Show>
             <Index each={props.fileChanges ?? []}>
               {(change) => <Show when={change().patch} fallback={
