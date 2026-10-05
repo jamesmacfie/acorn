@@ -46,7 +46,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 12 DONE | [Separate provider process ownership](./12-agent-processes.md) | A private lifecycle owner holds live generations, child retirement, callbacks, and process timers; engine and queue retain their distinct duties. See [evidence](./evidence.md#phase-12-provider-processes-2026-10-06). |
 | 13 DONE | [Replace runtime inheritance](./13-agent-composition.md) | Product commands compose one engine through explicit operations; API parity and gates in [evidence](./evidence.md#phase-13-agent-composition-2026-10-06). |
 | 14 DONE (retention) | [Resolve provider coupling debt](./14-provider-boundary.md) | Retained shared-core repository and task pull state; writer/consumer and invariant maps find no present blocked consumer. No migration approved. See [evidence](./evidence.md#phase-14-provider-boundary-2026-10-06). |
-| 15 ACCEPTANCE OPEN | [Combined acceptance](./15-acceptance.md) | Clean install, full gates, paired measurements, packed npm and staged PTY smokes, and live desktop/TUI sends passed. Local macOS release artifact and Windows/Linux target runtime proof remain open. See [combined evidence](./evidence.md#phase-15-combined-acceptance-2026-10-06). |
+| 15 ACCEPTANCE OPEN | [Combined acceptance](./15-acceptance.md) | Clean install, full gates, paired measurements, packed npm and staged PTY smokes, and live desktop/TUI sends passed. A local macOS app and DMG built with stripping disabled; updater signing and Windows/Linux target smokes remain open. See [combined evidence](./evidence.md#phase-15-combined-acceptance-2026-10-06) and [follow-up](./evidence.md#phase-15-follow-up-2026-10-06). |
 
 ## Rules that apply to each handoff
 

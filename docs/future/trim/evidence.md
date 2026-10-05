@@ -102,38 +102,129 @@ session list, composer; `Ctrl+Return` sent. Both drivers then reported their ses
 and their launcher PIDs and path-owned children were absent from the process table. Neither fixture
 used the production data root.
 
-Live final-host coverage does **not** establish task rename, origin switch, existing-worktree or
-project-folder creation, drag/right-click menus, native picker, modal/focus shortcuts, concurrent
-held awaits, fork, Chats only, queue edit/reorder/cancel, approvals, idle stop, workflow/delegated
-turns, terminal handoff, or loaded-plugin reload/disable. The desktop WebDriver cannot right-click,
-drag, or reach native menus/dialogs. The host had no pending approval or queued turn to manipulate;
-disabled controls are not proof. Phase 07/08 fixture tests and phase 08's earlier live picker/send
-cover task and composer cases. The full root run includes public controlled fixtures for queue,
-request, retirement, second boot, workflow capability activation, and plugin startup/invocation,
-failed `init`/`ready` reload retaining old, successful reload, disable, and storage disposal.
-These are deterministic proofs, not phase 15 live-host observations. The phase 10 replay-after-
-commit failure remains a documented limit, not a retained-old-instance guarantee.
+The [follow-up](#phase-15-follow-up-2026-10-06) added live task rename, native row menu,
+palette/Escape, Chats only across navigation, and queue edit/reorder/cancel through an isolated
+Codex session. Live final-host coverage still does **not** establish origin switch,
+existing-worktree creation, drag, concurrent held awaits, fork, pending approval action, idle stop,
+a completed workflow/delegated turn, terminal handoff, or loaded-plugin reload/disable. Phase 07/08
+fixture tests and phase 08's earlier live picker/send cover task and composer cases. The full root
+run includes public controlled fixtures for queue, request, retirement, second boot, workflow
+capability activation, and plugin startup/invocation, failed `init`/`ready` reload retaining old,
+successful reload, disable, and storage disposal. These are deterministic proofs, not phase 15
+live-host observations. The phase 10 replay-after-commit failure remains a documented limit,
+not a retained-old-instance guarantee.
 
 The existing `verify:bundle` supports macOS `.app`/DMG/updater inventory and a separate Windows
-bundle branch; its default path has no Linux release bundle implementation. The local macOS
-`dist --prebuilt` first hit Tauri CLI's executable-name detection because the pinned `node` was a
-symlink to `node-v24.21.0-aarch64-apple-darwin`. Copying the same binary under the name `node`
-passed that boundary. The Rust 1.96.0 release build then repeatedly generated proc-macro dylibs
-that macOS rejected with `mis-aligned LINKEDIT string pool` (observed for `serde_derive` and
-`zerofrom_derive`), even after cleaning only this checkout's release outputs. The retained
-[release failure](./artifacts/phase-15-dist-failed.log.gz) is the final attempt. With no `.app` or
-DMG, `verify:bundle` failed at the missing `target/release/bundle/macos` directory
-([verifier log](./artifacts/phase-15-verify-bundle-failed.log.gz)). No signed or installed desktop
-artifact was verified, and the release signing key was unavailable locally. A CI macOS target
-runner must build the release artifact and run `verify:bundle`, then smoke the installed helper's
-PTY and Claude fallback path. The Windows x64 release runner must execute ConPTY read/resize/stop
-from its installed bundle and run the Windows inventory branch. Linux CI must execute its locally
-built node-pty addon under the pinned runtime; the release inventory verifier has no Linux artifact
-branch, so the runner must report the addon smoke separately. The repository has those macOS,
-Windows, and Linux jobs, but no run for this branch/commit was available as evidence. Darwin
-staging fixtures and PTY smoke do not prove those target executions. Keep release acceptance open
-until these exact runner results and the uncovered host interactions required by the phase are
-recorded; no deployment, package publication, or merge occurred.
+bundle branch; its default path has no Linux release bundle implementation. The first local macOS
+`dist --prebuilt` hit Tauri CLI's executable-name detection because pinned `node` was a symlink.
+Copying the same binary under the name `node` passed that boundary. Two Rust 1.96.0 builds then
+generated proc-macro dylibs rejected with `mis-aligned LINKEDIT string pool` (`serde_derive` and
+`zerofrom_derive`). The earlier [release failure](./artifacts/phase-15-dist-failed.log.gz) and
+[missing-bundle verifier log](./artifacts/phase-15-verify-bundle-failed.log.gz) remain as initial
+evidence. A third, different build passed Rust compilation and produced an ad-hoc signed local app
+and DMG with `CARGO_PROFILE_RELEASE_STRIP=none`. Tauri stopped at the absent updater private key;
+`verify:bundle` checked all resources and the local code signature, then failed only on the missing
+updater `.sig`. This is neither a complete signed release nor an installed-artifact smoke. The
+[follow-up](#phase-15-follow-up-2026-10-06) records the exact runner work. Darwin staging and PTY
+smokes do not prove Windows or Linux execution. Acceptance remains open; no deployment,
+publication, or merge occurred.
+
+## Phase 15 follow-up (2026-10-06)
+
+### macOS release diagnosis and local artifact
+
+The host is macOS 27.0.0 with Xcode 27.0 (27A266a), Apple `ld-27037.1`, Apple clang 21.0.0,
+and the MacOSX SDK in `/Applications/Xcode.app/Contents/Developer/Platforms/MacOSX.platform/Developer/SDKs`.
+`rustc -vV` reports 1.96.0 (`ac68faa20`), `aarch64-apple-darwin`, LLVM 22.1.2. Installed `stable`
+and `1.96.0` both resolve to this compiler; changing their names would not test another compiler.
+The desktop crate requires Rust 1.82 or newer. No repository Cargo config or ambient `RUSTFLAGS`,
+`CARGO_PROFILE_*`, or linker override was found. The failing release used Cargo's default
+`-C strip=debuginfo` for proc macros. An isolated `zerofrom-derive` build happened to produce an
+aligned dylib, so it did not alone reproduce the layout-dependent failure.
+
+The [Rust compiler issue](https://github.com/rust-lang/rust/issues/157750) reproduces macOS 27's
+exact dyld error with `-C strip=debuginfo` and identifies unaligned `LC_SYMTAB.stroff`.
+The [LLVM issue](https://github.com/llvm/llvm-project/issues/203678) traces the bad Mach-O tail
+alignment to LLVM's objcopy debug stripping. This source and the observed command/dyld error
+justify a local strip override; they do not prove every possible Mach-O layout is safe. With
+`CARGO_PROFILE_RELEASE_STRIP=none`, verbose `zerofrom-derive` compilation omitted
+`-C strip=debuginfo`; its `LC_SYMTAB.stroff` was 2,939,568 (mod 8 = 0), and `dlopen` succeeded.
+The single materially different full attempt used pinned Node 24.21.0 and:
+
+```sh
+CARGO_PROFILE_RELEASE_STRIP=none CARGO_BUILD_JOBS=2 pnpm --filter @acorn/desktop run dist --prebuilt
+```
+
+It passed Rust compilation and produced `acorn.app`, `acorn_1.0.0_aarch64.dmg`, and
+`acorn.app.tar.gz`. Tauri ad-hoc signed the app, then exited 1: `A public key has been
+found, but no private key`; no updater `.sig` was emitted ([bounded build log](./artifacts/phase-15-dist-unstripped.log.gz)).
+The existing `pnpm --filter @acorn/desktop verify:bundle` checked bundled Node 24.21.0, 413
+client files, 2 bridge files, 6,405 helper files, 3 CLI files, 32 plugin files, valid local code
+signature, and the DMG. It exited 1 solely because `acorn.app.tar.gz.sig` was absent
+([verifier log](./artifacts/phase-15-verify-unstripped.log.gz)). The local `.app` is ad-hoc signed
+and unnotarized; no installed artifact or updater signature is claimed. This third build closes
+the proc-macro diagnosis and stops local rebuilds at the actual credential prerequisite. No
+dependency, budget, security, or signing policy changed.
+
+### Controlled host follow-up
+
+Desktop session `trim-15-correction` used `tui-navigation` in its own data root and generated repo.
+WebDriver opened the imported transcript, toggled Chats only, visited the other task, and returned:
+tool cards remained hidden and user/agent messages visible. Native control was bound to this
+session's exact app path and PID 11541, then raised its window. Right-clicking the task row opened
+`Actions for Plan follow-up work`; Rename saved `Plan follow-up verified` and the rail/breadcrumb
+updated. `⌘K` opened the command palette with 38 results; Escape closed it and returned to the task.
+The first phase 15 host run already proved task setup modes and branch conflict.
+
+On the second fixture task, a managed Codex session ran `sleep 90` while public composer sends
+queued A and B. `Move queued turn up` put B before A; after the held turn finished, the transcript
+showed B/QB before A/QA. A later `sleep 180` held the provider while a queued prompt was edited
+from `original text` to `revised text`, then removed. The revised card appeared before removal and
+disappeared while the provider still worked. Stopping the active turn returned the session to ready
+with an interrupted turn. These are live host controls, separate from deterministic race tests.
+The [bounded host excerpts](./artifacts/phase-15-host-followup.txt) record before/after text and
+control labels. No production data root was used.
+
+The same host's Workflows surface had no definition. Its public editor created a local one-step
+`Ask an agent` definition named `Trim 15 workflow fixture` with Codex selected and a no-edit
+prompt. The editor showed `1 step, no problems`, but remained `Saving…`, `Not published`, and
+`Run…` disabled. Clicking Publish opened no action. A completed workflow or delegated turn is
+therefore not claimed from this host. The imported transcript showed completed `Explore module`
+subagents, which are fixture history rather than a new live delegation. The full root gate's public
+runtime/capability tests remain deterministic workflow proof. The large-session fixture resolves
+each generated permission request before ending its imported session, so it cannot establish a
+host response to a pending approval. No safe live approval prompt was produced. Phase 07/08 live
+picker evidence remains applicable where implementation is unchanged; drag was not repeated.
+
+The desktop driver reported `trim-15-correction` not running after `stop`; a process-table check
+found no session-path process or `sleep 180` child. The session remained isolated and disposable.
+
+### Exact external runner follow-ups
+
+`.github/workflows/ci.yml` offers `workflow_dispatch` and a Linux `ubuntu-latest` suite;
+`.github/workflows/build-desktop.yml` defines `macos-latest` and `windows-latest` release bundles.
+This unpushed commit has no authorized runner execution. `gh auth status` found the configured
+GitHub token invalid, so no Actions run or artifact could be inspected or invoked here. This is
+an external runner access gap, not a Windows or Linux implementation failure.
+
+After review makes this exact commit available to runners, dispatch `ci.yml` for that commit with
+Node 24 and frozen pnpm 11 install. On macOS, supply the existing updater private key, use the
+proven `CARGO_PROFILE_RELEASE_STRIP=none` on macOS 27/Rust 1.96 if the image matches, run
+`pnpm --filter @acorn/desktop run dist --prebuilt` and
+`pnpm --filter @acorn/desktop verify:bundle`, and require `.app`, DMG, `.app.tar.gz`, and `.sig`
+inventory plus installed helper PTY read/resize/stop and Claude fallback smoke. On Windows x64,
+require the NSIS installer and signature, the verifier's Windows branch, and installed ConPTY
+read/resize/stop under the pinned runtime. On Linux, require the built `node-pty` addon
+(`build/Release/pty.node` and `spawn-helper`) to load under the pinned runtime and perform
+read/resize/stop. The verifier has no Linux release bundle branch, so report that separately.
+Preserve command logs and installed artifact paths. A Darwin staged helper is no substitute.
+
+Acceptance remains **OPEN** pending updater signing, installed artifact smokes, Windows/Linux
+target execution, and the still-uncovered host approval/workflow/plugin interactions required by
+the phase. The prior full install/lint/test/build/pack logs above remain valid for unchanged
+source. This follow-up changed evidence only; it did not repeat those complete gates. The final
+architecture/doc-link check passed 12 files and 86 tests after these edits
+([log](./artifacts/phase-15-arch-followup.log.gz)); `git diff --check` passed.
 
 ## Phase 14 provider boundary (2026-10-06)
 

@@ -14,19 +14,24 @@ The independent packed npm install, CLI help, TUI startup, and staged pinned-Nod
 and exit also passed. The [combined evidence](./evidence.md#phase-15-combined-acceptance-2026-10-06)
 records comparable inventory, owner walkthroughs, host screens, logs, and retained decisions.
 
-The isolated desktop sent a live managed Codex turn and retained a draft after navigation. The
-isolated TUI sent a live managed Codex turn at 120×40, closing phase 13's host focus/send gap.
+The isolated desktop sent live managed Codex turns, retained a draft after navigation, and in the
+follow-up exercised queue editing, reordering, and cancellation. Native control also proved task
+rename, row menu, and command palette/Escape; Chats only survived navigation. The isolated TUI
+sent a live managed Codex turn at 120×40, closing phase 13's host focus/send gap.
 Held requests, queue and process races, workflow adapters, and loaded-plugin rollback have
-deterministic public fixture proof in the full test run. The host drivers could not exercise every
-native menu, drag, picker, approval, queue, workflow, and loaded-plugin interaction live. Those
+deterministic public fixture proof in the full test run. The hosts did not prove pending approval
+action, a completed workflow/delegated run, drag, or loaded-plugin reload/disable live. Those
 limits are listed with the exact proof available in the combined evidence.
 
-Release acceptance remains open. The local macOS `dist --prebuilt` build failed because Rust 1.96.0
-generated a proc-macro dylib that macOS rejected with a misaligned `LINKEDIT` string pool. Cleaning
-only this checkout's release outputs and rebuilding reproduced it. No `.app`/DMG existed, so
-`verify:bundle` could not inspect an installed artifact. Windows ConPTY and Linux built-addon
-runtime smokes also need their target runners. Do not describe staged files or Darwin PTY behavior
-as those target results. This audit records those gaps without changing release policy or budgets.
+Release acceptance remains open. The first two local macOS release attempts failed when Rust 1.96.0
+produced proc-macro dylibs with misaligned `LINKEDIT` string pools. A third, materially different
+attempt used `CARGO_PROFILE_RELEASE_STRIP=none`: compilation, app bundling, and DMG creation passed.
+Tauri then refused to sign the updater because the required private key is unavailable locally.
+The existing `verify:bundle` checked the local app's resources, runtime, code signature, and DMG;
+its remaining failure was the absent updater `.sig`. This is an ad-hoc signed local bundle, not a
+complete signed release or an installed-artifact smoke. Windows ConPTY and Linux built-addon runtime
+smokes still need their target runners. The [follow-up evidence](./evidence.md#phase-15-follow-up-2026-10-06)
+gives the exact toolchain, host interactions, runner prerequisites, and remaining limits.
 
 ## Task and context
 
