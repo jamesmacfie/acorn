@@ -21,10 +21,10 @@ Node API, protocol, broker, client cache, and UI. Keep the Node/shell and plugin
 the contribution and capability seams. When behavior or a contract changes, update the doc that
 owns it and add any new doc to `docs/README.md`.
 
-## Simplicity, readability, and maintainability
+## Simplicity, readability, maintainability, and developer experience
 
 Treat these as requirements for every change, including fixes, features, tests, and refactors.
-Optimize for a developer who needs to understand the behavior and change it safely later.
+Optimize for a developer who needs to understand the behavior, change it safely, and verify the result.
 
 - Use descriptive names, straightforward control flow, typed contracts, and explicit dependencies.
   Make data flow, state ownership, side effects, and asynchronous lifetimes visible in the code.
@@ -39,10 +39,15 @@ Optimize for a developer who needs to understand the behavior and change it safe
   Keep useful libraries when they reduce the code and behavior Acorn must maintain.
 - Preserve behavior, persisted data, public contracts, and security boundaries when simplifying.
   Keep changes focused, remove obsolete paths created by the change, and verify observable behavior.
+- Consider developer experience (DX) for contributors and plugin authors. Keep setup reproducible,
+  commands and APIs discoverable, and development and test feedback timely. Provide actionable
+  errors and enough diagnostic context to debug failures. Reduce repeated manual steps and hidden
+  prerequisites, and document the workflow beside the feature or tool that owns it.
 
 Before handoff, review whether another developer can find the owner, follow the inputs and outputs,
-and make a routine change without tracing unrelated code. Explain any complexity the change adds
-and why it is needed. Flag broader cleanup separately when it falls outside the task's scope.
+and make and verify a routine change without tracing unrelated code or relying on undocumented steps.
+Explain any complexity or workflow burden the change adds and why it is needed. Flag broader cleanup
+separately when it falls outside the task's scope.
 
 ## Scripts
 
