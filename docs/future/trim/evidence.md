@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–04 complete; phase 05 is next.
+Date: 2026-10-06. Status: phases 01–05 complete; phase 06 is next.
 
 ## Historical investigation
 
@@ -384,6 +384,74 @@ Baseline checks used `PATH=/private/tmp/acorn-trim-node-bin:$PATH`:
 Phase 05 may start with the phase 03 dependency graph and stage policy. An SDK or adapter upgrade
 requires reviewing executable selection, settings import, managed-policy environment mutation,
 session query, logout, and `--cli` before revisiting this retention decision.
+
+## Phase 05: keymap dependency branch (2026-10-06)
+
+**Decision: retain.** Started at accepted revision `e99e535ce` on Darwin arm64 with Node 24.21.0,
+pnpm 11.0.0, and lockfile SHA-256 `83bbf1f7c3927a7db252a15e571c5fc66111d77e69a7e3d07693c8e49f29c8b4`.
+`packages/client-core/src/host/keys/install.ts` constructs the shared engine through its HTML
+adapter. `packages/client-core/src/kit/keys/keymapHost.ts` exposes the typed engine and intent layer
+seam to both hosts. `apps/tui/src/keys/install.ts` constructs that engine with the TUI's own
+`KeymapHost`, registers the universal parser, enabled fields, and metadata, then adds region keys.
+`apps/tui/src/keys/commandLayer.ts` applies Acorn's resolved command bindings at its own priority;
+`regions.ts` owns focus, `trap.ts` owns modal Escape, and collection layers own navigation. These
+owners preserve one intent table, typing protection, command precedence, and teardown. No keyboard
+code, contribution ID, preference, or public contract changed.
+
+The installed 0.5.9 package's `package.json` exports the main, `./addons`, and `./html` entries Acorn
+uses, plus OpenTUI-specific entries that Acorn does not use. It declares `@opentui/core` 0.5.9 as a
+regular dependency and MIT as its license. Its compiled main and universal addons import only
+keymap chunks and the keymap main; HTML imports those public entries. None of those chunks imports
+Core. Only the unselected `./opentui` and `./addons/opentui` JavaScript entries value-import Core;
+corresponding OpenTUI declarations also reference Core types. The accepted lock snapshot makes
+Core's renderer, eight platform optional packages, and other transitives installable regardless of
+the selected entry. The phase 03 inventory reports **18 uniquely removable locked snapshots** for
+the keymap root after subtracting every other production and development root; the historical
+24-entry branch count is not a delivered saving.
+
+The [upstream package manifest](https://github.com/anomalyco/opentui/blob/main/packages/keymap/package.json)
+was checked on October 6, 2026, when it identified version 0.5.12, MIT, the same public entry
+families, and a required `@opentui/core` dependency. The upstream
+[core API](https://opentui.com/docs/keymap/core/) and
+[universal addons](https://opentui.com/docs/keymap/addons/) describe the supported engine and
+registration API Acorn uses. They document no separate renderer-free distribution. An override that
+deletes Core would violate the package manifest, and a custom engine or vendor fork would assume
+Acorn's layer, sequence, focus, and cleanup semantics. No supported narrower candidate was
+established at reasonable maintenance cost. Revisit only if upstream publishes one or a separate
+replacement plan proves desktop and TUI parity and the independent Node installation.
+
+For emitted graph proof, the TUI was built with the accepted lock's modules copied from the phase 04
+worktree, whose lockfile hash matched. The Vite build passed, followed by
+`node apps/tui/scripts/check-startup-graph.mjs` and
+`node apps/tui/scripts/check-runtime-imports.mjs`. Startup reported 160 chunks and 710,371 B of
+2,187,158 B built, within its 720,000 B limit. Its external imports include
+`@opentui/keymap`, `@opentui/keymap/addons`, and `@opentui/keymap/html`. Parsing every emitted chunk
+reported zero `@opentui/core` external edges and zero bundled Core modules; no emitted JavaScript
+contained a Core import. The runtime check resolved all 47 external imports. These are emitted
+value-graph observations, not an independent installed-artifact test or a claim that Core is absent
+from `node_modules`.
+
+| Measure | Phase 05 change | Meaning |
+| --- | ---: | --- |
+| Direct dependency declarations | 0 | The two host declarations and standalone pin and peer policy remain. Only the TUI manifest explanation changed. |
+| Locked snapshots | 0 | The lockfile and its 18 potentially removable keymap-only snapshots remain. |
+| Emitted imports and bytes | 0 | No source or dependency changed; the TUI graph above is a retained baseline, not a before/after reduction. |
+| Installed package copies and bytes | 0 | Core remains installed through keymap; no installed closure was removed. |
+
+The worktree's offline frozen install lacked cached `@esbuild-kit/core-utils@3.3.2`; a sandboxed
+online attempt could not resolve npmjs.org. A copied identical-lock module tree let the emitted
+graph checks run, but pnpm's automatic dependency-status check then refused a noninteractive modules
+purge. The direct Vite and Node script commands above used the supported Node runtime. Since the
+retained implementation did not change behavior, focused keyboard tests, desktop build, outside
+install, and real desktop/TUI sessions were not repeated. Phase 15 still owns the combined gate.
+
+The architecture runner invoked directly from its copied `node_modules` passed 11 files and 83
+tests, including the document path and link checks. The remaining `testFocus.test.ts` integration
+case failed because its spawned pnpm command reached the same noninteractive modules-purge check;
+the full direct run reported 11 passing files, one failing file, and 85 passing tests out of 86.
+This is a copied-install verification limit, not a keyboard regression or a passing full gate.
+
+Phase 06 may proceed with the keymap dependency and keyboard seams unchanged.
 
 ## Future implementation record
 

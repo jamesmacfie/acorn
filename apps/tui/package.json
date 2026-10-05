@@ -17,7 +17,7 @@
     "lint": "tsc --noEmit",
     "test": "vitest run"
   },
-  "//dependencies": "@opentui/keymap is the keyboard engine and nothing else: it is pure TypeScript, it holds no renderer, and @acorn/client-core drives the same one through the desktop's HTML adapter. The painter packages it used to arrive with, @opentui/core and @opentui/solid, are gone.",
+  "//dependencies": "@opentui/keymap supplies the shared host-independent keyboard engine. The desktop uses its HTML adapter; the TUI supplies its own host and painter. Keymap still declares @opentui/core, which installs transitively even though these hosts' entrypoints do not value-import that renderer.",
   "dependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/custody": "workspace:*",

@@ -1,6 +1,6 @@
 # Trim: maintainability and dependency work
 
-Date: 2026-10-06. Status: phases 01–04 complete; phase 05 is next.
+Date: 2026-10-06. Status: phases 01–05 complete; phase 06 is next.
 Planning revision: `2ae55abb5ca25399d9510eb23df14176a1ba1c82`.
 
 This programme turns the maintainability and dependency investigations into sequential assignments.
@@ -25,7 +25,7 @@ There is no arbitrary package-count or file-length target. Read [refused approac
 
 ## Sequential assignments
 
-Phases 05–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
+Phases 06–15 remain TODO. Start the next phase only after the preceding phase's acceptance and
 handoff. This order is an execution order; some assignments have no technical dependency on earlier
 changes. Phases 04, 05, and 14 permit a documented retention decision under their acceptance criteria.
 That is a completed investigation, never a claim that a reduction or migration shipped.
@@ -36,7 +36,7 @@ That is a completed investigation, never a claim that a reduction or migration s
 | 02 DONE | [Remove unused direct dependencies](./02-direct-dependencies.md) | Five declarations removed; frozen lockfile, consumer suites, and independent CLI/TUI startup passed. See [evidence](./evidence.md#phase-02-unused-direct-dependencies-2026-10-06). |
 | 03 DONE | [Stage native files for the target](./03-native-payload.md) | Five target fixtures and Darwin arm64 PTY smoke passed; staged helper fell by 60,496,168 B. Other target runtime smoke remains a release gate. See [evidence](./evidence.md#phase-03-target-native-files-2026-10-06). |
 | 04 DONE (retention) | [Resolve the bundled Claude payload](./04-claude-payload.md) | Binary retained: adapter managed policy can clear Acorn's override and use the SDK fallback; zero realized savings. See [evidence](./evidence.md#phase-04-bundled-claude-payload-2026-10-06). |
-| 05 | [Resolve the keymap dependency branch](./05-keymap.md) | Supported narrower dependency, or a justified retention decision. |
+| 05 DONE (retention) | [Resolve the keymap dependency branch](./05-keymap.md) | Keymap retained: its supported entries avoid Core at runtime, but the required package dependency remains; zero realized savings. See [evidence](./evidence.md#phase-05-keymap-dependency-branch-2026-10-06). |
 | 06 | [Remove internal import cycles](./06-import-cycles.md) | Workflow and agent-selection value-import cycles removed without contract changes. |
 | 07 | [Separate rail task editing](./07-tab-rail.md) | Task dialog state and commands owned outside the rail composition component. |
 | 08 | [Separate composer operations](./08-agent-composer.md) | Submission, context capture, and attachments have explicit draft ownership. |
