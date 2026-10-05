@@ -23,7 +23,7 @@ describe('terminal source promotion', () => {
     try {
       openPromotion({ pluginId: 'probe-once', projectId: 'project-1',
         item: { id: 'incident-once', title: 'One linked incident', task: { title: 'One linked incident' } } as PluginRailItem })
-      await screen.until('Create or link task')
+      await screen.until('Project: acorn')
       for (let step = 0; step < 10 && !(await screen.caret()).text.includes('One linked incident'); step++) {
         await screen.press('TAB')
       }
