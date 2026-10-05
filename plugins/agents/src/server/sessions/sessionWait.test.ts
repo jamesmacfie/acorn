@@ -6,9 +6,9 @@ import { ManagedAgentRuntime } from './runtime'
 import { managedAgentsBridge } from '../routes/managedBridge'
 
 class WaitRuntime extends ManagedAgentRuntime {
-  commit(event: AgentNormalizedEvent, session = 'target') { return this.record(session, null, event) }
-  frame(frame: AgentWsFrame) { this.emit(frame) }
-  listenerCount() { return this.listeners.size }
+  commit(event: AgentNormalizedEvent, session = 'target') { return this['engine'].record(session, null, event) }
+  frame(frame: AgentWsFrame) { this['engine'].emit(frame) }
+  listenerCount() { return this['engine']['listeners'].size }
 }
 
 describe('authoritative managed waits', () => {

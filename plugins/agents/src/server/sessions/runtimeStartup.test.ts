@@ -14,8 +14,8 @@ const deferred = <T>() => {
 }
 
 class Engine extends ManagedAgentRuntime {
-  connect(session: AgentSession) { return this.ensureSession(session) }
-  disconnect(session: AgentSession) { return this.stopLive(session.id) }
+  connect(session: AgentSession) { return this['engine'].ensureSession(session) }
+  disconnect(session: AgentSession) { return this['engine'].stopLive(session.id) }
 }
 
 describe('managed startup generations', () => {

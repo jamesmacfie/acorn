@@ -30,6 +30,7 @@ import type { ProcessRow } from './footprint'
 import { AgentStore } from './store'
 import { QueueCoordinator } from './queueCoordinator'
 import { ProviderSessionLifecycle, type ProviderGeneration } from './providerSessionLifecycle'
+import type { AgentDriverSession } from '../drivers/types'
 import { clientEventRecord } from './rowMapping'
 import {
   eventSubagentId,
@@ -482,29 +483,46 @@ export class ManagedAgentEngine {
     if (retirementFailure) throw retirementFailure
   }
 
-  protected holdSessionReadiness(sessionId: string): void {
+  holdSessionReadiness(sessionId: string): void {
     this.processes.holdReadiness(sessionId)
   }
 
-  protected discardSessionReadinessHold(sessionId: string): void {
+  discardSessionReadinessHold(sessionId: string): void {
     this.processes.releaseReadiness(sessionId)
   }
 
-  protected async completeSessionReadiness(sessionId: string): Promise<void> {
+  async completeSessionReadiness(sessionId: string): Promise<void> {
     this.processes.releaseReadiness(sessionId)
     if (this.stopped) return
     await this.record(sessionId, null, { type: 'session_state', state: 'ready' })
     void this.pump()
   }
 
-  protected readWhileRunning<T>(query: () => Promise<T>): Promise<T> {
+  readWhileRunning<T>(query: () => Promise<T>): Promise<T> {
     this.shutdown.signal.throwIfAborted()
     return awaitWithSignal(query(), this.shutdown.signal)
   }
 
-  protected ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<ProviderGeneration> {
+  ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<ProviderGeneration> {
     return this.processes.ensure(session, admission)
   }
+
+  get shutdownSignal(): AbortSignal { return this.shutdown.signal }
+  get isStopped(): boolean { return this.stopped }
+  currentSession(sessionId: string) { return this.processes.current(sessionId) }
+  sessionSignal(generation: ProviderGeneration): AbortSignal { return this.processes.signal(generation) }
+  hasLiveSession(sessionId: string): boolean { return this.processes.has(sessionId) }
+  liveSessionIds(): string[] { return this.processes.ids() }
+  withSessionHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T> {
+    return this.processes.withHandle(generation, operation)
+  }
+  withCurrentSessionHandle<T>(generation: ProviderGeneration, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+    return this.processes.withCurrentHandle(generation, operation)
+  }
+  sessionHandleIfPresent<T>(sessionId: string, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
+    return this.processes.handleIfPresent(sessionId, operation)
+  }
+  flushProviderEvents(sessionId: string): Promise<void> { return this.providerEvents.flush(sessionId) }
 
   private scopedProviderEnvironment(session: AgentSession): Record<string, string> {
     // The session row is the authority for the tool ceiling across restarts.
@@ -650,7 +668,7 @@ export class ManagedAgentEngine {
     await this.record(sessionId, null, { type: 'session_state', state: 'reconnecting', detail: message })
   }
 
-  protected pump(): Promise<void> {
+  pump(): Promise<void> {
     return this.queue.pump()
   }
 
@@ -752,7 +770,7 @@ export class ManagedAgentEngine {
     return true
   }
 
-  protected async record(
+  async record(
     sessionId: string,
     turnId: string | null,
     event: AgentNormalizedEvent,
@@ -797,7 +815,7 @@ export class ManagedAgentEngine {
     if (turn) this.emit({ channel: 'agent:turn', turn })
   }
 
-  protected emit(frame: AgentWsFrame): void {
+  emit(frame: AgentWsFrame): void {
     if (this.stopped) return
     // Every broadcast row counts, whoever sent it, so record() compares against what clients last
     // heard. A read mark sends its own row with `attention: none`, and the next event that puts
@@ -850,7 +868,7 @@ export class ManagedAgentEngine {
     span?.end(outcome === 'completed' ? 'ok' : 'error', { outcome })
   }
 
-  protected forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
+  forkContext(source: AgentSession): ReturnType<typeof buildForkContext> {
     return buildForkContext(this.store, source)
   }
 
@@ -1004,7 +1022,7 @@ export class ManagedAgentEngine {
     return stopped
   }
 
-  protected stopLive(sessionId: string): Promise<void> {
+  stopLive(sessionId: string): Promise<void> {
     return this.processes.stop(sessionId)
   }
 }

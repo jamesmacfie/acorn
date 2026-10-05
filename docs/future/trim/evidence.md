@@ -1,6 +1,60 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–12 complete; phase 13 is next.
+Date: 2026-10-06. Status: phases 01–13 complete; phase 14 is next.
+
+## Phase 13 agent composition (2026-10-06)
+
+Base `05d8f1b4aef3fa613efa077489aa176f33124859`, branch
+`phase-13-compose-agent-runtime-operations`, Darwin arm64, Node 24.21.0 from
+`/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. `CI=true pnpm install --frozen-lockfile`
+passed with 426 package copies reused, zero downloads, and no lockfile edit.
+
+`ManagedAgentRuntime` constructs one `ManagedAgentEngine` and forwards the complete inherited
+observable API through named methods and readonly references. Product commands retain reservation,
+readiness/default application, title, transcript, configuration, and history policy. The engine keeps
+queue dispatch, process generations, event materialization, redaction, publication, and webhook
+shutdown. Test assertions for queue occupancy, startup generations, wait publication, and process
+gauges still inspect those behaviors through the engine owned by the facade; no production subclass
+path was retained. The API and ownership tables are in [phase 13](./13-agent-composition.md).
+
+The first desktop staging run measured 3,291,794 B and failed the unchanged 3,290,000 B service
+ceiling. Transcript import, resume verification, and export now load their one command instance on
+first use. The repeated staging measured 3,286,989 B across `service.js` and 46 chunks, 3,011 B
+under the unchanged ceiling. No warning override or budget change was used.
+
+| Command | Result |
+| --- | --- |
+| `pnpm test:focus @acorn/plugin-agents src/server/sessions/runtime.test.ts` | 40 passed after adding a real-store facade import/export and failed resume-verification case. |
+| `pnpm test:focus @acorn/plugin-agents src/server/sessions/runtimeTelemetry.test.ts` | Six passed after correcting the timer spy to its engine owner. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/plugin-agents` | Final run: 150 files, 1,100 passed, one existing skip. Includes runtime, startup, queue, session control and execution, title, transcript, history, delegation, routes, and real child process ownership. |
+| Focused Vitest run for runtime, startup, queue, session control and execution, title, defaults, transcript, history, managed routes, and delegation | 13 files, 226 passed with two workers and host process permissions. |
+| Same bounded command for `@acorn/plugin-workflows`, `@acorn/node`, and `@acorn/tui` in the final consumer run | Workflows 64 files and 553 passed; Node 40 files and 273 passed; TUI 68 files and 673 passed, two existing skips; zero cached tasks. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/desktop` | Final run passed bundle staging and unchanged service and renderer budgets; 28 desktop files and 171 tests, 10 boot tests, and 62 Rust tests; zero cached tasks. |
+| `pnpm --filter @acorn/tui build` | Complete startup closure: 160 chunks, 710,490 B against the unchanged 720,000 B ceiling; 47 external imports resolved. |
+| `pnpm --filter @acorn/arch-tests test` | 12 files, 86 passed after the phase evidence anchor was added. |
+| `pnpm lint` | Final normal root run passed 37 package tasks on Node 24.21.0; four unchanged tasks used local cache. |
+
+The combined five-package run failed on the two stale telemetry spies and the initial service
+budget. The corrected agents and desktop suites passed separately after the lazy transcript
+command change.
+
+Host inspection used isolated `trim-13` desktop and TUI sessions with the `tui-navigation` fixture.
+The TUI displayed Agent Center and its stopped imported session. In the enabled task pane, its
+command palette created a real Codex managed session; the detail changed from `creating` to `ready`
+and showed the Codex model, medium effort, task context, and enabled composer. Terminal-driver key
+focus did not reliably reach that composer, so this host run does not establish a TUI send or live
+stream. Its fixture navigation flow failed after manual navigation because it expected the initial
+screen to show `Agents 1`; the report is under `.acorn/agent-dev/tui/trim-13/reports/`. The desktop
+automation binary first failed to compile when
+Rust reported `No space left on device`; deleting only this worktree's generated Rust incremental
+output and retrying with `CARGO_INCREMENTAL=0` launched the host. A real Codex managed session
+became ready, accepted two prompts, streamed in `working`, completed, and reopened from Agent Center
+with the composer and transcript intact. Its provider options and read-only permission control were
+visible. The generated fixture's imported session has disabled composer and option controls; neither
+host presented a live pending approval or a held queue item for edit/cancel. Those paths remain
+covered by deterministic request and queue tests; fixture controls alone are not claimed as host
+acceptance. Both isolated launchers reported `stopped`; `ps` found neither launcher PID nor a
+process with either session directory in its command line.
 
 ## Phase 12 provider processes (2026-10-06)
 

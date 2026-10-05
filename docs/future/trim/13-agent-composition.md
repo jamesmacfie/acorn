@@ -1,6 +1,37 @@
 # Phase 13: replace agent runtime inheritance with composition
 
-Date: 2026-10-04. Status: TODO. Risk: high; inherited operations are part of current consumers.
+Completion note, October 6, 2026: `ManagedAgentRuntime` owns one `ManagedAgentEngine` through
+composition. The engine creates the only store, attachments, artifacts, MCP store, webhooks,
+redaction list, event materializer and buffer, queue coordinator, and provider lifecycle owner.
+The facade keeps product reservation, initialization, defaults, title, transcript, configuration,
+and retention commands. It calls named engine operations for readiness, checked provider handles,
+event recording, queue wakeup, and retirement. Constructor options and public signatures remain.
+Transcript commands load on first import, resume verification, or export and share one instance;
+this keeps the unchanged Node service graph below its startup budget.
+
+| Observable API before composition | Owner after composition | Consumers and timing |
+| --- | --- | --- |
+| `store`, `attachments`, `artifacts`, `webhooks`, `mcpServers` | Engine instances, readonly facade references | Routes, delegation, draft capability, data source, testkit; identical object identity and storage lifetime. |
+| `providers`, `usableProvider`, `reconcile`, `subscribe`, `stopTaskSessions`, `stopIdleSessions`, `stopIdleSessionsNow`, `processFootprint`, `diskFootprint` | Engine operations, bound facade forwards | Node activation, routes, delegation, storage UI, and process sampling; return types and callbacks stay intact. |
+| `createSession`, `acceptSession`, `enqueueTurn`, `implementCodexPlan`, `drainQueue` | Facade admission commands | Workflow, route, and delegation callers; ready return, durable interactive row, and durable queued turn boundaries stay distinct. |
+| `applyRequestedConfig`, `customAgents`, `spawnedAgentDefaults`, `regenerateTitle`, `importTranscript`, `verifyImportedResume`, `exportSession` | Facade and product collaborators | Defaults, custom agents, titles, import and export retain their persisted contracts. |
+| `cancelTurn`, `patchQueuedTurn`, `resolveRequest`, `compact`, `patchSession`, `sessionMcp`, `setSessionMcpServers`, `fork`, `archive`, `deleteSession`, `handoffToTerminal`, `resumeManaged` | Facade commands over checked engine operations | Routes and delegation; provider generation and request claim rules remain in their existing owners. |
+| `captureExecution`, `wait`, `removeArchivedHistory`, `stop` | Facade reads and lifecycle joins | Workflow, delegation, retention, and plugin disposal; one durable event flush and idempotent stop promise. |
+
+| State or lifetime | Owner |
+| --- | --- |
+| Reservations, initializations, title work | Facade; joined after immediate engine retirement starts. |
+| Live generations, callbacks, process timers | `providerSessionLifecycle.ts`, reached through engine operations. |
+| Fairness, delayed wake, scan and drain | `queueCoordinator.ts`. |
+| Event commit, publication, redaction, search and webhook shutdown | Engine; shared resources are constructed once. |
+
+Decision: retain readonly service references because route and capability consumers use those public
+stores. The engine remains private to the facade. Existing lifecycle tests inspect engine-owned
+state through test-only access; no production subclass path or public mutable process bag was added.
+No schema, API major, route, or persisted ID changed. Phase 14 can examine provider coupling without
+moving the process or event ownership described here.
+
+Date: 2026-10-06. Status: DONE. Risk: high; inherited operations are part of current consumers.
 Prerequisite: accepted [phase 12](./12-agent-processes.md). Next: [phase 14](./14-provider-boundary.md).
 Planning revision: `2ae55abb5`; admission/process owners now come from phases 11–12.
 

@@ -4,7 +4,13 @@ This page covers how the agents plugin queues and dispatches turns, waits out a 
 stops provider processes, and recovers from failure. `queueCoordinator.ts` owns queue scans,
 fairness, delayed wakeups, and drain. `providerSessionLifecycle.ts` owns live provider generations,
 children, process timers, and callback joins. `runtimeEngine.ts` owns durable event handling and
-dispatch outcomes; `runtime.ts` persists accepted turns before requesting a scan.
+dispatch outcomes; `runtime.ts` composes one engine and persists accepted turns before requesting a
+scan. The facade owns session reservation, initialization, defaults, titles, transcript import and
+export, configuration, and history retention. Its readonly store, attachment, artifact, webhook, and
+MCP references point to the engine's instances. Product commands call explicit engine operations
+for readiness, provider handles, event recording, queue wakeup, and retirement.
+Transcript import, resume verification, and export load their command module on first use, then
+share one instance.
 
 ## The turn queue
 
@@ -132,6 +138,9 @@ Shutdown closes queue admission, aborts starts, and clears reconnect, quiet, idl
 timers. It joins every provider retirement, queue scan, and callback, then flushes durable events and
 search, joins publication work, and stops webhook delivery. All of it runs before the plugin's SQLite
 file closes.
+The facade starts engine retirement as soon as `stop()` is called. It also joins title generation,
+session reservations, and initialization work before returning. Repeated calls share the same stop
+promise, and an engine or title stop failure reaches plugin disposal.
 `dispose()` in `plugins/agents/src/node/index.ts` runs this and then clears its capability bridges, so
 a second boot in one process never reads through the first boot's closed handle
 (`apps/node/src/composition/runtime.test.ts`).

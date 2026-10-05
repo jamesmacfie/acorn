@@ -466,6 +466,26 @@ describe('managed agent runtime conformance', () => {
     })
   }
 
+  it('imports and exports a historical transcript through the product facade', async () => {
+    const { taskId } = await seedTask(testDb, dataDir)
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = new ManagedAgentRuntime({
+      db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS,
+      currentUserId: () => null, registry,
+    })
+
+    const session = await runtime.importTranscript({
+      taskId, providerId: 'fake', profileId: 'fake',
+      content: '# Prior work\n\n## User\n\nCheck the queue\n\n## Assistant\n\nThe queue is clear.',
+    })
+    expect(session.kind).toBe('imported')
+    expect(session.controller).toBe('external')
+    const exported = await runtime.exportSession(session.id, 'json')
+    expect(JSON.parse(exported).turns).toHaveLength(1)
+    await expect(runtime.verifyImportedResume(session.id)).rejects.toThrow('no provider session reference')
+  })
+
   it('shows the worktree failure when a new session cannot get its task root', async () => {
     const seed = await seedTask(testDb, dataDir)
     core.tasks.requireRoot = vi.fn().mockRejectedValue(new Error('Git could not create the worktree.'))

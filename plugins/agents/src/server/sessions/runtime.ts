@@ -26,7 +26,7 @@ import { delegatedToolCeiling } from '../delegation/policy'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { SessionTitleGeneration } from './sessionTitleGeneration'
 import { SessionDefaultsCommands } from './sessionDefaultsCommands'
-import { TranscriptCommands } from './transcriptCommands'
+import type { TranscriptCommands } from './transcriptCommands'
 import { waitForSessionSnapshot } from './sessionWait'
 import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import { mergeSearchIndex } from './ledgerCompaction'
@@ -75,7 +75,51 @@ const assertOfferedOption = (request: AgentRequest, resolution: unknown): void =
  * Product-facing managed-agent commands. ManagedAgentEngine owns process supervision, event
  * durability, and scheduling. This class coordinates session lifecycle and user commands.
  */
-export class ManagedAgentRuntime extends ManagedAgentEngine {
+export class ManagedAgentRuntime {
+  private readonly engine: ManagedAgentEngine
+  readonly store: ManagedAgentEngine['store']
+  readonly attachments: ManagedAgentEngine['attachments']
+  readonly artifacts: ManagedAgentEngine['artifacts']
+  readonly webhooks: ManagedAgentEngine['webhooks']
+  readonly mcpServers: ManagedAgentEngine['mcpServers']
+  private readonly core: AgentRuntimeOptions['core']
+  private readonly db: AgentRuntimeOptions['db']
+  private readonly currentUserId: AgentRuntimeOptions['currentUserId']
+  private readonly standingContext: AgentRuntimeOptions['standingContext']
+  private readonly hooks: AgentRuntimeOptions['hooks']
+  private readonly telemetry: AgentRuntimeOptions['telemetry']
+  private readonly startTerminalHandoff: AgentRuntimeOptions['startTerminalHandoff']
+  private readonly terminalHandoffRunning: AgentRuntimeOptions['terminalHandoffRunning']
+
+  constructor(options: AgentRuntimeOptions) {
+    this.engine = new ManagedAgentEngine(options)
+    this.store = this.engine.store
+    this.attachments = this.engine.attachments
+    this.artifacts = this.engine.artifacts
+    this.webhooks = this.engine.webhooks
+    this.mcpServers = this.engine.mcpServers
+    this.core = options.core
+    this.db = options.db
+    this.currentUserId = options.currentUserId
+    this.standingContext = options.standingContext
+    this.hooks = options.hooks
+    this.telemetry = options.telemetry
+    this.startTerminalHandoff = options.startTerminalHandoff
+    this.terminalHandoffRunning = options.terminalHandoffRunning
+    this.titleGeneration = this.createTitleGeneration()
+    this.sessionDefaults = this.createSessionDefaults()
+  }
+
+  subscribe = (listener: Parameters<ManagedAgentEngine['subscribe']>[0]) => this.engine.subscribe(listener)
+  providers = (force?: boolean) => this.engine.providers(force)
+  usableProvider = (pick: Parameters<ManagedAgentEngine['usableProvider']>[0]) => this.engine.usableProvider(pick)
+  reconcile = () => this.engine.reconcile()
+  stopTaskSessions = (taskId: string) => this.engine.stopTaskSessions(taskId)
+  stopIdleSessions = (now?: number) => this.engine.stopIdleSessions(now)
+  stopIdleSessionsNow = () => this.engine.stopIdleSessionsNow()
+  processFootprint = (...args: Parameters<ManagedAgentEngine['processFootprint']>) => this.engine.processFootprint(...args)
+  diskFootprint = (now?: number) => this.engine.diskFootprint(now)
+
   /** Read once per spawn so the delegation ledger can retain the resolved choices for recovery. */
   async spawnedAgentDefaults(): Promise<SpawnedAgentDefaults> {
     const userId = this.currentUserId()
@@ -85,30 +129,36 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   private readonly sessionInitializations = new Map<string, Promise<AgentSession>>()
-  private readonly titleGeneration = new SessionTitleGeneration({
+  private readonly titleGeneration: SessionTitleGeneration
+  private readonly sessionDefaults: SessionDefaultsCommands
+  private transcripts: Promise<TranscriptCommands> | null = null
+
+  private createTitleGeneration() { return new SessionTitleGeneration({
     store: this.store,
     models: this.core.models,
     currentUserId: this.currentUserId,
-    publish: (session) => this.emit({ channel: 'agent:session', session }),
+    publish: (session) => this.engine.emit({ channel: 'agent:session', session }),
     telemetry: this.telemetry,
-  })
-  private readonly sessionDefaults = new SessionDefaultsCommands({
+  }) }
+  private createSessionDefaults() { return new SessionDefaultsCommands({
     store: this.store,
     prefs: this.core.prefs,
     currentUserId: this.currentUserId,
     patchSession: (sessionId, patch, options) => this.patchSession(sessionId, patch, options),
     recordWarning: async (sessionId, message) => {
-      await this.record(sessionId, null, { type: 'diagnostic', level: 'warning', message })
+      await this.engine.record(sessionId, null, { type: 'diagnostic', level: 'warning', message })
     },
-  })
-  private readonly transcripts = new TranscriptCommands({
-    store: this.store,
-    providers: () => this.providers(),
-    requireTaskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
-    record: async (sessionId, turnId, event) => { await this.record(sessionId, turnId, event) },
-    ensureSession: async (session) => { await this.ensureSession(session) },
-    publish: (session) => this.emit({ channel: 'agent:session', session }),
-  })
+  }) }
+  private transcriptCommands(): Promise<TranscriptCommands> {
+    return this.transcripts ??= import('./transcriptCommands').then(({ TranscriptCommands }) => new TranscriptCommands({
+      store: this.store,
+      providers: () => this.providers(),
+      requireTaskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+      record: async (sessionId, turnId, event) => { await this.engine.record(sessionId, turnId, event) },
+      ensureSession: async (session) => { await this.engine.ensureSession(session) },
+      publish: (session) => this.engine.emit({ channel: 'agent:session', session }),
+    }))
+  }
 
   async createSession(
     input: CreateAgentSessionInput,
@@ -152,13 +202,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
   ): Promise<{ session: AgentSession; created: boolean }> {
-    this.shutdown.signal.throwIfAborted()
+    this.engine.shutdownSignal.throwIfAborted()
     assertBoundedJson('Agent session configuration', input.config, MAX_AGENT_CONFIG_BYTES)
     if (idempotencyKey) {
-      const existing = await this.readWhileRunning(() => this.store.operationResult<AgentSession>(idempotencyKey, 'session.create'))
-      if (existing) return { session: await this.readWhileRunning(() => this.store.requireSession(existing.id)), created: false }
+      const existing = await this.engine.readWhileRunning(() => this.store.operationResult<AgentSession>(idempotencyKey, 'session.create'))
+      if (existing) return { session: await this.engine.readWhileRunning(() => this.store.requireSession(existing.id)), created: false }
     }
-    const provider = await this.readWhileRunning(() => this.usableProvider((candidate) => candidate.id === input.providerId))
+    const provider = await this.engine.readWhileRunning(() => this.usableProvider((candidate) => candidate.id === input.providerId))
     if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
     if (!provider.installed) throw new Error(provider.diagnostics[0] ?? `${provider.label} is unavailable.`)
     if (provider.authenticated === false) {
@@ -167,13 +217,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (input.profileId !== provider.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }
-    await this.readWhileRunning(() => this.core.tasks.requireRoot(input.taskId))
+    await this.engine.readWhileRunning(() => this.core.tasks.requireRoot(input.taskId))
     // The servers switched on in Settings, decided here rather than taken from the caller: which
     // programs a session starts is the owner's setting, not something a request body can widen.
-    const withAgent = await this.readWhileRunning(() => this.withCustomAgent(input))
-    const mcpServers = await this.readWhileRunning(() => this.mcpServers.enabledNames())
-    const standingContext = await this.readWhileRunning(() => this.standingContext?.(input.taskId) ?? Promise.resolve(null))
-    this.shutdown.signal.throwIfAborted()
+    const withAgent = await this.engine.readWhileRunning(() => this.withCustomAgent(input))
+    const mcpServers = await this.engine.readWhileRunning(() => this.mcpServers.enabledNames())
+    const standingContext = await this.engine.readWhileRunning(() => this.standingContext?.(input.taskId) ?? Promise.resolve(null))
+    this.engine.shutdownSignal.throwIfAborted()
     const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers, standingContext } }, provider)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
@@ -233,15 +283,15 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   private async initializeCreatedSession(session: AgentSession): Promise<AgentSession> {
-    this.holdSessionReadiness(session.id)
+    this.engine.holdSessionReadiness(session.id)
     try {
-      const live = await this.ensureSession(session)
-      const signal = this.processes.signal(live)
+      const live = await this.engine.ensureSession(session)
+      const signal = this.engine.sessionSignal(live)
       // Workflow steps and sessions with an origin set their own options. Forks retain theirs.
       if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
         await this.sessionDefaults.applySaved(session.id, session.providerId, signal).catch(async (error) => {
           signal.throwIfAborted()
-          await this.record(session.id, null, {
+          await this.engine.record(session.id, null, {
             type: 'diagnostic',
             level: 'warning',
             message: `Your saved defaults could not be read for this session: ${error instanceof Error ? error.message : 'unknown error'}`,
@@ -261,23 +311,25 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         }
       }
       signal.throwIfAborted()
-      await this.completeSessionReadiness(session.id)
+      await this.engine.completeSessionReadiness(session.id)
       return this.store.requireSession(session.id)
     } catch (error) {
-      this.discardSessionReadinessHold(session.id)
+      this.engine.discardSessionReadinessHold(session.id)
       throw error
     }
   }
 
   private runtimeStop: Promise<void> | null = null
 
-  override stop(): Promise<void> {
+  stop(): Promise<void> {
     if (this.runtimeStop) return this.runtimeStop
     // Retire startup immediately, while title generation drains its own work.
-    const engine = super.stop()
+    const engine = this.engine.stop()
     return this.runtimeStop = (async () => {
-      await Promise.all([this.titleGeneration.stop(), engine])
-      await Promise.allSettled([...this.reservations, ...this.sessionInitializations.values()])
+      const drains = Promise.allSettled([...this.reservations, ...this.sessionInitializations.values()])
+      const outcomes = await Promise.allSettled([this.titleGeneration.stop(), engine, drains])
+      const failure = outcomes.find((outcome) => outcome.status === 'rejected')
+      if (failure?.status === 'rejected') throw failure.reason
     })()
   }
 
@@ -293,11 +345,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     title?: string
     content: string
   }): Promise<AgentSession> {
-    return this.transcripts.import(input)
+    return (await this.transcriptCommands()).import(input)
   }
 
   async verifyImportedResume(sessionId: string): Promise<AgentSession> {
-    return this.transcripts.verifyResume(sessionId)
+    return (await this.transcriptCommands()).verifyResume(sessionId)
   }
 
   async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn> {
@@ -347,9 +399,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     })
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
-    this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
+    this.engine.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
     // The pump owns startup and admission after the durable acceptance boundary.
-    void this.pump().catch(() => undefined)
+    void this.engine.pump().catch(() => undefined)
     if (
       outcome.inserted
       && turn.ordinal === 0
@@ -379,9 +431,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const { turn, inserted } = await this.store.acceptCodexPlan(sessionId, itemId, prompt)
     if (inserted) {
       const updated = await this.store.requireSession(sessionId)
-      this.emit({ channel: 'agent:session', session: updated })
-      this.emit({ channel: 'agent:turn', turn })
-      void this.pump().catch(() => undefined)
+      this.engine.emit({ channel: 'agent:session', session: updated })
+      this.engine.emit({ channel: 'agent:turn', turn })
+      void this.engine.pump().catch(() => undefined)
     }
     return turn
   }
@@ -393,11 +445,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
   // A raised concurrency limit must wake the pump without waiting for another turn or completion.
   drainQueue(): void {
-    void this.pump()
+    void this.engine.pump()
   }
 
   async cancelTurn(sessionId: string, turnId?: string): Promise<void> {
-    const live = this.processes.current(sessionId)
+    const live = this.engine.currentSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
     if (!target) {
@@ -405,19 +457,19 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       const session = await this.store.getSession(sessionId)
       if (!session || !['working', 'waiting', 'cancelling'].includes(session.runtimeState)) return
       await this.store.expirePendingRequests(sessionId)
-      await this.record(sessionId, null, { type: 'session_state', state: 'ready' })
-      void this.pump()
+      await this.engine.record(sessionId, null, { type: 'session_state', state: 'ready' })
+      void this.engine.pump()
       return
     }
     if (!active || active.id !== target) {
       await this.store.cancelTurn(target)
-      if (this.processes.current(sessionId)?.admissionTurnId === target) await this.stopLive(sessionId)
-      void this.pump()
+      if (this.engine.currentSession(sessionId)?.admissionTurnId === target) await this.engine.stopLive(sessionId)
+      void this.engine.pump()
       return
     }
-    await this.record(sessionId, target, { type: 'session_state', state: 'cancelling' })
+    await this.engine.record(sessionId, target, { type: 'session_state', state: 'cancelling' })
     await this.store.expirePendingRequests(sessionId)
-    if (live) await this.processes.withCurrentHandle(live.generation, (handle) => handle.cancel())
+    if (live) await this.engine.withCurrentSessionHandle(live.generation, (handle) => handle.cancel())
     await this.store.cancelTurn(target)
   }
 
@@ -456,20 +508,20 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     if (!claim.claimed) return claim.request
     const session = await this.store.requireSession(sessionId)
     try {
-      const live = await this.ensureSession(session)
-      await this.processes.withHandle(live, (handle) => handle.resolveRequest(providerRequestId, resolution))
+      const live = await this.engine.ensureSession(session)
+      await this.engine.withSessionHandle(live, (handle) => handle.resolveRequest(providerRequestId, resolution))
     } catch (error) {
       // The provider may have accepted the response before transport failure. Expire the durable
       // claim rather than making a second attempt that could grant a permission twice.
       await this.store.expireClaimedRequest(sessionId, providerRequestId)
-      await this.record(sessionId, existing.turnId, {
+      await this.engine.record(sessionId, existing.turnId, {
         type: 'diagnostic',
         level: 'warning',
         message: 'The provider did not acknowledge this response. Acorn will not resend it automatically.',
       })
       throw error
     }
-    await this.record(sessionId, existing.turnId, {
+    await this.engine.record(sessionId, existing.turnId, {
       type: 'request_resolved',
       requestId: providerRequestId,
       resolution,
@@ -481,8 +533,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
   async compact(sessionId: string): Promise<void> {
     const session = await this.store.requireSession(sessionId)
-    const live = await this.ensureSession(session)
-    await this.processes.withHandle(live, (handle) => {
+    const live = await this.engine.ensureSession(session)
+    await this.engine.withSessionHandle(live, (handle) => {
       if (!handle.compact) throw new Error('This provider does not support native compaction.')
       return handle.compact()
     })
@@ -533,11 +585,11 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         }]
       })
       if (changed.length) {
-        const live = await this.ensureSession(before)
+        const live = await this.engine.ensureSession(before)
         for (const option of changed) {
-          await this.processes.withCurrentHandle(live, async (handle) => { await handle.setConfig?.(option.id, option.value) })
+          await this.engine.withCurrentSessionHandle(live, async (handle) => { await handle.setConfig?.(option.id, option.value) })
           // Record model and reasoning changes because they affect later turns.
-          await this.record(sessionId, null, {
+          await this.engine.record(sessionId, null, {
             type: 'diagnostic',
             level: 'info',
             message: `${option.label} changed to ${option.valueLabel}`,
@@ -556,20 +608,20 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       assertBoundedJson('Agent session configuration', persistedPatch.config, MAX_AGENT_CONFIG_BYTES)
     }
     if (patch.archived != null) {
-      const live = await this.ensureSession(before).catch(() => null)
+      const live = await this.engine.ensureSession(before).catch(() => null)
       if (live) {
-        await this.processes.withCurrentHandle(live, async (handle) => { await handle.archive?.(patch.archived!) }).catch(async (error) => {
-          await this.record(sessionId, null, {
+        await this.engine.withCurrentSessionHandle(live, async (handle) => { await handle.archive?.(patch.archived!) }).catch(async (error) => {
+          await this.engine.record(sessionId, null, {
             type: 'diagnostic',
             level: 'warning',
             message: `Local archive state changed, but the provider could not ${patch.archived ? 'archive' : 'unarchive'} its session: ${error instanceof Error ? error.message : 'unknown error'}`,
           })
         })
       }
-      if (patch.archived) await this.stopLive(sessionId)
+      if (patch.archived) await this.engine.stopLive(sessionId)
     }
     const session = await this.store.patchSession(sessionId, persistedPatch)
-    this.emit({ channel: 'agent:session', session })
+    this.engine.emit({ channel: 'agent:session', session })
     return session
   }
 
@@ -582,7 +634,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       transport: server.transport,
       enabled: selected.has(server.name),
     }))
-    const reported = await this.processes.handleIfPresent(sessionId, async (handle) => handle.mcpStatus ? handle.mcpStatus().catch(() => null) : null)
+    const reported = await this.engine.sessionHandleIfPresent(sessionId, async (handle) => handle.mcpStatus ? handle.mcpStatus().catch(() => null) : null)
     return { servers, reported, locked: await this.mcpLockedReason(session) }
   }
 
@@ -607,10 +659,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
 
     const latest = await this.store.requireSession(sessionId)
     const session = await this.store.patchSession(sessionId, { config: { ...latest.config, mcpServers: next } })
-    this.emit({ channel: 'agent:session', session })
+    this.engine.emit({ channel: 'agent:session', session })
     const changes = [...on.map((name) => `${name} on`), ...off.map((name) => `${name} off`)].join(', ')
-    const live = this.processes.has(sessionId)
-    await this.record(sessionId, null, {
+    const live = this.engine.hasLiveSession(sessionId)
+    await this.engine.record(sessionId, null, {
       type: 'diagnostic',
       level: 'info',
       message: live
@@ -618,10 +670,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         : `MCP servers changed (${changes}). They apply from the next message.`,
     })
     if (live) {
-      await this.stopLive(sessionId)
+      await this.engine.stopLive(sessionId)
       // Not awaited: a start can take as long as a session start does, and the panel polls. A start that
       // fails records its own error in the transcript, which is where the reader looks.
-      void this.ensureSession(session).catch(() => undefined)
+      void this.engine.ensureSession(session).catch(() => undefined)
     }
     return this.sessionMcp(sessionId)
   }
@@ -639,9 +691,9 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const source = await this.store.requireSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     if (active) throw new Error('Finish or cancel the active turn before forking.')
-    const live = await this.ensureSession(source)
-    const providerForkRef = (await this.processes.withCurrentHandle(live, async (handle) => handle.fork?.())) ?? undefined
-    const pendingForkContext = providerForkRef ? undefined : await this.forkContext(source)
+    const live = await this.engine.ensureSession(source)
+    const providerForkRef = (await this.engine.withCurrentSessionHandle(live, async (handle) => handle.fork?.())) ?? undefined
+    const pendingForkContext = providerForkRef ? undefined : await this.engine.forkContext(source)
     return this.createSession({
       taskId: source.taskId,
       providerId: source.providerId,
@@ -666,13 +718,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   async deleteSession(sessionId: string): Promise<AgentDeleteResult> {
     const session = await this.store.requireSession(sessionId)
     await this.titleGeneration.cancel(sessionId)
-    const live = this.processes.current(sessionId)?.generation
-      ?? (session.providerSessionRef ? await this.ensureSession(session).catch(() => null) : null)
+    const live = this.engine.currentSession(sessionId)?.generation
+      ?? (session.providerSessionRef ? await this.engine.ensureSession(session).catch(() => null) : null)
     let provider: AgentDeleteResult['provider'] = 'unsupported'
     let detail: string | undefined
     if (live) {
       try {
-        const deleted = await this.processes.withCurrentHandle(live, async (handle) => {
+        const deleted = await this.engine.withCurrentSessionHandle(live, async (handle) => {
           if (!handle.delete) return false
           await handle.delete()
           return true
@@ -683,13 +735,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
         detail = error instanceof Error ? error.message : 'Provider-side deletion failed.'
       }
     }
-    await this.stopLive(sessionId)
+    await this.engine.stopLive(sessionId)
     const removed = await this.store.deleteSession(sessionId)
     await Promise.all([
       this.attachments.collectNow(removed.attachmentIds),
       this.artifacts.collectRemoved(removed.artifactObjects),
     ])
-    this.emit({ channel: 'agent:deleted', sessionId })
+    this.engine.emit({ channel: 'agent:deleted', sessionId })
     return { local: 'deleted', provider, ...(detail ? { detail } : {}) }
   }
 
@@ -713,10 +765,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }): Promise<{ sessions: number; events: number; complete: boolean }> {
     const batch = options.batch ?? HISTORY_BATCH
     const totals = { sessions: 0, events: 0, complete: false }
-    while (!this.stopped && !options.signal?.aborted) {
+    while (!this.engine.isStopped && !options.signal?.aborted) {
       const taskIds = await options.taskIds()
-      if (this.stopped || options.signal?.aborted) break
-      const sessionId = this.store.sessionWithHistory(taskIds, new Set(this.processes.ids()))
+      if (this.engine.isStopped || options.signal?.aborted) break
+      const sessionId = this.store.sessionWithHistory(taskIds, new Set(this.engine.liveSessionIds()))
       if (!sessionId) {
         totals.complete = true
         break
@@ -732,15 +784,15 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
             this.artifacts.collectRemoved(finished.artifactObjects),
           ])
           // For a window that has the session open: the note lands, and a reload reads only the note.
-          this.emit({ channel: 'agent:event', event: finished.event })
-          this.emit({ channel: 'agent:session', session: finished.session })
+          this.engine.emit({ channel: 'agent:event', event: finished.event })
+          this.engine.emit({ channel: 'agent:session', session: finished.session })
         }
       }
       await new Promise((resolve) => setImmediate(resolve))
     }
     // Each deleted event left a tombstone in the search index (./ledgerCompaction.ts says what merging
     // gets back).
-    if (totals.events && !this.stopped) await mergeSearchIndex(this.db, undefined, options.signal)
+    if (totals.events && !this.engine.isStopped) await mergeSearchIndex(this.db, undefined, options.signal)
     return totals
   }
 
@@ -751,7 +803,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const before = await this.store.requireSession(sessionId)
     if (!before.providerSessionRef) throw new Error('The provider has not supplied a resumable session reference.')
     if (!this.startTerminalHandoff) throw new Error('Terminal handoff is unavailable.')
-    await this.stopLive(sessionId)
+    await this.engine.stopLive(sessionId)
     await this.store.setController(sessionId, 'terminal')
     let terminalSessionId: string
     try {
@@ -760,18 +812,18 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       await this.store.setController(sessionId, 'acorn')
       throw error
     }
-    await this.record(sessionId, null, {
+    await this.engine.record(sessionId, null, {
       type: 'session_state',
       state: 'stopped',
       detail: 'Input control was transferred to a terminal.',
     })
-    await this.record(sessionId, null, {
+    await this.engine.record(sessionId, null, {
       type: 'terminal',
       terminalSessionId,
       title: `Continue ${before.providerId} in terminal`,
     })
     const session = await this.store.requireSession(sessionId)
-    this.emit({ channel: 'agent:session', session })
+    this.engine.emit({ channel: 'agent:session', session })
     return session
   }
 
@@ -784,19 +836,19 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       throw new Error('Exit the linked provider terminal before returning input control to Acorn.')
     }
     const current = await this.store.setController(sessionId, 'acorn')
-    await this.ensureSession(current)
+    await this.engine.ensureSession(current)
     const session = await this.store.requireSession(sessionId)
-    this.emit({ channel: 'agent:session', session })
+    this.engine.emit({ channel: 'agent:session', session })
     return session
   }
 
   async exportSession(sessionId: string, format: 'json' | 'markdown'): Promise<string> {
-    return this.transcripts.export(sessionId, format)
+    return (await this.transcriptCommands()).export(sessionId, format)
   }
 
   async captureExecution(sessionId: string, turnIds: readonly string[]): Promise<AgentSessionSnapshot> {
     // Join accepted buffered deltas, including cancellation paths with no terminal provider event.
-    await this.providerEvents.flush(sessionId)
+    await this.engine.flushProviderEvents(sessionId)
     return this.store.executionSnapshot(sessionId, turnIds)
   }
 
@@ -810,7 +862,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     return waitForSessionSnapshot({
       store: this.store,
       subscribe: (listener) => this.subscribe(listener),
-      shutdown: this.shutdown.signal,
+      shutdown: this.engine.shutdownSignal,
     }, sessionId, afterSeq, until, timeoutMs, signal)
   }
 }

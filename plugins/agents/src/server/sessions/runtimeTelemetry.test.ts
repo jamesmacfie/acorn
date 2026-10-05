@@ -125,7 +125,7 @@ describe('what a session reports', () => {
 
     it('reports live, idle and summed memory as gauges this plugin owns', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
-      vi.spyOn(runtime, 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
+      vi.spyOn(runtime['engine'], 'processFootprint').mockResolvedValue({ live: 2, idle: 1, memoryBytes: 331 })
       // The timer keeps running while this waits, so only the first sample is compared.
       await vi.waitFor(() => expect(gauges().slice(0, 3)).toEqual([
         ['agent.processes.live', 2, 'agents'],
@@ -136,7 +136,7 @@ describe('what a session reports', () => {
 
     it('leaves memory out when the process table could not be read', async () => {
       runtime = build(new AgentDriverRegistry(), ctx.telemetry, 20)
-      vi.spyOn(runtime, 'processFootprint').mockResolvedValue({ live: 1, idle: 0, memoryBytes: null })
+      vi.spyOn(runtime['engine'], 'processFootprint').mockResolvedValue({ live: 1, idle: 0, memoryBytes: null })
       await vi.waitFor(() => expect(gauges().length).toBeGreaterThanOrEqual(2))
       expect(gauges().map(([name]) => name)).not.toContain('agent.processes.memory')
     })
@@ -144,7 +144,7 @@ describe('what a session reports', () => {
     it('does not list processes at all while nothing is collecting', async () => {
       const off: PluginTelemetry = { ...ctx.telemetry, enabled: () => false }
       runtime = build(new AgentDriverRegistry(), off, 20)
-      const footprint = vi.spyOn(runtime, 'processFootprint')
+      const footprint = vi.spyOn(runtime['engine'], 'processFootprint')
       await new Promise((done) => setTimeout(done, 100))
       expect(footprint).not.toHaveBeenCalled()
       expect(gauges()).toEqual([])

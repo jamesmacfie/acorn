@@ -15,7 +15,7 @@ const deferred = <T>() => {
 }
 
 class Runtime extends ManagedAgentRuntime {
-  counts() { return this.processes.occupancy().reduce((counts, live) => ({
+  counts() { return this['engine']['processes'].occupancy().reduce((counts, live) => ({
     active: counts.active + Number(!!live.activeTurnId),
     reserved: counts.reserved + Number(!!live.admissionTurnId),
   }), { active: 0, reserved: 0 }) }
