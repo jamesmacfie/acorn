@@ -1,7 +1,7 @@
 # Where the plugin system is going
 
 Date: October 4, 2026. Status: direction, not scheduled. Moved from the "Where this is going" section of
-[extensibility](../../extensibility.md) by the documentation overhaul. Where this page disagrees with
+[extensibility](../../extensibility.md). Where this page disagrees with
 the shipped docs, the shipped docs win.
 
 These are the next steps for the plugin system, roughly in order of how much they matter.

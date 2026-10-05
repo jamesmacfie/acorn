@@ -1,7 +1,7 @@
 # Terminal client: open doors
 
 Date: October 3, 2026. Status: proposals, moved from the "Doors left open" section of
-[the terminal client](../../tui.md) by the documentation overhaul. Nothing here is built.
+[the terminal client](../../tui.md). Nothing here is built.
 
 These are directions the terminal client's design leaves room for:
 
