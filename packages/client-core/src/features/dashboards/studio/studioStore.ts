@@ -1,8 +1,11 @@
 import { createSignal } from 'solid-js'
 import { panelPlanSchema, type DashboardDraft, type PanelPlan } from '@acorn/protocol/dashboards.ts'
+import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import type { dashboardClient } from '../dashboardClient'
 import type { dashboardRecoveryStore } from '../dashboardRecovery'
+import { mergeAuthoringCandidate } from '../../dataSources/authoringMerge'
+import { moveAuthoringConversation } from '../../dataSources/authoringStorage'
 
 // The panel studio's state: the plan, the selected part, undo and redo, the Node draft, and autosave
 // (docs/dashboards/mapping-and-editor.md § The generated editor). The undo model is the Workflows
@@ -28,6 +31,10 @@ export const blankPlan = (): PanelPlan => ({
   sources: [], columns: [], stages: [], view: { kind: 'list' },
 })
 
+/** An AI proposal under review: the reply, and its candidate rebased onto the plan as it was when the
+ *  reply arrived. */
+export type StudioReview = { proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>; merged: PanelPlan }
+
 const pushUndo = (stack: readonly PanelPlan[], plan: PanelPlan): PanelPlan[] => [...stack, plan].slice(-UNDO_DEPTH)
 
 export type StudioStore = ReturnType<typeof createStudioStore>
@@ -38,6 +45,8 @@ export function createStudioStore(input: {
   recovery: ReturnType<typeof dashboardRecoveryStore>
   /** The recovery key before the Node has assigned the draft an id. */
   recoveryId: string
+  /** Where the AI conversation is kept, so it moves to the draft's id once the Node assigns one. */
+  conversations?: Parameters<typeof moveAuthoringConversation>[0]
 }) {
   const { nodeId, client, recovery } = input
   const [plan, setPlan] = createSignal<PanelPlan>(blankPlan())
@@ -47,6 +56,7 @@ export function createStudioStore(input: {
   const [draft, setDraft] = createSignal<DashboardDraft>()
   const [saveState, setSaveState] = createSignal<StudioSaveState>('Not saved')
   const [problem, setProblem] = createSignal<string>()
+  const [review, setReview] = createSignal<StudioReview>()
   let saveTimer: ReturnType<typeof setTimeout> | undefined
   let lastPush = Number.NEGATIVE_INFINITY
   // Set by the first change, so a draft that loads after someone started typing doesn't replace it.
@@ -69,6 +79,8 @@ export function createStudioStore(input: {
     try {
       const current = draft()
       const saved = current ? await client.save(current.id, current.draftRevision, next) : await client.create(next)
+      // Before the id changes, because the conversation reads its context from the key the id names.
+      if (!current) moveAuthoringConversation(input.conversations, nodeId, 'dashboard', input.recoveryId, saved.id)
       setDraft(saved)
       recovery.acknowledge(recoveryCopy(next, current), saved.content)
       if (!current) recovery.discard(nodeId, input.recoveryId)
@@ -101,9 +113,11 @@ export function createStudioStore(input: {
     }
     show(next)
   }
+  // Undo and redo wait while a proposal is under review, because the proposal was rebased onto the
+  // plan as it is now.
   const undo = (): void => {
     const stack = past()
-    if (!stack.length) return
+    if (!stack.length || review()) return
     setFuture(forward => pushUndo(forward, plan()))
     setPast(stack.slice(0, -1))
     lastPush = Number.NEGATIVE_INFINITY
@@ -111,7 +125,7 @@ export function createStudioStore(input: {
   }
   const redo = (): void => {
     const stack = future()
-    if (!stack.length) return
+    if (!stack.length || review()) return
     setPast(back => pushUndo(back, plan()))
     setFuture(stack.slice(0, -1))
     lastPush = Number.NEGATIVE_INFINITY
@@ -135,10 +149,27 @@ export function createStudioStore(input: {
     setSaveState('Saved on this computer')
   }
 
+  /** Reviews an AI proposal against the plan as it is now. A proposal that conflicts with an edit made
+   *  while it was prepared ends review instead. `undefined` ends review. */
+  const reviewProposal = (proposal: StudioReview['proposal'] | undefined): void => {
+    if (!proposal) { setReview(undefined); return }
+    const merged = mergeAuthoringCandidate(proposal.base as PanelPlan, proposal.candidate as PanelPlan, plan())
+    if (merged.conflicts.length) setProblem('This panel changed while the proposal was prepared.')
+    setReview(merged.conflicts.length ? undefined : { proposal, merged: merged.value })
+  }
+  /** Applies the proposal under review as one undo step, and ends review. */
+  const applyReview = (): void => {
+    const current = review()
+    if (!current) return
+    setReview(undefined)
+    apply(() => current.merged)
+  }
+
   return {
     plan, apply, undo, redo,
-    canUndo: () => past().length > 0,
-    canRedo: () => future().length > 0,
+    canUndo: () => past().length > 0 && !review(),
+    canRedo: () => future().length > 0 && !review(),
+    review, reviewProposal, applyReview,
     selected,
     /** Selection moves no data, so it is not an undo step. */
     select: (key: PlanPartKey | undefined) => setSelected(() => key),

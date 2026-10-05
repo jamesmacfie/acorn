@@ -43,7 +43,7 @@ that type can answer, a value drawn by the field's type, and a tone. Selectors m
 unofferable. `normalizePanel` drops stale choices no selector catches, such as a filter on a field that
 disappeared when you swapped the source.
 
-**Add panel**, through the launcher below, and a panel's **Edit** open the panel studio
+**Add panel**, through the launcher below, and a panel's **Edit** and **Edit with AI…** open the panel studio
 (`studio/PanelStudio.tsx`), a full-window layer like Settings. It isn't a route, because a route would unmount the task's panes,
 plugin frames, and terminal drawer behind it. Task keybindings stand down while it's open
 (`isPanelStudioOpen` in `studio/studioOpen.ts`), **Escape** closes it, and focus returns to the
@@ -75,8 +75,31 @@ panel should show. **Edit** skips it. The launcher has three paths:
 The launcher's choice is where editing starts, so undo never goes back past it. The source and
 account list is `sourceEntries` in `features/dataSources/sourceEntries.ts`, which the source picker
 uses too. In the studio, a source joins the plan only once it's picked, so nothing is reported before
-then. The AI conversation opens in a dialog, asks for missing choices, and proposes the same plan
-used by the forms. Applying a proposal is one undoable step.
+then.
+
+**Ask AI** docks the AI conversation (`AuthoringConversation` with `layout="dock"`) in the inspector's
+column until you choose **Close**. The dock shows the turns so far, the model, a settings menu with
+**Use preview records to help AI**, and a box to type in. **Edit with AI…** opens the studio with the
+dock open. **Ask AI about this**, on an outline row or in the column list, fills the box with "About
+*part*: " and sends the part's JSON pointers ahead of the message, such as
+`[Focus: /stages/1 "Keep where Author is you"] `. The Node's prompt tells the model to change other
+parts only when the request needs it. A new panel's conversation moves from its `new:<workspaceId>`
+key to the draft's id when the Node assigns one (`moveAuthoringConversation`).
+
+When a proposal arrives, the studio reviews it (`reviewProposal` in `studioStore.ts`). The proposal
+is rebased onto the plan as it is now (`mergeAuthoringCandidate`), and a conflict ends review with
+"This panel changed while the proposal was prepared." During review, the outline shows the proposed
+plan compared by `diffOutline`. Added and changed rows carry a mark, a removed step stays struck
+through where it was, and the Columns row lists the column changes. The preview switches between
+**Before** and **After**, and **After** gives the row count it had before. The inspector is read-only,
+undo and redo wait, **Publish…** is off, and the status bar sums up the proposal. In the dock, the
+proposal lists the plan's requirements, each linked to its part, what it didn't cover, and any
+problems, which turn **Apply** off. **Apply** has the Node validate the plan, then applies it as one
+undo step. **Discard**, or sending another message, ends review.
+
+Requirements don't block publishing, because applying a proposal accepts it. Requirements that
+aren't fully covered, and what the last applied proposal didn't cover, show as warnings in the publish
+review and as a link in the status bar that opens the dock.
 
 The outline draws `planOutline` in the sections Data, Columns, Steps, Arrange, Look, and Settings.
 Each row shows its row count, such as "312 → 41" for a step, and a warning mark when the part has a
@@ -123,7 +146,7 @@ which the Node pushes down to the source, so the source picker hides **Add condi
 preview. Conditions a query already has show read-only, because they change which records come back.
 
 **Publish…** opens a review that lists what changes since the last publish, where the panel goes (a
-Home tab for a new Home panel), the requirements to confirm, and anything blocking: a schema
+Home tab for a new Home panel), the requirements warnings above, and anything blocking: a schema
 failure, a run error, or a region that wouldn't show the panel. `publishPanelPlan` in
 `panelPublish.ts` saves the draft, describes each source to find its `plugin:source` keys and field
 roles, checks them against the region, publishes, and refreshes every panel showing it.

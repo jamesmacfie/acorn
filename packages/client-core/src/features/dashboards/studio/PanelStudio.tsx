@@ -6,13 +6,12 @@ import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
 import type { PlanProblem } from '@acorn/dashboards-core/plan.ts'
 import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
-import { planPartLabel } from '@acorn/dashboards-core/labels.ts'
+import { planPartLabel, REQUIREMENT_STATUS_LABELS } from '@acorn/dashboards-core/labels.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
 import { ApiError } from '../../../infra/node/apiClient'
 import AuthoringConversation from '../../dataSources/AuthoringConversation'
-import { mergeAuthoringCandidate } from '../../dataSources/authoringMerge'
 import {
-  Alert, Badge, Button, Checkbox, CodeBlock, DetailColumn, EmptyState, Field, Input, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
+  Alert, Badge, Button, CodeBlock, DetailColumn, EmptyState, Field, Input, ListColumn, ListDetail, Row, Toolbar, ToolbarSpacer,
 } from '../../../kit/components/primitives'
 import { Heading } from '../../../kit/components/content/Heading'
 import Icon from '../../../kit/components/content/Icon'
@@ -41,7 +40,7 @@ import type { LaunchResult } from './PanelLauncher'
 import { createStudioStore } from './studioStore'
 import { markPanelStudioOpen } from './studioOpen'
 import StudioOutline, { type OutlineAddition } from './StudioOutline'
-import StudioPreview from './StudioPreview'
+import StudioPreview, { type PreviewSide } from './StudioPreview'
 import '../dashboards.css'
 
 // The panel studio: a full-window layer for building and editing one dashboard panel
@@ -53,6 +52,13 @@ import '../dashboards.css'
 const copy = <T,>(value: T): T => JSON.parse(JSON.stringify(value)) as T
 const plural = (count: number, noun: string) => `${count} ${noun}${count === 1 ? '' : 's'}`
 const CHANGE_WORDS: Record<Exclude<PartChange, 'same'>, string> = { added: 'Added', changed: 'Changed', removed: 'Removed' }
+type Requirement = NonNullable<PanelPlan['requirements']>[number]
+const REQUIREMENT_ICONS: Record<Requirement['status'], string> = {
+  covered: 'circle-check', partial: 'circle-dashed', choice: 'circle-question-mark', unavailable: 'circle-x',
+}
+/** A request the studio sends to the docked AI: what the box starts with, the part it is about, and
+ *  whether to send it straight away. */
+type AiRequest = { instruction?: string; focus?: { paths: string[]; title: string }; send?: boolean }
 
 /** "1 step added, 1 column changed", from a diff against the published plan. Empty when they match. */
 export function diffSummary(diff: OutlineDiff): string[] {
@@ -81,6 +87,8 @@ export default function PanelStudio(props: {
   placed?: Rect
   /** What the launcher chose for a new panel: a request for the AI, or a source and maybe a starter. */
   start?: Exclude<LaunchResult, { kind: 'draft' }>
+  /** Opens with the AI docked and its box focused, from a panel's Edit with AI. */
+  withAi?: boolean
   onPublished(id: string, title: string, scope: PlacementScope, view: DashboardView, sources: string[], fieldRoles: string[]): void
   onDeleted(id: string): void
   onClose(): void
@@ -90,19 +98,25 @@ export default function PanelStudio(props: {
   const scope = { workspaceId: props.scope.workspaceId ?? '' }
   const client = dashboardClient(nodeId, scope)
   const queryClient = useQueryClient()
-  const recovery = dashboardRecoveryStore(typeof localStorage === 'undefined' ? undefined : localStorage)
+  const storage = typeof localStorage === 'undefined' ? undefined : localStorage
+  const recovery = dashboardRecoveryStore(storage)
   const recoveryId = props.dashboardId ?? `new:${scope.workspaceId}`
-  const store = createStudioStore({ nodeId, client, recovery, recoveryId })
+  const store = createStudioStore({ nodeId, client, recovery, recoveryId, conversations: storage })
   onCleanup(store.dispose)
   const plan = store.plan
   const sources = createSourceTracking({ change: store.apply, validate: content => client.validate(content) })
   const [tab, setTab] = createSignal<'outline' | 'plan'>('outline')
   const [addingSource, setAddingSource] = createSignal(false)
   const [editingTitle, setEditingTitle] = createSignal(false)
-  const [ai, setAi] = createSignal<{ instruction?: string; send?: boolean }>()
+  // The dock mounts on first use and stays mounted while closed, so a reply still on its way lands.
+  const [dockStarted, setDockStarted] = createSignal(false)
+  const [dockOpen, setDockOpen] = createSignal(false)
+  const [aiRequest, setAiRequest] = createSignal<AiRequest>({})
+  const [showing, setShowing] = createSignal<PreviewSide>('after')
+  /** What the last applied proposal said it didn't cover, for the publish review. */
+  const [unaddressed, setUnaddressed] = createSignal<string[]>([])
   const [reviewing, setReviewing] = createSignal(false)
   const [publishing, setPublishing] = createSignal(false)
-  const [confirmedRequirements, setConfirmedRequirements] = createSignal<string[]>([])
   const [placement, setPlacement] = createSignal(props.scope.ownerId ?? '')
 
   onMount(async () => {
@@ -117,13 +131,18 @@ export default function PanelStudio(props: {
 
   // ── Runs and problems ────────────────────────────────────────────────────────────────────────
   const parsed = createMemo(() => panelPlanSchema.safeParse(plan()))
-  const preview = createQuery(() => ({
-    queryKey: ['dashboard-preview', nodeId, scope.workspaceId, JSON.stringify(plan())],
-    queryFn: ({ signal }: { signal: AbortSignal }) => client.run({ kind: 'draft', content: copy(plan()) }, 'preview', Intl.DateTimeFormat().resolvedOptions().timeZone, signal),
-    enabled: plan().sources.length > 0 && parsed().success,
+  /** A draft preview run of a plan, while it has a source and parses. */
+  const previewRun = (content: () => PanelPlan | undefined) => createQuery(() => ({
+    queryKey: ['dashboard-preview', nodeId, scope.workspaceId, JSON.stringify(content() ?? null)],
+    queryFn: ({ signal }: { signal: AbortSignal }) => client.run({ kind: 'draft', content: copy(content()!) }, 'preview', Intl.DateTimeFormat().resolvedOptions().timeZone, signal),
+    enabled: !!content()?.sources.length && panelPlanSchema.safeParse(content()).success,
     staleTime: 0,
   }))
+  const preview = previewRun(plan)
   const run = createMemo(() => preview.data ? copy(preview.data) : undefined)
+  // The proposal under review runs as its own draft preview, so Before and After switch without a wait.
+  const proposedPreview = previewRun(() => store.review()?.merged)
+  const proposedRun = createMemo(() => proposedPreview.data ? copy(proposedPreview.data) : undefined)
   /** Nothing before a source is picked, so a blank panel doesn't open on a list of errors. The run and
    *  the Node's validator can report the same problem, so each message shows once. */
   const problems = createMemo((): PlanProblem[] => {
@@ -136,8 +155,8 @@ export default function PanelStudio(props: {
     const reported = [...new Map((run()?.diagnostics.problems ?? []).map(entry => [entry.message, entry])).values()]
     return [...schema, ...reported.map(entry => ({ ...entry, message: `${planPartLabel(plan(), entry.path)}: ${entry.message}` }))]
   })
-  const selectPath = (path: string): void => {
-    const key = partForPath(plan(), path)
+  const selectPath = (path: string, inPlan = plan()): void => {
+    const key = partForPath(inPlan, path)
     if (key) select(key)
   }
 
@@ -188,34 +207,74 @@ export default function PanelStudio(props: {
   const start = props.start
   if (start?.kind === 'describe') {
     store.apply(current => ({ ...current, request: start.request }), { derived: true })
-    setAi({ instruction: start.request, send: true })
+    openAi({ instruction: start.request, send: true })
   } else if (start?.starter) store.apply(() => start.starter!, { derived: true })
   else if (start) {
     // The source's default columns arrive once it is described, so the Columns part shows what they are.
     store.apply(current => addSourceTo(current, start.reference), { derived: true })
     select('columns')
   }
+  if (props.withAi) openAi()
   const inspectorContext: InspectorContext = {
     plan, change: store.apply, select, workspaceId: scope.workspaceId, run, problems, sources,
     ...(props.region ? { region: props.region } : {}),
-    askAi: subject => setAi({ instruction: `About ${subject}: ` }),
+    askAi: key => { const part = parts().find(entry => entry.key === key); if (part) askAbout(part) },
     refreshQueries: () => void queryClient.invalidateQueries(),
   }
   // Keyed by id rather than by source object, so an edit to one source doesn't remount its picker.
   const sourceIds = createMemo(() => plan().sources.map(source => source.id), undefined, { equals: (a, b) => a.join() === b.join() })
 
   // ── AI ───────────────────────────────────────────────────────────────────────────────────────
+  let dock: HTMLDivElement | undefined
+  function openAi(request: AiRequest = {}): void {
+    setAiRequest(request)
+    setDockStarted(true)
+    setDockOpen(true)
+    queueMicrotask(() => dock?.querySelector('textarea')?.focus())
+  }
+  function askAbout(part: PlanPart): void {
+    openAi({ instruction: `About ${part.title}: `, focus: { paths: part.paths, title: part.title } })
+  }
+  const review = store.review
+  const reviewDiff = createMemo(() => review() ? diffOutline(plan(), review()!.merged) : undefined)
+  /** What the outline and the preview draw: the proposed plan while one is under review. */
+  const outlinePlan = () => review()?.merged ?? plan()
+  const previewPlan = () => review() && showing() === 'after' ? review()!.merged : plan()
+  const previewData = () => review() && showing() === 'after' ? proposedRun() : run()
+  const onProposal = (proposal: Parameters<typeof store.reviewProposal>[0]): void => {
+    setShowing('after')
+    store.reviewProposal(proposal)
+  }
+  /** Applying the proposal under review accepts it, after the Node validates it, as one undo step. */
   const applyAiProposal = async (proposal: Extract<AuthoringTurnResult, { state: 'proposal' }>): Promise<string | undefined> => {
-    const merged = mergeAuthoringCandidate(proposal.base as PanelPlan, proposal.candidate as PanelPlan, plan())
-    if (merged.conflicts.length) return 'This panel changed while the proposal was prepared.'
-    const result = panelPlanSchema.safeParse(merged.value)
+    const current = review()
+    if (current?.proposal !== proposal) return 'This panel changed while the proposal was prepared.'
+    const result = panelPlanSchema.safeParse(current.merged)
     if (!result.success) return 'The proposed plan does not fit this panel.'
     try { if ((await client.validate(result.data)).problems.length) return 'The proposed plan has source or column problems.' }
     catch { return 'The Node could not validate this proposal.' }
-    setConfirmedRequirements([])
-    store.apply(() => result.data)
+    setUnaddressed(proposal.unaddressed ?? [])
+    store.applyReview()
     return undefined
   }
+  /** The proposal's requirements, one line each. A line that names plan paths selects its part. */
+  const proposalRequirements = () => (
+    <For each={review()?.merged.requirements ?? []}>{item => (
+      <Row density="compact" leading={<Icon name={REQUIREMENT_ICONS[item.status]} />}
+        {...(item.paths?.[0] ? { onPress: () => selectPath(item.paths![0]!, outlinePlan()) } : {})}>
+        <Stack gap="none">
+          <Text wrap>{`${REQUIREMENT_STATUS_LABELS[item.status]}: ${item.text}`}</Text>
+          <Show when={item.status !== 'covered' && item.reason}>{reason => <Text emphasis="muted" wrap>{reason()}</Text>}</Show>
+        </Stack>
+      </Row>
+    )}</For>
+  )
+  /** Requirements the plan doesn't fully cover, which the publish review warns about. */
+  const notCovered = createMemo(() => [
+    ...(plan().requirements ?? []).filter(item => item.status !== 'covered')
+      .map(item => `${REQUIREMENT_STATUS_LABELS[item.status]}: ${item.text}${item.reason ? ` (${item.reason})` : ''}`),
+    ...unaddressed().map(item => `Not covered: ${item}`),
+  ])
 
   // ── Publish ──────────────────────────────────────────────────────────────────────────────────
   const tabs = () => props.scope.surface === 'home' ? homeTabs(dashboards(), props.scope.workspaceId) : []
@@ -226,12 +285,10 @@ export default function PanelStudio(props: {
     () => reviewing() && props.region && parsed().success ? JSON.stringify(plan()) : undefined,
     async () => regionRefusal(props.region!, plan().view.kind, await describePanelSources(nodeId, scope, plan())),
   )
-  const unconfirmed = () => plan().requirements?.some(item => !confirmedRequirements().includes(item.id)) ?? false
   const blockers = createMemo(() => [
     ...(plan().sources.length ? [] : ['Pick data first.']),
     ...problems().filter(problem => problem.severity === 'error').map(problem => problem.message),
     ...(regionCheck.error ? [] : regionCheck() ? [regionCheck()!] : []),
-    ...(unconfirmed() ? ['Confirm each requirement before publishing.'] : []),
   ])
   const publish = async (): Promise<void> => {
     const result = parsed()
@@ -305,11 +362,12 @@ export default function PanelStudio(props: {
       </div>
       <Badge tone={store.saveState() === "Couldn't save" ? 'warn' : undefined}>{store.saveState()}</Badge>
       <Badge>{publishBadge()}</Badge>
+      <Show when={review()}><Badge tone="accent">Reviewing AI proposal</Badge></Show>
       <ToolbarSpacer />
-      <Button size="sm" opens="dialog" onPress={() => setAi({})}><Icon name="sparkles" /> Ask AI</Button>
+      <Button size="sm" onPress={() => dockOpen() ? setDockOpen(false) : openAi()}><Icon name="sparkles" /> Ask AI</Button>
       <IconButton icon="undo-2" label="Undo" disabled={!store.canUndo()} onPress={store.undo} />
       <IconButton icon="redo-2" label="Redo" disabled={!store.canRedo()} onPress={store.redo} />
-      <Button size="sm" variant="solid" opens="dialog" disabled={!plan().sources.length} onPress={() => setReviewing(true)}>Publish…</Button>
+      <Button size="sm" variant="solid" opens="dialog" disabled={!plan().sources.length || !!review()} onPress={() => setReviewing(true)}>Publish…</Button>
       <Menu ariaLabel="More panel actions" placement="bottom-end"
         trigger={({ open, toggle }) => <IconButton icon="ellipsis" label="More actions" opens="menu" expanded={open()} onPress={toggle} />}>
         {menu => <>
@@ -331,32 +389,40 @@ export default function PanelStudio(props: {
           <Show when={problems().length > 1}><Text emphasis="muted">{`and ${problems().length - 1} more`}</Text></Show>
         </Inline>}
       </Show>
-      <Show when={unpublished().length}><Text emphasis="muted">{`Unpublished: ${unpublished().join(', ')}`}</Text></Show>
+      <Show when={reviewDiff()} fallback={<Show when={unpublished().length}><Text emphasis="muted">{`Unpublished: ${unpublished().join(', ')}`}</Text></Show>}>
+        {changes => <Text emphasis="muted">{`Proposal: ${diffSummary(changes()).join(', ') || 'no changes to the panel'}`}</Text>}
+      </Show>
+      <Show when={notCovered().length}>{count => <Link onPress={() => openAi()}>{`${plural(count(), 'requirement')} not fully covered`}</Link>}</Show>
     </Toolbar>
   )
 
+  // During review the forms show the plan as it is, and take no input until the proposal is applied or
+  // discarded.
   const inspector = (
-    <aside class="dash-studio-inspector" aria-label="Inspector">
+    <aside class="dash-studio-inspector" aria-label="Inspector" hidden={dockOpen()}>
       <Stack gap="stack">
         <Heading level={3}>{addingSource() ? 'Pick data' : selectedPart()?.title ?? 'This panel'}</Heading>
-        <Show when={addingSource()}>
-          <NewSourceInspector workspaceId={scope.workspaceId} onPick={pickSource}
-            {...(plan().sources.length ? { onCancel: () => setAddingSource(false) } : {})} />
-        </Show>
-        {/* Every source's picker stays mounted, hidden unless selected, because the column and step
-            forms read each source's described fields from what its picker reports. */}
-        <For each={sourceIds()}>{id => (
-          <div class="dash-studio-source" hidden={addingSource() || store.selected() !== `source:${id}`}>
-            <SourceInspector context={inspectorContext} part={`source:${id}`} />
-          </div>
-        )}</For>
-        <Show when={!addingSource() && selectedPart()?.key} keyed>{key => (
-          <Show when={partKind(key) !== 'source'}><Dynamic component={INSPECTORS[partKind(key)]} context={inspectorContext} part={key} /></Show>
-        )}</Show>
-        <Show when={!addingSource() && !selectedPart()}>
-          <Show when={plan().request}>{request => <Text wrap>{request()}</Text>}</Show>
-          <Text emphasis="muted" wrap>Select a part of the panel to change it.</Text>
-        </Show>
+        <Show when={review()}><Text emphasis="muted" wrap>Apply or discard the proposal to keep editing.</Text></Show>
+        <div class="dash-studio-forms" inert={!!review()}>
+          <Show when={addingSource()}>
+            <NewSourceInspector workspaceId={scope.workspaceId} onPick={pickSource}
+              {...(plan().sources.length ? { onCancel: () => setAddingSource(false) } : {})} />
+          </Show>
+          {/* Every source's picker stays mounted, hidden unless selected, because the column and step
+              forms read each source's described fields from what its picker reports. */}
+          <For each={sourceIds()}>{id => (
+            <div class="dash-studio-source" hidden={addingSource() || store.selected() !== `source:${id}`}>
+              <SourceInspector context={inspectorContext} part={`source:${id}`} />
+            </div>
+          )}</For>
+          <Show when={!addingSource() && selectedPart()?.key} keyed>{key => (
+            <Show when={partKind(key) !== 'source'}><Dynamic component={INSPECTORS[partKind(key)]} context={inspectorContext} part={key} /></Show>
+          )}</Show>
+          <Show when={!addingSource() && !selectedPart()}>
+            <Show when={plan().request}>{request => <Text wrap>{request()}</Text>}</Show>
+            <Text emphasis="muted" wrap>Select a part of the panel to change it.</Text>
+          </Show>
+        </div>
       </Stack>
     </aside>
   )
@@ -373,32 +439,36 @@ export default function PanelStudio(props: {
         <Show when={tab() === 'outline'} fallback={<div class="dash-studio-code"><CodeBlock copy>{JSON.stringify(plan(), null, 2)}</CodeBlock></div>}>
           <ListDetail split listLabel="Outline">
             <ListColumn>
-              <StudioOutline plan={plan()} stageCounts={run()?.diagnostics.stages ?? []} problems={problems()} selected={store.selected()}
-                onSelect={select} onAdd={addPart} onMoveStage={moveStage} onRemove={removePart}
-                onAskAi={part => setAi({ instruction: `About "${part.title}": ` })} />
+              <StudioOutline plan={outlinePlan()} stageCounts={(review() ? proposedRun() : run())?.diagnostics.stages ?? []}
+                problems={review() ? [] : problems()} selected={store.selected()}
+                onSelect={select} onAdd={addPart} onMoveStage={moveStage} onRemove={removePart} onAskAi={askAbout}
+                {...(reviewDiff() ? { review: { diff: reviewDiff()!, before: plan() } } : {})} />
             </ListColumn>
             <DetailColumn>
               <div class="dash-studio-detail">
-                <Show when={plan().sources.length} fallback={<div class="dash-studio-preview">{empty}</div>}>
-                  <StudioPreview plan={plan()} run={run()} loading={preview.isFetching} {...(props.placed ? { placed: props.placed } : {})}
-                    onRefresh={() => void preview.refetch()} onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
-                    onEditTitle={() => setEditingTitle(true)} />
+                <Show when={previewPlan().sources.length || review()} fallback={<div class="dash-studio-preview">{empty}</div>}>
+                  <StudioPreview plan={previewPlan()} run={previewData()} loading={review() && showing() === 'after' ? proposedPreview.isFetching : preview.isFetching}
+                    {...(props.placed ? { placed: props.placed } : {})}
+                    onRefresh={() => void (review() && showing() === 'after' ? proposedPreview : preview).refetch()}
+                    onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
+                    onEditTitle={() => setEditingTitle(true)}
+                    {...(review() ? { review: { showing: showing(), onShow: setShowing, ...(run() ? { beforeRows: run()!.rows.length } : {}) } } : {})} />
                 </Show>
                 {inspector}
+                <Show when={dockStarted()}>
+                  <div class="dash-studio-dock" ref={dock} hidden={!dockOpen()}>
+                    <AuthoringConversation layout="dock" onClose={() => setDockOpen(false)} endpoint="/v1/core/authoring/turn" target="dashboard"
+                      targetId={store.draft()?.id ?? recoveryId} scope={scope} baseRevision={store.draft()?.draftRevision ?? 0} base={plan()} label={plan().title}
+                      {...(aiRequest().instruction ? { instruction: aiRequest().instruction } : {})} {...(aiRequest().focus ? { focus: aiRequest().focus } : {})}
+                      sendOnOpen={aiRequest().send} onApply={applyAiProposal} onProposal={onProposal} proposalDetail={proposalRequirements} />
+                  </div>
+                </Show>
               </div>
             </DetailColumn>
           </ListDetail>
         </Show>
       </div>
       {statusBar}
-
-      <Show when={ai()}>{request => (
-        <Modal title={`Edit ${plan().title} with AI`} size="lg" onDismiss={() => setAi(undefined)}>
-          <AuthoringConversation onClose={() => setAi(undefined)} endpoint="/v1/core/authoring/turn" target="dashboard" targetId={store.draft()?.id ?? recoveryId}
-            scope={scope} baseRevision={store.draft()?.draftRevision ?? 0} base={plan()} label={plan().title}
-            {...(request().instruction ? { instruction: request().instruction } : {})} sendOnOpen={request().send} onApply={applyAiProposal} />
-        </Modal>
-      )}</Show>
 
       <Show when={reviewing()}>
         <Modal title="Publish panel" size="md" onDismiss={() => setReviewing(false)}>
@@ -416,14 +486,8 @@ export default function PanelStudio(props: {
               fallback={<Field label="Where it goes"><Text>{props.returnLabel}</Text></Field>}>
               <LabeledSelect label="Where it goes" value={placement()} options={tabs().map(entry => ({ value: entry.id, label: entry.name }))} onChange={setPlacement} />
             </Show>
-            <Show when={plan().requirements?.length}>
-              <Field label="Requirements to confirm" group><Stack gap="row">
-                <For each={plan().requirements}>{requirement => <Checkbox
-                  label={`${requirement.status}: ${requirement.text}${requirement.reason ? ` — ${requirement.reason}` : ''}`}
-                  checked={confirmedRequirements().includes(requirement.id)}
-                  onChange={checked => setConfirmedRequirements(current => checked ? [...new Set([...current, requirement.id])] : current.filter(id => id !== requirement.id))}
-                />}</For>
-              </Stack></Field>
+            <Show when={notCovered().length}>
+              <Alert tone="warn" title="Not fully covered"><Stack gap="none"><For each={notCovered()}>{item => <Text wrap>{item}</Text>}</For></Stack></Alert>
             </Show>
             <Show when={blockers().length}>
               <Alert tone="warn" title="Fix these before publishing"><Stack gap="none"><For each={blockers()}>{blocker => <Text wrap>{blocker}</Text>}</For></Stack></Alert>

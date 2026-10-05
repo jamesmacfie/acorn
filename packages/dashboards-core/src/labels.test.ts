@@ -3,7 +3,7 @@ import { panelPlanSchema } from '@acorn/protocol/dashboards.ts'
 import { DATA_OPERATORS } from '@acorn/protocol/dataBindings.ts'
 import {
   AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, DURATION_UNIT_LABELS, EMPTY_SORT_LABELS, EXPRESSION_LABELS,
-  GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS, MEASURE_LABELS, OPERATOR_LABELS, PRECISION_LABELS, PRESENTATION_LABELS, PREVIOUS_CHANGE_LABELS, RELATIVE_OFFSET_LABELS,
+  GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS, MEASURE_LABELS, OPERATOR_LABELS, PRECISION_LABELS, PRESENTATION_LABELS, PREVIOUS_CHANGE_LABELS, RELATIVE_OFFSET_LABELS, REQUIREMENT_STATUS_LABELS,
   SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNMATCHED_LABELS, VIEW_LABELS, WEEK_START_LABELS,
   calendarLabel, offsetLabel, operatorLabel, planPartLabel,
 } from './labels'
@@ -37,6 +37,7 @@ describe('panel labels', () => {
     ['operator', [...DATA_OPERATORS], OPERATOR_LABELS],
     ['tone', values(field(element(field(column, 'choices')), 'tone')), TONE_LABELS],
     ['sort direction', values(field(element(field(plan, 'sort')), 'direction')), SORT_DIRECTION_LABELS],
+    ['requirement status', values(field(element(field(plan, 'requirements')), 'status')), REQUIREMENT_STATUS_LABELS],
     ['time mode', values(field(field(plan, 'time'), 'mode')), TIME_MODE_LABELS],
     ['week start', values(field(field(plan, 'time'), 'weekStart')), WEEK_START_LABELS],
     ['expression', variants(expression).flatMap(option => values(field(option, 'kind'))), EXPRESSION_LABELS],

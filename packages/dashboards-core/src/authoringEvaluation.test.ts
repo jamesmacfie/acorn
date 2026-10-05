@@ -1,10 +1,11 @@
 import { describe, expect, it } from 'vitest'
-import { runAuthoringTurn, type AuthoringTurnRequest } from '@acorn/protocol/authoring.ts'
+import { authoringFocusPrefix, runAuthoringTurn, type AuthoringTurnRequest } from '@acorn/protocol/authoring.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { bindPanelRows, describePanelPlan, runPlanStages, sortPlanRows, validatePanelPlan, type PlanSource } from './plan'
 import { PANEL_CAPABILITIES } from './capabilities'
+import { diffOutline } from './outline'
 
 // Scripted cases exercise the actual model-response loop and plan validator. These are fixture
 // expectations; acceptance labels from people are collected separately.
@@ -212,5 +213,30 @@ describe('an evaluation case for every operation', () => {
     if (result.state !== 'proposal') return
     expect(result.problems).toEqual([])
     expect(panelPlanSchema.parse(result.candidate).stages.map(stage => stage.op)).toEqual([op])
+  })
+})
+
+describe('a focused request', () => {
+  // The scripted model edits whichever stage the focus prefix names, so this checks the prefix reaches
+  // the model intact and that the outline sees only that stage change.
+  it('changes only the focused stage', async () => {
+    const keep = (value: string): Stage => ({ op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/state' } }, operator: 'ne', right: { address: { from: 'literal', value } } } })
+    const base = panelPlanSchema.parse({ ...plan(), stages: [keep('draft'), keep('closed')] })
+    const request: AuthoringTurnRequest = { target: 'dashboard', scope: { workspaceId: 'w' }, targetId: 'focus', baseRevision: 0, base,
+      backendId: 'scripted:fixture', instruction: `${authoringFocusPrefix(['/stages/1'], 'Keep where State is not closed')}About Keep where State is not closed: merged instead`,
+      context: [], samplesEnabled: false }
+    const result = await runAuthoringTurn({ request, system: 'Only described capabilities.', facts: {},
+      generate: async ({ prompt }) => {
+        const asked = (JSON.parse(prompt) as { conversation: { content: string }[] }).conversation.at(-1)!.content
+        const index = Number(/^\[Focus: \/stages\/(\d+) /.exec(asked)![1])
+        const candidate = { ...base, stages: base.stages.map((stage, at) => at === index ? keep('merged') : stage) }
+        return { text: JSON.stringify({ kind: 'proposal', candidate, summary: 'Hides merged instead.' }), providerId: 'scripted', modelId: 'fixture' }
+      },
+      metadata: async () => ({}),
+      validate: async value => ({ candidate: panelPlanSchema.parse(value), problems: [] }),
+    })
+    if (result.state !== 'proposal') throw new Error(`Expected a proposal, got ${result.state}`)
+    const changed = Object.entries(diffOutline(base, panelPlanSchema.parse(result.candidate)).parts).filter(([, change]) => change !== 'same')
+    expect(changed).toEqual([['stage:1', 'changed']])
   })
 })

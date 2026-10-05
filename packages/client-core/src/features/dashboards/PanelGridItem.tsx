@@ -22,6 +22,7 @@ export type PanelGridItemLayout = {
 
 export type PanelGridItemActions = {
   edit: () => void
+  editWithAi: () => void
   beginLayout: () => void
   canMove: (delta: -1 | 1) => boolean
   move: (delta: -1 | 1) => void
@@ -64,6 +65,7 @@ export default function PanelGridItem(props: {
       {(menu) => (
         <>
           <Menu.Item context={menu} onSelect={props.actions.edit}>Edit</Menu.Item>
+          <Menu.Item context={menu} onSelect={props.actions.editWithAi}>Edit with AI…</Menu.Item>
           <Menu.Separator />
           <Show when={!props.layout.collapsed()}>
             <Menu.Item context={menu} onSelect={props.actions.beginLayout}>Move or resize</Menu.Item>

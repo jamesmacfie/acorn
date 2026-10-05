@@ -36,6 +36,10 @@ export const SORT_DIRECTION_LABELS: Record<NonNullable<PanelPlan['sort']>[number
   asc: 'Lowest or oldest first', desc: 'Highest or newest first',
 }
 
+export const REQUIREMENT_STATUS_LABELS: Record<NonNullable<PanelPlan['requirements']>[number]['status'], string> = {
+  covered: 'Covered', partial: 'Partly covered', choice: 'Needs a choice', unavailable: 'Unavailable',
+}
+
 export const TIME_MODE_LABELS: Record<PanelPlan['time']['mode'], string> = {
   fixed: 'Always this time zone', viewer: "Each viewer's time zone",
 }

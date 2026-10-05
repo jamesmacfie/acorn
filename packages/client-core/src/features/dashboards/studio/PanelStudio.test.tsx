@@ -29,19 +29,21 @@ let host: HTMLDivElement
 let dispose: (() => void) | undefined
 let client: QueryClient
 let opened: PanelPlan
+let turnReply: () => Promise<unknown>
 const onClose = vi.fn()
 const settle = async (times = 3) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
 const row = (text: string) => [...document.querySelectorAll<HTMLElement>('.ui-row')].find(entry => entry.textContent?.includes(text))
-const mount = (dashboardId?: string, start?: Parameters<typeof PanelStudio>[0]['start']) => {
+const mount = (dashboardId?: string, start?: Parameters<typeof PanelStudio>[0]['start'], withAi?: boolean) => {
   dispose = render(() => <QueryClientProvider client={client}>
-    <PanelStudio scope={{ surface: 'home', workspaceId: 'w' } as never} dashboardId={dashboardId} start={start} returnLabel="Home"
+    <PanelStudio scope={{ surface: 'home', workspaceId: 'w' } as never} dashboardId={dashboardId} start={start} withAi={withAi} returnLabel="Home"
       onPublished={() => {}} onDeleted={() => {}} onClose={onClose} />
   </QueryClientProvider>, host)
 }
 
 beforeEach(() => {
   opened = invalid
+  turnReply = () => new Promise(() => {})
   onClose.mockReset()
   requests.mockReset()
   requests.mockImplementation(async (path, options) => {
@@ -58,7 +60,7 @@ beforeEach(() => {
     if (path.includes('/integrations')) return { providers: [], integrations: [] }
     if (path.endsWith('/models/backends')) return { backends: [{ id: 'harness:claude', kind: 'harness', label: 'Claude Code', models: [] }] }
     if (path.endsWith('/core/prefs')) return {}
-    if (path.endsWith('/authoring/turn')) return new Promise(() => {})
+    if (path.endsWith('/authoring/turn')) return turnReply()
     if (body?.operation === 'describe') return new Promise(() => {})
     throw new Error(`Unexpected ${path}`)
   })
@@ -127,10 +129,55 @@ describe('PanelStudio', () => {
     expect(filter.dataset.tip).toBe('Add a column first.')
   })
 
+  it('opens Edit with AI with the dock open and its box focused', async () => {
+    mount('d1', undefined, true)
+    await settle(6)
+    expect(document.querySelector<HTMLElement>('.dash-studio-dock')!.hidden).toBe(false)
+    expect(document.querySelector<HTMLElement>('.dash-studio-inspector')!.hidden).toBe(true)
+    expect(document.activeElement).toBe(document.querySelector('.dash-studio-dock textarea'))
+    button('Close')!.click()
+    await settle()
+    expect(document.querySelector<HTMLElement>('.dash-studio-inspector')!.hidden).toBe(false)
+  })
+
   it('closes on Escape', async () => {
     mount('d1')
     await settle()
     document.querySelector<HTMLElement>('.dash-studio')!.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))
     expect(onClose).toHaveBeenCalledTimes(1)
+  })
+
+  it('reviews a proposal on the outline, with the inspector read-only and Publish off', async () => {
+    opened = filtered
+    const added: PanelPlan['stages'][number] = { op: 'filter', where: { kind: 'comparison', left: { address: { from: 'item', pointer: '/title' } }, operator: 'eq', right: { address: { from: 'literal', value: 'y' } } } }
+    turnReply = async () => ({
+      state: 'proposal', base: filtered, baseRevision: 1, candidate: { ...filtered, stages: [...filtered.stages, added] }, summary: 'Adds a filter.',
+      diff: [], problems: [], context: [{ role: 'user', content: 'Add a filter' }], usage: { requests: 1, inputTokens: 1, outputTokens: 1 }, providerId: 'p', modelId: 'm',
+    })
+    mount('d1')
+    await settle(6)
+    row('List')!.click()
+    await settle()
+    expect(document.querySelector<HTMLElement>('.dash-studio-forms')!.inert).toBeFalsy()
+    button('Ask AI')!.click()
+    await settle()
+    const field = document.querySelector<HTMLTextAreaElement>('.dash-studio-dock textarea')!
+    field.value = 'Add a filter'
+    field.dispatchEvent(new Event('input', { bubbles: true }))
+    await settle()
+    button('Send')!.click()
+    await settle(6)
+
+    expect(document.body.textContent).toContain('Reviewing AI proposal')
+    expect(row('Keep where Title is "y"')?.textContent).toContain('Added')
+    expect(button('Publish…')!.disabled).toBe(true)
+    expect(document.querySelector<HTMLElement>('.dash-studio-forms')!.inert).toBe(true)
+    expect(document.querySelector('.dash-studio-inspector')!.textContent).toContain('Apply or discard the proposal to keep editing.')
+    expect(document.body.textContent).toContain('Proposal: 1 step added')
+
+    button('Discard')!.click()
+    await settle()
+    expect(document.body.textContent).not.toContain('Reviewing AI proposal')
+    expect(row('Keep where Title is "y"')).toBeUndefined()
   })
 })

@@ -194,7 +194,7 @@ releases the wait without cancelling the process.
 | `POST` | `/v1/core/queries/:operation` | Provider access | The workspace query library |
 | `POST` | `/v1/core/dashboards/:operation` | Device, in the handler | `list`, `get`, `create`, `save`, `validate`, `publish`, `published`, `run`, and `delete` |
 | `GET` | `/v1/core/dashboards/history` | Open | The measure series a history panel draws |
-| `POST` | `/v1/core/authoring/turn` | Device | One AI authoring turn for a query or dashboard. No execution or publication |
+| `POST` | `/v1/core/authoring/turn` | Device | One AI authoring turn for a query or dashboard. An instruction that starts with `[Focus: <paths> "<title>"] ` is about those plan paths. No execution or publication |
 
 The path's operation must match the body's `operation`. `save` is a compare-and-swap on the draft
 revision. See the [workspace query library](../data-sources/query-library.md#workspace-query-library).

@@ -13,8 +13,11 @@ import PanelBody from '../views/PanelBody'
 
 // The studio's live preview: the panel's own body, in the card a placed panel uses, at the width and
 // height it would have on the dashboard (docs/dashboards/mapping-and-editor.md § The generated editor).
+// While an AI proposal is under review, it switches between the plan as it is and as proposed.
 
 type Size = 's' | 'm' | 'l'
+export type PreviewSide = 'before' | 'after'
+const rowCount = (count: number) => `${count} ${count === 1 ? 'row' : 'rows'}`
 
 /** The preset whose width is closest to where the panel is placed, or medium for a new panel. */
 const closestSize = (kind: string, placed: Rect | undefined): Size => {
@@ -32,6 +35,9 @@ export default function StudioPreview(props: {
   onRefresh: () => void
   onSelectPart: (key: PlanPartKey) => void
   onEditTitle: () => void
+  /** Set while a proposal is under review. `plan` and `run` are the side showing, and `beforeRows` is
+   *  the current plan's row count, for "17 rows (was 41)". */
+  review?: { showing: PreviewSide; onShow: (side: PreviewSide) => void; beforeRows?: number }
 }) {
   const [size, setSize] = createSignal<Size>(closestSize(props.plan.view.kind, props.placed))
   // The cell is a twelfth of the preview area, as a cell is a twelfth of the grid. The grid's gaps
@@ -48,8 +54,10 @@ export default function StudioPreview(props: {
         <Text emphasis="muted">Size on the dashboard</Text>
         <SegmentedControl ariaLabel="Size on the dashboard" size="sm" value={size()} onChange={setSize}
           options={[{ value: 's', label: 'S', title: 'Small' }, { value: 'm', label: 'M', title: 'Medium' }, { value: 'l', label: 'L', title: 'Large' }]} />
+        <Show when={props.review}>{review => <SegmentedControl ariaLabel="Compare with the proposal" size="sm" value={review().showing} onChange={review().onShow}
+          options={[{ value: 'before', label: 'Before' }, { value: 'after', label: 'After' }]} />}</Show>
         <Show when={props.run}>{run => <Text emphasis="muted">
-          {`${run().rows.length} ${run().rows.length === 1 ? 'row' : 'rows'} · read ${formatRelativeTime(run().diagnostics.evaluationTime)}`}
+          {`${rowCount(run().rows.length)}${props.review?.showing === 'after' && props.review.beforeRows !== undefined ? ` (was ${props.review.beforeRows})` : ''} · read ${formatRelativeTime(run().diagnostics.evaluationTime)}`}
         </Text>}</Show>
         <IconButton icon="refresh-cw" label="Read the data again" size="sm" spin={props.loading} disabled={props.loading} onPress={props.onRefresh} />
       </Inline>

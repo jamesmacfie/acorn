@@ -75,6 +75,18 @@
   overflow-y: auto;
 }
 .dash-studio-source[hidden] { display: none; }
+/* The inspector's forms, which go inert while an AI proposal is under review. The wrapper draws no
+   box, so the forms keep the inspector's spacing. */
+.dash-studio-forms { display: contents; }
+/* The docked AI conversation, which takes the inspector's column while it is open. The whole column
+   scrolls, composer included. */
+.dash-studio-dock {
+  min-width: 0;
+  min-height: 0;
+  padding: var(--space-4);
+  border-left: var(--chrome-divider);
+  overflow-y: auto;
+}
 /* One condition, sort key, grouping, or choice in an inspector: its fields stacked, and set apart from
    the next one by a rule. */
 .dash-studio-condition, .dash-studio-choice {
@@ -95,8 +107,8 @@
 
 @media (max-width: 1100px) {
   .dash-studio-detail { grid-template-columns: minmax(0, 1fr); overflow-y: auto; }
-  .dash-studio-preview, .dash-studio-inspector { overflow: visible; }
-  .dash-studio-inspector { border-left: 0; border-top: var(--chrome-divider); }
+  .dash-studio-preview, .dash-studio-inspector, .dash-studio-dock { overflow: visible; }
+  .dash-studio-inspector, .dash-studio-dock { border-left: 0; border-top: var(--chrome-divider); }
 }
 
 /* ── Placement ───────────────────────────────────────────────────────────────────────────── */

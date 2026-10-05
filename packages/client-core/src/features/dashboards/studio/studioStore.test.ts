@@ -2,7 +2,7 @@ import { createRoot } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DashboardDraft, PanelPlan } from '@acorn/protocol/dashboards.ts'
 import { dashboardRecoveryStore } from '../dashboardRecovery'
-import { blankPlan, createStudioStore } from './studioStore'
+import { blankPlan, createStudioStore, type StudioReview } from './studioStore'
 
 const memory = () => {
   const values = new Map<string, string>()
@@ -17,11 +17,15 @@ const sourced = (plan: PanelPlan): PanelPlan => ({ ...plan, sources: [{ id: 'tas
 } } }] })
 const titled = (title: string) => (plan: PanelPlan): PanelPlan => ({ ...plan, title })
 
+const proposal = (base: PanelPlan, candidate: PanelPlan) => ({ state: 'proposal', base, candidate, baseRevision: 0, summary: 'Renamed', diff: [], problems: [],
+  context: [], usage: { requests: 1, inputTokens: 0, outputTokens: 0 }, providerId: 'p', modelId: 'm' }) as StudioReview['proposal']
+
 let dispose: () => void
 const setup = () => {
   const client = { create: vi.fn(async (content: PanelPlan) => draft(content)), save: vi.fn(async (_id: string, revision: number, content: PanelPlan) => draft(content, revision + 1)) }
-  const store = createRoot(done => { dispose = done; return createStudioStore({ nodeId: 'n', client, recovery: dashboardRecoveryStore(memory()), recoveryId: 'new:w' }) })
-  return { store, client }
+  const conversations = memory()
+  const store = createRoot(done => { dispose = done; return createStudioStore({ nodeId: 'n', client, recovery: dashboardRecoveryStore(memory()), recoveryId: 'new:w', conversations }) })
+  return { store, client, conversations }
 }
 
 beforeEach(() => { vi.useFakeTimers(); vi.setSystemTime(0) })
@@ -117,5 +121,48 @@ describe('studio store', () => {
     store.open(draft({ ...blankPlan(), title: 'Loaded' }))
     expect(store.plan().title).toBe('Loaded')
     expect(store.canUndo()).toBe(false)
+  })
+
+  it('reviews a proposal and applies it as one undo step', () => {
+    const { store } = setup()
+    store.apply(titled('Mine'))
+    store.reviewProposal(proposal(store.plan(), titled('Proposed')(store.plan())))
+    expect(store.review()?.merged.title).toBe('Proposed')
+    expect(store.plan().title).toBe('Mine')
+    expect(store.canUndo()).toBe(false)
+    store.applyReview()
+    expect(store.review()).toBeUndefined()
+    expect(store.plan().title).toBe('Proposed')
+    store.undo()
+    expect(store.plan().title).toBe('Mine')
+  })
+
+  it('rebases a proposal over an edit it does not touch, and discards without a change', () => {
+    const { store } = setup()
+    const base = store.plan()
+    store.apply(plan => ({ ...plan, refresh: 60 }))
+    store.reviewProposal(proposal(base, titled('Proposed')(base)))
+    expect(store.review()?.merged).toMatchObject({ title: 'Proposed', refresh: 60 })
+    store.reviewProposal(undefined)
+    expect(store.review()).toBeUndefined()
+    expect(store.plan().title).toBe(blankPlan().title)
+  })
+
+  it('ends review when the plan changed where the proposal did', () => {
+    const { store } = setup()
+    const base = store.plan()
+    store.apply(titled('Edited meanwhile'))
+    store.reviewProposal(proposal(base, titled('Proposed')(base)))
+    expect(store.review()).toBeUndefined()
+    expect(store.problem()).toBe('This panel changed while the proposal was prepared.')
+  })
+
+  it("moves a new panel's AI conversation to its draft id when the Node assigns one", async () => {
+    const { store, conversations } = setup()
+    conversations.setItem('acorn:ai-authoring:v1:n:dashboard:new:w', '{"context":[]}')
+    store.apply(plan => titled('First')(sourced(plan)))
+    await vi.advanceTimersByTimeAsync(750)
+    expect(conversations.getItem('acorn:ai-authoring:v1:n:dashboard:d1')).toBe('{"context":[]}')
+    expect(conversations.getItem('acorn:ai-authoring:v1:n:dashboard:new:w')).toBeNull()
   })
 })

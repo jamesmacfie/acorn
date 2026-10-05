@@ -51,8 +51,8 @@ export type InspectorContext = {
   sources: SourceTracking
   /** The plugin area the panel will show in, which can refuse some views. */
   region?: PanelRegion
-  /** Opens the AI with a part of the panel named in the request. */
-  askAi: (subject: string) => void
+  /** Opens the AI about a part of the panel: named in the request, and its paths sent as the focus. */
+  askAi: (part: PlanPartKey) => void
   /** Refetches every query after a source starts keeping history. */
   refreshQueries: () => void
 }
@@ -292,7 +292,7 @@ function ColumnsInspector(props: InspectorProps) {
           <Menu.Item context={menu} disabled={item.index === 0} onSelect={() => context.change(current => moveColumnIn(current, item.index, -1))}>Move up</Menu.Item>
           <Menu.Item context={menu} disabled={item.index === plan().columns.length - 1} onSelect={() => context.change(current => moveColumnIn(current, item.index, 1))}>Move down</Menu.Item>
           <Menu.Item context={menu} tone="danger" onSelect={() => context.change(current => removeColumnFrom(current, item.column.id))}>Remove</Menu.Item>
-          <Menu.Item context={menu} onSelect={() => context.askAi(`the ${item.column.label} column`)}>Ask AI about this</Menu.Item>
+          <Menu.Item context={menu} onSelect={() => context.askAi(`column:${item.column.id}`)}>Ask AI about this</Menu.Item>
         </>}</RowActions>}>
         <Stack gap="none"><Text>{item.column.label}</Text><Text emphasis="muted">{fieldLabel(item.column)}</Text></Stack>
       </Row>}

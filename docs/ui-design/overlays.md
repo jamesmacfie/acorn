@@ -32,7 +32,8 @@ behind it, so the layer covers them instead. While either is open, the shell sta
 keybindings down through `taskActive` in `apps/desktop/src/client/App.tsx`. Focus that lands behind
 the layer returns into it, **Escape** closes it when nothing inside is open, and focus goes back to
 the control that opened it. Menus, select lists, and dialogs opened inside it portal to the body and
-paint above it.
+paint above it. The studio's AI conversation docks in a column inside the layer, in place of the
+inspector, rather than opening a dialog over it.
 
 ### The drawer
 

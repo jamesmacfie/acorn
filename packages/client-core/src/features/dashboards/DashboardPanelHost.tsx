@@ -11,7 +11,8 @@ import { sizePresets } from './layout'
 import type { PanelRegion } from './region'
 
 /** A panel to edit, or none for Add panel, which asks what to build first. */
-export type DashboardEditorSession = { dashboardId?: string }
+/** Which panel to edit, if any, and whether the studio opens with the AI docked and ready to type. */
+export type DashboardEditorSession = { dashboardId?: string; withAi?: boolean }
 
 type HostProps = {
   session?: DashboardEditorSession
@@ -44,6 +45,7 @@ function PanelSession(props: HostProps & { session: DashboardEditorSession }) {
       scope={props.scope}
       {...(dashboardId() ? { dashboardId: dashboardId() } : {})}
       {...(start() ? { start: start() } : {})}
+      withAi={props.session.withAi}
       {...(props.region ? { region: props.region } : {})}
       {...(dashboardId() && layoutAt(props.scope).rects[dashboardId()!] ? { placed: layoutAt(props.scope).rects[dashboardId()!] } : {})}
       returnLabel={props.returnLabel}

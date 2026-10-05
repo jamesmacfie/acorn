@@ -108,3 +108,48 @@ it('keeps a replacement request busy when a cancelled request settles later', as
   finish[1]({ state: 'stopped', context: [], reason: 'Authoritative reply' }); await settle()
   expect(host.textContent).toContain('Authoritative reply')
 })
+
+const turnContext = [
+  { role: 'user', content: '[Focus: /stages/1 "Keep where Author is you"] About Keep where Author is you: last 14 days' },
+  { role: 'assistant', content: JSON.stringify({ kind: 'metadata', request: { operation: 'list-sources' } }) },
+  { role: 'tool', content: '{"result":[]}' },
+  { role: 'assistant', content: JSON.stringify({ kind: 'proposal', candidate: {}, summary: 'Keeps the last 14 days.' }) },
+]
+const dockProposal = {
+  state: 'proposal', base: {}, baseRevision: 0, candidate: {}, summary: 'Keeps the last 14 days.', diff: [{ path: '/stages/1', change: 'change' }], problems: [],
+  context: turnContext, usage: { requests: 2, inputTokens: 10, outputTokens: 5 }, providerId: 'p', modelId: 'm',
+} as unknown as AuthoringTurnResult
+
+it('draws a docked conversation: turns, the proposal, and a composer, and sends the focus once', async () => {
+  const sent: string[] = []
+  const proposals: unknown[] = []
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <QueryClientProvider client={new QueryClient()}>
+    <AuthoringConversation layout="dock" endpoint="/unused" target="dashboard" targetId="t" scope={{ workspaceId: 'w', projectId: 'p' }}
+      baseRevision={0} base={{}} label="Panel" instruction="About Keep where Author is you: " focus={{ paths: ['/stages/1'], title: 'Keep where Author is you' }}
+      onApply={() => undefined} onProposal={proposal => proposals.push(proposal)}
+      proposalDetail={() => <span>Covered: recent changes</span>}
+      sendTurn={async request => { sent.push(request.instruction); return dockProposal }} />
+  </QueryClientProvider>, host)
+  await settle()
+  const field = host.querySelector('textarea')!
+  expect(field.placeholder).toBe('Ask for a change')
+  expect(field.value).toBe('About Keep where Author is you: ')
+  field.value = 'About Keep where Author is you: last 14 days'; field.dispatchEvent(new Event('input', { bubbles: true })); await settle()
+  ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Send')!.click(); await settle()
+
+  expect(sent).toEqual(['[Focus: /stages/1 "Keep where Author is you"] About Keep where Author is you: last 14 days'])
+  // The person's turn without the prefix, and the proposal once, in its card rather than as a turn too.
+  expect(host.textContent).toContain('YouAbout Keep where Author is you: last 14 days')
+  expect(host.textContent!.split('Keeps the last 14 days.').length).toBe(2)
+  expect(host.textContent).toContain('Covered: recent changes')
+  expect(host.textContent).not.toContain('/stages/1')
+  expect(host.textContent).not.toContain('input tokens')
+  expect(proposals.at(-1)).toBe(dockProposal)
+
+  field.value = 'and newest first'; field.dispatchEvent(new Event('input', { bubbles: true })); await settle()
+  ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Send')!.click(); await settle()
+  expect(sent[1]).toBe('and newest first')
+  ;[...host.querySelectorAll('button')].find(button => button.textContent === 'Discard')!.click(); await settle()
+  expect(proposals.at(-1)).toBeUndefined()
+})

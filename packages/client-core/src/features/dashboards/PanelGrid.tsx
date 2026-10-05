@@ -412,6 +412,7 @@ export default function PanelGrid(props: {
                   }}
                   actions={{
                     edit: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId }),
+                    editWithAi: () => setTypedEditing({ dashboardId: definition.publication!.dashboardId, withAi: true }),
                     beginLayout: () => enterLayoutMode(definition.id),
                     canMove: (delta) => canMove(definition.id, delta),
                     move: (delta) => moveTo(definition.id, delta),

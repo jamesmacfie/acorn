@@ -11,6 +11,10 @@ allowlisted source metadata, dynamic source discovery, option IDs, or compatible
 ask an inline clarification; or return a proposal. API-backed model connections and text-only agent
 harnesses use the same JSON response protocol over the existing `generateText` service.
 
+The conversation (`AuthoringConversation`) can also draw docked beside what it edits, as the panel
+studio's does. Workflows still opens it in a dialog, because docking it needs a step-by-step diff of
+the workflow to review proposals on.
+
 The conversation stores pending context, clarifications, and proposals in device-local recovery
 state keyed by Node and workflow. Source records stay out of the prompt unless the user enables
 **Use preview records to help AI**. An enabled sample contains at most three selected records and
