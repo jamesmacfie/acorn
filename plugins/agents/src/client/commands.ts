@@ -15,6 +15,7 @@ import { openManagedSession, requestComposerFocus } from './sessions/managedSele
 import { managedAgentStore } from './sessions/managedStore'
 import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
+import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../shared/sessionDefaults'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
 // task, and one search over that task's managed sessions
@@ -78,13 +79,14 @@ export const agentsCommands: readonly ContributedCommand[] = [
     // types (client-core localSearch.ts). Only installed harnesses, and only agents on one — an absent
     // CLI cannot start a session, and the pane's cards are where the diagnostic that says why belongs.
     ...localSearch(async () => {
-      const [providers, agents] = await Promise.all([
+      const [providers, agents, defaults] = await Promise.all([
         managedAgentApi.providers(),
         // A failed agents read still leaves the harnesses to pick from.
         readJson<CustomAgent[]>(customAgentsRoute).catch(() => []),
+        readJson<AgentSessionDefaults>(agentSessionDefaultsRoute).catch(() => null),
       ])
       pickedRows.clear()
-      return newSessionChoices(providers.filter((provider) => provider.installed), agents)
+      return newSessionChoices(providers.filter((provider) => provider.installed), agents, defaults?.hiddenProviders ?? [])
         .map((choice): CommandSearchItem => {
           const glyph = choiceGlyph(choice)
           const id = choice.agent ? `custom-agent:${choice.agent.id}` : choice.provider.id

@@ -11,12 +11,16 @@ import { startupContextInjection } from './startupContext'
 
 const mocks = vi.hoisted(() => ({
   prefs: {} as Record<string, string>,
+  hidden: [] as string[],
   saveStartup: vi.fn(async (_client: unknown, _on: boolean) => true),
+  writeDefaults: vi.fn(async (_client: unknown, current: unknown, patch: object) => ({ ...(current as object), ...patch })),
 }))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { queryKey: readonly string[] }) => ({
     get data() {
-      return options().queryKey.includes('session-defaults') ? defaultAgentSessionDefaults() : mocks.prefs
+      return options().queryKey.includes('session-defaults')
+        ? { ...defaultAgentSessionDefaults(), hiddenProviders: mocks.hidden }
+        : mocks.prefs
     },
   }),
   useQueryClient: () => ({}),
@@ -24,6 +28,10 @@ vi.mock('@tanstack/solid-query', () => ({
 vi.mock('./startupContext', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./startupContext')>()),
   saveStartupContextInjection: (client: unknown, on: boolean) => mocks.saveStartup(client, on),
+}))
+vi.mock('./sessionDefaultsClient', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./sessionDefaultsClient')>()),
+  writeAgentSessionDefaults: (client: unknown, current: unknown, patch: object) => mocks.writeDefaults(client, current, patch),
 }))
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
@@ -43,12 +51,17 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 const row = (label: string) =>
   [...host.querySelectorAll('.ui-setting-row')].find((each) => each.querySelector('.ui-setting-label')?.textContent?.startsWith(label))
 
-beforeEach(() => {
-  mocks.prefs = {}
-  mocks.saveStartup.mockClear()
+const mount = () => {
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => <AgentSessionDefaultsSettings />, host)
+}
+beforeEach(() => {
+  mocks.prefs = {}
+  mocks.hidden = []
+  mocks.saveStartup.mockClear()
+  mocks.writeDefaults.mockClear()
+  mount()
 })
 afterEach(() => {
   dispose?.()
@@ -85,5 +98,24 @@ describe('the startup-context preference', () => {
     // Only an explicit `false` turns it off. Anything else is a value nobody chose.
     expect(startupContextInjection({ [PrefKeys.startupContextInjection]: 'false' })).toBe(false)
     expect(startupContextInjection({ [PrefKeys.startupContextInjection]: 'nonsense' })).toBe(true)
+  })
+
+  it('switches a harness out of New, and keeps the last one on offer switched on', async () => {
+    await settle()
+    const codex = () => host.querySelector<HTMLInputElement>('input[aria-label="Show Codex in New"]')!
+    const claude = () => host.querySelector<HTMLInputElement>('input[aria-label="Show Claude Code in New"]')!
+    expect(codex().checked).toBe(true)
+    expect(claude().disabled).toBe(false)
+    codex().click()
+    await settle()
+    expect(mocks.writeDefaults).toHaveBeenCalledWith(expect.anything(), expect.anything(), { hiddenProviders: ['codex'] })
+
+    dispose?.()
+    host.remove()
+    mocks.hidden = ['codex']
+    mount()
+    await settle()
+    expect(codex().checked).toBe(false)
+    expect(claude().disabled).toBe(true)
   })
 })

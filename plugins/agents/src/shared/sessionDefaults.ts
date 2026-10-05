@@ -65,6 +65,11 @@ export type AgentSessionDefaults = {
   inline: { providerId: string | null; pinned: AgentDefaultValues }
   /** Separate choices for agent_spawn, including agents in child task worktrees. */
   spawned: SpawnedAgentDefaults
+  /**
+   * Provider ids left out of the New picker, the empty state and the palette. Only what is offered for
+   * a new session: sessions already on a hidden harness, workflows and agent_spawn still run it.
+   */
+  hiddenProviders: string[]
 }
 
 // Following, because it needs no setup to be useful and it matches what a session switch means: you
@@ -79,6 +84,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   last: {},
   inline: { providerId: null, pinned: {} },
   spawned: defaultSpawnedAgentDefaults(),
+  hiddenProviders: [],
 })
 
 // The client is the less-trusted side and this decides which model a provider child runs, so the
@@ -159,6 +165,14 @@ export function validateAgentSessionDefaults(
   if (record.followLastSession != null && typeof record.followLastSession !== 'boolean') {
     errors.push('followLastSession must be true or false.')
   }
+  let hiddenProviders: string[] | undefined
+  if (record.hiddenProviders != null) {
+    const ids = record.hiddenProviders
+    if (!Array.isArray(ids) || ids.length > MAX_PROVIDERS
+      || ids.some((id) => typeof id !== 'string' || !id || id.length > MAX_ID)) {
+      errors.push(`hiddenProviders must be a list of at most ${MAX_PROVIDERS} provider ids.`)
+    } else hiddenProviders = [...new Set(ids as string[])]
+  }
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
   const inlineRecord = record.inline
@@ -208,6 +222,7 @@ export function validateAgentSessionDefaults(
       ...(last ? { last } : {}),
       ...(inline ? { inline } : {}),
       ...(spawned ? { spawned } : {}),
+      ...(hiddenProviders ? { hiddenProviders } : {}),
     },
   }
 }

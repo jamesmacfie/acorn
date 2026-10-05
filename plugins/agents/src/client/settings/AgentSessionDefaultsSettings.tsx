@@ -112,17 +112,35 @@ export default function AgentSessionDefaultsSettings(props: { context?: PageCont
       <SettingsSection
         id="harnesses"
         label="Harnesses"
-        help="The agent command-line tools this computer can run. Plugins can add more."
+        help="The agent command-line tools this computer can run. Plugins can add more. Turn one off to leave it out of New; sessions already on it keep working."
       >
         <For each={providers() ?? []} fallback={<Text emphasis="muted">{providers.loading ? 'Loading harnesses…' : 'No harnesses on this node.'}</Text>}>
-          {(provider) => (
-            <SettingRow label={provider.label} description={harnessState(provider)}>
-              <Inline>
-                <ProviderGlyph glyph={provider.glyph} label={provider.label} />
-                <Badge tone={provider.installed ? 'ok' : 'neutral'}>{provider.installed ? 'Installed' : 'Not installed'}</Badge>
-              </Inline>
-            </SettingRow>
-          )}
+          {(provider) => {
+            const visibility = createSettingSave()
+            const hidden = () => record().hiddenProviders
+            const shown = () => !hidden().includes(provider.id)
+            // New with nothing in it is a dead end, so the last harness on offer stays on.
+            const lastShown = () => shown() && (providers() ?? []).filter((candidate) => !hidden().includes(candidate.id)).length === 1
+            const setShown = (checked: boolean) => visibility.run(() => save({
+              hiddenProviders: checked ? hidden().filter((id) => id !== provider.id) : [...hidden(), provider.id],
+            }))
+            return (
+              <SettingRow label={provider.label} description={harnessState(provider)} error={visibility.error()}>
+                <Inline>
+                  <ProviderGlyph glyph={provider.glyph} label={provider.label} />
+                  <Badge tone={provider.installed ? 'ok' : 'neutral'}>{provider.installed ? 'Installed' : 'Not installed'}</Badge>
+                  <Checkbox
+                    switch
+                    ariaLabel={`Show ${provider.label} in New`}
+                    title={lastShown() ? 'At least one harness stays in New.' : undefined}
+                    checked={shown()}
+                    disabled={lastShown()}
+                    onChange={setShown}
+                  />
+                </Inline>
+              </SettingRow>
+            )
+          }}
         </For>
       </SettingsSection>
 
