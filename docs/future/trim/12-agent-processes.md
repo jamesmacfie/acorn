@@ -1,6 +1,46 @@
 # Phase 12: give provider processes a single lifecycle owner
 
-Date: 2026-10-04. Status: TODO. Risk: high; late handles and callbacks can escape teardown.
+Completion note, October 6, 2026: `providerSessionLifecycle.ts` owns the private live map,
+generation identity, start and retirement promises, process handles, readiness holds, callback joins,
+and reconnect, quiet-child, idle, and process-sample timers. `runtimeEngine.ts` supplies typed task,
+workspace, history, scoped-environment, MCP, durable-event, and telemetry ports. It retains token
+minting and one redaction array shared with materialization, durable event commit, publication,
+dispatch outcomes, and the visible overall stop sequence. `queueCoordinator.ts` remains the only
+scan, wake, fairness, and drain owner; its `started = started || dispatched` correction and durable
+head revalidation remain in place.
+
+```text
+runtime.ts product commands ─┐
+queueCoordinator.ts scans ────┼──> providerSessionLifecycle.ts ──> driver child
+runtimeEngine.ts dispatch ────┘             │
+                                            └── bound generation callbacks ──> engine durable pipeline
+```
+
+| Lifetime or state | Owner and stop barrier |
+| --- | --- |
+| Live records, generation transitions, admission and active markers, accepted response, late handles | Lifecycle owner; generation checked before transitions and handle commands; failed retirement leaves its generation installed. |
+| Startup and readiness | Lifecycle owner installs before awaited task, workspace, history, environment, or MCP work; concurrent callers join; product initialization releases readiness. |
+| Reconnect, quiet-child, idle, and footprint timers | Lifecycle owner clears all at engine stop; queue owns only its delayed-head wake timer. |
+| Provider callbacks and process retirement | Lifecycle owner joins callbacks for each stopped generation, then joins all owned children before engine event flushing. |
+| Scoped token and provider/MCP secret redaction | Engine mints and appends to its single mutable redaction array; the materializer holds that same array. |
+| Durable events, search, publication, and webhooks | Engine joins provider retirement and queue scans, flushes event buffer and search, joins publication callbacks, then stops webhooks before plugin storage closes. |
+
+The owner exposes immutable `current`, `occupancy`, and `ids` facts; `ensure`, `owns`, `activate`,
+`release`, `clearActive`, and `takeActive` generation operations; checked handle commands; and
+`stop`, `stopAll`, `abortAndClearTimers`, and `joinCallbacks`. Callers receive generation identities,
+not live records. The durable buffer carries an internal optional generation identity so a queued
+event cannot settle a successor's active marker or span. No wire, schema, or plugin API changed.
+
+Phase 13 still needs to replace `ManagedAgentRuntime extends ManagedAgentEngine`. Product commands
+still use the engine's protected store, record, pump, readiness, and stop methods; the engine still
+coordinates dispatch outcomes and durability. The extraction kept these dependencies visible instead
+of moving product policy into the process owner. The owner accepts no duplicate shutdown flag and
+does not hold a second redaction list. The process timer move includes footprint sampling, which was
+engine-held before this phase. The process and disk footprint helper loads when measured, keeping it
+out of the service boot graph. See [phase 12 evidence](./evidence.md#phase-12-provider-processes-2026-10-06)
+for the bounded gates and shutdown/reboot proof.
+
+Date: 2026-10-06. Status: DONE. Risk: high; late handles and callbacks can escape teardown.
 Prerequisite: accepted [phase 11](./11-agent-admission.md). Next: [phase 13](./13-agent-composition.md).
 Planning revision: `2ae55abb5`; phase 11's accepted coordinator is the queue owner.
 

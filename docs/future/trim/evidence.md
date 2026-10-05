@@ -1,6 +1,56 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–11 complete; phase 12 is next.
+Date: 2026-10-06. Status: phases 01–12 complete; phase 13 is next.
+
+## Phase 12 provider processes (2026-10-06)
+
+Implementation base: `f40c391fbdedf7335e84f94dc498d909ae5d1d01`, branch
+`phase-12-own-provider-process-lifecycle`, Darwin arm64, Node 24.21.0 from
+`/private/tmp/acorn-trim-node-bin`, pnpm 11.0.0. `CI=true pnpm install --frozen-lockfile` passed
+with cache and network permission: 426 package copies reused, none downloaded, and no lockfile change.
+No dependency, database, public route, protocol, plugin API, or persisted identifier changed.
+
+`providerSessionLifecycle.ts` owns the only mutable live map, process generations, per-generation
+start and stop joins, callback work, readiness holds, and reconnect, quiet, idle, and footprint timers.
+The engine supplies specific task, workspace, history, scoped-environment, MCP, durable callback,
+and telemetry ports. Its original redaction array still feeds the same materializer instance. The
+queue coordinator retains scan and delayed-head ownership and phase 11's monotonic `started` update.
+Product commands and the queue use immutable facts, checked generation operations, and handle
+commands executed by the owner. An internal generation field in pending durable events prevents an
+older buffered completion from clearing a successor's active marker or turn span.
+
+The shutdown order is engine abort and owner timer clear, queue admission close, all owned child
+retirements, queue drain and callback joins, durable event and search flush, publication callback
+joins, then webhook stop before the plugin database closes. `runtimeStartup.test.ts` holds a provider
+callback inside the durable
+write: stop remains pending after the child stop is observed, then the callback commits. The test
+closes the plugin database, opens a fresh connection and engine in the same process, reconciles, and
+proves the committed event is readable while the stopped generation's later callback is ignored. A
+second case makes disconnect retirement throw `ProcessRetirementError` and proves replacement and
+shutdown both reject that failure. Held startup warning and webhook queue writes show that stop joins
+durable and publication work before storage closes. Other startup cases cover held reads, readiness,
+a driver that ignores cancellation and returns a late handle, and stale callbacks. Driver process-ownership cases
+exercise real process groups. The real Node `src/composition/runtime.test.ts` repeats service boot
+against one data root after stopping the previous runtime; it has no active agent child, so the
+active-child retirement proof comes from the focused driver and engine tests.
+
+Focused gates on the supported runtime passed: startup 16 tests, idle and footprint 10, queue 12,
+driver process ownership 15, telemetry 6, durable buffer 3, materializer 2, and real Node repeated
+runtime boot 3. The final bounded agents suite passed 150 files and 1,099 tests with one skipped;
+workflows passed 64 files and 553 tests; Node passed 40 files and 273 tests; TUI passed 68 files and
+673 tests with two skipped; desktop passed 28 shell files and 171 tests, 10 built boot tests, and
+62 Rust tests. `TURBO_FORCE=true` bypassed unsupported-runtime cache. The five-package run used
+`VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2` and zero cached tasks. Its TUI reachability frame
+exceeded the harness's 500 ms settle limit while agents and TUI shared the machine. A standalone
+bounded TUI package run passed all 68 files and 673 tests. No TUI source changed.
+
+The first standalone desktop stage measured the service's boot-time static graph at 3,290,481 B,
+481 B above its existing 3,290,000 B ceiling. Process and disk footprint logic now loads when
+measured rather than at service boot. The final standalone desktop gate passed with a 3,288,688 B
+static graph, 1,312 B under the unchanged ceiling. No budget or warning override was used. This
+phase's final `TURBO_FORCE=true pnpm lint` passed 37 of 37 tasks with zero cached. Architecture
+`pnpm --filter @acorn/arch-tests test` passed 12 files and 86 tests after source and docs staging.
+The root test, build, and pack gates remain phase 15's work.
 
 ## Phase 11 agent admission (2026-10-06)
 

@@ -1,4 +1,3 @@
-import { ProcessRetirementError } from '../processes/ownedProcess'
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
 import { agentProfileRegistry, createLogger, describeError } from '@acorn/plugin-api/node'
@@ -22,16 +21,15 @@ import { AGENT_IDLE_STOP_CHOICES, defaultAgentSessionDefaults } from '../../shar
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import { agentDriverRegistry, type AgentDriverRegistry } from '../drivers/registry'
 import { safeProviderMessage } from '../drivers/diagnostics'
-import type { AgentDriver } from '../drivers/types'
-import type { AgentDriverSession } from '../drivers/types'
 import { AgentWebhookService, webhookEventKind } from '../webhookService'
 import { AgentAttachmentStore } from './attachmentStore'
 import { AgentArtifactStore } from './artifactStore'
 import { DurableAgentEventBuffer, type PendingAgentEvent } from './durableEventBuffer'
 import { compactLedgers } from './ledgerCompaction'
-import { directoryBytes, listProcesses, processTreeBytes, type ProcessRow } from './footprint'
+import type { ProcessRow } from './footprint'
 import { AgentStore } from './store'
 import { QueueCoordinator } from './queueCoordinator'
+import { ProviderSessionLifecycle, type ProviderGeneration } from './providerSessionLifecycle'
 import { clientEventRecord } from './rowMapping'
 import {
   eventSubagentId,
@@ -115,29 +113,6 @@ const webhookLog = createLogger('agents:webhook', 'agents')
 
 export { agentTurnInputText } from './runtimeContext'
 
-type LiveSession = {
-  handle: AgentDriverSession | null
-  startPromise: Promise<AgentDriverSession> | null
-  controller: AbortController
-  stopPromise: Promise<void> | null
-  retirementFailure: ProcessRetirementError | null
-  callbacks: Set<Promise<void>>
-  activeTurnId: string | null
-  admissionTurnId: string | null
-  // So archiving a task can find its processes without a read per live session.
-  taskId: string
-  workspaceId: string
-  providerId: string
-  stopping: boolean
-  closing: boolean
-  // The last provider event, dispatch, or turn settle. The idle sweep measures from here rather than
-  // from the start, so a session in use is never the one it stops.
-  lastActivityAt: number
-  reconnectAttempt: number
-  acceptedResponse: boolean
-  driver: AgentDriver
-}
-
 export type AgentRuntimeOptions = {
   // This plugin's own SQLite file (server/plugins/storage.ts), not core's handle. Everything the engine reads
   // and writes is in the ten `agent_*` tables (node/schema.ts).
@@ -185,7 +160,6 @@ export type AgentRuntimeOptions = {
 export type WaitCondition = import('../../contract/wire').AgentWaitCondition
 type RuntimeListener = (frame: AgentWsFrame) => void
 
-const RECONNECT_DELAYS_MS = [1_000, 2_000, 5_000]
 // How long a providers answer is served without probing again. After this it is still served, and a
 // probe runs behind it. Short, because signing in or installing a CLI should show within a visit.
 const PROVIDER_FRESH_MS = 30_000
@@ -237,30 +211,14 @@ export class ManagedAgentEngine {
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
   // process died in the middle of reports nothing, which is the honest answer.
   protected readonly turnSpans = new Map<string, SpanHandle>()
-  protected readonly live = new Map<string, LiveSession>()
-  // A newly persisted session is visible to the client before its provider finishes starting. Hold
-  // the driver's early `ready` fact until product initialization (including saved defaults) is done,
-  // so `ready` continues to mean that a first turn may use the advertised configuration safely.
-  private readonly readinessHolds = new Set<string>()
-  // Every in-flight provider reconnect delay (onProviderClosed schedules up to three per session).
-  // Tracked so stop() can cancel them: a timer that fires after teardown calls ensureSession, which
-  // spawns a provider child against a closed SQLite handle.
-  // `apps/node/src/service/runtime.test.ts` starts the runtime several times in one process, so a leaked
-  // timer from an earlier boot lands inside a later one.
-  protected readonly reconnectTimers = new Set<ReturnType<typeof setTimeout>>()
-  // One pending quiet sweep per session, keyed by session id. A background child's traffic resets it,
-  // so it fires only once that child has actually gone silent. Tracked for the same reason the
-  // reconnect delays are: it must not outlive the engine that armed it.
-  protected readonly quietTimers = new Map<string, ReturnType<typeof setTimeout>>()
-  protected readonly queue: QueueCoordinator<LiveSession>
+  protected readonly processes: ProviderSessionLifecycle
+  protected readonly queue: QueueCoordinator
   protected readonly subagentQuietMs: number
   // Armed with the first provider start and cleared by stop(). A timer over the live map rather than a
   // node schedule, because what it sweeps exists only in this process (docs/managed-agents/operations.md
   // § Idle stop).
-  protected idleSweepTimer: ReturnType<typeof setInterval> | null = null
   protected readonly idleSweepMs: number
   // Armed at construction when there is a host to report to, and cleared by stop().
-  protected footprintTimer: ReturnType<typeof setInterval> | null = null
   // The background pass over rows stored before the ledger fold, started by reconcile(). See there.
   protected ledgerCompaction: { controller: AbortController; done: Promise<void> } | null = null
   // The last folder measurement, shared by every caller inside DISK_FOOTPRINT_MS.
@@ -277,7 +235,7 @@ export class ManagedAgentEngine {
   protected readonly shutdown = new AbortController()
   protected stopped = false
   private stopPromise: Promise<void> | null = null
-  private readonly providerCallbacks = new Set<Promise<void>>()
+  private readonly publicationCallbacks = new Set<Promise<void>>()
 
   constructor(options: AgentRuntimeOptions) {
     this.db = options.db
@@ -297,6 +255,36 @@ export class ManagedAgentEngine {
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.idleSweepMs = options.idleSweepMs ?? IDLE_SWEEP_MS
     this.store = new AgentStore(options.db, options.core, (frame) => { if (!this.stopped) this.publish?.(frame) })
+    this.processes = new ProviderSessionLifecycle({
+      registry: this.registry,
+      taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+      workspaceId: (taskId) => this.core.tasks.workspaceId(taskId),
+      hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
+      scopedEnvironment: (session) => this.scopedProviderEnvironment(session),
+      mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
+      mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
+        type: 'diagnostic', level: 'warning',
+        message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
+      }).then(() => undefined),
+      event: (sessionId, generation, event) => this.onProviderEvent(sessionId, generation, event),
+      closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
+      closeMessage: (error) => safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets),
+      startFailed: (sessionId, turnId, error) => this.onProviderStartFailed(sessionId, turnId, error),
+      retirementFlush: async (sessionId) => {
+        await this.providerEvents.flush(sessionId)
+        await this.store.flushSearch(sessionId)
+      },
+      session: (sessionId) => this.store.requireSession(sessionId),
+      idleSweep: async () => { await this.stopIdleSessions() },
+      quietSweep: (sessionId) => this.quietSubagents(sessionId),
+      footprintSample: () => this.sampleProcessFootprint(),
+      callbackError: (kind, error) => log.warn(`${kind} sweep failed: ${describeError(error).message}`),
+      started: (sessionId, reconnect) => this.telemetry?.startSpan('agent.session', {
+        attrs: { seam: 'agent.session', 'session.id': sessionId, provider: this.processes.current(sessionId)?.providerId ?? null, reconnect },
+      }),
+      pump: () => { void this.pump() },
+      shuttingDown: () => this.stopped,
+    }, this.idleSweepMs, this.subagentQuietMs)
     this.queue = new QueueCoordinator({
       queuedHeads: () => this.store.queuedHeads(),
       getSession: (id) => this.store.getSession(id),
@@ -311,13 +299,15 @@ export class ManagedAgentEngine {
           })
           : defaultAgentConcurrency()
       },
-      occupancy: () => this.live.values(),
-      live: (id) => this.live.get(id),
+      occupancy: () => this.processes.occupancy(),
+      live: (id) => this.processes.current(id),
       workspaceId: (taskId) => this.readWhileRunning(() => this.core.tasks.workspaceId(taskId)),
       stopLive: (id) => this.stopLive(id),
-      ensureSession: (session, turnId, workspaceId) => this.ensureSession(session, { turnId, workspaceId }),
-      ownsSession: (id, live) => this.ownsSession(id, live),
-      dispatch: (session, turn, live) => this.dispatchQueuedTurn(session, turn, live),
+      ensureSession: (session, turnId, workspaceId) => this.processes.ensure(session, { turnId, workspaceId }),
+      ownsSession: (generation) => this.processes.owns(generation),
+      activate: (generation, turnId) => this.processes.activate(generation, turnId),
+      release: (generation, turnId) => this.processes.release(generation, turnId),
+      dispatch: (session, turn, generation) => this.dispatchQueuedTurn(session, turn, generation),
       shuttingDown: () => this.stopped,
     })
     this.attachments = new AgentAttachmentStore(options.db, options.dataDir, options.core)
@@ -466,43 +456,42 @@ export class ManagedAgentEngine {
   private async stopEngine(): Promise<void> {
     this.stopped = true
     this.shutdown.abort(new Error('The managed agent runtime is shutting down.'))
-    for (const live of this.live.values()) live.controller.abort(new Error('The managed agent runtime is shutting down.'))
-    for (const timer of this.reconnectTimers) clearTimeout(timer)
-    this.reconnectTimers.clear()
-    for (const timer of this.quietTimers.values()) clearTimeout(timer)
-    this.quietTimers.clear()
+    this.processes.abortAndClearTimers()
     const queueDrain = this.queue.stop()
-    if (this.idleSweepTimer) clearInterval(this.idleSweepTimer)
-    this.idleSweepTimer = null
-    if (this.footprintTimer) clearInterval(this.footprintTimer)
-    this.footprintTimer = null
     // Stops at its next step. Awaited, because the database closes once stop() returns.
     this.ledgerCompaction?.controller.abort()
     await this.ledgerCompaction?.done
     this.ledgerCompaction = null
-    await Promise.all([...this.live.keys()].map((sessionId) => this.stopLive(sessionId)))
+    let retirementFailure: unknown
+    try {
+      await this.processes.stopAll()
+    } catch (error) {
+      retirementFailure = error
+    }
     await queueDrain
-    await Promise.allSettled([...this.providerCallbacks])
+    await this.processes.joinCallbacks()
     await this.providerEvents.flushAll()
     await this.store.flushSearch()
+    await Promise.allSettled([...this.publicationCallbacks])
     await this.webhooks.stop()
     this.turnSpans.clear()
     this.listeners.clear()
     this.eventMaterializer.clear()
     this.providerCache = null
     this.providerProbe = null
+    if (retirementFailure) throw retirementFailure
   }
 
   protected holdSessionReadiness(sessionId: string): void {
-    this.readinessHolds.add(sessionId)
+    this.processes.holdReadiness(sessionId)
   }
 
   protected discardSessionReadinessHold(sessionId: string): void {
-    this.readinessHolds.delete(sessionId)
+    this.processes.releaseReadiness(sessionId)
   }
 
   protected async completeSessionReadiness(sessionId: string): Promise<void> {
-    this.readinessHolds.delete(sessionId)
+    this.processes.releaseReadiness(sessionId)
     if (this.stopped) return
     await this.record(sessionId, null, { type: 'session_state', state: 'ready' })
     void this.pump()
@@ -513,193 +502,78 @@ export class ManagedAgentEngine {
     return awaitWithSignal(query(), this.shutdown.signal)
   }
 
-  protected async ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<LiveSession> {
-    if (this.stopped) throw new Error('The managed agent runtime is shutting down.')
-    const existing = this.live.get(session.id)
-    if (existing?.retirementFailure) throw existing.retirementFailure
-    if (existing?.stopping) throw new Error('The managed agent session is stopping.')
-    if (admission && existing) existing.admissionTurnId = admission.turnId
-    if (existing?.handle) return existing
-    if (existing?.startPromise) {
-      await existing.startPromise
-      if (!this.ownsSession(session.id, existing)) throw new Error('The managed agent session is stopping.')
-      return existing
-    }
-    if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
-    const driver = this.registry.create(session.providerId)
-    if (!driver) throw new Error(`Managed provider is not registered: ${session.providerId}`)
-    const live: LiveSession = {
-      handle: null,
-      startPromise: null,
-      controller: new AbortController(),
-      stopPromise: null,
-      retirementFailure: null,
-      callbacks: new Set(),
-      activeTurnId: null,
-      admissionTurnId: admission?.turnId ?? null,
-      taskId: session.taskId,
-      workspaceId: admission?.workspaceId ?? '',
-      providerId: session.providerId,
-      stopping: false,
-      closing: false,
-      lastActivityAt: Date.now(),
-      reconnectAttempt: existing?.reconnectAttempt ?? 0,
-      acceptedResponse: false,
-      driver,
-    }
-    // Install the complete wave before its first dependency read. Concurrent callers join it.
-    this.live.set(session.id, live)
-    this.armIdleSweep()
-    live.startPromise = Promise.resolve().then(() => this.startSession(session, live))
-    await live.startPromise
-    if (!this.ownsSession(session.id, live)) throw new Error('The managed agent session is stopping.')
-    return live
+  protected ensureSession(session: AgentSession, admission?: { turnId: string; workspaceId: string }): Promise<ProviderGeneration> {
+    return this.processes.ensure(session, admission)
   }
 
-  private async startSession(session: AgentSession, live: LiveSession): Promise<AgentDriverSession> {
-    const signal = live.controller.signal
-    const read = <T>(query: () => Promise<T>): Promise<T> => {
-      signal.throwIfAborted()
-      return awaitWithSignal(query(), signal)
+  private scopedProviderEnvironment(session: AgentSession): Record<string, string> {
+    // The session row is the authority for the tool ceiling across restarts.
+    const env = {
+      ...this.internalEnv({
+        scope: 'task', taskId: session.taskId, sessionId: session.id,
+        toolCeiling: persistedToolCeiling(session.config),
+      }),
+      ACORN_TASK_ID: session.taskId,
+      ACORN_SESSION_ID: session.id,
     }
-    let span: SpanHandle | undefined
-    try {
-      const cwd = await read(() => this.core.tasks.requireRoot(session.taskId))
-      if (!live.workspaceId) live.workspaceId = await read(() => this.core.tasks.workspaceId(session.taskId))
-      const noProviderExecutionHistory = !(await read(() => this.store.hasProviderExecutionHistory(session.id)))
-      signal.throwIfAborted()
-      // Scoped to this session's task (docs/security/credentials.md § Credential handling). The credential cannot
-      // drive another task's tools or read the owner's provider credentials.
-      const sessionEnv = {
-        ...this.internalEnv({
-          scope: 'task',
-          taskId: session.taskId,
-          sessionId: session.id,
-          // The session row is the authority across restarts. Workflow creation and later delegation
-          // persist the effective intersection here before any provider process is started.
-          toolCeiling: persistedToolCeiling(session.config),
-        }),
-        // The acorn MCP server lists no tools without a task ID. Claude Code and Codex start that server
-        // from their own registration, so it only sees what the provider process inherits from here. The
-        // node trusts the signed token for both values, never these.
-        ACORN_TASK_ID: session.taskId,
-        ACORN_SESSION_ID: session.id,
-      }
-      for (const secret of secretEnvironmentValues(sessionEnv)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
-      // The servers this session has switched on, resolved on every start because a harness keeps none of
-      // them between processes. Their secrets join the redaction list for the same reason the token does.
-      const userMcp = await read(() => this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal))
-      signal.throwIfAborted()
-      for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
-      if (userMcp.unavailable.length) {
-        await this.record(session.id, null, {
-          type: 'diagnostic',
-          level: 'warning',
-          message: `This session runs without ${userMcp.unavailable.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
-        })
-      }
-      // The session's span covers starting the provider, not the session's whole life. A session
-      // lives for hours and outlives the process, and a span nobody can close is not a measurement;
-      // spawning or reconnecting the child is the part something waited on
-      // (docs/telemetry/model.md § The admission rule for a span).
-      span = this.telemetry?.startSpan('agent.session', {
-        attrs: { seam: 'agent.session', 'session.id': session.id, provider: session.providerId, reconnect: live.reconnectAttempt > 0 },
-      })
-      signal.throwIfAborted()
-      const handle = await live.driver.start({
-        signal,
-        session,
-        cwd,
-        env: sessionEnv,
-        mcpServers: [...acornMcpServers(this.mcp(), session, sessionEnv), ...userMcp.servers],
-        noProviderExecutionHistory,
-        onEvent: (event) => this.providerCallback(session.id, live, () => this.onProviderEvent(session.id, event)),
-        onClosed: (error) => this.providerCallback(session.id, live, () => this.onProviderClosed(session.id, error)),
-      })
-      if (!this.ownsSession(session.id, live)) {
-        await handle.stop()
-        throw new Error('The managed agent runtime is shutting down.')
-      }
-      live.handle = handle
-      live.lastActivityAt = Date.now()
-      live.reconnectAttempt = 0
-      span?.end('ok')
-      void this.pump()
-      return handle
-    } catch (error) {
-      span?.end('error')
-      if (error instanceof ProcessRetirementError) live.retirementFailure = error
-      if (this.stopped || live.stopping) throw error
-      await this.record(session.id, live.admissionTurnId, {
-        type: 'error',
-        code: 'provider_start_failed',
-        message: safeProviderMessage(
-          error,
-          'Provider session failed to start.',
-          this.mintedSecrets,
-        ),
-        retryable: false,
-      })
-      throw error
-    } finally {
-      live.startPromise = null
-      if (!live.handle && !live.stopping && !live.retirementFailure && this.live.get(session.id) === live) this.live.delete(session.id)
+    for (const secret of secretEnvironmentValues(env)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    return env
+  }
+
+  private async providerMcpServers(
+    session: AgentSession,
+    env: Record<string, string>,
+    signal: AbortSignal,
+  ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[] }> {
+    const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal)
+    signal.throwIfAborted()
+    for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    return {
+      servers: [...acornMcpServers(this.mcp(), session, env), ...userMcp.servers],
+      unavailable: userMcp.unavailable,
     }
   }
 
-  private ownsSession(sessionId: string, live: LiveSession): boolean {
-    return !this.stopped && !live.stopping && !live.controller.signal.aborted && this.live.get(sessionId) === live
+  private async onProviderStartFailed(sessionId: string, turnId: string | null, error: unknown): Promise<void> {
+    await this.record(sessionId, turnId, {
+      type: 'error', code: 'provider_start_failed',
+      message: safeProviderMessage(error, 'Provider session failed to start.', this.mintedSecrets),
+      retryable: false,
+    })
   }
 
-  private providerCallback(sessionId: string, live: LiveSession, work: () => Promise<void>): Promise<void> {
-    if (!this.ownsSession(sessionId, live)) return Promise.resolve()
-    const done = work()
-    this.providerCallbacks.add(done)
-    live.callbacks.add(done)
-    const settled = () => {
-      this.providerCallbacks.delete(done)
-      live.callbacks.delete(done)
-    }
-    void done.then(settled, settled)
-    return done
-  }
-
-  protected async onProviderEvent(sessionId: string, event: AgentDriverEvent): Promise<void> {
-    if (
-      event.type === 'session_state'
-      && event.state === 'ready'
-      && this.readinessHolds.has(sessionId)
-    ) return
-    const live = this.live.get(sessionId)
-    if (!live || live.closing || !this.ownsSession(sessionId, live)) return
-    if (live) live.lastActivityAt = Date.now()
-    if (live && !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type)) {
-      live.acceptedResponse = true
-    }
-    const turnId = live?.activeTurnId ?? null
+  protected async onProviderEvent(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void> {
+    if (event.type === 'session_state' && event.state === 'ready' && this.processes.isReadinessHeld(sessionId)) return
+    const live = this.processes.current(sessionId)
+    if (!live || live.closing || !this.processes.owns(generation)) return
+    this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
+    const turnId = live.activeTurnId
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
-      if (!this.ownsSession(sessionId, live)) return
-      if (turnId && await this.deferForUsageLimit(sessionId, turnId, live, normalized)) continue
-      if (!this.ownsSession(sessionId, live)) return
-      await this.providerEvents.accept({ sessionId, turnId, event: normalized })
+      if (!this.processes.owns(generation)) return
+      if (turnId && await this.deferForUsageLimit(sessionId, turnId, generation, normalized)) continue
+      if (!this.processes.owns(generation)) return
+      await this.providerEvents.accept({ sessionId, turnId, event: normalized, generation })
     }
   }
 
   protected async deferForUsageLimit(
     sessionId: string,
     turnId: string,
-    live: LiveSession,
+    generation: ProviderGeneration,
     event: AgentNormalizedEvent,
   ): Promise<boolean> {
     if (!this.usageLimitResetAt || !mayBeUsageLimit(event)) return false
-    const resetAt = await awaitWithSignal(this.usageLimitResetAt(live.providerId).catch(() => null), live.controller.signal)
-    if (resetAt == null || !this.ownsSession(sessionId, live)) return false
+    const providerId = this.processes.current(sessionId)?.providerId
+    if (!providerId) return false
+    const resetAt = await awaitWithSignal(this.usageLimitResetAt(providerId).catch(() => null), this.processes.signal(generation))
+    if (resetAt == null || !this.processes.owns(generation)) return false
     const resumeAt = Math.max(Date.now(), resetAt + this.usageContinuationGraceMs)
     // Any streamed answer fragments must precede the scheduler's diagnostic in the durable ledger.
     await this.providerEvents.flush(sessionId)
+    if (!this.processes.owns(generation)) return false
     const turn = await this.store.deferTurnForUsageLimit(turnId, resumeAt, usageContinuationInput())
-    if (!turn) return false
-    live.activeTurnId = null
+    if (!turn || !this.processes.owns(generation)) return false
+    this.processes.clearActive(generation, turnId)
     this.endTurnSpan(turnId, 'requeued')
     this.emit({ channel: 'agent:turn', turn })
     await this.record(sessionId, turnId, {
@@ -717,22 +591,21 @@ export class ManagedAgentEngine {
     return true
   }
 
-  protected async commitProviderEvent({ sessionId, event, turnId }: PendingAgentEvent): Promise<void> {
-    const live = this.live.get(sessionId)
+  protected async commitProviderEvent({ sessionId, event, turnId, generation }: PendingAgentEvent): Promise<void> {
+    const live = this.processes.current(sessionId)
     const settlesTurn = event.type === 'turn_completed' || event.type === 'error'
     if (settlesTurn) {
-      if (live) {
-        live.activeTurnId = null
-        live.lastActivityAt = Date.now()
+      if (live && (!generation || live.generation === generation)) this.processes.clearActive(live.generation, turnId ?? undefined)
+      if (turnId && (!live || !generation || live.generation === generation)) {
+        this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
       }
-      if (turnId) this.endTurnSpan(turnId, event.type === 'error' ? 'error' : 'completed')
     }
     await this.record(sessionId, turnId, event)
     // The two things that change what the roster knows: a roster update, which is also how a child
     // first appears, and a child's own traffic. Each pushes the quiet sweep back, so a child that
     // keeps streaming keeps its row and a child that stops loses it a window later. Turn boundaries
     // are deliberately not on this list, and a session with no children never holds a timer.
-    if (event.type === 'subagent' || eventSubagentId(event)) this.armSubagentQuiet(sessionId)
+    if (event.type === 'subagent' || eventSubagentId(event)) this.processes.armQuiet(sessionId)
     if (settlesTurn) {
       void this.pump()
     }
@@ -744,24 +617,6 @@ export class ManagedAgentEngine {
   // every event the child produces pushes the sweep back, so it fires a full quiet window after the
   // last thing we heard. A real completion summary on a later turn still folds the row on to
   // `completed`, so nothing is lost by guessing `idle` first.
-  protected armSubagentQuiet(sessionId: string): void {
-    const existing = this.quietTimers.get(sessionId)
-    if (existing) clearTimeout(existing)
-    if (this.stopped) return
-    // Unref'd for the same reason the reconnect delays are: a node draining must not be held open by
-    // a sweep nobody is waiting on.
-    const timer = setTimeout(() => {
-      this.quietTimers.delete(sessionId)
-      if (this.stopped) return
-      const sweep = this.quietSubagents(sessionId)
-        .catch((error: unknown) => log.warn(`subagent quiet sweep failed: ${describeError(error).message}`))
-      this.providerCallbacks.add(sweep)
-      void sweep.finally(() => this.providerCallbacks.delete(sweep))
-    }, this.subagentQuietMs)
-    timer.unref?.()
-    this.quietTimers.set(sessionId, timer)
-  }
-
   protected async quietSubagents(sessionId: string): Promise<void> {
     if (this.stopped) return
     const session = await this.store.getSession(sessionId)
@@ -776,57 +631,31 @@ export class ManagedAgentEngine {
     // coming to arm the next sweep, so do it here. A child still streaming re-arms with its traffic.
     const waiting = session.subagents.some((entry) =>
       entry.background && isActiveSubagent(entry) && !quieted.includes(entry.id))
-    if (waiting) this.armSubagentQuiet(sessionId)
+    if (waiting) this.processes.armQuiet(sessionId)
   }
 
-  protected async onProviderClosed(sessionId: string, error?: Error): Promise<void> {
-    const live = this.live.get(sessionId)
-    if (!live || live.closing || live.stopping || this.stopped) return
-    const message = safeProviderMessage(
-      error,
-      'Provider process closed.',
-      this.mintedSecrets,
-    )
-    if (live.startPromise) {
-      live.controller.abort(new Error(message))
-      return
-    }
-    live.closing = true
-    await live.handle?.stop()
-    if (!this.ownsSession(sessionId, live)) return
+  protected async onProviderClosed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void> {
+    if (!this.processes.owns(generation)) return
+    const message = safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets)
     await this.store.interruptActiveTurn(sessionId, message)
+    if (!this.processes.owns(generation)) return
     await this.store.expirePendingRequests(sessionId)
-    if (live.activeTurnId) this.endTurnSpan(live.activeTurnId, 'interrupted')
-    live.activeTurnId = null
-    live.handle = null
-    const attempt = live.reconnectAttempt++
-    if (attempt >= RECONNECT_DELAYS_MS.length) {
-      this.live.delete(sessionId)
+    if (!this.processes.owns(generation)) return
+    const turnId = this.processes.takeActive(generation)
+    if (turnId) this.endTurnSpan(turnId, 'interrupted')
+    if (attempt >= 3) {
       await this.record(sessionId, null, { type: 'error', code: 'provider_disconnected', message, retryable: false })
       return
     }
     await this.record(sessionId, null, { type: 'session_state', state: 'reconnecting', detail: message })
-    if (!this.ownsSession(sessionId, live)) return
-    // Tracked and unref'd. Tracked so stop() cancels it; unref'd so a node draining between two
-    // reconnect attempts is not held open by a delay nobody is waiting on.
-    const timer = setTimeout(() => {
-      this.reconnectTimers.delete(timer)
-      if (!this.ownsSession(sessionId, live)) return
-      void this.store.requireSession(sessionId)
-        .then((session) => this.ownsSession(sessionId, live) ? this.ensureSession(session) : undefined)
-        .catch(() => undefined)
-    }, RECONNECT_DELAYS_MS[attempt])
-    timer.unref?.()
-    this.reconnectTimers.add(timer)
   }
 
   protected pump(): Promise<void> {
     return this.queue.pump()
   }
 
-  private async dispatchQueuedTurn(session: AgentSession, turn: AgentTurn, live: LiveSession): Promise<boolean> {
-    live.acceptedResponse = false
-    live.lastActivityAt = Date.now()
+  private async dispatchQueuedTurn(session: AgentSession, turn: AgentTurn, generation: ProviderGeneration): Promise<boolean> {
+    this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
     try {
       const input = turn.continuationInput ?? turn.input
@@ -850,22 +679,21 @@ export class ManagedAgentEngine {
             }] as const
           }),
       )))
-      if (!this.ownsSession(session.id, live)) return false
+      if (!this.processes.owns(generation)) return false
       await this.store.startTurn(turn.id)
-      if (!this.ownsSession(session.id, live)) return false
-      this.beginTurnSpan(turn.id, session.id, live.providerId, turn.source)
-      void live.handle!.sendTurn({ turn, input, attachments })
-        .then((result) => this.providerCallback(session.id, live, async () => {
-          if (!this.ownsSession(session.id, live)) return
+      if (!this.processes.owns(generation)) return false
+      this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
+      this.processes.sendTurn(generation, { turn, input, attachments },
+        async (result) => {
+          if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)
-        }))
-        .catch((error) => this.providerCallback(session.id, live, async () => {
-          if (!this.ownsSession(session.id, live) || live.activeTurnId !== turn.id) return
-          live.activeTurnId = null
-          const failure = live.driver.classifyTurnFailure?.(error) ?? 'uncertain'
+        }, async (error) => {
+          if (!this.processes.owns(generation) || this.processes.current(session.id)?.activeTurnId !== turn.id) return
+          this.processes.clearActive(generation, turn.id)
+          const failure = this.processes.driverFailure(generation, error)
           if (
             failure === 'safe_transient'
-            && !live.acceptedResponse
+            && !this.processes.accepted(generation)
             && turn.attempt + 1 < 3
           ) {
             const message = safeProviderMessage(
@@ -893,6 +721,7 @@ export class ManagedAgentEngine {
           await this.providerEvents.accept({
             sessionId: session.id,
             turnId: turn.id,
+            generation,
             event: {
               type: 'error',
               code: 'turn_dispatch_failed',
@@ -905,12 +734,13 @@ export class ManagedAgentEngine {
             },
           })
           void this.pump()
-        }))
+        })
     } catch (error) {
-      live.activeTurnId = null
+      this.processes.clearActive(generation, turn.id)
       await this.providerEvents.accept({
         sessionId: session.id,
         turnId: turn.id,
+        generation,
         event: {
           type: 'error',
           code: 'turn_dispatch_failed',
@@ -977,12 +807,18 @@ export class ManagedAgentEngine {
     // The socket gets the record without its search text; the node's own listeners keep it.
     this.publish?.(frame.channel === 'agent:event' ? { ...frame, event: clientEventRecord(frame.event) } : frame)
     for (const listener of this.listeners) listener(frame)
-    void this.webhooks.accept(frame).catch((error) => {
+    this.trackPublication(this.webhooks.accept(frame).catch((error) => {
       webhookLog.warn(`failed to queue delivery: ${describeError(error).message}`)
-    })
-    void this.announce(frame).catch((error) => {
+    }))
+    this.trackPublication(this.announce(frame).catch((error) => {
       log.warn(`failed to announce a session edge: ${describeError(error).message}`)
-    })
+    }))
+  }
+
+  private trackPublication(work: Promise<void>): void {
+    this.publicationCallbacks.add(work)
+    const settled = () => this.publicationCallbacks.delete(work)
+    void work.then(settled, settled)
   }
 
   // The webhook filter pointed inward: the same two edges, on a core channel every window and any
@@ -1023,12 +859,12 @@ export class ManagedAgentEngine {
   // sessions stay. A restored task resumes them on the next prompt, the same way it does after a
   // restart, so this records what reconcile() records.
   async stopTaskSessions(taskId: string): Promise<void> {
-    const stopping = [...this.live].filter(([, live]) => live.taskId === taskId)
-    await Promise.all(stopping.map(async ([sessionId, live]) => {
-      const turnId = live.activeTurnId
+    const stopping = this.processes.occupancy().filter((live) => live.taskId === taskId)
+    await Promise.all(stopping.map(async (live) => {
+      const sessionId = live.generation.sessionId
+      const turnId = this.processes.takeActive(live.generation)
       // Cleared before the stop, so the send that fails when the process dies is not retried or
       // recorded as a provider failure.
-      live.activeTurnId = null
       await this.stopLive(sessionId)
       await this.store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
       await this.store.expirePendingRequests(sessionId)
@@ -1041,38 +877,13 @@ export class ManagedAgentEngine {
     }))
   }
 
-  protected armIdleSweep(): void {
-    if (this.idleSweepTimer || this.stopped) return
-    // Unref'd like the other timers here: nothing should hold a draining node open for a sweep.
-    this.idleSweepTimer = setInterval(() => {
-      if (this.stopped) return
-      const sweep = this.stopIdleSessions()
-        .then(() => undefined)
-        .catch((error: unknown) => log.warn(`idle sweep failed: ${describeError(error).message}`))
-      this.providerCallbacks.add(sweep)
-      void sweep.finally(() => this.providerCallbacks.delete(sweep))
-    }, this.idleSweepMs)
-    this.idleSweepTimer.unref?.()
-  }
-
-  // Idle as far as this process can tell without a read: started, not stopping, no turn in flight,
-  // no start still being set up, and nothing heard from the provider since `before`.
-  protected idleLive(sessionId: string, live: LiveSession, before: number): boolean {
-    return live.handle != null
-      && !live.startPromise
-      && !live.stopping
-      && !live.activeTurnId
-      && !this.readinessHolds.has(sessionId)
-      && live.lastActivityAt <= before
-  }
-
   /**
    * Stops each provider process that has been idle past the owner's limit, and returns the sessions
    * it stopped. Each one holds an agent CLI and its MCP servers, about 450 MB, and nothing else stops
    * a session nobody prompts again. Read per sweep, so a change in Settings applies to the next one.
    */
   async stopIdleSessions(now = Date.now()): Promise<string[]> {
-    if (this.stopped || !this.live.size) return []
+    if (this.stopped || !this.processes.ids().length) return []
     const userId = this.currentUserId()
     const { stopIdleAfterMinutes: minutes } = userId
       ? await this.readWhileRunning(() => readAgentSessionDefaults(this.core.prefs, userId)).catch((error: unknown) => {
@@ -1091,7 +902,7 @@ export class ManagedAgentEngine {
   /** Stop idle agents now, in Settings > Storage and memory: the sweep's rules with no time limit.
    *  It runs whatever the owner's limit is, Never included, because the owner asked for it. */
   async stopIdleSessionsNow(): Promise<string[]> {
-    if (this.stopped || !this.live.size) return []
+    if (this.stopped || !this.processes.ids().length) return []
     return this.stopIdle(Date.now(), 'The provider process was stopped from Settings to free memory. Send a prompt to resume.')
   }
 
@@ -1100,18 +911,18 @@ export class ManagedAgentEngine {
    * trees. `list` is a parameter so a test can hand it a fake table.
    */
   async processFootprint(
-    list: () => Promise<ProcessRow[] | null> = () => listProcesses(this.core.proc),
+    list: () => Promise<ProcessRow[] | null> = async () => (await import('./footprint')).listProcesses(this.core.proc),
   ): Promise<{ live: number; idle: number; memoryBytes: number | null }> {
-    const running = [...this.live].filter(([, live]) => !live.stopping)
+    const running = this.processes.occupancy().filter((live) => !live.stopping)
     const now = Date.now()
     let idle = 0
-    for (const [sessionId, live] of running) {
-      if (await this.stoppableIdle(sessionId, live, now)) idle++
+    for (const live of running) {
+      if (await this.stoppableIdle(live.generation.sessionId, live.generation, now)) idle++
     }
     if (this.stopped) return { live: 0, idle: 0, memoryBytes: null }
-    const pids = running.flatMap(([, live]) => (live.handle?.pid ? [live.handle.pid] : []))
+    const pids = running.flatMap((live) => live.pid ? [live.pid] : [])
     const rows = running.length ? await list() : []
-    return { live: running.length, idle, memoryBytes: rows ? processTreeBytes(rows, pids) : null }
+    return { live: running.length, idle, memoryBytes: rows ? (await import('./footprint')).processTreeBytes(rows, pids) : null }
   }
 
   /**
@@ -1121,27 +932,29 @@ export class ManagedAgentEngine {
    * reported as zero.
    */
   protected armFootprintSample(everyMs: number): void {
+    if (this.telemetry) this.processes.armFootprintSample(everyMs)
+  }
+
+  private async sampleProcessFootprint(): Promise<void> {
     const telemetry = this.telemetry
-    if (!telemetry || this.footprintTimer) return
-    this.footprintTimer = setInterval(() => {
-      if (this.stopped || !telemetry.enabled()) return
-      void this.processFootprint().then(({ live, idle, memoryBytes }) => {
-        if (this.stopped) return
-        telemetry.gauge('agent.processes.live', live)
-        telemetry.gauge('agent.processes.idle', idle)
-        if (memoryBytes !== null) telemetry.gauge('agent.processes.memory', memoryBytes)
-      }).catch((error: unknown) => log.warn(`process footprint failed: ${describeError(error).message}`))
-    }, everyMs)
-    // Unref'd like the other timers here.
-    this.footprintTimer.unref?.()
+    if (!telemetry?.enabled()) return
+    const { live, idle, memoryBytes } = await this.processFootprint()
+    if (this.stopped) return
+    telemetry.gauge('agent.processes.live', live)
+    telemetry.gauge('agent.processes.idle', idle)
+    if (memoryBytes !== null) telemetry.gauge('agent.processes.memory', memoryBytes)
   }
 
   /** The size of the attachment and artifact folders. Walking them stats every file, so the answer is
    *  kept for DISK_FOOTPRINT_MS and a page polling every few seconds reuses it. */
   diskFootprint(now = Date.now()): Promise<{ attachmentsBytes: number; artifactsBytes: number }> {
     if (this.diskMeasure && now - this.diskMeasure.at < DISK_FOOTPRINT_MS) return this.diskMeasure.bytes
-    const bytes = Promise.all([directoryBytes(this.attachments.root), directoryBytes(this.artifacts.root)])
-      .then(([attachmentsBytes, artifactsBytes]) => ({ attachmentsBytes, artifactsBytes }))
+    const bytes = import('./footprint').then(async ({ directoryBytes }) => {
+      const [attachmentsBytes, artifactsBytes] = await Promise.all([
+        directoryBytes(this.attachments.root), directoryBytes(this.artifacts.root),
+      ])
+      return { attachmentsBytes, artifactsBytes }
+    })
     this.diskMeasure = { at: now, bytes }
     return bytes
   }
@@ -1153,8 +966,8 @@ export class ManagedAgentEngine {
    * workflow steps reach a session through enqueueTurn, which resumes a stopped one, so those need no
    * exception.
    */
-  protected async stoppableIdle(sessionId: string, live: LiveSession, before: number): Promise<AgentSession | null> {
-    if (!this.idleLive(sessionId, live, before)) return null
+  protected async stoppableIdle(sessionId: string, generation: ProviderGeneration, before: number): Promise<AgentSession | null> {
+    if (!this.processes.idleCandidate(sessionId, generation, before)) return null
     const session = await this.store.getSession(sessionId)
     // `failed` too: a turn error leaves the process running, and the next prompt restarts a failed
     // session anyway.
@@ -1168,21 +981,22 @@ export class ManagedAgentEngine {
   // The sweep and the Settings button, which differ only in `before` and in what the transcript says.
   protected async stopIdle(before: number, detail: string): Promise<string[]> {
     const stopped: string[] = []
-    for (const [sessionId, live] of [...this.live]) {
+    for (const live of this.processes.occupancy()) {
+      const sessionId = live.generation.sessionId
       if (this.stopped) break
-      const session = await this.stoppableIdle(sessionId, live, before)
+      const session = await this.stoppableIdle(sessionId, live.generation, before)
       if (!session) continue
       // Again, because a prompt could have arrived during the reads.
-      if (this.live.get(sessionId) !== live || !this.idleLive(sessionId, live, before)) continue
+      if (!this.processes.idleCandidate(sessionId, live.generation, before)) continue
       // Marked before the record, so the dispatcher leaves this process alone while it is written.
       // Recorded before the stop, so a prompt that lands in between sees `stopped` and takes the resume
       // path rather than queueing behind a process that is about to exit. A failed session's state is
       // left as it is, so the failure still shows.
-      live.stopping = true
+      if (!this.processes.markStopping(live.generation)) continue
       if (session.runtimeState === 'ready') {
         await this.record(sessionId, null, { type: 'session_state', state: 'stopped', detail })
       }
-      if (this.live.get(sessionId) === live) await this.stopLive(sessionId)
+      if (this.processes.current(sessionId)?.generation === live.generation) await this.stopLive(sessionId)
       stopped.push(sessionId)
     }
     // A prompt that queued behind a stopping process has nothing else to wake it.
@@ -1191,20 +1005,6 @@ export class ManagedAgentEngine {
   }
 
   protected stopLive(sessionId: string): Promise<void> {
-    const live = this.live.get(sessionId)
-    if (!live) return Promise.resolve()
-    live.stopping = true
-    live.controller.abort(new Error('The managed agent session is stopping.'))
-    return live.stopPromise ??= (async () => {
-      // Built-in and manifest drivers acknowledge cancellation after retiring their spawn owner.
-      // A native factory that ignores the signal is still joined, including cleanup of a late handle.
-      await live.startPromise?.catch(() => undefined)
-      if (live.retirementFailure) throw live.retirementFailure
-      if (live.handle) await live.handle.stop()
-      await Promise.allSettled([...live.callbacks])
-      await this.providerEvents.flush(sessionId)
-      await this.store.flushSearch(sessionId)
-      if (this.live.get(sessionId) === live) this.live.delete(sessionId)
-    })()
+    return this.processes.stop(sessionId)
   }
 }

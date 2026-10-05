@@ -113,6 +113,27 @@ describe('managed startup generations', () => {
     expect(tokens).toBe(tokensBeforeStop)
   })
 
+  it('joins a held startup warning before closing storage', async () => {
+    vi.spyOn(engine.mcpServers, 'resolve').mockResolvedValue({ servers: [], secrets: [], unavailable: ['missing-server'] })
+    const held = deferred<void>()
+    const record = engine.store.recordEvent.bind(engine.store)
+    const writing = vi.spyOn(engine.store, 'recordEvent').mockImplementation(async (sessionId, turnId, event) => {
+      if (event.type === 'diagnostic' && event.message.includes('missing-server')) await held.promise
+      return record(sessionId, turnId, event)
+    })
+    const starting = engine.connect(session).catch((error: unknown) => error)
+    await vi.waitFor(() => expect(writing).toHaveBeenCalledWith(session.id, null,
+      expect.objectContaining({ type: 'diagnostic', message: expect.stringContaining('missing-server') })))
+    let finished = false
+    const stopping = engine.stop().then(() => { finished = true })
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(finished).toBe(false)
+    held.resolve()
+    await stopping
+    expect(await starting).toBeInstanceOf(Error)
+    expect(starts).toHaveLength(0)
+  })
+
   it('joins and retires a late handle from a native driver that ignores cancellation', async () => {
     const held = deferred<void>()
     launch = async (options) => { await held.promise; return new FakeAgentDriver().start(options) }
@@ -128,6 +149,60 @@ describe('managed startup generations', () => {
     expect(stops).toBe(1)
   })
 
+  it('joins a held provider callback and commits its event before shutdown returns', async () => {
+    await engine.connect(session)
+    const held = deferred<void>()
+    const record = engine.store.recordEvent.bind(engine.store)
+    const writing = vi.spyOn(engine.store, 'recordEvent').mockImplementation(async (sessionId, turnId, event) => {
+      if (event.type === 'assistant_message') await held.promise
+      return record(sessionId, turnId, event)
+    })
+    const emitted = starts[0].onEvent({ type: 'assistant_message', text: 'committed before close' })
+    await vi.waitFor(() => expect(writing).toHaveBeenCalledWith(session.id, null, expect.objectContaining({ type: 'assistant_message' })))
+    let finished = false
+    const stopping = engine.stop().then(() => { finished = true })
+    await vi.waitFor(() => expect(stops).toBe(1))
+    expect(finished).toBe(false)
+    held.resolve()
+    await emitted
+    await stopping
+    plugin.db.close()
+    const reopened = plugin.openConnection()
+    try {
+      engine = new Engine({ db: reopened, dataDir: plugin.dataDir, core, registry: new AgentDriverRegistry(),
+        internalEnv: () => ({}), secrets: new SecretService('11'.repeat(32)), currentUserId: () => null })
+      await engine.reconcile()
+      expect((await engine.store.eventPage(session.id)).events).toEqual(expect.arrayContaining([
+        expect.objectContaining({ event: expect.objectContaining({ type: 'assistant_message', text: 'committed before close' }) }),
+      ]))
+      await starts[0].onEvent({ type: 'assistant_message', text: 'after close' })
+      expect((await engine.store.eventPage(session.id)).events.some((entry) =>
+        entry.event.type === 'assistant_message' && entry.event.text === 'after close')).toBe(false)
+    } finally {
+      await engine.stop()
+      reopened.close()
+    }
+  })
+
+  it('joins an in-flight webhook queue write before shutdown returns', async () => {
+    await engine.connect(session)
+    const held = deferred<void>()
+    const accepting = vi.spyOn(engine.webhooks, 'accept').mockImplementation(async () => { await held.promise })
+    let stopping: Promise<void> | null = null
+    try {
+      await starts[0].onEvent({ type: 'assistant_message', text: 'published event' })
+      await vi.waitFor(() => expect(accepting).toHaveBeenCalled())
+      let finished = false
+      stopping = engine.stop().then(() => { finished = true })
+      await vi.waitFor(() => expect(stops).toBe(1))
+      await new Promise<void>((resolve) => setImmediate(resolve))
+      expect(finished).toBe(false)
+    } finally {
+      held.resolve()
+      await stopping
+    }
+  })
+
   it('refuses replacement startup after process retirement failed', async () => {
     const failure = new ProcessRetirementError('synthetic exit was not acknowledged')
     launch = async () => { throw failure }
@@ -135,6 +210,19 @@ describe('managed startup generations', () => {
     await expect(engine.connect(session)).rejects.toBe(failure)
     await expect(engine.connect(session)).rejects.toBe(failure)
     expect(starts).toHaveLength(1)
+    await expect(engine.stop()).rejects.toBe(failure)
+  })
+
+  it('refuses replacement after a disconnected process fails retirement', async () => {
+    const failure = new ProcessRetirementError('disconnected child did not exit')
+    launch = async (options) => {
+      const handle = await new FakeAgentDriver().start(options)
+      return { ...handle, stop: async () => { throw failure } }
+    }
+    expectedStopError = failure
+    await engine.connect(session)
+    await expect(starts[0].onClosed(new Error('stream ended'))).rejects.toBe(failure)
+    await expect(engine.connect(session)).rejects.toBe(failure)
     await expect(engine.stop()).rejects.toBe(failure)
   })
 

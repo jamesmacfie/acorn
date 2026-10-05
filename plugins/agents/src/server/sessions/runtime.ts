@@ -236,7 +236,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     this.holdSessionReadiness(session.id)
     try {
       const live = await this.ensureSession(session)
-      const signal = live.controller.signal
+      const signal = this.processes.signal(live)
       // Workflow steps and sessions with an origin set their own options. Forks retain theirs.
       if (session.kind === 'interactive' && !session.parentSessionId && !session.origin) {
         await this.sessionDefaults.applySaved(session.id, session.providerId, signal).catch(async (error) => {
@@ -397,7 +397,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   }
 
   async cancelTurn(sessionId: string, turnId?: string): Promise<void> {
-    const live = this.live.get(sessionId)
+    const live = this.processes.current(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
     if (!target) {
@@ -411,13 +411,13 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     }
     if (!active || active.id !== target) {
       await this.store.cancelTurn(target)
-      if (this.live.get(sessionId)?.admissionTurnId === target) await this.stopLive(sessionId)
+      if (this.processes.current(sessionId)?.admissionTurnId === target) await this.stopLive(sessionId)
       void this.pump()
       return
     }
     await this.record(sessionId, target, { type: 'session_state', state: 'cancelling' })
     await this.store.expirePendingRequests(sessionId)
-    await live?.handle?.cancel()
+    if (live) await this.processes.withCurrentHandle(live.generation, (handle) => handle.cancel())
     await this.store.cancelTurn(target)
   }
 
@@ -457,8 +457,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.requireSession(sessionId)
     try {
       const live = await this.ensureSession(session)
-      if (!live.handle) throw new Error('Provider session is not connected.')
-      await live.handle.resolveRequest(providerRequestId, resolution)
+      await this.processes.withHandle(live, (handle) => handle.resolveRequest(providerRequestId, resolution))
     } catch (error) {
       // The provider may have accepted the response before transport failure. Expire the durable
       // claim rather than making a second attempt that could grant a permission twice.
@@ -483,8 +482,10 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   async compact(sessionId: string): Promise<void> {
     const session = await this.store.requireSession(sessionId)
     const live = await this.ensureSession(session)
-    if (!live.handle?.compact) throw new Error('This provider does not support native compaction.')
-    await live.handle.compact()
+    await this.processes.withHandle(live, (handle) => {
+      if (!handle.compact) throw new Error('This provider does not support native compaction.')
+      return handle.compact()
+    })
   }
 
   async patchSession(
@@ -534,7 +535,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       if (changed.length) {
         const live = await this.ensureSession(before)
         for (const option of changed) {
-          await live.handle?.setConfig?.(option.id, option.value)
+          await this.processes.withCurrentHandle(live, async (handle) => { await handle.setConfig?.(option.id, option.value) })
           // Record model and reasoning changes because they affect later turns.
           await this.record(sessionId, null, {
             type: 'diagnostic',
@@ -556,8 +557,8 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     }
     if (patch.archived != null) {
       const live = await this.ensureSession(before).catch(() => null)
-      if (live?.handle?.archive) {
-        await live.handle.archive(patch.archived).catch(async (error) => {
+      if (live) {
+        await this.processes.withCurrentHandle(live, async (handle) => { await handle.archive?.(patch.archived!) }).catch(async (error) => {
           await this.record(sessionId, null, {
             type: 'diagnostic',
             level: 'warning',
@@ -581,8 +582,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
       transport: server.transport,
       enabled: selected.has(server.name),
     }))
-    const handle = this.live.get(sessionId)?.handle
-    const reported = handle?.mcpStatus ? await handle.mcpStatus().catch(() => null) : null
+    const reported = await this.processes.handleIfPresent(sessionId, async (handle) => handle.mcpStatus ? handle.mcpStatus().catch(() => null) : null)
     return { servers, reported, locked: await this.mcpLockedReason(session) }
   }
 
@@ -609,7 +609,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const session = await this.store.patchSession(sessionId, { config: { ...latest.config, mcpServers: next } })
     this.emit({ channel: 'agent:session', session })
     const changes = [...on.map((name) => `${name} on`), ...off.map((name) => `${name} off`)].join(', ')
-    const live = this.live.has(sessionId)
+    const live = this.processes.has(sessionId)
     await this.record(sessionId, null, {
       type: 'diagnostic',
       level: 'info',
@@ -640,7 +640,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     const active = await this.store.activeTurn(sessionId)
     if (active) throw new Error('Finish or cancel the active turn before forking.')
     const live = await this.ensureSession(source)
-    const providerForkRef = await live.handle?.fork?.()
+    const providerForkRef = (await this.processes.withCurrentHandle(live, async (handle) => handle.fork?.())) ?? undefined
     const pendingForkContext = providerForkRef ? undefined : await this.forkContext(source)
     return this.createSession({
       taskId: source.taskId,
@@ -666,14 +666,18 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
   async deleteSession(sessionId: string): Promise<AgentDeleteResult> {
     const session = await this.store.requireSession(sessionId)
     await this.titleGeneration.cancel(sessionId)
-    const live = this.live.get(sessionId)
+    const live = this.processes.current(sessionId)?.generation
       ?? (session.providerSessionRef ? await this.ensureSession(session).catch(() => null) : null)
     let provider: AgentDeleteResult['provider'] = 'unsupported'
     let detail: string | undefined
-    if (live?.handle?.delete) {
+    if (live) {
       try {
-        await live.handle.delete()
-        provider = 'deleted'
+        const deleted = await this.processes.withCurrentHandle(live, async (handle) => {
+          if (!handle.delete) return false
+          await handle.delete()
+          return true
+        })
+        if (deleted) provider = 'deleted'
       } catch (error) {
         provider = 'failed'
         detail = error instanceof Error ? error.message : 'Provider-side deletion failed.'
@@ -712,7 +716,7 @@ export class ManagedAgentRuntime extends ManagedAgentEngine {
     while (!this.stopped && !options.signal?.aborted) {
       const taskIds = await options.taskIds()
       if (this.stopped || options.signal?.aborted) break
-      const sessionId = this.store.sessionWithHistory(taskIds, new Set(this.live.keys()))
+      const sessionId = this.store.sessionWithHistory(taskIds, new Set(this.processes.ids()))
       if (!sessionId) {
         totals.complete = true
         break

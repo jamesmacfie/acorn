@@ -2,8 +2,9 @@
 
 This page covers how the agents plugin queues and dispatches turns, waits out a plan limit, starts and
 stops provider processes, and recovers from failure. `queueCoordinator.ts` owns queue scans,
-fairness, delayed wakeups, and drain. `runtimeEngine.ts` owns provider generations and dispatch
-outcomes; `runtime.ts` persists accepted turns before requesting a scan.
+fairness, delayed wakeups, and drain. `providerSessionLifecycle.ts` owns live provider generations,
+children, process timers, and callback joins. `runtimeEngine.ts` owns durable event handling and
+dispatch outcomes; `runtime.ts` persists accepted turns before requesting a scan.
 
 ## The turn queue
 
@@ -57,6 +58,12 @@ generations. `createSession` returns after provider readiness and saved settings
 creation is accepted once the session row is durable, so a startup failure marks that row `failed`
 and records the error in its ledger.
 
+The lifecycle owner installs a generation before reading the task, workspace, or session ledger. It
+gets those reads, the scoped environment, MCP configuration, and durable callbacks through specific
+engine ports. Callers receive immutable occupancy facts or a generation identity. The owner checks
+that identity before a handle command or state transition. The engine keeps the one redaction list
+shared with event materialization and the durable event buffer.
+
 ACP and Codex initialization have a 60-second deadline. A stop gives ACP session close and Codex
 thread unsubscribe up to 1 second, then sends SIGTERM to pipe children or SIGHUP to usage PTYs,
 escalates after 2 seconds, and waits 2 more for the exit. A failed exit rejects the teardown. On macOS
@@ -100,7 +107,7 @@ A `ready` session records `stopped` with the limit that applied, which the clien
 The next prompt resumes the conversation, Claude Code through `session/load` and Codex through
 `thread/resume`. A `failed` session's process stops too, and nothing is recorded. Delegated and
 workflow sessions get no exception: `enqueueTurn` resumes a stopped session, and a workflow gate is a
-pending request, so it keeps its session. The sweep is a timer the engine owns, not a schedule
+pending request, so it keeps its session. The sweep is a timer the lifecycle owner holds, not a schedule
 ([schedules](../schedules.md#what-deliberately-is-not-a-schedule)), because it sweeps a map that
 exists only in this process.
 
@@ -113,16 +120,18 @@ size of the `agent-objects` and `agent-artifacts` folders. Memory is the residen
 session's process tree, from one `ps -A -o pid=,ppid=,rss=` walk down from each driver's `pid`
 (`plugins/agents/src/server/sessions/footprint.ts`). It counts shared pages more than once, so the
 page says "about". Where `ps` fails, or on Windows, it shows counts without memory. Folder sizes are
-measured at most every 30 seconds.
+measured at most every 30 seconds. The footprint helper loads when a measurement is requested, and
+shutdown joins a sample already in progress.
 
 **Stop idle agents now** is `POST /v1/p/agents/stop-idle`, which runs `stopIdleSessionsNow` with the
 same rules and no time limit. Both routes are device-only, because they reach every task's agents.
 
 ## Shutdown
 
-Shutdown runs in an order that can't revive what it stopped: cancel every pending reconnect timer,
-because a live one would call `ensureSession`, then stop each provider, then flush the event buffer's
-timers, then stop the webhook delivery pump. All of it runs before the plugin's SQLite file closes.
+Shutdown closes queue admission, aborts starts, and clears reconnect, quiet, idle, and process sample
+timers. It joins every provider retirement, queue scan, and callback, then flushes durable events and
+search, joins publication work, and stops webhook delivery. All of it runs before the plugin's SQLite
+file closes.
 `dispose()` in `plugins/agents/src/node/index.ts` runs this and then clears its capability bridges, so
 a second boot in one process never reads through the first boot's closed handle
 (`apps/node/src/composition/runtime.test.ts`).

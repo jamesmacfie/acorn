@@ -1,36 +1,40 @@
 import type { AgentSession, AgentTurn } from '../../contract/wire'
 import type { AgentConcurrencyLimits } from '../../shared/concurrency'
+import type { ProviderGeneration } from './providerSessionLifecycle'
 import { decideAgentCommand } from './stateMachine'
 
 type QueueHead = { session: AgentSession; turn: AgentTurn }
 
 export type QueueGeneration = {
+  generation: ProviderGeneration
   activeTurnId: string | null
   admissionTurnId: string | null
   workspaceId: string
   providerId: string
   stopping: boolean
-  handle: { ready: boolean } | null
+  ready: boolean
 }
 
-export type QueueCoordinatorPorts<Generation extends QueueGeneration> = {
+export type QueueCoordinatorPorts = {
   queuedHeads(): Promise<QueueHead[]>
   getSession(sessionId: string): Promise<AgentSession | null>
   requireSession(sessionId: string): Promise<AgentSession>
   nextQueuedTurn(sessionId: string): Promise<AgentTurn | null>
   limits(): Promise<AgentConcurrencyLimits>
-  occupancy(): Iterable<Generation>
-  live(sessionId: string): Generation | undefined
+  occupancy(): Iterable<QueueGeneration>
+  live(sessionId: string): QueueGeneration | null
   workspaceId(taskId: string): Promise<string>
   stopLive(sessionId: string): Promise<void>
-  ensureSession(session: AgentSession, turnId: string, workspaceId: string): Promise<Generation>
-  ownsSession(sessionId: string, generation: Generation): boolean
-  dispatch(session: AgentSession, turn: AgentTurn, generation: Generation): Promise<boolean>
+  ensureSession(session: AgentSession, turnId: string, workspaceId: string): Promise<ProviderGeneration>
+  ownsSession(generation: ProviderGeneration): boolean
+  activate(generation: ProviderGeneration, turnId: string): boolean
+  release(generation: ProviderGeneration, turnId: string): void
+  dispatch(session: AgentSession, turn: AgentTurn, generation: ProviderGeneration): Promise<boolean>
   shuttingDown(): boolean
 }
 
-/** Serializes durable queue scans. Provider generations and turn outcomes belong to the engine. */
-export class QueueCoordinator<Generation extends QueueGeneration> {
+/** Serializes durable queue scans. Provider generations belong to the lifecycle owner. */
+export class QueueCoordinator {
   private pumping = false
   private requested = false
   private interactiveStreak = 0
@@ -39,7 +43,7 @@ export class QueueCoordinator<Generation extends QueueGeneration> {
   private readonly drainWaiters = new Set<() => void>()
   private closed = false
 
-  constructor(private readonly ports: QueueCoordinatorPorts<Generation>) {}
+  constructor(private readonly ports: QueueCoordinatorPorts) {}
 
   pump(): Promise<void> {
     if (this.closed || this.ports.shuttingDown()) return Promise.resolve()
@@ -123,14 +127,15 @@ export class QueueCoordinator<Generation extends QueueGeneration> {
           const starting = this.ports.ensureSession(item.session, item.turn.id, workspaceId)
           const owner = this.ports.live(item.session.id)
           try {
-            const live = await starting.catch(() => {
+            const generation = await starting.catch(() => {
               if (!owner?.stopping && !this.closed && !this.ports.shuttingDown()) failedStarts.add(item.session.id)
               return null
             })
-            if (!live?.handle?.ready || live.activeTurnId || live.stopping || this.closed || this.ports.shuttingDown()) continue
+            const live = generation ? this.ports.live(item.session.id) : null
+            if (!generation || live?.generation !== generation || !live.ready || live.activeTurnId || live.stopping || this.closed || this.ports.shuttingDown()) continue
             const currentSession = await this.ports.requireSession(item.session.id)
             const currentHead = await this.ports.nextQueuedTurn(item.session.id)
-            if (!this.ports.ownsSession(item.session.id, live) || currentHead?.id !== item.turn.id
+            if (!this.ports.ownsSession(generation) || currentHead?.id !== item.turn.id
               || currentSession.controller !== 'acorn' || currentSession.archivedAt) continue
             if (currentHead.notBefore != null && currentHead.notBefore > Date.now()) {
               this.wakeAtTime(currentHead.notBefore)
@@ -144,14 +149,14 @@ export class QueueCoordinator<Generation extends QueueGeneration> {
               pendingRequestIds: [],
             }, { type: 'dispatch_turn', turnId: item.turn.id })
             if (!decision.ok) continue
-            live.activeTurnId = item.turn.id
+            if (!this.ports.activate(generation, item.turn.id)) continue
             workspaceActive.set(live.workspaceId, (workspaceActive.get(live.workspaceId) ?? 0) + 1)
             providerActive.set(live.providerId, (providerActive.get(live.providerId) ?? 0) + 1)
             this.interactiveStreak = item.turn.source === 'workflow' ? 0 : this.interactiveStreak + 1
-            const dispatched = await this.ports.dispatch(item.session, item.turn, live)
+            const dispatched = await this.ports.dispatch(item.session, item.turn, generation)
             started = started || dispatched
           } finally {
-            if (owner?.admissionTurnId === item.turn.id) owner.admissionTurnId = null
+            if (owner) this.ports.release(owner.generation, item.turn.id)
           }
         }
         if (!started && !this.requested) return

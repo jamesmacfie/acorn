@@ -1,9 +1,11 @@
 import type { AgentNormalizedEvent } from '../../contract/wire.ts'
+import type { ProviderGeneration } from './providerSessionLifecycle'
 
 export type PendingAgentEvent = {
   sessionId: string
   turnId: string | null
   event: AgentNormalizedEvent
+  generation?: ProviderGeneration
 }
 
 type DeltaEvent = Extract<AgentNormalizedEvent, { type: 'assistant_message' | 'reasoning' }>
@@ -16,12 +18,13 @@ export const isAppendDelta = (event: AgentNormalizedEvent): event is DeltaEvent 
 // The buffer coalesces on this, and the repository indexes each such message once for search
 // (sessionRepository.ts § recordEvent).
 export const continuesStream = (
-  previous: Pick<PendingAgentEvent, 'turnId' | 'event'>,
-  next: Pick<PendingAgentEvent, 'turnId' | 'event'>,
+  previous: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
+  next: Pick<PendingAgentEvent, 'turnId' | 'event' | 'generation'>,
 ): boolean =>
   isAppendDelta(previous.event)
   && isAppendDelta(next.event)
   && previous.turnId === next.turnId
+  && previous.generation === next.generation
   && previous.event.type === next.event.type
   && previous.event.messageId === next.event.messageId
 
