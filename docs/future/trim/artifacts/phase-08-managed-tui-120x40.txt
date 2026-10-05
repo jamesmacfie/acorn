@@ -1,0 +1,36 @@
+│  Agents                        ││Agents 1                      ││TUI draft return check                ✓ ready [Stop]│
+│  Memory                        ││                              ││Session actions [Agent utilization] [ New ▾ ]       │
+│                                ││MANAGED SESSIOrder managed se ││                                                    │
+└────────────────────────────────┘│  ✓ TUI draft return check    ││▍──────────────────────────────────────────────────┐│
+┌─Browse─────────────────────────┐│    claude · Opus 5.5 · High  ││▍ YOU 8:34 AM                                      ││
+│Choose a source.                ││                              ││▍ TUI draft return check Reply OK for TUI check    ││
+│                                ││                              ││▍                                                  ││
+│                                ││                              ││▍ [Context: Task context · attached]               ││
+│                                ││                              ││▍ ▸ Context manifest                               ││
+│                                ││                              ││▍──────────────────────────────────────────────────┘│
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││▍──────────────────────────────────────────────────┐│
+│                                ││                              ││▍ AGENT 8:34 AM                 Copy this response ││
+│                                ││                              ││▍ OK                                               ││
+│                                ││                              ││▍──────────────────────────────────────────────────┘│
+│                                ││                              ││                                                    │
+│                                ││                              ││Turn complete · end_turn  39,558 / 1,000,000 context│
+│                                ││                              ││Claude Code session title: TUI draft return check   │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││                                                    │
+│                                ││                              ││Mode Auto▾ Model Opus 5.5▾ Effort High▾             │
+│                                ││                              ││                                                    │
+│                                ││                              ││Fast mode Off▾                                      │
+└────────────────────────────────┘│                              ││┌──────────────────────────────────────────────────┐│
+┌─Tasks──────────────────────────┐│                              │││Draft after TUI send                              ││
+│  Review changed files          ││                              │││                                                  ││
+│  Plan follow-up work           ││                              │││                                                  ││
+│                                ││                              ││└──────────────────────────────────────────────────┘│
+│                                ││                              ││[Attach] [ Context ▾ ] [ Insert ▾ ]   ⇧↩ for newline│
+│                                ││                              ││[Send]                                              │
+└────────────────────────────────┘└──────────────────────────────┘└────────────────────────────────────────────────────┘
+esc back · ctrl+return send · tab next · ctrl+k commands · ? help · w switch workspace · p switch project · ctrl+b ra…

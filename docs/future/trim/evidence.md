@@ -1,6 +1,6 @@
 # Trim evidence and handoffs
 
-Date: 2026-10-06. Status: phases 01–07 complete; phase 08 is next.
+Date: 2026-10-06. Status: phases 01–08 complete; phase 09 is next.
 
 ## Phase 07: rail task editing (2026-10-06)
 
@@ -625,3 +625,45 @@ screen capture, then stopped again.
 
 Phase 09 can use these feature-owned operation modules without changing draft scope or the public
 composer props.
+
+
+### Phase 08 review correction (2026-10-06)
+
+The accepted installation gate uses the unmodified repository settings. On Darwin arm64,
+`PATH=/private/tmp/acorn-trim-node-bin:$PATH CI=true pnpm install --frozen-lockfile`
+completed with pnpm 11.0.0: the lockfile was up to date, resolution was skipped, and pnpm reported
+"Already up to date" and "Done in 824ms." This run used host permissions for cache and network
+access. Node reported v24.21.0. `pnpm lint` then passed 37/37 tasks with no cache, and
+`pnpm --filter @acorn/arch-tests test` passed 12 files/86 tests. Neither command used a pnpm status
+warning override. `git status --short` was empty after installation, and `git diff` showed no
+change to `pnpm-lock.yaml`, `pnpm-workspace.yaml`, or root `package.json`. The earlier copied-tree
+and missing-tarball account describes the first sandboxed attempt, not the accepted install gate.
+
+The isolated `trim-08` desktop fixture created an Acorn-managed interactive Claude session in
+**Plan follow-up work**, separate from the imported, externally controlled session in **Review
+changed files**. Its composer became enabled after startup and attached task context automatically.
+WebDriver filled an unsent draft, navigated to the imported session, then returned and found the
+same draft and context. It sent "Reply with exactly OK. Isolated phase 08 composer check." The
+transcript showed the submitted context and the provider answered "OK." A follow-up draft typed
+during the turn remained after completion. Native Computer Use opened the composer's file picker
+and selected a 36-byte text file inside the isolated fixture; the draft then showed
+`phase08-note.txt` beside the retained text. The retained
+[managed desktop screenshot](./artifacts/phase-08-managed-composer-attached.png) shows the sent
+context, response, unsent draft, and uploaded attachment.
+
+The isolated `trim-08-tui` fixture created a separate Acorn-managed interactive Claude session in
+**Plan follow-up work**. At 120 by 40, the terminal driver pasted an unsent draft, used **Go to**
+to visit **Review changed files**, returned, and found the same draft and automatic context. Enter
+submitted the draft; the transcript showed task context and the provider answered "OK." A new
+draft pasted during the turn remained after completion. The retained
+[managed TUI output](./artifacts/phase-08-managed-tui-120x40.txt) shows that state.
+
+The host sends completed quickly, so these live runs do not prove a concurrent edit during the
+enqueue await. `composerOwnership.test.tsx` holds that await and proves submitted-revision
+acknowledgement through the public composer. The desktop WebDriver cannot operate the native picker;
+Computer Use supplied that step. The fixture has no contributor for the `agents:attachment` replace
+point, so the host offers no replacement action; the public attachment-slot and compare-and-swap
+tests cover replacement. The fixture has one Agent pane per task and no second live Workflows run
+view for the managed session; the public component test covers two composer surfaces sharing one
+session. Both isolated hosts were stopped, and their drivers then reported the sessions as not
+running. No provider prompt included private project data.

@@ -1,5 +1,15 @@
 # Phase 08: separate composer operations with explicit draft ownership
 
+Review correction, October 6, 2026: **done**. A genuine frozen pnpm install completed under Node
+24.21.0 without configuration or lockfile changes. Standard `pnpm lint` and architecture commands
+passed. Isolated desktop and TUI fixtures created Acorn-managed interactive sessions with enabled
+composers. Both retained drafts across task navigation, sent a turn with automatic context, and
+retained a later draft. Native desktop control uploaded an isolated file. Live provider sends finished
+before a deterministic concurrent-enqueue edit could be staged; the held component fixture proves
+that race. The fixture has no replacement contributor or second Workflows view for the session, so
+those paths remain covered by public component tests. See the
+[review correction evidence](./evidence.md#phase-08-review-correction-2026-10-06).
+
 Completion note, October 6, 2026: **done**. `composerState.ts` remains the sole mutable draft
 owner per Node/session. `submitOperation.ts`, `attachmentOperations.ts`, and `contextOperations.ts`
 now own the asynchronous work through a captured `ComposerOrigin`; the component retains local
