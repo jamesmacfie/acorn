@@ -23,11 +23,19 @@ post-write invalidation, activation, and navigation check that the dialog still 
 has not changed. A workspace switch keeps the dialog's project list. Server validation remains the
 final branch authority, and a failed availability read still permits submission.
 
+A transport-level regression holds task creation on Node A, switches the active Node to B, then
+releases the response. It verifies that the setup notification still goes to A. This covers the
+create-to-setup await boundary with the real mutation and bridge, where the rail's mocked mutation
+cannot observe routing.
+
 | Gate | Result |
 | --- | --- |
 | `pnpm test:focus @acorn/client-core src/features/tabs/TabRail.test.tsx` | Passed, 18 tests. Held availability after reopen and right-click selection/drag cases added. |
+| `pnpm test:focus @acorn/client-core src/features/tasks/taskMutations.test.ts` | Passed, 1 test. Held create response across an active Node switch; setup request retained the origin Node. |
+| `pnpm --filter @acorn/client-core lint` | Passed after the captured-Node regression. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/client-core` | Passed after the captured-Node regression, 315 files/2,403 tests, zero cached. |
 | `TURBO_FORCE=true pnpm lint` | Passed, 37/37 tasks. |
-| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/client-core --filter=@acorn/tui --filter=@acorn/desktop` | Final run passed with listener access, 3/3 packages, zero cached. Client-core: 314 files/2,402 tests. TUI: 68 files/673 passed, two skipped. Desktop: 28 files/171 tests, helper 10 tests, and 62 Rust tests passed. Initial sandbox run failed socket tests with `EPERM`. An intermediate run exposed a stale config mock in the held-request fixture; the corrected fixture and final combined run passed. |
+| `TURBO_FORCE=true VITEST_MAX_WORKERS=2 ACORN_TEST_CONCURRENCY=2 pnpm test --filter=@acorn/client-core --filter=@acorn/tui --filter=@acorn/desktop` | Original phase run passed with listener access, 3/3 packages, zero cached. Client-core then: 314 files/2,402 tests. TUI: 68 files/673 passed, two skipped. Desktop: 28 files/171 tests, helper 10 tests, and 62 Rust tests passed. Initial sandbox run failed socket tests with `EPERM`. An intermediate run exposed a stale config mock in the held-request fixture; the corrected fixture and final combined run passed. TUI and desktop suites were not repeated for the regression-only follow-up. |
 | `VITEST_MAX_WORKERS=2 pnpm --filter @acorn/arch-tests test --maxWorkers=2` | Passed, 12 files/86 tests. |
 
 Desktop host: `trim-07-fixture`, generated `tui-navigation` Git fixture. Created a project-folder
