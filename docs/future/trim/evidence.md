@@ -106,8 +106,10 @@ The [follow-up](#phase-15-follow-up-2026-10-06) added live task rename, native r
 palette/Escape, Chats only across navigation, and queue edit/reorder/cancel through an isolated
 Codex session. Live final-host coverage still does **not** establish origin switch,
 existing-worktree creation, drag, concurrent held awaits, fork, pending approval action, idle stop,
-a completed workflow/delegated turn, terminal handoff, or loaded-plugin reload/disable. Phase 07/08
-fixture tests and phase 08's earlier live picker/send cover task and composer cases. The full root
+a delegated turn, terminal handoff, or loaded-plugin reload/disable. A later isolated desktop
+fixture completed a published one-step workflow through the public editor and managed provider;
+the [diagnosis below](#phase-15-follow-up-2026-10-06) records its pre-existing Outline save bug.
+Phase 07/08 fixture tests and phase 08's earlier live picker/send cover task and composer cases. The full root
 run includes public controlled fixtures for queue, request, retirement, second boot, workflow
 capability activation, and plugin startup/invocation, failed `init`/`ready` reload retaining old,
 successful reload, disable, and storage disposal. These are deterministic proofs, not phase 15
@@ -188,8 +190,18 @@ control labels. No production data root was used.
 The same host's Workflows surface had no definition. Its public editor created a local one-step
 `Ask an agent` definition named `Trim 15 workflow fixture` with Codex selected and a no-edit
 prompt. The editor showed `1 step, no problems`, but remained `Saving…`, `Not published`, and
-`Run…` disabled. Clicking Publish opened no action. A completed workflow or delegated turn is
-therefore not claimed from this host. The imported transcript showed completed `Explore module`
+`Run…` disabled. Clicking Publish opened no action. The [workflow save diagnosis](./artifacts/phase-15-workflow-save-diagnosis.txt)
+subsequently traced a valid Outline rename to HTTP 200 and a persisted revision. The editor's
+custody compared serialized objects after the route parsed the definition into a different key
+order, so it kept the status at `saving` and the publication guard rejected the apparent dirty
+draft. Those client/route files are unchanged from the programme merge base; this is a
+pre-existing editor bug, not a phase 09 activation regression or a Node save failure. On a fresh
+isolated `tui-navigation` desktop fixture, entering the same one-step definition in the Code tab
+with `baseline`, `formatVersion`, `name`, then `steps` fields and clicking Apply reached `Saved`.
+The public Publish review committed version 1, and Run on fixture task `Plan follow-up work`
+completed the managed Codex step with `WORKFLOW_OK`. This is live host publication and workflow
+execution proof with a specific authoring path; it does not establish that Outline rename works.
+The imported transcript showed completed `Explore module`
 subagents, which are fixture history rather than a new live delegation. The full root gate's public
 runtime/capability tests remain deterministic workflow proof. The large-session fixture resolves
 each generated permission request before ending its imported session, so it cannot establish a
@@ -225,10 +237,10 @@ read/resize/stop. The verifier has no Linux release bundle branch, so report tha
 Preserve command logs and installed artifact paths. A Darwin staged helper is no substitute.
 
 Acceptance remains **OPEN** pending updater signing, installed artifact smokes, Windows/Linux
-target execution, and the still-uncovered host approval/workflow/plugin interactions required by
-the phase. The prior full install/lint/test/build/pack logs above remain valid for unchanged
-source. This follow-up changed evidence only; it did not repeat those complete gates. The final
-architecture/doc-link check passed 12 files and 86 tests after these edits
+target execution, and the still-uncovered host approval/plugin interactions required by the phase.
+The prior full install/lint/test/build/pack logs above remain valid for unchanged source. This
+follow-up changed evidence only; it did not repeat those complete gates. The final
+architecture/doc-link check passed 12 files and 86 tests after the preceding edits
 ([log](./artifacts/phase-15-arch-followup.log.gz)); `git diff --check` passed.
 
 ## Phase 14 provider boundary (2026-10-06)

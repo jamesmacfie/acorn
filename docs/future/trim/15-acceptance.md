@@ -19,9 +19,14 @@ follow-up exercised queue editing, reordering, and cancellation. Native control 
 rename, row menu, and command palette/Escape; Chats only survived navigation. The isolated TUI
 sent a live managed Codex turn at 120×40, closing phase 13's host focus/send gap.
 Held requests, queue and process races, workflow adapters, and loaded-plugin rollback have
-deterministic public fixture proof in the full test run. The hosts did not prove pending approval
-action, a completed workflow/delegated run, drag, or loaded-plugin reload/disable live. Those
-limits are listed with the exact proof available in the combined evidence.
+deterministic public fixture proof in the full test run. A further isolated desktop run authored
+a valid workflow in the Code tab, published version 1, and completed its managed Codex step on a
+fixture task. An Outline rename still leaves the editor at `Saving…` even though the public update
+route returns 200 and persists a revision. The [causal record](./artifacts/phase-15-workflow-save-diagnosis.txt)
+identifies preprogramme serialized key-order comparison in client draft custody and the working
+public invocation. The hosts did not prove pending approval action, live delegation, drag, or
+loaded-plugin reload/disable. These limits and their exact available proof are in the combined
+evidence.
 
 Release acceptance remains open. The first two local macOS release attempts failed when Rust 1.96.0
 produced proc-macro dylibs with misaligned `LINKEDIT` string pools. A third, materially different

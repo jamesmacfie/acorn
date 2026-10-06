@@ -1,0 +1,53 @@
+Phase 15 workflow editor diagnosis, 2026-10-06, Darwin arm64, Node 24.21.0, pnpm 11.
+All desktop sessions used their own disposable tui-navigation fixture data and localhost service.
+
+Failed Outline path (isolated desktop trim-15-workflow-save):
+- A newly created workflow initially showed Saved, revision 1.
+- Renaming in Outline to "Trim 15 save diagnosis" left the badge at Saving... .
+  The isolated workflows SQLite row had the name and revision 2. Two more renames reached
+  revisions 3 and 4 in the row while the badge remained Saving... .
+- A temporary WebDriver probe wrapped only window.acorn.nodeFetch in this isolated webview.
+  The final rename observed POST /v1/p/workflows/defs/validate -> 200,
+  PUT /v1/p/workflows/defs/<fixture-id> -> 200 (name "Trim 15 save diagnosis three",
+  revision 4), and GET /v1/p/workflows/defs?workspaceId=<fixture-id> -> 200.
+  The Node service log reported workflow plugin initialized and service ready; it had no
+  workflow save error. The 200 response and SQLite revision distinguish this from a failed save.
+- Recovery for revision 3 had equal semantic fields but different insertion order:
+  base  {"baseline":"acorn-1","formatVersion":1,"name":"Trim 15 save diagnosis two","steps":[]}
+  local {"baseline":"acorn-1","formatVersion":1,"steps":[],"name":"Trim 15 save diagnosis two"}
+  Thus JSON.stringify(base) !== JSON.stringify(local).
+
+Cause and scope:
+- plugins/workflows/src/client/editor/draftCustody.ts dirty() compares JSON.stringify(local)
+  to JSON.stringify(base). The Outline name edit spreads the old object before adding name;
+  plugins/workflows/src/server/routes/defs.ts defSchema parses the response in baseline,
+  formatVersion, name, steps order. A successful acknowledgement can therefore leave custody
+  status at saving. draftStore.ts also uses serialized JSON for dirty/publication preparation.
+- git diff from the phase 01 merge base 9dfd29df7116d44b16f5bd81e4a18b39df0e32c7 to
+  the phase 15 branch changes none of draftCustody.ts, draftStore.ts, or routes/defs.ts.
+  This is pre-existing client reconciliation behavior. Phase 09 owns server activation; its
+  public route/capability accepted and persisted the update correctly. No production code changed.
+
+Working public invocation (new isolated desktop trim-15-workflow-code):
+- New workflow -> Code tab -> enter JSON with baseline, formatVersion, name, steps in that
+  order -> Apply. The one-step agent definition with profileId codex, after [], and a no-edit
+  prompt showed "1 step, no problems" and "Saved". No direct database or private capability
+  mutation was used.
+- Publish... -> review -> Publish produced "Published" version 1 and enabled Run... .
+- Run... -> select fixture task "Plan follow-up work" -> Run navigated to that task. Its
+  Workflows pane showed the live step running, then Done after one turn; the transcript showed
+  the agent reply WORKFLOW_OK. This required the managed Codex provider already available in
+  the isolated host. It proves publication and execution, not Outline rename correctness.
+
+Cleanup:
+- The earlier trim-15-workflow-save host had already exited; stop reported it no longer owned
+  its app PID. A process-table check found no process with that session path or port.
+- dev:agent:ui stop ended trim-15-workflow-code. A following status reported it not running;
+  the process table had no trim-15-workflow-save or trim-15-workflow-code process or associated
+  localhost endpoint. No production data root, signing key, or external runner was used.
+
+Documentation verification:
+- With pinned Node 24.21.0, TURBO_FORCE=true, VITEST_MAX_WORKERS=2, and
+  ACORN_TEST_CONCURRENCY=2, pnpm --filter @acorn/arch-tests test passed 12 files / 86 tests.
+- git diff --check passed. No production source changed, so the previously recorded full
+  install/lint/test/build/pack gates were preserved rather than repeated.
