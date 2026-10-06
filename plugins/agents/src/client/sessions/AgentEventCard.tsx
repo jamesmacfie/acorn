@@ -82,6 +82,36 @@ function CopyOutputMenu(props: { text: () => string; event: () => AgentNormalize
   )
 }
 
+// The same card the reader's own turn gets, in the other stripe colour: the two sides of the
+// conversation are the pair that has to be told apart at a glance, and everything else in the stream
+// is a tool call or a note rather than somebody talking.
+//
+// A subagent's run is that same pair one level down — the brief it was handed and the report it hands
+// back — so both of its cards say whose run this is and keep the stripes that tell the two apart.
+function AssistantMessageCard(props: {
+  label: string
+  text: string
+  event: () => AgentNormalizedEvent
+  createdAt: number
+  taskId: string
+}) {
+  const time = createMemo(() => eventTime(props.createdAt))
+  return (
+    <Card pad="sm" stripe="ok">
+      <Stack gap="row">
+        <Inline spread>
+          <Inline>
+            <Text emphasis="eyebrow">{props.label}</Text>
+            <Text emphasis="eyebrow" tip={time().full} tipAt={props.createdAt}>{time().short}</Text>
+          </Inline>
+          <CopyOutputMenu text={() => props.text} event={props.event} />
+        </Inline>
+        <AgentMarkdown text={props.text} taskId={props.taskId} />
+      </Stack>
+    </Card>
+  )
+}
+
 export default function AgentEventCard(props: {
   item: AgentConversationItem
   taskId: string
@@ -193,27 +223,14 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'assistant_message'}>
         {(_shown) => {
           const message = () => event() as Extract<ReturnType<typeof event>, { type: 'assistant_message' }>
-          const time = createMemo(() => eventTime(props.item.createdAt))
           return (
-            // The same card the reader's own turn gets, in the other stripe colour: the two sides of
-            // the conversation are the pair that has to be told apart at a glance, and everything
-            // else in the stream is a tool call or a note rather than somebody talking.
-            //
-            // A subagent's run is that same pair one level down — the brief it was handed and the
-            // report it hands back — so both of its cards say whose run this is and keep the stripes
-            // that tell the two apart.
-            <Card pad="sm" stripe="ok">
-              <Stack gap="row">
-                <Inline spread>
-                  <Inline>
-                    <Text emphasis="eyebrow">{message().subagentId ? 'Subagent' : 'Agent'}</Text>
-                    <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
-                  </Inline>
-                  <CopyOutputMenu text={() => message().text} event={message} />
-                </Inline>
-                <AgentMarkdown text={message().text} taskId={props.taskId} />
-              </Stack>
-            </Card>
+            <AssistantMessageCard
+              label={message().subagentId ? 'Subagent' : 'Agent'}
+              text={message().text}
+              event={message}
+              createdAt={props.item.createdAt}
+              taskId={props.taskId}
+            />
           )
         }}
       </Show>
@@ -311,23 +328,28 @@ export default function AgentEventCard(props: {
       <Show when={event().type === 'plan_proposal'}>
         {(_shown) => {
           const proposal = () => event() as Extract<ReturnType<typeof event>, { type: 'plan_proposal' }>
+          // Drawn the way a Claude plan reads: the plan as the agent talking, then the question of
+          // whether to build it as a card that waits on the reader, the one AgentRequestCard draws for
+          // Claude's own "Ready to code?". Once answered, the question goes and the plan stays, as a
+          // resolved permission does.
           return (
-            <Card pad="sm">
-              <Stack gap="row">
-                <Text emphasis="eyebrow">Proposed plan</Text>
-                <AgentMarkdown text={proposal().text} taskId={props.taskId} />
-                <Show when={props.planHandoffState === 'actionable'}>
-                  <Button variant="solid" size="sm" disabled={implementing()}
-                    onPress={() => void implementPlan(proposal().itemId)}>
-                    {implementing() ? 'Starting implementation…' : 'Implement plan'}
-                  </Button>
-                </Show>
-                <Show when={props.planHandoffState === 'handled'}>
-                  <Text emphasis="muted">Implementation started</Text>
-                </Show>
-                <Show when={planError()}>{(message) => <Alert>{message()}</Alert>}</Show>
-              </Stack>
-            </Card>
+            <Stack gap="row">
+              <AssistantMessageCard label="Agent" text={proposal().text} event={proposal}
+                createdAt={props.item.createdAt} taskId={props.taskId} />
+              <Show when={props.planHandoffState === 'actionable'}>
+                <Card stripe="warn" pad="sm">
+                  <Stack gap="row">
+                    <Heading level={3} eyebrow="plan">Ready to code?</Heading>
+                    <Inline wrap>
+                      <Button disabled={implementing()} onPress={() => void implementPlan(proposal().itemId)}>
+                        {implementing() ? 'Starting implementation…' : 'Implement plan'}
+                      </Button>
+                    </Inline>
+                    <Show when={planError()}>{(message) => <Alert>{message()}</Alert>}</Show>
+                  </Stack>
+                </Card>
+              </Show>
+            </Stack>
           )
         }}
       </Show>

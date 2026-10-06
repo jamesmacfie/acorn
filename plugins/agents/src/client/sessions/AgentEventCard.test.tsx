@@ -142,8 +142,8 @@ it('offers the completed Codex proposal in the shared desktop and terminal card'
   const disposeHandled = render(() => <AgentEventCard item={item} taskId="task" sessionId="session"
     planHandoffState="handled" />, handled)
   try {
-    expect(handled.textContent).toContain('Implementation started')
-    expect(handled.textContent).not.toContain('Implement plan')
+    expect(handled.textContent).toContain('1. Update the API')
+    expect(handled.textContent).not.toContain('Ready to code?')
   } finally { disposeHandled() }
 })
 
