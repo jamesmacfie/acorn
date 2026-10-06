@@ -84,7 +84,11 @@ export function openPluginDb(dataDir: string, plugin: string, options: { migrati
     // un-migrate. Nothing in this system has down-migrations, so the author iterating on the plugin
     // owns the data they just reshaped.
     migrate(db, { migrationsFolder: options.migrationsFolder })
-    securePluginDbFiles(databasePath, false)
+    // Don't open these files with node:fs from here on. SQLite holds POSIX locks on them, and closing
+    // any descriptor to a file drops every lock this process holds on it. Without its lock on the
+    // -shm file, the next process to open the database, even `sqlite3 -readonly`, resets that file.
+    // This process then reads its memory map past the end of the file and dies with SIGBUS. The
+    // preflight above already created the files with private modes.
 
     const withBatch = db as unknown as PluginDatabase
     // `.batch([...])` as a synchronous transaction, matching openDb. All-or-nothing within this file

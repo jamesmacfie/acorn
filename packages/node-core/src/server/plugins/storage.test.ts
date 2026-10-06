@@ -1,3 +1,4 @@
+import { spawnSync } from 'node:child_process'
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync, existsSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -57,6 +58,28 @@ describe('plugin storage', () => {
     try {
       const [mode] = Object.values(db.$client.prepare('PRAGMA journal_mode').get() as Record<string, unknown>)
       expect(String(mode).toLowerCase()).toBe('wal')
+    } finally {
+      db.close()
+    }
+  })
+
+  // Opening and closing a database file with node:fs after SQLite opens it drops this process's
+  // locks on that file. Another process then resets the -shm file under this process's memory map,
+  // and the node dies with SIGBUS. Asking for exclusive access from a second process detects the
+  // dropped lock without risking that crash in the test runner.
+  // The second open is a reload: the candidate opens its handle while the previous instance still
+  // holds one, so the preflight runs against a live database.
+  it('keeps its file locks once open, including through a reload', () => {
+    const db = openPluginDb(dir, 'widgets', { migrationsFolder: migrations })
+    openPluginDb(dir, 'widgets', { migrationsFolder: migrations }).close()
+    try {
+      const path = join(dir, PLUGIN_DB_DIR, 'widgets.sqlite')
+      const probe = spawnSync(process.execPath, ['-e', `
+        const db = new (require('node:sqlite').DatabaseSync)(${JSON.stringify(path)})
+        db.exec('PRAGMA locking_mode = EXCLUSIVE')
+        try { db.prepare('SELECT 1 FROM sqlite_master').all(); console.log('exclusive') }
+        catch (error) { console.log(error.message) }`], { encoding: 'utf8' })
+      expect(probe.stdout.trim()).toBe('database is locked')
     } finally {
       db.close()
     }

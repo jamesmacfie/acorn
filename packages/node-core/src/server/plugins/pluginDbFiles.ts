@@ -10,6 +10,11 @@ function checkFile(path: string, create: boolean, privateMode: boolean): void {
   // there, while the descriptor flags below close that leaf-open gap on POSIX hosts.
   const entry = lstatSync(path, { throwIfNoEntry: false })
   if (entry && !entry.isFile()) throw new Error('Plugin database state must be a regular file.')
+  // Stop at lstat when there is nothing to fix. A reload or a worker can run this while another
+  // handle in this process has the database open, and closing any descriptor to these files drops
+  // every POSIX lock the process holds on them. SQLite then loses its claim on the -shm file, and the
+  // next outside open resets it under this process's memory map (SIGBUS). See storage.ts.
+  if (entry && (!privateMode || process.platform === 'win32' || (entry.mode & 0o777) === 0o600)) return
   let fd: number
   try {
     // NONBLOCK keeps a FIFO from hanging preflight. NOFOLLOW refuses a linked leaf before it can

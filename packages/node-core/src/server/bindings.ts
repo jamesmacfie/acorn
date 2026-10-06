@@ -155,7 +155,13 @@ export function openDb(dbPath: string): AppDatabase {
   chmodSync(dataDir, 0o700) // migrate an existing installation created under a permissive umask
   // Pre-create the database privately. SQLite derives WAL/SHM permissions from the database file,
   // so hardening before journal_mode prevents newly-created sidecars inheriting 0644.
-  closeSync(openSync(databasePath, 'a', 0o600))
+  // `wx` only ever creates. Opening an existing file and closing it would drop the SQLite locks of
+  // any other handle this process has on it (server/plugins/storage.ts explains the crash).
+  try {
+    closeSync(openSync(databasePath, 'wx', 0o600))
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw error
+  }
   chmodSync(databasePath, 0o600)
   const sqlite = openSqlite(databasePath)
   // WAL for concurrent read/write, and a short busy timeout instead of immediate SQLITE_BUSY.
