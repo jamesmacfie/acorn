@@ -3,6 +3,7 @@ import { openPane, type ClientPlugin } from '@acorn/plugin-api/client'
 import { lazy } from 'solid-js'
 import { changeViewSlice } from './changesPrefs'
 import { changesPaneContribution } from './paneContribution'
+import { changesRailMarkerContribution } from './railMarker'
 import { DIFF_LINE_KEY, PUSH_ACTIONS_MAX } from './extensionPoints'
 import { AGENT_TOOL_CARD_POINT } from '@acorn/protocol/extensionPoints.ts'
 
@@ -12,6 +13,8 @@ export const changesClientPlugin: ClientPlugin = {
   name: 'changes',
   init: (ctx) => {
     ctx.panes.register(changesPaneContribution)
+    // A dot on the pane's rail button for which way the uncommitted lines lean (./railMarker.ts).
+    ctx.railMarkers.register(changesRailMarkerContribution)
     // How the list is drawn: one device preference, so it survives a relaunch and stays on this
     // machine (./changesPrefs.ts, docs/state-ownership/scope-rules.md § Scope rules).
     ctx.persistedStateSlices.register(changeViewSlice)

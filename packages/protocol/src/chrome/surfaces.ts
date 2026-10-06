@@ -5,7 +5,7 @@ export type RailMarkerData = {
   id: string
   label: string
   icon?: string
-  dotTone?: 'ok' | 'warn' | 'bad' | 'mixed'
+  dotTone?: 'ok' | 'warn' | 'bad' | 'mixed' | 'diff'
   tone?: 'neutral' | 'accent' | 'warn' | 'danger'
   busy?: boolean
   placements: readonly ('top-start' | 'top-end' | 'bottom-start' | 'bottom-end' | 'bottom-center')[]
