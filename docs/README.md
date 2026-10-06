@@ -337,6 +337,23 @@ These planned handoffs follow Editor file viewers. They do not describe shipped 
 | [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
 | [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
 
+## Future Git client handoff
+
+These pages describe planned work, not shipped behavior. The first release ends after phase 04.
+
+| Document | What it holds |
+| --- | --- |
+| [Git client context](./future/git-client/README.md) | Product decisions, screenshot references, two surfaces, owners, data flow, mutation admission, release boundary, and verification. |
+| [Scope boundaries](./future/git-client/refused.md) | Refused alternatives, deferred functionality, and their reasons. |
+| [Phase 01](./future/git-client/01-plugin-and-worktrees.md) | Built-in plugin, repository source, task pane, worktree inventory, and cleanup. |
+| [Phase 02](./future/git-client/02-history-and-diffs.md) | Paginated history, compact graph, revision detail, and segmented diffs. |
+| [Phase 03](./future/git-client/03-stashes.md) | Stash actions, freshness checks, and coordinated checkout admission. |
+| [Phase 04](./future/git-client/04-explanations-and-first-release.md) | Explicit AI explanations, both-host first-release acceptance, and external plugin retirement. |
+| [Phase 05](./future/git-client/05-task-and-workflow-launches.md) | Pinned commit/branch launches, core task drafts, workflow inputs/retry, and attachment. |
+| [Phase 06](./future/git-client/06-refs-remotes-and-settings.md) | Refs, remotes, comparison, scoped settings, and opt-in Node fetching. |
+| [Phase 07](./future/git-client/07-operations.md) | Task operations, recovery controls, and Editor/Changes conflict handoff. |
+| [Phase 08](./future/git-client/08-conflict-resolution.md) | Three-way resolution, safe result saving/staging, and combined acceptance. |
+
 ## Plugin topic pages
 
 Each plugin landing page above has topic pages in a folder of the same name:
