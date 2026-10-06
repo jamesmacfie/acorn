@@ -11,6 +11,9 @@ const MAX_FILE_BYTES = 32 * 1024 * 1024
 const MAX_FILES = 2_000
 const SESSION_GAP_MS = 30 * 60 * 1_000
 const MILLION = 1_000_000
+// Claude Code writes this model name on messages it makes itself, such as API errors and
+// interrupts. Nothing was billed, so counting them would leave the whole day unpriced.
+const SYNTHETIC_MODEL = '<synthetic>'
 
 type TokenUsageRecord = {
   messageId: string | null
@@ -42,7 +45,7 @@ function parseRecord(line: string): TokenUsageRecord | null {
   if (root?.type !== 'assistant' || typeof root.timestamp !== 'string') return null
   const message = asObject(root.message)
   const usage = asObject(message?.usage)
-  if (!message || !usage || typeof message.model !== 'string') return null
+  if (!message || !usage || typeof message.model !== 'string' || message.model === SYNTHETIC_MODEL) return null
   const timestamp = Date.parse(root.timestamp)
   if (!Number.isFinite(timestamp)) return null
   return {
