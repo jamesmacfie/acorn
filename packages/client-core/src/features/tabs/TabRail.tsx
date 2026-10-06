@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '../../infra/queries'
+import { integrationsOptions, prefsOptions, projectsOptions, tasksKey, tasksOptions, workspacesOptions, type Task, type Workspace } from '../../infra/queries'
 import { archiveTask } from '../tasks/taskMutations'
 import { applyRailOrder, applySourceOrder, moveTask, parseRailOrder, pinTask, unpinTask, type RailDropPosition, type RailOrder } from './railOrder'
 import { checksState } from '../../kit/lib/rendering/displayMeta'
@@ -103,7 +103,10 @@ export default function TabRail() {
   // Scope the rail to the active workspace through project IDs, so switching workspaces swaps the
   // roster.
   const activeProjectId = () => params.projectId ?? query.data?.find((task) => task.id === activeTaskId())?.projectId
-  const activeWorkspace = () => workspaceForProject(workspaces.data, activeProjectId())
+  // A task refresh can remove the active row before archive navigation reaches its project.
+  // Retain the workspace through that gap, as the desktop shell does for its topbar.
+  const activeWorkspace = createMemo<Workspace | null>((previous) =>
+    workspaceForProject(workspaces.data, activeProjectId()) ?? previous ?? null)
   const sourceScope = createSourceScope(() => activeWorkspace()?.id)
   const orderedTasks = () => {
     const ws = activeWorkspace()
@@ -309,6 +312,7 @@ export default function TabRail() {
         setActiveTaskId(null)
         const source = defaultSourceId()
         if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
+        navigate(projectPath(w.projectId))
       }
     })
     await invalidate()

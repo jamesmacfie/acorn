@@ -43,7 +43,7 @@ export default function ModelPickerPopover(props: {
     >
       <Stack gap="row">
         {props.above}
-        <SectionHeader level="group">Model for the message</SectionHeader>
+        <SectionHeader level="group">Model</SectionHeader>
         {props.children}
       </Stack>
     </Popover>

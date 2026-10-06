@@ -2,16 +2,16 @@ import { createEffect, createMemo, createSignal, ErrorBoundary, For, on, onClean
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { authoringFocusPrefix, type AuthoringContextEntry, type AuthoringTurnRequest, type AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import type { QueryScope } from '@acorn/protocol/dataQueries.ts'
-import type { ModelBackend } from '@acorn/protocol/modelProviders.ts'
 import { modelBackendsOptions, prefsOptions } from '../../infra/queries'
 import { writeJson } from '../../infra/node/apiClient'
 import { activeCacheId, activeNodeId } from '../../infra/node/activeNode'
 import { queryOwner } from '../../infra/node/queryOwnership'
 import { ORIGIN_NODE_ID } from '../../infra/node/fleet'
-import { effectiveModelPick, readGeneratePick, saveGeneratePick, type ModelPick } from '../settings/models/generatePick'
+import { effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick, type ModelPick } from '../settings/models/generatePick'
 import ModelBackendPicker from '../settings/models/ModelBackendPicker'
+import ModelPickerPopover from '../settings/models/ModelPickerPopover'
 import { authoringStorageKey } from './authoringStorage'
-import { Alert, Button, Checkbox, Field, Select, Textarea, Toolbar } from '../../kit/components/primitives'
+import { Alert, Button, Checkbox, Field, Textarea, Toolbar, ToolbarSpacer } from '../../kit/components/primitives'
 import { Composer } from '../../kit/components/inputs/Composer'
 import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Menu } from '../../kit/components/overlays/Menu'
@@ -232,6 +232,18 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   const send = () => (
     <Button variant="solid" disabled={busy() || props.disabled || !instruction().trim() || !backendId()} busy={busy()} onPress={() => void submit()}>Send</Button>
   )
+  // The model waits behind the sparkle beside Send, as it does for a commit message
+  // (plugins/changes/src/client/GenerateButton.tsx), so the request is the only thing in the way.
+  const modelPicker = () => (
+    <Show when={backends().length}>
+      <ModelPickerPopover label="Model for the edit" title="Choose who drafts the edit" tipSub={modelPickLabel(backends(), pick())} sparkle>
+        <ModelBackendPicker backends={backends()} backendId={backendId()} modelId={modelId()} onChange={next => {
+          setChoice(next)
+          void saveGeneratePick(queryClient, next)
+        }} />
+      </ModelPickerPopover>
+    </Show>
+  )
   const describe = (path: string, candidate: unknown): string => props.describePath?.(path, candidate) ?? path
   const layout = props.layout ?? (props.onClose ? 'modal' : 'fold')
   const docked = layout === 'dock'
@@ -282,7 +294,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     ? 'Up to 3 records and 16 KiB from a model-requested preview may be sent through the selected backend.'
     : "The AI sees each source's fields and choices, not its records."
 
-  if (docked) return <DockedConversation {...{ backends, backendId, modelId, samplesEnabled, samplesNote, busy, stop }}
+  if (docked) return <DockedConversation {...{ samplesEnabled, samplesNote, busy, stop }} picker={modelPicker()}
     turns={() => {
       // The reply waiting below is drawn in full there, so its line here would say it twice.
       const turns = conversationTurns(context())
@@ -290,26 +302,22 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     }}
     // The box stays enabled while the models load, so a host can focus it as the dock opens.
     instruction={instruction()} onInstruction={setInstruction} disabled={!!props.disabled || (!backendQuery.isPending && !backendId())}
-    onPick={next => { setChoice(next); void saveGeneratePick(queryClient, next) }}
     onSamples={() => setSamplesEnabled(value => !value)} onSubmit={answer => void submit(answer.trim())}
     {...(props.onClose ? { onClose: props.onClose } : {})}>{feedback}{reply}</DockedConversation>
 
-  // What to ask comes first, then who answers it, then what they may read.
+  // What to ask comes first, then what the AI may read. Who answers sits beside Send.
   const body = (
     <Stack gap="row">
       <Field label="What should AI change?" group>
         <Textarea label="What should AI change?" assist={false} rows={4} maxLength={8_000} value={instruction()}
           disabled={busy() || props.disabled} onInput={setInstruction} />
       </Field>
-      <ModelBackendPicker backends={backends()} backendId={backendId()} modelId={modelId()} onChange={next => {
-        setChoice(next)
-        void saveGeneratePick(queryClient, next)
-      }} />
       <Checkbox label="Use preview records to help AI" checked={samplesEnabled()} disabled={busy() || props.disabled}
         onChange={setSamplesEnabled} />
       <Text emphasis="muted" wrap>{samplesNote()}</Text>
       <Show when={layout === 'fold'}>
         <Inline gap="inline" wrap>
+          {modelPicker()}
           {send()}
           <Show when={busy()}><Button variant="bare" onPress={stop}>Cancel</Button></Show>
         </Inline>
@@ -324,6 +332,7 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
     <>
       <ModalBody>{body}</ModalBody>
       <ModalActions>
+        {modelPicker()}
         <Show when={busy()} fallback={<Button variant="ghost" onPress={() => props.onClose?.()}>Close</Button>}>
           <Button variant="ghost" onPress={stop}>Cancel</Button>
         </Show>
@@ -333,22 +342,10 @@ export default function AuthoringConversation(props: AuthoringConversationProps)
   )
 }
 
-/** One choice per backend and model, so the dock's header holds a single select. Mirrors
- *  ModelBackendPicker: an agent CLI also offers its own default, and a saved model the catalog no
- *  longer lists stays choosable. */
-const modelChoices = (backends: readonly ModelBackend[], current: ModelPick | undefined) => backends.flatMap(backend => [
-  ...(backend.kind === 'harness' || !backend.models.length ? [{ id: '', label: `${backend.label} default` }] : []),
-  ...backend.models.map(model => ({ id: model.id, label: backends.length > 1 ? `${backend.label} · ${model.label}` : model.label })),
-  ...(current?.backendId === backend.id && current.modelId && !backend.models.some(model => model.id === current.modelId)
-    ? [{ id: current.modelId, label: `${current.modelId} (saved)` }] : []),
-].map(model => ({ value: JSON.stringify([backend.id, model.id]), label: model.label })))
-
 /** The `dock` layout: a header with the model and settings, the turns so far, the reply waiting for an
  *  answer, and a composer. The conversation's state stays in AuthoringConversation. */
 function DockedConversation(props: {
-  backends: () => ModelBackend[]
-  backendId: () => string
-  modelId: () => string
+  picker: JSX.Element
   samplesEnabled: () => boolean
   samplesNote: () => string
   busy: () => boolean
@@ -357,19 +354,15 @@ function DockedConversation(props: {
   disabled: boolean
   stop: () => void
   onInstruction: (value: string) => void
-  onPick: (pick: ModelPick) => void
   onSamples: () => void
   onSubmit: (answer: string) => void
   onClose?: () => void
   children: JSX.Element
 }) {
-  const pick = () => props.backendId() ? { backendId: props.backendId(), modelId: props.modelId() } : undefined
   return (
     <Stack gap="stack">
-      {/* The select takes the room a spacer would, so the model's name shows in full. */}
       <Toolbar size="sm" ariaLabel="AI">
-        <Select label="Model" size="sm" value={JSON.stringify([props.backendId(), props.modelId()])} options={modelChoices(props.backends(), pick())}
-          onChange={value => { const [backendId, modelId] = JSON.parse(value) as [string, string]; props.onPick({ backendId, modelId }) }} />
+        <ToolbarSpacer />
         <Menu ariaLabel="AI settings" placement="bottom-end"
           trigger={({ open, toggle }) => <IconButton icon="sliders-horizontal" label="AI settings" size="sm" opens="menu" expanded={open()} onPress={toggle} />}>
           {menu => <>
@@ -383,7 +376,7 @@ function DockedConversation(props: {
       <For each={props.turns()}>{turn => <Stack gap="none"><Text emphasis="eyebrow">{turn.who}</Text><Text wrap>{turn.text}</Text></Stack>}</For>
       {props.children}
       <Composer value={props.instruction} onInput={props.onInstruction} onSubmit={props.onSubmit} busy={props.busy()} disabled={props.disabled}
-        placeholder="Ask for a change" submitLabel="Send" secondary={<Show when={props.busy()}><Button variant="bare" onPress={props.stop}>Cancel</Button></Show>} />
+        placeholder="Ask for a change" submitLabel="Send" secondary={<>{props.picker}<Show when={props.busy()}><Button variant="bare" onPress={props.stop}>Cancel</Button></Show></>} />
     </Stack>
   )
 }

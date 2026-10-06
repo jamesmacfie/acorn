@@ -63,7 +63,7 @@ describe('inline diff chat', () => {
     const popover = document.querySelector('.ui-popover')!
     await vi.waitFor(() => expect(popover.querySelectorAll('select')).toHaveLength(2))
     expect(popover.textContent).toContain('Permissions')
-    expect(popover.textContent).toContain('Model for the message')
+    expect(popover.textContent).toContain('Model')
     expect(popover.querySelector('[aria-label="Agent permissions"]')).toBeTruthy()
     const model = popover.querySelectorAll<HTMLSelectElement>('select')[1]!
     model.value = 'fast'

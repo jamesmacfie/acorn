@@ -129,7 +129,9 @@ async function sharedRead(env: Env, source: PlanSource, mode: 'preview' | 'execu
   // A loaded plugin in development mode can change its logic without changing its revision, so its
   // source is read fresh each run and a save shows on the next one.
   const developing = !!registeredDataSource(source.query.source)?.loaded && developmentPlugins(env.DATA_DIR).includes(source.query.source.pluginId)
-  return developing ? read() : dashboardSharedRead(key, read)
+  // The studio runs a new preview as you edit and cancels the one before it. A run that shared the
+  // cancelled one's read is still waiting, so it reads again rather than reporting `cancelled`.
+  return developing ? read() : dashboardSharedRead(key, read, error => error instanceof DataSourceError && error.code === 'cancelled')
 }
 
 export async function runDashboard(env: Env, args: {

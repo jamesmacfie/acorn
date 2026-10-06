@@ -24,7 +24,20 @@ export const asObject = (value: unknown): JsonObject | null =>
 export const stringValue = (value: unknown): string | null => typeof value === 'string' ? value : null
 export const numberValue = (value: unknown): number | null => typeof value === 'number' && Number.isFinite(value) ? value : null
 
-const decodedBase64 = (value: string): Uint8Array | null => {
+// Codex passes a rejected API request through with the provider's raw JSON body as the message, for
+// example `{"type":"error","error":{"message":"model 'x' is not enabled",...},"status":400}`. The
+// reader needs the sentence inside it, not the envelope.
+const readableErrorMessage = (message: string | null): string | null => {
+  if (!message?.trimStart().startsWith('{')) return message
+  try {
+    const body = asObject(JSON.parse(message))
+    return stringValue(asObject(body?.error)?.message) ?? stringValue(body?.message) ?? message
+  } catch {
+    return message
+  }
+}
+
+const decodedBase64 =(value: string): Uint8Array | null => {
   const encoded = value.trim().replace(/^data:[^;,]+;base64,/i, '').replace(/\s/g, '')
   if (!encoded || !/^[A-Za-z0-9+/]*={0,2}$/.test(encoded)) return null
   const bytes = Buffer.from(encoded, 'base64')
@@ -265,7 +278,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
         return [{
           type: 'error',
           code: stringValue(error?.codexErrorInfo) ?? 'codex_turn_failed',
-          message: stringValue(error?.message) ?? 'Codex turn failed.',
+          message: readableErrorMessage(stringValue(error?.message)) ?? 'Codex turn failed.',
           retryable: false,
         }]
       }
@@ -369,7 +382,7 @@ export function normalizeCodexNotification(notification: JsonRpcNotification): A
       return [{
         type: 'error',
         code: stringValue(error?.codexErrorInfo) ?? 'codex_error',
-        message: stringValue(params.message) ?? stringValue(error?.message) ?? 'Codex reported an error.',
+        message: readableErrorMessage(stringValue(params.message) ?? stringValue(error?.message)) ?? 'Codex reported an error.',
         retryable: Boolean(params.willRetry),
       }]
     }

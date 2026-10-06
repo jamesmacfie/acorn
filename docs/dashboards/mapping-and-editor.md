@@ -60,7 +60,7 @@ the first problem as a link to its part, and the changes since the last publish.
 is and asks what it should show. **Edit** skips it. The launcher has three paths:
 
 - **Describe it.** Type a request and choose **Draft it**. The studio opens with the request as the
-  plan's `request` and the AI already asked. The model it drafts with sits on one line under the box.
+  plan's `request` and the AI already asked. The sparkle beside **Draft it** opens the model it drafts with.
   Up to four suggestions, after **Try**, are titles of starter plans from sources described earlier in
   the session, because the source catalog carries no starters. A suggestion fills the box only.
 - **Start from data.** Pick a source or a saved query. Sources sit under where they come from, such
@@ -82,8 +82,8 @@ uses too. In the studio, a source joins the plan only once it's picked, so nothi
 then.
 
 **Ask AI** docks the AI conversation (`AuthoringConversation` with `layout="dock"`) in the inspector's
-column until you choose **Close**. The dock shows the turns so far, the model, a settings menu with
-**Use preview records to help AI**, and a box to type in. **Edit with AI…** opens the studio with the
+column until you choose **Close**. The dock shows the turns so far, a settings menu with
+**Use preview records to help AI**, and a box to type in. The sparkle beside **Send** opens the model. **Edit with AI…** opens the studio with the
 dock open. **Ask AI about this**, on an outline row or in the column list, fills the box with "About
 *part*: " and sends the part's JSON pointers ahead of the message, such as
 `[Focus: /stages/1 "Keep where Author is you"] `. The Node's prompt tells the model to change other

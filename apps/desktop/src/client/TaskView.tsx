@@ -7,7 +7,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { prefsOptions, runTargetsOptions, tasksKey, tasksOptions, workspacesOptions, type Task } from '@acorn/client-core/infra/queries.ts'
 import { archiveTask } from '@acorn/client-core/features/tasks'
 import { paneAvailable, paneContributions } from '@acorn/client-core/host/registries/panes/panes.ts'
-import { registerCommands } from '@acorn/client-core/host/registries/commands'
+import { projectPath, registerCommands } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings, resolveKeybindings, keybindingRegistry } from '@acorn/client-core/host/registries/commands'
 import { workspaceForProject } from '@acorn/client-core/features/workspaces'
 import { refreshSessionSources } from '@acorn/client-core/features/tasks'
@@ -201,6 +201,7 @@ export default function TaskView(props: {
   async function confirmClose(skipTeardown = false) {
     if (closing()) return
     const archivedTaskId = props.task.id
+    const archivedProjectId = props.task.projectId
     // Held to the end, not just around the request: the spinner runs until the row leaves the rail.
     await withArchiving(archivedTaskId, async () => {
       // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
@@ -235,7 +236,7 @@ export default function TaskView(props: {
           const source = defaultSourceId()
           if (source) setSelectedSource(source)
           setActiveTaskId(null)
-          navigate('/')
+          navigate(projectPath(archivedProjectId))
         }
       })
       await queryClient.invalidateQueries({ queryKey: tasksKey })

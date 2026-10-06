@@ -111,6 +111,9 @@ export async function startCodexSession(
   let threadId = options.session.providerSessionRef
   const resuming = threadId != null
   let currentTurnId: string | null = null
+  // Codex reports a failed turn twice: an `error` notification it will not retry, then
+  // `turn/completed` carrying the same error. The transcript shows it once.
+  let shownTurnFailure: string | null = null
   let ready = false
   let currentModel: string | null = null
   let currentEffort: string | null = null
@@ -198,6 +201,10 @@ export async function startCodexSession(
       for (const event of normalizeCodexNotification(notification)) {
         if (event.type === 'session_state') ready = event.state === 'ready'
         if (event.type === 'turn_completed' || event.type === 'error') currentTurnId = null
+        if (event.type === 'error' && !event.retryable) {
+          if (event.message === shownTurnFailure) continue
+          shownTurnFailure = event.message
+        }
         emit(event)
       }
       const generatedArtifact = codexGeneratedArtifact(notification)
@@ -340,6 +347,7 @@ export async function startCodexSession(
       if (!threadId) throw new Error('Codex thread is not initialized.')
       if (!ready || currentTurnId) throw new Error('Codex session is not ready for another turn.')
       ready = false
+      shownTurnFailure = null
       const policy = turnOptions.turn.effectivePolicy
       const collaborationMode = codexCollaborationModeForTurn(
         collaborationModes,

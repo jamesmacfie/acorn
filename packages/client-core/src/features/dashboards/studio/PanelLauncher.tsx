@@ -13,8 +13,9 @@ import {
 } from '../../dataSources/sourceEntries'
 import InputAccountField from '../../dataSources/InputAccountField'
 import { queriesClient, queriesKey } from '../../queries/queriesClient'
-import { effectiveModelPick, readGeneratePick, saveGeneratePick, type ModelPick } from '../../settings/models/generatePick'
+import { effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick, type ModelPick } from '../../settings/models/generatePick'
 import ModelBackendPicker from '../../settings/models/ModelBackendPicker'
+import ModelPickerPopover from '../../settings/models/ModelPickerPopover'
 import { Alert, Button, Chip, ConfirmButton, Field, Input, Row, SectionHeader } from '../../../kit/components/primitives'
 import { Composer } from '../../../kit/components/inputs/Composer'
 import { Inline } from '../../../kit/components/layout/Inline'
@@ -163,17 +164,19 @@ export default function PanelLauncher(props: {
       <Modal.Body><Stack gap="stack">
         <Text emphasis="muted" wrap>A panel shows live records from one of your sources. Say what you want and AI drafts it, or pick a source and build it yourself.</Text>
         <SectionHeader level="group">Describe it</SectionHeader>
+        {/* The model sits beside Draft it behind the sparkle, as it does for a commit message
+            (plugins/changes/src/client/GenerateButton.tsx). */}
         <Composer value={request()} onInput={setRequest} placeholder="For example: my open pull requests that need a review, oldest first" submitLabel="Draft it" disabled={!pick()}
-          onSubmit={value => props.onLaunch({ kind: 'describe', request: value.trim() })} />
-        <Show when={pick()} fallback={<Text emphasis="muted" wrap>Connect a model in Settings to draft a panel with AI.</Text>}>{current =>
-          <div class="dash-launcher-model">
-            <Text emphasis="muted">Drafts with</Text>
-            <ModelBackendPicker backends={backends.data?.backends ?? []} backendId={current().backendId} modelId={current().modelId} onChange={next => {
-              setChoice(next)
-              void saveGeneratePick(queryClient, next)
-            }} />
-          </div>
-        }</Show>
+          onSubmit={value => props.onLaunch({ kind: 'describe', request: value.trim() })}
+          secondary={<Show when={pick()}>{current =>
+            <ModelPickerPopover label="Model for the panel" title="Choose who drafts the panel" tipSub={modelPickLabel(backends.data?.backends ?? [], current())} sparkle>
+              <ModelBackendPicker backends={backends.data?.backends ?? []} backendId={current().backendId} modelId={current().modelId} onChange={next => {
+                setChoice(next)
+                void saveGeneratePick(queryClient, next)
+              }} />
+            </ModelPickerPopover>
+          }</Show>} />
+        <Show when={!pick()}><Text emphasis="muted" wrap>Connect a model in Settings to draft a panel with AI.</Text></Show>
         <Show when={suggestions().length}>
           <Inline gap="inline" wrap>
             <Text emphasis="muted">Try</Text>

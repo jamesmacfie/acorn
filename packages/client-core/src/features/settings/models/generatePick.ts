@@ -75,3 +75,12 @@ export function effectiveModelPick(
   const first = backends[0]
   return first ? { backendId: first.id, modelId: defaultModelIdFor(first) } : null
 }
+
+/** The pick as one line for a tip, such as "Claude Code, Opus". The model's catalog label when it has
+ *  one, its id when the catalog no longer lists it, and only the backend for the backend's default. */
+export function modelPickLabel(backends: readonly ModelBackend[], pick: ModelPick | null | undefined): string | undefined {
+  const backend = pick ? backends.find((candidate) => candidate.id === pick.backendId) : undefined
+  if (!pick || !backend) return undefined
+  const model = backend.models.find((candidate) => candidate.id === pick.modelId)?.label ?? pick.modelId
+  return model ? `${backend.label}, ${model}` : backend.label
+}

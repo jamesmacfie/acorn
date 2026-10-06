@@ -8,23 +8,28 @@ import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
-const { createTaskMock, readJsonMock } = vi.hoisted(() => ({ createTaskMock: vi.fn(), readJsonMock: vi.fn() }))
+const { archiveTaskMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
+  archiveTaskMock: vi.fn(), createTaskMock: vi.fn(), navigateMock: vi.fn(), readJsonMock: vi.fn(),
+}))
 vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock }))
 vi.mock('../tasks/taskMutations', () => ({
-  archiveTask: vi.fn(),
+  archiveTask: archiveTaskMock,
   createTask: createTaskMock,
   patchTask: vi.fn(),
 }))
 vi.mock('../tasks/taskBridge', () => ({
   taskBridge: () => ({ project: { get: async () => ({ config: { branchPrefix: null } }) } }),
 }))
+vi.mock('../tasks/confirmTaskArchive', () => ({
+  confirmTaskArchive: async () => ({ confirmed: true, checked: [] }),
+}))
 
 // The rail's hover prefetch. A task switch disposes the whole task scope, so what makes coming back
 // cheap is the cache being warm before the click (docs/panes/contributions.md § Contributions).
 //
-// The rail is a router surface; nothing here navigates, so the router is answered rather than mounted.
+// Navigation is recorded at the router boundary; the rail owns the task and workspace decisions.
 vi.mock('@solidjs/router', () => ({
-  useNavigate: () => () => {},
+  useNavigate: () => navigateMock,
   useParams: () => ({}),
   A: (props: { children?: unknown }) => props.children,
 }))
@@ -66,6 +71,8 @@ const registered: Disposable[] = []
 
 beforeEach(() => {
   vi.useFakeTimers()
+  archiveTaskMock.mockReset()
+  navigateMock.mockReset()
   createTaskMock.mockReset()
   readJsonMock.mockReset()
   readJsonMock.mockImplementation(async (url: string) => {
@@ -123,6 +130,42 @@ const pointAt = (element: Element) => {
     value: vi.fn(() => element),
   })
 }
+
+describe('workspace scope after archiving a project-folder task', () => {
+  it.each([false, true])('returns to the project and retains the roster when refresh precedes the response: %s', async (refreshFirst) => {
+    const current = { ...task('current', 'Project folder'), branch: null, worktreePath: null }
+    const remaining = task('remaining', 'Same workspace')
+    const elsewhere = { ...task('elsewhere', 'Other workspace'), projectId: 'p2' }
+    setActiveTaskId(current.id)
+    mount([current, remaining, elsewhere], true)
+    queryClient.setQueryData(workspacesKey, [
+      { id: 'w1', name: 'Workspace', projects: [{ id: 'p1' }] },
+      { id: 'w2', name: 'Other workspace', projects: [{ id: 'p2' }] },
+    ])
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Project folder', 'Same workspace']))
+
+    let finishArchive!: () => void
+    archiveTaskMock.mockImplementation(() => new Promise<void>((resolve) => { finishArchive = resolve }))
+    host.querySelector<HTMLElement>('[data-task-id="current"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+    const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('Archive'))!
+    archiveButton.click()
+    await vi.waitFor(() => expect(archiveTaskMock).toHaveBeenCalledWith(current.id))
+
+    if (refreshFirst) {
+      queryClient.setQueryData(tasksKey, [remaining, elsewhere])
+      await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
+    }
+    finishArchive()
+    await vi.waitFor(() => expect(activeTaskId()).toBeNull())
+    expect(navigateMock).toHaveBeenLastCalledWith('/p/p1')
+    if (!refreshFirst) queryClient.setQueryData(tasksKey, [remaining, elsewhere])
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Same workspace']))
+
+    setActiveTaskId(elsewhere.id)
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Other workspace']))
+  })
+})
 
 describe('hovering a task row', () => {
   it('warms that task’s panes once the pointer has settled', () => {

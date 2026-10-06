@@ -351,6 +351,38 @@ describe('Codex collaboration modes', () => {
     }])
   })
 
+  // Captured 2026-10-06: Codex sends the failure as an `error` notification, then again on
+  // `turn/completed`, and puts the provider's raw JSON body in the message.
+  it('shows a failed turn once, with the provider message, and again on the next turn', async () => {
+    const body = JSON.stringify({
+      type: 'error',
+      error: { message: "model 'gpt-6.1-sol' is not enabled in rustponsesapi", type: 'invalid_request_error' },
+      status: 400,
+    })
+    const fail = async () => {
+      const error = { message: body, codexErrorInfo: 'other' }
+      wire.onNotification?.({ method: 'error', params: { error, willRetry: false } })
+      wire.onNotification?.({ method: 'turn/completed', params: { turn: { id: 'turn-provider-1', status: 'failed', error } } })
+      await Promise.resolve()
+    }
+    const { events, handle } = await start()
+    const errors = () => events.filter((event) => event.type === 'error')
+
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    await fail()
+    expect(errors()).toEqual([{
+      type: 'error',
+      code: 'other',
+      message: "model 'gpt-6.1-sol' is not enabled in rustponsesapi",
+      retryable: false,
+    }])
+
+    wire.onNotification?.({ method: 'thread/status/changed', params: { status: { type: 'idle' } } })
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    await fail()
+    expect(errors()).toHaveLength(2)
+  })
+
   // Each app-server process numbers its requests from 0, so a resumed session asks a second
   // request 0. Reusing that number would attach the new question to the one already answered.
   it('gives a request Codex numbered again after a restart its own id', async () => {

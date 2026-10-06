@@ -49,7 +49,8 @@ files. A failed archive clears the flag and triggers a fresh read.
 
 When the archive finishes, the client moves you away only if you're still on that task. You may have
 opened another task during the teardown. With nothing left to show, you land on the default browse
-view.
+view at the archived task's project. The rail keeps its workspace scope while the task list refreshes,
+including when the task used the project folder instead of a worktree.
 
 ## What archive keeps
 

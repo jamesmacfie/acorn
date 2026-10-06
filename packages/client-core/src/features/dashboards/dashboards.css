@@ -96,16 +96,6 @@
   padding-bottom: var(--space-3);
   border-bottom: var(--chrome-divider);
 }
-/* The launcher's model choice: its caption, then the backend and model sharing one line, so choosing a
-   model reads as a setting of the request above rather than a step of its own. */
-.dash-launcher-model {
-  display: grid;
-  grid-auto-flow: column;
-  grid-template-columns: auto;
-  grid-auto-columns: minmax(0, 1fr);
-  align-items: center;
-  gap: var(--space-3);
-}
 /* The source the launcher's starting points are for: its icon, its name over where it comes from, and
    the way back to the list, boxed so it reads as the choice already made. */
 .dash-launcher-picked {
