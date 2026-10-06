@@ -136,6 +136,16 @@ export function parseExtensionPointRef(value: string): { owner: string; point: s
 }
 
 /**
+ * Node-side points a loaded plugin must name in its manifest's `extensions` before it may file into
+ * them, with the sentence the trust prompt shows for that grant. A node point otherwise has no manifest
+ * form, so without this a plugin could reach one the owner never consented to. The copy is the host's,
+ * fixed per point, and always high: each of these spends something of the owner's.
+ */
+export const DISCLOSED_NODE_POINTS: Readonly<Record<string, string>> = {
+  'agents:session-messenger': 'Send notes to your agent sessions, which starts a turn on your agent provider',
+}
+
+/**
  * One row a contribution's route answers with. Host-defined, like every other descriptor body: the host
  * is the one rendering these, so the shape is its contract and not the plugin's.
  *

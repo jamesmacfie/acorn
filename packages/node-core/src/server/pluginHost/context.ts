@@ -25,7 +25,7 @@ import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
 import { contributeExtension, extensionsFor, openExtensionPoint } from './extensionPoints'
 import { registerHookHandler, registerHookPoint, runHook } from './hooks'
-import { qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
+import { DISCLOSED_NODE_POINTS, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routes/registry'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
@@ -163,6 +163,14 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   const permissions = options.loaded?.permissions
   const recordUndo = options.onUndo ?? (() => {})
   const pending = options.pending
+  // A loaded plugin files into a disclosed node point only if its manifest named it, which is what put
+  // the grant in front of the owner (@acorn/protocol/extensionPoints.ts § DISCLOSED_NODE_POINTS).
+  const assertDisclosedPoint = <T>(point: ExtensionPointId<T>): ExtensionPointId<T> => {
+    if (permissions && Object.hasOwn(DISCLOSED_NODE_POINTS, point) && !options.loaded?.extensions?.some((entry) => entry.point === point)) {
+      throw new Error(`Plugin '${plugin}' must declare '${point}' in its manifest's contributions.extensions before it can contribute there.`)
+    }
+    return point
+  }
   const ctx: HostPluginContext = {
     name: plugin,
     routes: {
@@ -307,13 +315,13 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
     // candidate instance has to be able to take back what it filed.
     extensionPoints: {
       declare: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
-      handle: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
+      handle: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
       handlers: (point) => extensionsFor(point),
       // The names these three carried until 2026-08-31, kept for one major so a plugin outside this
       // repository moves on its own schedule (docs/plugins/plugin-api.md § The plugin API). Aliases rather than
       // wrappers, so the guard pass below wraps each of the six once and both spellings behave the same.
       open: (point, label) => recordUndo(openExtensionPoint(plugin, point as ExtensionPointId<unknown>, label).dispose),
-      contribute: (point, entry) => recordUndo(contributeExtension(plugin, point, entry).dispose),
+      contribute: (point, entry) => recordUndo(contributeExtension(plugin, assertDisclosedPoint(point), entry).dispose),
       entries: (point) => extensionsFor(point),
     },
     // Owner-bound on both halves, like the extension points above. `declare` mints the point id from

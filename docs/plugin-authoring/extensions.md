@@ -29,6 +29,11 @@ naming the owner is the disclosure. Exactly one carrier says what you bring:
 - `frame` is an `inline` surface of yours, for a rectangle.
 - `route` is a POST on your own namespace, for a hook handler.
 
+A disclosed node point, such as `agents:session-messenger`, is the exception. Its entry names no
+carrier, because your node half files the value through `ctx.extensionPoints.handle`. The manifest
+entry is the declaration the trust prompt reads, and the node refuses the `ctx` call without it
+([disclosed points](../plugins/node-side-extension-points.md#disclosed-points)).
+
 `items` and `route` need a `node` entry, because only the node half serves them. `remote` and `frame`
 need a client bundle. `matches` narrows a tree or a rectangle to the key values it draws, and
 `onSelect` takes the narrow verb set. A `remote` extension may name one `overlay` of your own

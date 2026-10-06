@@ -3,6 +3,7 @@ import { createComponent, lazy } from 'solid-js'
 import type { NodePluginRow, PluginChromeAction, PluginCommandSelectAction, PluginSourceEmptyState } from '@acorn/protocol/api.ts'
 import { isPluginShortcutChord, qualifiedPluginCommandId } from '@acorn/protocol/keybindings.ts'
 import { isPluginOpenableUrl } from '@acorn/protocol/externalUrl.ts'
+import { DISCLOSED_NODE_POINTS } from '@acorn/protocol/extensionPoints.ts'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { agentContextRegistry } from '../registries/sources/agentContexts'
 import { attentionRegistry, type AttentionItem } from '../registries/rail/attention'
@@ -373,6 +374,8 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
     // The two carriers that run this plugin's own bytes register in the frames pass instead, where the
     // accepted bundle hash and the trust answer are both in scope (plugins/frames/register.ts).
     if (descriptor.remote !== undefined || descriptor.frame !== undefined) continue
+    // A disclosed node point is filled on the node. Its only client half is the trust prompt's line.
+    if (Object.hasOwn(DISCLOSED_NODE_POINTS, descriptor.point)) continue
     // Same check a command and a context-menu row get. The point owner never sees this failure: a
     // contribution the device can't honour simply never delivers.
     if (descriptor.onSelect && !contextFreeActionUsable(pluginId, surfaces, descriptor.onSelect)) {

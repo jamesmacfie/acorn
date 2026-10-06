@@ -1666,6 +1666,14 @@ describe('the five kinds', () => {
       .toContain('an extension names exactly one of items, remote, frame or route, not items and route')
   })
 
+  it('declares a disclosed node point with no carrier, because the node files it through ctx', () => {
+    const extension = (over: Record<string, unknown>) =>
+      nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'agents:session-messenger', label: 'E', ...over }] })
+    expect(extension({}).success).toBe(true)
+    expect(messages(extension({ items: '/v1/p/board/rows' })))
+      .toContain("'agents:session-messenger' is filled from the node through ctx.extensionPoints.handle, so it names no items")
+  })
+
   it('makes a hook handler say what it asks to do, and refuses a mode on anything else', () => {
     const extension = (over: Record<string, unknown>) =>
       nodeManifest({ frames: [PANE], extensions: [{ id: 'e', point: 'other:p', label: 'E', ...over }] })

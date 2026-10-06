@@ -1,7 +1,142 @@
 # Phase 03: attributed session messages
 
-Status: proposed, 2026-10-03. Entry: phase 02 accepted with its loaded policy consumer. Next:
-[phase 04](./04-model-grants-and-advisor.md).
+Status: done with recorded limitations, 2026-10-07. Proposed 2026-10-03. Entry: phase 02 accepted
+with its loaded policy consumer. Next: [phase 04](./04-model-grants-and-advisor.md).
+
+## Completion note, 2026-10-07
+
+**What landed.** On branch `phase-03-session-messages`, at the commit titled "Phase 03: Attributed
+session messages". [Session messages](../../../managed-agents/session-messages.md) is the owning
+contract.
+
+- `agents:session-messenger`, declared in `plugins/agents/src/contract/sessionMessages.ts` with
+  `SessionMessage`, `SessionMessageResult`, `SessionMessenger`, `SessionMessengerContribution`, and
+  the limits. A contribution's value is `{ connect(sender) }`. Agents calls `connect` with a sender
+  bound to the host-minted `pluginId` of the entry, at `ready` and on every `plugins:changed`. The
+  messenger itself, `server/sessions/sessionMessages.ts`, loads on the first contribution.
+- Each `queue` call checks that its entry is still the live one, so a removed entry, a reloaded
+  plugin's old sender, and a sender whose agents plugin stopped all throw at once.
+- Refusals: `unknown-session` (missing, or in another task), `archived`, `unattended-not-supported`
+  (workflow and delegated sessions), `not-controlled` (terminal-held or not interactive), `cap`, and
+  `vetoed`. A malformed message throws. An unexpected failure rejects.
+- The turn source `plugin` and host-written `effectivePolicy.sentBy: { pluginId }`. The visible text
+  is the host's, `**<plugin id>** sent a note: "<subject>". It is not from the person…`. The plugin's
+  text is one `pasted_content`-wrapped context part with source `plugin:<plugin id>`. The HTTP enqueue
+  schema still refuses `plugin`, so no client can claim a plugin's identity.
+- `TurnVetoedError` in `runtime.ts`, so a `before-send` veto maps to `vetoed` and every other error
+  stays an error. `AgentStore.countPluginMessages` counts by `sentBy.pluginId` with `json_extract`.
+- `senderLabel` draws "From <plugin id>" from `sentBy`. Both hosts render the transcript through the
+  same `AgentEventCard`.
+- Disclosure. `DISCLOSED_NODE_POINTS` in `@acorn/protocol/extensionPoints.ts` names the point and its
+  fixed trust sentence, "Send notes to your agent sessions, which starts a turn on your agent
+  provider", always high. A loaded package declares the point in `contributions.extensions` with no
+  carrier, which the manifest schema allows only for a disclosed point. `buildPluginContext` refuses
+  `ctx.extensionPoints.handle` on that point from a loaded plugin whose manifest didn't declare it,
+  and the client's chrome pass skips the carrier-less entry.
+- The policy package is 0.2.0, in [`docs/future/pi/packages/permission-policy/`](../packages/permission-policy/README.md).
+  It adds `explanations.js`, a migration chain with `settings` and `explanations` tables, the
+  `plugin:agents:request-changed` event and `agents.requests` capability grants, the messenger
+  declaration, and a palette `setting` command, **Permission policy: explain refusals to the agent**,
+  off by default.
+
+No agents migration: `source` is a text column and `sentBy` lives in `effective_policy_json`. The wire
+change is additive.
+
+**Decisions and deviations.**
+
+- **The exact backing module for atomic admission** is `SessionMessages#serialized` in
+  `plugins/agents/src/server/sessions/sessionMessages.ts`. It's an in-memory promise chain per
+  session. Inside it, the duplicate check, the session checks, the count, and `enqueueTurn` run in
+  order. The count is read from the turn rows, so an accepted turn and its count are one write. No
+  SQLite transaction spans the `before-send` hook. The Node is the only writer, which is why memory is
+  enough.
+- **Duplicates come first.** A repeated key returns the original turn before the archived, cap, and
+  hook checks, and after the task association check, so a retry after a restart is idempotent even
+  once the session is archived.
+- **One bell row per plugin and session.** The first new key past the cap writes a
+  `plugin-message.cap` row to `agent_operations` and raises `ctx.events.notice` with a
+  `managed-agent` target. The operations row keeps a restart from raising it again.
+- **The plugin id, not the plugin's label, names the sender.** The id is what the host mints and what
+  the blocked card already shows. Agents has no host-owned label for a loaded plugin.
+- **The subject is quoted, and `"` is refused in it.** A background security review flagged an
+  unquoted subject in the visible text. Control characters, line and paragraph separators, and
+  bidirectional overrides are refused too.
+- **A disclosed node point is a small new protocol rule.** A node point had no manifest form, so
+  without it a loaded plugin could join one with no consent line. The table holds one point. Built-in
+  plugins aren't checked.
+- **The policy switch is a palette `setting` command, not a settings page.** A settings page needs a
+  client bundle, and this package has no build step.
+- **The policy's veto route only records work.** Delivery waits for the resolved event and the
+  `agents.requests` row whose `blocked.by` is the policy. Each `connect` replays every recorded
+  refusal. A record whose request row never appears is dropped after 60 seconds.
+- **The service boot budget rose to 3,123,500 B.** The build measured 3,117,860 B before this phase
+  and 3,123,120 B after. The messenger (about 6 KB) is lazy. The point declaration and loader, the
+  store count, the veto error class, the manifest rule, and the host gate load at boot.
+
+**Verification.**
+
+- `pnpm lint` passes. `@acorn/arch-tests`: 86 passed.
+- `@acorn/plugin-agents`: 152 files, 1,130 passed. `sessionMessages.test.ts` drives a real runtime on
+  the fake driver. It covers host-bound identity and host-written text, an idle session starting the
+  note, a busy one queueing it behind the running turn, coarse refusals before the hook, a repeated
+  key across a restart, 25 concurrent calls admitting exactly 20 with one bell row that a restart
+  doesn't repeat, a `before-send` veto, UTF-8 byte bounds, subject rules, and revocation.
+- `@acorn/node-core` under Node 26.8.1: 1,587 passed. The three failures are `storage/backup.test.ts`,
+  which times out on 26.8.1 and passes its 12 tests on Node 24.11. `reload.test.ts` installs a folder
+  package with a real loaded worker. The worker keeps a host-bound sender past `connect`, calls it,
+  and echoes the answer it got back, and the host sees both calls under the package's own id. A
+  package that files into the point without declaring it fails to start. `manifest.test.ts` covers
+  the carrier-less declaration.
+- `@acorn/client-core`: 2,454 passed. The two failures are phase 02's pre-existing ones,
+  `scopes.test.ts` and the `cssHygiene` box-shadow ratchet. `permissionLines.test.ts` covers the
+  fixed high line.
+- `@acorn/protocol`: 294 passed. `@acorn/tui` under Node 26.8.1: 676 passed.
+  `@acorn/plugin-workflows`: 568 passed.
+- The policy package's `node --test`: 10 passed. `explanations.test.mjs` covers off by default, one
+  note per confirmed veto keyed by session and request, no note for another plugin's veto or an
+  ignored late verdict, a missed event recovered on the next connect, a failed send keeping its
+  record, and a host refusal ending the work.
+- `apps/node` `pnpm build` passes the service budget at 3,123,120 B.
+
+Real host, `pnpm dev:agent -- --session pi-phase-03`, Claude Code through ACP, Opus 5.5:
+
+- The package installed through `POST /v1/core/plugins/install`, and after a Node restart it was
+  `active`. Its **Permissions** tab lists the veto and "Send notes to your agent sessions, which
+  starts a turn on your agent provider", both marked **Broad access**.
+- The palette read the switch as **Off** and then set it to **On**, which the route read back as
+  `on`.
+- In **Default** mode, `rm -rf /tmp/acorn-pi03-outside` drew no card. The transcript shows the
+  resolved "Blocked by acorn-permission-policy" request, the agent's turn ending, then one turn
+  labelled **From acorn-permission-policy** with its context manifest folded, then the agent saying
+  it won't work around the rule. SQLite has one `plugin` turn with `sentBy`, and the policy's work
+  table is empty. The directory survived.
+- After another Node restart, no second note was sent.
+- That Node bundle was staged before the subject quoting, so its visible text has no quotes. The
+  quoting is covered by `sessionMessages.test.ts`.
+- Screenshot `screenshot-1791329948184.png` is in the session's ignored
+  `.acorn/agent-dev/pi-phase-03/screenshots/`.
+
+**Limitations.**
+
+- **Codex wasn't run to a refusal.** codex-cli 0.159.2 started a session, and the first turn answered
+  "Usage limit reached" until 2026-10-10 10:44 AM. The messenger and the policy are
+  harness-neutral, and the Codex refusal path is phase 02's. Manual check 157 in
+  [agents and providers](../../../testing/agents-and-providers.md) is owed for Codex.
+- **No terminal-client PTY run of the note.** The terminal client draws the same `AgentEventCard`,
+  and `turnSender.test.ts` covers the label. A PTY case was tried, but at 40 rows the note is above
+  the visible transcript, and a taller screen changes the focus order.
+- **Node switching wasn't exercised.** The session had one Node. The label reads only the turn row,
+  which the selected-Node cache already carries.
+- **Archived, terminal-held, and unattended refusals, cancellation of a queued note, and concurrent
+  cap admission were proven in tests, not on the real host.** A queued note is an ordinary turn row.
+- **DeepSeek and `omp` weren't run.** Neither is on this machine.
+- **An older client labels a note "You".** The visible text still names the plugin.
+
+**For phase 04.** Contribute the advisor's messenger through `agents:session-messenger`, and declare
+it in the manifest with no carrier, or the node refuses it. Its notes count against its own 20-per-session
+cap, because the cap is per plugin. Use a stable idempotency key per reviewed turn.
+Workflow and delegated sessions answer `unattended-not-supported` until phase 05 changes
+`SessionMessages#sessionRefusal`. The policy package revision is 0.2.0 at this phase's commit.
 
 ## Outcome
 

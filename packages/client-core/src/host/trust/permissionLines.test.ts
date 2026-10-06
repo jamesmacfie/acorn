@@ -394,6 +394,15 @@ describe('the cross-plugin grants', () => {
     expect(new Set(modes.map((line) => line.key)).size).toBe(3)
   })
 
+  it('words a disclosed node point with the host’s fixed, high sentence, whatever the manifest says', () => {
+    const line = extensionPermissionLine({ kind: 'extends', pointKind: 'rows', target: 'agents:session-messenger', label: 'say hello' })
+    expect(line).toMatchObject({
+      text: 'Send notes to your agent sessions, which starts a turn on your agent provider',
+      high: true,
+      key: 'extension:extends:rows:agents:session-messenger',
+    })
+  })
+
   it('still discloses a kind this build cannot name, rather than saying nothing', () => {
     // The version-skew case. A shell that cannot describe the kind must not therefore drop the line:
     // "this package reaches into that one" is the disclosure.

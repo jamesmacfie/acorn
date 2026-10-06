@@ -77,7 +77,7 @@ export const agentTurns = sqliteTable(
     id: text('id').primaryKey(),
     sessionId: text('session_id').notNull(),
     ordinal: integer('ordinal').notNull(),
-    source: text('source').notNull(), // interactive | workflow | delegation | delegation_report | automation | import
+    source: text('source').notNull(), // interactive | workflow | delegation | delegation_report | automation | import | plugin
     status: text('status').notNull(), // queued | dispatching | active | completed | cancelled | failed | interrupted
     inputJson: text('input_json').notNull(),
     continuationInputJson: text('continuation_input_json'),

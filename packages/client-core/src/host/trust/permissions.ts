@@ -1,5 +1,5 @@
 import type { NodePluginPermissions, PluginInputLine, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
-import { isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
+import { DISCLOSED_NODE_POINTS, isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
 import { formatChord } from '../../features/tasks/paneShortcuts'
@@ -351,6 +351,9 @@ export function extensionPermissionLine(grant: PluginExtensionGrant): Permission
   // exclusive slot and never has either, and a segment that is always the same carries nothing.
   const parts = ['extension', grant.kind, ...(kind ? [kind] : []), ...(mode ? [mode] : []), grant.target]
   const key = parts.join(':')
+  // A node point that spends the owner's resources has one fixed sentence, whatever the manifest's label.
+  const disclosed = grant.kind === 'extends' && Object.hasOwn(DISCLOSED_NODE_POINTS, grant.target)
+  if (disclosed) return line(key, { text: DISCLOSED_NODE_POINTS[grant.target]!, icon: EXTENSION_KIND_ICON.extends, high: true })
   return line(key, {
     text: fill(template, grant).replace('%t', grant.target),
     icon: EXTENSION_KIND_ICON[grant.kind],

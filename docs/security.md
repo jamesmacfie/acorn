@@ -83,7 +83,9 @@ summary table. Its topic pages cover [client bundle trust](./security/plugin-bun
 [installing plugins](./security/plugin-install.md), [the client sandbox](./security/plugin-client-sandbox.md),
 [the node realm](./security/plugin-node-realm.md),
 [secrets, routes, and agent tools](./security/plugin-secrets-and-routes.md), and
-[storage and supply chain](./security/plugin-storage-and-supply-chain.md).
+[storage and supply chain](./security/plugin-storage-and-supply-chain.md). A plugin that sends notes to
+agent sessions spends turns on the person's provider, so it holds a disclosed, high grant of its own,
+separate from any veto it holds ([client bundle trust](./security/plugin-bundles.md)).
 
 <a id="the-renderers-policy-and-its-dangerous-sinks"></a>
 <a id="untrusted-provider-data"></a>

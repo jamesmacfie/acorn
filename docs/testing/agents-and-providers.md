@@ -128,3 +128,15 @@ acceptance pass.
     installed. Ask for `rm -rf /tmp/outside` and confirm the second rule refuses it, then for
     `rm -rf build` inside the task and confirm the ordinary card appears
     ([permission policy](../managed-agents/permission-policy.md)).
+
+157. A policy plugin's explanation. With the policy from check 156 installed, the **Permissions** tab
+    also says it can send notes to your agent sessions, marked high. Run **Permission policy: explain
+    refusals to the agent** from the palette and pick **On**. In a Claude Code session in **Default**
+    mode, ask the agent to run `rm -rf /tmp/<throwaway>`. The transcript shows the blocked request,
+    then one turn labelled **From acorn-permission-policy** whose visible text says the plugin sent a
+    note. Its context manifest names `plugin:acorn-permission-policy`, and the agent's answer
+    acknowledges the refusal without retrying. Repeat in Codex. Then check that a terminal-held
+    session and an archived session get no note, that cancelling the queued note works like any queued
+    turn, and that switching Nodes and back keeps the label. In the terminal client, the note reads
+    **From acorn-permission-policy** too. A workflow step's refusal stands with no note
+    ([session messages](../managed-agents/session-messages.md)).

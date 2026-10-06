@@ -28,6 +28,27 @@ command the harness sent as a string, and nothing a script does once it runs. A 
 | DeepSeek | `bash`'s `command`, merged from the tool call announced before the request. |
 | `omp` | Whatever its ACP permission request carries. Not checked: `omp` source and a working `omp` model were unavailable when this package was written. |
 
+## Explain refusals
+
+Off by default. Run **Permission policy: explain refusals to the agent** from the palette and pick
+**On**, and the plugin sends the agent one note per request it refused, through
+`agents:session-messenger` ([session messages](../../../../managed-agents/session-messages.md)).
+
+- The veto route records the session, task, and request ids in the plugin's own database
+  (`migrations/`) and sends nothing, because a verdict the host ignores after its timeout isn't a
+  refusal.
+- On the resolved `plugin:agents:request-changed` event, it reads `agents.requests` and sends a note
+  only for a resolved row whose `blocked.by` is `acorn-permission-policy`. Another plugin's veto or
+  the person's own answer drops the record.
+- Each time agents connects the sender, it reads every recorded refusal again, so a missed event or a
+  restart doesn't lose one. A send that throws keeps its record for that pass.
+- The idempotency key is `<sessionId>:<requestId>`, so one refusal is one note. A failed note never
+  undoes the refusal. Workflow and delegated sessions answer `unattended-not-supported`, and the
+  refusal stands with no note.
+
+The manifest asks for `plugin:agents:request-changed`, the `agents.requests` capability, and a
+declared `agents:session-messenger` extension, which the trust prompt shows as a high grant.
+
 ## Install
 
 The package has no build step and no dependencies. Post
@@ -41,10 +62,5 @@ Restart the Node, and accept the trust prompt.
 node --test
 ```
 
-Run it from this folder. `policy.test.mjs` covers every form listed above.
-
-## Later phases
-
-Phase 03 adds an optional explanation: after the resolved `plugin:agents:request-changed` event, read
-`agents.requests` for this plugin's `blocked` summary and queue one session message per refused
-`requestId`.
+Run it from this folder. `policy.test.mjs` covers every command form listed above, and
+`explanations.test.mjs` covers when a refusal is explained and when it isn't.

@@ -70,6 +70,11 @@ These pages cover harnesses and the work agents do:
 - [Permission policy](./managed-agents/permission-policy.md): `agents:before-permission`, a plugin's
   refusal of a harness permission request, and what it can't see.
 
+<a id="session-messages"></a>
+
+- [Session messages](./managed-agents/session-messages.md): `agents:session-messenger`, a plugin's
+  attributed note on an interactive session, with its limits and idempotency.
+
 <a id="provider-native-subagents"></a>
 
 - [Subagents](./managed-agents/subagents.md): provider-native subagents.

@@ -72,6 +72,15 @@ behind it. A policy that doesn't answer in time passes the harness's request on 
 timeout costs a few seconds and never an approval
 ([permission policy](../managed-agents/permission-policy.md#where-it-runs)).
 
+A node-side point has no manifest form of its own, so a few that spend the person's resources are
+disclosed points. A loaded plugin must name one in its manifest before the node lets it file there,
+and the trust prompt draws the host's fixed sentence for it, marked high
+([disclosed points](../plugins/node-side-extension-points.md#disclosed-points)).
+`agents:session-messenger` is one: a note starts a turn on the person's provider. The host binds each
+sender to the contributor's plugin id, puts the plugin's words in fenced context rather than the
+person's text, and caps notes at 20 per plugin per session. Holding a veto doesn't grant it
+([session messages](../managed-agents/session-messages.md)).
+
 Frame key capture is manifest-bounded too. A frame may stop shell forwarding only for modified chords
 listed in `claimsKeys`, and the trust prompt and Settings show those claims. Runtime code may narrow
 the list, never extend it, and the palette, settings, task-switching, and Escape chords can't be

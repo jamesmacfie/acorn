@@ -30,7 +30,9 @@ export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
 // `delegation` is a turn an owner queued on its delegated child; `delegation_report` is the child's
 // settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import'
+// `plugin` is a note a plugin queued through `agents:session-messenger`; its `effectivePolicy.sentBy`
+// names the plugin (docs/managed-agents/session-messages.md).
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin'
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'

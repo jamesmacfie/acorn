@@ -38,6 +38,9 @@ import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 // 95th percentile, about 22,000 rows a second. A step of 500 doubled the median for little gain.
 const HISTORY_BATCH = 200
 
+/** A `before-send` handler refused the turn. Its own class, so a caller can answer a refusal rather than fail. */
+export class TurnVetoedError extends Error {}
+
 /**
  * Replaces the first text part with the hook's single result and keeps every non-text part.
  * The hook receives joined text, so retaining later text parts would repeat the prompt.
@@ -365,7 +368,7 @@ export class ManagedAgentRuntime {
       taskId: session.taskId,
       text: input.input.flatMap((part) => (part.type === 'text' ? [part.text] : [])).join('\n'),
     })
-    if (prompt && !prompt.ok) throw new Error(`${prompt.by}: ${prompt.reason}`)
+    if (prompt && !prompt.ok) throw new TurnVetoedError(`${prompt.by}: ${prompt.reason}`)
     const enqueued = prompt && prompt.payload.text !== undefined
       ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
       : input

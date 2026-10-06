@@ -2,14 +2,15 @@
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "acorn-permission-policy",
   "name": "Permission policy",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "baseline": "acorn-1",
   "apiVersion": "3",
   "node": "./node.js",
+  "migrations": "./migrations",
   "permissions": {
     "api": [],
-    "events": [],
-    "node": { "core": [], "capabilities": [], "secrets": false, "exec": false, "net": [] }
+    "events": ["plugin:agents:request-changed"],
+    "node": { "core": [], "capabilities": ["agents.requests"], "secrets": false, "exec": false, "net": [] }
   },
   "contributions": {
     "extensions": [
@@ -19,6 +20,25 @@
         "label": "run a tool the agent asks permission for",
         "route": "/v1/p/acorn-permission-policy/before-permission",
         "mode": "veto"
+      },
+      {
+        "id": "explanations",
+        "point": "agents:session-messenger",
+        "label": "explain a refused permission to the agent"
+      }
+    ],
+    "commands": [
+      {
+        "id": "explain",
+        "title": "Permission policy: explain refusals to the agent",
+        "kind": "setting",
+        "scope": "node",
+        "readRoute": "/v1/p/acorn-permission-policy/settings/explain",
+        "writeRoute": "/v1/p/acorn-permission-policy/settings/explain",
+        "options": [
+          { "value": "off", "label": "Off" },
+          { "value": "on", "label": "On, one note per refusal" }
+        ]
       }
     ]
   }

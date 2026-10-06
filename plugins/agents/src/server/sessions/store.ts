@@ -814,6 +814,19 @@ export class AgentStore extends AgentSessionRepository {
     return Number(row?.count ?? 0)
   }
 
+  /** Notes one plugin has queued on one session. `sentBy` is host-written, so the count can't be dodged. */
+  async countPluginMessages(sessionId: string, pluginId: string): Promise<number> {
+    const [row] = await this.db
+      .select({ count: sql<number>`count(*)` })
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.sessionId, sessionId),
+        eq(schema.agentTurns.source, 'plugin'),
+        sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.sentBy.pluginId') = ${pluginId}`,
+      ))
+    return Number(row?.count ?? 0)
+  }
+
   /** Settled turns an owner queued and asked to hear back about. The LIKE is a narrow cut on a JSON
    *  column; the caller still reads `reportTo` from the parsed policy. Startup-only. */
   async settledReportingTurns(): Promise<AgentTurn[]> {

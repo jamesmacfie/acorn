@@ -6,7 +6,7 @@
 // Everything here uses the real host, the real context builder and the real module-singleton registries,
 // because the whole question is what those do when a second instance of one plugin arrives.
 import { Hono } from 'hono'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { memoryIdentityStore } from '../activeIdentity'
 import { createCoreServices, SecretService } from '../core'
@@ -317,6 +317,82 @@ describe('a folder plugin’s hook handler through the loader and the host', () 
       point.dispose()
       clearRegistrations('hook-fixture')
       rmSync(root, { recursive: true, force: true })
+    }
+  })
+})
+
+// A host-bound sender handed to a loaded worker: the agents session messenger's carrier
+// (plugins/agents/src/server/sessions/sessionMessages.ts). The owner here stands in for agents, so this
+// proves the transport and the manifest gate, not the admission rules agents' own tests cover.
+describe('a folder plugin’s session messenger through the loader and the host', () => {
+  const install = async (manifestExtensions: unknown[]) => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { installPlugin } = await import('./installer')
+    const { loadExternalPlugins, loadedPluginBinding } = await import('./loader')
+    const { PLUGIN_API_MAJOR } = await import('./manifest')
+    const root = mkdtempSync(join(tmpdir(), 'acorn-messenger-folder-'))
+    const source = join(root, 'source')
+    mkdirSync(join(source, 'dist'), { recursive: true })
+    writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
+      id: 'messenger-fixture', name: 'Messenger fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+      contributions: { extensions: manifestExtensions },
+    }))
+    // The worker keeps the sender past `connect`, then uses it twice: once to send, once to echo
+    // the answer it got back. It also names another plugin in the message, which nothing reads.
+    writeFileSync(join(source, 'dist', 'node.js'), `export default { name: "messenger-fixture", init(ctx) {
+      ctx.extensionPoints.handle("agents:session-messenger", { id: "notes", value: { connect(sender) {
+        setTimeout(async () => {
+          const answer = await sender.queue({ taskId: "t", sessionId: "s", subject: "hi", text: "first", idempotencyKey: "k", pluginId: "agents" })
+          await sender.queue({ taskId: "t", sessionId: "s", subject: "echo", text: JSON.stringify(answer), idempotencyKey: "k2" })
+        }, 0)
+      } } })
+    } }\n`)
+    await installPlugin(root, { path: source })
+    const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+    const host = await initPlugins(loaded.map((entry) => entry.plugin), {
+      ...hostOptions(), dataDir: root,
+      loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+    })
+    return { host, cleanup: () => { clearRegistrations('messenger-fixture'); rmSync(root, { recursive: true, force: true }) } }
+  }
+
+  it('calls a sender the host bound, after connect returned, and gets its answer back', async () => {
+    const { extensionsFor, openExtensionPoint } = await import('../pluginHost/extensionPoints')
+    const point = openExtensionPoint('agents', 'agents:session-messenger' as never, 'Session messengers')
+    const { host, cleanup } = await install([{ id: 'notes', point: 'agents:session-messenger', label: 'send notes' }])
+    try {
+      const calls: { pluginId: string; message: Record<string, unknown> }[] = []
+      const [entry] = extensionsFor<{ connect(sender: unknown): unknown }>('agents:session-messenger' as never)
+      expect(entry).toMatchObject({ id: 'messenger-fixture:notes', pluginId: 'messenger-fixture' })
+      await entry!.value.connect({
+        queue: async (message: Record<string, unknown>) => {
+          calls.push({ pluginId: entry!.pluginId, message })
+          return { ok: true, turnId: 'turn-1' }
+        },
+      })
+      await vi.waitFor(() => expect(calls).toHaveLength(2))
+      expect(calls.map((call) => call.pluginId)).toEqual(['messenger-fixture', 'messenger-fixture'])
+      expect(calls[1]!.message.text).toBe('{"ok":true,"turnId":"turn-1"}')
+      await host.dispose()
+    } finally {
+      point.dispose()
+      cleanup()
+    }
+  })
+
+  it('refuses a contribution the manifest never declared, so the owner saw no grant for it', async () => {
+    const { extensionsFor, openExtensionPoint } = await import('../pluginHost/extensionPoints')
+    const point = openExtensionPoint('agents', 'agents:session-messenger' as never, 'Session messengers')
+    const { host, cleanup } = await install([])
+    try {
+      expect(extensionsFor('agents:session-messenger' as never)).toEqual([])
+      expect(host.roster.find((entry) => entry.name === 'messenger-fixture')).toMatchObject({ state: 'failed' })
+      await host.dispose()
+    } finally {
+      point.dispose()
+      cleanup()
     }
   })
 })

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import type { AgentTurnSource } from '../contract/wire.ts'
 
 export const agentRuntimeStateSchema = z.enum([
   'creating',
@@ -131,5 +132,7 @@ export const agentWaitQuerySchema = z.object({
 
 export type CreateAgentSessionInput = z.infer<typeof createAgentSessionSchema>
 export type ImportAgentTranscriptInput = z.infer<typeof importAgentTranscriptSchema>
-export type EnqueueAgentTurnInput = z.infer<typeof enqueueAgentTurnSchema>
+// `plugin` is the one source no HTTP caller may claim. Only the session messenger writes it, with the
+// host's `sentBy` (server/sessions/sessionMessages.ts), so the schema above leaves it out.
+export type EnqueueAgentTurnInput = Omit<z.infer<typeof enqueueAgentTurnSchema>, 'source'> & { source: AgentTurnSource }
 export type ResolveAgentRequestInput = z.infer<typeof resolveAgentRequestSchema>

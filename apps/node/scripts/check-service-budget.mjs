@@ -40,7 +40,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,117,742 B with `agents:before-permission`. The policy step (about 3 KB) loads on the
 // first permission request; the hook declaration and the `blocked` branches in the request projection,
 // state reducers, webhook filter, and event bounds run on every boot or event. Add 2 KB.
-const limits = { ceiling: 3_118_000, floor: 1_000_000 }
+// 2026-10-07: 3,123,120 B with `agents:session-messenger`. The messenger (about 6 KB) loads on the
+// first contribution. The point's declaration and loader, the per-plugin count in the turn store, the
+// typed veto error, the manifest rule for a carrier-less declaration, and the host check that a loaded
+// plugin declared the point all load at boot. Add 5.5 KB.
+const limits = { ceiling: 3_123_500, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

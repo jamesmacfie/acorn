@@ -67,6 +67,20 @@ Reach the registry only through `ctx`. A loaded plugin's bundle inlines every `@
 makes, so a plugin that imported the registry module directly would get a private copy and contribute
 into nothing.
 
+## Disclosed points
+
+A few points spend something of the person's, so a loaded plugin needs their consent before it may
+join one. `DISCLOSED_NODE_POINTS` in `@acorn/protocol/extensionPoints.ts` lists them, each with the
+host's fixed trust-prompt sentence. To join one, a loaded package names the point in its manifest's
+`extensions` with no carrier, and then files the entry through `ctx`. The trust prompt draws the fixed
+sentence, marked high, whatever the manifest's label says. `ctx.extensionPoints.handle` throws for a
+loaded plugin that files into a disclosed point its manifest didn't name. A built-in plugin isn't
+checked. The only disclosed point is `agents:session-messenger`.
+
+An owner that hands a contributor something to keep, such as a sender, passes it to a function on the
+entry's value. A loaded contributor's function runs in its worker, and anything it's given crosses
+back as an asynchronous function, so the contributor can call it after the first call returned.
+
 ## Points that exist
 
 - The workflows plugin declares `workflows:step-kind`, `workflows:policy`, and `workflows:trigger`.
@@ -76,3 +90,7 @@ into nothing.
   Memory contributes its standing contract and indexes there. Terminal resolves the handlers on each
   launch and limits delivery before sending text to the terminal. The provider owns the content, and
   terminal owns delivery ([agent launch context](../plugin-authoring/the-node-half.md#contributing-agent-launch-context)).
+- The agents plugin declares `agents:session-messenger`. Each entry's `connect` receives a sender
+  bound to the contributor's plugin id, and the sender queues an attributed note on an interactive
+  session. Agents connects entries when every plugin has started and after each roster change, and a
+  sender fails once its entry is gone ([session messages](../managed-agents/session-messages.md)).

@@ -103,6 +103,8 @@ watch requests without the power to stop them.
 resolution stays private. A consumer that wants to act on its own refusal, for example to explain it
 to the agent, should wait for the resolved `plugin:agents:request-changed` event and read this
 summary. A handler's own verdict isn't proof: a verdict that arrives after the timeout is ignored.
+The explanation itself is a note through `agents:session-messenger`, a separate grant
+([session messages](./session-messages.md#the-policy-plugins-explanations)).
 
 ## What it doesn't do
 
@@ -115,4 +117,5 @@ summary. A handler's own verdict isn't proof: a verdict that arrives after the t
 - **It isn't a policy engine.** Rules live in the handler plugin's code. Acorn adds no rule language.
 
 A sample consumer with two rules, no force-push and no deletion outside the task root, is kept in
-`docs/future/pi/packages/permission-policy/`.
+`docs/future/pi/packages/permission-policy/`. It can also explain each refusal to the agent, off by
+default.

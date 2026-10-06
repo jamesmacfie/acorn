@@ -11,6 +11,8 @@ import { createHarnessRegistry } from '../server/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { BEFORE_PERMISSION_HOOK } from '../contract/permissionHook.ts'
+import { AGENTS_SESSION_MESSENGER } from '../contract/sessionMessages.ts'
+import type { SessionMessages } from '../server/sessions/sessionMessages'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
@@ -99,6 +101,9 @@ export type AgentsPluginDeps = {
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
   let runtime: ManagedAgentRuntime | null = null
   let delegation: AgentDelegationService | null = null
+  let messages: Promise<SessionMessages> | null = null
+  let reconcileMessages: (() => Promise<void>) | null = null
+  let pluginsChanged: { dispose(): void } | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let mcpServersRoute: { dispose(): void } | null = null
@@ -234,6 +239,21 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         (await import('../server/data/usageSourceHandler')).createUsageSourceHandler(store, core)(request, context),
       { prefix: '/data/usage' })
       ctx.dataSources.register(usageSource)
+
+      // A plugin's notes to a session (../server/sessions/sessionMessages.ts). Entries are read live, and
+      // `ready` and every roster change connect the ones a late or reloaded plugin filed.
+      // Loaded on the first contribution, to stay inside the service boot budget
+      // (apps/node/scripts/check-service-budget.mjs).
+      ctx.extensionPoints.declare(AGENTS_SESSION_MESSENGER, 'Session messengers')
+      const entries = () => ctx.extensionPoints.handlers(AGENTS_SESSION_MESSENGER)
+      const messagesRuntime = runtime
+      reconcileMessages = async () => {
+        if (!messages && !entries().length) return
+        messages ??= import('../server/sessions/sessionMessages').then(({ SessionMessages }) =>
+          new SessionMessages({ runtime: messagesRuntime, entries, notice: (notice) => ctx.events.notice(notice) }))
+        await (await messages).reconcile()
+      }
+      pluginsChanged = ctx.events.on('plugins:changed', () => void reconcileMessages?.().catch(() => undefined))
 
       delegation = new AgentDelegationService(
         runtime,
@@ -377,9 +397,18 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // turn, because the node cannot transact with an array in the client.
       draftAttachmentsRoute = ctx.capabilities.provide(AGENTS_DRAFT_ATTACHMENTS, createDraftAttachments(runtime.attachments))
     },
+    ready: async () => {
+      await reconcileMessages?.()
+    },
     // Releases what init acquired, in the order docs/managed-agents/operations.md § Operations and failure
     // describes.
     dispose: async () => {
+      // First, so no sender queues a turn on a runtime that is stopping.
+      reconcileMessages = null
+      void messages?.then((loaded) => loaded.dispose())
+      messages = null
+      pluginsChanged?.dispose()
+      pluginsChanged = null
       await runtime?.stop()
       runtime = null
       delegation = null

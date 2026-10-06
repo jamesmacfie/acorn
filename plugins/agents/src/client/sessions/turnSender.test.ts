@@ -28,6 +28,12 @@ describe('senderLabel', () => {
     expect(senderLabel({ ...turn('workflow'), effectivePolicy: { continuationOf: 'first' } })).toBe('Acorn')
   })
 
+  it('names the plugin the host stamped, not a label the plugin wrote', () => {
+    const note = { ...turn('plugin', [sender('plugin:acme', 'The person')]), effectivePolicy: { sentBy: { pluginId: 'acme' } } }
+    expect(senderLabel(note)).toBe('From acme')
+    expect(senderLabel(turn('plugin'))).toBe('From a plugin')
+  })
+
   it('ignores an unrelated context part and falls back for older turns', () => {
     expect(senderLabel(turn('delegation', [sender('agents', 'History copied from X')]))).toBe('From the delegating agent')
   })

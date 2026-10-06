@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import {
-  ARBITRATION_MODES, EXTENSION_POINT_KINDS, EXTENSION_POINT_LOCATIONS,
+  ARBITRATION_MODES, DISCLOSED_NODE_POINTS, EXTENSION_POINT_KINDS, EXTENSION_POINT_LOCATIONS,
   HOOK_MODES, HOOK_PAYLOAD_TYPES, parseExtensionPointRef,
 } from '../../chrome/extensionPoints.ts'
 import { contextFreeAction, panelRegion, refresh } from './chromeDescriptors.ts'
@@ -127,7 +127,13 @@ export const extensionDescriptor = z.object({
     ctx.addIssue({ code: 'custom', path: ['point'], message: `'${descriptor.point}' is not an extension point reference — use '<pluginId>:<pointId>'` })
   }
   const carriers = (['items', 'remote', 'frame', 'route'] as const).filter((key) => descriptor[key] !== undefined)
-  if (carriers.length !== 1) {
+  // A disclosed node point is filed from the node through `ctx.extensionPoints.handle`. The entry here is
+  // the declaration the trust prompt reads, so it names no carrier.
+  if (Object.hasOwn(DISCLOSED_NODE_POINTS, descriptor.point)) {
+    if (carriers.length) {
+      ctx.addIssue({ code: 'custom', path: [carriers[0]!], message: `'${descriptor.point}' is filled from the node through ctx.extensionPoints.handle, so it names no ${carriers.join(' or ')}` })
+    }
+  } else if (carriers.length !== 1) {
     ctx.addIssue({
       code: 'custom',
       path: ['items'],
