@@ -158,6 +158,10 @@ export function workflowDispatchProblems(args: {
       try { processingFields(step.repeat) } catch (error) { errors.push(`${label}: ${error instanceof Error ? error.message : 'Invalid repeat policy'}`) }
     }
     if (!step.items) errors.push(`${label} needs items`)
+    else if (typeof step.items !== 'object' || Array.isArray(step.items)
+      || typeof step.items.step !== 'string' || typeof step.items.pointer !== 'string') {
+      errors.push(`${label} items must be {"step":"structured-predecessor-id","pointer":"/array"}, using the predecessor's stable ID. Put step and pointer directly in items, without an address wrapper.`)
+    }
     else {
       errors.push(...unexpectedFields(step.items, ['step', 'pointer']).map((field) => `${label} items has unsupported field '${field}'`))
       if (!indexes.has(step.items.step)) errors.push(`${label} items references unknown step '${step.items.step}'`)

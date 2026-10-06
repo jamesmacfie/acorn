@@ -27,6 +27,7 @@ const SECTION_KINDS_PREAMBLE = [
   'Get record details record binds the exact /ref object, retaining its scope. If condition is {kind:"comparison",left:<binding>,operator:"eq",right:{address:{from:"literal",value:true}}}, or a bounded all/any group of predicates.',
   '',
   'For each (workflow-map) chooses exactly one target: agent or childWorkflow. agent is {prompt, profileId?, schema?, onFailure?: "continue" | "stop"}. It starts separate managed sessions, sequentially, in the parent task’s folder. Each session automatically receives the current item as context. No saved child workflow is needed. The agent prompt is plain text, without template references.',
+  'For each items is exactly {"step":"structured-predecessor-id","pointer":"/issues"}. step is the predecessor\'s stable id, and pointer selects its array. Unlike input bindings, items does not use address, from, or stepId. Set itemKey to a stable field within each item, such as "/issueId".',
   'A kind marked "runs an agent" may also take `profileId`, `isolation` and `inputs`. On any other',
   'kind `isolation` and `inputs` are errors and `profileId` does nothing, so leave all three off.',
 ].join('\n')
@@ -45,7 +46,7 @@ const fieldType = (field: StepField, detail: KindDetail): string => {
     return `number from ${field.min ?? 'any'} to ${field.max ?? 'any'}`
   }
   if (field.type === 'child-workflow') return 'child workflow object'
-  if (field.type === 'workflow-map-source') return 'structured map source object'
+  if (field.type === 'workflow-map-source') return 'object with step (predecessor ID) and pointer (JSON Pointer to its array)'
   if (field.type === 'workflow-json-pointer') return 'JSON Pointer string'
   if (field.type === 'workflow-title') return 'bound title object'
   if (field.type === 'gate-form') return 'form object with fields and values'

@@ -96,6 +96,18 @@ describe('reading the reply', () => {
     const backticks = '{"name":"W","steps":[{"name":"a","prompt":"Answer in a ```json block."}]}'
     expect(stripJsonFences(backticks)).toBe(backticks)
   })
+
+  it.each([
+    { address: { from: 'step', stepId: 'plan', pointer: '/issues' }, fallback: [] },
+    { address: { from: 'step', stepId: 'plan', pointer: '/issues' }, conversion: 'json-to-text' },
+    { address: { from: 'step', stepId: 'plan', pointer: '/issues', unknown: true } },
+    { address: { from: 'input', name: 'issues', pointer: '' } },
+    { address: { from: 'step', stepId: 'plan', pointer: '/__proto__' } },
+  ])('leaves a map binding that cannot be converted without changing its meaning for validation: %j', items => {
+    const result = parsed(JSON.stringify(workflow([{ name: 'fix', kind: 'workflow-map', items, agent: { prompt: 'Fix it.' } }])))
+    expect(result.def.steps[0]?.items).toEqual(items)
+    expect(result.notes).toEqual([])
+  })
 })
 
 describe('what cannot be applied', () => {

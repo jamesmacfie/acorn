@@ -10,7 +10,7 @@ import { authorWorkflowConversation, type SourceRuntime } from './conversation'
 const original: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Review', steps: [{ id: 'read', name: 'read', prompt: 'Read the issue.' }] }
 const proposed: WorkflowDef = { ...original, steps: [{ id: 'read', name: 'read', prompt: 'Read the issue and summarize the risk.' }] }
 const catalog: WorkflowCatalog = {
-  kinds: BUILTIN_STEP_KINDS.map(id => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
+  kinds: [...BUILTIN_STEP_KINDS, 'workflow', 'workflow-map'].map(id => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
   policies: [], profiles: [{ id: 'claude-code', label: 'Claude Code', managed: true, structured: true }],
   workflows: [{ ref: { source: 'database', id: 'triage' }, name: 'Triage', inputs: [{ name: 'issue', required: true }] }],
 }
@@ -76,4 +76,26 @@ it('keeps samples opt-in and omits an oversized selected preview instead of trun
     expect(sources.invoke).toHaveBeenCalledTimes(enabled ? 1 : 0)
     expect(result.state).toBe('proposal')
   }
+})
+
+it('returns an applicable item-agent edit when the model writes items as a plain step binding', async () => {
+  const expected: WorkflowDef = { ...original, name: 'Dependabot review', steps: [
+    { id: 'identify', name: 'Identify issues', after: [], prompt: 'Identify issues.', schema: { type: 'object', properties: {
+      issues: { type: 'array', items: { type: 'object', properties: { issueId: { type: 'string' } } } },
+    } } },
+    { id: 'fix', name: 'Fix each issue in its own agent session', kind: 'workflow-map', after: ['identify'],
+      items: { step: 'identify', pointer: '/issues' }, itemKey: '/issueId',
+      agent: { prompt: 'Fix this issue and test it.', profileId: 'claude-code', onFailure: 'continue' } },
+    { id: 'review', name: 'Review the fixes', after: ['fix'], prompt: 'Review every issue and its session result.' },
+  ] }
+  const candidate = { ...expected, steps: expected.steps.map(step => step.id === 'fix'
+    ? { ...step, items: { address: { from: 'step', stepId: 'identify', pointer: '/issues' } } } : step) }
+  const generate = vi.fn().mockResolvedValue(answer({ kind: 'proposal', candidate, summary: 'Run a session for each issue.' }))
+  const result = await authorWorkflowConversation({
+    request: { ...turn('harness:codex'), instruction: 'Run a separate agent session for each issue.' },
+    catalog: { ...catalog, workflows: [] }, validation, generate,
+    principal: { kind: 'device', userId: 'u1', deviceId: 'd1' }, signal: new AbortController().signal,
+    sources: sourceRuntime() as unknown as SourceRuntime,
+  })
+  expect(result).toMatchObject({ state: 'proposal', candidate: expected, problems: [], usage: { requests: 1 } })
 })

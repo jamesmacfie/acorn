@@ -27,6 +27,13 @@ base against the current definition by stable step ID, refuses conflicts, and ru
 validator again. One accepted proposal creates one undo entry. Rejecting it changes nothing. The
 conversation cannot save, publish, run, activate, change a provider, or read credentials.
 
+For each sources use `items: { step: "predecessor-id", pointer: "/issues" }`. Both authoring
+paths teach this shape even when no saved child workflows are available. If the model writes a
+plain typed step binding instead, the response parser converts it to this source shape before
+validation, preserving the referenced step ID and pointer. It leaves fallback values, conversions,
+other binding sources, and malformed addresses for validation and repair. The proposal diff shows
+the canonical definition that applying the edit uses.
+
 ### Legacy one-shot endpoint
 
 The device-only `/defs/generate` route remains for compatibility with callers of the earlier
@@ -96,6 +103,6 @@ follows: a control whose only message is "connect one first" is a control in the
 beside it, and Settings, under AI models, is where a key is added. Repository file drafts
 use the same conversation and keep their separate review-before-publication flow.
 
-One submitted instruction can make at most eight metadata requests and two candidate attempts. The
+One submitted instruction can make at most eight metadata requests and three candidate attempts. The
 client uses an 11-minute broker timeout for the bounded sequence and exposes **Cancel** while it runs
 ([api-reference.md](../api-reference.md) § Transport).

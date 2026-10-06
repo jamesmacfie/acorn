@@ -7,6 +7,7 @@
 // `vars` out of that description because the editor cannot draw them, so generation drops those
 // keys with a note. This keeps unknown `with` keys from passing through without validation.
 import type { WorkflowGenerateNote, WorkflowGenerateNoteCode } from '../../shared/api'
+import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import type {
   WorkflowCatalog,
   WorkflowDef,
@@ -157,7 +158,20 @@ export function parseGeneratedWorkflow(text: string): ParsedWorkflow {
     return true
   })
   if (!steps.length) return { error: 'The workflow the model wrote has no steps.' }
-  const def = (steps.length === written.length ? parsed : { ...parsed, steps }) as WorkflowDef
+  // A plain step binding names exactly the same source. Fallbacks and conversions have no map
+  // equivalent, so leave those and other malformed sources intact for validation and repair.
+  const normalized = steps.map(step => {
+    if (step.kind !== 'workflow-map' || !isRecord(step.items)
+      || Object.keys(step.items).length !== 1 || !Object.hasOwn(step.items, 'address')) return step
+    const binding = dataBindingSchema.safeParse(step.items)
+    if (!binding.success || binding.data.address.from !== 'step') return step
+    const address = binding.data.address
+    notes.push({ code: 'normalized-map-source', step: step.name,
+      message: `Step '${step.name}' items was converted from a step binding to a map source, preserving its step ID and pointer.` })
+    return { ...step, items: { step: address.stepId, pointer: address.pointer } }
+  })
+  const changed = normalized.length !== written.length || normalized.some((step, index) => step !== written[index])
+  const def = (changed ? { ...parsed, steps: normalized } : parsed) as WorkflowDef
   return { def, notes }
 }
 
