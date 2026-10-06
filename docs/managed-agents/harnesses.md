@@ -9,6 +9,12 @@ launch the CLI, resume it, and run it headless. It's registered in a core regist
 agents, and workflows share. A profile can exist for terminal use with no managed driver behind it,
 as `aider` does.
 
+A profile names its managed driver in `managedProvider`. Claude Code names `claude`, Codex names
+`codex`, and a contributed harness's profile names its own runtime ID. A workflow agent step, or a map
+step's item agent, runs as a managed session only on a profile that names one. A step on any other
+profile falls back to the profile's headless argv (`managedProviderForProfile` in
+`plugins/agents/src/contract/sessionExecute.ts`).
+
 ## Two driver tiers
 
 **Tier 1 is the generic ACP driver, and a harness is data.** One driver, `acpDriver.ts`, runs from a
@@ -25,9 +31,12 @@ registry's two doors name the difference: `register(spec)` takes data, and
 
 The ACP driver reads how to resume from the agent's `initialize` answer. `session/load` replays the
 history the agent kept, and `session/resume` restores context and sends nothing back. Claude Code
-offers the first and DeepSeek the second, so a harness declares neither. If the agent answers that it
-doesn't know the reference, as after a moved checkout or a pruned store, the driver starts a fresh
-session and warns in the transcript. The `sessionPersistence` quirk covers only the terminal handoff.
+offers the first and DeepSeek the second, so a harness declares neither. An agent that offers both,
+as `omp` does, gets `session/resume`. If the agent answers that it doesn't know the reference, as
+after a moved checkout or a pruned store, the driver starts a fresh session and warns in the
+transcript. The driver reads that answer from the error code, `-32002` or `-32602`. `omp` 18.7.0
+answers an unknown reference with `-32603`, an internal error, so its session fails to start instead.
+The `sessionPersistence` quirk covers only the terminal handoff.
 
 ### Codex
 

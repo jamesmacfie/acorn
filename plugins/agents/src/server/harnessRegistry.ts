@@ -102,13 +102,16 @@ const harnessProfile = (harness: ManifestHarness): AgentProfileContribution => {
     label: harness.label,
     kind: 'agent',
     command,
+    // The driver registered beside this profile, so a workflow step that names the harness runs as a
+    // managed session, the same way it runs in the Agent pane.
+    managedProvider: harness.id,
     backendPreference: terminal?.backendPreference ?? 'tmux',
     transport: 'pty',
     launchArgs: terminal?.launchArgs ?? [],
     ...(terminal ? {} : { interactive: false }),
     // No `headlessArgv` and no `resumeArgv`, on purpose: those need conditional argv assembly, and
-    // putting that in manifest data means inventing a template language. A data-only harness works in
-    // the Agent pane and the terminal, but no agentic workflow step can name it.
+    // putting that in manifest data means inventing a template language. A workflow step reaches the
+    // harness through `managedProvider` above instead.
     //
     // `aiArgv` is admitted where those two are refused, and the difference is the whole reason it can
     // be: a one-shot text turn has two variables in fixed positions and no conditions, so there is

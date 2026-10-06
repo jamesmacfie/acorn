@@ -61,6 +61,29 @@ The id is saved in session rows and workflow steps, so renaming it breaks your u
 If you find yourself writing code to add a harness, either the agent doesn't speak ACP, and this
 contract doesn't cover it, or the seam has a gap, which is a bug report.
 
+The harness for [oh-my-pi](https://github.com/can1357/oh-my-pi) is just as short. It has no `oneShot`
+block, because `omp -p` loads tools and extensions, and no argument set has been found that turns them
+all off:
+
+```json
+{
+  "id": "omp",
+  "label": "oh-my-pi",
+  "glyph": "brand:omp",
+  "spawn": { "command": "omp", "args": ["acp"] },
+  "envPassthrough": ["OMP_*"],
+  "quirks": { "sessionPersistence": false },
+  "terminal": { "command": "omp" }
+}
+```
+
+`omp` keeps its logins under `~/.omp`, so the owner signs in once by running `omp` in a terminal, and
+no provider key passes through. `OMP_*` carries `OMP_PROFILE`, which picks one of `omp`'s isolated
+profiles. Most of `omp`'s other environment settings are named `PI_*` and don't pass through. Leave
+`--auto-approve` and `--approval-mode` out of `args`: in ACP mode `omp` sends a permission request for
+`bash` and other risky calls, and either flag would skip acorn's permission card. The tested package
+and its results are in [the omp harness phase](../future/pi/phases/01-omp-harness.md).
+
 ## Spawn
 
 `spawn` takes exactly one of two forms:
@@ -135,6 +158,9 @@ text". Changing those arguments in a later version asks the owner again.
 ## What a data-only harness doesn't get
 
 A data-only harness works in the Agent pane, the terminal, and the Generate lists. A workflow's agent
-step can't name it, because conditional argv would need a template language. A workflow `decide` step
-can, but it needs a JSON verdict, and a manifest can't ask your CLI for one, so a `text` harness fails
-there. A harness that needs either needs first-party work, not a bigger manifest.
+step, and each item a map step runs, can name it too. The step runs as a managed session on the same
+ACP driver the Agent pane uses, because the harness's profile names that driver. What a step can't do
+is run your CLI as a bare headless process, because conditional argv would need a template language.
+A workflow `decide` step can name a harness with `oneShot`, but it needs a JSON verdict, and a manifest
+can't ask your CLI for one, so a `text` harness fails there. A harness that needs a headless argv or
+a structured one-shot needs first-party work, not a bigger manifest.

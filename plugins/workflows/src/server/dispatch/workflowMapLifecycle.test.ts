@@ -89,6 +89,7 @@ describe('workflow map lifecycle', () => {
       label: 'Claude Code',
       kind: 'agent',
       command: 'claude',
+      managedProvider: 'claude',
       backendPreference: 'tmux',
       transport: 'pty',
     })

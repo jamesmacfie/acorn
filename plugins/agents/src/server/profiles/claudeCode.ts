@@ -6,6 +6,7 @@ export const claudeCodeProfile: AgentProfileContribution = {
   label: 'Claude Code',
   kind: 'agent',
   command: 'claude',
+  managedProvider: 'claude',
   backendPreference: 'tmux',
   transport: 'pty',
   mcpRegistration: (name, launcher) => registerAcornMcp(claudeMcpCommands, name, launcher),

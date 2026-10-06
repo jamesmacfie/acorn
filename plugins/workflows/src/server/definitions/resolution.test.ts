@@ -18,7 +18,7 @@ const catalog: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
   policies: new Set(),
   profiles: new Set(['claude-code']),
-  structuredProfiles: new Set(['claude-code']),
+  structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']),
 }
 
 const leaf = (name = 'child', inputs?: WorkflowDef['inputs']): WorkflowDef => ({

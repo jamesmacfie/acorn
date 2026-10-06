@@ -116,14 +116,15 @@ describe('a contributed harness becomes a driver like any other', () => {
       label: 'OpenCode',
       kind: 'agent',
       command: 'opencode',
+      managedProvider: 'opencode:opencode',
       backendPreference: 'tmux',
       transport: 'pty',
       launchArgs: ['--acorn'],
     }])
     // A `terminal` block is what makes it a terminal, so nothing says otherwise here.
     expect(profiles[0].interactive).toBeUndefined()
-    // No headless argv and no stream-JSON adapter, so a workflow step cannot name this harness. That is
-    // the design, not an oversight.
+    // No headless argv and no stream-JSON adapter. A workflow step runs this harness through the managed
+    // driver its profile names, never as a bare process.
     expect(profiles[0].headlessArgv).toBeUndefined()
     expect(profiles[0].streamJson).toBeUndefined()
     // And no one-shot mode either, so it is not a model backend: the block below is the opt-in.

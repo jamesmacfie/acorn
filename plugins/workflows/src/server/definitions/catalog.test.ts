@@ -28,7 +28,7 @@ const validation: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
   policies: new Set(),
   profiles: new Set(['claude-code']),
-  structuredProfiles: new Set(['claude-code']),
+  structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']),
 }
 
 describe('the project-scoped workflow catalog', () => {

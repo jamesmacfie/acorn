@@ -40,8 +40,9 @@ authored in the app was in that state, because the select only writes `profile` 
 one.
 
 So a profile is now what decides which of the two paths a step takes, and nothing else does. A profile
-with a managed driver, meaning `claude-code` or `codex`, runs the step as a managed session with a
-durable transcript ([managed-agents.md](../managed-agents.md)). A profile without one runs it headless:
+with a managed driver, meaning `claude-code`, `codex`, or a harness a plugin contributes, runs the
+step as a managed session with a durable transcript ([managed-agents.md](../managed-agents.md)). The
+profile names its driver in `managedProvider`. A profile without one runs it headless:
 a one-shot process, its stream captured into the step's events, and no session for the run pane to
 draw. Each child workflow resolves its own step profile from the frozen definition.
 

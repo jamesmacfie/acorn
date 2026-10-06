@@ -16,7 +16,8 @@ export type WorkflowPublicationServices = {
   query(request: QueryPublicationRequest): Promise<QueryPublicationResult>
   validateQuery(scope: QueryScope, reference: QueryReference, context: QueryBindingContext): Promise<void>
   queryConsumer(scope: QueryScope, queryId: string, consumer: Omit<QueryConsumer, 'pluginId'>, remove?: boolean): Promise<void>
-  catalog: WorkflowValidationCatalog
+  // Asked on each call, not held: a loaded plugin registers its harness profiles after this service exists.
+  catalog(): WorkflowValidationCatalog
   scope(workspaceId: string, projectId?: string): Promise<WorkflowResolutionScope>
 }
 
@@ -72,7 +73,7 @@ export function workflowPublication(db: PluginDatabase, services: WorkflowPublic
         const useDraft = selected[id] !== undefined || !published
         if (selected[id] !== undefined && draft.revision !== selected[id]) throw new Error('Dependency changed before publication review')
         const def = useDraft ? draft.def : published!.def
-        const problems = validateWorkflow(def, services.catalog)
+        const problems = validateWorkflow(def, services.catalog())
         if (problems.length) throw new Error(problems.join('; '))
         if (visited.has(`workflow:${id}`)) return def
         const ownScope = { workspaceId: draft.workspaceId, projectId: draft.projectId ?? undefined }
@@ -81,7 +82,7 @@ export function workflowPublication(db: PluginDatabase, services: WorkflowPublic
           if (!step.childWorkflow) continue
           const ref = step.childWorkflow.ref
           const child = ref.source === 'database' ? await walk(ref.id, [...chain, id], depth + 1)
-            : (await resolveScopedWorkflowDefinition(db, ref, scope, services.catalog)).definition
+            : (await resolveScopedWorkflowDefinition(db, ref, scope, services.catalog())).definition
           const declared = new Set((child.inputs ?? []).map(input => input.name))
           for (const name of Object.keys(step.childWorkflow.inputs ?? {})) if (!declared.has(name)) throw new Error(`Undeclared child input: ${name}`)
           for (const input of child.inputs ?? []) if (input.required && input.default === undefined && !step.childWorkflow.inputs?.[input.name]) throw new Error(`Missing child input: ${input.name}`)

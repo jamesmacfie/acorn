@@ -15,7 +15,7 @@ const catalog: WorkflowValidationCatalog = {
   stepKinds: new Set(['agent']),
   policies: new Set(),
   profiles: new Set(['claude-code']),
-  structuredProfiles: new Set(['claude-code']),
+  structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']),
 }
 
 const def = (name: string): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'only', name: 'only', prompt: 'Do it.' }] })

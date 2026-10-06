@@ -396,10 +396,13 @@ export async function startAcpSession(
         await options.onEvent({ type: 'turn_completed', ...(stopReason ? { stopReason } : {}) })
         return {}
       } catch (error) {
+        // The ACP SDK answers anything an agent throws as `Internal error` and puts the agent's own
+        // message in `data.details`. The generic message tells the reader nothing, so the details win.
+        const details = error instanceof RequestError ? (error.data as { details?: unknown } | undefined)?.details : undefined
         await options.onEvent({
           type: 'error',
           code: `${id}_turn_failed`,
-          message: error instanceof Error ? error.message : `${label} turn failed.`,
+          message: typeof details === 'string' && details ? details : error instanceof Error ? error.message : `${label} turn failed.`,
           retryable: false,
         })
         throw error

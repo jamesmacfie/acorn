@@ -258,6 +258,34 @@ describe('the generic ACP driver describes a harness before it starts one', () =
     })
   })
 
+  // Every agent built on the ACP SDK reports a thrown error as `Internal error`, with its own words in
+  // `data.details`. The transcript shows those words, or the reader learns nothing about the failure.
+  it('shows the agent’s own reason when a turn fails with an internal error', async () => {
+    const events: AgentNormalizedEvent[] = []
+    const handle = await new AcpDriver({
+      id: 'stub',
+      profileId: 'stub',
+      label: 'Stub',
+      spawn: { entry: () => fileURLToPath(new URL('./__fixtures__/failingAcpAgent.mjs', import.meta.url)) },
+    }).start({
+      session: { ...sessionWithRef(''), providerSessionRef: null },
+      cwd: process.cwd(),
+      env: {},
+      mcpServers: [],
+      noProviderExecutionHistory: false,
+      onEvent: (event) => {
+        if (event.type !== 'generated_artifact') events.push(event)
+      },
+      onClosed: () => {},
+    })
+    try {
+      await expect(handle.sendTurn({ turn: {} as never, input: [{ type: 'text', text: 'go' }], attachments: {} })).rejects.toThrow('Internal error')
+      expect(events).toContainEqual(expect.objectContaining({ type: 'error', code: 'stub_turn_failed', message: 'No model selected.' }))
+    } finally {
+      await handle.stop()
+    }
+  })
+
   // ACP spells an environment as an ordered list of pairs, so a server naming the same variable twice
   // is a protocol error the agent reports rather than a silent last-wins.
   it('hands acorn\u2019s own tool server to the agent as ordered environment pairs', () => {

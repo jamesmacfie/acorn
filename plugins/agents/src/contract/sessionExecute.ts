@@ -1,11 +1,11 @@
-import { type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { capabilityId } from '@acorn/protocol/plugin/ids.ts'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 
 export type AgentSessionExecuteRequest = {
   taskId: string
-  // The agent profile to run as. A profile with no managed driver, meaning not claude-code or codex,
-  // resolves to `null`, which is how a caller learns to fall back to its own headless path rather than
+  // The agent profile to run as. A profile that names no managed driver (`managedProvider`) resolves
+  // to `null`, which is how a caller learns to fall back to its own headless path rather than
   // failing.
   profileId: string | undefined
   // Session title, used only when a new session is created.
@@ -52,10 +52,8 @@ export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.
 // because it is the other half of the sentence above: a caller reads it to know, before it calls,
 // whether this profile will resolve to a session or to `null`. The workflows catalog says `managed`
 // on a profile from this (docs/workflows/step-kinds.md § Contributed step kinds).
-const MANAGED_PROVIDERS: Readonly<Record<string, string>> = {
-  'claude-code': 'claude',
-  codex: 'codex',
-}
-
+//
+// Read off the profile, which names its own driver: the built-in Claude and Codex profiles, and every
+// harness a manifest contributes (../server/harnessRegistry.ts).
 export const managedProviderForProfile = (profileId: string | undefined): string | null =>
-  MANAGED_PROVIDERS[profileId ?? ''] ?? null
+  (profileId ? agentProfileRegistry.get(profileId)?.managedProvider : undefined) ?? null

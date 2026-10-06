@@ -21,6 +21,7 @@ export function catalogValidation(catalog: WorkflowCatalog): WorkflowValidationC
     policies: new Set(catalog.policies.map((policy) => policy.id)),
     profiles: new Set(catalog.profiles.map((profile) => profile.id)),
     structuredProfiles: new Set(catalog.profiles.filter((profile) => profile.structured).map((profile) => profile.id)),
+    managedProfiles: new Set(catalog.profiles.filter((profile) => profile.managed).map((profile) => profile.id)),
     agentStepKinds: new Set(catalog.kinds.filter((kind) => kind.describe?.runsAgent).map((kind) => kind.id)),
     describeStepKind: (kind) => described.get(kind) ?? undefined,
     workflowTargets: catalog.workflows,

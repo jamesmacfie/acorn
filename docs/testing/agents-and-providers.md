@@ -103,3 +103,16 @@ acceptance pass.
     confirm each acorn tool still appears once, not twice. Last, press the commit-message wand and open
     **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
     entry should be absent throughout, because `dsh` alone has no interactive mode.
+
+155. The contributed `omp` harness, which needs `omp` on the Node's `PATH` and the package in
+    `docs/future/pi/packages/omp-harness/` installed from its folder. Sign in once by opening a task
+    terminal on **oh-my-pi** and finishing `omp`'s own setup. Start an oh-my-pi session: the pane
+    shows `omp`'s **Mode**, **Model**, and **Thinking** options. Ask for a file write, which runs
+    without a card, then a shell command, which raises a permission card. Reject it once and allow it
+    once, and confirm `omp` reports the rejection as a failed `bash` call. Ask it to use its `ask` tool
+    with two options and confirm the question card offers both plus a free-text field. Restart the
+    app and send another turn: the session remembers the earlier turn, because the driver picks
+    `session/resume`. Run a one-step workflow on `omp:omp` and have a Claude Code session delegate to
+    it with `agent_spawn`. Both run as managed `omp` sessions. Last, read the turn after a provider
+    error, such as an over-long prompt: `omp` sends it as an ordinary answer ending in `end_turn`, so
+    a workflow step reads it as success ([the omp harness phase](../future/pi/phases/01-omp-harness.md)).

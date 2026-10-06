@@ -53,6 +53,10 @@ export type AgentProfileContribution = {
   // to answer one prompt, where running `command` bare would fail in front of whoever picked it. The
   // terminal's profile menu leaves those out (../profiles.ts) and the spawn route refuses them.
   interactive?: boolean
+  // The agents provider whose managed driver runs this profile as a session, so a workflow step that
+  // names the profile runs in the Agent pane's driver rather than headless. Omitted means none, and the
+  // step falls back to `headlessArgv` (plugins/agents/src/contract/sessionExecute.ts).
+  managedProvider?: string
   headlessArgv?: (command: string, opts: HeadlessOpts) => HeadlessArgv
   resumeArgv?: (command: string, sessionRef: string) => HeadlessArgv
   // Declaring this is the opt-in for text generation, not just for a workflow `decide` step: a profile

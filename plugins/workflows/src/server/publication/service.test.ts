@@ -9,7 +9,7 @@ import { publishedWorkflow } from './store'
 import { resolveScopedWorkflowDefinition, resolveWorkflowGraph } from '../definitions/resolution'
 import type { QueryDraft, QueryRevision } from '@acorn/protocol/dataQueries.ts'
 
-const catalog = { stepKinds: new Set(['agent']), policies: new Set<string>(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']) }
+const catalog = { stepKinds: new Set(['agent']), policies: new Set<string>(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']) }
 const scope = { workspaceId: 'workspace', projectId: 'project', repoDir: null, userDir: null }
 const leaf = (name = 'Child'): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'work', name: 'Work', prompt: 'Do work.' }] })
 describe('workflow publication', () => {
@@ -17,7 +17,7 @@ describe('workflow publication', () => {
   let services: WorkflowPublicationServices
   beforeEach(() => {
     db = makeTestPluginDb('workflows')
-    services = { catalog, scope: async () => scope, query: async () => ({}), validateQuery: async () => {}, queryConsumer: async () => {} }
+    services = { catalog: () => catalog, scope: async () => scope, query: async () => ({}), validateQuery: async () => {}, queryConsumer: async () => {} }
   })
   afterEach(() => db.cleanup())
   const draft = (def: WorkflowDef) => createDef(db.db, { workspaceId: scope.workspaceId, projectId: scope.projectId, def })
@@ -117,7 +117,7 @@ describe('workflow publication', () => {
     }
     services.queryConsumer = async () => { interrupt('consumer') }
     const row = await draft({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name: 'Consumer', steps: [{ id: 'find', name: 'Find', kind: 'find-records', query: { kind: 'saved', queryId: query.id, bindings: {} } }] })
-    services.catalog = { ...catalog, stepKinds: new Set(['find-records']) }
+    services.catalog = () => ({ ...catalog, stepKinds: new Set(['find-records']) })
     const publication = workflowPublication(db.db, services)
     const operation = await publication.prepare({ id: row.id, revision: 1 })
     expect((await publication.publish(operation.id)).state).toBe('needs-reconciliation')

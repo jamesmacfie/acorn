@@ -3,12 +3,13 @@ import { mkdir } from 'node:fs/promises'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestNodeContext, schema, type TestNodeContext } from '@acorn/plugin-api/testkit'
-import type { InternalEnvFactory } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, type InternalEnvFactory } from '@acorn/plugin-api/node'
 import type { AgentConfigOption, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import type { StreamEvent } from '@acorn/plugin-api/node'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from '../drivers/types'
 import { AgentDriverRegistry } from '../drivers/registry'
+import { claudeCodeProfile } from '../profiles/claudeCode'
 import { ManagedAgentRuntime } from './runtime'
 import { createSessionExecute } from './sessionExecute'
 
@@ -36,8 +37,7 @@ const advertised = (): AgentConfigOption[] => [
 // Registered as the profile `agents.sessionExecute` maps to a managed provider, so the whole path
 // runs rather than falling through to the caller's headless fallback.
 class ConfigDriver implements AgentDriver {
-  readonly providerId = 'claude'
-  readonly profileId = 'claude-code'
+  constructor(readonly providerId = 'claude', readonly profileId = 'claude-code') {}
   readonly configSets: Array<[string, string]> = []
   readonly turns: AgentDriverTurnOptions[] = []
   readonly envs: Record<string, string>[] = []
@@ -109,8 +109,12 @@ describe('agents.sessionExecute config options', () => {
   let driver: ConfigDriver
   let taskId: string
   let mintedClaims: Parameters<InternalEnvFactory>[0][]
+  let registry: AgentDriverRegistry
+  let releaseProfile: () => void
 
   beforeEach(async () => {
+    // The profile names its managed driver, which is how a step on it reaches the session path at all.
+    releaseProfile = agentProfileRegistry.register(claudeCodeProfile)
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
     const worktree = join(ctx.dataDir, 'worktree')
     await mkdir(worktree)
@@ -146,7 +150,7 @@ describe('agents.sessionExecute config options', () => {
       updatedAt: at,
     })
     driver = new ConfigDriver()
-    const registry = new AgentDriverRegistry()
+    registry = new AgentDriverRegistry()
     registry.registerNative('claude', () => driver)
     mintedClaims = []
     runtime = new ManagedAgentRuntime({
@@ -165,6 +169,7 @@ describe('agents.sessionExecute config options', () => {
 
   afterEach(async () => {
     await runtime.stop()
+    releaseProfile()
     ctx.cleanup()
   })
 
@@ -227,6 +232,31 @@ describe('agents.sessionExecute config options', () => {
     const warnings = snapshot.events.flatMap((record) =>
       record.event.type === 'diagnostic' && record.event.level === 'warning' ? [record.event.message] : [])
     expect(warnings.join('\n')).toContain('model = gpt-9')
+  })
+
+  // A manifest harness registers its profile with its own runtime id as the managed provider
+  // (../harnessRegistry.ts), so a step names it the way it names Claude. A profile that names no
+  // driver still answers null, which is the caller's cue to run its headless fallback.
+  it('runs a contributed harness profile as a managed session, and answers null for one with no driver', async () => {
+    const contributed = new ConfigDriver('acme:agent', 'acme:agent')
+    const releaseDriver = registry.registerNative('acme:agent', () => contributed)
+    const base = { kind: 'agent', command: 'acme', backendPreference: 'tmux', transport: 'pty' } as const
+    const releaseProfiles = [
+      agentProfileRegistry.register({ ...base, id: 'acme:agent', label: 'Acme', managedProvider: 'acme:agent' }),
+      agentProfileRegistry.register({ ...base, id: 'plain', label: 'Plain' }),
+    ]
+    try {
+      const step = { taskId, title: 'Workflow: contributed', prompt: 'Write one answer.', runId: 'run-1' }
+      const result = await createSessionExecute(runtime)({ ...step, profileId: 'acme:agent', stepId: 'step-acme' })
+      expect(result?.status).toBe('ok')
+      expect(contributed.turns).toHaveLength(1)
+      expect(await runtime.store.requireSession(result!.agentSessionId!)).toMatchObject({ providerId: 'acme:agent', profileId: 'acme:agent' })
+
+      expect(await createSessionExecute(runtime)({ ...step, profileId: 'plain', stepId: 'step-plain' })).toBeNull()
+    } finally {
+      for (const release of releaseProfiles) release()
+      releaseDriver()
+    }
   })
 
   it('leaves the session alone when the step asks for nothing', async () => {

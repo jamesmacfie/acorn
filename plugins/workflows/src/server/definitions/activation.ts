@@ -66,7 +66,7 @@ export const workflowDefinitions = (
         return { principal: { kind: 'internal' as const, scope: 'service' as const, userId }, signal: AbortSignal.timeout(60_000) }
       }
       const publications = workflowPublication(store, {
-        catalog: runner.validationCatalog(),
+        catalog: () => runner.validationCatalog(),
         scope: async (workspaceId, projectId) => {
           const project = projectId ? await core.projects.byId(projectId) : null
           if (projectId && (!project || project.workspaceId !== workspaceId)) throw new Error('Project is outside this workspace')

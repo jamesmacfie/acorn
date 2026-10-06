@@ -203,6 +203,7 @@ export class WorkflowRunner {
       policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
+      managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => managedProviderForProfile(profile.id)).map((profile) => profile.id)),
       // A contributed kind joins the agent kinds by saying so in its description, which is the only
       // place `isolation`, `inputs` and `configOptions` are ever allowed from.
       agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),

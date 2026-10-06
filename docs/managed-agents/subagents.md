@@ -47,7 +47,9 @@ update carries them. Codex needs no lift: `codexChildRouting.ts` tags a child th
 `user_message` with the subagent ID.
 
 The shared ACP normalizer reads Claude's `_meta.claudeCode` namespace directly. Another harness's
-namespace is absent, so the branch costs nothing. A quirk joins `HarnessQuirks` when a second harness
+namespace is absent, so the branch costs nothing. A contributed harness gets no roster unless it sends
+that namespace. `omp` 18.7.0 sends no subagent metadata over ACP, so its `task` subagents draw as
+ordinary tool calls in the parent's transcript. A quirk joins `HarnessQuirks` when a second harness
 needs one.
 
 The normalizer drops Claude's tool heartbeat. Every 30 seconds the CLI pings a running tool as a

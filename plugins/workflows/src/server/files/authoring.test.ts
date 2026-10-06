@@ -16,7 +16,7 @@ import { resolveWorkflowGraph, resolveScopedWorkflowDefinition } from '../defini
 import { validateWorkflowDestination } from '../validation/destination'
 import type { WorkflowValidationCatalog } from '../validation/definition'
 
-const catalog: WorkflowValidationCatalog = { stepKinds: new Set(['agent', 'workflow', 'find-records']), policies: new Set(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']) }
+const catalog: WorkflowValidationCatalog = { stepKinds: new Set(['agent', 'workflow', 'find-records']), policies: new Set(), profiles: new Set(['claude-code']), structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']) }
 const def = (name = 'Example'): WorkflowDef => ({ baseline: 'acorn-1' as const, formatVersion: 1 as const, name, steps: [{ id: 'one', name: 'One', kind: 'agent', prompt: 'Work' }] })
 const target = { projectId: 'project', source: 'repo' as const, path: '.acorn/workflows/example.toml' }
 const query: QueryContent = { name: 'Selected records', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {}, query: {

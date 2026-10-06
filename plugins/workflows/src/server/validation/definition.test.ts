@@ -10,7 +10,7 @@ const catalog: WorkflowValidationCatalog = {
   stepKinds: new Set<string>(BUILTIN_STEP_KINDS),
   policies: new Set<string>(BUILTIN_POLICIES),
   profiles: new Set(['claude-code']),
-  structuredProfiles: new Set(['claude-code']),
+  structuredProfiles: new Set(['claude-code']), managedProfiles: new Set(['claude-code']),
   validateStepKind: (kind, step, context) =>
     BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 }
@@ -327,5 +327,29 @@ describe('the approval form on a human gate', () => {
     expect(check({ name: 'W', steps: [draft, gate({ fields })] } as never)).toContain("step 'approve' form has 21 fields; the limit is 20")
     expect(check({ name: 'W', posture: 'autonomous', tools: { maxRisk: 'read' }, steps: [draft, gate({ fields: [title] })] } as never))
       .toContain("step 'approve' form field 'title' is required, and this workflow is autonomous, so nobody would be asked to fill it")
+  })
+})
+
+// A map step opens one managed session per item, so its agent has to name a profile with a managed
+// driver. A contributed harness has one (plugins/agents/src/server/harnessRegistry.ts); a profile
+// that only runs headless does not.
+describe('the agent a map step runs', () => {
+  const mapOn = (profileId: string): WorkflowDef => ({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [
+    { id: 'list', name: 'list', profileId: 'claude-code', prompt: 'List issues.', schema: { type: 'object', properties: { issues: { type: 'array' } } } },
+    { id: 'fix', name: 'fix', profileId: 'claude-code', kind: 'workflow-map', after: ['list'], items: { step: 'list', pointer: '/issues' },
+      agent: { prompt: 'Fix it.', profileId } },
+  ] })
+  const withManaged = (managed: string[]): WorkflowValidationCatalog => ({
+    ...catalog,
+    profiles: new Set(['claude-code', 'omp:omp', 'plain']),
+    managedProfiles: new Set(managed),
+  })
+
+  it('runs on any profile the catalog lists as managed, contributed or built in', () => {
+    expect(validateWorkflow(mapOn('omp:omp'), withManaged(['claude-code', 'omp:omp'])).filter((error) => error.includes('agent'))).toEqual([])
+  })
+
+  it('refuses a known profile with no managed driver', () => {
+    expect(validateWorkflow(mapOn('plain'), withManaged(['claude-code']))).toContain("step 'fix' agent profile 'plain' has no managed session driver")
   })
 })

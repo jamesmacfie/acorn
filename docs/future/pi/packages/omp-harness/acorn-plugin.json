@@ -1,0 +1,24 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "omp",
+  "name": "oh-my-pi",
+  "version": "0.1.0",
+  "baseline": "acorn-1",
+  "apiVersion": "3",
+  "icon": {
+    "d": "M3 5h18v2.5h-3.5v10c0 .8.4 1.2 1.1 1.2.5 0 .9-.1 1.4-.3V21c-.7.3-1.5.4-2.3.4-2 0-3.2-1.2-3.2-3.5V7.5h-4.5v6.3c0 3.6-1.2 6.2-3.6 7.6l-1.6-2.1c1.6-1 2.3-2.8 2.3-5.6V7.5H3z"
+  },
+  "contributions": {
+    "harnesses": [
+      {
+        "id": "omp",
+        "label": "oh-my-pi",
+        "glyph": "brand:omp",
+        "spawn": { "command": "omp", "args": ["acp"] },
+        "envPassthrough": ["OMP_*"],
+        "quirks": { "sessionPersistence": false },
+        "terminal": { "command": "omp" }
+      }
+    ]
+  }
+}

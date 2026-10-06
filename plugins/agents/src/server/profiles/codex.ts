@@ -17,6 +17,7 @@ export const codexProfile: AgentProfileContribution = {
   label: 'Codex',
   kind: 'agent',
   command: 'codex',
+  managedProvider: 'codex',
   backendPreference: 'tmux',
   transport: 'pty',
   mcpRegistration: (name, launcher) => registerAcornMcp(codexMcpCommands, name, launcher),
