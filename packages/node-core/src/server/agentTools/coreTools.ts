@@ -2,7 +2,7 @@ import { taskScriptWaitInputSchema, taskScriptLogsInputSchema } from '@acorn/pro
 import { taskScripts } from '../taskScripts/service'
 import { z } from 'zod'
 import { assembleContext, parseInclude } from './contextSections.ts'
-import { pluginAuthoringTool } from './pluginAuthoring.ts'
+import { pluginAuthoringTool } from './pluginAuthoringContribution.ts'
 import { pluginRequestTool } from './pluginRequests.ts'
 import { registerAgentTool, removeAgentTools, ToolError, type AgentToolContribution, type ToolContext } from './registry.ts'
 import { issueDetailTool } from './issueDetail.ts'

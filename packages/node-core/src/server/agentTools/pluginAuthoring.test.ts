@@ -11,10 +11,12 @@ import { THEME_PALETTE_TOKENS } from '@acorn/protocol/themeTokens.ts'
 import { NODE_CORE_FACETS, scopeCore } from '../plugins/permissions.ts'
 import { getContextSections } from './contextSections.ts'
 import {
-  PLUGIN_AUTHORING_SECTION,
   PLUGIN_AUTHORING_TOOL,
-  pluginAuthoringSection,
+  PLUGIN_AUTHORING_SECTION,
   pluginAuthoringTool,
+  pluginAuthoringSection,
+} from './pluginAuthoringContribution.ts'
+import {
   pluginAuthoringVocabulary,
   renderPluginAuthoring,
 } from './pluginAuthoring.ts'
