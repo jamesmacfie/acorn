@@ -11,6 +11,7 @@ searches, and [command kinds](../plugins.md#command-kinds) holds the vocabulary.
 | New agent session | Search, task-scoped | Lists installed harnesses, then the custom agents on them. Picking one creates the session, selects it, and shows the Agent pane |
 | New *agent* session | Action, task-scoped | One row per custom agent. Desktop only |
 | Open Agent Center | Action, no scope | Selects the `agents` rail source |
+| Mark all agents read | Action, no scope | Clears every finished or failed agent and marks their notices read. Shown only when one exists |
 | Find an agent session | Search, task-scoped | The Node's search over session titles, events, and artifacts, for the captured task |
 | New Claude Code terminal | Action, needs a task | Opens a terminal on the `claude-code` profile and focuses it |
 | New Codex terminal | Action, needs a task | The same for the `codex` profile |
@@ -34,6 +35,13 @@ about a workspace. A palette row from another task would need the router to swit
 a plugin can't do, so the palette asks about the captured task. The Node ranks rows, the client
 doesn't re-rank, a request is capped at 50, and each row carries its task. Selection goes through
 `plugins/agents/src/client/sessions/managedSelection.ts`, the path Agent Center uses.
+
+**Mark all agents read leaves blocked agents alone.** It does what opening each session would: it
+moves the session's read mark to its last event, which clears `attention` on the Node, retires its
+**Needs you** row, and marks the bell notices that point at it read. It clears only `completed` and
+`error`. An agent waiting on a permission, a question, or a workflow gate can't move until you answer,
+so it keeps its flag. The same item is on the right-click menu of the Agents rail icon
+(`plugins/agents/src/client/sessions/markAgentsRead.ts`).
 
 **The harness terminals belong to this plugin.** The profile IDs are this plugin's
 (`plugins/agents/src/server/profiles/index.ts`), so the commands are too

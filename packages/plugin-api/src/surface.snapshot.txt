@@ -203,6 +203,7 @@ client: learnRefPrefixes
 client: linkifyRefs
 client: localSearch
 client: markAttentionSeen
+client: markTargetsRead
 client: modelBackendsOptions
 client: nodeReady
 client: nodeState
