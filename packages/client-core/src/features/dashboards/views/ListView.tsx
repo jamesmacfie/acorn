@@ -14,13 +14,15 @@ import RowControls, { openRowMenu } from './RowControls'
 
 export default function ListView(props: PanelViewProps) {
   const lead = () => titleField(props.schema)
-  const status = () => props.fields.find((field) => field.role === 'status' && field.type === 'enum')
+  // A hidden title still leads, because a row needs a label. Hidden status and meta fields drop out.
+  const status = () => props.fields.find((field) => field.role === 'status' && field.type === 'enum' && !field.hidden)
   // Everything the panel projects except the ones the row already draws in their own slots: the
   // lead, the status chip, and the source, whose slot is the provenance badge below. A `source`
   // field is an ordinary projected field now (mapping.ts § PANEL_SOURCE_FIELD_ID), so without this
   // it would print beside the badge that already says it.
   const meta = () => props.fields.filter((field) =>
-    field.id !== lead()?.id
+    !field.hidden
+    && field.id !== lead()?.id
     && field.id !== status()?.id
     && !(props.provenance && field.id === PANEL_SOURCE_FIELD_ID))
 

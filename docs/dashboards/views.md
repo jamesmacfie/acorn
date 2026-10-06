@@ -22,6 +22,13 @@ when it's empty, because that's where you'd drop the card back. An undeclared va
 after the declared ones, and a row with no value goes to one "Uncategorised" column that exists only
 when something is in it. Every row lands somewhere.
 
+A plan column marked `hidden` stays in the run, so sort, group, filter, a board, and a chart can still
+use it, but a table and a list leave it out. A list still leads with a hidden title, because a row
+needs a label. In the studio, a column's menu offers **Hide** or **Show**, and the Columns form
+lists hidden columns under their own **Hidden** heading, which appears only when one is hidden. The
+authoring AI gets the same rule and an example from `hiddenColumns` in
+`packages/dashboards-core/src/capabilities.ts`.
+
 **Charts are two shapes and no dependency.** A `bar` takes its categories from an enum, with the
 board's bucketing, and its height from the same measure a stat draws. A `line` takes its x from a
 `datetime` bucketed by day. Either can be split into series by an enum through `view.series`: one line

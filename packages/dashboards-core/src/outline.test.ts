@@ -3,7 +3,10 @@ import { dataSourceDescriptionSchema } from '@acorn/protocol/dataSources.ts'
 import { panelPlanSchema, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { DataPredicate } from '@acorn/protocol/dataBindings.ts'
 import { describePanelPlan, type PlanSource } from './plan'
-import { availableOperations, availableViews, columnParts, countsByPart, diffOutline, inputChain, partForPath, planOutline, problemsByPart, switchView, type PlanInputs } from './outline'
+import {
+  availableOperations, availableViews, columnParts, countsByPart, diffOutline, emptyRunReason, inputChain, partForPath, planOutline, planSummary, problemsByPart, switchView,
+  type PlanInputs,
+} from './outline'
 
 const description = dataSourceDescriptionSchema.parse({
   schema: { type: 'object', properties: {
@@ -161,6 +164,25 @@ describe('planOutline', () => {
     expect(columnParts(joined()).map(({ key, detail }) => [key, detail])).toEqual([
       ['column:title', 'Text'], ['column:state', 'Choice'], ['column:updated', 'Date and time'], ['column:closed', 'Date and time'], ['column:labels', 'List of text'],
     ])
+  })
+})
+
+describe('telling plans apart', () => {
+  it('sums a plan up as its view, steps, and sort', () => {
+    expect(planSummary(joined())).toBe('Board · Keep where Closed is empty or Closed is at least the start of the week 1 week ago')
+    expect(planSummary({ ...joined(), stages: [], sort: [{ column: 'updated', direction: 'desc' }] })).toBe('Board · Updated, newest first')
+    const flagged = { ...joined(), columns: [...joined().columns, { id: 'draft', label: 'Draft', type: 'boolean' as const, bind: bind('issues') }],
+      stages: [{ op: 'filter' as const, where: where('draft', 'eq', { from: 'literal', value: false }) }] }
+    expect(planSummary(flagged)).toBe('Board · Keep where Draft is no')
+  })
+
+  it('says why a run has no rows: nothing read, or the step that removed the last of them', () => {
+    const one = { ...joined(), sources: joined().sources.slice(0, 1) }
+    expect(emptyRunReason(one, [{ path: '/stages/0', input: 0, output: 0 }])).toBe('Issues returned no records. The panel shows them once there are some.')
+    expect(emptyRunReason({ ...one, stages: [] }, [])).toBe('Issues returned no records. The panel shows them once there are some.')
+    expect(emptyRunReason(joined(), [{ path: '/stages/0', input: 0, output: 0 }])).toBe('No rows came out of the sources.')
+    expect(emptyRunReason(pulls(), [{ path: '/stages/0', input: 40, output: 12 }, { path: '/stages/1', input: 12, output: 0 }]))
+      .toBe('The step "Keep where State is one of Open, Draft and Updated is after 7 days ago" removed all 12 rows.')
   })
 })
 

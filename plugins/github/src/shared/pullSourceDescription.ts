@@ -30,6 +30,7 @@ const pullStarterPlans: PanelPlan[] = [
 ]
 
 export const pullSourceDescription: DataSourceDescription = {
+  projectScope: { kind: 'repository', parameter: '/repositories', record: '/repository' },
   revision: '6',
   schema: {
     type: 'object', additionalProperties: false,
@@ -112,6 +113,6 @@ export const pullSourceDescription: DataSourceDescription = {
   coverage: { kind: 'snapshot' },
   starterPlans: pullStarterPlans,
   reach: { parameter: '/repositories', itemPlural: 'repositories',
-    default: 'every repository the {account} account can see', empty: 'no linked repositories' },
-  consistency: 'With no repository selection, GitHub search reaches every repository visible to the account. An explicit list restricts that reach. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
+    default: 'repositories linked to this workspace', empty: 'no linked repositories' },
+  consistency: 'Workspace reads are restricted to linked repositories. An explicit list selects a subset. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
 }

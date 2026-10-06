@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { getHighlighter, highlightToHtml, LANGS, langFor } from './shiki'
+import { getHighlighter, highlightToHtml, LANGS, langFor, tokenizeAnsiLines } from './shiki'
 
 describe('langFor', () => {
   it('maps known extensions to their shiki language id', () => {
@@ -83,5 +83,25 @@ describe('fence html', () => {
     expect(html).toContain('--l:')
     expect(html).toContain('--r:')
     expect(html).not.toMatch(/(^|[^-])\b(color|background-color):/)
+  })
+})
+
+describe('ANSI lines', () => {
+  it('colours what the output coloured and leaves the rest to the surface', async () => {
+    // A shell profile's reset, then bold red, then plain text. The leading `ESC ( B` is what Shiki
+    // would otherwise leave in the text.
+    const [line] = tokenizeAnsiLines(await getHighlighter(), '\x1b(B\x1b[m\x1b[1;31merror\x1b[0m: plain')
+    expect(line.map((token) => token.content).join('')).toBe('error: plain')
+    const [error, plain] = line
+    expect(error).toMatchObject({ content: 'error', bold: true, italic: false })
+    expect(error.light).not.toBe('')
+    expect(error.dark).not.toBe('')
+    expect(plain).toMatchObject({ content: ': plain', light: '', dark: '', lightBg: '', bold: false })
+  })
+
+  it('keeps parsing after a hyperlink', async () => {
+    const [line] = tokenizeAnsiLines(await getHighlighter(), '\x1b]8;;http://x\x07link\x1b]8;;\x07 \x1b[4;32mok\x1b[0m')
+    expect(line.map((token) => token.content).join('')).toBe('link ok')
+    expect(line.find((token) => token.content === 'ok')).toMatchObject({ underline: true })
   })
 })

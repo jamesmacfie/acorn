@@ -73,7 +73,9 @@ export function columnLabel(plan: PanelPlan, id: string): string {
 
 function operandLabel(column: PanelPlanColumn | undefined, address: DataBindingAddress | undefined): string {
   if (address?.from === 'literal') {
-    const word = (value: DataValue) => (typeof value === 'string' && column?.choices?.find(choice => choice.id === value)?.label) || JSON.stringify(value)
+    // A yes-or-no reads as the words the column type is named for, not as `true`.
+    const word = (value: DataValue) => typeof value === 'boolean' ? (value ? 'yes' : 'no')
+      : (typeof value === 'string' && column?.choices?.find(choice => choice.id === value)?.label) || JSON.stringify(value)
     return Array.isArray(address.value) ? address.value.map(word).join(', ') : word(address.value)
   }
   if (address?.from !== 'context') return 'another value'
@@ -114,6 +116,8 @@ export function pressTarget(plan: PanelPlan, sources: readonly PlanSource[]): { 
   return { subject, place: PRESENTATION_LABELS[press.prefer] }
 }
 
+/** A source's icon, here and in the studio's guide to a panel's parts. */
+export const SOURCE_ICON = 'database'
 const STAGE_ICONS: Record<Stage['op'], string> = { filter: 'list-filter', compute: 'calculator', summarize: 'sigma', expand: 'list-tree', overlap: 'calendar-range' }
 /** The icon each view shows as, in the outline and the Look inspector. */
 export const VIEW_ICONS: Record<PanelPlan['view']['kind'], string> = { stat: 'hash', list: 'list', table: 'table', board: 'kanban', chart: 'chart-column' }
@@ -155,7 +159,7 @@ export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = []
     ...plan.sources.flatMap((source, index): PlanPart[] => {
       const resolved = sources.find(candidate => candidate.instanceId === source.id)
       return [{
-        key: `source:${source.id}`, section: 'data', icon: 'database', paths: [`/sources/${index}`],
+        key: `source:${source.id}`, section: 'data', icon: SOURCE_ICON, paths: [`/sources/${index}`],
         title: resolved?.accountLabel ? `${source.label} · ${resolved.accountLabel}` : source.label,
         detail: resolved ? sourceReach(resolved) : plan.sources.length > 1 ? SOURCE_ROLE_LABELS[source.role] : undefined,
       }, ...(inputs[source.id] ?? []).map((input): PlanPart => ({
@@ -186,7 +190,7 @@ export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = []
     },
     {
       key: 'behaviour', section: 'look', icon: 'mouse-pointer-click', paths: ['/actions'],
-      title: press ? `Click opens ${press.subject}` : 'Clicking a row does nothing',
+      title: press ? `Click opens ${press.subject}` : "Click does the source's default",
       detail: sentence(press && `in ${press.place}`, buttons > 0 && plural(buttons, 'button')),
     },
     {
@@ -195,6 +199,28 @@ export function planOutline(plan: PanelPlan, sources: readonly PlanSource[] = []
       detail: `${plan.time.mode === 'viewer' ? TIME_MODE_LABELS.viewer : plan.time.zone} · week starts ${WEEK_START_LABELS[plan.time.weekStart]}`,
     },
   ]
+}
+
+/** "List · Keep where Updated is after the start of this week · Updated, newest first": the view, each
+ *  step, and the sort, to tell starter panels apart where a person picks one. */
+export function planSummary(plan: PanelPlan): string {
+  const parts = planOutline(plan)
+  const steps = parts.filter(part => part.section === 'steps').map(part => part.title)
+  const sort = plan.sort?.length ? parts.filter(part => part.key === 'arrange').map(part => part.title) : []
+  return [VIEW_LABELS[plan.view.kind], ...steps, ...sort].join(' · ')
+}
+
+/** Why a run that worked has no rows: the source had none, or a step removed the last of them. The
+ *  step is named in the outline's words, so the person can find it. */
+export function emptyRunReason(plan: PanelPlan, stages: readonly PlanStageCount[]): string {
+  const counts = plan.stages.map((_stage, index) => stages.find(count => count.path === `/stages/${index}`))
+  const nothingRead = plan.stages.length ? counts[0]?.input === 0 : true
+  if (nothingRead) return plan.sources.length === 1
+    ? `${plan.sources[0]!.label} returned no records. The panel shows them once there are some.`
+    : 'No rows came out of the sources.'
+  const emptied = counts.findIndex(count => count?.output === 0)
+  if (emptied < 0) return 'No rows are left to show.'
+  return `The step "${stageWords(plan, plan.stages[emptied]!).title}" removed all ${plural(counts[emptied]!.input, 'row')}.`
 }
 
 /** One part per bound column, for the columns inspector. */

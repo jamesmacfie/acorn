@@ -2,7 +2,7 @@ import { For, Show } from 'solid-js'
 import type { DashboardDisplayRow } from '@acorn/dashboards-core/render'
 import type { PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { PlanRecordItem } from '@acorn/dashboards-core/plan.ts'
-import { Button } from '../../../kit/components/primitives'
+import { IconButton } from '../../../kit/components/inputs/IconButton'
 import { RowActions } from '../../../kit/components/layout/RowActions'
 import { Menu } from '../../../kit/components/overlays/Menu'
 
@@ -20,7 +20,9 @@ export default function RowControls(props: {
 }) {
   const task: ButtonPlan = { kind: 'createTask', label: 'Start task' }
   return <span class="dash-row-controls" data-dash-panel={props.panelId ?? ''} data-dash-row={props.row.id}>
-    <For each={props.buttons ?? []}>{button => <Button size="xs" variant="ghost" onPress={() => props.onButton?.(props.row, button)}>{button.label}</Button>}</For>
+    <For each={props.buttons ?? []}>{button => <IconButton size="xs" variant="ghost"
+      icon={button.icon ?? (button.kind === 'createTask' ? 'plus' : button.kind === 'open' ? 'external-link' : 'mouse-pointer-click')}
+      label={button.label} onPress={() => props.onButton?.(props.row, button)} />}</For>
     <RowActions ariaLabel={`Actions for ${props.row.id}`}>
       {menu => <>
         <Show when={(props.row.recordItems?.length ?? 0) > 1}><For each={props.row.recordItems}>{item => <Menu.Item context={menu} onSelect={() => props.onOpenRecord?.(props.row, item)}>Open {item.ref.pluginId} {item.ref.recordId}</Menu.Item>}</For></Show>

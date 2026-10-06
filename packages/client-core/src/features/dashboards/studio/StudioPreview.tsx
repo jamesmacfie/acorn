@@ -35,6 +35,8 @@ export default function StudioPreview(props: {
   onRefresh: () => void
   onSelectPart: (key: PlanPartKey) => void
   onEditTitle: () => void
+  /** Why a run that worked has no rows, shown in place of the empty view. */
+  emptyReason?: string
   /** Set while a proposal is under review. `plan` and `run` are the side showing, and `beforeRows` is
    *  the current plan's row count, for "17 rows (was 41)". */
   review?: { showing: PreviewSide; onShow: (side: PreviewSide) => void; beforeRows?: number }
@@ -67,9 +69,9 @@ export default function StudioPreview(props: {
             <div class="dash-panel-head"><Heading level={3}><Button variant="bare" onPress={props.onEditTitle}>{props.plan.title}</Button></Heading></div>
             <div class="dash-panel-body">
               <Show when={display()} fallback={<EmptyState align="start" size="sm" busy={props.loading} title="No preview yet">Finish the parts marked with a problem to see rows.</EmptyState>}>
-                {value => <PanelBody view={props.plan.view} schema={value().schema} fields={value().fields} rows={value().rows}
+                {value => <Show when={!props.emptyReason} fallback={<EmptyState align="start" size="sm" busy={props.loading} title="No rows">{props.emptyReason}</EmptyState>}><PanelBody view={props.plan.view} schema={value().schema} fields={value().fields} rows={value().rows}
                   groups={displayPlanGroups(props.run!.groups, value().rows)} {...(props.plan.group?.[0] ? { groupBy: props.plan.group[0].column } : {})}
-                  provenance={props.plan.sources.length > 1} onSelectPart={props.onSelectPart} />}
+                  provenance={props.plan.sources.length > 1} onSelectPart={props.onSelectPart} /></Show>}
               </Show>
             </div>
           </Card>

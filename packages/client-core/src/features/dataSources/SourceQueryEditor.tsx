@@ -9,7 +9,7 @@ import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { MISSING, readDataPointer, type DataValue } from '@acorn/protocol/dataValues.ts'
 import { integrationsOptions } from '../../infra/queries'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, SegmentedControl, Select, Stack, Text } from './kit.ts'
+import { Alert, Badge, Button, Field, Fold, Inline, Input, Picker, pluginLabel, Select, Stack, Text } from './kit.ts'
 import { queriesClient, queriesKey } from '../queries/queriesClient'
 import { QUERY_AUTOSAVE_MS, queryRecoveryStore } from '../queries/recoveryStore'
 import {
@@ -80,6 +80,12 @@ function DynamicOptions(props: {
   value: DataValue | typeof MISSING
   disabled?: boolean
   multiple?: boolean
+  /** Lists only these ids, such as the workspace's repositories, instead of asking the source. Each
+   *  shows as its id, which for GitHub is "owner/name"; a source with opaque ids would need labels.
+   *  A chosen id outside the list stays listed, so it can be removed. */
+  only?: readonly string[]
+  /** `only` is still on its way. */
+  onlyPending?: boolean
   onChange(value: DataValue): void
 }) {
   const [search, setSearch] = createSignal('')
@@ -87,17 +93,21 @@ function DynamicOptions(props: {
     operation: 'options' as const, source: props.query.source, scope: props.query.scope,
     target: props.target, pointer: props.field.pointer, search: search(), pageSize: 100,
   })
-  const options = createQuery(() => ({ ...dataSourceQueryOptions(props.nodeId, request()), enabled: !props.disabled }))
+  const options = createQuery(() => ({ ...dataSourceQueryOptions(props.nodeId, request()), enabled: !props.disabled && !props.only }))
   const selectedIds = () => Array.isArray(props.value) ? props.value.filter((id): id is string => typeof id === 'string') : typeof props.value === 'string' ? [props.value] : []
-  const selected = () => options.data?.options.filter(option => selectedIds().includes(option.id)) ?? []
+  const listed = () => props.only
+    ? [...new Set([...props.only, ...selectedIds()])].filter(id => id.toLowerCase().includes(search().trim().toLowerCase())).map(id => ({ id, label: id }))
+    : options.data?.options ?? []
+  const selected = () => props.only ? selectedIds().map(id => ({ id, label: id })) : options.data?.options.filter(option => selectedIds().includes(option.id)) ?? []
   return <Picker
-    label={selected().length ? selected().map(option => option.label).join(', ') : props.value === MISSING ? props.multiple ? 'Every available scope' : 'Choose…' : String(props.value)}
+    label={selected().length ? selected().map(option => option.label).join(', ') : props.value === MISSING ? props.multiple ? 'Every available scope' : 'Choose…' : props.only ? 'Choose…' : String(props.value)}
     ariaLabel={props.field.label}
     placeholder={`Search ${props.field.label.toLowerCase()}`}
-    emptyText={options.isPending ? 'Loading options…' : options.isError ? 'Options unavailable.' : 'No matching options.'}
+    emptyText={props.only ? props.onlyPending ? 'Loading options…' : props.only.length ? 'No matching options.' : 'None are linked to this workspace.'
+      : options.isPending ? 'Loading options…' : options.isError ? 'Options unavailable.' : 'No matching options.'}
     disabled={props.disabled}
     onSearch={setSearch}
-    items={(options.data?.options ?? []).map(option => ({ id: option.id, label: option.label, active: selectedIds().includes(option.id) }))}
+    items={listed().map(option => ({ id: option.id, label: option.label, active: selectedIds().includes(option.id) }))}
     onPick={id => props.onChange(props.multiple ? selectedIds().includes(id) ? selectedIds().filter(value => value !== id) : [...selectedIds(), id] : id)}
     status={options.isError ? <Text emphasis="muted">Options could not be loaded. Your existing selection is retained.</Text> : undefined}
   />
@@ -427,24 +437,45 @@ export default function SourceQueryEditor(props: {
     const { [key]: _binding, ...bindings } = content()?.sourceParameters ?? {}
     emitContent({ ...content()!, query: next, sourceParameters: bindings })
   }
-  const setListReach = (field: DataField, reach: 'account' | 'workspace'): void => {
+  const setListReach = (field: DataField): void => {
     if (!query() || !content()) return
     const key = field.pointer.slice(1)
     const { [key]: _value, ...parameters } = query()!.scope.parameters
     const { [key]: _binding, ...bindings } = content()!.sourceParameters
     emitContent({ ...content()!, query: { ...query()!, scope: { ...query()!.scope, parameters } },
-      sourceParameters: reach === 'workspace' ? { ...bindings, [key]: { address: { from: 'context', name: 'workspaceLinks' } } } : bindings })
+      sourceParameters: { ...bindings, [key]: { address: { from: 'context', name: 'workspaceLinks' } } } })
   }
-  /** The panel picker draws a source's declared reach as one choice: everything, workspace links,
-   *  or chosen items, with the item picker only for the last. */
+  /** Choose all workspace links or a subset of them. */
   const isReachChoice = (described: DataSourceDescription, field: DataField): boolean =>
     !!props.pickSourceAccount && described.reach?.parameter === field.pointer && field.choices?.kind === 'dynamic'
-  const reachMode = (field: DataField): 'account' | 'workspace' | 'chosen' => {
+  const reachMode = (field: DataField): 'workspace' | 'chosen' => {
     const binding = content()?.sourceParameters[field.pointer.slice(1)]
     if (binding?.address.from === 'context' && binding.address.name === 'workspaceLinks') return 'workspace'
-    return Array.isArray(currentParameter(field)) ? 'chosen' : 'account'
+    return Array.isArray(currentParameter(field)) ? 'chosen' : 'workspace'
   }
   const currentParameter = (field: DataField) => query() ? readDataPointer(query()!.scope.parameters, field.pointer) : MISSING
+  /** The workspace's own items for the source's reach, such as its GitHub repositories, as the Node
+   *  resolves "linked to this workspace" (node-core queries/sourceContext.ts). Asked through the
+   *  resolve route, so the list a person picks from and the list a run reads can't disagree. */
+  const reachField = () => description.data?.reach && description.data.parameterFields.find(field => field.pointer === description.data!.reach!.parameter)
+  const listsWorkspaceItems = () => !!props.pickSourceAccount && !!reachField() && !!content()?.query.scope.connectionId && !!scope().workspaceId
+  const workspaceItems = createQuery(() => {
+    const field = reachField()
+    const current = content()
+    const connectionId = current?.query.scope.connectionId
+    return {
+      queryKey: [...queriesKey(nodeId(), scope()), 'workspace-items', current ? sourceKey(current.query.source) : null, connectionId ?? null, field?.pointer ?? null],
+      queryFn: async ({ signal }: { signal: AbortSignal }): Promise<string[]> => {
+        const linked: QueryContent = { ...current!, sourceParameters: { ...current!.sourceParameters, [field!.pointer.slice(1)]: { address: { from: 'context', name: 'workspaceLinks' } } } }
+        const resolved = await queriesClient(nodeId(), scope()).resolve({ kind: 'inline', content: linked, bindings: {} }, {}, signal)
+        const value = readDataPointer(resolved.query.scope.parameters, field!.pointer)
+        return Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
+      },
+      enabled: listsWorkspaceItems(),
+    }
+  })
+  /** A failed workspace read must not widen the picker to the whole account. */
+  const onlyItems = () => !listsWorkspaceItems() ? {} : { only: workspaceItems.data ?? [], onlyPending: workspaceItems.isPending }
   const parameterSchema = (field: DataField) => description.data ? schemaAtPointer(description.data.parameters, field.pointer) : undefined
   const queryFields = () => description.data?.fields.filter(field => field.query?.operators.length) ?? []
   const addFirstCondition = (): void => {
@@ -575,20 +606,26 @@ export default function SourceQueryEditor(props: {
       <Show when={description.isPending && canDescribe()}><Text emphasis="muted">Loading source fields…</Text></Show>
       <Show when={description.isError}><Alert tone="danger">{errorMessage(description.error)}</Alert></Show>
       <Show when={description.data}>{described => <>
-        <Show when={props.pickSourceAccount && !props.inputBinding && !described().reach}><Text emphasis="muted" wrap>{`Reach: ${described().consistency}`}</Text></Show>
+        {/* How fresh and complete the source's records are, in its own words. It isn't a reach. */}
+        <Show when={props.pickSourceAccount && !props.inputBinding && !described().reach}><Text emphasis="muted" wrap>{described().consistency}</Text></Show>
         <Show when={source()?.inputs && described().parameterFields.length}><Text emphasis="strong">Its own settings</Text></Show>
         <For each={described().parameterFields}>{field => <Show when={!isReachChoice(described(), field)} fallback={<Field label="Reach" group><Stack gap="row">
-          <SegmentedControl ariaLabel="Reach" size="sm" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field, mode as 'account' | 'workspace')}
-            options={[{ value: 'account', label: 'Everything this account can see' },
-              ...(props.inputBinding ? [] : [{ value: 'workspace', label: 'Workspace links' }]), { value: 'chosen', label: `Chosen ${described().reach!.itemPlural}` }]} />
+          <Select size="sm" label="Reach" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field)}
+            options={[{ value: 'workspace', label: `This workspace's ${described().reach!.itemPlural}` },
+              { value: 'chosen', label: `Only the ${described().reach!.itemPlural} I choose` }]} />
+          {/* What "this workspace's" covers, so the choice isn't a guess. */}
+          <Show when={reachMode(field) === 'workspace' && workspaceItems.data}>{items => <Text emphasis="muted" wrap>
+            {items().length ? items().join(', ') : `This workspace has ${described().reach!.empty}.`}
+          </Text>}</Show>
           <Show when={reachMode(field) === 'chosen'}>
+            <Show when={workspaceItems.isError}><Alert tone="danger">Could not load this workspace's links.</Alert></Show>
             <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple
+              {...onlyItems()}
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           </Show>
         </Stack></Field>}><Field label={field.label} hint={field.description} group>
           <Show when={!props.inputBinding && parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
-            <Button size="sm" variant="bare" onPress={() => setListReach(field, 'account')}>Everywhere this account can see</Button>
-            <Button size="sm" variant="bare" onPress={() => setListReach(field, 'workspace')}>Workspace links</Button>
+            <Button size="sm" variant="bare" onPress={() => setListReach(field)}>Workspace links</Button>
           </Inline></Show>
           <Show when={parameterSchema(field)}>{schema => field.choices?.kind === 'dynamic' ? (
             <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple={schema().type === 'array'}

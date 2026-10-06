@@ -141,11 +141,14 @@ export function renderBlocks(src: string, opts: MarkdownOptions = {}): MarkdownB
       const buf: string[] = []
       i++
       while (i < lines.length && !lines[i].trim().startsWith('```')) buf.push(lines[i++])
+      // A fence with no closing line is still streaming, or was never finished. The Markdown component
+      // draws a diagram only from a closed one, rather than retrying a half-written one every frame.
+      const open = i >= lines.length ? ' data-open=""' : ''
       i++ // closing fence
       // The language hint travels as an attribute rather than a class because nothing styles it: the
       // Markdown component reads it to pick a Shiki grammar, and a fence with no hint stays plain.
       const lang = fence[1] || 'text'
-      emit(`<div class="ui-code-wrap"><pre><code data-language="${esc(lang)}">${esc(buf.join('\n'))}</code></pre></div>`, start)
+      emit(`<div class="ui-code-wrap"><pre><code data-language="${esc(lang)}"${open}>${esc(buf.join('\n'))}</code></pre></div>`, start)
       continue
     }
     const h = /^(#{1,6})\s+(.*)$/.exec(line)

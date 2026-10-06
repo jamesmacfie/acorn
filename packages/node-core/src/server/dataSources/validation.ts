@@ -28,6 +28,15 @@ export function sourceFieldSchema(schema: DataSchema, pointer: string): DataSche
 export function validateDescription(description: DataSourceDescription): void {
   if (description.operations.incremental !== !!description.incremental) throw new DataSourceError('invalid-response')
   if (description.operations.details !== !!description.detailSchema) throw new DataSourceError('invalid-response')
+  if (description.projectScope) {
+    const { parameter, record } = description.projectScope
+    const parameterSchema = sourceFieldSchema(description.parameters, parameter)
+    const recordSchema = sourceFieldSchema(description.schema, record)
+    if (!/^\/[^/~]+$/.test(parameter) || recordSchema?.type !== 'string'
+      || !(parameterSchema?.type === 'string' || parameterSchema?.type === 'array' && parameterSchema.items?.type === 'string')) {
+      throw new DataSourceError('invalid-response')
+    }
+  }
   const fields = new Map(description.parameterFields.map(field => [field.pointer, field]))
   for (const [schema, metadata] of [[description.schema, description.fields], [description.parameters, description.parameterFields]] as const) {
     for (const field of metadata) {

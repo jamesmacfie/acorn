@@ -97,6 +97,17 @@ A fence takes its color from the theme. `highlightToHtml` asks Shiki for dual-th
 `defaultColor: false`, so each token carries both colors as `--l` and `--r`, and `.ui-markdown .shiki`
 picks one with `light-dark()`, as `.diff-code span` does.
 
+A closed ```` ```mermaid ```` fence becomes a diagram. `kit/lib/rendering/mermaid.ts` loads Mermaid
+the first time a surface shows one, and draws it in Mermaid's light or dark theme to match the app.
+The component redraws its diagrams when the appearance changes, because the colors are baked into
+the SVG. A fence with no closing line is marked `data-open` and stays code, so a streaming message
+draws its diagram once, when the fence closes. A diagram that doesn't parse also stays code, and the
+copy button copies the source either way.
+
+A diagram follows the same rule as a `placeholder` image. Mermaid's `strict` mode removes scripts, and
+`scrubDiagram` then removes everything that could make a request or navigate: images, links, and CSS
+that points outside the diagram. Plugin frames and the terminal client render fences as code.
+
 A caller has to keep one rule: `text` is read in an effect, and a prop is a getter, not a memo, so the
 effect runs whenever anything upstream changes. The guard on the last rendered string stops an
 identical value from touching the DOM.

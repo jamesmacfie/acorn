@@ -25,6 +25,7 @@ import type { DataRecordAction } from '@acorn/protocol/dataActions.ts'
 import { getDb } from '../db'
 import { getConnection } from '../integrations/connections'
 import { cachedSourceIdentity, rememberSourceIdentity } from './identityCache'
+import { workspaceSourceProjects, workspaceSourceQuery, recordProjectId } from './workspaceProjects'
 
 function parse<T>(schema: { parse(value: unknown): T }, input: unknown, response = true): T {
   try { return schema.parse(input) } catch { throw new DataSourceError(response ? 'invalid-response' : 'invalid-request') }
@@ -182,13 +183,27 @@ export async function invokeDataSource(env: Env, input: unknown, invocation: Dat
       || !fields.some(field => field.pointer === request.pointer && field.choices?.kind === 'dynamic')) {
       throw new DataSourceError('unsupported-query')
     }
-    const page = parse(dataSourceOptionsSchema, await dispatchRegistered(env, source, request, invocation, DATA_LIMITS.detailBytes, derived))
-    if (page.options.length > request.pageSize || page.exhausted === !!page.nextCursor
-      || new Set(page.options.map(option => option.id)).size !== page.options.length) {
-      throw new DataSourceError('invalid-response')
+    const linked = description.projectScope && request.target === 'parameter' && request.pointer === description.projectScope.parameter
+      ? await workspaceSourceProjects(env, scope, description.projectScope) : undefined
+    if (linked && !linked.projects.size) return { options: [], exhausted: true }
+    const options: { id: string; label: string }[] = []
+    const cursors = new Set<string>(request.cursor ? [request.cursor] : [])
+    let cursor = request.cursor
+    for (let index = 0; index < DATA_LIMITS.queryPages; index++) {
+      const pageSize = request.pageSize - options.length
+      const page = parse(dataSourceOptionsSchema, await dispatchRegistered(env, source, { ...request, cursor, pageSize }, invocation, DATA_LIMITS.detailBytes, derived))
+      if (page.options.length > pageSize || page.exhausted === !!page.nextCursor
+        || new Set(page.options.map(option => option.id)).size !== page.options.length) {
+        throw new DataSourceError('invalid-response')
+      }
+      if (page.nextCursor && cursors.has(page.nextCursor)) throw new DataSourceError('cursor-loop')
+      if (!linked) return page
+      options.push(...page.options.filter(option => linked.projects.has(linked.kind === 'repository' ? option.id.toLowerCase() : option.id)))
+      if (page.exhausted || options.length === request.pageSize || index === DATA_LIMITS.queryPages - 1) return { ...page, options }
+      cursor = page.nextCursor!
+      cursors.add(cursor)
     }
-    if (page.nextCursor && page.nextCursor === request.cursor) throw new DataSourceError('cursor-loop')
-    return page
+    throw new DataSourceError('invalid-response')
   }
   if (request.operation === 'actions') {
     validateRecordReference(request.ref, scope, true)
@@ -253,7 +268,9 @@ async function querySource(
   ownRevision: string,
   derived?: DerivedReadState,
 ): Promise<DataSourceResult> {
-  validateSourceQuery(request.query, description)
+  const linked = description.projectScope ? await workspaceSourceProjects(env, request.query.scope, description.projectScope) : undefined
+  if (linked?.projects.size) request = { ...request, query: workspaceSourceQuery(request.query, description, linked) }
+  if (!linked || linked.projects.size) validateSourceQuery(request.query, description)
   if (request.mode === 'execution' && request.cursor) throw new DataSourceError('invalid-request')
   let cursor = request.cursor
   const cursors = new Set<string>(cursor ? [cursor] : [])
@@ -265,6 +282,10 @@ async function querySource(
     completeness: { kind: 'incomplete', cause: 'host-budget' },
     mode: request.mode,
     evaluationTime: request.evaluationTime,
+  }
+  const selectedContainers = description.projectScope && request.query.scope.parameters[description.projectScope.parameter.slice(1)]
+  if (linked && (!linked.projects.size || Array.isArray(selectedContainers) && !selectedContainers.length)) {
+    return { ...result, completeness: { kind: 'complete' } }
   }
   let bytes = 0
   for (let index = 0; index < DATA_LIMITS.queryPages; index++) {
@@ -308,6 +329,7 @@ async function querySource(
         || !description.actions?.some(declared => declared.id === named.id && declared.risk === named.risk))) throw new DataSourceError('invalid-response')
       if (record.writableFields?.some(field => !description.writable?.some(declared => declared.field === field))) throw new DataSourceError('invalid-response')
       const { recordId, ...contents } = record
+      const projectId = linked && description.projectScope ? recordProjectId(record.data, description.projectScope, linked) : request.query.scope.projectId
       result.records.push({
         ...contents,
         ref: {
@@ -315,6 +337,7 @@ async function querySource(
           sourceId: source.sourceId,
           ...(request.query.scope.connectionId ? { connectionId: request.query.scope.connectionId } : {}),
           recordId,
+          ...(projectId ? { projectId } : {}),
           scope: request.query.scope,
         },
       })

@@ -167,6 +167,8 @@ export const panelPlanSchema = z.object({
     choices: z.array(choiceSchema).max(100).optional(),
     unmatched: z.enum(['catch-all', 'hidden']).optional(),
     precedence: z.array(columnId).max(8).optional(),
+    /** Left out of table and list views. Sort, group, filter, board, and chart can still use it. */
+    hidden: z.boolean().optional(),
     bind: z.record(columnId, bindingSchema),
   }).strict()).max(100),
   stages: z.array(stageSchema).max(8),

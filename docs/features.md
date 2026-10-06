@@ -81,9 +81,9 @@ rail, and leads its page with the fix. [Integrations](./integrations.md) covers 
 
 OpenAI and Anthropic are model-provider connections, used by features such as SQL generation. The
 model-provider plugin doesn't store prompts or responses. Settings > AI models lists what you can
-generate with, both keys and installed agent CLIs. It holds the one **Generate with** default that
-every Generate control opens on. That default is a device setting on a Node page, as
-[state ownership](./state-ownership.md) § Scope rules explains. The first-run wizard shows the same
+generate with, both keys and installed agent CLIs. Settings > Agents > Harnesses and defaults holds
+the one **Generate with** default that every Generate control opens on. That default is a device
+setting on a Node page, as [state ownership](./state-ownership.md) § Scope rules explains. The first-run wizard shows the same
 list on a **Generate with AI** step, with a key form per provider. The step never blocks: an agent
 CLI on the machine needs no setup, and you can skip both and find the list in Settings later.
 
@@ -135,7 +135,7 @@ A few pages need more detail:
 
 - **Harnesses and defaults** sets each harness, when an idle agent stops, how long an archived task
   keeps its agent history, what a new session starts on, and whether a terminal agent gets the task's
-  context.
+  context. Its **Generating text** section sets the device's shared **Generate with** default.
 - **Storage and memory** shows the Node's running agents and their memory, the Node's own memory, its
   database and blob cache sizes, and this device's saved cache for that Node. It has buttons to stop
   idle agents and clear the cache.

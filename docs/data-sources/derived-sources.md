@@ -150,7 +150,7 @@ has an account. In a plugin region, the region's rules apply to the derived sour
 In the studio, the source's inspector shows the same pickers under "From *Plugin*. Reads the inputs
 below with the accounts you choose here." Once an input has an account, its source's reach and
 parameters follow, drawn by a nested source picker in input mode (`inputBinding` on
-`SourceQueryEditor`). Input mode leaves out **Workspace links**, because a binding can't carry it. The
+`SourceQueryEditor`). Input mode leaves out the workspace's links, because a binding can't carry them. The
 derived source's own parameters follow under **Its own settings**, and **About this source** opens the
 plugin's page in Settings. The plugin never draws UI here.
 

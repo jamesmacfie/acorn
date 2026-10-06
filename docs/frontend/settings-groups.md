@@ -54,7 +54,7 @@ The Agents group has six pages, and the agents plugin owns four (`plugins/agents
 
 | Page | Owner | What it holds |
 | --- | --- | --- |
-| Harnesses and defaults (`agent-defaults`) | agents | Each harness and whether this machine can run it, usage limits, new-session defaults with the task-context switch, inline diff chats, and the device's **Tool call display** |
+| Harnesses and defaults (`agent-defaults`) | agents | Each harness and whether this machine can run it, usage limits, new-session defaults with the task-context switch, inline diff chats, and the device's **Generate with** and **Tool call display** |
 | Custom agents (`custom-agents`) | agents | A list, then one agent's editor with a danger zone |
 | Tools and permissions (`agent-tools`) | core | The three tiers, then every tool grouped by owner or tier |
 | MCP servers (`agent-mcp-servers`) | agents | The servers acorn declares to every session, a list then one server's editor |
@@ -75,7 +75,7 @@ what each holds.
 | Page | What it holds |
 | --- | --- |
 | Services (`integrations`) | Every connection that isn't a model key, one connection's page, and the Add connection gallery |
-| AI models (`ai-models`) | **Generate with**, a device row with its own chip, the model keys, and the agent CLIs this machine has |
+| AI models (`ai-models`) | The model keys and the agent CLIs this machine has |
 
 A connection's page and the gallery are details of the list, drawn by `ConnectionsPage.tsx`, which
 both pages share. A link to one from elsewhere goes through `openConnectionPage` in

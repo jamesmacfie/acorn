@@ -35,6 +35,7 @@ export type DataSourceDescription = {
   dataset?: { mode: 'current-mirror' | 'event-archive' | 'snapshot-history'; feeder: 'capture' | 'workflow' | 'agent' }
   coverageWindows?: { fromTime: number; toTime: number; kind: 'complete' | 'gap'; reason: string | null }[]
   reach?: { parameter: string; itemPlural: string; default: string; empty: string }
+  projectScope?: { kind: 'repository' | 'external-project'; parameter: string; record: string }
   coverage?: { kind: 'snapshot' } | { kind: 'events'; retention?: string; earliestTime?: number; complete: boolean }
   starterPlans?: unknown[]
   actions?: { id: string; label: string; icon?: string; risk: 'read' | 'write' | 'execute' }[]
@@ -46,7 +47,7 @@ export type DataSourceQuery = {
   sort: { pointer: string; direction: 'asc' | 'desc' }[]; take?: number
   incremental?: { kind: 'baseline' } | { kind: 'continue'; boundary: DataValue }
 }
-export type DataRecordRef = DataSourceRef & { connectionId?: string; recordId: string; scope?: DataSourceScope }
+export type DataRecordRef = DataSourceRef & { connectionId?: string; recordId: string; projectId?: string; scope?: DataSourceScope }
 export type DataSourceRequest =
   | { operation: 'describe'; source: DataSourceRef; scope: DataSourceScope }
   | { operation: 'identity'; source: DataSourceRef; scope: DataSourceScope }

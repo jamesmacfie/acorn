@@ -6,6 +6,7 @@ import { pullSourceDescription } from '../../shared/pullSourceDescription'
 import { pullSearch, selectPulls } from './pullQuery'
 import { readPullSelection, readRepositoryOptions, readViewerIdentity } from './pullRead'
 import { pullStateDetails, writePullState } from './pullWrite'
+import { READ_SENTENCES } from '../../shared/readFailures'
 
 type Selection = { key: string; page: DataSourcePage; expires: number; bytes: number }
 
@@ -90,9 +91,12 @@ export function createPullSourceHandler(): PluginFetchHandler {
       }
       return Response.json({ ...selection.page, records, completeness: more
         ? { kind: 'more', cursor: `${id}:${offset + records.length}` } : selection.page.completeness })
-    } catch {
-      // Provider bodies and credentials never become source error details.
-      return Response.json({ error: 'github_source_failed' }, { status: 502 })
+    } catch (error) {
+      // Provider bodies and credentials never become source error details. A code this plugin threw
+      // does, as the pull list's sentence for it, so a panel can say why it has no rows.
+      const code = error instanceof Error ? error.message : ''
+      const reason = Object.hasOwn(READ_SENTENCES, code) ? READ_SENTENCES[code] : undefined
+      return Response.json({ error: 'github_source_failed', ...(reason ? { reason } : {}) }, { status: code === 'rate_limited' ? 429 : 502 })
     }
   }
 }

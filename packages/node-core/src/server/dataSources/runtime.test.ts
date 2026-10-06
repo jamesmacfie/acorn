@@ -201,6 +201,14 @@ describe('typed source transport conformance', () => {
     await expect(invokeDataSource(env, query(mode), invocation())).rejects.toMatchObject({ code })
   })
 
+  it("keeps a failed source's own reason, and nothing else from its reply", async () => {
+    const { env } = await world()
+    const failed = await invokeDataSource(env, query('reason'), invocation()).catch((error: unknown) => error)
+    expect(failed).toMatchObject({ code: 'provider-failure', detail: { reason: 'The project was archived.' } })
+    expect(JSON.stringify(failed)).not.toContain('provider text')
+    await expect(invokeDataSource(env, query('error'), invocation())).rejects.toMatchObject({ code: 'provider-failure', detail: undefined })
+  })
+
   it('keeps preview and incomplete results nondispatchable', async () => {
     const { env } = await world()
     expect(await invokeDataSource(env, { ...query(), mode: 'preview' }, invocation())).toMatchObject({ mode: 'preview', completeness: { kind: 'more' }, records: [{ ref: { recordId: 'sample-1' } }] })

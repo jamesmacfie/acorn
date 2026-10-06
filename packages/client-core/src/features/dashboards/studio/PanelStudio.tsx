@@ -4,8 +4,8 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { panelPlanSchema, type DashboardView, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { AuthoringTurnResult } from '@acorn/protocol/authoring.ts'
 import { eventChord, isTypingTarget } from '@acorn/protocol/keybindings.ts'
-import type { PlanProblem, SourceFailure } from '@acorn/dashboards-core/plan.ts'
-import { columnParts, diffOutline, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
+import { describePanelPlan, type PlanProblem, type SourceFailure } from '@acorn/dashboards-core/plan.ts'
+import { columnParts, diffOutline, emptyRunReason, partForPath, planOutline, type OutlineDiff, type PartChange, type PlanPart, type PlanPartKey } from '@acorn/dashboards-core/outline.ts'
 import { planPartLabel, REQUIREMENT_STATUS_LABELS } from '@acorn/dashboards-core/labels.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
 import { reloadNodePlugin } from '../../../infra/node/nodePlugins'
@@ -40,8 +40,8 @@ import { describePanelSources, publishFailureMessage, publishPanelPlan } from '.
 import { dashboards, homeTabs, homeTabScope, type PlacementScope } from '../persist'
 import { regionRefusal, type PanelRegion } from '../region'
 import {
-  addColumnTo, addSourceTo, addStageTo, createSourceTracking, INSPECTORS, moveStageIn, NewSourceInspector, partKind, removeSourceFrom,
-  removeStageFrom, SourceInspector, type InspectorContext,
+  addColumnTo, addSourceTo, addStageTo, createSourceTracking, INSPECTORS, inspectorIntro, moveStageIn, NewSourceInspector, PanelGuide, partKind,
+  removeSourceFrom, removeStageFrom, SourceInspector, type InspectorContext,
 } from './inspectors'
 import type { LaunchResult } from './PanelLauncher'
 import { createStudioStore } from './studioStore'
@@ -299,6 +299,16 @@ export default function PanelStudio(props: {
   const outlineInputs = createMemo(() => review() ? planInputs(outlinePlan(), catalogSources(), connections()) : inputs())
   const previewPlan = () => review() && showing() === 'after' ? review()!.merged : plan()
   const previewData = () => review() && showing() === 'after' ? proposedRun() : run()
+  /** Why the preview has no rows, rather than only "Nothing to show": the plan's first error, or else
+   *  whether the source had nothing or which step removed everything. A number still draws, because a
+   *  count of 0 is an answer. The plan's problems are in plain words only for the plan as it is, so a
+   *  proposal's failed run keeps the view's own message. */
+  const emptyReason = () => {
+    const shown = previewData()
+    if (!shown || shown.rows.length || previewPlan().view.kind === 'stat') return undefined
+    if (!shown.diagnostics.problems.some(problem => problem.severity === 'error')) return emptyRunReason(previewPlan(), shown.diagnostics.stages)
+    return shown === run() ? problems().find(problem => problem.severity === 'error')?.message : undefined
+  }
   const onProposal = (proposal: Parameters<typeof store.reviewProposal>[0]): void => {
     setShowing('after')
     store.reviewProposal(proposal)
@@ -461,7 +471,11 @@ export default function PanelStudio(props: {
   const inspector = (
     <aside class="dash-studio-inspector" aria-label="Inspector" hidden={dockOpen()}>
       <Stack gap="stack">
-        <Heading level={3}>{addingSource() ? 'Pick data' : selectedPart()?.title ?? 'This panel'}</Heading>
+        <Show when={!addingSource() && selectedPart()} fallback={<Heading level={3}>{addingSource() ? 'Pick data' : 'How a panel works'}</Heading>}>{part => <>
+          <Heading level={3}>{inspectorIntro(plan(), part()).heading}</Heading>
+          <Show when={inspectorIntro(plan(), part()).help}>{help => <Text emphasis="muted" wrap>{help()}</Text>}</Show>
+        </>}</Show>
+        <Show when={addingSource()}><Text emphasis="muted" wrap>A second source can add rows, add columns to each row, or attach a list to each row.</Text></Show>
         <Show when={review()}><Text emphasis="muted" wrap>Apply or discard the proposal to keep editing.</Text></Show>
         <div class="dash-studio-forms" inert={!!review()}>
           <Show when={addingSource()}>
@@ -479,8 +493,10 @@ export default function PanelStudio(props: {
             <Show when={!key.startsWith('source:') && !key.startsWith('input:')}><Dynamic component={INSPECTORS[partKind(key)]} context={inspectorContext} part={key} /></Show>
           )}</Show>
           <Show when={!addingSource() && !selectedPart()}>
-            <Show when={plan().request}>{request => <Text wrap>{request()}</Text>}</Show>
-            <Text emphasis="muted" wrap>Select a part of the panel to change it.</Text>
+            <Stack gap="row">
+              <Show when={plan().request}>{request => <Field label="You asked for" group><Text wrap>{request()}</Text></Field>}</Show>
+              <PanelGuide plan={plan()} onSelect={select} />
+            </Stack>
           </Show>
         </div>
       </Stack>
@@ -495,7 +511,7 @@ export default function PanelStudio(props: {
       <DevelopmentStrip plugins={developing()} sources={developmentSources()} showingRecords={showingRecords()} reloading={reloadingPlugin()}
         onShowRecords={() => setShowingRecords(!showingRecords())} onReload={id => void reloadPlugin(id)} onLogs={id => openPluginSettings(id, 'logs')} />
       <Tabs idPrefix="dashboards-studio" ariaLabel="Studio view" active={tab()} onChange={id => setTab(id as 'outline' | 'plan')}
-        tabs={[{ id: 'outline', label: 'Outline' }, { id: 'plan', label: 'Plan' }]} />
+        tabs={[{ id: 'outline', label: 'Outline' }, { id: 'plan', label: 'JSON' }]} />
       <Show when={store.problem()}>{message => <Alert tone="warn">{message()}</Alert>}</Show>
       <div class="dash-studio-body">
         <Show when={tab() === 'outline'} fallback={<div class="dash-studio-code"><CodeBlock copy>{JSON.stringify(plan(), null, 2)}</CodeBlock></div>}>
@@ -515,7 +531,7 @@ export default function PanelStudio(props: {
                       {...(props.placed ? { placed: props.placed } : {})}
                       onRefresh={() => void (review() && showing() === 'after' ? proposedPreview : preview).refetch()}
                       onSelectPart={key => { if (parts().some(part => part.key === key)) select(key) }}
-                      onEditTitle={() => setEditingTitle(true)}
+                      onEditTitle={() => setEditingTitle(true)} {...(emptyReason() ? { emptyReason: emptyReason() } : {})}
                       {...(review() ? { review: { showing: showing(), onShow: setShowing, ...(run() ? { beforeRows: run()!.rows.length } : {}) } } : {})} />
                   </Show>
                 }>
@@ -540,8 +556,8 @@ export default function PanelStudio(props: {
       <Show when={reviewing()}>
         <Modal title="Publish panel" size="md" onDismiss={() => setReviewing(false)}>
           <Modal.Body><Stack gap="stack">
-            <Field label="What changes" group>
-              <Show when={diff()} fallback={<Text>New panel</Text>}>{changes => <Stack gap="none">
+            <Field label={diff() ? 'What changes' : 'What it shows'} group>
+              <Show when={diff()} fallback={<Stack gap="none"><For each={describePanelPlan(plan())}>{line => <Text wrap>{line}</Text>}</For></Stack>}>{changes => <Stack gap="none">
                 <For each={parts().filter(part => changes().parts[part.key] && changes().parts[part.key] !== 'same')}>{part => (
                   <Row density="compact" leading={<Icon name={part.icon} />} meta={<Badge size="xs">{CHANGE_WORDS[changes().parts[part.key] as Exclude<PartChange, 'same'>]}</Badge>}>{part.title}</Row>
                 )}</For>

@@ -51,9 +51,9 @@ can be retried. Claude's catalog is the CLI's stable aliases. An empty model ID 
 
 `GET /v1/core/models/backends` is device-only and returns `backends` in list order, plus `missing`:
 one-shot profiles whose command isn't here. It's an ID and label projection, not a generate endpoint.
-The onboarding wizard, Settings > AI models, and the AI SQL schema editor's gate read it. Only the
-wizard reads `missing`. A plugin frame uses its own plugin's route, because `/v1/core/*` has no bridge
-scope.
+The onboarding wizard, Settings > AI models, Settings > Agents > Harnesses and defaults, and the AI
+SQL schema editor's gate read it. The wizard and AI models page read `missing`. A plugin frame uses
+its own plugin's route, because `/v1/core/*` has no bridge scope.
 
 ## Calling a backend
 

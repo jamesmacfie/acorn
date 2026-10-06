@@ -3,7 +3,7 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { panelPlanSchema, type DashboardDraft, type PanelPlan } from '@acorn/protocol/dashboards.ts'
 import type { QueryReference } from '@acorn/protocol/dataQueries.ts'
 import type { DataSourceDescription, DataSourceScope } from '@acorn/protocol/dataSources.ts'
-import { describePanelPlan } from '@acorn/dashboards-core/plan.ts'
+import { planSummary, SOURCE_ICON, VIEW_ICONS } from '@acorn/dashboards-core/outline.ts'
 import { formatRelativeTime } from '@acorn/dashboards-core/relativeTime.ts'
 import { activeCacheId } from '../../../infra/node/activeNode'
 import { integrationsOptions, modelBackendsOptions, prefsOptions } from '../../../infra/queries'
@@ -21,6 +21,7 @@ import { Inline } from '../../../kit/components/layout/Inline'
 import { Rows } from '../../../kit/components/layout/Rows'
 import { Stack } from '../../../kit/components/layout/Stack'
 import { Text } from '../../../kit/components/content/Text'
+import Icon from '../../../kit/components/content/Icon'
 import { Modal } from '../../../kit/components/overlays/Modal'
 import { dashboardClient, dashboardDraftsKey } from '../dashboardClient'
 import { unpublishedDashboards } from '../dashboardEditorModel'
@@ -78,7 +79,13 @@ export default function PanelLauncher(props: {
     sources: catalog.data?.sources ?? [], connections: integrations.data?.integrations ?? [], saved: library.data ?? [], byAccount: true,
   }).filter(entry => !props.region || regionAllowsSource(props.region, sourceKey(entry.kind === 'saved' ? entry.query.content.query.source : entry.source))))
   const [search, setSearch] = createSignal('')
-  const shown = createMemo(() => entries().filter(entry => entry.label.toLowerCase().includes(search().trim().toLowerCase())))
+  const shown = createMemo(() => entries().filter(entry => `${entry.label} ${entry.group}`.toLowerCase().includes(search().trim().toLowerCase())))
+  /** The shown entries under where they come from, in catalog order: "Acorn", "Agents", "GitHub · Work". */
+  const groups = createMemo(() => {
+    const byGroup = new Map<string, SourceEntry[]>()
+    for (const entry of shown()) byGroup.set(entry.group, [...byGroup.get(entry.group) ?? [], entry])
+    return [...byGroup].map(([label, members]) => ({ label, members }))
+  })
   const referenceFor = (entry: SourceEntry, inputs?: DataSourceScope['inputs']): QueryReference => entry.kind === 'saved'
     ? { kind: 'saved', queryId: entry.query.id, bindings: {} }
     : sourceReference(entry.source, { ...baseScope, ...(entry.connectionId ? { connectionId: entry.connectionId } : {}), ...(inputs ? { inputs } : {}) })
@@ -95,6 +102,7 @@ export default function PanelLauncher(props: {
   }))].slice(0, SUGGESTIONS))
 
   const [picked, setPicked] = createSignal<SourceEntry>()
+  let back: HTMLDivElement | undefined
   /** A picked derived source's input bindings, one account per input. */
   const [inputBindings, setInputBindings] = createSignal<DataSourceScope['inputs']>()
   const pickedReference = createMemo(() => picked() && referenceFor(picked()!, inputBindings()))
@@ -121,6 +129,8 @@ export default function PanelLauncher(props: {
     else {
       setInputBindings(defaultInputBindings(entry.source, catalog.data?.sources ?? [], integrations.data?.integrations ?? []))
       setPicked(entry)
+      // The row that had focus is gone, so focus moves to the way back.
+      queueMicrotask(() => back?.querySelector('button')?.focus())
     }
   }
   const startFrom = (key: string): void => {
@@ -130,8 +140,10 @@ export default function PanelLauncher(props: {
     props.onLaunch({ kind: 'source', reference, ...(starter ? { starter } : {}) })
   }
   const starterRows = () => [
-    ...(starters() ?? []).map((starter, index) => ({ key: String(index), label: starter.title, detail: describePanelPlan(starter)[0], disabled: unbound().length > 0 })),
-    { key: BLANK, label: 'Blank', detail: 'Start with the source and its main fields.', disabled: unbound().length > 0 },
+    ...(starters() ?? []).map((starter, index) => ({
+      key: String(index), label: starter.title, detail: planSummary(starter), icon: VIEW_ICONS[starter.view.kind], disabled: unbound().length > 0,
+    })),
+    { key: BLANK, label: 'Blank panel', detail: 'Just the source, with its main fields as columns. Build the rest yourself.', icon: 'plus', disabled: unbound().length > 0 },
   ]
 
   // ── Drafts ───────────────────────────────────────────────────────────────────────────────────
@@ -149,74 +161,100 @@ export default function PanelLauncher(props: {
   return (
     <Modal title="Add panel" size="lg" onDismiss={props.onDismiss}>
       <Modal.Body><Stack gap="stack">
-        <Composer value={request()} onInput={setRequest} placeholder="Describe what you want to see" submitLabel="Draft it" disabled={!pick()}
+        <Text emphasis="muted" wrap>A panel shows live records from one of your sources. Say what you want and AI drafts it, or pick a source and build it yourself.</Text>
+        <SectionHeader level="group">Describe it</SectionHeader>
+        <Composer value={request()} onInput={setRequest} placeholder="For example: my open pull requests that need a review, oldest first" submitLabel="Draft it" disabled={!pick()}
           onSubmit={value => props.onLaunch({ kind: 'describe', request: value.trim() })} />
         <Show when={pick()} fallback={<Text emphasis="muted" wrap>Connect a model in Settings to draft a panel with AI.</Text>}>{current =>
-          <ModelBackendPicker backends={backends.data?.backends ?? []} backendId={current().backendId} modelId={current().modelId} onChange={next => {
-            setChoice(next)
-            void saveGeneratePick(queryClient, next)
-          }} />
+          <div class="dash-launcher-model">
+            <Text emphasis="muted">Drafts with</Text>
+            <ModelBackendPicker backends={backends.data?.backends ?? []} backendId={current().backendId} modelId={current().modelId} onChange={next => {
+              setChoice(next)
+              void saveGeneratePick(queryClient, next)
+            }} />
+          </div>
         }</Show>
         <Show when={suggestions().length}>
-          <Inline gap="inline" wrap><For each={suggestions()}>{title => <Chip onPress={() => setRequest(title)}>{title}</Chip>}</For></Inline>
+          <Inline gap="inline" wrap>
+            <Text emphasis="muted">Try</Text>
+            <For each={suggestions()}>{title => <Chip onPress={() => setRequest(title)}>{title}</Chip>}</For>
+          </Inline>
         </Show>
 
-        <SectionHeader level="group">Or start from data</SectionHeader>
-        <Input label="Search sources" placeholder="Search sources and saved queries" value={search()} onInput={setSearch} />
-        <Show when={catalog.isError}><Alert tone="warn">Sources couldn't be loaded. Try again once the Node reconnects.</Alert></Show>
-        <Show when={shown().length} fallback={<Text emphasis="muted">{catalog.isPending ? 'Loading sources…' : 'No sources match.'}</Text>}>
-          <Rows id="dashboards.launcher.sources" ariaLabel="Sources" items={shown().map(entry => ({ key: entry.id, label: entry.label }))}
-            selected={picked()?.id ?? null} onSelect={choose}>
-            {(item, itemProps, selected) => (
-              <Row item={itemProps} selected={selected()} density="compact" onPress={() => choose(item.key)}
-                meta={<Show when={entries().find(entry => entry.id === item.key)?.note}>{note => <Text emphasis="muted">{note()}</Text>}</Show>}>
-                {item.label}
-              </Row>
-            )}
-          </Rows>
-        </Show>
-        <Show when={pickedSource()?.inputs}>{inputs => (
-          <Field label="Choose an account for each input" group>
-            <For each={Object.keys(inputs())}>{name => {
-              const input = () => inputs()[name]!
-              const providerId = () => inputSourceOf(input(), catalog.data?.sources ?? [])?.providerId
-              return <Show when={providerId()}>
-                <InputAccountField label={input().label} optional={input().optional} provider={inputProviderLabel(input(), catalog.data?.sources ?? [])}
-                  connections={usableConnections(integrations.data?.integrations ?? [], providerId())}
-                  value={inputBindings()?.[name]?.connectionId} bound={!!inputBindings()?.[name]} onChange={connectionId => bindInput(name, connectionId)} />
-              </Show>
-            }}</For>
-          </Field>
-        )}</Show>
-        <Show when={picked()?.kind === 'source' && picked()}>{entry => (
-          <Field label={`Start ${entry().label} from`} group>
+        <SectionHeader level="group">Start from data</SectionHeader>
+        {/* Two steps in one place: pick a source, then a starting point for it. Picking swaps the list
+            for the starting points, so they show where the person is looking rather than below it. */}
+        <Show when={picked()?.kind === 'source' && picked()} fallback={<>
+          <Text emphasis="muted" wrap>Pick where the panel's rows come from. Next you choose a starting point.</Text>
+          <Input label="Search sources" placeholder="Search sources and saved queries" value={search()} onInput={setSearch} />
+          <Show when={catalog.isError}><Alert tone="warn">Sources couldn't be loaded. Try again once the Node reconnects.</Alert></Show>
+          <Show when={shown().length} fallback={<Text emphasis="muted">{catalog.isPending ? 'Loading sources…' : 'No sources match.'}</Text>}>
+            <For each={groups()}>{group => <>
+              <SectionHeader level="sub">{group.label}</SectionHeader>
+              <Rows id={`dashboards.launcher.sources.${group.label}`} ariaLabel={group.label}
+                items={group.members.map(entry => ({ key: entry.id, label: entry.label, entry }))} selected={null} onSelect={choose}>
+                {(item, itemProps, selected) => (
+                  <Row item={itemProps} selected={selected()} density="compact" variant={item.entry.detail ? 'stacked' : 'default'} onPress={() => choose(item.key)}
+                    leading={<Icon name={item.entry.icon ?? (item.entry.kind === 'saved' ? 'file-search' : SOURCE_ICON)} />} trailing={<Icon name="chevron-right" />}>
+                    <Stack gap="none">
+                      <Text>{item.entry.name}</Text>
+                      <Show when={item.entry.detail}>{detail => <Text emphasis="muted">{detail()}</Text>}</Show>
+                    </Stack>
+                  </Row>
+                )}
+              </Rows>
+            </>}</For>
+          </Show>
+        </>}>{entry => <>
+          <div class="dash-launcher-picked" ref={back}>
+            <Icon name={entry().icon ?? SOURCE_ICON} />
+            <Stack gap="none"><Text emphasis="strong">{entry().name}</Text><Text emphasis="muted">{entry().group}</Text></Stack>
+            <Button size="sm" variant="ghost" onPress={() => setPicked(undefined)}>Change source</Button>
+          </div>
+          <Show when={pickedSource()?.inputs}>{inputs => (
+            <Field label="Choose an account for each input" group>
+              <For each={Object.keys(inputs())}>{name => {
+                const input = () => inputs()[name]!
+                const providerId = () => inputSourceOf(input(), catalog.data?.sources ?? [])?.providerId
+                return <Show when={providerId()}>
+                  <InputAccountField label={input().label} optional={input().optional} provider={inputProviderLabel(input(), catalog.data?.sources ?? [])}
+                    connections={usableConnections(integrations.data?.integrations ?? [], providerId())}
+                    value={inputBindings()?.[name]?.connectionId} bound={!!inputBindings()?.[name]} onChange={connectionId => bindInput(name, connectionId)} />
+                </Show>
+              }}</For>
+            </Field>
+          )}</Show>
+          <Field label="Pick a starting point" group>
+            <Text emphasis="muted" wrap>A starter is a ready-made panel. You can change any of it once it opens.</Text>
             <Show when={unbound().length}><Text emphasis="muted" wrap>Choose an account for each input to start.</Text></Show>
             <Show when={description.isError}><Alert tone="warn">This source couldn't describe its fields, so it has no starter panels.</Alert></Show>
             <Show when={!description.isPending && !starters.loading} fallback={<Text emphasis="muted">Looking for starter panels…</Text>}>
-              <Rows id="dashboards.launcher.starters" ariaLabel="Starter panels" items={starterRows()} selected={null} onSelect={startFrom}>
+              <Rows id="dashboards.launcher.starters" ariaLabel="Starting points" items={starterRows()} selected={null} onSelect={startFrom}>
                 {(item, itemProps, selected) => (
-                  <Row item={itemProps} selected={selected()} density="compact" variant="stacked" onPress={() => startFrom(item.key)}>
-                    <Stack gap="none"><Text>{item.label}</Text><Text emphasis="muted">{item.detail}</Text></Stack>
+                  <Row item={itemProps} selected={selected()} density="compact" variant="stacked" onPress={() => startFrom(item.key)}
+                    leading={<Icon name={item.icon} />} trailing={<Icon name="chevron-right" />}>
+                    <Stack gap="none"><Text>{item.label}</Text><Text emphasis="muted" wrap>{item.detail}</Text></Stack>
                   </Row>
                 )}
               </Rows>
             </Show>
           </Field>
-        )}</Show>
+        </>}</Show>
 
         <Show when={unfinished().length}>
           <SectionHeader level="group">Unfinished</SectionHeader>
-          <Stack gap="row">
+          <Stack gap="none">
             <For each={allDrafts() ? unfinished() : unfinished().slice(0, DRAFTS_SHOWN)}>{draft => (
-              <Inline gap="inline" wrap>
-                <Text>{draft.content.title}</Text>
-                <Text emphasis="muted">{`edited ${formatRelativeTime(draft.updatedAt)}`}</Text>
-                <Button size="sm" onPress={() => props.onLaunch({ kind: 'draft', dashboardId: draft.id })}>Continue</Button>
-                <ConfirmButton size="sm" variant="ghost" confirmLabel="Discard draft?" onConfirm={() => void discard(draft)}>Discard</ConfirmButton>
-              </Inline>
+              <Row density="compact" leading={<Icon name="square-pen" />} meta={<Text emphasis="muted">{`Edited ${formatRelativeTime(draft.updatedAt)}`}</Text>}
+                trailing={<Inline gap="inline">
+                  <Button size="sm" onPress={() => props.onLaunch({ kind: 'draft', dashboardId: draft.id })}>Continue</Button>
+                  <ConfirmButton size="sm" variant="ghost" confirmLabel="Discard draft?" onConfirm={() => void discard(draft)}>Discard</ConfirmButton>
+                </Inline>}>
+                {draft.content.title}
+              </Row>
             )}</For>
             <Show when={!allDrafts() && unfinished().length > DRAFTS_SHOWN}>
-              <Button size="sm" variant="bare" onPress={() => setAllDrafts(true)}>{`and ${unfinished().length - DRAFTS_SHOWN} more`}</Button>
+              <Inline><Button size="sm" variant="bare" onPress={() => setAllDrafts(true)}>{`Show ${unfinished().length - DRAFTS_SHOWN} more`}</Button></Inline>
             </Show>
           </Stack>
         </Show>

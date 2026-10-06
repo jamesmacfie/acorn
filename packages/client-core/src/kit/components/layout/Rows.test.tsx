@@ -1,4 +1,4 @@
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, onTestFinished, vi } from 'vitest'
 import { Row } from '../primitives'
@@ -201,4 +201,16 @@ it('admits a bounded first frame and replays an early reveal when geometry arriv
   await vi.waitFor(() => expect(rows().some((row) => row.textContent === '1999')).toBe(true))
   expect(rows().length).toBeLessThan(40)
   expect(host.querySelector('[role="listbox"]')?.getAttribute('aria-activedescendant')).toBe('rows-early-reveal-item-1999')
+})
+
+describe('Row slots', () => {
+  it('draws no leading slot when every mark inside it is hidden', () => {
+    const [shown, setShown] = createSignal(false)
+    mount(() => (
+      <Row leading={<><Show when={shown()}><span>a</span></Show><Show when={shown()}><span>b</span></Show></>}>Title</Row>
+    ))
+    expect(host.querySelector('.ui-row-leading')).toBeNull()
+    setShown(true)
+    expect(host.querySelector('.ui-row-leading')?.textContent).toBe('ab')
+  })
 })

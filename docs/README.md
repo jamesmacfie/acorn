@@ -290,6 +290,17 @@ Each feature landing page above has topic pages in a folder of the same name:
   delivery records kept while acceptance is open. Its README indexes every programme and single file,
   including the [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
   in an owning doc above.
+- [DeerFlow review](./future/deerflow/README.md): five proposals taken from DeerFlow,
+  [session references](./future/deerflow/01-session-references.md),
+  [session goals](./future/deerflow/02-session-goals.md),
+  [agent history search](./future/deerflow/03-history-search.md),
+  [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
+  [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
+  [what it refused](./future/deerflow/refused.md).
+- [Prompt caching analysis](./future/cache.md): Codex and Claude caching behavior, Acorn's protections,
+  proposed MCP and usage improvements, and verification before implementation.
+- [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
+  Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -298,6 +309,31 @@ Each feature landing page above has topic pages in a folder of the same name:
 Keep one owning page for each contract, and add every new page to this index in the same commit.
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
+
+## Future UI extension handoffs
+
+These planned handoffs follow Editor file viewers. They do not describe shipped behavior.
+
+| Document | What it holds |
+| --- | --- |
+| [Programme](./future/ui-extension/README.md) | Scope, prerequisites, sequential execution, and status. |
+| [Design](./future/ui-extension/design.md) | Ownership, data flow, carriers, identity, lifetime, and compatibility. |
+| [Refused alternatives](./future/ui-extension/refused.md) | Deferrals, isolation boundaries, and a retained path for later dynamic App hooks. |
+| [Phase 00](./future/ui-extension/00-foundations.md) | Confirm the shipped Editor prerequisites and extension contracts. |
+| [Phase 01](./future/ui-extension/01-link-previews.md) | URL and reference previews with host interaction and provider UI. |
+| [Phase 02](./future/ui-extension/02-transcript-media.md) | Sent attachment/artifact viewers and a read-only media capability. |
+| [Phase 03](./future/ui-extension/03-workflow-step-ui.md) | Provider-owned workflow result bodies and retained owner controls. |
+| [Phase 04](./future/ui-extension/04-resource-actions.md) | File row and document tab menus. |
+| [Phase 05](./future/ui-extension/05-message-actions.md) | Message and completed-turn actions. |
+| [Phase 06](./future/ui-extension/06-detail-regions.md) | Outer host regions for loaded detail owners. |
+| [Phase 07](./future/ui-extension/07-file-annotations.md) | Batched file and tab annotations. |
+| [Phase 08](./future/ui-extension/08-selection-actions.md) | Explicit actions on supported content selections. |
+| [Phase 09](./future/ui-extension/09-document-intelligence.md) | Route-backed document hover and diagnostics. |
+| [Phase 10](./future/ui-extension/10-markdown-fences.md) | Completed Markdown fence viewers with source and copy retained. |
+| [Phase 11](./future/ui-extension/11-toolbar-actions.md) | Preview and Terminal toolbar UI and narrow owner actions. |
+| [Phase 12](./future/ui-extension/12-rail-status.md) | Consenting source and task-pane status annotations. |
+| [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
+| [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
 
 ## Plugin topic pages
 

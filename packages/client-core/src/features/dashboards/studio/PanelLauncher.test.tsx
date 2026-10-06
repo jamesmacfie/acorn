@@ -35,6 +35,9 @@ const onLaunch = vi.fn<(result: LaunchResult) => void>()
 const settle = async (times = 4) => { for (let index = 0; index < times; index += 1) await new Promise(resolve => setTimeout(resolve, 0)) }
 const button = (text: string) => [...document.querySelectorAll('button')].find(entry => entry.textContent?.trim() === text) as HTMLButtonElement | undefined
 const row = (text: string) => [...document.querySelectorAll<HTMLElement>('.ui-row')].find(entry => entry.textContent?.includes(text))
+/** A source's row under its group heading, such as "Pull requests" under "github · Work". */
+const sourceRow = (group: string, name: string) => [...document.querySelectorAll<HTMLElement>(`.ui-rows[aria-label="${group}"] .ui-row`)]
+  .find(entry => entry.textContent?.includes(name))
 const bodies = (operation: string) => requests.mock.calls.flatMap(([path, options]) => path.endsWith(`/${operation}`) && options?.body ? [JSON.parse(options.body) as Record<string, unknown>] : [])
 const select = (label: string) => document.querySelector<HTMLButtonElement>(`button.ui-select[aria-label="${label}"]`)
 const choose = (label: string, value: string) => {
@@ -107,9 +110,11 @@ describe('PanelLauncher', () => {
   it("moves a starter onto the picked row's workspace and account", async () => {
     mount()
     await settle()
-    row('Pull requests · github · Work')!.click()
+    sourceRow('github · Work', 'Pull requests')!.click()
     await settle(8)
     expect(bodies('describe')[0]).toMatchObject({ scope: { workspaceId: 'w', connectionId: 'work' } })
+    // A starter reads as what it shows, not as "One row per record".
+    expect(row('My open pull requests')!.textContent).toContain('List')
     row('My open pull requests')!.click()
     const result = onLaunch.mock.calls[0]![0] as Extract<LaunchResult, { kind: 'source' }>
     expect(result.kind).toBe('source')
@@ -123,7 +128,7 @@ describe('PanelLauncher', () => {
     mount()
     await settle()
     expect(document.querySelector('.ui-chip')).toBeNull()
-    row('Pull requests · github · Work')!.click()
+    sourceRow('github · Work', 'Pull requests')!.click()
     await settle(8)
     dispose?.()
     mount()
@@ -140,6 +145,14 @@ describe('PanelLauncher', () => {
     await settle()
     row('Workspace tasks')!.click()
     await settle(8)
+    // The source list gives way to the source's starting points, with a way back to it.
+    expect(sourceRow('linear · Acme', 'Issues')).toBeUndefined()
+    button('Change source')!.click()
+    await settle()
+    // Each account's sources sit under one heading, and a row doesn't repeat it.
+    expect(sourceRow('linear · Acme', 'Issues')!.textContent).not.toContain('linear')
+    row('Workspace tasks')!.click()
+    await settle(8)
     row('Blank')!.click()
     expect(onLaunch).toHaveBeenCalledWith({ kind: 'source', reference: expect.objectContaining({ kind: 'inline' }) })
     expect((onLaunch.mock.calls[0]![0] as { starter?: PanelPlan }).starter).toBeUndefined()
@@ -148,7 +161,8 @@ describe('PanelLauncher', () => {
   it('picks an account per input, starting on the only one, and holds the starters until each required input has one', async () => {
     mount()
     await settle()
-    row('Release readiness · northwind · reads github and linear')!.click()
+    expect(sourceRow('northwind', 'Release readiness')!.textContent).toContain('Reads github and linear')
+    sourceRow('northwind', 'Release readiness')!.click()
     await settle(8)
     // GitHub has one account, so its input starts on it. Linear has two, so the person picks.
     expect(select('Pull requests')!.textContent).toContain('Work')
@@ -186,7 +200,7 @@ describe('PanelLauncher', () => {
     expect(text()).toContain('Fourth')
     expect(text()).not.toContain('First')
     expect(text()).not.toContain('Placed')
-    button('and 1 more')!.click()
+    button('Show 1 more')!.click()
     expect(text()).toContain('First')
     button('Continue')!.click()
     expect(onLaunch).toHaveBeenCalledWith({ kind: 'draft', dashboardId: 'd4' })

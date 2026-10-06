@@ -81,6 +81,11 @@ describe('renderMarkdown', () => {
     expect(renderMarkdown('```\nplain\n```')).toContain('data-language="text"')
   })
 
+  it('marks a fence that has not closed, so a diagram waits for the whole source', () => {
+    expect(renderMarkdown('```mermaid\nflowchart LR')).toContain('<code data-language="mermaid" data-open="">')
+    expect(renderMarkdown('```mermaid\nflowchart LR\n```')).not.toContain('data-open')
+  })
+
   it('never loads a remote image when told to use placeholders', () => {
     const html = renderMarkdown('![private](https://example.com/tracker.png)', { images: 'placeholder' })
     expect(html).toContain('[image: private]')

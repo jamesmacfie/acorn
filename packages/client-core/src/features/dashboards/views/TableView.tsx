@@ -16,14 +16,15 @@ import RowControls, { openRowMenu } from './RowControls'
 // allowed.
 
 export default function TableView(props: PanelViewProps) {
+  const fields = () => props.fields.filter(field => !field.hidden)
   const table = (rows: typeof props.rows) => (
     <Show
-      when={rows.length && props.fields.length}
+      when={rows.length && fields().length}
       fallback={<EmptyState align="start" size="sm">Nothing to show.</EmptyState>}
     >
       <Table size="sm" stickyHead>
         <TableRow head>
-          <For each={props.fields}>{(field) => <TableHead><Show when={props.onSelectPart} fallback={field.name}>
+          <For each={fields()}>{(field) => <TableHead><Show when={props.onSelectPart} fallback={field.name}>
             {select => <Button size="sm" variant="bare" onPress={() => select()(`column:${field.id}`)}>{field.name}</Button>}
           </Show></TableHead>}</For>
           <Show when={props.onButton || props.onCorrect}><TableHead>Actions</TableHead></Show>
@@ -31,7 +32,7 @@ export default function TableView(props: PanelViewProps) {
         <For each={rows}>
           {(row) => (
             <TableRow onPress={rowPress(props, row)} onMenu={props.onButton ? () => openRowMenu(props.panelId, row.id) : undefined} tip={!rowPress(props, row) && props.onActivate ? 'This row has no available destination.' : undefined}>
-              <For each={props.fields}>
+              <For each={fields()}>
                 {(field) => <TableCell><Show when={row.summaryStage !== undefined && props.onMeasureDrilldown && field.type === 'number'} fallback={<Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} />}>
                   <Button size="sm" variant="bare" onPress={() => props.onMeasureDrilldown?.(row, field.id)}><Cell field={field} value={row.values[field.id]} unit={row.units?.[field.id]} /></Button>
                 </Show><Show when={row.partial?.[field.id]}>{reason => <span title={reason()} aria-label={`Partial: ${reason()}`}> · partial</span>}</Show></TableCell>}

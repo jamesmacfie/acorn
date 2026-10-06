@@ -470,6 +470,7 @@ acorn-plugin-types: member DataRecordAction.surface
 acorn-plugin-types: member DataRecordAction.url
 acorn-plugin-types: member DataRecordAction.verb
 acorn-plugin-types: member DataRecordRef.connectionId
+acorn-plugin-types: member DataRecordRef.projectId
 acorn-plugin-types: member DataRecordRef.recordId
 acorn-plugin-types: member DataRecordRef.scope
 acorn-plugin-types: member DataSchema.additionalProperties
@@ -512,6 +513,10 @@ acorn-plugin-types: member DataSourceDescription.operations.options
 acorn-plugin-types: member DataSourceDescription.operations.query
 acorn-plugin-types: member DataSourceDescription.parameterFields
 acorn-plugin-types: member DataSourceDescription.parameters
+acorn-plugin-types: member DataSourceDescription.projectScope
+acorn-plugin-types: member DataSourceDescription.projectScope.kind
+acorn-plugin-types: member DataSourceDescription.projectScope.parameter
+acorn-plugin-types: member DataSourceDescription.projectScope.record
 acorn-plugin-types: member DataSourceDescription.reach
 acorn-plugin-types: member DataSourceDescription.reach.default
 acorn-plugin-types: member DataSourceDescription.reach.empty

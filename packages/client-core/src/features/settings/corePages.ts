@@ -99,9 +99,8 @@ const services: SearchDeclaration = {
   ],
 }
 const aiModels: SearchDeclaration = {
-  keywords: ['model', 'api key', 'keys for generating text', 'default model', 'llm', 'anthropic', 'openai', 'claude', 'codex', 'commit message', 'sql generation', 'generate'],
+  keywords: ['model', 'api key', 'keys for generating text', 'llm', 'anthropic', 'openai', 'claude', 'codex', 'commit message', 'sql generation', 'generate'],
   sections: [
-    { id: 'generate', label: 'Generating text', rows: ['Generate with'], keywords: ['default model', 'this device'] },
     { id: 'keys', label: 'API keys', keywords: ['add a key', 'provider key', 'replace key'] },
     { id: 'clis', label: 'Agent CLIs', keywords: ['installed', 'not installed', 'path'] },
   ],

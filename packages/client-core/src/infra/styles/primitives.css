@@ -1116,6 +1116,10 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-code[data-wrap] { white-space: pre-wrap; overflow-wrap: anywhere; }
 /* Capped with its own scroll, for a preview that must not push the page down. */
 .ui-code[data-max='block'] { max-height: 240px; }
+/* Terminal colour from an `ansi` block. Both sides ride the run as custom properties and light-dark()
+   picks one, the same way a highlighted fence does (§ Markdown below). */
+.ui-code [data-fg] { color: light-dark(var(--l), var(--r)); }
+.ui-code [data-bg] { background: light-dark(var(--lb), var(--rb)); }
 /* CodeBlock's own copy button, reached by position for the same reason. A markdown fence's button
    is a CopyButton and styles/copy.css owns that one. */
 .ui-code-wrap > .ui-btn { position: absolute; top: var(--space-2); right: var(--space-2); }
@@ -1238,6 +1242,8 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 .ui-row:hover .ui-row-actions,
 .ui-row:focus-within .ui-row-actions,
 .ui-row[data-selected] .ui-row-actions,
+.ui-table tr:hover .ui-row-actions,
+.ui-table tr:focus-within .ui-row-actions,
 .ui-row-actions:has([aria-expanded='true']) { opacity: 1; }
 
 /* ── SplitHandle ────────────────────────────────────────────────────────────────────────────
@@ -1434,6 +1440,16 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 /* A highlighted fence, coloured the way a diff row is (diff.css § Shiki dual-theme): both colours
    ride the token as --l/--r and light-dark() reads the side this theme's color-scheme asks for. */
 .ui-markdown .shiki, .ui-markdown .shiki span { color: light-dark(var(--l), var(--r)); }
+/* A ```mermaid fence drawn as a diagram (kit/lib/rendering/mermaid.ts), in the frame the fence had, so
+   it reads as the same block. Mermaid sizes the svg to its natural width; a wider one scrolls. */
+.ui-markdown .ui-mermaid {
+  padding: var(--space-4);
+  overflow-x: auto;
+  border: var(--surface-border);
+  border-radius: var(--radius);
+  background: var(--bg-subtle);
+  text-align: center;
+}
 .ui-markdown :is(h1, h2, h3) { font-size: var(--fs); margin: var(--space-4) 0 var(--space-2); }
 /* Links track the theme accent instead of the browser-default blue (clashes with non-blue themes). */
 .ui-markdown a { color: var(--accent); }

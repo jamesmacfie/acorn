@@ -144,6 +144,48 @@ describe('SourceQueryEditor', () => {
     expect(remove.disabled).toBe(true)
   })
 
+  it("lists only the workspace's repositories, as the Node resolves them, once Reach is the ones you choose", async () => {
+    const chosen: QueryReference = { ...initial, content: { ...initial.content, query: { ...initial.content.query,
+      scope: { workspaceId: 'w', connectionId: 'work', parameters: { repositories: ['org/old'] } } } } }
+    const fallback = requests.getMockImplementation()!
+    requests.mockImplementation(async (path, options) => {
+      const body = options?.body ? JSON.parse(options.body) as { operation?: string; reference?: QueryReference } : undefined
+      if (path.endsWith('/data-sources/list')) return { sources: [{ pluginId: 'fixture', sourceId: 'records', name: 'Pull requests', singular: 'Pull', plural: 'Pulls', identityScope: 'fixture', providerId: 'fixture' }], discoveries: [] }
+      if (path.includes('/integrations')) return { providers: [], integrations: [{ id: 'work', providerId: 'fixture', label: 'Fixture', status: 'connected' }] }
+      if (path.endsWith('/queries/resolve')) {
+        const linked = body?.reference?.kind === 'inline' && body.reference.content.sourceParameters.repositories
+        return { query: { ...chosen.content.query, scope: { ...chosen.content.query.scope, parameters: { repositories: linked ? ['org/a', 'org/b'] : ['org/old'] } } }, parameters: {} }
+      }
+      if (body?.operation === 'describe') return {
+        revision: '1', consistency: 'fixture', schema: { type: 'object', properties: {}, additionalProperties: true }, fields: [],
+        parameters: { type: 'object', properties: { repositories: { type: 'array', items: { type: 'string' } } }, additionalProperties: false },
+        parameterFields: [{ pointer: '/repositories', label: 'Repositories', origin: 'declared', choices: { kind: 'dynamic', dependsOn: [] } }],
+        operations: { query: true, options: true, details: false, incremental: false, groups: ['all'] },
+        reach: { parameter: '/repositories', itemPlural: 'repositories', default: 'everything', empty: 'no linked repositories' },
+      }
+      return fallback(path, options)
+    })
+    dispose = render(() => <QueryClientProvider client={client}>
+      <SourceQueryEditor workspaceId="w" value={chosen} onChange={() => {}} pickSourceAccount />
+    </QueryClientProvider>, host)
+    for (let tick = 0; tick < 6; tick++) await settle()
+    const reach = host.querySelector<HTMLButtonElement>('[aria-label="Reach"]')!
+    reach.click()
+    await settle()
+    expect([...document.querySelectorAll('[role="option"]')].map(option => option.textContent))
+      .toEqual(["This workspace's repositories", 'Only the repositories I choose'])
+    document.querySelector<HTMLButtonElement>('[role="option"][data-value="chosen"]')!.click()
+    await settle()
+    const trigger = [...host.querySelectorAll('button')].find(button => button.textContent?.includes('org/old')) as HTMLButtonElement
+    trigger.click()
+    await settle()
+    const listed = document.body.textContent ?? ''
+    expect(listed).toContain('org/a')
+    expect(listed).toContain('org/b')
+    // Nothing asked GitHub for every repository the account can see.
+    expect(requests.mock.calls.some(([, options]) => options?.body && JSON.parse(options.body).operation === 'options')).toBe(false)
+  })
+
   it('offers Add condition by default', async () => {
     dispose = render(() => <QueryClientProvider client={client}>
       <SourceQueryEditor workspaceId="w" projectId="p" value={initial} onChange={() => {}} />

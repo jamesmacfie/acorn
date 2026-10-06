@@ -3,10 +3,12 @@ import { createEffect, onCleanup } from 'solid-js'
 import { render } from 'solid-js/web'
 import { isGrammar, langFor } from '../../../infra/highlight/langs'
 import { renderBlocks, type MarkdownOptions } from '../../lib/rendering/markdown'
+import { watchAppearance } from '../../tokens/appearance'
 import CopyButton from '../inputs/CopyButton'
 
 // Markdown source to rendered DOM: the sanitizing pass in kit/lib/rendering/markdown.ts, then a Shiki
-// grammar per fence and a copy button on each one. Everything a call site would otherwise repeat.
+// grammar per fence, a diagram for each closed ```mermaid fence (kit/lib/rendering/mermaid.ts), and a
+// copy button on each one. Everything a call site would otherwise repeat.
 //
 // It renders block by block. A streaming agent message arrives about 25 times a second and grows at
 // the end, and this component used to answer each of those by replacing the whole subtree: every
@@ -30,7 +32,30 @@ const grammarFor = (hint: string): string | null => {
 // One rendered block: the element it produced, the copy button mounted inside it, and whether it is
 // still the current render's. `live` is what an in-flight highlight checks, rather than a render
 // generation: a block that survives three updates while its grammar loads must still get its colour.
-type Block = { key: string; el: Element; dispose?: () => void; live: boolean }
+// `diagrams` are its mermaid fences, kept so a theme change can redraw them.
+type Diagram = { wrap: Element; source: string; block: Block }
+type Block = { key: string; el: Element; dispose?: () => void; live: boolean; diagrams?: Diagram[] }
+
+// Drawn one at a time, because mermaid queues its renders anyway. A diagram that will not parse stays
+// on screen as its source, the way a fence whose grammar will not load stays plain.
+async function drawDiagrams(diagrams: Diagram[]): Promise<void> {
+  if (!diagrams.length) return
+  // Caught like a grammar load: an engine chunk that will not load must not reach the host as an
+  // unhandled rejection.
+  const engine = await import('../../lib/rendering/mermaid').catch(() => null)
+  if (!engine) return
+  for (const { wrap, source, block } of diagrams) {
+    if (!block.live) continue
+    const svg = await engine.renderMermaid(source).catch(() => null)
+    if (!svg || !block.live) continue
+    const figure = document.createElement('div')
+    figure.className = 'ui-mermaid'
+    figure.append(svg)
+    // Into the wrapper, like a highlight, so the copy button survives. The second match is the diagram
+    // a theme change is replacing.
+    wrap.querySelector(':scope > pre, :scope > .ui-mermaid')?.replaceWith(figure)
+  }
+}
 
 export default function Markdown(props: {
   text: string
@@ -56,12 +81,15 @@ export default function Markdown(props: {
   let root: HTMLDivElement | undefined
   let rendered: string | undefined
   let blocks: Block[] = []
+  // Watching starts with the first diagram, because most messages never hold one.
+  let stopWatchingAppearance: (() => void) | undefined
 
   const drop = (block: Block) => {
     block.live = false
     block.dispose?.()
   }
   onCleanup(() => {
+    stopWatchingAppearance?.()
     for (const block of blocks) drop(block)
     blocks = []
   })
@@ -85,6 +113,7 @@ export default function Markdown(props: {
     }
 
     const fences: { code: HTMLElement; grammar: string; wrap: Element; block: Block }[] = []
+    const diagrams: Diagram[] = []
     const placed: Block[] = []
     for (const { key, html } of next) {
       const reused = spare.get(key)?.shift()
@@ -108,10 +137,10 @@ export default function Markdown(props: {
           // Per block rather than on the root, so hovering one fence does not light up every button in
           // the document (styles/copy.css keys the reveal off a `.copyable` ancestor).
           wrap.classList.add('copyable')
-          // The accessor re-queries rather than closing over the element, because the highlight pass
-          // below replaces the `<pre>` it would have captured.
-          const codeText = () => wrap.querySelector('code')?.textContent ?? ''
-          const dispose = render(() => <CopyButton text={codeText} onCopy={props.onCopy} />, wrap)
+          // Read once, before the highlight or diagram pass replaces the `<pre>` it lives in. Neither
+          // changes the text, and a diagram has no `<code>` left to read.
+          const source = wrap.querySelector('code')?.textContent ?? ''
+          const dispose = render(() => <CopyButton text={() => source} onCopy={props.onCopy} />, wrap)
           const previous = block.dispose
           block.dispose = () => {
             previous?.()
@@ -121,6 +150,13 @@ export default function Markdown(props: {
       }
       for (const wrap of wraps) {
         const code = wrap.querySelector<HTMLElement>('pre > code[data-language]')
+        if (code?.dataset.language === 'mermaid' && !code.hasAttribute('data-open')) {
+          const diagram = { wrap, source: code.textContent ?? '', block }
+          block.diagrams ??= []
+          block.diagrams.push(diagram)
+          diagrams.push(diagram)
+          continue
+        }
         const grammar = code && grammarFor(code.dataset.language ?? 'text')
         if (code && grammar) fences.push({ code, grammar, wrap, block })
       }
@@ -138,6 +174,10 @@ export default function Markdown(props: {
     for (const queue of spare.values()) for (const block of queue) drop(block)
     blocks = placed
 
+    if (diagrams.length) {
+      stopWatchingAppearance ??= watchAppearance(() => void drawDiagrams(blocks.flatMap((block) => block.diagrams ?? [])))
+      void drawDiagrams(diagrams)
+    }
     if (!fences.length) return
     // Grammars load on demand (highlight/langs.ts), so each fence has to ask for its own before the
     // highlighter can route to it. The import is dynamic so a plugin frame that renders a ticket

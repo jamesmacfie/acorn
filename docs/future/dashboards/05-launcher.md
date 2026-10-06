@@ -206,8 +206,8 @@ The tests cover it.
 
 Left for later:
 
-- Each starter's description is the first line of `describePanelPlan`, as requirement 8 asks. For
-  single-source starters that's "One row per record from *Source*." every time, which doesn't tell
-  them apart. Their filter line would.
+- Each starter's description was the first line of `describePanelPlan`, which for single-source
+  starters is "One row per record from *Source*." every time. Fixed on October 5, 2026: a starter now
+  reads as its view, steps, and sort (`planSummary` in `outline.ts`).
 - In a starter with several sources, a source that doesn't read the picked source keeps its own
   scope. No shipped starter has more than one source.

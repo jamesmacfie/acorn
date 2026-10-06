@@ -4,8 +4,7 @@ import type { Integration } from '@acorn/protocol/api.ts'
 import type { PublicIntegrationProvider } from '@acorn/protocol/integrations.ts'
 
 // Services and AI models: a refused connection is listed first and its page leads with the fix, a
-// provider at its limit still shows in the gallery as connected, and Generate with says it is this
-// device's.
+// provider at its limit still shows in the gallery as connected, and model keys sit beside CLIs.
 const provider = (id: string, label: string, extra: Partial<PublicIntegrationProvider['connection']> = {}, kind: PublicIntegrationProvider['kind'] = 'issue-tracker'): PublicIntegrationProvider => ({
   id, label, kind, glyph: label[0]!, capabilities: {},
   connection: { authKind: 'api-key', fields: [{ id: 'token', label: 'Personal API key', type: 'password', required: true }], connectable: true, disconnectable: true, ...extra },
@@ -108,10 +107,8 @@ describe('Services', () => {
 })
 
 describe('AI models', () => {
-  it('marks Generate with as this device\'s and lists the node\'s keys and CLIs', () => {
+  it('lists the node\'s keys and CLIs', () => {
     dispose = render(() => <AiModelsSettings context={context} />, host)
-    const generate = [...host.querySelectorAll('.ui-setting-row')].find((row) => row.querySelector('.ui-setting-label')?.textContent?.startsWith('Generate with'))!
-    expect(generate.querySelector('.ui-setting-scope')?.textContent).toBe('This device')
     expect(labels('keys')).toEqual(['Anthropic'])
     expect(labels('clis')).toEqual(['Claude Code'])
   })

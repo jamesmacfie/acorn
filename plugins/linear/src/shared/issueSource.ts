@@ -8,6 +8,7 @@ export const issueSource: DataSourceRegistration = {
 
 export const issueSourceDescription: DataSourceDescription = {
   revision: '1',
+  projectScope: { kind: 'external-project', parameter: '/project', record: '/projectId' },
   schema: { type: 'object', additionalProperties: false, properties: {
     id: { type: 'string' }, identifier: { type: 'string' }, title: { type: 'string' }, url: { type: 'string' },
     description: { type: ['string', 'null'] }, projectId: { type: 'string' },

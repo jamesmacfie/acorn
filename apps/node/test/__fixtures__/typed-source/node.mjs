@@ -11,6 +11,7 @@ export async function fetchSource(request) {
   const scope = input.operation === 'query' ? input.query.scope : input.scope
   const mode = scope?.parameters?.mode
   if (mode === 'error') return new Response('Unavailable', { status: 503 })
+  if (mode === 'reason') return Response.json({ error: 'archived', reason: 'The project was archived.', body: 'provider text' }, { status: 502 })
   if (mode === 'timeout') return new Promise(() => {})
   if (input.operation === 'discover') return Response.json({ sources: [{ ...descriptor, sourceId: 'discovered' }], exhausted: true })
   if (input.operation === 'describe') return Response.json({

@@ -41,10 +41,11 @@ export const ghGraphQL = (token: string, query: string, variables: Record<string
   token
     ? fetch('https://api.github.com/graphql', {
         method: 'POST',
-        ...(signal ? { signal } : {}),
         headers: { ...ghHeaders(token), 'Content-Type': 'application/json' },
         body: JSON.stringify({ query, variables }),
-        signal: AbortSignal.timeout(REQUEST_TIMEOUT_MS),
+        // As with REST, a caller's own signal wins. A data source read brings its run's budget,
+        // and one search page can take longer than four seconds.
+        signal: signal ?? AbortSignal.timeout(REQUEST_TIMEOUT_MS),
       })
     : Promise.resolve(notConnected())
 

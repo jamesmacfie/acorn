@@ -4,7 +4,7 @@ import { DATA_OPERATORS } from '@acorn/protocol/dataBindings.ts'
 import {
   AGGREGATE_LABELS, ARITHMETIC_LABELS, BUCKET_LABELS, CHART_SHAPE_LABELS, COLUMN_TYPE_LABELS, COMPARE_LABELS, DURATION_UNIT_LABELS, EMPTY_SORT_LABELS, EXPRESSION_LABELS,
   GOOD_DIRECTION_LABELS, GROUP_ORDER_LABELS, MEASURE_LABELS, OPERATOR_LABELS, PRECISION_LABELS, PRESENTATION_LABELS, PREVIOUS_CHANGE_LABELS, RELATIVE_OFFSET_LABELS, REQUIREMENT_STATUS_LABELS,
-  SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNMATCHED_LABELS, VIEW_LABELS, WEEK_START_LABELS,
+  OPERATION_HELP, SORT_DIRECTION_LABELS, SOURCE_ROLE_LABELS, TIME_MODE_LABELS, TONE_LABELS, TREND_LABELS, UNMATCHED_LABELS, VIEW_HELP, VIEW_LABELS, WEEK_START_LABELS,
   calendarLabel, offsetLabel, operatorLabel, planPartLabel,
 } from './labels'
 
@@ -46,6 +46,8 @@ describe('panel labels', () => {
     ['measure', values(field(element(field(summarize, 'measures')), 'kind')), MEASURE_LABELS],
     ['group bucket', values(field(element(field(plan, 'group')), 'bucket')), BUCKET_LABELS],
     ['view', values(field(view, 'kind')), VIEW_LABELS],
+    ['view help', values(field(view, 'kind')), VIEW_HELP],
+    ['operation help', variants(stages).flatMap(option => values(field(option, 'op'))), OPERATION_HELP],
     ['aggregate', values(field(view, 'aggregate')), AGGREGATE_LABELS],
     ['chart shape', values(field(view, 'shape')), CHART_SHAPE_LABELS],
     ['presentation', values(field(field(field(plan, 'actions'), 'press'), 'prefer')), PRESENTATION_LABELS],

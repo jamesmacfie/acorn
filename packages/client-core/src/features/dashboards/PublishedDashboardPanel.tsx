@@ -20,7 +20,8 @@ import { descriptorPromotion } from '../../host/chrome/promotion'
 import { writeJson } from '../../infra/node/apiClient'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
 import { activeCacheId } from '../../infra/node/activeNode'
-import { Alert, Button, Card, EmptyState, Select, Textarea } from '../../kit/components/primitives'
+import { Alert, Button, Card, EmptyState, Textarea } from '../../kit/components/primitives'
+import { Modal } from '../../kit/components/overlays/Modal'
 import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
@@ -100,6 +101,8 @@ export default function PublishedDashboardPanel(props: {
   const [pending, setPending] = createSignal<{ row: DashboardDisplayRow; action: DataRecordAction; actionId?: string }>()
   const [taskRow, setTaskRow] = createSignal<DashboardDisplayRow>()
   const [taskProject, setTaskProject] = createSignal('')
+  const [taskBusy, setTaskBusy] = createSignal(false)
+  const [taskError, setTaskError] = createSignal('')
   const [outcome, setOutcome] = createSignal('')
   const [correcting, setCorrecting] = createSignal<DashboardDisplayRow>()
   const [correction, setCorrection] = createSignal('null')
@@ -143,7 +146,17 @@ export default function PublishedDashboardPanel(props: {
     else setOutcome('This source has no destination for the record.')
   }
   const dispatch = (row: DashboardDisplayRow, action: DataRecordAction, actionId?: string, prefer: 'route' | 'refPanel' | 'pane' | 'overlay' | 'external' = 'route'): void => {
-    if (action.verb === 'createTask') { setTaskRow(row); setTaskProject(taskById(row.taskId ?? '')?.projectId ?? row.records?.[0]?.scope?.projectId ?? ''); return }
+    if (action.verb === 'createTask') {
+      setTaskError('')
+      const recordProjects = (row.records ?? []).map(ref => ref.projectId ?? ref.scope?.projectId)
+      const projects = new Set(recordProjects)
+      const projectId = taskById(row.taskId ?? '')?.projectId ?? (projects.size === 1 ? recordProjects[0] : undefined)
+      const project = allProjects().find(candidate => candidate.id === projectId && candidate.workspaceId === props.workspaceId)
+      if (!project) { setOutcome('This record needs a link to one project in this workspace before you can start a task.'); return }
+      setTaskProject(project.id)
+      setTaskRow(row)
+      return
+    }
     if (actionId) {
       const ref = row.records?.[0]
       if (!ref) { setOutcome('This row has no source record.'); return }
@@ -283,6 +296,9 @@ export default function PublishedDashboardPanel(props: {
     } catch { setOutcome('Could not add the panel.') }
   }
   const startTaskFromRow = async (row: DashboardDisplayRow): Promise<void> => {
+    if (taskBusy() || !taskProject()) return
+    setTaskBusy(true)
+    setTaskError('')
     const item = { id: row.sourceRowId ?? row.id, title: rowTitle(row) }
     const promotion = descriptorPromotion(row.pluginId)
     const context = { projectId: taskProject(), owner: '', repo: '' }
@@ -292,7 +308,8 @@ export default function PublishedDashboardPanel(props: {
       await promotion.afterCreate?.(task, item, context)
       setTaskRow(undefined)
       setOutcome('Task created.')
-    } catch { setOutcome('Could not create the task.') }
+    } catch { setTaskError('Could not create the task.') }
+    finally { setTaskBusy(false) }
   }
   const saveCorrection = async (): Promise<void> => {
     const row = correcting()
@@ -348,11 +365,6 @@ export default function PublishedDashboardPanel(props: {
         </>}>Correct {rowTitle(row())}. Enter the corrected value as JSON; it remains attached to this record across later writes.
           <Textarea label="Corrected value" rows={3} value={correction()} onChange={setCorrection} />
         </Alert>}</Show>
-        <Show when={taskRow()}>{row => <Alert tone="muted" actions={<>
-          <Select label="Project" size="sm" value={taskProject()} options={allProjects().map(project => ({ value: project.id, label: project.name }))} onChange={setTaskProject} />
-          <Button size="sm" variant="ghost" onPress={() => setTaskRow(undefined)}>Cancel</Button>
-          <Button size="sm" disabled={!taskProject()} onPress={() => void startTaskFromRow(row())}>Create task</Button>
-        </>}>Start a task from this row</Alert>}</Show>
         <Show when={pending()}>{item => <Alert tone="warn" actions={<>
           <Button size="sm" variant="ghost" onPress={() => setPending(undefined)}>Cancel</Button>
           <Button size="sm" variant="solid" tone="danger" onPress={() => { setPending(undefined); dispatch(item().row, item().action, item().actionId) }}>{RISK_CONFIRM[item().action.risk ?? '']?.verb ?? 'Continue?'}</Button>
@@ -368,6 +380,17 @@ export default function PublishedDashboardPanel(props: {
         </Show>
       </Show>
     </div>
+    <Show when={taskRow()}>{row => <Modal title="Start task" size="sm" onDismiss={() => { if (!taskBusy()) setTaskRow(undefined) }}>
+      <Modal.Body>
+        <p>{rowTitle(row())}</p>
+        <p>{`Create in ${allProjects().find(project => project.id === taskProject())?.name ?? 'the linked project'}.`}</p>
+        <Show when={taskError()}>{message => <Alert tone="danger">{message()}</Alert>}</Show>
+      </Modal.Body>
+      <Modal.Actions>
+        <Button size="sm" variant="ghost" disabled={taskBusy()} onPress={() => setTaskRow(undefined)}>Cancel</Button>
+        <Button size="sm" variant="solid" busy={taskBusy()} disabled={!taskProject()} onPress={() => void startTaskFromRow(row())}>Create task</Button>
+      </Modal.Actions>
+    </Modal>}</Show>
     <Show when={drill()}>{value => <Portal><div class="dash-drill-backdrop" onClick={() => setDrill(undefined)} /><aside class="dash-drill-panel" role="dialog" aria-modal="true" aria-label="Rows behind this result">
       <div class="dash-panel-head"><Heading level={3}>{value().plan.title}</Heading><Button size="sm" variant="ghost" onPress={() => setDrill(undefined)}>Close</Button></div>
       <Show when={value().loading}><Alert tone="muted">Preparing the panel at the original evaluation instant…</Alert></Show>

@@ -28,6 +28,11 @@ describe('describeSourceFailure', () => {
     [{ code: 'incomplete', reason: 'upstream-cap', input: 'pulls' }, names, 'GitHub returned only part of the pull requests, so some items may be missing.', undefined],
     [{ code: 'incomplete', reason: 'upstream-cap' }, bare, 'Release readiness returned only part of its records, so some items may be missing.', undefined],
     [{ code: 'provider-failure' }, names, "Release readiness couldn't answer.", 'retry'],
+    // The source's own reason says why, unless it's only a code or a status.
+    [{ code: 'provider-failure', reason: "GitHub turned down acorn's sign-in" }, names, "Release readiness couldn't answer. GitHub turned down acorn's sign-in.", 'retry'],
+    [{ code: 'provider-failure', reason: 'provider-failure' }, names, "Release readiness couldn't answer.", 'retry'],
+    [{ code: 'provider-failure', reason: '502' }, names, "Release readiness couldn't answer.", 'retry'],
+    [{ code: 'provider-failure', reason: 'github_unavailable' }, names, "Release readiness couldn't answer.", 'retry'],
   ])('%j', (failure, given, message, fix) => {
     expect(describeSourceFailure(failure, given)).toEqual({ message, ...(fix ? { fix } : {}) })
   })

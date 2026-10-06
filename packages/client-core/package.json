@@ -168,6 +168,7 @@
     "./kit/lib/savedSignal": "./src/kit/lib/controls/savedSignal.ts",
     "./kit/lib/graphLayout": "./src/kit/lib/layout/graphLayout.ts",
     "./kit/lib/markdown": "./src/kit/lib/rendering/markdown.ts",
+    "./kit/lib/ansi": "./src/kit/lib/rendering/ansi.ts",
     "./kit/lib/modelProviderFailure": "./src/kit/lib/rendering/modelProviderFailure.ts",
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
@@ -213,6 +214,7 @@
     "diff": "^9.0.0",
     "idb-keyval": "^6.2.5",
     "lucide-static": "^1.27.0",
+    "mermaid": "^12.1.0",
     "shiki": "^4.2.0",
     "solid-js": "catalog:"
   },
