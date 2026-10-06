@@ -284,7 +284,9 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
         <Show
           when={drawsConversation()}
           fallback={(
-            <Stack gap="section">
+            <>
+              {/* A fragment, so the bar is the region's own child. The region caps its children at the
+                  reading width and lets only a bar reach the edges. Inside the Stack, this one stopped short. */}
               <Toolbar ariaLabel="Workflow step">
                 <Icon
                   name={stepGlyph(current().status)}
@@ -296,89 +298,90 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                 {meta(current)}
                 {controls(current)}
               </Toolbar>
-
-              <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
-              <Show when={search.workflowReturnRun && search.workflowReturnRecord}>
-                <Show
-                  when={returnTaskAvailable()}
-                  fallback={<Text emphasis="muted">The original task is archived or gone. Its record history is still here.</Text>}
-                >
-                  <Button size="sm" variant="bare" onPress={returnToRecord}>Back to selected record</Button>
+              <Stack gap="section">
+                <RunLineage run={model.selectedRun()} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+                <Show when={search.workflowReturnRun && search.workflowReturnRecord}>
+                  <Show
+                    when={returnTaskAvailable()}
+                    fallback={<Text emphasis="muted">The original task is archived or gone. Its record history is still here.</Text>}
+                  >
+                    <Button size="sm" variant="bare" onPress={returnToRecord}>Back to selected record</Button>
+                  </Show>
                 </Show>
-              </Show>
-              {alerts(current)}
-              {childTaskLine()}
-              <Show when={current().kind !== 'workflow-map'}>
-                <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
-              </Show>
+                {alerts(current)}
+                {childTaskLine()}
+                <Show when={current().kind !== 'workflow-map'}>
+                  <ChildRuns step={current() as WorkflowStepProjection} tasks={tasks.data ?? []} onOpen={openTaskTarget} />
+                </Show>
 
-              <Switch>
-                <Match when={shape() === 'gate'}>
-                  <Show
-                    when={model.gateForm(current() as WorkflowStepProjection)}
-                    fallback={(
-                      <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
-                        <Stack gap="row">
-                          <Text>Waiting for you.</Text>
-                          <GateAnswer model={model} />
-                        </Stack>
-                      </Show>
-                    )}
-                  >
-                    {(form) => <GateFormBody step={current()} form={form()} model={model} />}
-                  </Show>
-                </Match>
+                <Switch>
+                  <Match when={shape() === 'gate'}>
+                    <Show
+                      when={model.gateForm(current() as WorkflowStepProjection)}
+                      fallback={(
+                        <Show when={current().status === 'waiting-gate'} fallback={<Text emphasis="muted">{gateOutcome(current().status)}</Text>}>
+                          <Stack gap="row">
+                            <Text>Waiting for you.</Text>
+                            <GateAnswer model={model} />
+                          </Stack>
+                        </Show>
+                      )}
+                    >
+                      {(form) => <GateFormBody step={current()} form={form()} model={model} />}
+                    </Show>
+                  </Match>
 
-                <Match when={shape() === 'command'}>
-                  <CommandBody step={current()} model={model} />
-                </Match>
+                  <Match when={shape() === 'command'}>
+                    <CommandBody step={current()} model={model} />
+                  </Match>
 
-                <Match when={shape() === 'run-target'}>
-                  <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
-                </Match>
+                  <Match when={shape() === 'run-target'}>
+                    <RunTargetBody step={current()} output={structured() as RunTargetOutput | null} />
+                  </Match>
 
-                <Match when={shape() === 'data'}>
-                  <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
-                </Match>
+                  <Match when={shape() === 'data'}>
+                    <DataBody output={structured() as RowsOutput | null} running={current().status === 'running'} />
+                  </Match>
 
-                <Match when={shape() === 'http'}>
-                  <HttpBody output={structured() as HttpOutput | null} />
-                </Match>
+                  <Match when={shape() === 'http'}>
+                    <HttpBody output={structured() as HttpOutput | null} />
+                  </Match>
 
-                <Match when={shape() === 'agent'}>
-                  <AgentBody step={current()} structured={structured()} />
-                </Match>
+                  <Match when={shape() === 'agent'}>
+                    <AgentBody step={current()} structured={structured()} />
+                  </Match>
 
-                <Match when={shape() === 'other'}>
-                  <Show
-                    when={current().kind === 'workflow-map' && model.selectedRunId()}
-                    fallback={<Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>}
-                  >
-                    {(runId) => (
-                      <RunRecords
-                        runId={runId()}
-                        stepId={current().id}
-                        tasks={tasks.data ?? []}
-                        initialRecordId={searchValue(search.workflowRecord)}
-                        onOpen={openTaskTarget}
-                        onOpenSession={openAgentPane}
-                      />
-                    )}
-                  </Show>
-                </Match>
-              </Switch>
+                  <Match when={shape() === 'other'}>
+                    <Show
+                      when={current().kind === 'workflow-map' && model.selectedRunId()}
+                      fallback={<Show when={structured()}>{(value) => <CodeBlock wrap maxHeight="block">{pretty(value())}</CodeBlock>}</Show>}
+                    >
+                      {(runId) => (
+                        <RunRecords
+                          runId={runId()}
+                          stepId={current().id}
+                          tasks={tasks.data ?? []}
+                          initialRecordId={searchValue(search.workflowRecord)}
+                          onOpen={openTaskTarget}
+                          onOpenSession={openAgentPane}
+                        />
+                      )}
+                    </Show>
+                  </Match>
+                </Switch>
 
-              <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
-                <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
-              </Show>
-              <Show when={otherEvents().length}>
-                <Fold label="Events" count={otherEvents().length}>
-                  <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
-                </Fold>
-              </Show>
+                <Show when={(model.droppedEventsFor?.(current().id) ?? 0) > 0}>
+                  <Text tone="muted">{model.droppedEventsFor(current().id)} earlier live events are outside the display window.</Text>
+                </Show>
+                <Show when={otherEvents().length}>
+                  <Fold label="Events" count={otherEvents().length}>
+                    <CodeBlock wrap maxHeight="block">{otherEvents().map(pretty).join('\n')}</CodeBlock>
+                  </Fold>
+                </Show>
 
-              {retryModal()}
-            </Stack>
+                {retryModal()}
+              </Stack>
+            </>
           )}
         >
           {/* The agent shape. A fragment, because the conversation below owns the scroll and takes
