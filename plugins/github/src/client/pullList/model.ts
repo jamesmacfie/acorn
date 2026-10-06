@@ -5,5 +5,5 @@ import type { Pull } from '../../shared/api'
 export const filterPulls = (pulls: Pull[], query: string) => {
   const q = query.trim().toLowerCase()
   if (!q) return pulls
-  return pulls.filter((p) => `#${p.number} ${p.title} ${p.author ?? ''}`.toLowerCase().includes(q))
+  return pulls.filter((p) => `#${p.number} ${p.title} ${p.author ?? ''} ${p.headRef ?? ''}`.toLowerCase().includes(q))
 }

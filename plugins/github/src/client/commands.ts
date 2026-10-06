@@ -142,7 +142,7 @@ export function githubCommands(deps: GithubCommandDeps): ContributedCommand[] {
       query: async (text, context) => {
         const list = await openPulls(context)
         // The browse list's own matcher, so the palette finds a pull request by the same words the
-        // filter box does: its number, its title and its author.
+        // filter box does: its number, its title, its author and its branch.
         return filterPulls(list, text).slice(0, MAX_PULL_ROWS).map((pull): CommandSearchItem => ({
           id: String(pull.number),
           title: pull.title,

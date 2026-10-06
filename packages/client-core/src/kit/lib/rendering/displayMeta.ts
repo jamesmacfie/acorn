@@ -71,8 +71,10 @@ export function checksState(checks: readonly { status: string | null }[]): 'succ
 }
 
 /** Map a rail marker's dot state to the kit's StatusDot props. */
-export const railDotProps = (dot: RailMarkerDot): { tone: 'ok' | 'warn' | 'danger'; mixed?: boolean } =>
-  dot === 'mixed' ? { tone: 'danger', mixed: true } : { tone: dot === 'bad' ? 'danger' : dot }
+export const railDotProps = (dot: RailMarkerDot): { tone: 'ok' | 'warn' | 'danger'; mixed?: boolean; diff?: boolean } =>
+  dot === 'mixed' ? { tone: 'danger', mixed: true }
+    : dot === 'diff' ? { tone: 'ok', diff: true }
+    : { tone: dot === 'bad' ? 'danger' : dot }
 
 export const CHECK_TONE: Record<ReturnType<typeof checksState>, RailMarkerDot> = {
   success: 'ok',

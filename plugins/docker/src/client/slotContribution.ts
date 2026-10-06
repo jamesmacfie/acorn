@@ -18,15 +18,20 @@ export const dockerRailMarkerContribution: RailMarkerContribution = {
   id: 'docker',
   order: 50,
   markers: (target) => {
-    if (target.kind !== 'task') return []
-    const running = dockerTaskSummary(target.id)?.running ?? 0
+    // The task's rail row, and the Docker button in that task's pane rail.
+    const taskId = target.kind === 'task' ? target.id
+      : target.kind === 'pane' && target.id === 'docker' ? target.taskId : null
+    if (!taskId) return []
+    const running = dockerTaskSummary(taskId)?.running ?? 0
     if (!running) return []
     return [{
       id: 'running',
       label: `${running} running container${running === 1 ? '' : 's'}`,
-      icon: 'brand:docker',
       tone: 'accent',
-      placements: ['top-start', 'bottom-start'],
+      // A green dot in the top-right corner of the Docker button, whose own glyph is already the whale.
+      ...(target.kind === 'pane'
+        ? { dotTone: 'ok' as const, placements: ['top-end'] as const }
+        : { icon: 'brand:docker', placements: ['top-start', 'bottom-start'] as const }),
     }]
   },
 }

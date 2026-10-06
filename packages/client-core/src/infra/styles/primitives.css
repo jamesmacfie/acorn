@@ -511,6 +511,8 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-dot[data-tone='muted'] { background: var(--text-faint); }
 /* "Some failed, some still running": half bad, half warn. */
 .ui-dot[data-mixed] { background: linear-gradient(90deg, var(--state-bad) 0 50%, var(--state-warn) 50% 100%); }
+/* "Lines added and lines removed": half ok, half bad, in the order a diff reads, + before −. */
+.ui-dot[data-diff] { background: linear-gradient(90deg, var(--state-ok) 0 50%, var(--state-bad) 50% 100%); }
 /* Terminal hand-rolled this keyframe and skipped the reduced-motion guard that core's .spin has. */
 .ui-dot[data-pulse] { animation: ui-dot-pulse 1s var(--ease-in-out) infinite; }
 @keyframes ui-dot-pulse { 50% { opacity: 0.25; } }

@@ -71,3 +71,18 @@ describe('the agent rail marker while a session streams', () => {
     expect(markers.get('t1')?.map((marker) => marker.id)).toEqual(['attention'])
   })
 })
+
+describe('the Workflows pane button', () => {
+  it('spins only for a working workflow agent, so the Agent button can spin while it stays still', () => {
+    managedAgentStore.activate()
+    const workflowsButton = (taskId: string) => agentRailMarkerContribution.markers({ kind: 'pane', id: 'workflows', taskId })
+    const agentButton = (taskId: string) => agentRailMarkerContribution.markers({ kind: 'pane', id: 'agents', taskId })
+
+    managedAgentStore.upsertSession(row('chat', 'wf-a', { runtimeState: 'working' }))
+    expect(agentButton('wf-a').map((marker) => marker.id)).toEqual(['working'])
+    expect(workflowsButton('wf-a')).toEqual([])
+
+    managedAgentStore.upsertSession(row('step', 'wf-b', { runtimeState: 'working', kind: 'workflow' }))
+    expect(workflowsButton('wf-b')).toMatchObject([{ id: 'working', busy: true, placements: ['top-end'] }])
+  })
+})
