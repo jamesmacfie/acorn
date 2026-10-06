@@ -16,6 +16,7 @@
       "task.terminal.new-codex",
       "agents.sessions.new",
       "source.agents.open",
+      "agents.sessions.mark-read",
       "agents.sessions.find",
       "changes.open",
       "context.open",
