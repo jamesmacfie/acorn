@@ -6,6 +6,7 @@ import { join } from 'node:path'
 import { openDb } from '../bindings'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
+import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
 import { TaskScriptService } from './service'
 
 let db: TestDb
@@ -103,6 +104,63 @@ describe('durable task script contract', () => {
     expect(() => scripts.logs('task', { phase: 'teardown', attemptId: id.attemptId })).toThrow('not found')
     expect(() => scripts.logs('other', { phase: 'setup', attemptId: id.attemptId })).toThrow('not found')
     expect(() => scripts.wait('task', { phase: 'setup', timeoutMs: 30001 })).toThrow()
+  })
+})
+
+describe('setup by hand', () => {
+  beforeEach(() => {
+    db.db.insert(schema.projects).values({ id: 'p', name: 'Project', workspaceId: 'w', vcs: 'git', setupScript: 'pnpm install', createdAt: 1, updatedAt: 1 }).run()
+    db.db.update(schema.tasks).set({ branch: 'feature', worktreePath: '/worktrees/feature', skipSetup: true }).where(eq(schema.tasks.id, 'task')).run()
+  })
+  const setupState = { user_skipped: () => scripts.admit('task', 'setup', 'user_skipped'), disabled: () => scripts.admit('task', 'setup', 'disabled'),
+    not_configured: () => scripts.admit('task', 'setup', 'not_configured'),
+    failed: () => scripts.report(admit(), { type: 'exit', exitCode: 1 }), interrupted: () => scripts.report(admit(), { type: 'interrupted', reason: 'restart' }) }
+
+  it.each(Object.keys(setupState) as (keyof typeof setupState)[])('admits a run after %s, in the same generation', (state) => {
+    setupState[state]()
+    const generation = scripts.status('task').generation
+    expect(scripts.status('task').setupRunnable).toBe(true)
+    expect(scripts.admitManualSetup('task')).toMatchObject({ state: 'starting', generation })
+    expect(scripts.takeSetup('task')?.script).toBe('pnpm install')
+    expect(scripts.store.task('task')).toMatchObject({ scriptGeneration: generation, skipSetup: true })
+  })
+
+  it.each([
+    ['a task with no worktree of its own', () => scripts.admit('task', 'setup', 'not_applicable'), 'not_needed'],
+    ['setup not started yet', () => {}, 'not_needed'],
+    ['setup that succeeded', () => scripts.report(admit(), { type: 'exit', exitCode: 0 }), 'not_needed'],
+    ['setup that is starting', () => admit(), 'already_running'],
+    ['setup that is running', () => scripts.report(admit(), { type: 'started', terminalSessionId: 's' }), 'already_running'],
+    ['an empty setup script', () => { db.db.update(schema.projects).set({ setupScript: '  ' }).run(); scripts.admit('task', 'setup', 'user_skipped') }, 'not_configured'],
+    ['a task without a worktree', () => { db.db.update(schema.tasks).set({ worktreePath: null }).run(); scripts.admit('task', 'setup', 'user_skipped') }, 'no_worktree'],
+  ] as const)('refuses %s', (_, arrange, code) => {
+    arrange()
+    expect(scripts.status('task').setupRunnable).toBe(false)
+    expect(() => scripts.admitManualSetup('task')).toThrow(expect.objectContaining({ code }))
+  })
+
+  it('refuses a task being archived', () => {
+    scripts.admit('task', 'setup', 'user_skipped')
+    beginTaskArchive('task')
+    try {
+      expect(() => scripts.admitManualSetup('task')).toThrow('This task is being archived.')
+    } finally { finishTaskArchive('task') }
+  })
+
+  it('lets only one of two back-to-back requests through', () => {
+    scripts.admit('task', 'setup', 'user_skipped')
+    scripts.admitManualSetup('task')
+    expect(() => scripts.admitManualSetup('task')).toThrow('Setup is already running.')
+  })
+
+  it('fences a manual run that a new worktree generation replaced', () => {
+    scripts.admit('task', 'setup', 'user_skipped')
+    const manual = scripts.admitManualSetup('task')
+    scripts.newGeneration('task')
+    const current = admit()
+    scripts.report({ attemptId: manual.attemptId!, generation: manual.generation }, { type: 'exit', exitCode: 0 })
+    expect(scripts.status('task').setup).toMatchObject({ attemptId: current.attemptId, state: 'starting' })
+    expect(scripts.takeSetup('task')).toBeNull()
   })
 })
 

@@ -136,6 +136,7 @@ client: allProjects
 client: brandMarkRegistry
 client: brandStyle
 client: bytesOf
+client: cachedTaskScripts
 client: canPickFolder
 client: canonicalDataEncoding
 client: canonicalDataProjection

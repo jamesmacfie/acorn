@@ -57,6 +57,20 @@ The **New task** dialog offers **Skip setup script** for a Git worktree task. So
 makes a task from an integration's item, **Start workflow…** included. The task stores the choice,
 so setup stays skipped if another surface creates the worktree later or you restore the task.
 
+To run setup by hand, open the command palette on the task and choose **Run setup script**. It
+starts the same "Setup" session in the task's worktree and records a normal attempt. The command
+appears when all of these hold:
+
+- The project has a setup script.
+- The task has a Git worktree of its own and isn't being archived.
+- The last setup attempt was skipped by the user, by an **Off** trigger, or for lack of a script,
+  or it failed or was interrupted.
+
+The **Off** trigger only stops automatic runs, so the command still appears under it. It doesn't
+appear before the worktree exists, while setup runs, or after setup succeeds. The Node makes this
+decision and returns it as `setupRunnable` in task script status. The route is
+`POST /v1/p/terminal/tasks/:taskId/setup`, and a refusal answers 409 with the reason.
+
 [Task script results](./task-scripts.md) covers how the Node records each setup attempt.
 
 ## Copy files into a worktree

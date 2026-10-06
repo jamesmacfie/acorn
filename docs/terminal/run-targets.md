@@ -66,8 +66,11 @@ make the package graph cyclic. A test in the workflows plugin checks the mirror.
 
 ## From the command palette
 
-The plugin registers three searches under its own **Run** group, `terminal.run`
-(`plugins/terminal/src/client/commands.ts`):
+The plugin registers one command and three searches under its own **Run** group, `terminal.run`
+(`plugins/terminal/src/client/commands.ts`). **Run setup script** runs the project's setup script
+in the task's worktree when automatic setup was skipped, failed, or was interrupted. For when it
+appears, see [Run the setup script](../workspaces-and-tasks/worktrees.md#run-the-setup-script). The
+searches are:
 
 | Row | What it finds | What picking one does |
 | --- | --- | --- |
@@ -75,7 +78,7 @@ The plugin registers three searches under its own **Run** group, `terminal.run`
 | Apply a layout | The configuration's layout recipes | Replaces the pane layout, starts the recipe's target, and points the browser pane at its URL |
 | Focus a terminal | Live sessions in this task, with exited ones badged | Shows the drawer, selects that tab, and focuses it |
 
-All three are task-scoped and gated on the terminal plugin. A parse error in the configuration shows
+All four are task-scoped and gated on the terminal plugin. A parse error in the configuration shows
 as a badged row at the top, and Enter on it repeats the message. Rows come from one read when the
 palette opens, filtered locally (`localSearch.ts`). Focusing a terminal fetches nothing, because the
 roster is already a signal. Picking a target decides run or stop from a fresh read, not the drawn

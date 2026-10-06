@@ -11,6 +11,12 @@ export type AttemptIdentity = { attemptId: string; generation: number }
 type Row = typeof schema.taskScriptAttempts.$inferSelect
 const attempts = schema.taskScriptAttempts
 const active = ['starting', 'running']
+// The setup outcomes a person can follow with a run by hand. `not_applicable` is a task with no
+// worktree of its own, and `succeeded` needs no second run (docs/workspaces-and-tasks/task-scripts.md).
+const rerunnableSetup = (setup: TaskScriptSnapshot): boolean => setup.state === 'failed' || setup.state === 'interrupted'
+  || setup.state === 'skipped' && ['user_skipped', 'disabled', 'not_configured'].includes(setup.reason)
+
+export type ManualSetup = { script: string } | { code: 'archiving' | 'no_worktree' | 'not_configured' | 'already_running' | 'not_needed'; message: string }
 const snapshots = (row: Row): TaskScriptSnapshot => taskScriptSnapshotSchema.parse(row)
 
 /** Synchronous SQLite operations keep process evidence ordered, including immediate exits. */
@@ -44,7 +50,21 @@ export class TaskScriptStore {
     const task = this.task(taskId)
     const rows = this.db.select().from(attempts).where(eq(attempts.taskId, taskId)).orderBy(desc(attempts.requestedAt), desc(sql`rowid`)).limit(51).all()
     return { taskId, generation: task.scriptGeneration, archiveInProgress: isTaskArchiving(taskId), setup: this.select(taskId, 'setup'), teardown: this.select(taskId, 'teardown'),
-      attempts: rows.slice(0, 50).map(snapshots), attemptsTruncated: rows.length > 50 }
+      setupRunnable: 'script' in this.manualSetup(taskId), attempts: rows.slice(0, 50).map(snapshots), attemptsTruncated: rows.length > 50 }
+  }
+  /** Whether setup can be started by hand right now, and with which script. Synchronous, so a caller
+   *  that admits on the answer leaves no gap for a second request to pass the same check. */
+  manualSetup(taskId: string): ManualSetup {
+    const task = this.task(taskId)
+    if (isTaskArchiving(taskId)) return { code: 'archiving', message: 'This task is being archived.' }
+    if (task.status !== 'active' || !task.branch || !task.worktreePath) return { code: 'no_worktree', message: 'This task has no worktree.' }
+    // The project row, not the repo's `.acorn/config.toml`, the same source automatic setup reads.
+    const project = this.db.select().from(schema.projects).where(eq(schema.projects.id, task.projectId)).get()
+    if (!project?.setupScript?.trim()) return { code: 'not_configured', message: 'This task has no setup script.' }
+    const setup = this.select(taskId, 'setup')
+    if (active.includes(setup.state)) return { code: 'already_running', message: 'Setup is already running.' }
+    if (!rerunnableSetup(setup)) return { code: 'not_needed', message: "Setup doesn't need to run for this task." }
+    return { script: project.setupScript }
   }
   newGeneration(taskId: string): number {
     const generation = this.db.transaction((tx) => {

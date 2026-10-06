@@ -177,6 +177,7 @@ export { isArchiving } from '@acorn/client-core/features/tasks'
 export { agentSessionsFor, focusSession, refreshSessionSources, sendToSession, sessionSummaries } from '@acorn/client-core/features/tasks'
 export type { SessionSummary, SessionSubmit } from '@acorn/client-core/features/tasks'
 export { runApi } from '@acorn/client-core/features/tasks'
+export { cachedTaskScripts } from '@acorn/client-core/features/tasks'
 export { taskBridge } from '@acorn/client-core/features/tasks'
 export { taskStatus, taskStatusRevision } from '@acorn/client-core/features/tasks'
 

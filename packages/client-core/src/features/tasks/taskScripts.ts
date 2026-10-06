@@ -1,8 +1,8 @@
 import { createQuery } from '@tanstack/solid-query'
-import { taskScriptsKey, taskScriptsRoute, taskScriptsStatusSchema, type TaskScriptSnapshot } from '@acorn/protocol/taskScripts.ts'
+import { taskScriptsKey, taskScriptsRoute, taskScriptsStatusSchema, type TaskScriptSnapshot, type TaskScriptsStatus } from '@acorn/protocol/taskScripts.ts'
 import { readJson } from '../../infra/node/apiClient'
-import { activeNodeId } from '../../infra/node/activeNode'
-import { nodeState } from '../../infra/node/fleet'
+import { activeCacheId, activeNodeId } from '../../infra/node/activeNode'
+import { clientFor, nodeState } from '../../infra/node/fleet'
 import { freshnessOf } from '../../infra/node/freshness'
 
 export function createTaskScripts(taskId: () => string) {
@@ -15,6 +15,11 @@ export function createTaskScripts(taskId: () => string) {
   const freshness = () => freshnessOf(nodeState(activeNodeId() ?? ''), query)
   return { query, freshness }
 }
+
+/** The status this window last read for a task, without reading again. For a synchronous gate such as
+ *  a palette command's `when`. Undefined until something on screen has read the task's scripts. */
+export const cachedTaskScripts = (taskId: string): TaskScriptsStatus | undefined =>
+  clientFor(activeCacheId()).client.getQueryData<TaskScriptsStatus>([...taskScriptsKey, taskId])
 export function scriptLabel(snapshot: TaskScriptSnapshot, now = Date.now()): string {
   const phase = snapshot.phase === 'setup' ? 'Setup' : 'Teardown'
   const elapsed = snapshot.startedAt === null ? '' : ` · ${Math.max(0, Math.floor(((snapshot.finishedAt ?? now) - snapshot.startedAt) / 1000))}s`

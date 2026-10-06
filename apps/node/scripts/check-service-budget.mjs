@@ -37,7 +37,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,115,487 B with startup phase call sites. Timing helpers and CLI auth/version probes
 // load on first use; the remaining labels and callbacks stay beside their operations. Add 1 KB,
 // keeping the previous lazy-import cuts protected.
-const limits = { ceiling: 3_116_000, floor: 1_000_000 }
+// 2026-10-07: 3,118,217 B with setup run by hand: the rule core checks before admitting it, the
+// terminal route and bridge verb that spawn it, and the status flag the palette reads. All three are
+// registered at boot, so the ceiling moves by 3 KB.
+const limits = { ceiling: 3_119_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

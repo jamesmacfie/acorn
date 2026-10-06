@@ -439,12 +439,13 @@ function startIdleWatch() {
 // Registered as the taskWorktree onWorktreeCreated hook, so it fires exactly once whichever
 // path creates the worktree. Ordered before any requested session, so a setup spawned from create() is
 // tab #1.
-async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Promise<void> {
+async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Promise<TerminalSession | null> {
   assertOwner(engine)
   const setup = engine.core.taskScripts.takeSetup(t.id)
-  if (!setup) return
+  if (!setup) return null
+  let session: TerminalSession
   try {
-    await spawnOne({ taskId: t.id, command: setup.script, title: 'Setup' }, cwd, true, taskContext(t), t, engine, setup.identity)
+    session = await spawnOne({ taskId: t.id, command: setup.script, title: 'Setup' }, cwd, true, taskContext(t), t, engine, setup.identity)
   } catch (error) {
     engine.core.taskScripts.report(setup.identity, { type: 'failed', reason: 'spawn_failed' })
     throw error
@@ -453,6 +454,30 @@ async function maybeRunSetup(t: TaskRef, cwd: string, engine: EngineOwner): Prom
   // Roster publication belongs to spawnOne.
   invalidateWorktreeStatus(cwd)
   engine.worktree(t.id) // a setup script installs dependencies, which is a dirty worktree
+  return session
+}
+
+// Setup by hand, for a task whose automatic setup was skipped, failed or was interrupted
+// (docs/workspaces-and-tasks/worktrees.md § Run the setup script). Core admits the attempt and refuses
+// what it should not run; this half spawns it the way the worktree-created hook does.
+async function runSetup(taskId: string, engine: EngineOwner): Promise<{ sessionId: string }> {
+  assertOwner(engine)
+  const admitted = engine.core.taskScripts.admitManualSetup(taskId)
+  try {
+    const t = await engine.core.tasks.load(taskId)
+    assertOwner(engine)
+    const { cwd, isWorktree } = await engine.core.tasks.resolveCwd(t, undefined)
+    assertOwner(engine)
+    if (!t || !isWorktree) throw new Error('This task has no worktree.')
+    const session = await maybeRunSetup(t, cwd, engine)
+    if (!session) throw new Error('Setup did not start.')
+    return { sessionId: session.id }
+  } catch (error) {
+    // Anything between admission and the spawn would otherwise leave the attempt `starting` for good.
+    // A no-op when the spawn already reported, or a new worktree generation has replaced this attempt.
+    engine.core.taskScripts.report({ attemptId: admitted.attemptId!, generation: admitted.generation }, { type: 'failed', reason: 'spawn_failed' })
+    throw error
+  }
 }
 
 async function create(opts: CreateOpts, engine = owner()): Promise<TerminalSession> {
@@ -813,6 +838,7 @@ export function registerTerminalChannel(pluginDb: PluginDatabase, coreServices: 
     list: async () => { assertOwner(engine); return [...sessions.values()].filter(s => s.admitted && !s.retired).map((s) => s.meta) },
     profiles: async () => listProfiles(),
     create: (opts) => create(opts ?? ({} as CreateOpts), engine),
+    runSetup: (taskId) => runSetup(taskId, engine),
     // sendToAgent (docs/terminal/activity.md § Sending text to an agent).
     sendToAgent: async (sessionId, text, submit) => {
       assertOwner(engine)
