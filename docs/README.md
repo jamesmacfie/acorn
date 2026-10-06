@@ -301,6 +301,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   proposed MCP and usage improvements, and verification before implementation.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
+- [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
+  code on first use, to keep heavy, rarely used routes out of the node's boot graph.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
