@@ -1,9 +1,9 @@
 import { execFileSync } from 'node:child_process'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { _resetWorktreeStatus, invalidateWorktreeStatus, parseWorktreeStatus, worktreeGitText, worktreeStatus } from './worktreeStatus'
+import { _resetWorktreeStatus, invalidateWorktreeStatus, parseWorktreeStatus, setWorktreeStatusCeiling, worktreeGitText, worktreeStatus } from './worktreeStatus'
 import { removeWorktree } from './worktrees'
 
 // Real git subprocesses, because what is being counted is real git subprocesses.
@@ -120,6 +120,41 @@ describe('the coalesced worktree status read', () => {
 
     // Forced still goes through, which is the affordance the dialog offers.
     expect(await removeWorktree(checkout, worktree, true)).toEqual({ ok: true, path: worktree })
+  })
+
+  // A task folder that lost its `.git` link, inside a worktrees folder that itself sits in a repository,
+  // which is the development layout. Git climbed to that repository and reported its changes as the task's.
+  it('does not report the enclosing repository for a folder git no longer tracks', async () => {
+    const root = join(checkout, 'managed')
+    const stale = join(root, 'stale')
+    mkdirSync(stale, { recursive: true })
+    writeFileSync(join(checkout, 'a.txt'), 'changed in the enclosing checkout\n')
+    expect((await worktreeStatus(stale, { fresh: true })).dirty).toBe(true)
+
+    setWorktreeStatusCeiling(root)
+    expect(await worktreeStatus(stale, { fresh: true })).toEqual({ dirty: false, count: 0, branch: null, head: null })
+    expect((await worktreeStatus(worktree, { fresh: true })).branch).toBe('feat-x')
+  })
+
+  // `git worktree remove` refuses a folder git no longer tracks, which left such a task impossible to archive.
+  it('removes a worktree folder whose .git link is gone and frees its branch', async () => {
+    rmSync(join(worktree, '.git'))
+    writeFileSync(join(worktree, 'leftover.txt'), 'copied config\n')
+
+    expect(await removeWorktree(checkout, worktree, false, dir)).toEqual({ ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' })
+    expect(existsSync(worktree)).toBe(true)
+
+    expect(await removeWorktree(checkout, worktree, true, dir)).toEqual({ ok: true, path: worktree })
+    expect(existsSync(worktree)).toBe(false)
+    git(checkout, 'worktree', 'add', '-q', worktree, 'feat-x')
+  })
+
+  // Outside the managed worktrees folder the leftover belongs to the user, so only git's record goes.
+  it('keeps an unlinked folder outside the worktrees folder', async () => {
+    rmSync(join(worktree, '.git'))
+    expect(await removeWorktree(checkout, worktree, true, join(dir, 'managed'))).toEqual({ ok: true, path: worktree })
+    expect(existsSync(worktree)).toBe(true)
+    expect(git(checkout, 'worktree', 'list')).not.toContain('feat-x')
   })
 
   // The changes pane's line counts. Two clients on one task asked for the pair twice a poll each.

@@ -79,9 +79,20 @@ function rescheduleExpiry(): void {
   scheduleExpiry(next)
 }
 
+// Git looks for a repository by climbing parent folders. A task folder that has lost its `.git` link
+// would then report whatever repository holds the worktrees folder, which in development is the
+// acorn checkout, so its changes showed up as the task's. Stopping the climb at the worktrees folder
+// makes such a read fail instead, and leaves a live worktree, whose `.git` sits in its own folder,
+// unaffected.
+let ceiling: string | undefined
+export const setWorktreeStatusCeiling = (worktreesRoot: string): void => {
+  ceiling = worktreesRoot
+  invalidateWorktreeStatus()
+}
+
 const run = async (path: string, args: readonly string[], timeoutMs: number): Promise<string | null> => {
   try {
-    return (await gitOrThrow(args, { cwd: path, timeoutMs })).stdout
+    return (await gitOrThrow(args, { cwd: path, timeoutMs, ...(ceiling ? { env: { GIT_CEILING_DIRECTORIES: ceiling } } : {}) })).stdout
   } catch {
     return null
   }
@@ -184,5 +195,6 @@ export function invalidateWorktreeStatus(path?: string): void {
 
 /** Test seam: the maps are module singletons whose lifetime is the node's. */
 export function _resetWorktreeStatus(): void {
+  ceiling = undefined
   invalidateWorktreeStatus()
 }

@@ -1,6 +1,6 @@
 import { gitOrThrow, gitText } from '../core/git'
 import { ProcessError } from '../core/proc'
-import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, statSync } from 'node:fs'
+import { constants, copyFileSync, existsSync, lstatSync, mkdirSync, readFileSync, rmSync, statSync } from 'node:fs'
 import { dirname, isAbsolute, join, resolve } from 'node:path'
 import { isValidBranch } from '@acorn/protocol/branch.ts'
 import type { WorktreeResult } from '@acorn/protocol/task.ts'
@@ -228,7 +228,8 @@ export async function worktreePorcelain(path: string): Promise<WorktreeStatus> {
 
 // Remove a worktree through the main checkout. Refuses a dirty worktree unless force is set, which
 // discards uncommitted changes. The UI surfaces that, so removal is never quietly destructive.
-export async function removeWorktree(checkout: string, path: string, force = false): Promise<WorktreeResult> {
+export async function removeWorktree(checkout: string, path: string, force = false, worktreesRoot?: string): Promise<WorktreeResult> {
+  if (isUnlinkedWorktree(path)) return removeUnlinkedWorktree(checkout, path, force, worktreesRoot)
   if (!force && (await worktreeDirty(path))) {
     return { ok: false, reason: 'Worktree has uncommitted changes. Confirm to discard.' }
   }
@@ -240,6 +241,37 @@ export async function removeWorktree(checkout: string, path: string, force = fal
   }
   // The directory is gone, so whatever we remembered about it is a lie about a path that may be
   // recreated on the same name by the next `ensureWorktree`.
+  invalidateWorktreeStatus(path)
+  return { ok: true, path }
+}
+
+// A task folder that git no longer tracks: its `.git` link file is missing, or points at an entry
+// `git worktree prune` already removed. A `.git` folder is a full repository, not ours to delete, so
+// it never counts.
+function isUnlinkedWorktree(dir: string): boolean {
+  const link = lstatSync(join(dir, '.git'), { throwIfNoEntry: false })
+  if (!link) return true
+  if (!link.isFile()) return false
+  const pointer = readFileSync(join(dir, '.git'), 'utf8').trim()
+  return pointer.startsWith('gitdir:') && !existsSync(resolve(dir, pointer.slice('gitdir:'.length).trim()))
+}
+
+// `git worktree remove` refuses a folder git no longer tracks, so a task left with one could never be
+// archived. Prune git's record instead, and delete the leftover folder when it sits inside the
+// worktrees folder Acorn manages. A folder anywhere else belongs to the user, so it stays.
+async function removeUnlinkedWorktree(checkout: string, path: string, force: boolean, worktreesRoot: string | undefined): Promise<WorktreeResult> {
+  if (existsSync(path)) {
+    if (!force) return { ok: false, reason: 'The worktree folder is no longer linked to git. Confirm to delete it.' }
+    if (worktreesRoot && isContainedPath(worktreesRoot, path) && resolve(path) !== resolve(worktreesRoot)) {
+      rmSync(path, { recursive: true, force: true })
+    }
+  }
+  try {
+    await gitOrThrow(['worktree', 'prune'], { cwd: checkout, timeoutMs: 30_000 })
+  } catch {
+    // The folder is already gone or never was a worktree. A record git keeps after a failed prune
+    // only matters if the task is restored, and restore names the branch that is still checked out.
+  }
   invalidateWorktreeStatus(path)
   return { ok: true, path }
 }

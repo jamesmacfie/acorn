@@ -86,6 +86,10 @@ The changes pane reads the same output, which is why the command carries `--bran
 `git diff --numstat -z` counts and its `rev-parse --git-dir` go through the same window by argument
 list, in `worktreeGitText`.
 
+Every read sets `GIT_CEILING_DIRECTORIES` to the worktrees folder. Without it, git climbs out of a
+task folder that has lost its `.git` link and reports whichever repository holds the worktrees
+folder. In development that's the acorn checkout, whose changes then showed on the task's rail icon.
+
 These rules keep the cache honest:
 
 - The Node drops every entry under a path when it writes there, runs in flight included. That covers

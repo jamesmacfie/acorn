@@ -19,7 +19,7 @@ import { copyWorktreeFiles, ensureWorktree, listWorktrees, staleWorktreeReason, 
 import { isTaskArchiving } from './archiveGate'
 import { broadcastTasksChanged } from '../notify'
 import { admitTaskHead, noticeTaskHead, pruneTaskHeads, resetTaskHeads, retireTaskHead, taskHeadScope } from './taskHeadObserver'
-import { invalidateWorktreeStatus } from './worktreeStatus'
+import { invalidateWorktreeStatus, setWorktreeStatusCeiling } from './worktreeStatus'
 import { runHook } from '../pluginHost/hooks'
 import { BridgeError } from '../bridge'
 import { createLogger, describeError } from '../telemetry/logger'
@@ -30,7 +30,7 @@ const log = createLogger('worktrees')
 let worktreesRoot = ''
 export const setWorktreesRoot = (dir: string): void => {
   resetTaskHeads()
-  invalidateWorktreeStatus()
+  setWorktreeStatusCeiling(dir)
   worktreesRoot = dir
 }
 export const getWorktreesRoot = (): string => worktreesRoot

@@ -13,7 +13,7 @@ import type { AppDatabase } from '../db'
 import { schema } from '../db'
 import type { ArchiveOpts, ArchiveResult, RestoreOpts, RestoreResult } from '@acorn/protocol/task.ts'
 import { getProjectConfig } from '../projectConfig'
-import { isDir, loadTask, projectForTask, resolveTaskCwd, toTaskRef, waitForTaskWorktreeCreation } from '../worktrees/taskWorktree'
+import { getWorktreesRoot, isDir, loadTask, projectForTask, resolveTaskCwd, toTaskRef, waitForTaskWorktreeCreation } from '../worktrees/taskWorktree'
 import { buildSessionEnv } from '../taskEnv'
 import { branchExists, removeWorktree } from '../worktrees/worktrees'
 import { beginTaskArchive, finishTaskArchive } from '../worktrees/archiveGate'
@@ -140,7 +140,7 @@ async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts
     : []
 
   if (deleteWorktree && ownsWorktree && t.worktreePath && project?.path && project.vcs === 'git') {
-    const res = await removeWorktree(project.path, t.worktreePath, force) // force discards a dirty tree
+    const res = await removeWorktree(project.path, t.worktreePath, force, getWorktreesRoot()) // force discards a dirty tree
     if (!res.ok) return res
     // With no mapped checkout there is nothing to git-remove, so archive anyway and drop the
     // orphaned reference.

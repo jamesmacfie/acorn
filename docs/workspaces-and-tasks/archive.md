@@ -28,7 +28,10 @@ The Node then runs these steps in order:
 4. Run core's `core:task-archiving` hook, where the agents plugin stops the provider process behind
    each of the task's agent sessions ([operations](../managed-agents/operations.md)).
 5. Run the plugin cleanups you ticked in the dialog.
-6. Remove the worktree. `removeWorktree` refuses a dirty tree unless forced.
+6. Remove the worktree. `removeWorktree` refuses a dirty tree unless forced. A folder that git no
+   longer tracks, because its `.git` link is gone, can't go through `git worktree remove`. The Node
+   prunes git's record instead and, when forced, deletes the folder if it sits inside the worktrees
+   folder. A folder outside it stays on disk.
 7. Drop the terminal plugin's saved sessions, and mark the task archived.
 
 The teardown, the stops, and the cleanups sit before removal, so anything that needs the worktree
