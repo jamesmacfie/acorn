@@ -281,9 +281,7 @@ export class ManagedAgentEngine {
       quietSweep: (sessionId) => this.quietSubagents(sessionId),
       footprintSample: () => this.sampleProcessFootprint(),
       callbackError: (kind, error) => log.warn(`${kind} sweep failed: ${describeError(error).message}`),
-      started: (sessionId, reconnect) => this.telemetry?.startSpan('agent.session', {
-        attrs: { seam: 'agent.session', 'session.id': sessionId, provider: this.processes.current(sessionId)?.providerId ?? null, reconnect },
-      }),
+      telemetry: this.telemetry,
       pump: () => { void this.pump() },
       shuttingDown: () => this.stopped,
     }, this.idleSweepMs, this.subagentQuietMs)

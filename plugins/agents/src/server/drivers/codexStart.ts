@@ -19,6 +19,7 @@ import type { AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOption
 import { contextBlock } from './contextBlock'
 import { canReplaceMissingCodexSession } from './codexSessionRecovery'
 import { providerStderrNotice } from './diagnostics'
+import { measureAgentStartup } from './startupTelemetry'
 import {
   codexCollaborationModeForTurn,
   codexCollaborationModes,
@@ -223,14 +224,14 @@ export async function startCodexSession(
 
   own(() => rpc.stop())
 
-  await rpc.request('initialize', {
+  await measureAgentStartup(options, 'provider.initialize', () => rpc.request('initialize', {
     clientInfo: { name: 'acorn', version: '1.0.0' },
     capabilities: {
       experimentalApi: true,
       requestAttestation: false,
       mcpServerOpenaiFormElicitation: true,
     },
-  })
+  }))
   rpc.notify('initialized')
 
   // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
@@ -239,26 +240,26 @@ export async function startCodexSession(
     typeof options.session.config.standingContext === 'string' ? options.session.config.standingContext : undefined,
   ].filter(Boolean).join('\n\n')
   const developerInstructions = instructions ? { developerInstructions: instructions } : {}
-  const startThread = () => rpc.request<Record<string, unknown>>('thread/start', {
+  const startThread = () => measureAgentStartup(options, 'provider.session.create', () => rpc.request<Record<string, unknown>>('thread/start', {
     cwd: options.cwd,
     runtimeWorkspaceRoots: [options.cwd],
     threadSource: 'appServer',
     ephemeral: false,
     ...(mcpConfig ? { config: mcpConfig } : {}),
     ...developerInstructions,
-  }, 60_000)
+  }, 60_000))
   let sessionResponse: Record<string, unknown>
   try {
     if (threadId) {
       try {
-        sessionResponse = await rpc.request<Record<string, unknown>>('thread/resume', {
+        sessionResponse = await measureAgentStartup(options, 'provider.session.resume', () => rpc.request<Record<string, unknown>>('thread/resume', {
           threadId,
           cwd: options.cwd,
           runtimeWorkspaceRoots: [options.cwd],
           excludeTurns: false,
           ...(mcpConfig ? { config: mcpConfig } : {}),
           ...developerInstructions,
-        }, 60_000)
+        }, 60_000))
       } catch (error) {
         if (!canReplaceMissingCodexSession(error, options.noProviderExecutionHistory)) throw error
         await options.onEvent({
@@ -287,12 +288,12 @@ export async function startCodexSession(
   childRouter.setRootThread(threadId)
 
   const [models, permissionProfiles, skills, modeResponse] = await Promise.all([
-    rpc.request('model/list', { limit: 100, includeHidden: false }).catch(() => null),
-    rpc.request('permissionProfile/list', { cwd: options.cwd, limit: 100 }).catch(() => null),
-    rpc.request('skills/list', { cwds: [options.cwd], forceReload: false }).catch(() => null),
+    measureAgentStartup(options, 'provider.models', () => rpc.request('model/list', { limit: 100, includeHidden: false })).catch(() => null),
+    measureAgentStartup(options, 'provider.permissions', () => rpc.request('permissionProfile/list', { cwd: options.cwd, limit: 100 })).catch(() => null),
+    measureAgentStartup(options, 'provider.skills', () => rpc.request('skills/list', { cwds: [options.cwd], forceReload: false })).catch(() => null),
     // App-servers without this experimental endpoint reject the request. A missing response means
     // no advertised option, leaving the rest of session startup unchanged.
-    rpc.request('collaborationMode/list', {}).catch(() => null),
+    measureAgentStartup(options, 'provider.modes', () => rpc.request('collaborationMode/list', {})).catch(() => null),
   ])
   const activePermission = asObject(sessionResponse.activePermissionProfile)
   currentModel = currentModel ?? stringValue(sessionResponse.model)
@@ -312,12 +313,12 @@ export async function startCodexSession(
     ),
     ...codexPermissionOptions(permissionProfiles, stringValue(activePermission?.id)),
   ]
-  await options.onEvent({
+  await measureAgentStartup(options, 'provider.metadata', async () => options.onEvent({
     type: 'session_metadata',
     providerSessionRef: threadId,
     configOptions,
     skills: codexSkillsFromResponse(skills),
-  })
+  }))
   metadataReady = true
   if (latestThreadSettings) {
     const synchronized = codexOptionsWithThreadSettings(configOptions, latestThreadSettings)
@@ -331,7 +332,7 @@ export async function startCodexSession(
     }
   }
   ready = true
-  await options.onEvent({ type: 'session_state', state: 'ready' })
+  await measureAgentStartup(options, 'provider.ready', async () => options.onEvent({ type: 'session_state', state: 'ready' }))
 
   return {
     get providerSessionRef() {

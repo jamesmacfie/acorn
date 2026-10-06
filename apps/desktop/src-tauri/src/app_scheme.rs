@@ -17,11 +17,19 @@ pub fn is_app_authority(uri: &Uri) -> bool {
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy", for why this matches only
 /// the highlighter's worker entry and what a rename would cost. The shared renderer Vite config sets
-/// the `worker-` prefix it keys on.
-fn is_highlight_worker(path: &str) -> bool {
-    let Some(rest) = path.strip_prefix("/assets/worker-highlighter.worker-") else { return false };
-    let Some(hash) = rest.strip_suffix(".js") else { return false };
-    !hash.is_empty() && hash.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+/// the `worker-` prefix it keys on. Vite serves the source entry in development, distinguished from
+/// its main-thread wrapper by `worker_file&type=module`.
+fn is_highlight_worker(uri: &Uri, dev: bool) -> bool {
+    let path = uri.path();
+    if let Some(rest) = path.strip_prefix("/assets/worker-highlighter.worker-") {
+        return rest.strip_suffix(".js").is_some_and(|hash| {
+            !hash.is_empty() && hash.bytes().all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        });
+    }
+    dev
+        && path.starts_with("/@fs/")
+        && path.ends_with("/packages/client-core/src/infra/highlight/highlighter.worker.ts")
+        && uri.query() == Some("worker_file&type=module")
 }
 
 /// See docs/shell.md, "The syntax-highlighter worker's separate policy".
@@ -169,7 +177,7 @@ pub fn serve(source: &Source, helper_port: u16, request: &Request<Vec<u8>>) -> R
         Source::Files(_) => None,
     };
 
-    let csp = if is_highlight_worker(&pathname) { WORKER_CSP.to_string() } else { renderer_csp(helper_port, dev) };
+    let csp = if is_highlight_worker(request.uri(), dev.is_some()) { WORKER_CSP.to_string() } else { renderer_csp(helper_port, dev) };
 
     // Checked ahead of the source, because it is true of both. Vite answers an unknown path with the
     // shell's HTML exactly as the packaged read would.
@@ -308,11 +316,31 @@ mod tests {
 
     #[test]
     fn the_highlighter_worker_gets_its_own_policy() {
-        assert!(is_highlight_worker("/assets/worker-highlighter.worker-B1a2_c3.js"));
-        assert!(!is_highlight_worker("/assets/worker-highlighter.worker-.js"));
-        assert!(!is_highlight_worker("/assets/worker-other.worker-abc.js"));
-        assert!(!is_highlight_worker("/assets/index-abc.js"));
+        for (path, allowed) in [
+            ("/assets/worker-highlighter.worker-B1a2_c3.js", true),
+            ("/assets/worker-highlighter.worker-.js", false),
+            ("/assets/worker-other.worker-abc.js", false),
+            ("/assets/index-abc.js", false),
+        ] {
+            let uri = format!("app://acorn{path}").parse().unwrap();
+            assert_eq!(is_highlight_worker(&uri, false), allowed, "{path}");
+        }
         assert!(WORKER_CSP.contains("'wasm-unsafe-eval'"));
+    }
+
+    #[test]
+    fn only_the_dev_highlighter_entry_gets_the_worker_policy() {
+        let path = "/@fs/Users/dev/acorn/packages/client-core/src/infra/highlight/highlighter.worker.ts";
+        let worker: Uri = format!("app://acorn{path}?worker_file&type=module").parse().unwrap();
+        assert!(is_highlight_worker(&worker, true));
+        assert!(!is_highlight_worker(&worker, false), "source paths are never workers in packaged builds");
+        for query in ["", "?worker", "?worker_file", "?worker_file&type=classic"] {
+            let uri = format!("app://acorn{path}{query}").parse().unwrap();
+            assert!(!is_highlight_worker(&uri, true), "{query}");
+        }
+        let other: Uri = "app://acorn/@fs/Users/dev/acorn/packages/client-core/src/infra/diff/wordDiff.worker.ts?worker_file&type=module".parse().unwrap();
+        assert!(!is_highlight_worker(&other, true));
+        assert!(!renderer_csp(51234, Some("http://localhost:4319")).contains("wasm-unsafe-eval"));
     }
 
     #[test]

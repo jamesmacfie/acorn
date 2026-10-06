@@ -1,8 +1,7 @@
 # Core routes
 
-This page lists every route core mounts under `/v1/core`, grouped by owner, with the gate in front of
-each group. It's part of the [API reference](../api-reference.md). The route modules under
-`packages/node-core/src/server/routes/` own the bodies and validation.
+This page lists core's `/v1/core` routes by owner and gate. It's part of the [API reference](../api-reference.md).
+The modules under `packages/node-core/src/server/routes/` own the bodies and validation.
 
 `packages/node-core/src/server/mountCoverage.test.ts` builds the app and fails unless every core
 route is behind a gate mount or named, with its reason, as open to a task token.
@@ -114,6 +113,7 @@ Workspace and project routes are device-only. Task routes are open to a task tok
 | `GET`, `POST` | `/v1/core/workspaces` | List workspaces with project membership, or create one |
 | `POST` | `/v1/core/workspaces/bootstrap` | Create the default workspace |
 | `PATCH`, `DELETE` | `/v1/core/workspaces/:id` | Rename, or delete a non-default workspace |
+| `PUT` | `/v1/core/workspaces/:id/project-order` | [Save the complete project order](../workspaces-and-tasks/projects.md#arrange-projects) |
 | `GET`, `PUT` | `/v1/core/workspaces/:id/external-projects` | Read or replace provider projects linked to a workspace |
 | `GET`, `POST` | `/v1/core/projects` | List projects and their facets, or add one |
 | `GET`, `PATCH`, `DELETE` | `/v1/core/projects/:id` | Read, update identity, colour, folder, or visibility, or delete with its tasks |

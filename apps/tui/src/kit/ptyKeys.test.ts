@@ -92,6 +92,7 @@ const LEGACY: readonly (readonly [string, PtyKey, string])[] = [
   // `commit` is Ctrl+Return, and a legacy terminal has never had a second byte for it — which is the
   // whole reason this app asks the kitty protocol to disambiguate its *own* keyboard.
   ['ctrl+return', key('return', { ctrl: true }), '\r'],
+  ['ctrl+shift+return', key('return', { ctrl: true, shift: true }), '\r'],
   ['alt+return', key('return', { meta: true }), '\x1b\r'],
   ['ctrl+backspace', key('backspace', { ctrl: true }), '\b'],
   ['alt+backspace', key('backspace', { meta: true }), '\x1b\x7f'],

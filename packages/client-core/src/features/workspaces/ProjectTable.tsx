@@ -10,6 +10,8 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 import { Badge, Button, Checkbox, Input, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
 import { Toolbar } from '../../kit/components/layout/Toolbar'
 import './projects.css'
+import { createProjectOrder } from './createProjectOrder'
+import { ProjectOrderHandle } from './ProjectOrderHandle'
 
 // Projects as a table, grouped under their workspace, with row selection and a bar for the changes
 // people make to several projects at once: move, hide, and colour (docs/workspaces-and-tasks.md).
@@ -39,6 +41,8 @@ export function ProjectTable(props: {
   refresh: () => Promise<unknown>
 }) {
   const all = createMemo(() => props.groups.flatMap((group) => group.projects))
+  let table: HTMLDivElement | undefined
+  const order = createProjectOrder({ groups: () => props.groups, table: () => table, refresh: () => props.refresh() })
   const [selected, setSelected] = createSignal<ReadonlySet<string>>(new Set())
   const [result, setResult] = createSignal<BulkResult>()
   // A project deleted or moved off this table drops out of the selection with it.
@@ -60,9 +64,10 @@ export function ProjectTable(props: {
   return (
     <>
       {/* The wrapper gives the rows their floor in projects.css. */}
-      <div class="ws-project-table">
+      <div class="ws-project-table" ref={table} aria-busy={order.busy()}>
       <Table size="sm">
         <TableRow head>
+          <TableHead><span class="sr-only">Reorder</span></TableHead>
           <TableHead>
             <Checkbox
               ariaLabel="Select every project"
@@ -83,6 +88,7 @@ export function ProjectTable(props: {
             <>
               <Show when={props.groupHeads}>
                 <TableRow>
+                  <TableCell />
                   <TableCell>
                     <Show when={group().projects.length}>
                       <Checkbox
@@ -113,11 +119,16 @@ export function ProjectTable(props: {
               </Show>
               {/* Index, not For: a refetch after every write hands back new objects, and For would
                   rebuild the rows under the pointer and drop the focus on the row's checkbox. */}
-              <Index each={group().projects}>
-                {(project) => (
+              <Index each={order.projectsFor(group())}>
+                {(project, index) => (
                   // The whole row opens the project. The row leaves a press on its checkbox, its folder
                   // button, or its chevron to that control (Table.tsx § inCellControl).
                   <TableRow onPress={() => props.openProject(project().id)}>
+                    <TableCell>
+                      <Show when={group().workspaceId}>
+                        <ProjectOrderHandle project={project()} order={order} first={index === 0} last={index === group().projects.length - 1} />
+                      </Show>
+                    </TableCell>
                     <TableCell>
                       <Checkbox ariaLabel={`Select ${project().name}`} checked={isSelected(project().id)} onChange={(on) => toggle([project().id], on)} />
                     </TableCell>
@@ -164,6 +175,8 @@ export function ProjectTable(props: {
         </Index>
       </Table>
       </div>
+      <Show when={order.error()}>{(error) => <Text tone="danger" wrap>{error()}</Text>}</Show>
+      <span class="sr-only" role="status">{order.announcement()}</span>
 
       <Show when={chosen().length}>
         <BulkBar

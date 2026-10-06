@@ -66,6 +66,7 @@ type TextareaProps = {
   onChange?: (value: string) => void
   /** Shared `commit` intent for fields that submit their own draft. */
   onCommit?: () => void
+  onToggleExpand?: () => void
   /** The composer's existing `commit` callback receives the buffer's text. */
   onSubmit?: (value: string) => void
   onBlur?: () => void
@@ -83,7 +84,12 @@ function textareaRef(props: TextareaProps, element: Renderable & FieldApi): void
   // `commit` is a chord — Ctrl+Return on this host — so it reaches a focused field: it is one of
   // the typing-exempt intents by design (client-core kit/keys/intents.ts § TYPING_EXEMPT). Bound
   // in `focus` mode, so a composer inside a list does not answer for the list.
-  onCleanup(registerIntentLayer(element, ['commit'], () => {
+  onCleanup(registerIntentLayer(element, ['commit', ...(props.onToggleExpand ? ['maximize'] as const : [])], (intent) => {
+    if (intent === 'maximize') {
+      if (props.disabled || !props.onToggleExpand) return false
+      props.onToggleExpand()
+      return true
+    }
     if (props.disabled || props.readOnly || (!props.onCommit && !props.onSubmit)) return false
     if (props.onCommit) props.onCommit()
     else props.onSubmit?.(element.plainText)

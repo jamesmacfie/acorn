@@ -8,6 +8,8 @@ import { clearHooks, registerHookHandler } from '../pluginHost/hooks'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { computeTaskStatuses, loadTask, requireTaskRoot, resolveTaskCwd, setWorktreesRoot, taskRoot } from './taskWorktree'
 import { _resetWorktreeStatus, invalidateWorktreeStatus } from './worktreeStatus'
+import type { TelemetryRecord } from '@acorn/protocol/telemetry.ts'
+import { flushTelemetry, onTelemetryBatch, resetTelemetryForTest, runWithTelemetry, startTelemetry, telemetryEnabled } from '../telemetry/collector'
 
 const broadcasts: Record<string, unknown>[] = []
 vi.mock('../transport/wsHub', async (importOriginal) => ({
@@ -97,6 +99,35 @@ describe('resolveTaskCwd core:worktree-created hook', () => {
     expect(fresh).toMatchObject({ cwd: a.cwd, created: false })
     expect(stale).toMatchObject({ cwd: a.cwd, created: false })
     expect(created).toHaveLength(1)
+  })
+
+  it('correlates creation and shared waiting with their requesting surfaces without paths', async () => {
+    const records: TelemetryRecord[] = []
+    const sink = onTelemetryBatch((batch) => records.push(...batch.records))
+    const reader = startTelemetry({ node: 'test', version: 'test', readPref: async () => '1' })
+    try {
+      await vi.waitFor(() => expect(telemetryEnabled()).toBe(true))
+      const task = await loadTask(t.db, TASK)
+      await Promise.all([
+        runWithTelemetry({ traceId: '1'.repeat(32), spanId: '1'.repeat(16), owner: 'preview' }, () => resolveTaskCwd(t.db, task, checkout)),
+        runWithTelemetry({ traceId: '2'.repeat(32), spanId: '2'.repeat(16), owner: 'database' }, () => resolveTaskCwd(t.db, task, checkout)),
+      ])
+      flushTelemetry()
+      const spans = records.filter((record) => record.kind === 'span')
+      const creator = spans.find((span) => span.name === 'task.prepare')!
+      const waiter = spans.find((span) => span.name === 'task.prepare.wait')!
+      expect(creator).toMatchObject({ traceId: '1'.repeat(32), parentSpanId: '1'.repeat(16), status: 'ok', attrs: { 'task.id': TASK, owner: 'preview', shared: false } })
+      expect(waiter).toMatchObject({ traceId: '2'.repeat(32), parentSpanId: '2'.repeat(16), status: 'ok', attrs: { 'task.id': TASK, owner: 'database', shared: true } })
+      const phases = spans.filter((span) => span.name === 'task.prepare.phase')
+      expect(phases.map((span) => span.attrs.phase)).toEqual(['git.worktree.add', 'worktree.validate', 'files.copy', 'setup.admit'])
+      expect(phases.every((span) => span.traceId === creator.traceId && span.parentSpanId === creator.spanId)).toBe(true)
+      expect(created).toHaveLength(1)
+      expect(JSON.stringify(records)).not.toContain(checkout)
+    } finally {
+      reader.dispose()
+      sink.dispose()
+      resetTelemetryForTest()
+    }
   })
 
   it('reports a worktree failure separately from a missing checkout for execution', async () => {

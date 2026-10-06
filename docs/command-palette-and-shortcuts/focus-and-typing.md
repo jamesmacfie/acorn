@@ -35,10 +35,11 @@ switcher doesn't change the keyboard.
 
 Keys become intents before a component sees them. The fixed set is in
 `packages/client-core/src/kit/keys/intents.ts`: `next`, `prev`, `first`, `last`, `pageNext`,
-`pagePrev`, `expand`, `collapse`, `activate`, `dismiss`, `commit`, `search`, `menu`, `delete`, and
+`pagePrev`, `expand`, `collapse`, `activate`, `dismiss`, `commit`, `maximize`, `search`, `menu`, `delete`, and
 the four region and pane moves. `packages/client-core/src/kit/keys/keymap.ts` maps the desktop's keys
 onto them, and it's the only file that knows a platform difference: `commit` is Cmd+Enter on macOS and
-Ctrl+Enter elsewhere.
+Ctrl+Enter elsewhere. `maximize` adds Shift to that chord. A textarea with `onToggleExpand` handles
+it in a focused field layer, ahead of the shell's pane-maximize binding.
 
 The host picks the modifier, not the platform. A terminal emulator keeps Cmd and never delivers it,
 so the terminal client passes `ctrl` to `setKeymap`, and every chord in the table and in its shell is

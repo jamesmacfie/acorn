@@ -76,9 +76,14 @@ inlined `blob:` worker, which would inherit the document's policy.
 
 `app_scheme.rs` matches the one relaxed response by file name:
 `/assets/worker-highlighter.worker-<hash>.js`. The `worker-` prefix (`apps/desktop/vite.config.ts`) is
-required, because Vite also emits a small main-thread wrapper derived from the same file. If a bundler
-change renames the entry, the worker falls back to the document's policy, Oniguruma fails, and
-`highlight/worker.ts` logs and falls back to the main thread.
+required, because Vite also emits a small main-thread wrapper derived from the same file.
+
+With the Vite dev server, the worker entry is
+`/@fs/<checkout>/packages/client-core/src/infra/highlight/highlighter.worker.ts?worker_file&type=module`.
+Only that source entry and query get the worker
+policy, and only when the shell proxies a dev server. Its `?worker` wrapper keeps the renderer
+policy. If a bundler change renames either entry, Oniguruma initialization fails and
+`highlight/worker.ts` records a failed worker result and falls back to the main thread.
 
 ## The plugin frame origin
 

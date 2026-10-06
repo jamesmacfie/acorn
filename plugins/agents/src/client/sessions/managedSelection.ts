@@ -52,6 +52,12 @@ export function selectManagedSession(taskId: string, sessionId: string): void {
   requestComposerFocus(sessionId)
 }
 
+/** The conversation measures its own mount before the task list restores this selection. */
+export function restoreManagedSessionSelection(taskId: string, sessionId: string): void {
+  setSelectedByTask((current) => ({ ...current, [taskId]: sessionId }))
+  requestComposerFocus(sessionId)
+}
+
 export function clearManagedSession(taskId: string, expectedSessionId?: string): void {
   setSelectedByTask((current) => {
     if (!(taskId in current) || (expectedSessionId && current[taskId] !== expectedSessionId)) return current

@@ -27,11 +27,12 @@ spans take the pointer and hand the caret back to the textarea on mousedown.
 
 ## Expand the field
 
-⌘⇧↩, or the expand button in the box's corner, grows the field from three rows to 18. It's the chord
-the shell uses to maximize a pane. It isn't a registered keybinding, because a task-scoped binding
-doesn't fire inside a typing target. The terminal client registers `agents.composer.expand` for the
-same job. The transcript yields the height and keeps its place. The state is per composer and lasts
-the app session, because two panes on one session are two readers.
+⌘⇧↩ on macOS, Ctrl+Shift+Enter elsewhere, or the expand button in the box's corner toggles the field
+between three rows and 18. The textarea handles the keymap's `maximize` intent while focused, before
+the shell's pane-maximize binding. Outside the field, the chord maximizes the pane. The terminal also
+registers `agents.composer.expand` on Alt+E for terminals that can't distinguish modified Enter.
+The transcript yields the height and keeps its place. The state is per composer and lasts the app
+session, because two panes on one session are two readers.
 
 ## Composer slots
 

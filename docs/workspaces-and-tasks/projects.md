@@ -40,6 +40,23 @@ because a deleted workspace's projects move there. A project whose workspace has
 `Unassigned`, so you can rescue it. [Frontend](../frontend/settings-groups.md) § Workspaces and
 projects has the pages.
 
+Drag a project's grip in Settings → Overview or a workspace's Projects table to reorder it within
+that workspace. The insertion line shows where it will land. You can also open the grip's menu and
+choose **Move up** or **Move down**, or focus the grip and press Alt+Up or Alt+Down. Escape cancels a
+drag. Moving projects between workspaces uses the selection bar.
+
+The Node saves the complete workspace order in one transaction. The topbar's project dropdown uses
+that order, and selecting a workspace opens its first project. Added or imported projects and
+projects moved into a workspace go at the end. A failed save restores the table from the Node and
+shows an error. A workspace whose membership changed since the table loaded refuses the reorder
+until the client refreshes.
+
+`PUT /v1/core/workspaces/:id/project-order` accepts `{ projectIds: string[] }`, with every project in
+the workspace exactly once, including hidden projects. It stores ascending sort positions and
+publishes `project:changed` for changed rows after commit. Duplicate or malformed IDs return 400;
+missing, unknown, or foreign projects return 409 without writes; an unknown workspace returns 404.
+The success response is `{ ok: true }`.
+
 The project color is a machine-local accent. Every task in that project draws it as the strip down
 the left of its rail tab. With no color there's no strip, and an active tab uses the theme's accent.
 

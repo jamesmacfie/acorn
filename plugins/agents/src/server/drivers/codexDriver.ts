@@ -1,23 +1,11 @@
 // Discovery stays on the boot path; protocol session ownership loads after the launch check.
-import { execFile } from 'node:child_process'
-import { promisify } from 'node:util'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { awaitWithSignal, startCancellation } from '../processes/startCancellation'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
-import { probeCodexAuthentication } from './authProbe'
+import type { MeasureAgentStartup } from './startupTelemetry'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions } from './types'
 
-const execFileAsync = promisify(execFile)
 const DRIVER_VERSION = 'codex-app-server-v2'
-
-async function executableVersion(executable: string): Promise<string | undefined> {
-  try {
-    const { stdout, stderr } = await execFileAsync(executable, ['--version'], { timeout: 3_000, encoding: 'utf8' })
-    return (stdout || stderr).trim().split(/\r?\n/)[0] || undefined
-  } catch {
-    return undefined
-  }
-}
 
 export class CodexAgentDriver implements AgentDriver {
   readonly providerId = 'codex'
@@ -26,6 +14,13 @@ export class CodexAgentDriver implements AgentDriver {
   async probe(): Promise<AgentProviderDescriptor> {
     const env = usageProcessEnv()
     const executable = resolveUsageCommand('codex', env)
+    let authenticated: boolean | null = null
+    let version: string | undefined
+    if (executable) {
+      const probes = await import('./authProbe')
+      authenticated = await probes.probeCodexAuthentication(executable)
+      version = await probes.probeExecutableVersion(executable)
+    }
     return {
       id: this.providerId,
       profileId: this.profileId,
@@ -34,9 +29,9 @@ export class CodexAgentDriver implements AgentDriver {
       driverKind: 'codex-app-server',
       driverVersion: DRIVER_VERSION,
       installed: executable != null,
-      authenticated: executable ? await probeCodexAuthentication(executable) : null,
+      authenticated,
       executable: executable ?? undefined,
-      executableVersion: executable ? await executableVersion(executable) : undefined,
+      executableVersion: version,
       statusAuthority: 'protocol',
       capabilities: [
         'streaming_messages',
@@ -97,7 +92,8 @@ export class CodexAgentDriver implements AgentDriver {
     options: AgentDriverStartOptions,
     own: (stop: () => Promise<void>) => void,
   ): Promise<AgentDriverSession> {
-    const descriptor = await this.probe()
+    const measure: MeasureAgentStartup = options.measureStartup ?? ((_phase, run) => run())
+    const descriptor = await measure('provider.probe', () => this.probe())
     options.signal?.throwIfAborted()
     if (!descriptor.executable) throw new Error('Codex is not available on PATH.')
     await options.onEvent({
@@ -105,7 +101,7 @@ export class CodexAgentDriver implements AgentDriver {
       state: options.session.providerSessionRef ? 'replaying' : 'connecting',
     })
 
-    const { startCodexSession } = await import('./codexStart')
+    const { startCodexSession } = await measure('driver.load', () => import('./codexStart'))
     options.signal?.throwIfAborted()
     return startCodexSession(options, descriptor.executable, own)
   }

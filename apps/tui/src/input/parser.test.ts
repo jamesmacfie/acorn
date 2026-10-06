@@ -436,6 +436,7 @@ const RECORDED: Record<string, { legacy?: string; kitty: string }> = {
   // No legacy column, and that absence is the reason the app asks for the kitty protocol at all: a
   // legacy terminal sends `\r` for this and for Return, so there is nothing to record.
   'ctrl+return': { kitty: '\x1b[13;5u' },
+  'ctrl+shift+return': { kitty: '\x1b[13;6u' },
   'ctrl+f': { legacy: '\x06', kitty: '\x1b[102;5u' },
   'ctrl+meta+right': { legacy: '\x1b[1;7C', kitty: '\x1b[57351;7u' },
   'ctrl+meta+left': { legacy: '\x1b[1;7D', kitty: '\x1b[57350;7u' },

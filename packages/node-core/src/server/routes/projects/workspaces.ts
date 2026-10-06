@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
-import { and, eq, inArray, max } from 'drizzle-orm'
+import { and, asc, eq, inArray, max } from 'drizzle-orm'
 import { Hono } from 'hono'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -9,6 +9,8 @@ import { respondError } from '../../respond'
 import type { Workspace, WorkspaceExternalProjectsResponse, WorkspaceProjectRef, WorkspaceSeed } from '@acorn/protocol/api.ts'
 import { getConnection } from '../../integrations/connections'
 import { broadcastProjectChanged, broadcastWorkspaceChanged, broadcastWorkspaceProjectsChanged } from '../../notify'
+import { workspaceProjectOrderBody } from '@acorn/protocol/api.ts'
+import { reorderWorkspaceProjects } from '../../projects'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
@@ -47,6 +49,7 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
   const projectRows = await db.select().from(schema.projects).where(inArray(schema.projects.workspaceId, ids))
+    .orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt), asc(schema.projects.id))
   const projectsByWs = new Map<string, WorkspaceProjectRef[]>()
   for (const project of projectRows) {
     const list = projectsByWs.get(project.workspaceId) ?? []
@@ -132,6 +135,14 @@ export const workspaces = new Hono<AppEnv>()
       await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
       broadcastWorkspaceChanged({ workspaceId: id })
     }
+    return c.json({ ok: true })
+  })
+  .put('/:id/project-order', async (c) => {
+    const parsed = workspaceProjectOrderBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request', ['Supply each project ID once.'])
+    const result = reorderWorkspaceProjects(getDb(c.env), c.req.param('id'), parsed.data.projectIds)
+    if (result === 'not_found') return respondError(c, 404, 'not_found')
+    if (result === 'membership_changed') return respondError(c, 409, 'conflict', ['The workspace projects changed. Refresh and try again.'])
     return c.json({ ok: true })
   })
   .delete('/:id', async (c) => {

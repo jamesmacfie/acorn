@@ -66,6 +66,7 @@ nanoseconds, measured on September 11, 2026.
 | Every serve-then-revalidate decision | `server/sync/engine.ts` | Count `sync.fresh`, `sync.stale`, or `sync.cold` with the resource |
 | Every outbound WebSocket frame | `server/transport/wsHub.ts` | Histogram `ws.frame` with the channel prefix. Event `ws.shed` when a socket falls behind |
 | Every agent tool call | `server/routes/plugins/agentTools.ts` | Span `tool.call`, owner from the plugin that contributed the tool |
+| Task worktree preparation | `server/worktrees/taskWorktree.ts`, `worktrees.ts` | Spans `task.prepare`, `task.prepare.wait`, and `task.prepare.phase` ([task preparation](#task-preparation)) |
 | Every audit row | `server/audit.ts` | Event `audit.<action>` with the actor and none of the row's details |
 | Uncaught exception or rejection | `apps/node/src/composition/crash.ts` | A fatal error with its stack, then exit 1 |
 | Runtime pressure | `server/telemetry/runtimePressure.ts` | Event loop, CPU, and memory gauges every five seconds ([diagnosis](./diagnosis.md)) |
@@ -73,6 +74,24 @@ nanoseconds, measured on September 11, 2026.
 
 Git and SQL histograms take their owner from the ambient store. A loaded plugin's HTTP routes need
 nothing extra, because the request span already names the plugin from `/v1/p/<id>/`.
+
+### Task preparation
+
+`task.prepare` measures a task's worktree preparation attempt, including file copying and setup
+admission. It carries `task.id` and `shared: false`. A caller joining an in-flight preparation raises
+`task.prepare.wait` with the same task ID and `shared: true`, in that caller's trace. Cached roots
+produce neither span.
+
+Child `task.prepare.phase` spans label `git.fetch`, `git.worktree.add`, `worktree.validate`,
+`files.copy`, or `setup.admit`. The setup phase waits for hook admission, not script completion.
+Each phase retains the requesting plugin's owner and enters the ambient trace, so hook spans nest
+under preparation. Git command errors mark their phase as failed even when the resolver converts
+the error into a worktree-unavailable result. Paths, branch names, commands, and file contents stay
+out of these attributes.
+
+Compare the request's `route` and `owner` with preparation spans to find availability checks that
+trigger worktree creation. Use `task.id` to connect shared waiters to the creator when Sentry's task-ID
+setting allows it. Git and process histograms remain aggregated across traces.
 
 Installing a crash handler changes what Node does. With any `uncaughtException` listener registered,
 Node stops printing the stack and stops exiting, so `installCrashHandlers` does both itself, with one

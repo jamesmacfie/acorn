@@ -17,6 +17,8 @@ export type TextareaProps = ControlOwn & {
   onInput?: (value: string) => void
   /** The host's commit chord: Command-Enter on macOS, Control-Enter elsewhere. */
   onCommit?: () => void
+  /** Toggle the field's expanded size with Command/Control-Shift-Enter. */
+  onToggleExpand?: () => void
   /** The committed value: blur, or Enter. See `InputProps.onChange`. */
   onChange?: (value: string) => void
   /** A textarea owns its keys and its own surface while focused: the composer completes mentions,
@@ -44,11 +46,20 @@ export function Textarea(props: TextareaProps) {
     <textarea
       {...controlAttrs(own, 'ui-input', field)}
       {...assistAttrs(own)}
-      ref={props.onCommit ? (element) => {
+      ref={props.onCommit || props.onToggleExpand ? (element) => {
         if (typeof props.ref === 'function') props.ref(element)
-        bindIntents(element, ['commit'], () => {
-          if (props.disabled || props.readOnly || !props.onCommit) return false
-          props.onCommit()
+        bindIntents(element, [
+          ...(props.onCommit ? ['commit'] as const : []),
+          ...(props.onToggleExpand ? ['maximize'] as const : []),
+        ], (intent) => {
+          if (props.disabled) return false
+          if (intent === 'maximize') {
+            if (!props.onToggleExpand) return false
+            props.onToggleExpand()
+          } else {
+            if (props.readOnly || !props.onCommit) return false
+            props.onCommit()
+          }
           return true
         }, { mode: 'focus' })
       } : props.ref}

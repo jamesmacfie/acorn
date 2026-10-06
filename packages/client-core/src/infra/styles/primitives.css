@@ -750,6 +750,9 @@ textarea.ui-input[data-grow] { flex: 1; min-height: 0; resize: none; }
 .ui-chip[data-selected] { background: var(--bg-selected); border-color: var(--accent); color: var(--text); }
 .ui-chip-label { overflow: hidden; text-overflow: ellipsis; }
 .ui-chip-leading { flex: none; display: inline-flex; align-items: center; }
+/* Context labels share a toolbar with its heading and controls. Cap their share and let them
+   shrink so a long workflow or parent name truncates inside the chip. */
+.ui-toolbar > .ui-chip { flex: 0 1 auto; min-width: 0; max-width: 40%; }
 
 /* Clickable form: `button.ui-chip` is how the component switches element on interactivity. */
 button.ui-chip { cursor: pointer; }

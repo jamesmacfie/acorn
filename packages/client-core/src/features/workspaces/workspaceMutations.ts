@@ -11,6 +11,8 @@ import {
   workspaceExternalProjectsRoute,
   type WorkspaceExternalProject,
   workspaceRoute,
+  workspaceProjectOrderRoute,
+  type WorkspaceProjectOrder,
   workspacesRoute,
   workspaceBootstrapRoute,
 } from '@acorn/protocol/api.ts'
@@ -53,6 +55,12 @@ export const deleteProject = (id: string) =>
   writeJson<{ ok: true }>(projectRoute(id), { method: 'DELETE' }, (res) => `project ${res.status}`)
 export const setProjectWorkspace = (id: string, workspaceId: string) => patchProject(id, { workspaceId })
 export const setProjectHidden = (id: string, hidden: boolean) => patchProject(id, { hidden })
+export const setWorkspaceProjectOrder = (id: string, projectIds: string[]) => {
+  const body: WorkspaceProjectOrder = { projectIds }
+  return writeJson<{ ok: true }>(workspaceProjectOrderRoute(id), {
+    method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+  }, (res) => `Could not save project order (${res.status}).`)
+}
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })
 // Build/run/db/preview config and project colour are Project-scoped; edit them via the Project API.
 export const deleteWorkspace = async (id: string) =>

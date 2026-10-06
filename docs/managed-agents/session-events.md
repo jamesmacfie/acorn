@@ -47,13 +47,37 @@ which also publishes the `agent:session` frame clients use to update their cache
 
 ## What a session reports
 
-Starting a provider raises an `agent.session` span, and dispatching a turn raises an `agent.turn`
-span, both through `ctx.telemetry` ([ambient attribution](../telemetry/runtimes.md#ambient-attribution)).
-The session span carries the session ID, the provider, and whether it reconnected. The turn span
+Starting a provider raises an `agent.session.start` span through `ctx.telemetry`
+([ambient attribution](../telemetry/runtimes.md#ambient-attribution)). It covers task-root resolution,
+workspace and execution-history reads, MCP preparation, and the provider handshake. Its child
+`agent.session` covers the driver start alone, preserving the provider-only timing.
+
+Both spans carry task and session IDs, the provider, whether it reconnected, and outcome `ready`,
+`error`, or `cancelled`. Child `agent.session.phase` spans carry a fixed `phase` label:
+
+| Phase | What it waits for |
+| --- | --- |
+| `task.root`, `workspace.read`, `history.read`, `mcp.prepare` | The runtime's preparation before driver start |
+| `driver.load` | Protocol session code and ACP SDK imports |
+| `provider.probe` | Codex executable discovery, authentication status, and version checks before protocol startup |
+| `provider.initialize` | The protocol initialization response, including process startup |
+| `provider.session.create`, `.resume`, `.load` | The provider's session or thread response. A refused resume followed by fresh creation produces separate error and success spans |
+| `provider.models`, `.permissions`, `.skills`, `.modes` | Each Codex metadata request, measured separately while they run concurrently |
+| `provider.metadata`, `provider.ready` | Durable metadata and readiness event handling |
+
+The driver phases are children of `agent.session`; runtime preparation phases are children of
+`agent.session.start`. An optional metadata failure keeps its error outcome even when startup succeeds.
+Cancellation closes an active phase when the signal aborts. Neither protocol parameters nor error
+messages become attributes. The shared ACP driver and native Codex driver emit protocol phase detail;
+other native drivers retain the total driver span. These spans start at provider connection, after
+session admission has resolved its initial task root. Worktree preparation during admission has
+[its own spans](../telemetry/runtimes.md#task-preparation).
+
+Dispatching a turn raises an `agent.turn` span. The turn span
 carries the turn ID, session ID, provider, and source. Neither carries a prompt, a result, or a
 transcript.
 
-The session span covers spawning or reconnecting the provider and nothing more, because a session
+The startup spans cover connecting the provider, because a session
 outlives its process and a span over its life couldn't close. The turn span opens at dispatch, not at
 enqueue, because a turn can wait minutes behind the concurrency limit. It closes on a completed turn,
 an error, a provider that closed, or a retry that puts the turn back in the queue. A turn whose

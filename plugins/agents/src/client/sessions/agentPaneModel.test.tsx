@@ -42,6 +42,8 @@ vi.mock('../settings/customAgentsClient', () => ({
 
 const { managedAgentStore } = await import('./managedStore')
 const { createAgentPaneModel, sessionIsBlank } = await import('./agentPaneModel')
+const { agentTelemetry, claimAgentSelection } = await import('./agentTelemetry')
+const { clearManagedSession } = await import('./managedSelection')
 
 const event = (seq: number): AgentEventRecord => ({
   id: `e${seq}`, sessionId: 's1', turnId: 'turn', seq, schemaVersion: 1, searchText: null, createdAt: 100 + seq,
@@ -49,6 +51,10 @@ const event = (seq: number): AgentEventRecord => ({
 } as unknown as AgentEventRecord)
 
 afterEach(() => {
+  clearManagedSession('t1')
+  clearManagedSession('t2')
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
   vi.useRealTimers()
   managedAgentStore.clear()
   providers.mockReset()
@@ -75,6 +81,10 @@ it('marks read up to the newest event frame, which the row no longer carries', a
 })
 
 it('opens the session the list will select, so a first visit reads one snapshot', async () => {
+  vi.useFakeTimers()
+  vi.stubGlobal('requestAnimationFrame', undefined)
+  const end = vi.fn()
+  const opening = vi.spyOn(agentTelemetry, 'startOperation').mockReturnValue({ traceId: 'trace', spanId: 'span', end })
   // `older` was started first and has been working since; `newer` was started later and left alone.
   const older = { ...session, id: 'older', createdAt: 1, updatedAt: 50 }
   const newer = { ...session, id: 'newer', createdAt: 10, updatedAt: 20 }
@@ -86,12 +96,21 @@ it('opens the session the list will select, so a first visit reads one snapshot'
   const opened: (string | undefined)[] = []
   const { model, dispose } = createRoot((dispose) => {
     const model = withQueryClient(() => createAgentPaneModel({ id: 't1' } as never, { shown: () => false }))
-    createEffect(() => opened.push(model.selectedSessionId()))
+    createEffect(() => {
+      const id = model.selectedSessionId()
+      opened.push(id)
+      if (id) claimAgentSelection(id).ready()
+    })
     return { model, dispose }
   })
   await model.sessionsLoaded
   await Promise.resolve()
   expect(opened).toEqual(['older'])
+  // Restoring the already-mounted fallback must not leave a second span waiting for a remount.
+  expect(opening).toHaveBeenCalledOnce()
+  expect(end).toHaveBeenCalledExactlyOnceWith('ok', { outcome: 'ready' })
+  vi.advanceTimersByTime(30_000)
+  expect(end).toHaveBeenCalledOnce()
   dispose()
 })
 

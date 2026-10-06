@@ -8,6 +8,7 @@ import type {
   AgentTurn,
 } from '../../contract/wire.ts'
 import type { AgentMcpReportedServer } from '../../shared/mcpServers'
+import type { MeasureAgentStartup } from './startupTelemetry'
 
 /**
  * Binary output from a provider before Acorn takes custody of it. This type never crosses the wire
@@ -40,6 +41,8 @@ export type AgentDriverMcpServer =
 export type AgentDriverStartOptions = {
   /** Local compiled-runtime cancellation. This signal never crosses plugin RPC. */
   signal?: AbortSignal
+  /** Local startup timing only. This callback never crosses plugin RPC. */
+  measureStartup?: MeasureAgentStartup
   session: AgentSession
   cwd: string
   env: Record<string, string>

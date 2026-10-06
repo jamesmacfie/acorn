@@ -41,7 +41,9 @@ describe('the key map', () => {
   it('puts the whole platform difference in the command key', () => {
     expect(macos.commit).toEqual(['super+return'])
     expect(other.commit).toEqual(['ctrl+return'])
-    const unchanged = INTENTS.filter((intent) => intent !== 'commit' && intent !== 'search')
+    expect(macos.maximize).toEqual(['super+shift+return'])
+    expect(other.maximize).toEqual(['ctrl+shift+return'])
+    const unchanged = INTENTS.filter((intent) => !['commit', 'maximize', 'search'].includes(intent))
     for (const intent of unchanged) expect(macos[intent], intent).toEqual(other[intent])
   })
 

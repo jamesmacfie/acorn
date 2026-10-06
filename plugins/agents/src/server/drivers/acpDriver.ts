@@ -4,6 +4,7 @@ import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
 import type { AgentDriver, AgentDriverSession, AgentDriverStartOptions } from './types'
+import type { MeasureAgentStartup } from './startupTelemetry'
 
 const DRIVER_VERSION = 'acp-1'
 
@@ -87,6 +88,7 @@ export class AcpDriver implements AgentDriver {
   }
 
   async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+    const measure: MeasureAgentStartup = options.measureStartup ?? ((_phase, run) => run())
     const cancellation = startCancellation(options.signal)
     let cleanup: () => Promise<void> = async () => {}
     const scoped = {
@@ -101,7 +103,7 @@ export class AcpDriver implements AgentDriver {
       cancellation.signal.throwIfAborted()
       const launch = this.launch()
       if (launch.diagnostics.length) throw new Error(launch.diagnostics[0])
-      const { startAcpSession } = await import('./acpSession')
+      const { startAcpSession } = await measure('driver.load', () => import('./acpSession'))
       cancellation.signal.throwIfAborted()
       const handle = await awaitWithSignal(startAcpSession(scoped, this.spec, launch, (stop) => { cleanup = stop }), cancellation.signal)
       cancellation.signal.throwIfAborted()

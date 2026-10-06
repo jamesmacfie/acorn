@@ -16,6 +16,9 @@ resolves to `primitives.ts`. Specificity is layered by convention:
 
 A pack wins because it's more specific, never because its stylesheet loads last.
 
+Direct chips in a `Toolbar` take at most 40% of its width and shrink when space is limited. Their
+labels truncate with an ellipsis so long workflow or parent names leave room for the toolbar controls.
+
 No plugin draws a raw `div` or `span` (`tools/arch/primitiveAdoption.test.ts`). A plugin's tree is kit
 nodes. A raw element is how a plugin reached a host class, and it can't cross to a worker. The rule
 names those two tags only, because `section`, `table`, and `input` carry meaning. Two rules in

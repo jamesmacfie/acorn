@@ -1520,6 +1520,18 @@ const BEHAVIOURS: Behaviour[] = [
     },
   },
   {
+    node: 'MentionTextarea',
+    does: 'toggles its size with Control-Shift-Enter without submitting or editing the draft',
+    render: (record) => <MentionTextarea value="question" onInput={record}
+      onSubmit={() => record('sent')} onToggleExpand={() => record('expanded')} />,
+    size: { width: 30, height: 5 },
+    drive: async (screen, pressed) => {
+      pressed.length = 0
+      await screen.press('RETURN', { ctrl: true, shift: true })
+      expect(pressed).toEqual(['expanded'])
+    },
+  },
+  {
     node: 'Textarea',
     does: 'moves the caret up and down over the visual lines of a wrapped value',
     render: () => (

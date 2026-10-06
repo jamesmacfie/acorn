@@ -10,6 +10,7 @@ import { spawnOwnedProcess } from '../processes/ownedProcess'
 import type { AgentInputPart, AgentNormalizedEvent } from '../../contract/wire.ts'
 import { normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
 import { providerStderrNotice } from './diagnostics'
+import { measureAgentStartup } from './startupTelemetry'
 import { contextBlock } from './contextBlock'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
@@ -173,7 +174,7 @@ export async function startAcpSession(
   const { id, label, quirks } = spec
   // The SDK loads here, not at the top of the file. Building its generated schemas takes about 30 ms,
   // the node loads this module on every boot, and most launches never start an ACP session.
-  const { ClientSideConnection, ndJsonStream, RequestError } = await import('@agentclientprotocol/sdk')
+  const { ClientSideConnection, ndJsonStream, RequestError } = await measureAgentStartup(options, 'driver.load', () => import('@agentclientprotocol/sdk'))
   await options.onEvent({
     type: 'session_state',
     state: options.session.providerSessionRef ? 'replaying' : 'connecting',
@@ -240,7 +241,7 @@ export async function startAcpSession(
   child.on('exit', (code) => closed(code === 0 ? undefined : new Error(`${label} exited with code ${code ?? 'unknown'}.`)))
   void connection.closed.then(() => closed(new Error(`${label} ACP connection closed.`)), closed)
 
-  const initialized = await agent.initialize({
+  const initialized = await measureAgentStartup(options, 'provider.initialize', async () => agent.initialize({
     protocolVersion: 1,
     clientInfo: { name: 'acorn', version: '1.0.0' },
     // acorn declines every client capability but one. See docs/managed-agents/harnesses.md § Harnesses for
@@ -255,7 +256,7 @@ export async function startAcpSession(
       session: { configOptions: {} },
       elicitation: { form: {} },
     },
-  })
+  }))
   // Two ways back into a session the agent still holds, and they are different calls. `session/load`
   // replays the history the agent kept; `session/resume` restores the context and sends nothing back.
   // An agent advertises whichever one it implements, Claude Code the first and DeepSeek the second, and
@@ -290,12 +291,12 @@ export async function startAcpSession(
     : null
   let instructionsOwed = false
   const createSession = async (): Promise<void> => {
-    const created = await agent.newSession({
+    const created = await measureAgentStartup(options, 'provider.session.create', async () => agent.newSession({
       cwd: options.cwd,
       additionalDirectories: [],
       mcpServers,
       ...(sessionMeta ? { _meta: sessionMeta } : {}),
-    })
+    }))
     providerSessionRef = created.sessionId
     configOptions = created.configOptions ?? []
     instructionsOwed = fallbackInstructions != null
@@ -315,8 +316,8 @@ export async function startAcpSession(
     }
     try {
       const reconnected = supportsResume
-        ? await agent.resumeSession!(reference)
-        : await agent.loadSession!(reference)
+        ? await measureAgentStartup(options, 'provider.session.resume', async () => agent.resumeSession!(reference))
+        : await measureAgentStartup(options, 'provider.session.load', async () => agent.loadSession!(reference))
       configOptions = reconnected?.configOptions ?? []
     } catch (error) {
       // The agent no longer holds the session this row points at. Claude Code, for one, keys its
@@ -344,12 +345,12 @@ export async function startAcpSession(
     await createSession()
   }
   replaying = false
-  await options.onEvent({
+  await measureAgentStartup(options, 'provider.metadata', async () => options.onEvent({
     type: 'session_metadata',
     providerSessionRef: providerSessionRef ?? undefined,
     configOptions: normalizeAcpConfig(configOptions),
-  })
-  await options.onEvent({ type: 'session_state', state: 'ready' })
+  }))
+  await measureAgentStartup(options, 'provider.ready', async () => options.onEvent({ type: 'session_state', state: 'ready' }))
 
   let active = false
   let currentConfig = normalizeAcpConfig(configOptions)

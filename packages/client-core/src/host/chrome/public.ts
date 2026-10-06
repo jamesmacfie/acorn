@@ -1,4 +1,5 @@
 export { runChromeAction } from './actions.ts'
+export { filterSourceItems } from './sourceFilter.ts'
 export { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData.ts'
 export { setExtendedPane } from './extendedPane.ts'
 export type { ExtendedPaneProps } from './extendedPane.ts'

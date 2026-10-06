@@ -120,6 +120,7 @@ export async function ensureWorktree(
     return { ok: false, reason: staleWorktreeReason(path, branch, on) }
   }
 
+  const { prepareWorktreePhase } = await import('./preparationTelemetry')
   mkdirSync(worktreesRoot, { recursive: true })
 
   if (pullNumber != null) {
@@ -134,7 +135,7 @@ export async function ensureWorktree(
     // records what the branch came from.
     const head = `refs/acorn/pull/${pullNumber}`
     try {
-      await gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 })
+      await prepareWorktreePhase('git.fetch', () => gitOrThrow(['fetch', '--no-tags', '--quiet', 'origin', `+pull/${pullNumber}/head:${head}`], { cwd: checkout, timeoutMs: 60_000 }))
     } catch (error) {
       return { ok: false, reason: gitFailure(`Could not fetch pull/${pullNumber}/head.`, error) }
     }
@@ -143,7 +144,7 @@ export async function ensureWorktree(
       ? ['worktree', 'add', '--', path, branch]
       : ['worktree', 'add', '-b', branch, '--', path, head]
     try {
-      await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
+      await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
     } catch (error) {
       return { ok: false, reason: await worktreeCreationFailure(checkout, branch, 'Could not create the worktree.', error) }
     }
@@ -161,7 +162,7 @@ export async function ensureWorktree(
     ? ['worktree', 'add', '--', path, branch]
     : ['worktree', 'add', '-b', branch, '--', path]
   try {
-    await gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 })
+    await prepareWorktreePhase('git.worktree.add', () => gitOrThrow(args, { cwd: checkout, timeoutMs: 60_000 }))
   } catch (error) {
     return { ok: false, reason: await worktreeCreationFailure(checkout, branch, `Could not create a worktree for ${branch}.`, error) }
   }

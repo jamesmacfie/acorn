@@ -2,7 +2,7 @@ import { taskScripts } from './taskScripts/service'
 import { randomUUID } from 'node:crypto'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { and, asc, eq, inArray, sql } from 'drizzle-orm'
+import { and, asc, eq, inArray, max, sql } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 import { git } from './core/git'
@@ -16,6 +16,41 @@ import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChang
 // folder changes underneath us.
 
 export type ProjectRow = typeof schema.projects.$inferSelect
+
+function nextProjectSort(db: AppDatabase, workspaceId: string): number {
+  const row = db.select({ value: max(schema.projects.sort) }).from(schema.projects)
+    .where(eq(schema.projects.workspaceId, workspaceId)).get()
+  return (row?.value ?? -1) + 1
+}
+
+// Validate membership and save the whole order together. A stale table must not reorder a project
+// that another client moved to a different workspace, or leave a partially saved order.
+export function reorderWorkspaceProjects(db: AppDatabase, workspaceId: string, projectIds: readonly string[]) {
+  const result = db.transaction((tx) => {
+    if (!tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId)).get()) {
+      return 'not_found' as const
+    }
+    const members = tx.select({ id: schema.projects.id, sort: schema.projects.sort }).from(schema.projects)
+      .where(eq(schema.projects.workspaceId, workspaceId)).all()
+    const ids = new Set(projectIds)
+    if (ids.size !== projectIds.length || members.length !== ids.size || members.some((project) => !ids.has(project.id))) {
+      return 'membership_changed' as const
+    }
+    const sorts = new Map(members.map((project) => [project.id, project.sort]))
+    const changed: string[] = []
+    const now = Date.now()
+    projectIds.forEach((id, sort) => {
+      if (sorts.get(id) === sort) return
+      tx.update(schema.projects).set({ sort, updatedAt: now }).where(eq(schema.projects.id, id)).run()
+      changed.push(id)
+    })
+    return changed
+  })
+  if (Array.isArray(result)) {
+    for (const projectId of result) broadcastProjectChanged({ projectId })
+  }
+  return result
+}
 
 async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): Promise<ProjectRow | undefined> {
   const canonicalPath = realpathSync(path)
@@ -154,6 +189,7 @@ export async function createProject(
     name: input.name?.trim() || facets.githubName || basename(input.path),
     path: input.path,
     workspaceId,
+    sort: nextProjectSort(db, workspaceId),
     ...facets,
     createdAt: now,
     updatedAt: now,
@@ -169,7 +205,7 @@ export async function getProject(db: AppDatabase, id: string): Promise<ProjectRo
 }
 
 export async function listProjects(db: AppDatabase): Promise<ProjectRow[]> {
-  return db.select().from(schema.projects).orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt))
+  return db.select().from(schema.projects).orderBy(asc(schema.projects.sort), asc(schema.projects.createdAt), asc(schema.projects.id))
 }
 
 // Find a project by GitHub owner and repo, ignoring case. When several local projects point at the
@@ -228,6 +264,7 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     const [workspace] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, patch.workspaceId))
     if (!workspace) return { ok: false, reason: 'No such workspace.' }
     set.workspaceId = patch.workspaceId
+    if (patch.workspaceId !== project.workspaceId) set.sort = nextProjectSort(db, patch.workspaceId)
   }
   if (patch.hidden !== undefined) set.hidden = patch.hidden
   if (patch.color !== undefined) set.color = patch.color
@@ -305,6 +342,7 @@ export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefI
     name,
     path: null,
     workspaceId,
+    sort: nextProjectSort(db, workspaceId),
     githubOwner: normalizeGithubPart(input.github.owner),
     githubName: normalizeGithubPart(input.github.name),
     githubRepoId: input.github.repoId ?? null,

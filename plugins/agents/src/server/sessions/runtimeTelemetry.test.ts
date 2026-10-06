@@ -80,6 +80,13 @@ describe('what a session reports', () => {
     const start = spanNamed(ctx, 'agent.session')!
     expect(start.attrs).toMatchObject({ seam: 'agent.session', 'session.id': session.id, provider: 'fake', reconnect: false, owner: 'agents' })
     expect(start.status).toBe('ok')
+    const total = spanNamed(ctx, 'agent.session.start')!
+    expect(start.traceId).toBe(total.traceId)
+    expect(start.parentSpanId).toBe(total.spanId)
+    expect(total.attrs).toMatchObject({ 'task.id': taskId, outcome: 'ready' })
+    const preparation = ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
+    expect(preparation.map((record) => record.attrs.phase)).toEqual(['task.root', 'workspace.read', 'history.read', 'mcp.prepare'])
+    expect(preparation.every((record) => record.kind === 'span' && record.traceId === total.traceId && record.parentSpanId === total.spanId)).toBe(true)
 
     const turn = spanNamed(ctx, 'agent.turn')!
     expect(turn.attrs).toMatchObject({ seam: 'agent.turn', 'session.id': session.id, provider: 'fake', source: 'interactive', outcome: 'completed' })
@@ -102,6 +109,43 @@ describe('what a session reports', () => {
     const accepted = await runtime.acceptSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
     await runtime.wait(accepted.id, 0, 'stopped', 2_000)
     expect(spanNamed(ctx, 'agent.session')?.status).toBe('error')
+    expect(spanNamed(ctx, 'agent.session.start')?.attrs.outcome).toBe('error')
+  })
+
+  it('identifies task preparation failure before any provider handshake starts', async () => {
+    const taskId = await seedTask(ctx)
+    vi.spyOn(ctx.core.tasks, 'requireRoot').mockRejectedValue(new Error('private checkout path and credential'))
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = build(registry, ctx.telemetry)
+    const accepted = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    await expect(runtime['engine'].ensureSession(accepted)).rejects.toThrow('private checkout path and credential')
+    const phase = spanNamed(ctx, 'agent.session.phase')!
+    expect(phase).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'error' } })
+    const total = spanNamed(ctx, 'agent.session.start')!
+    expect(phase.parentSpanId).toBe(total.spanId)
+    expect(total.status).toBe('error')
+    expect(spanNamed(ctx, 'agent.session')).toBeUndefined()
+    expect(JSON.stringify(ctx.recorded)).not.toContain('private checkout path and credential')
+  })
+
+  it('closes a cancelled preparation once even if its dependency finishes after shutdown', async () => {
+    const taskId = await seedTask(ctx)
+    let release!: (cwd: string) => void
+    const root = vi.spyOn(ctx.core.tasks, 'requireRoot').mockReturnValue(new Promise<string>((resolve) => { release = resolve }))
+    const registry = new AgentDriverRegistry()
+    registry.registerNative('fake', () => new FakeAgentDriver())
+    runtime = build(registry, ctx.telemetry)
+    const session = await runtime.store.createSession({ taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, await new FakeAgentDriver().probe())
+    const starting = runtime['engine'].ensureSession(session).catch((error: unknown) => error)
+    await vi.waitFor(() => expect(root).toHaveBeenCalledOnce())
+    await runtime.stop()
+    expect(await starting).toBeInstanceOf(Error)
+    expect(spanNamed(ctx, 'agent.session.phase')).toMatchObject({ status: 'error', attrs: { phase: 'task.root', outcome: 'cancelled' } })
+    expect(spanNamed(ctx, 'agent.session.start')?.attrs.outcome).toBe('cancelled')
+    release(ctx.dataDir)
+    await new Promise<void>((resolve) => setImmediate(resolve))
+    expect(ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')).toHaveLength(1)
   })
 
   it('runs with no telemetry, because a test builds an engine with no host around it', async () => {

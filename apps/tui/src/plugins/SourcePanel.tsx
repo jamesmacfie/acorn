@@ -7,7 +7,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
-import { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from '@acorn/client-core/host/chrome'
+import { chromeDeps, chromeKey, filterSourceItems, readRailItems, scopedSourceItemsPath } from '@acorn/client-core/host/chrome'
 import { runChromeAction } from '@acorn/client-core/host/chrome'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -36,8 +36,8 @@ import { openPromotion } from '../chrome/promotionStore'
 // component.
 //
 // The desktop's dashboard panels beside the list are not here: they need a separate cell surface.
-// Row promotion uses the host task picker below. The title filter remains in the list, because a
-// hundred issues without a way to narrow them is a list nobody can page through.
+// Row promotion uses the host task picker below. The title and identifier filter stays in the list,
+// because a hundred issues without a way to narrow them is a list nobody can page through.
 
 /** One row's secondary text: the aligned fields where a source sends them, the pre-joined line where
  *  it sends that instead. The DOM reserves a track per field so the Nth lines up down the list; in
@@ -79,12 +79,7 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
 
   const row = () => result().rows[0]
   const all = createMemo<PluginRailItem[]>(() => row()?.data ?? [])
-  // Title only. The secondary line is whatever fields the source chose to send and a reader filtering
-  // a list is looking for the thing they can read down the left edge.
-  const items = createMemo<PluginRailItem[]>(() => {
-    const text = query().trim().toLowerCase()
-    return text ? all().filter((item) => item.title.toLowerCase().includes(text)) : all()
-  })
+  const items = createMemo(() => filterSourceItems(all(), query()))
   const unavailable = () => result().unavailable[0]
 
   const select = (id: string, activate = false): void => {

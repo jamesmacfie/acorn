@@ -3,7 +3,8 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { Project, ProjectConfigResponse, Task } from '@acorn/protocol/api.ts'
+import type { Project, ProjectConfigResponse, Task, Workspace } from '@acorn/protocol/api.ts'
+import { createProjectRef } from '../../projects'
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
@@ -68,6 +69,66 @@ describe('project rows own workspace membership and visibility', () => {
     const res = await call('/api/workspaces', 'POST', { name })
     return ((await res.json()) as { id: string }).id
   }
+
+  const seedOrderedProjects = async () => {
+    const workspaceId = await createWorkspace('Ordered')
+    const otherId = await createWorkspace('Other')
+    await t.db.insert(schema.projects).values([
+      { id: 'a', name: 'A', workspaceId, sort: 0, hidden: false, createdAt: 1, updatedAt: 1 },
+      { id: 'b', name: 'B', workspaceId, sort: 0, hidden: true, createdAt: 2, updatedAt: 2 },
+      { id: 'c', name: 'C', workspaceId, sort: 0, hidden: false, createdAt: 3, updatedAt: 3 },
+      { id: 'other', name: 'Other', workspaceId: otherId, sort: 0, hidden: false, createdAt: 4, updatedAt: 4 },
+    ])
+    broadcasts.length = 0
+    return { workspaceId, otherId }
+  }
+
+  it('saves one workspace order in both navigation reads, includes hidden projects, and appends arrivals', async () => {
+    const { workspaceId, otherId } = await seedOrderedProjects()
+    const url = `/api/workspaces/${workspaceId}/project-order`
+    expect((await call(url, 'PUT', { projectIds: ['c', 'a', 'b'] })).status).toBe(200)
+    const workspace = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find((row) => row.id === workspaceId)!
+    expect(workspace.projects.map((project) => project.id)).toEqual(['c', 'a', 'b'])
+    const listed = (await (await call('/api/projects', 'GET')).json()) as { projects: Project[] }
+    expect(listed.projects.filter((project) => project.workspaceId === workspaceId).map((project) => project.id)).toEqual(['c', 'a', 'b'])
+    expect((await projectRows()).find((project) => project.id === 'other')).toMatchObject({ workspaceId: otherId, sort: 0 })
+    expect(broadcasts).toEqual([
+      { channel: 'project:changed', projectId: 'a' },
+      { channel: 'project:changed', projectId: 'b' },
+    ])
+    broadcasts.length = 0
+    await call(url, 'PUT', { projectIds: ['c', 'a', 'b'] })
+    expect(broadcasts).toEqual([])
+
+    const added = (await (await call('/api/projects', 'POST', { path: dir, workspaceId, name: 'Added' })).json()) as { project: Project }
+    const imported = await createProjectRef(t.db, { name: 'Imported', workspaceId, github: { owner: 'acme', name: 'imported' } })
+    expect((await call('/api/projects/other', 'PATCH', { workspaceId })).status).toBe(200)
+    const after = ((await (await call('/api/workspaces', 'GET')).json()) as Workspace[]).find((row) => row.id === workspaceId)!
+    expect(after.projects.map((project) => project.id)).toEqual(['c', 'a', 'b', added.project.id, imported.id, 'other'])
+  })
+
+  it.each([
+    { projectIds: ['a', 'a', 'c'], status: 400 },
+    { projectIds: ['a', 'c'], status: 409 },
+    { projectIds: ['a', 'other', 'c'], status: 409 },
+    { projectIds: ['a', 'missing', 'c'], status: 409 },
+  ])('rejects an invalid or stale order without writes: $projectIds', async ({ projectIds, status }) => {
+    const { workspaceId } = await seedOrderedProjects()
+    const before = await projectRows()
+    expect((await call(`/api/workspaces/${workspaceId}/project-order`, 'PUT', { projectIds })).status).toBe(status)
+    expect(await projectRows()).toEqual(before)
+    expect(broadcasts).toEqual([])
+  })
+
+  it('rolls back every sort update when one project cannot be written', async () => {
+    const { workspaceId } = await seedOrderedProjects()
+    const before = await projectRows()
+    t.db.$client.exec("CREATE TRIGGER fail_sort BEFORE UPDATE OF sort ON projects WHEN NEW.id = 'b' BEGIN SELECT RAISE(ABORT, 'write failed'); END")
+    app.onError(() => new Response('write failed', { status: 500 }))
+    expect((await call(`/api/workspaces/${workspaceId}/project-order`, 'PUT', { projectIds: ['c', 'a', 'b'] })).status).toBe(500)
+    expect(await projectRows()).toEqual(before)
+    expect(broadcasts).toEqual([])
+  })
 
   it('moves a known project between workspaces and toggles visibility by project id', async () => {
     const w1 = await createWorkspace('One')

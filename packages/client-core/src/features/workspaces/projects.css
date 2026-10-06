@@ -19,6 +19,16 @@
 /* A small table's rows keep the small row height, so a row is a target the size of a list row. A
    cell's height is its row's floor. */
 .ws-project-table :is(td, th[scope='row']) { height: var(--row-h-sm); }
+.ws-project-reorder { display: inline-flex; touch-action: none; }
+.ws-project-reorder .ui-btn { cursor: grab; }
+.ws-project-reorder .ui-btn:disabled { cursor: default; }
+.ws-project-table tr:has(.ws-project-reorder[data-dragging]) { opacity: 0.5; }
+.ws-project-table tr:has(.ws-project-reorder[data-drop-position='before']) > :is(td, th) {
+  box-shadow: inset 0 2px var(--accent);
+}
+.ws-project-table tr:has(.ws-project-reorder[data-drop-position='after']) > :is(td, th) {
+  box-shadow: inset 0 -2px var(--accent);
+}
 .ws-row-facets { display: flex; align-items: center; gap: var(--space-2); }
 .ws-group-name { display: flex; align-items: baseline; gap: var(--space-3); }
 .ws-group-count { color: var(--text-faint); font-weight: var(--fw-normal); font-variant-numeric: var(--tabular); }

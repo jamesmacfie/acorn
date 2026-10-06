@@ -34,7 +34,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // sampler, and the plugin authoring renderer moved to first use. Ceiling: 3,290,000 -> 3,115,000 B.
 // The former 5% allowance bought about two weeks of growth at the measured rate. Even 2% would let
 // the 18,012 B authoring import return without failing, so about 0.5% keeps all four cuts protected.
-const limits = { ceiling: 3_115_000, floor: 1_000_000 }
+// 2026-10-07: 3,115,487 B with startup phase call sites. Timing helpers and CLI auth/version probes
+// load on first use; the remaining labels and callbacks stay beside their operations. Add 1 KB,
+// keeping the previous lazy-import cuts protected.
+const limits = { ceiling: 3_116_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

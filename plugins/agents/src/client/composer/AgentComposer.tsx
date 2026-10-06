@@ -459,15 +459,7 @@ export default function AgentComposer(props: {
         onFiles={addFiles}
         onSubmit={() => void send()}
         onCancel={canStopAgent(props.session) ? () => void stop() : undefined}
-        onKeyDown={(event) => {
-          // The shell's own meta+shift+enter maximises the focused pane, and its dispatcher skips a
-          // typing target for anything but a global binding, so the chord is unclaimed in here. Same
-          // fingers, nearest meaning: the surface you are typing in grows.
-          if ((event.metaKey || event.ctrlKey) && event.shiftKey && event.key === 'Enter') {
-            event.preventDefault()
-            setExpanded((current) => !current)
-          }
-        }}
+        onToggleExpand={() => setExpanded((current) => !current)}
         overlay={
           <Only hosts={['dom']}>
             <IconButton

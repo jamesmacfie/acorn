@@ -6,6 +6,15 @@ import { usageProcessEnv } from '../usage/processRunner'
 const execFileAsync = promisify(execFile)
 const claudeAuthStatusSchema = z.object({ loggedIn: z.boolean().optional() }).passthrough()
 
+export async function probeExecutableVersion(executable: string): Promise<string | undefined> {
+  try {
+    const { stdout, stderr } = await execFileAsync(executable, ['--version'], { timeout: 3_000, encoding: 'utf8' })
+    return (stdout || stderr).trim().split(/\r?\n/)[0] || undefined
+  } catch {
+    return undefined
+  }
+}
+
 export async function probeCodexAuthentication(executable: string): Promise<boolean | null> {
   try {
     const { stdout } = await execFileAsync(executable, ['login', 'status'], {

@@ -52,6 +52,11 @@ as a ticket key or an HTTP verb. A row with neither `short` nor `icon` gets a do
 places in `client-core/host/chrome/chromeData.ts` rebuild a rail row field by field from an
 allowlist, so a field added to `PluginRailItem` must be added to both, or it's dropped silently.
 
+Desktop and terminal list filters match the title, `short`, and the linked item's identifier or
+`ref.displayId`, ignoring case. A bare number or `#` followed by a number matches identifiers too.
+Filters narrow the loaded rows and keep their order. The host doesn't search opaque row IDs,
+occurrence counts, or task descriptions.
+
 A source can offer a panel area beside its list instead of a detail pane: a dashboard the person
 composes, under constraints the source declares in `panels`
 ([placements](../dashboards/placements.md)). A source declaring both `panels` and a `navigate`

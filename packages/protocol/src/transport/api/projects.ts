@@ -1,5 +1,6 @@
 import type { ExternalRef } from '../../integrations/providers.ts'
 import type { McpServerSummary } from '../../integrations/mcp.ts'
+import { z } from 'zod'
 
 // Workspaces group projects and are the top-level unit (docs/workspaces-and-tasks.md).
 // When the worktree setup script runs: 'off' never, 'created' when the task is created, 'terminal'
@@ -30,6 +31,10 @@ export type Workspace = {
   projects: WorkspaceProjectRef[]
 }
 export type WorkspaceSeed = { name: string }
+export const workspaceProjectOrderBody = z.object({
+  projectIds: z.array(z.string().min(1)).refine((ids) => new Set(ids).size === ids.length, 'Project IDs must be unique.'),
+}).strict()
+export type WorkspaceProjectOrder = z.infer<typeof workspaceProjectOrderBody>
 
 // A project is a folder on the node's machine, the unit a workspace groups
 // (docs/workspaces-and-tasks.md). The successor to (owner, name) repo keying. `vcs` and `github` are
@@ -205,6 +210,7 @@ export const taskOnCreatedRoute = (id: string) => `/v1/core/tasks/${id}/on-creat
 // Workspaces (named groups of Projects): the top-level unit.
 export const workspacesRoute = '/v1/core/workspaces'
 export const workspaceRoute = (id: string) => `/v1/core/workspaces/${id}`
+export const workspaceProjectOrderRoute = (id: string) => `${workspaceRoute(id)}/project-order`
 export const workspaceBootstrapRoute = '/v1/core/workspaces/bootstrap'
 export const workspaceExternalProjectsRoute = (id: string) => `/v1/core/workspaces/${id}/external-projects`
 // Tasks (Project -> Task units of work): rail rows.

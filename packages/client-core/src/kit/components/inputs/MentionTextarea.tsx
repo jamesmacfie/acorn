@@ -62,6 +62,8 @@ export type MentionTextareaProps = {
   onSubmit?: () => void
   /** Escape, when the list is closed. Absent leaves Escape to whatever is outside the field. */
   onCancel?: () => void
+  /** Toggle this field's expanded size with the host's maximize chord. */
+  onToggleExpand?: () => void
   /** Files pasted or dropped onto the field. Return the work so a paste can restore focus after an
    *  asynchronous upload redraws its caller. */
   onFiles?: (files: File[]) => void | Promise<void>
@@ -179,6 +181,7 @@ export default function MentionTextarea(props: MentionTextareaProps) {
         )}
       </Show>
       <Textarea
+        onToggleExpand={props.onToggleExpand}
         ref={(element) => {
           field = element
           ;(props.ref as ((element: HTMLTextAreaElement) => void) | undefined)?.(element)

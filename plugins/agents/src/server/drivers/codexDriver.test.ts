@@ -1,8 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentNormalizedEvent, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from './types'
+import type { MeasureAgentStartup } from './startupTelemetry'
+import { sessionStartupTelemetry } from '../sessions/startupTelemetry'
+import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
 
 const wire = vi.hoisted(() => ({
+  modelsWait: undefined as Promise<void> | undefined,
   requests: [] as Array<{ method: string; params: Record<string, unknown> }>,
   responses: [] as Array<{ id: string | number; result: unknown }>,
   modeResponse: {
@@ -22,19 +26,11 @@ const wire = vi.hoisted(() => ({
   }) => void),
 }))
 
-vi.mock('node:child_process', () => ({
-  execFile: (
-    _command: string,
-    _args: string[],
-    _options: unknown,
-    callback: (error: null, result: { stdout: string; stderr: string }) => void,
-  ) => callback(null, { stdout: 'codex-cli test', stderr: '' }),
-}))
 vi.mock('../usage/processRunner', () => ({
   resolveUsageCommand: () => '/tmp/codex-test',
   usageProcessEnv: () => ({}),
 }))
-vi.mock('./authProbe', () => ({ probeCodexAuthentication: async () => true }))
+vi.mock('./authProbe', () => ({ probeCodexAuthentication: async () => true, probeExecutableVersion: async () => 'codex-cli test' }))
 vi.mock('./jsonRpcProcess', () => ({
   JsonRpcProcess: class {
     closed = false
@@ -58,6 +54,7 @@ vi.mock('./jsonRpcProcess', () => ({
         }
       }
       if (method === 'model/list') {
+        await wire.modelsWait
         return {
           data: [{
             id: 'gpt-codex',
@@ -149,6 +146,7 @@ async function start(
   resumed = false,
   config: Record<string, unknown> = {},
   mcpServers: readonly AgentDriverMcpServer[] = [],
+  measureStartup?: MeasureAgentStartup,
 ) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
@@ -160,6 +158,7 @@ async function start(
     env: {},
     mcpServers,
     noProviderExecutionHistory: false,
+    measureStartup,
     onEvent: (event) => {
       driverEvents.push(event)
       if (event.type !== 'generated_artifact') events.push(event)
@@ -174,6 +173,7 @@ const requestIds = (events: AgentNormalizedEvent[]): string[] =>
 
 describe('Codex collaboration modes', () => {
   beforeEach(() => {
+    wire.modelsWait = undefined
     wire.requests.length = 0
     wire.responses.length = 0
     wire.modeResponse = {
@@ -184,6 +184,35 @@ describe('Codex collaboration modes', () => {
     }
     wire.onRequest = undefined
     wire.onNotification = undefined
+  })
+
+  it('separates a slow metadata request from initialization and records an optional failure', async () => {
+    const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    const startup = sessionStartupTelemetry(ctx.telemetry, session(), false, new AbortController().signal)!
+    let release!: () => void
+    wire.modelsWait = new Promise<void>((resolve) => { release = resolve })
+    wire.modeResponse = new Error('private provider payload')
+    const pending = startup.provider((measure) => start(null, false, {}, [], measure))
+    const phases = () => ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
+    try {
+      await vi.waitFor(() => expect(phases().some((record) => record.attrs.phase === 'provider.modes')).toBe(true))
+      expect(phases().some((record) => record.attrs.phase === 'provider.initialize')).toBe(true)
+      expect(phases().some((record) => record.attrs.phase === 'provider.models')).toBe(false)
+      release()
+      const { handle } = await pending
+      startup.end('ok')
+      expect(handle.ready).toBe(true)
+      const provider = ctx.recorded.find((record) => record.kind === 'span' && record.name === 'agent.session')!
+      expect(phases().every((record) => record.kind === 'span' && provider.kind === 'span' && record.traceId === provider.traceId && record.parentSpanId === provider.spanId)).toBe(true)
+      expect(phases().find((record) => record.attrs.phase === 'provider.modes')).toMatchObject({ status: 'error', attrs: { outcome: 'error' } })
+      expect(phases().find((record) => record.attrs.phase === 'provider.models')).toMatchObject({ status: 'ok' })
+      expect(JSON.stringify(ctx.recorded)).not.toContain('private provider payload')
+      await handle.stop()
+    } finally {
+      release()
+      await pending.then(({ handle }) => handle.stop()).catch(() => undefined)
+      ctx.cleanup()
+    }
   })
 
   // The same text on start and on resume, from the snapshot the session was created with.

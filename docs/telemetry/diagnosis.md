@@ -31,6 +31,8 @@ file path. Workload sizes are histogram values, never labels.
 | Did the renderer stop responding? | `ui.event_loop.delay`, `ui.frame.gap`, and `ui.stall` in the focused, visible renderer. `ui.hang.suspected` and `ui.hang.recovered` come from the desktop helper. |
 | Which browser phase held the interaction? | `ui.render` carries `phase.turn_ms`, `phase.frame_wait_ms`, and `phase.paint_wait_ms`. Navigation, pane-layout actions other than resize, session selection, and snapshot display opt in. |
 | Which agent view was opening? | `agents.center.open`, `agents.sidebar.open`, `agents.session.open`, and `agents.subagent.open`, with outcome `ready`, `error`, `cancelled`, or `timeout` (30 seconds). |
+| Why is an agent connecting slowly? | `agent.session.start`, its provider-only child `agent.session`, and `agent.session.phase`, grouped by `phase` and provider. [Session phases](../managed-agents/session-events.md#what-a-session-reports) distinguish preparation, protocol initialization, session creation, and metadata. |
+| Is a task waiting for its worktree? | `task.prepare`, `task.prepare.wait`, and `task.prepare.phase`. [Task preparation](./runtimes.md#task-preparation) separates a creator from callers sharing its wait, with Git fetch, worktree creation, copy, and setup-admission phases. |
 | Was the response cheap to fetch but expensive to process? | `api.request` carries `responseBytes`. `api.response.bytes` and `api.decode` measure JSON reads. |
 | Is history size driving the cost? | `agents.snapshot.merge`, `agents.snapshot.index`, `agents.transcript.project`, and `agents.transcript.visible`, with counts. `agents.center.rows`, `agents.center.filter`, and `agents.sidebar.rows` cover rosters. |
 | Are cheap updates repeating too often? | `agents.snapshot.load` and `agents.roster.load` tell cache hits from misses, and `resume` marks a snapshot read resumed from held events. `rows.reconcile`, `rows.item.mount`, and `pane.region.mount` count churn. `ui.interaction.work` reports up to five most frequent operations per interaction. |
@@ -79,6 +81,20 @@ To investigate:
 A frame gap is a paint-opportunity measurement, not proof the compositor presented pixels. Collection
 that's off during startup doesn't measure cache hydration after the fact. The boot account is the
 exception: its marks are kept and sent once collection turns on.
+
+### Find slow connections in Sentry
+
+In **Traces**, filter `span.op:agent.session.start` and sort duration descending. Open a slow trace,
+then compare `agent.session` with `agent.session.phase`. Filter `span.op:agent.session.phase` and group
+by `phase` and `provider` to find a recurring slow stage. Parallel metadata durations overlap.
+
+For task delays, filter `span.op:task.prepare` or `span.op:task.prepare.wait`. Follow the requesting
+HTTP route and the creator's phase spans. A long `setup.admit` does not measure the setup script's
+whole execution. Client cache processing retains its `cache.serialize` and `cache.dehydrate`
+histograms, with detailed spans for slow operations under the interaction that scheduled the save.
+
+Automatic session selection restoration raises no additional opening span. The mounted conversation
+owns its content-to-paint timing, avoiding an unclaimed second span that times out after 30 seconds.
 
 ## Memory over a day
 

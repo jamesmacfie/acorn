@@ -3,6 +3,8 @@ import { awaitWithSignal } from '../processes/startCancellation'
 import type { AgentSession } from '../../contract/wire'
 import type { AgentDriver, AgentDriverEvent, AgentDriverMcpServer, AgentDriverSession } from '../drivers/types'
 import type { AgentDriverRegistry } from '../drivers/registry'
+import type { PluginTelemetry } from '@acorn/plugin-api/node'
+import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
 
 export type ProviderGeneration = Readonly<{ sessionId: string; number: number }>
 
@@ -63,7 +65,7 @@ export type ProviderLifecyclePorts = {
   quietSweep(sessionId: string): Promise<void>
   footprintSample(): Promise<void>
   callbackError(kind: 'idle' | 'quiet' | 'footprint', error: unknown): void
-  started(sessionId: string, reconnect: boolean): { end(outcome: 'ok' | 'error'): void } | undefined
+  telemetry?: Pick<PluginTelemetry, 'enabled' | 'startSpan'>
   pump(): void
   shuttingDown(): boolean
 }
@@ -215,28 +217,36 @@ export class ProviderSessionLifecycle {
 
   private async start(session: AgentSession, live: LiveSession): Promise<AgentDriverSession> {
     const signal = live.controller.signal
-    let span: ReturnType<ProviderLifecyclePorts['started']>
+    let startup: ReturnType<typeof import('./startupTelemetry')['sessionStartupTelemetry']>
     try {
+      if (this.ports.telemetry?.enabled()) {
+        const { sessionStartupTelemetry } = await import('./startupTelemetry')
+        signal.throwIfAborted()
+        startup = sessionStartupTelemetry(this.ports.telemetry, session, live.reconnectAttempt > 0, signal)
+      }
+      const prepare = <T>(phase: AgentStartupPhase, run: () => Promise<T>): Promise<T> =>
+        startup ? startup.phase(phase, run) : run()
       const read = <T>(query: () => Promise<T>): Promise<T> => {
         signal.throwIfAborted()
         return awaitWithSignal(query(), signal)
       }
-      const cwd = await read(() => this.ports.taskRoot(session.taskId))
-      if (!live.workspaceId) live.workspaceId = await read(() => this.ports.workspaceId(session.taskId))
-      const noProviderExecutionHistory = !(await read(() => this.ports.hasProviderExecutionHistory(session.id)))
+      const cwd = await prepare('task.root', () => read(() => this.ports.taskRoot(session.taskId)))
+      if (!live.workspaceId) live.workspaceId = await prepare('workspace.read', () => read(() => this.ports.workspaceId(session.taskId)))
+      const noProviderExecutionHistory = !(await prepare('history.read', () => read(() => this.ports.hasProviderExecutionHistory(session.id))))
       signal.throwIfAborted()
       const env = this.ports.scopedEnvironment(session)
-      const mcp = await read(() => this.ports.mcpServers(session, env, signal))
+      const mcp = await prepare('mcp.prepare', () => read(() => this.ports.mcpServers(session, env, signal)))
       signal.throwIfAborted()
       // A warning write is durable work. Join it even if stop aborts the following driver start.
       if (mcp.unavailable.length) await this.ports.mcpUnavailable(session.id, mcp.unavailable)
       signal.throwIfAborted()
-      span = this.ports.started(session.id, live.reconnectAttempt > 0)
-      const handle = await live.driver.start({
+      const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
         cwd, env, mcpServers: mcp.servers, noProviderExecutionHistory, signal, session,
+        measureStartup,
         onEvent: (event) => this.callback(live, () => this.ports.event(session.id, live.generation, event)),
         onClosed: (error) => this.callback(live, () => this.closed(session.id, live, error)),
       })
+      const handle = await (startup ? startup.provider(launch) : launch())
       if (!this.owns(live.generation)) {
         await handle.stop()
         throw new Error('The managed agent runtime is shutting down.')
@@ -244,11 +254,11 @@ export class ProviderSessionLifecycle {
       live.handle = handle
       live.lastActivityAt = Date.now()
       live.reconnectAttempt = 0
-      span?.end('ok')
+      startup?.end('ok')
       this.ports.pump()
       return handle
     } catch (error) {
-      span?.end('error')
+      startup?.end('error')
       if (error instanceof ProcessRetirementError) live.retirementFailure = error
       if (!this.ports.shuttingDown() && !live.stopping) await this.ports.startFailed(session.id, live.admissionTurnId, error)
       throw error

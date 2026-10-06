@@ -5,6 +5,8 @@ import type { AgentDriverStartOptions } from './types'
 import { AcpDriver } from './acpDriver'
 import { acpMcpServers, clientFor, type PendingRequest } from './acpSession'
 import { harnessCapabilities } from './harness'
+import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
+import { sessionStartupTelemetry } from '../sessions/startupTelemetry'
 
 const sessionWithRef = (providerSessionRef: string): AgentSession => ({
   id: 'session-1',
@@ -93,8 +95,11 @@ describe('the generic ACP driver describes a harness before it starts one', () =
   // The recovery worth pinning, because the alternative is a session nobody can use: the agent's store
   // no longer holds the reference on the row, and every start retries it and fails.
   it('starts a fresh provider session when the agent no longer has the stored one', async () => {
+    const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
+    const session = sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f')
+    const startup = sessionStartupTelemetry(ctx.telemetry, session, false, new AbortController().signal)!
     const events: AgentNormalizedEvent[] = []
-    const handle = await new AcpDriver({
+    const handle = await startup.provider((measureStartup) => new AcpDriver({
       id: 'stub',
       profileId: 'stub',
       label: 'Stub',
@@ -103,7 +108,8 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       },
       quirks: { sessionPersistence: true },
     }).start({
-      session: sessionWithRef('d2c6edee-10be-460b-a636-083f68dcde6f'),
+      session,
+      measureStartup,
       cwd: process.cwd(),
       env: {},
       mcpServers: [],
@@ -112,7 +118,8 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         if (event.type !== 'generated_artifact') events.push(event)
       },
       onClosed: () => {},
-    })
+    }))
+    startup.end('ok')
 
     try {
       expect(handle.providerSessionRef).toBe('fresh-session-id')
@@ -123,8 +130,14 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       expect(events).toContainEqual(
         expect.objectContaining({ type: 'session_metadata', providerSessionRef: 'fresh-session-id' }),
       )
+      const phases = ctx.recorded.filter((record) => record.kind === 'span' && record.name === 'agent.session.phase')
+      expect(phases.find((record) => record.attrs.phase === 'provider.session.load')).toMatchObject({ status: 'error' })
+      expect(phases.find((record) => record.attrs.phase === 'provider.session.create')).toMatchObject({ status: 'ok' })
+      const provider = ctx.recorded.find((record) => record.kind === 'span' && record.name === 'agent.session')!
+      expect(phases.every((record) => record.kind === 'span' && provider.kind === 'span' && record.traceId === provider.traceId && record.parentSpanId === provider.spanId)).toBe(true)
     } finally {
       await handle.stop()
+      ctx.cleanup()
     }
   })
 

@@ -24,6 +24,7 @@ import { PromoteToTaskModal } from '../../features/integrations/PromoteToTaskMod
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { taskTracksRef } from '../registries/sources/sources'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
+import { filterSourceItems } from './sourceFilter'
 
 const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
   severity === 'info' ? 'accent' : severity
@@ -116,15 +117,12 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const allItems = () => row()?.data ?? []
   const unavailable = () => result().unavailable[0]
 
-  // Client-side title filter over the loaded list, the same bargain github's PR filter strikes
+  // Client-side filter over the loaded list, the same bargain github's PR filter strikes
   // (plugins/github pullList/model.ts). It narrows what the source returned rather than asking the
   // plugin to search, so no descriptor field and no plugin route is involved.
   const [filter, setFilter] = createSignal('')
   const query = () => collapsed() ? '' : filter().trim().toLowerCase()
-  const items = createMemo(() => {
-    if (!query()) return allItems()
-    return allItems().filter((item) => item.title.toLowerCase().includes(query()))
-  })
+  const items = createMemo(() => filterSourceItems(allItems(), query()))
 
   const [refreshing, setRefreshing] = createSignal(false)
   const refresh = async (): Promise<void> => {
@@ -277,7 +275,7 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             kind="filter"
             size="sm"
             placeholder={`Filter ${props.descriptor.label}…`}
-            label={`Filter ${props.descriptor.label} by title`}
+            label={`Filter ${props.descriptor.label} by title or number`}
             value={filter()}
             onInput={(value) => setFilter(value)}
           />

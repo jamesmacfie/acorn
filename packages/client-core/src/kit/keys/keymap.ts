@@ -60,6 +60,7 @@ export function intentKeys(primary: 'super' | 'ctrl'): Record<Intent, readonly s
     activate: ['return', 'space'],
     dismiss: ['escape'],
     commit: [`${primary}+return`],
+    maximize: [`${primary}+shift+return`],
     search: [`${primary}+f`, '/'],
     // The keyboard's own context-menu key, plus the chord Windows and GNOME both fire it with.
     menu: ['menu', 'shift+f10'],

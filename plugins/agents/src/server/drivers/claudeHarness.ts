@@ -5,7 +5,6 @@
 // persisted, the first on every session row, the second on session rows and workflow steps
 // (docs/managed-agents/harnesses.md § Harnesses).
 import { createRequire } from 'node:module'
-import { probeClaudeAuthentication } from './authProbe'
 import type { AgentSession } from '../../contract/wire.ts'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
@@ -63,5 +62,5 @@ export const claudeHarness: HarnessLaunchSpec = {
   // on. Compaction is the CLI's `/compact`, but ACP cannot request it, so it stays undeclared until
   // the adapter carries it.
   quirks: { sessionPersistence: true },
-  probeAuth: probeClaudeAuthentication,
+  probeAuth: async (executable) => (await import('./authProbe')).probeClaudeAuthentication(executable),
 }

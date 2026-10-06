@@ -103,6 +103,7 @@ export function MentionTextarea(props: MentionTextareaProps) {
         disabled={props.disabled}
         rows={props.rows ?? 3}
         onFocus={props.onFocus}
+        onToggleExpand={props.onToggleExpand}
         // The agents composer uses this field. Its submit prop sends on Enter, while the terminal's
         // ordinary text field uses the commit chord.
         {...(props.onSubmit ? { onSubmit: () => props.onSubmit!() } : {})}

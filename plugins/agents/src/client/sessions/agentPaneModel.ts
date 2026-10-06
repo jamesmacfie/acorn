@@ -15,6 +15,7 @@ import {
   agentAttentionItemId,
   clearManagedSubagent,
   clearManagedSession,
+  restoreManagedSessionSelection,
   selectManagedSession,
   selectedManagedSession,
 } from './managedSelection'
@@ -120,7 +121,7 @@ export function createAgentPaneModel(task: Task, pane: PaneModelContext) {
   void sessionsLoaded
     .then((sessions) => {
       rosterOwner.check()
-      if (!selectedManagedSession(task.id) && sessions[0]) selectManagedSession(task.id, sessions[0].id)
+      if (!selectedManagedSession(task.id) && sessions[0]) restoreManagedSessionSelection(task.id, sessions[0].id)
     })
     .catch((caught) => setError(caught instanceof Error ? caught.message : 'Unable to load agent sessions.'))
 
