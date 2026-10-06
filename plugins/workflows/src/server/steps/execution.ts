@@ -327,6 +327,10 @@ export class WorkflowStepExecution {
   async runHeadless(taskId: string, def: WorkflowStepDef, opts: StepRunRequest, ctx: StepHandlerContext): Promise<HeadlessResult> {
     // Record the session when the first event names it so the Agent pane can link a running step.
     let noted = ctx.step.agentSessionId ?? ''
+    const dispatch = ctx.run.trigger === 'agent-map'
+      ? (await this.services.db.select({ payload: schema.workflowDispatches.payloadJson }).from(schema.workflowDispatches).where(eq(schema.workflowDispatches.runId, ctx.run.id)))[0]
+      : undefined
+    const sessionTitle: string | undefined = dispatch ? JSON.parse(dispatch.payload).task.title : undefined
     const root = await this.services.state.run(ctx.run.rootRunId ?? ctx.run.id)
     const concurrency = root ? (JSON.parse(root.defJson) as WorkflowDef).maxConcurrency ?? MAX_CONCURRENT_HEADLESS : MAX_CONCURRENT_HEADLESS
     return this.#headless.use(opts.signal ?? ctx.signal, async () => {
@@ -342,6 +346,8 @@ export class WorkflowStepExecution {
           workflowRunId: ctx.run.id,
           workflowStepId: ctx.step.id,
           managedSessionId: ctx.step.agentSessionId ?? undefined,
+          ...(sessionTitle ? { sessionTitle } : {}),
+          requireManagedSession: ctx.run.trigger === 'agent-map',
           onEvent: (event) => {
             opts.onEvent?.(event)
             ctx.emit({ at: now(), event })

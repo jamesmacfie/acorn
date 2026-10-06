@@ -22,6 +22,7 @@ export function RunRecords(props: {
   stepId: string
   tasks: readonly Task[]
   initialRecordId?: string
+  onOpenSession?(sessionId: string): void
   onOpen(taskId: string, runId?: string, record?: { rootRunId: string; recordId: string }): void
 }) {
   const [filter, setFilter] = createSignal<WorkflowRecordFilter>('all')
@@ -290,9 +291,12 @@ export function RunRecords(props: {
               </Fold>
             </Show>
             <Inline wrap>
+              <Show when={row().agentSessionId && props.onOpenSession}>
+                <Button size="sm" onPress={() => props.onOpenSession?.(row().agentSessionId!)}>Open session</Button>
+              </Show>
               <Show when={row().taskId && row().runId && props.tasks.some(task => task.id === row().taskId)}>
                 <Button size="sm" onPress={() => props.onOpen(row().taskId!, row().runId!, { rootRunId: props.runId, recordId: row().id })}>
-                  Open task and run
+                  {row().taskMode === 'parent' ? 'Open item run' : 'Open task and run'}
                 </Button>
               </Show>
               <Show when={row().taskId && !props.tasks.some(task => task.id === row().taskId)}>
@@ -321,6 +325,9 @@ export function RunRecords(props: {
                       <Inline wrap>
                         <Badge size="xs" tone={attempt.status === 'failed' ? 'danger' : attempt.status === 'gated' ? 'warn' : undefined}>{statusLabel(attempt.status)}</Badge>
                         <Text emphasis="muted">{formatRelativeTime(attempt.createdAt)}</Text>
+                        <Show when={attempt.agentSessionId && props.onOpenSession}>
+                          <Button size="sm" variant="bare" onPress={() => props.onOpenSession?.(attempt.agentSessionId!)}>Open session</Button>
+                        </Show>
                         <Show when={props.tasks.some(task => task.id === attempt.taskId)} fallback={<Text emphasis="muted">Task unavailable</Text>}>
                           <Button size="sm" variant="bare" onPress={() => props.onOpen(attempt.taskId, attempt.runId, { rootRunId: props.runId, recordId: row().id })}>Open attempt</Button>
                         </Show>

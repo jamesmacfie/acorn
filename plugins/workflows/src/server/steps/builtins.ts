@@ -100,7 +100,7 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
     const task = await services.deps.assembleContext(ctx.run.taskId, ctx.run.id)
     return {
       prompt: base,
-      context: [...upstream, ...(task ? [{ label: 'Task context', source: 'workflow.task-context', content: task }] : [])],
+      context: [...upstream, ...(ctx.run.trigger === 'agent-map' ? [{ label: 'Current item', source: 'workflow.item', content: JSON.stringify(ctx.inputs.item) }] : []), ...(task ? [{ label: 'Task context', source: 'workflow.task-context', content: task }] : [])],
     }
   }
 

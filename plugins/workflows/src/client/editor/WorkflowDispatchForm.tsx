@@ -1,3 +1,5 @@
+import MapAgentForm from './MapAgentForm'
+import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import { For, Show } from 'solid-js'
 import { dataBindingSchema, type DataBinding } from '@acorn/protocol/dataBindings.ts'
 import type { DataSchema } from '@acorn/protocol/dataSchemas.ts'
@@ -24,6 +26,7 @@ export default function WorkflowDispatchForm(props: {
   def: WorkflowDef
   step: WorkflowStepDef
   catalog: WorkflowCatalog | undefined
+  providers?: readonly AgentProviderDescriptor[]
   disabled?: boolean
   onChange: (patch: Partial<WorkflowStepDef>) => void
   onCreateChild?: (itemSchema: DataSchema) => void
@@ -76,6 +79,18 @@ export default function WorkflowDispatchForm(props: {
         }} />
     </Show>
 
+    <Show when={isMap()}>
+      <Field label="Run" group>
+        <Select label="Run" value={props.step.agent ? 'agent' : 'workflow'} disabled={props.disabled}
+          options={[{ value: 'agent', label: 'Agent session' }, { value: 'workflow', label: 'Child workflow' }]}
+          onChange={value => props.onChange(value === 'agent'
+            ? { agent: { prompt: '', onFailure: 'continue' }, childWorkflow: undefined }
+            : { agent: undefined })} />
+      </Field>
+    </Show>
+    <Show when={props.step.agent}>{agent => <MapAgentForm agent={agent()} catalog={props.catalog} providers={props.providers}
+      disabled={props.disabled} onChange={value => props.onChange({ agent: value })} />}</Show>
+    <Show when={!props.step.agent}>
     <Field label="Child workflow"
       error={!targetKey() ? 'Choose a saved workflow.' : !target() ? 'This workflow is not available to the selected project.' : undefined} group>
       <Select label="Child workflow" disabled={props.disabled} value={targetKey()}
@@ -101,14 +116,15 @@ export default function WorkflowDispatchForm(props: {
       <For each={targetInputs()}>{input => Binding({ ...input, required: input.required && !input.hasDefault })}</For>
     </Show>
 
+    </Show>
     <Show when={isMap()}>
       <Fold label="Advanced" level="sub"><Stack gap="row">
         <Field label="Item ID field" help="Only for plain lists. Records from a source already have an ID." group>
           <Input label="Item ID field" disabled={props.disabled} value={props.step.itemKey ?? ''}
             placeholder="/id" onInput={itemKey => props.onChange({ itemKey: itemKey || undefined })} />
         </Field>
-        <Field label="Task title" hint="Optional. Leave empty to use each record's title." group>
-          <Input label="Task title" disabled={props.disabled} value={props.step.title?.template ?? ''}
+        <Field label={props.step.agent ? "Session title" : "Task title"} hint="Optional. Leave empty to use each item’s title." group>
+          <Input label={props.step.agent ? "Session title" : "Task title"} disabled={props.disabled} value={props.step.title?.template ?? ''}
             placeholder="Review ${ticket}" onInput={template => props.onChange({ title: template ? { template, bindings: props.step.title?.bindings } : undefined })} />
         </Field>
         <For each={titleNames()}>{name =>

@@ -18,6 +18,9 @@ export type WorkflowUsageSummary = {
 
 /** One admitted child workflow, projected from the dispatch ledger and child run row. */
 export type WorkflowChildRunSummary = {
+  taskMode?: 'child' | 'parent'
+  agentSessionId?: string | null
+  result?: import('@acorn/protocol/dataValues.ts').DataValue | null
   outputs?: Record<string, import('@acorn/protocol/dataValues.ts').DataValue>
   parentTaskId: string
   parentRunId: string

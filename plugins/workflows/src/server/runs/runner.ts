@@ -1,3 +1,4 @@
+import { AGENT_MAP_INTERRUPTED } from '../../shared/agentMap'
 // Durable workflow coordinator. Rows remain the checkpoint; the runner schedules graph work and
 // coordinates step execution, child runs, and termination.
 import { eq, inArray } from 'drizzle-orm'
@@ -292,6 +293,10 @@ export class WorkflowRunner {
     return this.#state.childSteps(parentStepId)
   }
 
+  async waitForRun(parentRunId: string, runId: string, signal: AbortSignal) {
+    return this.#childLifecycle.waitForChild(parentRunId, runId, signal)
+  }
+
   async childRuns(parentStepId: string) {
     return this.#childLifecycle.summariesForStep(parentStepId)
   }
@@ -363,7 +368,10 @@ export class WorkflowRunner {
         await this.cancelRun(run.id, run.error ?? 'Cancellation completed after restart.')
       } else if (run.status === 'running') {
         for (const step of await this.steps(run.id)) {
-          if (step.status === 'running' || step.status === 'waiting-children') {
+          if (run.trigger === 'agent-map' && step.status === 'running') {
+            if (step.agentSessionId) await this.deps.cancelAgentSession?.(run.taskId, step.agentSessionId).catch(() => undefined)
+            await this.#state.setStep(step.id, { status: 'failed', error: AGENT_MAP_INTERRUPTED })
+          } else if (step.status === 'running' || step.status === 'waiting-children') {
             await this.#state.setStep(step.id, { status: 'pending', error: 'restarted: step re-queued after app restart' })
           }
         }
@@ -468,6 +476,13 @@ export class WorkflowRunner {
     const run = await this.run(runId)
     if (!run) return { ok: false, error: 'No such run.' }
     if (!['failed', 'safety-rail', 'completed-with-failures'].includes(run.status)) return { ok: false, error: `A ${run.status} run cannot be retried.` }
+    if (run.trigger === 'agent-map') {
+      const active = await this.db.select({ id: schema.workflowRuns.id, trigger: schema.workflowRuns.trigger, status: schema.workflowRuns.status }).from(schema.workflowRuns)
+        .where(eq(schema.workflowRuns.taskId, run.taskId))
+      if (active.some(candidate => candidate.id !== run.id && candidate.trigger === 'agent-map' && ['running', 'gated', 'cancelling'].includes(candidate.status))) {
+        return { ok: false, error: 'Another item is using this task’s folder. Retry after it finishes.' }
+      }
+    }
     const rows = (await this.steps(runId)).filter((row) => row.parentStepId == null)
     const step = rows.find((row) => row.id === stepId)
     if (!step) return { ok: false, error: 'No such step in this run.' }

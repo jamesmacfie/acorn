@@ -58,6 +58,15 @@ export type WorkflowMapSource = {
   pointer: string
 }
 
+export type WorkflowMapAgent = {
+  prompt: string
+  profileId?: string
+  model?: string
+  configOptions?: Record<string, string>
+  schema?: object
+  onFailure?: 'continue' | 'stop'
+}
+
 export type WorkflowStepDef = {
   repeat?: import('./workflowProcessing').WorkflowRepeatPolicy
   incremental?: boolean
@@ -91,6 +100,7 @@ export type WorkflowStepDef = {
   requiresRun?: string
   // Runtime child workflows use a separate key from static `workflow` file composition. Resolution
   // freezes the referenced definition before any child task exists.
+  agent?: WorkflowMapAgent
   childWorkflow?: ChildWorkflowConfig
   // `workflow-map` reads an array from one predecessor's structured result. The item key is a JSON
   // Pointer within each item, and the title template can read only its declared bindings.

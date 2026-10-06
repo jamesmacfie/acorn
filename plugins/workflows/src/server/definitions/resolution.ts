@@ -1,4 +1,5 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import { agentMapWorkflow } from '../../shared/agentMap'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { eq } from 'drizzle-orm'
 import { workflowFileOperations } from '../../node/schema'
@@ -194,6 +195,16 @@ export async function resolveWorkflowGraph(
       fingerprint: workflowContentFingerprint({ definition: frozen, provenance, defaultInputs: defaults }),
     })
     for (const step of frozen.steps.filter(runtimeKind)) {
+      if (step.agent) {
+        const child = agentMapWorkflow(step)
+        if (depth >= MAX_CHILD_WORKFLOW_DEPTH) throw new WorkflowValidationError(['Agent loop exceeds the workflow depth limit.'])
+        const problems = validateWorkflow(child, options.catalog)
+        if (problems.length) throw new WorkflowValidationError(problems)
+        // Terminal node: adding another inline provenance to walk would look like a cycle.
+        nodes.push({ path: [...path, stepIdentity(step)], depth: depth + 1, definition: child,
+          provenance: { source: 'inline' }, defaultInputs: {}, fingerprint: workflowContentFingerprint(child) })
+        continue
+      }
       if (step.childWorkflow!.ref.source === 'database' && options.allowDatabaseDefinitions === false) {
         throw new WorkflowValidationError([`step '${step.name}' cannot resolve an owner-authored database workflow from a task-confined caller`])
       }

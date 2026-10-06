@@ -77,6 +77,26 @@ describe('the providers answer', () => {
     expect(driver.pending).toHaveLength(0)
   })
 
+  it('exposes newly advertised model and effort choices without repeating the cached availability probe', async () => {
+    const descriptors = await warm()
+    const olderOptions = [{ id: 'model', label: 'Model', category: 'model' as const, currentValue: 'old', values: [] }]
+    const latestOptions = [
+      { id: 'model', label: 'Model', category: 'model' as const, currentValue: 'new', values: [{ value: 'new', label: 'New' }] },
+      { id: 'reasoning', label: 'Effort', category: 'reasoning' as const, currentValue: 'high', values: [{ value: 'high', label: 'High' }] },
+    ]
+    const makeSession = (configOptions: typeof latestOptions) => runtime.store.createSession({
+      taskId: 'task-options', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions },
+    }, descriptors[0]!)
+    const older = await makeSession(olderOptions)
+    const latest = await makeSession(latestOptions)
+    const connecting = await makeSession([])
+    vi.spyOn(runtime.store, 'listSessions').mockResolvedValue({ sessions: [connecting, latest, older], delegations: [], nextCursor: null })
+
+    expect((await runtime.providers())[0]?.configOptions).toEqual(latestOptions)
+    expect(driver.pending).toHaveLength(0)
+    expect(descriptors[0]?.configOptions).toEqual([])
+  })
+
   it('answers a stale call with the old answer while one probe refreshes it', async () => {
     const old = await warm()
     driver.installed = false

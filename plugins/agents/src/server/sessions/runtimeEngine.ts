@@ -3,6 +3,7 @@ import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, Plugin
 import { agentProfileRegistry, createLogger, describeError } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
+  AgentConfigOption,
   AgentNormalizedEvent,
   AgentProviderDescriptor,
   AgentSession,
@@ -341,9 +342,24 @@ export class ManagedAgentEngine {
     const cached = this.providerCache
     if (!force && cached && cached.generation === this.registry.generation) {
       if (Date.now() - cached.probedAt > PROVIDER_FRESH_MS) void this.probeProviders(false).catch(() => undefined)
-      return cached.descriptors
+      return this.withAdvertisedOptions(cached.descriptors)
     }
-    return this.probeProviders(force)
+    return this.withAdvertisedOptions(await this.probeProviders(force))
+  }
+
+  /** Probes discover availability; connected sessions advertise the actual model and effort values.
+   *  Read them on every request so a cached probe doesn't hide newly connected session options. */
+  private async withAdvertisedOptions(descriptors: AgentProviderDescriptor[]): Promise<AgentProviderDescriptor[]> {
+    const { sessions } = await this.store.listSessions({ limit: 50 })
+    const advertised = new Map<string, AgentConfigOption[]>()
+    for (const session of sessions) {
+      const options = session.config.configOptions
+      if (!advertised.has(session.providerId) && Array.isArray(options) && options.length) {
+        advertised.set(session.providerId, options as AgentConfigOption[])
+      }
+    }
+    if (!advertised.size) return descriptors
+    return descriptors.map(provider => ({ ...provider, configOptions: advertised.get(provider.id) ?? provider.configOptions }))
   }
 
   /**

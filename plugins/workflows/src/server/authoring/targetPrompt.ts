@@ -40,7 +40,8 @@ export function renderWorkflowTargets(
     '## 6. Saved child workflows',
     '',
     'A `workflow` step starts one saved workflow in its own child task. A `workflow-map` step reads an',
-    'array from a structured predecessor and starts one child task and saved workflow per item. Both',
+    'array from a structured predecessor. With `agent` it starts a separate agent session per item,',
+    'sequentially in the parent task folder. With `childWorkflow` it starts a child task and saved workflow per item. Both',
     'wait for every child they admit. Use only a reference listed below. Never invent an id or path.',
     '',
     'A child input binding is one of these closed shapes:',
@@ -55,7 +56,7 @@ export function renderWorkflowTargets(
     'that declares structured output.',
   ]
   if (!targets.length) {
-    lines.push('', 'This project has no saved child workflows. Do not write a `workflow` or `workflow-map` step.')
+    lines.push('', 'This project has no saved child workflows. Use `workflow-map` with `agent` for separate sessions in the parent task. Do not write a saved-child `workflow` step.')
     return lines.join('\n')
   }
 

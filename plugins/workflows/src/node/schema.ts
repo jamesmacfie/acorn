@@ -5,6 +5,7 @@
 // plugins/agents' session table, are plain IDs rather than foreign keys, dereferenced through
 // CoreServices.tasks and the agents capability.
 //
+import { sql } from 'drizzle-orm'
 import { index, integer, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 
 // Workflow runs (docs/workflows.md): the durable checkpoint for the state machine. Machine-scoped
@@ -158,6 +159,7 @@ export const workflowDispatches = sqliteTable(
     callerKey: text('caller_key').notNull(),
     payloadFingerprint: text('payload_fingerprint').notNull(),
     payloadJson: text('payload_json').notNull(),
+    taskMode: text('task_mode').notNull().default('child'), // child task | parent task agent session
     parentTaskId: text('parent_task_id').notNull(),
     taskId: text('task_id').notNull(),
     runId: text('run_id').notNull(),
@@ -172,7 +174,7 @@ export const workflowDispatches = sqliteTable(
   },
   (table) => [
     uniqueIndex('workflow_dispatches_caller_key_uq').on(table.callerKey),
-    uniqueIndex('workflow_dispatches_task_id_uq').on(table.taskId),
+    uniqueIndex('workflow_dispatches_child_task_id_uq').on(table.taskId).where(sql`${table.taskMode} = 'child'`),
     uniqueIndex('workflow_dispatches_run_id_uq').on(table.runId),
     index('workflow_dispatches_state_updated_idx').on(table.state, table.updatedAt),
     index('workflow_dispatches_root_created_idx').on(table.rootRunId, table.createdAt),

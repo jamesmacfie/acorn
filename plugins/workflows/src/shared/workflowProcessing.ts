@@ -20,6 +20,8 @@ export type WorkflowRecordHistory = {
   status: string | null
   reason: string | null
   result: string | null
+  agentSessionId?: string | null
+  taskMode?: 'child' | 'parent'
   retryStepId: string | null
   outputs: WorkflowNamedOutput[]
 }
@@ -69,6 +71,8 @@ export type WorkflowRecordAttempt = {
   runId: string
   status: string
   error: string | null
+  agentSessionId?: string | null
+  taskMode?: 'child' | 'parent'
   retryStepId: string | null
   result: string | null
   outputs: WorkflowNamedOutput[]

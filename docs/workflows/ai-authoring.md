@@ -18,7 +18,9 @@ the workflow to review proposals on.
 The conversation stores pending context, clarifications, and proposals in device-local recovery
 state keyed by Node and workflow. Source records stay out of the prompt unless the user enables
 **Use preview records to help AI**. An enabled sample contains at most three selected records and
-16 KiB. Cancellation keeps the draft unchanged, and each result reports model request and token use.
+16 KiB. Responses that fail the authoring protocol are repaired with the exact invalid field
+and validation limit. After three rejected responses, the error includes the final validation
+problems so the failure can be diagnosed. Cancellation keeps the draft unchanged, and each result reports model request and token use.
 
 A proposal shows a semantic diff before it can change the draft. Applying it reconciles a stale
 base against the current definition by stable step ID, refuses conflicts, and runs the workflow
@@ -58,8 +60,9 @@ repair text because whitespace and section order affect model behavior and provi
 Generation also receives the selected project's bounded child workflow catalog. It contains the
 same references, input signatures, and output schemas that the child workflow picker uses. Grounding
 removes a reference outside that catalog, an input binding the target does not declare, and a source
-that is not a structured predecessor. If the catalog is empty, the prompt forbids both child
-workflow kinds.
+that is not a structured predecessor. An empty catalog forbids saved-child targets but permits For each with an inline item agent.
+No saved workflow is needed for that target. Model and reasoning choices remain editor settings
+in the compatibility generator, including nested item-agent configuration.
 
 The server does not silently restore a changed child target. Both the conversation and compatibility
 route keep only references in the scoped child catalog, and the conversation exposes a target change

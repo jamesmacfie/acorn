@@ -1,5 +1,5 @@
 import { getProfile, resolveCommand, type PluginDatabase } from '@acorn/plugin-api/node'
-import { desc, eq, inArray, isNotNull, or, sql, sum } from 'drizzle-orm'
+import { and, ne, desc, eq, inArray, isNotNull, or, sql, sum } from 'drizzle-orm'
 import type { WorkflowRunner } from '../runner'
 import type { WorkflowStepProjection } from '../../../shared/api'
 import { RUN_LIST_LIMIT, TERMINAL_WORKFLOW_STATUSES, toRunStatus } from '../../../shared/runStatus'
@@ -12,7 +12,7 @@ export async function workflowRunList(db: PluginDatabase) {
     createdAt: workflowRuns.createdAt, updatedAt: workflowRuns.updatedAt,
     taskId: workflowRuns.taskId, depth: workflowRuns.depth, rootRunId: workflowRuns.rootRunId,
     error: workflowRuns.error,
-  }).from(workflowRuns).orderBy(desc(workflowRuns.createdAt), sql`${workflowRuns}.rowid`).limit(RUN_LIST_LIMIT)
+  }).from(workflowRuns).where(ne(workflowRuns.trigger, 'agent-map')).orderBy(desc(workflowRuns.createdAt), sql`${workflowRuns}.rowid`).limit(RUN_LIST_LIMIT)
   const treeCostRows = rows.length
     ? await db
       .select({ id: workflowTurnAdmissions.rootRunId, costUsd: sum(workflowTurnAdmissions.costUsd) })
@@ -51,7 +51,7 @@ export async function workflowTaskNavigation(db: PluginDatabase) {
     id: workflowRuns.id, taskId: workflowRuns.taskId, status: workflowRuns.status,
     parentRunId: workflowRuns.parentRunId, rootRunId: workflowRuns.rootRunId, trigger: workflowRuns.trigger,
   }).from(workflowRuns)
-    .where(or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.trigger, 'reprocess')))
+    .where(and(ne(workflowRuns.trigger, 'agent-map'), or(isNotNull(workflowRuns.parentRunId), eq(workflowRuns.trigger, 'reprocess'))))
     // Keep the full-scan insertion order for timestamp ties explicit as projections evolve.
     .orderBy(desc(workflowRuns.updatedAt), sql`${workflowRuns}.rowid`)
   const latestByTask = new Map<string, typeof children[number]>()

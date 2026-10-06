@@ -9,6 +9,12 @@ each harness's plan usage. The usage collectors are in `plugins/agents/src/serve
 configuration options each advertises. The workflow editor reads the same route, so its model and
 reasoning lists match the Agent pane's.
 
+Model and effort choices come from the newest connected session for each provider among the 50
+latest active sessions. They are read separately from the availability cache, so connecting a session
+makes its choices available on the next provider request. Before a harness has advertised any choices,
+the workflow editor asks you to open a session on it once. Execution validates requested options
+against the new session's own advertised values.
+
 A probe starts each harness's CLI, which took 211 ms typically and up to 5 seconds, so the Node serves
 the last answer from memory (`ManagedAgentEngine.providers` in `runtimeEngine.ts`). Once that answer
 is 30 seconds old, the next read still gets it, and one probe runs behind the read to replace it.

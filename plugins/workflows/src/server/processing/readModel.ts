@@ -26,9 +26,9 @@ const RESULT_CHARS = 160
 // decoded UTF-16 units for bounded(), including its length check and surrogate-pair slicing.
 const resultPrefix = (column: typeof schema.workflowSteps.structuredJson | typeof schema.workflowSteps.resultJson) =>
   sql<Uint8Array | null>`case when ${column} = '' then cast('' as blob) else substr(cast(${column} as blob), 1, ${RESULT_CHARS * 4}) end`
-type HistoryDispatch = Pick<typeof schema.workflowDispatches.$inferSelect, 'payloadJson' | 'taskId' | 'runId' | 'state' | 'error'>
+type HistoryDispatch = Pick<typeof schema.workflowDispatches.$inferSelect, 'taskMode' | 'payloadJson' | 'taskId' | 'runId' | 'state' | 'error'>
 type HistoryRun = Pick<typeof schema.workflowRuns.$inferSelect, 'id' | 'status' | 'error'>
-type HistoryStep = Pick<typeof schema.workflowSteps.$inferSelect, 'id' | 'runId' | 'status' | 'parentStepId' | 'structuredJson' | 'resultJson'>
+type HistoryStep = Pick<typeof schema.workflowSteps.$inferSelect, 'agentSessionId' | 'id' | 'runId' | 'status' | 'parentStepId' | 'structuredJson' | 'resultJson'>
 
 const bounded = (value: string | null | undefined, limit = SUMMARY_CHARS): string | null => {
   if (!value) return null
@@ -85,7 +85,8 @@ const recordHistory = (
     attemptId: row.attemptId,
     taskId: dispatch?.taskId ?? null,
     runId: dispatch?.runId ?? null,
-    status,
+    status: dispatch?.taskMode === 'parent' && status === 'reserved' ? 'waiting' : status,
+    ...(dispatch?.taskMode === 'parent' ? { taskMode: 'parent', agentSessionId: steps.find(step => step.agentSessionId)?.agentSessionId ?? null } : {}),
     reason: bounded(run?.error ?? dispatch?.error ?? (row.decision === 'seen' ? 'Previously processed' : row.decision === 'unchanged' ? 'Tracked fields are unchanged' : row.decision === 'active' ? running.has(status ?? '') ? 'A prior attempt is still active' : 'A prior attempt was active when this run checked it' : row.decision === 'baseline' ? 'Recorded by the initial baseline' : null)),
     result: runResult(steps),
     retryStepId: retryStep(steps),
@@ -159,7 +160,7 @@ export function workflowSelectionPage(
   const selected = db.select({
     id: schema.workflowSelectedRecords.id, position: schema.workflowSelectedRecords.position,
     decision: schema.workflowSelectedRecords.decision, status: schema.workflowRuns.status,
-    dispatchState: schema.workflowDispatches.state,
+    dispatchState: schema.workflowDispatches.state, taskMode: schema.workflowDispatches.taskMode,
   }).from(schema.workflowSelectedRecords)
     .leftJoin(schema.workflowRecordAttempts, eq(schema.workflowRecordAttempts.id, schema.workflowSelectedRecords.attemptId))
     .leftJoin(schema.workflowDispatches, eq(schema.workflowDispatches.id, schema.workflowRecordAttempts.dispatchId))
@@ -173,16 +174,16 @@ export function workflowSelectionPage(
   const counts = all.reduce((total, row) => {
     const key = category(row)
     total.total += 1
-    total[key] += 1
+    if (row.taskMode !== 'parent' || row.status !== 'reserved') total[key] += 1
     return total
   }, emptyCounts())
-  const eligible = all.filter(row => row.position > after && (filter === 'all' || category(row) === filter))
+  const eligible = all.filter(row => row.position > after && (filter === 'all' || (!(row.taskMode === 'parent' && row.status === 'reserved') && category(row) === filter)))
   const count = Math.min(100, Math.max(1, limit))
   const pageIds = eligible.slice(0, count).map(row => row.id)
   const details = pageIds.length ? db.select({
     selected: schema.workflowSelectedRecords,
     dispatch: {
-      payloadJson: schema.workflowDispatches.payloadJson, taskId: schema.workflowDispatches.taskId,
+      taskMode: schema.workflowDispatches.taskMode, payloadJson: schema.workflowDispatches.payloadJson, taskId: schema.workflowDispatches.taskId,
       runId: schema.workflowDispatches.runId, state: schema.workflowDispatches.state, error: schema.workflowDispatches.error,
     },
     run: { id: schema.workflowRuns.id, status: schema.workflowRuns.status, error: schema.workflowRuns.error },
@@ -195,7 +196,7 @@ export function workflowSelectionPage(
   const pageRunIds = [...new Set(details.flatMap(row => row.run ? [row.run.id] : []))]
   const steps = pageRunIds.length ? db.select({
     id: schema.workflowSteps.id, runId: schema.workflowSteps.runId, status: schema.workflowSteps.status,
-    parentStepId: schema.workflowSteps.parentStepId,
+    agentSessionId: schema.workflowSteps.agentSessionId, parentStepId: schema.workflowSteps.parentStepId,
     structuredJson: resultPrefix(schema.workflowSteps.structuredJson), resultJson: resultPrefix(schema.workflowSteps.resultJson),
   }).from(schema.workflowSteps).where(inArray(schema.workflowSteps.runId, pageRunIds)).all() : []
   const stepsByRun = new Map<string, HistoryStep[]>()
@@ -248,6 +249,7 @@ export function workflowRecordAttemptPage(db: PluginDatabase, runId: string, rec
       runId: dispatch.runId,
       status: run?.status ?? (dispatch.state === 'terminal' ? 'cancelled' : dispatch.state),
       error: bounded(run?.error ?? dispatch.error),
+      ...(dispatch.taskMode === 'parent' ? { taskMode: 'parent', agentSessionId: runSteps.find(step => step.agentSessionId)?.agentSessionId ?? null } : {}),
       retryStepId: retryStep(runSteps),
       result: runResult(runSteps),
       outputs: namedOutputs(run, runSteps),

@@ -87,7 +87,7 @@ export function addNode(draft: WorkflowDraft, kind: string, base?: string): Work
   // Every step the editor writes carries an explicit `after`, so a node added at the end of a list
   // written by hand does not silently inherit the step above it.
   const explicit = draft.def.steps.map((step, index) => (step.after ? step : { ...step, after: [...effectiveAfter(draft.def, index)] }))
-  const step: WorkflowStepDef = { ...(draft.def.formatVersion === 1 ? { id: crypto.randomUUID() } : {}), name, ...(kind === 'agent' ? {} : { kind }), after: parent ? [parent] : [] }
+  const step: WorkflowStepDef = { ...(draft.def.formatVersion === 1 ? { id: crypto.randomUUID() } : {}), name, ...(kind === 'agent' ? {} : { kind }), ...(kind === 'workflow-map' ? { agent: { prompt: '', onFailure: 'continue' as const } } : {}), after: parent ? [parent] : [] }
   return { def: { ...draft.def, steps: [...explicit, step] }, selection: { kind: 'node', name: stepIdentity(step) } }
 }
 

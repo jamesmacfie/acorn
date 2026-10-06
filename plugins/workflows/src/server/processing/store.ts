@@ -85,6 +85,7 @@ export class WorkflowProcessingStore {
         sourceRecordId: request.recordId,
         sourceDigest: request.digest,
         parentTaskId: prepared.payload.parentTaskId,
+        taskMode: prepared.payload.taskMode,
         itemKey: prepared.recordKey,
         task: prepared.payload.task,
         workflow: prepared.payload.workflow,

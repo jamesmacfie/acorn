@@ -36,6 +36,20 @@ describe('the model-visible definition', () => {
 })
 
 describe('protected configuration restoration', () => {
+  it('keeps nested agent settings private and restores them without restoring a replaced child target', () => {
+    const configured: WorkflowDef = { ...current, steps: [{
+      name: 'each', kind: 'workflow-map', agent: { prompt: 'Fix it.', model: 'private-model', configOptions: { reasoning: 'high' } },
+    }] }
+    expect(definitionForPrompt(configured).steps[0]?.agent).toEqual({ prompt: 'Fix it.' })
+    const edited = { ...configured, steps: [{ name: 'each', kind: 'workflow-map', agent: { prompt: 'Fix and test it.' } }] }
+    expect(restoreProtectedDefinition(configured, edited).steps[0]?.agent).toEqual({
+      prompt: 'Fix and test it.', model: 'private-model', configOptions: { reasoning: 'high' },
+    })
+    const child: WorkflowDef = { ...configured, steps: [{ name: 'each', kind: 'workflow-map',
+      childWorkflow: { ref: { source: 'database', id: 'old-target' } } }] }
+    expect(restoreProtectedDefinition(child, edited).steps[0]?.childWorkflow).toBeUndefined()
+  })
+
   it('restores hidden values only onto a surviving step of the same kind', () => {
     const changed: WorkflowDef = { baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'Safer deploy',

@@ -31,6 +31,8 @@ describe('outline model', () => {
     expect(stepSummary(def.steps[0]!, def, undefined)).toBe('Find records with a saved query.')
     expect(stepSummary(def.steps[1]!, def, undefined)).toContain('For each result from Recent issues')
     expect(dependencyLabels(def.steps[1]!, def)).toEqual(['Recent issues'])
+    expect(stepSummary({ ...def.steps[1]!, childWorkflow: undefined, agent: { prompt: 'Fix it.' } }, def, undefined))
+      .toBe('For each result from Recent issues, start an agent session.')
   })
 
   it('labels branches and names affected references before deletion', () => {

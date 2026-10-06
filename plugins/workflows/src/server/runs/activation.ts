@@ -78,7 +78,7 @@ export const createWorkflowExecution = (
       const managed = await ctx.capabilities.get(AGENTS_SESSION_EXECUTE)?.({
         taskId,
         profileId: opts.profileId,
-        title: `Workflow: ${def.name}`,
+        title: opts.sessionTitle ?? `Workflow: ${def.name}`,
         prompt: opts.prompt,
         context: opts.context,
         schema: opts.schema,
@@ -93,6 +93,7 @@ export const createWorkflowExecution = (
         signal: opts.signal,
       })
       if (managed) return managed
+      if (opts.requireManagedSession) throw new Error('Agent sessions are unavailable. Enable the Agents plugin to run this loop.')
       // The headless fallback, which now means what it says: a profile with no managed driver, or
       // a node with agents disabled. It used to catch a blank harness as well.
       const task = await core.tasks.load(taskId)

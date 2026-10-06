@@ -124,7 +124,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
   },
   'workflow-map': {
     label: 'For each',
-    description: 'Start one saved workflow in a child task for each selected item.',
+    description: 'Start an agent session in this task, or a saved workflow in a child task, for each selected item.',
     icon: 'git-fork',
     fields: [
       {
@@ -146,7 +146,7 @@ export const BUILTIN_STEP_DESCRIPTIONS: Readonly<Record<string, StepKindDescript
         id: 'childWorkflow',
         label: 'Child workflow',
         type: 'child-workflow',
-        required: true,
+        required: false,
         hint: 'Pick a workflow available to this project, then bind its declared inputs.',
       },
       {

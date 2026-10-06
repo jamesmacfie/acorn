@@ -14,6 +14,7 @@ const schemaFields = (schema: DataSchema | undefined, name = ''): string[] => {
   const type = Array.isArray(schema.type) ? schema.type.find(value => value !== 'null') : schema.type
   if (type === 'array') return schemaFields(schema.items, name)
   if (type !== 'object') return name ? [name] : []
+  if (!Object.keys(schema.properties ?? {}).length) return name ? [name] : []
   return [...new Set(Object.entries(schema.properties ?? {}).flatMap(([child, value]) => schemaFields(value, child)))]
 }
 

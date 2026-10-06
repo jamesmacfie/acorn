@@ -120,7 +120,7 @@ export function resolveWorkflowMapRoster(
   admitted?: Readonly<Record<string, DataValue>>,
   childName = 'Workflow',
 ): WorkflowMapRoster {
-  if (def.kind !== 'workflow-map' || !def.items || !def.childWorkflow) {
+  if (def.kind !== 'workflow-map' || !def.items || (!def.childWorkflow && !def.agent)) {
     throw new Error(`Step '${def.name}' is not a complete workflow-map step.`)
   }
   const source = steps.find((candidate) => candidate.name === def.items!.step && candidate.parentStepId == null)
@@ -142,10 +142,10 @@ export function resolveWorkflowMapRoster(
 
     const childInputs = {
       ...defaults,
-      ...resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }, admitted),
+      ...(def.agent ? { item: parseDataValue(item, WORKFLOW_VALUE_BYTES) } : resolveBindings(def.childWorkflow!.inputs ?? {}, inputs, steps, { value: item }, admitted)),
     }
     const titleBindings = resolveBindings(def.title?.bindings ?? {}, inputs, steps, { value: item }, admitted)
-    const defaultLabel = sourceIdentity ? item.display?.title ?? item.ref.recordId : String(rawKey)
+    const defaultLabel = sourceIdentity ? item.display?.title ?? item.ref.recordId : def.agent && item && typeof item === 'object' && typeof item.title === 'string' ? item.title : String(rawKey)
     const renderedTitle = def.title ? def.title.template.replace(BOUND_TEMPLATE_RE, (_token, name: string) => {
       if (!Object.hasOwn(titleBindings, name)) throw new Error(`Title binding '${name}' is missing`)
       return workflowText(titleBindings[name])

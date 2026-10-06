@@ -4,6 +4,7 @@ import type {
   WorkflowStepDef,
   WorkflowValueBinding,
 } from '../../shared/workflowContracts'
+import { parseDataSchema } from '@acorn/protocol/dataSchemas.ts'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { stepIdentity } from '../../shared/workflowIdentity'
 import { processingFields } from '../processing/rules'
@@ -102,6 +103,7 @@ export function workflowDispatchProblems(args: {
   if (step.repeat && kind !== 'workflow-map') return [`${label} repeat policy is only valid on For each`]
   if (!RUNTIME_WORKFLOW_KINDS.has(kind)) {
     const errors: string[] = []
+    if (step.agent != null) errors.push(`${label} is a '${kind}' step, which cannot take agent`)
     if (step.childWorkflow != null) errors.push(`${label} is a '${kind}' step, which cannot take childWorkflow`)
     if (step.items != null) errors.push(`${label} is a '${kind}' step, which cannot take items`)
     if (step.itemKey != null) errors.push(`${label} is a '${kind}' step, which cannot take itemKey`)
@@ -109,7 +111,26 @@ export function workflowDispatchProblems(args: {
     return errors
   }
 
-  const errors = childWorkflowProblems(label, step, step.childWorkflow, declaredInputs, indexes, precedes, structured)
+  const errors = step.agent ? [] : childWorkflowProblems(label, step, step.childWorkflow, declaredInputs, indexes, precedes, structured)
+  if (step.agent && step.childWorkflow) errors.push(`${label} must choose either agent or childWorkflow`)
+  if (step.agent && kind !== 'workflow-map') errors.push(`${label} can run an agent directly only in For each`)
+  if (step.agent) {
+    if (typeof step.agent !== 'object' || Array.isArray(step.agent)) return [...errors, `${label} agent must be a configuration object`]
+    const agent = step.agent
+    errors.push(...unexpectedFields(agent, ['prompt', 'profileId', 'model', 'configOptions', 'schema', 'onFailure']).map(field => `${label} agent has unsupported field '${field}'`))
+    if (typeof agent.prompt !== 'string' || !agent.prompt.trim()) errors.push(`${label} agent needs a prompt`)
+    if (agent.onFailure !== undefined && !['continue', 'stop'].includes(agent.onFailure)) errors.push(`${label} agent onFailure must be continue or stop`)
+    if (agent.model !== undefined && typeof agent.model !== 'string') errors.push(`${label} agent model must be a string`)
+    if (agent.model && agent.configOptions?.model) errors.push(`${label} agent sets both model and configOptions.model`)
+    if (agent.configOptions !== undefined && (!agent.configOptions || typeof agent.configOptions !== 'object'
+      || Array.isArray(agent.configOptions) || Object.values(agent.configOptions).some(value => typeof value !== 'string'))) {
+      errors.push(`${label} agent configOptions must map option IDs to strings`)
+    }
+    if (agent.schema !== undefined) {
+      try { parseDataSchema(agent.schema) } catch (error) { errors.push(`${label} agent schema: ${error instanceof Error ? error.message : 'Invalid result schema'}`) }
+    }
+    if (/\$\{/.test(agent.prompt ?? '')) errors.push(`${label} agent prompt receives the current item automatically; template references are not supported`)
+  }
   if (step.childWorkflow && targets) {
     const ref = step.childWorkflow.ref
     const target = ref && targets.find((entry) => {

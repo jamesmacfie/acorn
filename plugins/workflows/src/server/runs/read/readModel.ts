@@ -1,4 +1,4 @@
-import { desc, eq, inArray, sql } from 'drizzle-orm'
+import { and, desc, eq, inArray, ne, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../../node/schema'
 import type { WorkflowRunProjection, WorkflowUsageSummary } from '../../../shared/api'
@@ -37,8 +37,8 @@ export async function workflowRunUsage(db: PluginDatabase, runId: string): Promi
 }
 
 /** Builds the task-scoped run read model, including explicit lineage and tree usage. */
-export async function workflowRunsForTask(db: PluginDatabase, taskId: string): Promise<WorkflowRunProjection[]> {
-  const rows = await db.select(runFields).from(schema.workflowRuns).where(eq(schema.workflowRuns.taskId, taskId))
+export async function workflowRunsForTask(db: PluginDatabase, taskId: string, includeAgentItems = false): Promise<WorkflowRunProjection[]> {
+  const rows = await db.select(runFields).from(schema.workflowRuns).where(and(eq(schema.workflowRuns.taskId, taskId), ...(includeAgentItems ? [] : [ne(schema.workflowRuns.trigger, 'agent-map')])))
     .orderBy(desc(schema.workflowRuns.createdAt), sql`${schema.workflowRuns}.rowid`)
   if (!rows.length) return []
 
@@ -85,7 +85,7 @@ export async function workflowRunById(db: PluginDatabase, runId: string): Promis
   const [row] = await db.select({ taskId: schema.workflowRuns.taskId }).from(schema.workflowRuns)
     .where(eq(schema.workflowRuns.id, runId)).limit(1)
   if (!row) return null
-  return (await workflowRunsForTask(db, row.taskId)).find((run) => run.id === runId) ?? null
+  return (await workflowRunsForTask(db, row.taskId, true)).find((run) => run.id === runId) ?? null
 }
 
 /** Bounded status-only read for clients polling a run without transferring step results. */

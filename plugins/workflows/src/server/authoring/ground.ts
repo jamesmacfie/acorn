@@ -32,7 +32,7 @@ export type ParsedWorkflow = GroundedWorkflow | { error: string }
 const DEF_KEYS = ['baseline', 'maxDescendants', 'maxConcurrency', 'formatVersion', 'name', 'posture', 'trigger', 'tools', 'budget', 'inputs', 'outputs', 'steps']
 const STEP_KEYS = [
   'id', 'name', 'kind', 'after', 'isolation', 'inputs', 'configOptions', 'profileId', 'model', 'prompt',
-  'schema', 'policy', 'maxIterations', 'requiresRun', 'childWorkflow', 'items', 'itemKey',
+  'schema', 'policy', 'maxIterations', 'requiresRun', 'agent', 'childWorkflow', 'items', 'itemKey',
   'title', 'form', 'branches', 'with', 'tools', 'budget',
 ]
 const INPUT_KEYS = ['name', 'label', 'schema', 'description', 'required', 'default']
@@ -286,6 +286,11 @@ function groundKeys(def: WorkflowDef, notes: Notes): WorkflowDef {
       const why = code === 'forbidden-key' ? 'which a generated workflow cannot set' : 'which is not part of a step'
       add(notes, code, `Step '${step.name}' set '${key}', ${why}, so it was dropped.`, step.name)
     })
+    if (isRecord(ahead.agent)) {
+      ahead = { ...ahead, agent: pruneKeys(ahead.agent, ['prompt', 'profileId', 'schema', 'onFailure'], (key, code) => {
+        add(notes, code, `Step '${step.name}' agent set '${key}', which a generated workflow cannot set, so it was dropped.`, step.name)
+      }) }
+    }
     if (ahead.after !== undefined && !Array.isArray(ahead.after)) {
       add(notes, 'unknown-key', `Step '${step.name}' set \`after\` to something that is not a list, so it was dropped.`, step.name)
       ahead = without(ahead, 'after')

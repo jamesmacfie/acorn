@@ -51,7 +51,10 @@ The inspector draws whatever the list has selected. For a node that is its name,
 on as removable chips with a picker beside them, the agent fields when the kind runs an agent, then
 the kind's own fields in declared order. A prompt field carries a chip per declared input and per
 step that is certain to have finished first, and pressing one appends the reference. A `decide` node
-draws its branches as verdict-to-step rows. For each selects a child workflow and typed item bindings.
+draws its branches as verdict-to-step rows. For each selects **Agent session** or **Child workflow**. Agent sessions show a prompt, harness,
+model and reasoning options, and an **On failure** choice. Each receives its current item
+automatically and runs in the parent folder. Child workflows show the saved target and typed
+item bindings.
 A **Wait for a person** node has a **Form** section: the inputs list for its fields, with a 20-field
 cap, and a typed binding picker per field that chooses where the proposal comes from. Removing every
 field makes it a plain gate again, and the step preview lists each field and where it is filled from
@@ -63,7 +66,7 @@ the dependency and preselects that step's records output as one undoable edit. F
 direct conditions use the shared typed field picker. Conditions expose field, comparison, and typed
 value controls. Agent output uses a field list with nested object and list fields, types, and
 requiredness. Raw pointers and JSON Schema remain available in **Code**, but the normal setup does
-not require them. Task title templates, ordinary-array identity keys, and execution limits remain
+not require them. Session or task title templates, ordinary-array identity keys, and execution limits remain
 under **Advanced** until validation requires them.
 
 <a id="scheduling-a-published-workflow"></a>
@@ -73,7 +76,8 @@ under **Advanced** until validation requires them.
 The agent fields are the editor's, not any kind's: the harness from the catalog's profiles, then one
 select per option that harness advertises through `GET /v1/p/agents/providers`, then where the step
 runs and what it does with its upstream outputs. A plugin contributing a kind that runs an agent
-never restates the model list.
+never restates the model list. These choices come from the harness's newest connected session. If
+none has connected yet, open a session on that harness once, then reopen the workflow editor.
 
 **Workflow timeout in minutes**, under Definition's Budget section, limits the whole run and its
 child workflows. **Step timeout in minutes** limits active step execution, including agent loops and child

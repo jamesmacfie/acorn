@@ -1,5 +1,5 @@
 import { For, Show } from 'solid-js'
-import { Field, SegmentedControl, Select, Stack } from '@acorn/plugin-api/ui'
+import { Field, SegmentedControl, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { AgentProviderDescriptor } from '@acorn/plugin-agents/contract/wire.ts'
 import type { WorkflowCatalog, WorkflowStepDef } from '../../shared/workflowContracts'
 
@@ -18,6 +18,7 @@ export default function AgentNodeForm(props: {
   step: WorkflowStepDef
   catalog: WorkflowCatalog | undefined
   providers: readonly AgentProviderDescriptor[] | undefined
+  sharedTask?: boolean
   disabled?: boolean
   onStep: (patch: Partial<WorkflowStepDef>) => void
 }) {
@@ -31,7 +32,7 @@ export default function AgentNodeForm(props: {
     const current = { ...(props.step.configOptions ?? {}) }
     if (value) current[id] = value
     else delete current[id]
-    props.onStep({ configOptions: Object.keys(current).length ? current : undefined })
+    props.onStep({ configOptions: Object.keys(current).length ? current : undefined, ...(id === 'model' ? { model: undefined } : {}) })
   }
 
   return (
@@ -45,12 +46,11 @@ export default function AgentNodeForm(props: {
             { value: '', label: 'Workflow default' },
             ...profiles().map((profile) => ({ value: profile.id, label: profile.label })),
           ]}
-          onChange={(value) => props.onStep({ profileId: value || undefined })}
+          onChange={(value) => props.onStep({ profileId: value || undefined, model: undefined, configOptions: undefined })}
         />
       </Field>
 
-      {/* One select per option the harness advertises. A harness that advertises none draws none,
-          which is the honest answer for a profile with no managed driver. */}
+      {/* Model and effort choices come from a connected session, rather than a static model list. */}
       <For each={options()}>
         {(option) => (
           <Field label={option.label} group>
@@ -67,6 +67,12 @@ export default function AgentNodeForm(props: {
           </Field>
         )}
       </For>
+      <Show when={provider() && !options().length}>
+        <Text emphasis="muted" wrap>{`Open a ${provider()!.label} session once to load its model, effort, and mode choices.`}</Text>
+      </Show>
+      <Show when={!props.step.profileId}>
+        <Text emphasis="muted" wrap>Choose a harness to set its model and effort. Workflow default uses your usual agent settings.</Text>
+      </Show>
       <Show when={props.step.profileId && !provider()}>
         <Field
           hint="This agent isn't installed on this computer, so its models can't be listed."
@@ -76,7 +82,7 @@ export default function AgentNodeForm(props: {
         </Field>
       </Show>
 
-      <Field
+      <Show when={!props.sharedTask}><Field
         label="Where it runs"
         help="In its own worktree, a step gets a child task and branch. Use it for steps that change code."
         group
@@ -106,7 +112,7 @@ export default function AgentNodeForm(props: {
           ]}
           onChange={(value) => props.onStep({ inputs: value === 'append' ? undefined : (value as 'template' | 'none') })}
         />
-      </Field>
+      </Field></Show>
     </Stack>
   )
 }

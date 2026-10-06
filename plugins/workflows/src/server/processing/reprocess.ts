@@ -21,11 +21,21 @@ export function resolveWorkflowReprocess(db: PluginDatabase | WorkflowTransactio
   const fingerprint = workflowContentFingerprint({ attemptId: attempt.id, snapshot: admitted.snapshotJson, payload: dispatch.payloadJson })
   if (digest !== undefined && digest !== fingerprint) throw new Error('Reprocess preparation changed')
   const payload = JSON.parse(dispatch.payloadJson) as Pick<WorkflowDispatchRequest, 'task' | 'workflow' | 'inputs'> & {
+    taskMode?: 'child' | 'parent'
     parentTaskId: string
     resolvedGraph?: ResolvedWorkflowGraph
     effectiveTools?: WorkflowReprocessDispatchRequest['effectiveTools']
     effectiveBudget?: WorkflowReprocessDispatchRequest['effectiveBudget']
     requiresRepoTrust?: boolean
+  }
+  if (payload.taskMode === 'parent') {
+    const dispatches = db.select({ state: schema.workflowDispatches.state }).from(schema.workflowDispatches)
+      .where(and(eq(schema.workflowDispatches.taskId, dispatch.taskId), eq(schema.workflowDispatches.taskMode, 'parent'))).all()
+    const runs = db.select({ trigger: schema.workflowRuns.trigger, status: schema.workflowRuns.status }).from(schema.workflowRuns)
+      .where(eq(schema.workflowRuns.taskId, dispatch.taskId)).all()
+    if (dispatches.some(row => row.state !== 'terminal') || runs.some(row => row.trigger === 'agent-map' && ['running', 'gated', 'cancelling'].includes(row.status))) {
+      throw new Error('Another item is using this task’s folder. Run this item again after the loop finishes.')
+    }
   }
   return { recordId, digest: fingerprint, previousAttemptId: attempt.id, recordKey: admitted.recordKey,
     selectionId: selection.id, stepId: selection.stepId, stateId: state.id,

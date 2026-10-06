@@ -155,16 +155,18 @@ export function boundedAuthoringContext(entries: readonly AuthoringContextEntry[
   return kept
 }
 
-function parseReply(raw: string): z.infer<typeof authoringModelReplySchema> | null {
+function parseReply(raw: string): { reply: z.infer<typeof authoringModelReplySchema> | null; problems: string[] } {
   const fenced = /```(?:json)?\s*([\s\S]*?)```/i.exec(raw)?.[1]
+  let problems = ['The response must be one JSON object.']
   for (const candidate of [fenced, raw]) {
     if (!candidate) continue
     try {
       const parsed = authoringModelReplySchema.safeParse(JSON.parse(candidate.trim()))
-      if (parsed.success) return parsed.data
-    } catch { /* The repair prompt below explains the expected envelope. */ }
+      if (parsed.success) return { reply: parsed.data, problems: [] }
+      problems = parsed.error.issues.map(issue => `/${issue.path.join('/')}: ${issue.message}`)
+    } catch { /* Keep any schema errors from the fenced object for the repair. */ }
   }
-  return null
+  return { reply: null, problems }
 }
 
 const predicates = (value: unknown): string[] => {
@@ -220,11 +222,11 @@ export async function runAuthoringTurn(args: {
     usage.outputTokens += generated.usage?.outputTokens ?? 0
     providerId = generated.providerId
     modelId = generated.modelId
-    const reply = parseReply(generated.text)
+    const { reply, problems: replyProblems } = parseReply(generated.text)
     if (!reply) {
       candidateAttempts += 1
-      if (candidateAttempts >= AUTHORING_LIMITS.candidateAttempts) return { state: 'stopped', reason: 'The model did not return a supported authoring response after three attempts.', context, usage, providerId, modelId }
-      repair = 'Your previous response was not one supported JSON object. Return metadata, clarification, or proposal JSON only.'
+      if (candidateAttempts >= AUTHORING_LIMITS.candidateAttempts) return { state: 'stopped', reason: `The model did not return a supported authoring response after three attempts. ${replyProblems.join(' | ')}`, context, usage, providerId, modelId }
+      repair = `Your previous response failed validation:\n${replyProblems.join('\n')}\nReturn one supported JSON object. Clarification questions must be at most 500 characters; choice labels at most 200 characters. Use description for extra choice details.`
       continue
     }
     context.push({ role: 'assistant', content: content(reply) })

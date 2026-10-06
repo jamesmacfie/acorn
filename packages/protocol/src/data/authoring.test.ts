@@ -126,3 +126,16 @@ it('projects at most three records and only the fields the model requested', () 
   })
   expect(JSON.stringify(sample)).not.toContain('not selected')
 })
+
+it('repairs an oversized clarification using the rejected field and its limit', async () => {
+  const generate = vi.fn()
+    .mockResolvedValueOnce({ text: reply({ kind: 'clarification', question: 'x'.repeat(548), choices: [{ id: 'a', label: 'x'.repeat(241) }, { id: 'b', label: 'Skip' }] }), providerId: 'p', modelId: 'm' })
+    .mockResolvedValueOnce({ text: reply({ kind: 'clarification', question: 'Which item agent?', choices: [{ id: 'a', label: 'Fix each issue' }, { id: 'b', label: 'Report only' }] }), providerId: 'p', modelId: 'm' })
+  const result = await runAuthoringTurn({ request: request('harness:codex'), system: 'system', generate, metadata: vi.fn(), validate: vi.fn() })
+  expect(result).toMatchObject({ state: 'clarification', question: 'Which item agent?' })
+  const repair = generate.mock.calls[1][0].prompt
+  expect(repair).toContain('/question')
+  expect(repair).toContain('/choices/0/label')
+  expect(repair).toContain('500')
+  expect(repair).toContain('200')
+})

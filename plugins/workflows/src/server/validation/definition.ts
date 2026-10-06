@@ -3,6 +3,7 @@ import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { workflowDataProblems } from './dataSteps'
 import { gateFormDefinitionProblems } from '../workflowGateForm'
 import { declaredOutputSchema } from '../../shared/gateForm'
+import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../../shared/stepFields'
 import type {
@@ -257,6 +258,11 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
     if (!narrowsToolCeiling(def.tools, step.tools)) errors.push(`${label} tool ceiling widens the workflow ceiling`)
     errors.push(...validateBudget(`${label} budget`, step.budget))
     if (!budgetNarrows(def.budget, step.budget)) errors.push(`${label} budget widens the workflow budget`)
+    if (step.agent) {
+      const profile = step.agent.profileId ?? DEFAULT_PROFILE_ID
+      if (!catalog.profiles.has(profile)) errors.push(`${label} agent names unknown profile '${profile}'`)
+      else if (!managedProviderForProfile(profile)) errors.push(`${label} agent profile '${profile}' has no managed session driver`)
+    }
     if ((catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       const profileId = step.profileId ?? DEFAULT_PROFILE_ID
       if (!catalog.profiles.has(profileId)) errors.push(`${label} names unknown profile '${profileId}'`)

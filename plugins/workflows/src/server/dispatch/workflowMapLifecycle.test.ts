@@ -6,6 +6,10 @@ import * as schema from '../../node/schema'
 import type { ResolvedWorkflowGraph, WorkflowDef } from '../../shared/workflowContracts'
 import { WorkflowDispatcher } from './dispatcher'
 import { WorkflowRunner, type RunnerDeps } from '../runs/runner'
+import { resolveWorkflowGraph } from '../definitions/resolution'
+import { prepareWorkflowReprocess } from '../processing/reprocess'
+import { workflowSelectionPage } from '../processing/readModel'
+import { workflowRunById, workflowRunsForTask } from '../runs/read/readModel'
 import { WorkflowProcessingStore } from '../processing/store'
 
 const result = (structuredOutput: unknown = null) => ({
@@ -135,6 +139,144 @@ describe('workflow map lifecycle', () => {
     await vi.waitFor(async () => expect(statuses).toContain((await runner.run(runId))?.status), { timeout: 10_000 })
     return (await runner.run(runId))!
   }
+
+  const agentDefinition = (onFailure: 'continue' | 'stop' = 'continue'): WorkflowDef => {
+    const root = mapDefinition()
+    const loop = root.steps[1]
+    delete loop.childWorkflow
+    loop.agent = { prompt: 'Fix the current issue and verify the change.', profileId: DEFAULT_PROFILE_ID,
+      configOptions: { model: 'opus', reasoning: 'high' }, schema: { type: 'object' }, onFailure }
+    return root
+  }
+  const agentGraph = (runner: WorkflowRunner, root: WorkflowDef) => resolveWorkflowGraph(store.db, root, {
+    scope: { workspaceId: 'w', projectId: 'p', repoDir: null, userDir: null }, catalog: runner.validationCatalog(),
+  })
+
+  it('runs separate item sessions sequentially in the parent task and retries only the failed item', async () => {
+    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }, { id: 'three', number: 'ABC-3' }]
+    let release = () => {}
+    const blocked = new Promise<void>(resolve => { release = resolve })
+    let releaseThird = () => {}
+    const thirdBlocked = new Promise<void>(resolve => { releaseThird = resolve })
+    const seen: { taskId: string; stepId: string; item: string; session: string }[] = []
+    let fail = true
+    const { runner } = makeRunner(tickets, {
+      runStep: async (taskId, def, opts) => {
+        if (def.name === 'source') return result({ tickets })
+        const item = opts.context!.find(part => part.label === 'Current item')!.content
+        const session = opts.managedSessionId ?? `session-${opts.workflowStepId}`
+        seen.push({ taskId, stepId: opts.workflowStepId!, item, session })
+        expect(opts.profileId).toBe(DEFAULT_PROFILE_ID)
+        expect(def.configOptions).toEqual({ model: 'opus', reasoning: 'high' })
+        expect(opts.requireManagedSession).toBe(true)
+        expect(opts.sessionTitle).toContain(JSON.parse(item).number)
+        opts.onEvent?.({ type: 'managed-agent', sessionId: session })
+        if (seen.length === 1) await blocked
+        if (seen.length === 3) await thirdBlocked
+        return fail && item.includes('ABC-2')
+          ? { ...result(), status: 'error', exitCode: 1, stderrTail: 'Could not fix this issue' }
+          : result({ fixed: JSON.parse(item).id })
+      },
+    })
+    const root = agentDefinition()
+    const runId = await runner.start('parent-task', root, { resolvedGraph: await agentGraph(runner, root) })
+    await vi.waitFor(() => expect(seen).toHaveLength(1))
+    const loop = (await runner.steps(runId)).find(row => row.name === 'dispatch')!
+    await vi.waitFor(() => {
+      const page = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id)
+      expect(page.counts.running).toBe(1)
+      expect(page.records.map(row => row.status)).toEqual(['running', 'waiting', 'waiting'])
+      expect(page.records[0].agentSessionId).toBe(seen[0].session)
+    })
+    expect(taskIds.size).toBe(0)
+    release()
+    await vi.waitFor(() => expect(seen).toHaveLength(3))
+    const inFlightFailure = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records[1]
+    expect(await runner.retryStep(inFlightFailure.runId!, inFlightFailure.retryStepId!)).toMatchObject({ ok: false, error: expect.stringContaining('Another item') })
+    expect(() => prepareWorkflowReprocess(store.db, runId, inFlightFailure.id)).toThrow('Another item')
+    releaseThird()
+    await waitForRun(runner, runId, ['completed-with-failures'])
+    expect(seen.map(row => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three'])
+    expect(seen.every(row => row.taskId === 'parent-task')).toBe(true)
+    expect(new Set(seen.map(row => row.stepId)).size).toBe(3)
+    expect(new Set(seen.map(row => row.session)).size).toBe(3)
+    const outcomes = JSON.parse((await runner.steps(runId)).find(row => row.id === loop.id)!.structuredJson!).children
+    expect(outcomes.map((row: { result: unknown }) => row.result)).toMatchObject([{ fixed: 'one' }, { status: 'error', stderrTail: 'Could not fix this issue' }, { fixed: 'three' }])
+    expect((await workflowRunsForTask(store.db, 'parent-task')).map(row => row.id)).toEqual([runId])
+    expect(await workflowRunById(store.db, outcomes[1].runId)).not.toBeNull()
+    fail = false
+    const failed = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records[1]
+    expect(await runner.retryStep(failed.runId!, failed.retryStepId!)).toEqual({ ok: true })
+    await waitForRun(runner, runId, ['done'])
+    expect(seen.map(row => JSON.parse(row.item).id)).toEqual(['one', 'two', 'three', 'two'])
+    expect(seen[3].session).toBe(seen[1].session)
+    expect(taskIds.size).toBe(0)
+  })
+
+  it.each(['stop', 'cancel'] as const)('retains queued records when the agent loop must %s', async mode => {
+    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    let started = 0
+    const cancelSession = vi.fn(async () => {})
+    const { runner } = makeRunner(tickets, {
+      cancelAgentSession: cancelSession,
+      runStep: async (_taskId, def, opts) => {
+        if (def.name === 'source') return result({ tickets })
+        started++
+        opts.onEvent?.({ type: 'managed-agent', sessionId: 'working-session' })
+        if (mode === 'cancel') await new Promise<void>(resolve => opts.signal!.addEventListener('abort', () => resolve(), { once: true }))
+        return { ...result(), status: 'error', exitCode: 1, stderrTail: 'Fix failed' }
+      },
+    })
+    const root = agentDefinition('stop')
+    const runId = await runner.start('parent-task', root, { resolvedGraph: await agentGraph(runner, root) })
+    await vi.waitFor(() => expect(started).toBe(1))
+    if (mode === 'cancel') {
+      await runner.cancelRun(runId)
+      expect(cancelSession).toHaveBeenCalledWith('parent-task', 'working-session')
+    }
+    await waitForRun(runner, runId, [mode === 'cancel' ? 'cancelled' : 'completed-with-failures'])
+    expect(started).toBe(1)
+    const dispatches = store.db.select().from(schema.workflowDispatches).all()
+    expect(dispatches).toHaveLength(2)
+    expect(dispatches.every(row => row.state === 'terminal' && row.taskId === 'parent-task')).toBe(true)
+    expect(await runner.run(dispatches[1].runId)).toBeUndefined()
+    expect(cancelledTasks).toEqual([])
+    expect(taskIds.size).toBe(0)
+  })
+
+  it('stops interrupted item work for review after restart without opening a duplicate session', async () => {
+    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    let calls = 0
+    const first = makeRunner(tickets, { runStep: async (_taskId, def, opts) => {
+      if (def.name === 'source') return result({ tickets })
+      calls++
+      opts.onEvent?.({ type: 'managed-agent', sessionId: 'original-session' })
+      // Simulate the execution disappearing while its durable row remains running.
+      return new Promise(() => {})
+    } })
+    const root = agentDefinition()
+    const runId = await first.runner.start('parent-task', root, { resolvedGraph: await agentGraph(first.runner, root) })
+    await vi.waitFor(() => expect(store.db.select().from(schema.workflowSteps).all().some(row => row.agentSessionId === 'original-session')).toBe(true))
+    first.runner.stop()
+    const recovered = makeRunner([], { runStep: async (_task, _def, opts) => {
+      calls++
+      expect(opts.managedSessionId).toBe('original-session')
+      return result({ fixed: true })
+    } })
+    await recovered.dispatcher.reconcile()
+    await recovered.runner.reconcile()
+    await waitForRun(recovered.runner, runId, ['completed-with-failures'])
+    expect(calls).toBe(1)
+    const loop = (await recovered.runner.steps(runId)).find(row => row.name === 'dispatch')!
+    const records = workflowSelectionPage(store.db, runId, undefined, -1, 100, loop.id).records
+    expect(records[0]).toMatchObject({ agentSessionId: 'original-session', status: 'failed', reason: expect.stringContaining('Interrupted during restart') })
+    expect(records[1].status).toBe('cancelled')
+    expect(await recovered.runner.retryStep(records[0].runId!, records[0].retryStepId!)).toEqual({ ok: true })
+    await waitForRun(recovered.runner, runId, ['completed-with-failures'])
+    await vi.waitFor(() => expect(calls).toBe(2))
+    expect(store.db.select().from(schema.workflowDispatches).all()).toHaveLength(2)
+    expect(taskIds.size).toBe(0)
+  })
 
   it.each([0, 1, 12])('maps %i structured items in source order', async (count) => {
     const tickets = Array.from({ length: count }, (_, index) => ({ id: `id-${index}`, number: `ABC-${index + 1}` }))

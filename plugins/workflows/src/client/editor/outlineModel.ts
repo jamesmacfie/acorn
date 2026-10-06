@@ -57,7 +57,8 @@ export function stepSummary(step: WorkflowStepDef, def: WorkflowDef, catalog: Wo
   }
   if (kind === 'workflow-map') {
     const source = def.steps.find(candidate => stepIdentity(candidate) === step.items?.step)?.name ?? 'chosen records'
-    return `For each result from ${source}, run ${targetName(step, catalog)}.`
+    return step.agent ? `For each result from ${source}, start an agent session.`
+      : `For each result from ${source}, run ${targetName(step, catalog)}.`
   }
   if (kind === 'workflow') return `Run ${targetName(step, catalog)}.`
   if (kind === 'if') return step.condition ? `If ${conditionLabel(step.condition, def)}` : conditionLabel(undefined, def)

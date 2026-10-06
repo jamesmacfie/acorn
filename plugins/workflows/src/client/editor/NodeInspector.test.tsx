@@ -212,6 +212,23 @@ describe('runtime workflow fields', () => {
     { id: 'workflow-map', pluginId: null, describe: { label: 'Map to workflows', description: 'Run child workflows.', icon: 'git-fork', output: { description: 'Child results.' }, fields: [{ id: 'childWorkflow', label: 'Child workflow', type: 'child-workflow' }] } },
   ]
 
+  it('configures item sessions with harness options in the shared parent folder', () => {
+    mount({ baseline: 'acorn-1', formatVersion: 1, name: 'w', steps: [
+      { id: 'source', name: 'Source', schema: { type: 'object' } },
+      { id: 'loop', name: 'Fix issues', kind: 'workflow-map', after: ['source'], items: { step: 'source', pointer: '/issues' },
+        agent: { prompt: 'Fix this issue.', profileId: 'claude-code', configOptions: { reasoning: 'high' } } },
+    ] }, kinds, 'loop')
+    expect(labels('button.ui-select')).toEqual(expect.arrayContaining(['Run', 'Harness', 'Model', 'Reasoning', 'On failure']))
+    expect(labels('button.ui-select')).not.toContain('Child workflow')
+    expect(host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt"]')?.value).toBe('Fix this issue.')
+    expect(host.querySelector('[aria-label="Where it runs"]')).toBeNull()
+    expect(host.textContent).toContain("parent task's folder and branch")
+    const prompt = host.querySelector<HTMLTextAreaElement>('textarea[aria-label="Prompt"]')!
+    prompt.value = 'Fix and test this issue.'
+    prompt.dispatchEvent(new Event('input', { bubbles: true }))
+    expect(noActions.setStep).toHaveBeenLastCalledWith('loop', { agent: expect.objectContaining({ prompt: 'Fix and test this issue.', configOptions: { reasoning: 'high' } }) })
+  })
+
   it('offers the scoped child target and its declared required input', () => {
     mount({ baseline: 'acorn-1' as const, formatVersion: 1 as const,
       name: 'w',

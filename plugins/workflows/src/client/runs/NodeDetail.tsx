@@ -361,6 +361,7 @@ export default function NodeDetail(props: { task: Task; model: RunPaneModel }) {
                         tasks={tasks.data ?? []}
                         initialRecordId={searchValue(search.workflowRecord)}
                         onOpen={openTaskTarget}
+                        onOpenSession={openAgentPane}
                       />
                     )}
                   </Show>

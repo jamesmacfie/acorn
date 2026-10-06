@@ -34,7 +34,7 @@ inside the outer graph.
 
 ## Child workflow tasks
 
-`workflow` starts one saved workflow in a child task. `workflow-map` reads an array from a structured
+`workflow` starts one saved workflow in a child task. `workflow-map` with `childWorkflow` reads an array from a structured
 predecessor and starts one child task for each item. Before a root run starts, the Node resolves every
 database, repository, and user reference in the task's project scope. It validates the supplied or
 defaulted child inputs, applies repository trust, and freezes the resolved graph with the run. An edit
@@ -72,13 +72,44 @@ dispatch path and reuses the task, run, roster, and frozen graph. Successful sib
 The original absolute deadline still applies. A restart keeps unknown-usage turn reservations counted.
 
 The editor's **Ask AI for a list, then run each** shortcut inserts a structured agent plan and a For each
-step as one undoable draft edit. Select the child workflow and bind its inputs in the inspector. The
+step as one undoable draft edit. Configure its item agent in the inspector, or select **Child workflow**
+and bind the saved workflow’s inputs. The
 plan declares stable item IDs and accepts an empty array. Removed execution kinds receive an upgrade
 diagnostic; they do not execute. Ordinary graph convergence uses `after` edges.
 
 This replay protection is limited to one root run. Starting a fresh root can process the same
 business item again; cross-run business deduplication is deliberately not part of workflow dispatch.
 
+
+## Agent sessions for each item
+
+For each can run an agent directly with `agent` instead of `childWorkflow`. Each item gets a
+separate managed agent session in the parent task’s folder and branch. It creates no child task or
+worktree. Sessions run sequentially in source order. The prompt receives the complete current item
+as a **Current item** context part, alongside the parent task context. It uses plain text rather
+than item template expressions.
+
+The agent configuration accepts `prompt`, `profileId`, `model`, `configOptions`, an optional
+structural result `schema`, and `onFailure`. Harness, model, reasoning effort, and other advertised
+options use the same controls as an ordinary agent step. Only harnesses with managed sessions are
+accepted. The Agents plugin must be enabled; this target fails if session execution is unavailable.
+
+`onFailure` defaults to `continue`, which runs the remaining items and reports partial failures.
+`stop` retains the remaining items as cancelled, without starting their sessions. Cancellation stops
+the active session and queued items. Files already edited stay in the parent folder.
+
+Each item uses a frozen, terminal one-agent run internally so dispatch reservations, usage budgets,
+record history, cancellation, and retry retain one lifecycle owner. These runs appear through item
+history rather than as separate entries in the task’s workflow list. The ordered `children` output
+includes each item’s status, `agentSessionId`, `result`, error, and declared outputs. Item history
+has **Open session**, **Open item run**, and **Retry attempt** actions. Retrying a failed attempt
+reuses its session and frozen item; successful items remain done. Retry and **Run again** reject an
+item while another item session is active in the task.
+
+After a restart, an item whose agent was running becomes failed with an interruption message.
+Queued items are cancelled. Review the session and working tree before retrying the interrupted
+item or using **Run again** on an unstarted item. Recovery never automatically sends another turn
+to an interrupted session.
 
 ## Client run refreshes and live output
 

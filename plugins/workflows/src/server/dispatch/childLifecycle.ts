@@ -113,7 +113,7 @@ export class WorkflowChildLifecycle {
 
   mapHandler(): StepHandler {
     return async (ctx) => {
-      if (ctx.def.kind !== 'workflow-map' || !ctx.def.childWorkflow) {
+      if (ctx.def.kind !== 'workflow-map' || (!ctx.def.childWorkflow && !ctx.def.agent)) {
         return { status: 'failed', error: `Step '${ctx.def.name}' is not a workflow-map step.` }
       }
       const snapshot = this.childSnapshot(ctx.run, stepIdentity(ctx.def))
@@ -221,7 +221,7 @@ export class WorkflowChildLifecycle {
     }
   }
 
-  private async waitForChild(
+  async waitForChild(
     parentRunId: string,
     childRunId: string,
     signal: AbortSignal,
@@ -350,6 +350,8 @@ export class WorkflowChildLifecycle {
       itemKey: dispatch.itemKey,
       taskId: dispatch.taskId,
       runId: dispatch.runId,
+      ...(dispatch.taskMode === 'parent' ? { taskMode: 'parent', agentSessionId: result?.agentSessionId ?? steps.find(step => step.agentSessionId)?.agentSessionId ?? null,
+        result: result ? JSON.parse(result.structuredJson ?? result.resultJson!) : null } : {}),
       name: run?.name ?? null,
       dispatchState: dispatch.state as WorkflowChildRunSummary['dispatchState'],
       runStatus: asRunStatus(run?.status),

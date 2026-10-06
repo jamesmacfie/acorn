@@ -57,7 +57,7 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
     },
   },
   {
-    note: 'A structured plan can return zero items. Select a published child workflow, then add For each using /items and the stable /id key. Do not infer identity from array position.',
+    note: 'A structured plan can return zero items. For each runs a separate agent session in the parent folder, using /items and the stable /id key. Do not infer identity from array position.',
     def: {
       baseline: ACORN_BASELINE,
       formatVersion: 1,
@@ -68,6 +68,10 @@ export const BUILTIN_EXAMPLES: readonly { def: WorkflowDef; note: string }[] = [
         schema: { type: 'object', required: ['items'], properties: {
           items: { type: 'array', items: { type: 'object', required: ['id', 'title'], properties: { id: { type: 'string' }, title: { type: 'string' } } } },
         } },
+      }, {
+        id: 'update', name: 'Update each package', kind: 'workflow-map', after: ['plan'],
+        items: { step: 'plan', pointer: '/items' }, itemKey: '/id',
+        agent: { prompt: 'Update the package described by the current item, run the relevant checks, and report what changed.', onFailure: 'continue' },
       }],
     },
   },

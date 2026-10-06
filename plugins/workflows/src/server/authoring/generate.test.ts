@@ -91,7 +91,7 @@ it('keeps generation, edit, and repair prompt bytes stable', () => {
     problems: ['Step A has no predecessor.'],
   })
   expect([digest(system), digest(user), digest(repair)]).toEqual([
-    'bb3ccd41c35e6e678070e1205280a814255268824430cab0fa32bc89a81d768e',
+    'c666458bd178a8de8c0aa3c9030adbe8a7946d87446d99a97ece249415e62b0c',
     '7c05d99245a0227ce0871974a643edd54542ede256f4b4d76eb6a24a402d45bd',
     'd56c93453b6719c4f1ee299d50d01ad01cfc928c1e305cc263411b60199b003a',
   ])
@@ -293,9 +293,9 @@ describe('saved child workflows in the prompt', () => {
     expect(text).toContain('`summary`: {"type":"object"')
   })
 
-  it('forbids dispatch when the scoped catalog is empty', () => {
+  it('allows item sessions without saved child workflows', () => {
     expect(renderWorkflowTargets(catalog({ workflows: [] })))
-      .toContain('Do not write a `workflow` or `workflow-map` step.')
+      .toContain('Use `workflow-map` with `agent` for separate sessions in the parent task.')
   })
 })
 
@@ -317,9 +317,10 @@ describe('the built-in worked examples', () => {
   // is something the runner handles. Both are wrong only against what the prose says, so the prose
   // and the examples are what these check against each other.
 
-  it('allows empty structured plans and requires For each to select a workflow', () => {
+  it('allows empty structured plans and both For each targets', () => {
     expect(prompt()).toContain('An empty array succeeds without tasks.')
-    expect(prompt()).toContain('Choose childWorkflow.ref from the available workflow catalog')
+    expect(prompt()).toContain('choose childWorkflow.ref from the available workflow catalog')
+    expect(prompt()).toContain('For separate sessions in the parent task, set agent:')
     expect(prompt()).not.toContain('Plan emitted no task list')
   })
 
@@ -336,7 +337,7 @@ describe('the built-in worked examples', () => {
 
   it('teaches a stable-key structured plan without a second execution mechanism', () => {
     const second = BUILTIN_EXAMPLES[1]!.def
-    expect(second.steps.map(step => step.kind)).toEqual(['agent'])
+    expect(second.steps.map(step => step.kind)).toEqual(['agent', 'workflow-map'])
     expect(second.steps[0]!.schema).toMatchObject({ properties: { items: { items: { required: ['id', 'title'] } } } })
   })
 })

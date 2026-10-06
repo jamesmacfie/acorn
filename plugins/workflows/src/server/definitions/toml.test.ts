@@ -160,6 +160,36 @@ binding_json = '{"address":{"from":"item","pointer":"/number"}}'
     expect(staticStep?.steps[0].childWorkflow).toBeUndefined()
   })
 
+  it('round trips agent item configuration and session titles', () => {
+    const { parsed, again } = roundTrip(`
+format_version = 1
+baseline = "acorn-1"
+name = "fix issues"
+[[steps]]
+id = "find"
+name = "find"
+schema_json = '{"type":"object"}'
+[[steps]]
+id = "fix"
+name = "fix"
+kind = "workflow-map"
+item_key = "/id"
+[steps.items]
+step = "find"
+pointer = "/issues"
+[steps.agent]
+prompt = "Fix the current item."
+profile = "codex"
+config_options = { model = "code-model", reasoning = "high" }
+on_failure = "stop"
+schema_json = '{"type":"object","properties":{"fixed":{"type":"boolean"}}}'
+`)
+    expect(again).toEqual(parsed)
+    expect(again.steps[1].agent).toMatchObject({ prompt: 'Fix the current item.', profileId: 'codex',
+      configOptions: { model: 'code-model', reasoning: 'high' }, onFailure: 'stop', schema: { type: 'object' } })
+    expect(again.steps[1].childWorkflow).toBeUndefined()
+  })
+
   it('round trips a gate form with typed fields, defaults and bindings', () => {
     const { parsed, written, again } = roundTrip(`
 format_version = 1

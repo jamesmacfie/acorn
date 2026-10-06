@@ -25,6 +25,7 @@ const httpKind: StepKindDescription = {
 const catalog: WorkflowCatalog = {
   kinds: [
     ...BUILTIN_STEP_KINDS.map((id) => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
+    ...['workflow', 'workflow-map'].map(id => ({ id, pluginId: null, describe: BUILTIN_STEP_DESCRIPTIONS[id] ?? null })),
     { id: 'http:request', pluginId: 'http', describe: httpKind },
     // A contributed kind with no description at all: its `with` is unreadable, so nothing in it is dropped.
     { id: 'notes:write', pluginId: 'notes', describe: null },

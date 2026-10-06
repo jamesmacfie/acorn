@@ -213,6 +213,13 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     policy: str(o.policy),
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
+    agent: o.agent && typeof o.agent === 'object' ? (() => {
+      const a = o.agent as Record<string, unknown>
+      const unknown = Object.fromEntries(Object.entries(a).filter(([key]) => !['prompt', 'profile', 'model', 'config_options', 'schema_json', 'on_failure'].includes(key)))
+      return { ...unknown, prompt: a.prompt as string, profileId: str(a.profile), model: str(a.model),
+        configOptions: parseStringTable(a.config_options), schema: typeof a.schema_json === 'string' ? JSON.parse(a.schema_json) : undefined,
+        onFailure: a.on_failure as 'continue' | 'stop' | undefined }
+    })() : undefined,
     childWorkflow: parseChildWorkflow(o.child_workflow),
     items: parseMapSource(o.items),
     itemKey: typeof o.item_key === 'string' ? o.item_key : undefined,

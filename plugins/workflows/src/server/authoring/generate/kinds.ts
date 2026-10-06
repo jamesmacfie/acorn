@@ -26,6 +26,7 @@ const SECTION_KINDS_PREAMBLE = [
   'Find records query is {kind:"saved",queryId,revision,bindings} or {kind:"inline",content,bindings}. Each binding uses {address:{from:"input",name,pointer}} or {address:{from:"step",stepId,pointer}}.',
   'Get record details record binds the exact /ref object, retaining its scope. If condition is {kind:"comparison",left:<binding>,operator:"eq",right:{address:{from:"literal",value:true}}}, or a bounded all/any group of predicates.',
   '',
+  'For each (workflow-map) chooses exactly one target: agent or childWorkflow. agent is {prompt, profileId?, schema?, onFailure?: "continue" | "stop"}. It starts separate managed sessions, sequentially, in the parent task’s folder. Each session automatically receives the current item as context. No saved child workflow is needed. The agent prompt is plain text, without template references.',
   'A kind marked "runs an agent" may also take `profileId`, `isolation` and `inputs`. On any other',
   'kind `isolation` and `inputs` are errors and `profileId` does nothing, so leave all three off.',
 ].join('\n')
@@ -60,6 +61,7 @@ const fieldLine = (field: PromptField, prefix: string, detail: KindDetail): stri
 /** Built-in keys that the editor draws as graph edges rather than form controls. The model needs
  *  these keys, but adding them to `describe` would create unusable inspector fields. */
 const UNDESCRIBED_FIELDS: Readonly<Record<string, readonly PromptField[]>> = {
+  'workflow-map': [{ id: 'agent', shape: 'agent configuration object', hint: 'Choose agent or childWorkflow, never both. Model and effort are chosen in the editor.' }],
   decide: [{ id: 'branches', shape: 'object of verdict to downstream step ID, required', hint: 'Section 4 shows one.' }],
   if: [{ id: 'branches', shape: 'object with true and otherwise keys naming downstream step IDs, required', hint: 'Deterministic condition; no AI call. condition uses the shared typed predicate and bindings.' }],
 }

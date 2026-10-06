@@ -43,6 +43,7 @@ export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
         requiresRun: _requiresRun,
         tools: hiddenTools,
         childWorkflow: hiddenWorkflow,
+        agent: hiddenAgent,
         with: hiddenWith,
         ...safe
       } = step
@@ -52,6 +53,7 @@ export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
         : undefined
       return {
         ...safe,
+        ...(hiddenAgent ? { agent: { prompt: hiddenAgent.prompt, profileId: hiddenAgent.profileId, schema: hiddenAgent.schema, onFailure: hiddenAgent.onFailure } } : {}),
         ...(stepTools ? { tools: stepTools } : {}),
         ...(hiddenWorkflow ? {
           childWorkflow: { inputs: hiddenWorkflow.inputs },
@@ -82,7 +84,7 @@ export function restoreProtectedWorkflowTargets(current: WorkflowDef, changed: W
     ...changed,
     steps: changed.steps.map((step) => {
       const before = protectedSourceFor(current, changed, step)
-      if (!before?.childWorkflow) return step
+      if (!before?.childWorkflow || step.agent) return step
       return {
         ...step,
         childWorkflow: {
@@ -110,6 +112,9 @@ export function restoreProtectedDefinition(current: WorkflowDef, changed: Workfl
     let next: WorkflowStepDef = { ...step, tools: restoreTools(before.tools, step.tools) }
     for (const key of ['model', 'configOptions', 'requiresRun'] as const) {
       if (Object.hasOwn(before, key)) next = { ...next, [key]: before[key] }
+    }
+    if (before.agent && next.agent) {
+      next = { ...next, agent: { ...next.agent, model: before.agent.model, configOptions: before.agent.configOptions } }
     }
     const protectedWith = Object.fromEntries(
       SCRUBBED_WITH_KEYS.filter((key) => before.with && Object.hasOwn(before.with, key)).map((key) => [key, before.with![key]]),

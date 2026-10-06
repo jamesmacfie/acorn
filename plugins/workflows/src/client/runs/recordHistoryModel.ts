@@ -13,6 +13,7 @@ export const recordStatus = (row: WorkflowRecordHistory): string => {
   if (row.decision === 'active') return ['reserved', 'task-created', 'run-started', 'running', 'cancelling'].includes(row.status ?? '')
     ? 'Running elsewhere'
     : 'Skipped while another attempt was active'
+  if (row.status === 'waiting') return 'Waiting'
   if (row.status === 'gated') return 'Needs approval'
   if (row.decision === 'baseline') return 'Baseline only'
   if (row.decision === 'seen') return 'Previously processed'
@@ -37,4 +38,4 @@ export const recordCanRetry = (row: WorkflowRecordHistory): boolean =>
   !!row.runId && !!row.retryStepId && ['failed', 'safety-rail', 'completed-with-failures'].includes(row.status ?? '')
 
 export const recordCanReprocess = (row: WorkflowRecordHistory): boolean =>
-  !!row.attemptId && !['reserved', 'task-created', 'run-started', 'running', 'gated', 'cancelling'].includes(row.status ?? '')
+  !!row.attemptId && !['waiting', 'reserved', 'task-created', 'run-started', 'running', 'gated', 'cancelling'].includes(row.status ?? '')

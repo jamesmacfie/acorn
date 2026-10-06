@@ -23,6 +23,8 @@ export type RunStepOptions = HeadlessOpts & {
   tools?: ToolCeiling
   workflowRunId?: string
   workflowStepId?: string
+  sessionTitle?: string
+  requireManagedSession?: boolean
   managedSessionId?: string
   timeoutMs?: number
 }

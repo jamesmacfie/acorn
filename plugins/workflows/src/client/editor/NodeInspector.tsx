@@ -296,6 +296,7 @@ export default function NodeInspector(props: {
                     def={def()}
                     step={current()}
                     catalog={props.catalog}
+                      providers={props.providers}
                     disabled={props.readOnly}
                     onChange={(patch) => props.actions.setStep(stepIdentity(current()), patch)}
                     onCreateChild={(schema) => props.actions.createChild(stepIdentity(current()), schema)}

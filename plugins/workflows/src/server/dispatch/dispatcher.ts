@@ -1,4 +1,5 @@
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
+import { AGENT_MAP_INTERRUPTED } from '../../shared/agentMap'
 import { randomUUID } from 'node:crypto'
 import { and, eq, inArray } from 'drizzle-orm'
 import type { CoreServices, PluginDatabase } from '@acorn/plugin-api/node'
@@ -32,6 +33,8 @@ type WorkflowDispatchPayload = {
   rootReprocess?: true
   reprocessSource?: { runId: string; stepId: string; recordId: string; digest: string }
   resolvedGraph?: ResolvedWorkflowGraph
+  taskMode?: 'child' | 'parent'
+  onFailure?: 'continue' | 'stop'
   parentTaskId: string
   rootRunId: string
   depth: number
@@ -50,6 +53,7 @@ export type WorkflowReprocessDispatchRequest = {
   sourceStepId: string
   sourceRecordId: string
   sourceDigest: string
+  taskMode?: 'child' | 'parent'
   parentTaskId: string
   itemKey: string
   task: WorkflowDispatchRequest['task']
@@ -64,7 +68,7 @@ export type WorkflowReprocessDispatchRequest = {
 type WorkflowDispatchRow = typeof schema.workflowDispatches.$inferSelect
 export type WorkflowTransaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 
-type WorkflowStarter = Pick<WorkflowRunner, 'start'> & Partial<Pick<WorkflowRunner, 'cancelRun'>>
+type WorkflowStarter = Pick<WorkflowRunner, 'start'> & Partial<Pick<WorkflowRunner, 'waitForRun'>> & Partial<Pick<WorkflowRunner, 'cancelRun'>>
 type ChildTaskCreator = Pick<CoreServices['tasks'], 'createChild'>
 
 type WorkflowDispatchAuthority = {
@@ -101,7 +105,26 @@ export class WorkflowDispatcher {
 
   async resumeMany(rows: readonly WorkflowDispatchRow[], signal?: AbortSignal): Promise<WorkflowDispatchResult[]> {
     const results: WorkflowDispatchResult[] = []
-    for (const row of rows) results.push(await this.resume(row, signal))
+    for (const [index, row] of rows.entries()) {
+      const result = await this.resume(row, signal)
+      results.push(result)
+      const hasRun = row.taskMode === 'parent' && this.db.select({ id: schema.workflowRuns.id })
+        .from(schema.workflowRuns).where(eq(schema.workflowRuns.id, row.runId)).get() != null
+      if (row.taskMode === 'parent' && (result.state !== 'terminal' || hasRun)) {
+        if (!this.runner.waitForRun) throw new Error('Agent loop completion tracking is unavailable.')
+        const outcome = await this.runner.waitForRun(row.parentRunId, row.runId, signal ?? new AbortController().signal)
+        const payload = JSON.parse(row.payloadJson) as WorkflowDispatchPayload
+        const interrupted = 'error' in outcome && outcome.error?.includes(AGENT_MAP_INTERRUPTED)
+        if (outcome.status === 'cancelled' || interrupted || (payload.onFailure === 'stop' && outcome.status !== 'done')) {
+          for (const pending of rows.slice(index + 1)) {
+            await this.db.update(schema.workflowDispatches).set({ state: 'terminal', error: 'Not started because the preceding agent stopped.', updatedAt: Date.now() })
+              .where(and(eq(schema.workflowDispatches.id, pending.id), inArray(schema.workflowDispatches.state, ['reserved', 'task-created'])))
+            results.push({ taskId: pending.taskId, runId: pending.runId, state: 'terminal' })
+          }
+          break
+        }
+      }
+    }
     return results
   }
 
@@ -113,6 +136,7 @@ export class WorkflowDispatcher {
     const errors: string[] = []
     let reconciled = 0
     for (const row of rows) {
+      if (row.taskMode === 'parent') continue // The parent loop owns ordered admission on recovery.
       try {
         await this.resume(row)
         reconciled += 1
@@ -160,6 +184,7 @@ export class WorkflowDispatcher {
         const envelope = childSafetyEnvelope(parent, dispatchDefinition, request.workflow, reservationAt)
 
         const payload: WorkflowDispatchPayload = {
+          ...(dispatchDefinition.agent ? { taskMode: 'parent', onFailure: dispatchDefinition.agent.onFailure ?? 'continue' } : {}),
           parentTaskId: parent.taskId,
           rootRunId: parent.rootRunId ?? parent.id,
           depth: parent.depth + 1,
@@ -206,7 +231,8 @@ export class WorkflowDispatcher {
           payloadFingerprint,
           payloadJson,
           parentTaskId: payload.parentTaskId,
-          taskId: this.id(),
+          taskMode: payload.taskMode ?? 'child',
+          taskId: payload.taskMode === 'parent' ? parent.taskId : this.id(),
           runId: this.id(),
           rootRunId: payload.rootRunId,
           parentRunId: request.parentRunId,
@@ -242,6 +268,7 @@ export class WorkflowDispatcher {
           recordId: request.sourceRecordId,
           digest: request.sourceDigest,
         },
+        ...(request.taskMode === 'parent' ? { taskMode: 'parent' as const } : {}),
         parentTaskId: request.parentTaskId,
         // Kept for the shared persisted payload shape. The invocation below deliberately starts a
         // new root and uses the reserved run ID as its accounting owner.
@@ -278,7 +305,8 @@ export class WorkflowDispatcher {
         payloadFingerprint,
         payloadJson: JSON.stringify(payloadBase satisfies WorkflowDispatchPayload),
         parentTaskId: request.parentTaskId,
-        taskId: this.id(),
+        taskMode: request.taskMode ?? 'child',
+        taskId: request.taskMode === 'parent' ? request.parentTaskId : this.id(),
         runId,
         rootRunId: runId,
         parentRunId: request.sourceRunId,
@@ -303,7 +331,7 @@ export class WorkflowDispatcher {
         await this.assertAdmission(row, signal)
         await this.assertAuthority(row, payload)
         if (row.state === 'reserved') {
-          await this.tasks.createChild(row.parentTaskId, { ...payload.task, origin: payload.task.origin ?? 'workflows:child' }, row.taskId)
+          if (row.taskMode !== 'parent') await this.tasks.createChild(row.parentTaskId, { ...payload.task, origin: payload.task.origin ?? 'workflows:child' }, row.taskId)
           await this.assertAdmission(row, signal)
           await this.assertAuthority(row, payload)
           row = await this.advance(row, 'task-created')
@@ -321,7 +349,7 @@ export class WorkflowDispatcher {
             parentStepId: payload.rootReprocess ? null : row.parentStepId,
             depth: payload.rootReprocess ? 0 : payload.depth,
           },
-          ...(payload.rootReprocess ? { trigger: 'reprocess' } : {}),
+          ...(row.taskMode === 'parent' ? { trigger: 'agent-map' } : payload.rootReprocess ? { trigger: 'reprocess' } : {}),
           effectiveTools: payload.effectiveTools,
           effectiveBudget: payload.effectiveBudget,
           deadlineAt: payload.deadlineAt,

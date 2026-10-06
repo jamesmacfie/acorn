@@ -23,6 +23,7 @@ export function childWorkflowDefinition(parentName: string, itemSchema: DataSche
 /** Configure the parent in the same edit that creates the child, including typed current-record prefill. */
 export function connectCreatedChild(step: WorkflowStepDef, childId: string): Partial<WorkflowStepDef> {
   return {
+    agent: undefined,
     childWorkflow: {
       ref: { source: 'database', id: childId },
       inputs: {
