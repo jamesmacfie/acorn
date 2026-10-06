@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
 | [dashboards/](./dashboards/README.md) | The panel studio: a launcher, a full-window studio with an outline, live preview, and inspector, a docked AI that reviews proposals on the plan, and quick edits from the panel menu. Then derived sources: plugin sources built from other sources' data with the plugin's own logic, with host-mediated reads, input approval, an SDK, and a dev loop. Twelve phases. | Proposed, 2026-10-05; all twelve phases shipped 2026-10-05, with phase 8's GitHub branch source move left open. Replaces the dashboards workstreams, which shipped by 2026-10-04. |
