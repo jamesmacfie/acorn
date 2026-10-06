@@ -7,8 +7,6 @@ import { workflowFileAuthoring } from '../files/authoring'
 import { workflowDraftQueries } from '../publication/draftQueries'
 import { workflowPublication } from '../publication/service'
 import { publishedWorkflow } from '../publication/store'
-import { generateWorkflowRequest } from '../authoring/generationRequest'
-import { authorWorkflowConversation } from '../authoring/conversation'
 import { validateWorkflow } from '../validation/definition'
 import type { WorkflowDefsBridge } from '../routes/defs'
 import type { WorkflowRunner, WorkflowDef } from '../runs/runner'
@@ -150,6 +148,7 @@ export const workflowDefinitions = (
         return { error: 'The selected project is not in this workspace.' }
       }
       const catalog = await starts.generationCatalog(request.projectId, request.defId)
+      const { generateWorkflowRequest } = await import('../authoring/generationRequest')
       return generateWorkflowRequest({
         request,
         catalog,
@@ -167,6 +166,7 @@ export const workflowDefinitions = (
         throw new Error('The selected project is not in this workspace.')
       }
       const catalog = await starts.generationCatalog(projectId, request.targetId)
+      const { authorWorkflowConversation } = await import('../authoring/conversation')
       return authorWorkflowConversation({
         request,
         catalog,
