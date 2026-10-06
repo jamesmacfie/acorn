@@ -65,7 +65,8 @@ console.log(`[service-budget] resolved at run time: ${list(staticBare)}; on firs
 if (bytes > limits.ceiling) {
   throw new Error(
     `The node service's static graph is ${bytes}B, over the ${limits.ceiling}B ceiling. Find what grew before raising it: `
-    + 'anything a boot does not need belongs behind a dynamic import in the plugin that owns it.',
+    + 'run pnpm --filter @acorn/node measure:service-graph [--why <path fragment>]. '
+    + 'Anything a boot does not need belongs behind a dynamic import in the plugin that owns it.',
   )
 }
 if (bytes < limits.floor) {

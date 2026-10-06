@@ -25,6 +25,12 @@ change requires review of the policy and its target fixtures.
 and its static imports pass a byte ceiling. Both builds write the license text of every bundled
 package beside their output, as `THIRD-PARTY-NOTICES.txt` and `helper-THIRD-PARTY-NOTICES.txt`.
 
+Run `pnpm --filter @acorn/node measure:service-graph` to find what contributes to the boot graph.
+It builds into a temporary directory, reports rendered module bytes by npm package and workspace
+folder, and lists the 50 largest modules. Add `--why smol-toml`, or another path fragment, to print
+the shortest static import chain from the service entry. Dynamic imports stay outside the module
+total. The chunk total includes import lines and generated glue, so it matches the budget check.
+
 The helper's production bundle enables Oxc minification in `apps/desktop/vite.helper.config.ts`. On
 October 2, 2026, it measured 269,402 B.
 
