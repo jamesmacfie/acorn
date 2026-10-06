@@ -20,7 +20,7 @@ const args = process.argv.slice(2)
 const dirFlag = args.indexOf('--dir')
 const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : args[dirFlag + 1])
 
-// The measured figure plus about 5%: 3,063,547 B on 2026-10-02, when the old 3,062,000 B ceiling
+// 3,063,547 B on 2026-10-02, when the old 3,062,000 B ceiling
 // stopped `pnpm dev:agent` from starting. Before that it was 2,916,482 B on 2026-09-29, and 48 KB of
 // that rise is jsdiff, which the agent drivers use to write each file change's hunks
 // (plugins/agents/src/server/drivers/patchText.ts). `floor` is a lower bound, not a target: a graph
@@ -30,7 +30,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-05: 3,277,281 B. Derived sources (dashboards phases 8 to 11) took the graph to 3,267,364 B,
 // which already stopped `pnpm dev:agent`, and the development mode of phase 12 adds about 10 KB. Both
 // are registration and checks a boot runs, so the ceiling moves rather than the code.
-const limits = { ceiling: 3_290_000, floor: 1_000_000 }
+// 2026-10-06: 3,296,190 -> 3,099,374 B after workflow AI authoring, Codex session code, the dashboard
+// sampler, and the plugin authoring renderer moved to first use. Ceiling: 3,290,000 -> 3,115,000 B.
+// The former 5% allowance bought about two weeks of growth at the measured rate. Even 2% would let
+// the 18,012 B authoring import return without failing, so about 0.5% keeps all four cuts protected.
+const limits = { ceiling: 3_115_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
