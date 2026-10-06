@@ -10,6 +10,7 @@ import { agentDriverRegistry } from '../server/drivers/registry'
 import { createHarnessRegistry } from '../server/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
+import { BEFORE_PERMISSION_HOOK } from '../contract/permissionHook.ts'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
@@ -134,7 +135,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         onRefreshed: () => ctx.events.send({ channel: pluginChannel('agents', 'usage-refreshed') }),
       })
 
-      // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,
+      // The first decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks). A prompt policy,
       // a redactor or a context injector registers a handler here; the point exists whether or not
       // anybody does, because declaring it is the consent.
       ctx.hooks.declare({
@@ -143,6 +144,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
       })
+      // The second: a harness permission request, before anyone sees it. Observe and veto only
+      // (../server/sessions/permissionPolicy.ts).
+      ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
 
       runtime = new ManagedAgentRuntime({
         db: store,

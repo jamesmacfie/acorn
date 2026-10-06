@@ -15,8 +15,10 @@ export type AgentWebhookEventType = 'completion' | 'attention'
 // inward, so there is exactly one vocabulary for "the agent did something a person cares about".
 export const webhookEventKind = (frame: AgentWsFrame): AgentWebhookEventType | null => {
   if (frame.channel !== 'agent:event') return null
-  const type = frame.event.event.type
-  return type === 'turn_completed' ? 'completion' : type === 'request' || type === 'error' ? 'attention' : null
+  const event = frame.event.event
+  // A request a policy plugin refused is already answered, so it asks nobody for anything.
+  const asks = event.type === 'request' && !event.blocked
+  return event.type === 'turn_completed' ? 'completion' : asks || event.type === 'error' ? 'attention' : null
 }
 
 export type AgentWebhook = {

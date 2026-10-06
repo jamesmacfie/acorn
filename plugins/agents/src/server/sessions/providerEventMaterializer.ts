@@ -62,7 +62,11 @@ export class ProviderEventMaterializer {
         byteSize: artifact.byteSize ?? undefined,
       }]
     }
-    const event = boundProviderEvent(providerEvent, this.secretValues)
+    // The subject and the parked-request handles stay in the driver's event; only the request is kept.
+    const event = boundProviderEvent(
+      providerEvent.type === 'permission_request' ? providerEvent.request : providerEvent,
+      this.secretValues,
+    )
     if (event.type === 'tool') {
       const key = `${sessionId}:${turnId ?? 'session'}:${event.tool.id}`
       if (event.tool.outputAppend && event.tool.output != null) {

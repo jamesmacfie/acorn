@@ -37,7 +37,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,115,487 B with startup phase call sites. Timing helpers and CLI auth/version probes
 // load on first use; the remaining labels and callbacks stay beside their operations. Add 1 KB,
 // keeping the previous lazy-import cuts protected.
-const limits = { ceiling: 3_116_000, floor: 1_000_000 }
+// 2026-10-07: 3,117,742 B with `agents:before-permission`. The policy step (about 3 KB) loads on the
+// first permission request; the hook declaration and the `blocked` branches in the request projection,
+// state reducers, webhook filter, and event bounds run on every boot or event. Add 2 KB.
+const limits = { ceiling: 3_118_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

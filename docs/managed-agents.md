@@ -65,6 +65,11 @@ These pages cover harnesses and the work agents do:
 
 - [App-access approval](./managed-agents/app-access.md): Computer Use consent for Codex.
 
+<a id="permission-policy"></a>
+
+- [Permission policy](./managed-agents/permission-policy.md): `agents:before-permission`, a plugin's
+  refusal of a harness permission request, and what it can't see.
+
 <a id="provider-native-subagents"></a>
 
 - [Subagents](./managed-agents/subagents.md): provider-native subagents.

@@ -70,6 +70,8 @@ const belongsInThread = (
 ): boolean => {
   if (event.type !== 'request') return true
   if (event.kind !== 'permission') return true
+  // A refusal by a policy plugin is the only record that the agent asked, so it stays.
+  if (event.blocked) return true
   const status = requestFor?.(event.requestId)?.status
   return status === 'pending' || status === 'resolving'
 }

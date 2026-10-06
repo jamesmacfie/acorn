@@ -216,11 +216,18 @@ const agentSnapshot = () => process.env.ACORN_FIXTURE_CODEX_PLAN ? ({
     event(3, { type: 'plan', entries: [{ id: 'step-1', text: 'Inspect code', status: 'completed' }] }),
     event(4, { type: 'plan_proposal', itemId: 'plan-1', providerTurnId: 'codex-turn-1',
       text: '1. Update the API\n2. Test the UI' }),
-    event(5, { type: 'turn_completed', stopReason: 'completed' }),
+    // Refused by a policy plugin before anyone saw it (docs/managed-agents/permission-policy.md).
+    event(5, { type: 'request', requestId: 'blocked-1', kind: 'permission', title: 'Allow command?',
+      blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' } }),
+    event(6, { type: 'turn_completed', stopReason: 'completed' }),
   ],
   requests: [{ id: 'question-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'question-1',
     kind: 'question', status: 'resolved', title: 'Shall I plan it?', detail: null, payload: {},
-    resolution: { answers: { go: 'Yes, plan it' } }, expiresAt: null, createdAt: 0, resolvedAt: 0 }],
+    resolution: { answers: { go: 'Yes, plan it' } }, expiresAt: null, createdAt: 0, resolvedAt: 0 }, {
+    id: 'blocked-1', sessionId: 'session-1', turnId: 'turn-1', providerRequestId: 'blocked-1',
+    kind: 'permission', status: 'resolved', title: 'Allow command?', detail: null, payload: { options: [] },
+    resolution: { blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' } },
+    expiresAt: null, createdAt: 0, resolvedAt: 0 }],
 }) : ({
   session: agentSessions()[0],
   turns: [AGENT_TURN],

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  codexPermissionSubject,
   codexServerRequestResponse,
   normalizeCodexNotification,
   normalizeCodexServerRequest,
@@ -367,5 +368,27 @@ describe('Codex web activity, unit cases', () => {
       status: 'failed',
       action: { type: 'search', query: 'q', queries: null },
     })).toMatchObject({ status: 'failed', web: { action: { type: 'search', queries: ['q'] } } })
+  })
+})
+
+describe('Codex permission subjects', () => {
+  it('maps commands, file changes and permission grants without inventing data', () => {
+    expect(codexPermissionSubject({ id: 1, method: 'item/commandExecution/requestApproval', params: {
+      itemId: 'item-1', command: 'git push --force', cwd: '/work/task',
+    } })).toEqual({ toolCallId: 'item-1', kind: 'command', command: 'git push --force', paths: ['/work/task'] })
+    expect(codexPermissionSubject({ id: 2, method: 'item/commandExecution/requestApproval', params: {} }))
+      .toEqual({ toolCallId: '', kind: 'command', command: '', paths: [] })
+    expect(codexPermissionSubject({ id: 3, method: 'item/fileChange/requestApproval', params: { itemId: 'item-3', grantRoot: '/etc' } }))
+      .toEqual({ toolCallId: 'item-3', kind: 'edit', command: '', paths: ['/etc'] })
+    expect(codexPermissionSubject({ id: 4, method: 'item/fileChange/requestApproval', params: { reason: 'Write docs' } }))
+      .toEqual({ toolCallId: '', kind: 'edit', command: '', paths: [] })
+    expect(codexPermissionSubject({ id: 5, method: 'item/permissions/requestApproval', params: { permissions: { network: true } } }))
+      .toEqual({ toolCallId: '', kind: 'permissions', command: '', paths: [] })
+    expect(codexPermissionSubject({ id: 6, method: 'item/tool/requestUserInput', params: {} })).toBeNull()
+  })
+
+  it('answers a veto with decline, which refuses the call without ending the turn', () => {
+    expect(codexServerRequestResponse({ id: 1, method: 'item/commandExecution/requestApproval', params: {} }, { optionId: 'decline' }))
+      .toEqual({ decision: 'decline' })
   })
 })

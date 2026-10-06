@@ -580,6 +580,19 @@ export class ManagedAgentEngine {
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
     const turnId = live.activeTurnId
+    if (event.type === 'permission_request') {
+      // Before the event queue, and loaded on first use (./permissionPolicy.ts). The asking turn is the
+      // one captured above, however long the hook takes.
+      const { settlePermissionRequest } = await import('./permissionPolicy')
+      return settlePermissionRequest({
+        hooks: this.hooks,
+        session: () => this.store.requireSession(sessionId),
+        taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+        owned: () => this.processes.owns(generation),
+        accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
+      }, event)
+    }
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
       if (!this.processes.owns(generation)) return
       if (turnId && await this.deferForUsageLimit(sessionId, turnId, generation, normalized)) continue

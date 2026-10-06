@@ -10,6 +10,7 @@ import { CodexChildRouter } from './codexChildRouting'
 import {
   asObject,
   codexGeneratedArtifact,
+  codexPermissionSubject,
   codexServerRequestResponse,
   normalizeCodexNotification,
   normalizeCodexServerRequest,
@@ -146,7 +147,27 @@ export async function startCodexSession(
     // already answered. The store keys a request on session and id, and would keep the old row.
     const requestId = randomUUID()
     pendingRequests.set(requestId, request)
-    emit({ ...event, requestId })
+    const subject = codexPermissionSubject(request)
+    emit(subject
+      ? {
+        type: 'permission_request',
+        request: { ...event, requestId },
+        subject,
+        open: () => pendingRequests.has(requestId) && !rpc.closed,
+        respond: (resolution) => answer(requestId, resolution),
+      }
+      : { ...event, requestId })
+  }
+
+  // The one way a parked request is answered, whether by the person through the session handle or by a
+  // policy veto that may arrive before the handle exists.
+  const answer = (requestId: string, resolution: unknown): void => {
+    const request = pendingRequests.get(requestId)
+    if (!request) throw new Error('Codex request is no longer pending.')
+    // Built first: an answer the request never offered throws here, before anything is sent.
+    const response = codexServerRequestResponse(request, resolution)
+    pendingRequests.delete(requestId)
+    rpc.respond(request.id, response)
   }
 
   rpc = new JsonRpcProcess({
@@ -378,12 +399,7 @@ export async function startCodexSession(
       await rpc.request('turn/interrupt', { threadId, turnId: currentTurnId }).catch(() => undefined)
     },
     async resolveRequest(providerRequestId, resolution) {
-      const request = pendingRequests.get(providerRequestId)
-      if (!request) throw new Error('Codex request is no longer pending.')
-      // Built first: an answer the request never offered throws here, before anything is sent.
-      const response = codexServerRequestResponse(request, resolution)
-      pendingRequests.delete(providerRequestId)
-      rpc.respond(request.id, response)
+      answer(providerRequestId, resolution)
     },
     async setConfig(optionId, value) {
       configOptions = configOptions.map((option) => option.id === optionId ? { ...option, currentValue: value } : option)

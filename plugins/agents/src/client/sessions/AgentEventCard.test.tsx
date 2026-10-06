@@ -26,7 +26,7 @@ const dispatchLayout = vi.fn()
 vi.mock('@acorn/plugin-api/client', async (original) => ({ ...await original<Record<string, unknown>>(), dispatchLayout }))
 
 const { default: AgentEventCard, withoutAttachmentPlaceholders, withoutPastedMarkers } = await import('./AgentEventCard')
-const { buildConversationItems } = await import('./conversationItems')
+const { buildConversationItems, visibleConversationItems } = await import('./conversationItems')
 
 const fileChange = (event: Extract<AgentConversationItem['event'], { type: 'file_change' }>): AgentConversationItem =>
   ({ key: 'change', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'turn-1', event })
@@ -279,6 +279,32 @@ it('answers a blocking question in the thread, and keeps the answer in the same 
     fold.dispatchEvent(new Event('toggle'))
     expect(settled.textContent).toContain('Coffee')
   } finally { disposeSettled() }
+})
+
+// A permission a policy plugin refused before anyone saw it. Resolved permissions usually leave the
+// thread, but this one is the only record that the agent asked, so it stays and names who said no.
+it('keeps a refused permission in the thread and names the plugin that refused it', () => {
+  const blocked: AgentConversationItem = {
+    key: 'refused', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'turn-1',
+    event: {
+      type: 'request', requestId: 'perm-1', kind: 'permission', title: 'Allow command?',
+      options: [{ id: 'decline', label: 'Reject', kind: 'reject_once' }],
+      blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' },
+    },
+  }
+  const row = {
+    ...requestRow('resolved', { blocked: { by: 'acorn-permission-policy', reason: 'Force-pushing rewrites shared history.' } }),
+    providerRequestId: 'perm-1', kind: 'permission' as const, title: 'Allow command?',
+  }
+  expect(visibleConversationItems([blocked], () => row)).toEqual([blocked])
+  const host = document.createElement('div')
+  const dispose = render(() => <AgentEventCard item={blocked} taskId="task" sessionId="session" request={row} />, host)
+  try {
+    expect(host.textContent).toContain('Blocked by acorn-permission-policy')
+    expect(host.textContent).toContain('Force-pushing rewrites shared history.')
+    expect(host.textContent).not.toContain('No answer')
+    expect(host.querySelector('button')).toBeNull()
+  } finally { dispose() }
 })
 
 it('closes a turn with the context window on the right of the line', () => {

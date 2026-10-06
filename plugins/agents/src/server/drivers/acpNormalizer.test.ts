@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { SessionUpdate } from '@agentclientprotocol/sdk'
-import { acpElicitationResponse, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
+import { acpElicitationResponse, acpPermissionSubject, normalizeAcpElicitation, normalizeAcpUpdate } from './acpNormalizer'
 import { foldSubagentRoster } from '../sessions/stateMachine'
 import type { AgentNormalizedEvent } from '../../contract/wire.ts'
 import capture from './__fixtures__/claudeSubagentWire.json' with { type: 'json' }
@@ -792,5 +792,24 @@ describe('Claude tool loading', () => {
       status: 'failed',
       content: [{ type: 'content', content: { type: 'text', text: 'Tool search unavailable' } }],
     }).output).toBe('Tool search unavailable')
+  })
+})
+
+describe('ACP permission subjects', () => {
+  it('maps the kinds a policy reads and takes paths from locations', () => {
+    expect(acpPermissionSubject({
+      toolCallId: 'bash-1', kind: 'execute', rawInput: { command: 'rm -rf build', description: 'Clean' },
+      locations: [{ path: '/work/task/build' }],
+    })).toEqual({ toolCallId: 'bash-1', kind: 'command', command: 'rm -rf build', paths: ['/work/task/build'] })
+    expect(['edit', 'delete', 'move', 'read', 'search', 'fetch', 'think', 'switch_mode', 'other']
+      .map((kind) => acpPermissionSubject({ toolCallId: 'x', kind: kind as 'other' }).kind))
+      .toEqual(['edit', 'edit', 'edit', 'read', 'read', 'fetch', 'other', 'other', 'other'])
+  })
+
+  it('leaves what the agent did not send empty rather than inventing it', () => {
+    expect(acpPermissionSubject({ toolCallId: 'x' })).toEqual({ toolCallId: 'x', kind: 'other', command: '', paths: [] })
+    // An argv array or a non-object input is not a command line, so it is not rebuilt into one.
+    expect(acpPermissionSubject({ toolCallId: 'x', kind: 'execute', rawInput: { command: ['git', 'push'] } }).command).toBe('')
+    expect(acpPermissionSubject({ toolCallId: 'x', kind: 'execute', rawInput: 'git push' }).command).toBe('')
   })
 })

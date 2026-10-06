@@ -116,3 +116,15 @@ acceptance pass.
     it with `agent_spawn`. Both run as managed `omp` sessions. Last, read the turn after a provider
     error, such as an over-long prompt: `omp` sends it as an ordinary answer ending in `end_turn`, so
     a workflow step reads it as success ([the omp harness phase](../future/pi/phases/01-omp-harness.md)).
+
+156. A loaded permission policy. Install `docs/future/pi/packages/permission-policy/` from its folder,
+    restart the Node, and read the trust prompt: it says the plugin can stop the agents plugin from
+    running a tool the agent asks permission for, marked high. Then, in a Claude Code session in a
+    permission mode that asks before Bash, ask the agent to run `git push --force`. No card asks you
+    anything. The transcript shows a resolved permission that says **Blocked by
+    acorn-permission-policy** with the policy's reason, the session never shows "Needs you", and the
+    agent reports a rejected call. Repeat in Codex with an approval policy that asks, where the
+    refusal goes back as `decline` and the turn carries on, and in DeepSeek and `omp` when they're
+    installed. Ask for `rm -rf /tmp/outside` and confirm the second rule refuses it, then for
+    `rm -rf build` inside the task and confirm the ordinary card appears
+    ([permission policy](../managed-agents/permission-policy.md)).

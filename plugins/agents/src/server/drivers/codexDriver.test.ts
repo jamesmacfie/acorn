@@ -161,7 +161,7 @@ async function start(
     measureStartup,
     onEvent: (event) => {
       driverEvents.push(event)
-      if (event.type !== 'generated_artifact') events.push(event)
+      if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
     },
     onClosed: () => {},
   })

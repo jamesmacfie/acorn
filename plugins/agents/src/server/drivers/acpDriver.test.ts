@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '../../contract/wire.ts'
-import type { AgentDriverStartOptions } from './types'
+import type { AgentDriverPermissionRequest, AgentDriverStartOptions } from './types'
 import { AcpDriver } from './acpDriver'
 import { acpMcpServers, clientFor, type PendingRequest } from './acpSession'
 import { harnessCapabilities } from './harness'
@@ -115,7 +115,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
       },
       onClosed: () => {},
     }))
@@ -162,7 +162,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -198,7 +198,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: !history,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -230,7 +230,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: false,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact') events.push(event)
+          if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
         },
         onClosed: () => {},
       })
@@ -274,7 +274,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -376,6 +376,30 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
     pending.get(requestId)!.resolve({ optionId: 'allow' })
     expect(await response).toEqual({ outcome: { outcome: 'selected', optionId: 'allow' } })
   })
+
+  // DeepSeek's shape: the request names only the call, and the command arrived on the call's update.
+  it('reads a permission subject from the tool call the agent announced before asking', async () => {
+    const { events, pending, client } = parked()
+    await client.sessionUpdate({ sessionId: 'acp-session', update: {
+      sessionUpdate: 'tool_call', toolCallId: 'call_1', title: 'bash', kind: 'other', rawInput: { command: 'ls -la' },
+    } })
+    const response = client.requestPermission({
+      sessionId: 'acp-session',
+      toolCall: { toolCallId: 'call_1' },
+      options: [{ optionId: 'reject-once', name: 'Reject', kind: 'reject_once' }],
+    })
+    const asked = events.at(-1) as unknown as AgentDriverPermissionRequest
+    expect(asked).toMatchObject({
+      type: 'permission_request',
+      request: { type: 'request', kind: 'permission', requestId: [...pending.keys()][0] },
+      subject: { toolCallId: 'call_1', kind: 'other', command: 'ls -la', paths: [] },
+    })
+    expect(asked.open()).toBe(true)
+    asked.respond({ optionId: 'reject-once' })
+    expect(asked.open()).toBe(false)
+    expect(() => asked.respond({ optionId: 'reject-once' })).toThrow('no longer pending')
+    expect(await response).toEqual({ outcome: { outcome: 'selected', optionId: 'reject-once' } })
+  })
 })
 
 // The failure this prevents is a session nobody can use: the ACP request is never answered, so the
@@ -396,7 +420,7 @@ describe('a question the agent stopped waiting for is released with the turn', (
       env: {},
       mcpServers: [],
       noProviderExecutionHistory: false,
-      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event) },
+      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event) },
       onClosed: () => {},
     })
 

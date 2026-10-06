@@ -222,6 +222,8 @@ export function boundProviderEvent(
           scopes: event.approval.scopes.slice(0, 2),
           ...(event.approval.warning ? { warning: event.approval.warning.slice(0, 2_000) } : {}),
         },
+        // The host already capped the reason (pluginHost/hooks.ts); this keeps the row's bound here too.
+        blocked: event.blocked && { by: event.blocked.by.slice(0, 200), reason: event.blocked.reason.slice(0, 200) },
       }
     case 'request_resolved':
       return event

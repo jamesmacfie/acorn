@@ -245,7 +245,10 @@ export class AgentSessionRepository {
           turnId,
           providerRequestId: event.requestId,
           kind: event.kind,
-          status: 'pending',
+          // A policy plugin's refusal is already the answer, so the row is never pending: nothing
+          // notifies, badges, or wakes a delegated parent over it.
+          status: event.blocked ? 'resolved' : 'pending',
+          ...(event.blocked ? { resolutionJson: JSON.stringify({ blocked: event.blocked }), resolvedAt: timestamp } : {}),
           title: event.title,
           detail: event.detail ?? null,
           // Additive: a row written before `approval` existed reads as the plain consent it was.

@@ -67,7 +67,10 @@ confinement of every route a contribution uses. A contribution that runs its own
 device to have accepted that bundle, as a pane does. Hooks change what another plugin does, so two of
 the three hook modes are drawn **high**, with the mode in the grant key. The hook chain fails open, so
 a stalled handler can't brick a push. `core:before-tool-call` is the exception: it's an approval gate
-and denies on timeout.
+and denies on timeout. `agents:before-permission` fails open for a different reason: a person stands
+behind it. A policy that doesn't answer in time passes the harness's request on to the person, so a
+timeout costs a few seconds and never an approval
+([permission policy](../managed-agents/permission-policy.md#where-it-runs)).
 
 Frame key capture is manifest-bounded too. A frame may stop shell forwarding only for modified chords
 listed in `claimsKeys`, and the trust prompt and Settings show those claims. Runtime code may narrow

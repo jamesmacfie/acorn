@@ -9,6 +9,7 @@ import type {
   AgentWebActivity,
   AgentWebResult,
 } from '../../contract/wire.ts'
+import type { AgentPermissionSubject } from '../../contract/permissionHook.ts'
 import type { AgentDriverGeneratedArtifact } from './types'
 import type { JsonRpcNotification, JsonRpcServerRequest } from './jsonRpcProcess'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
@@ -463,6 +464,26 @@ export function normalizeCodexServerRequest(request: JsonRpcServerRequest): Agen
         ? { ...event, options: appApprovalOptions(approval), approval }
         : event
     }
+    default:
+      return null
+  }
+}
+
+// What `agents:before-permission` reads from Codex's three approval requests, and `null` for any other
+// server request. A file change carries only the root it wants to write under, so that is its path.
+export function codexPermissionSubject(request: JsonRpcServerRequest): AgentPermissionSubject | null {
+  const toolCallId = stringValue(request.params.itemId) ?? ''
+  const path = (value: unknown): string[] => {
+    const text = stringValue(value)
+    return text ? [text] : []
+  }
+  switch (request.method) {
+    case 'item/commandExecution/requestApproval':
+      return { toolCallId, kind: 'command', command: stringValue(request.params.command) ?? '', paths: path(request.params.cwd) }
+    case 'item/fileChange/requestApproval':
+      return { toolCallId, kind: 'edit', command: '', paths: path(request.params.grantRoot) }
+    case 'item/permissions/requestApproval':
+      return { toolCallId, kind: 'permissions', command: '', paths: [] }
     default:
       return null
   }

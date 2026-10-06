@@ -453,8 +453,18 @@ export default function AgentEventCard(props: {
                     </Stack>
                   )}
                 </Show>
-                <Show when={askedQuestions(asked(), props.request).length} fallback={
-                  <Text emphasis="muted">No answer</Text>
+                {/* Refused by a policy plugin before anyone saw it. The host stamped who, and capped why. */}
+                <Show when={asked().blocked}>
+                  {(blocked) => (
+                    // One sentence rather than a title, because the terminal's alert sets a title beside
+                    // its text and a long plugin id would squeeze both.
+                    <Alert tone="warn">
+                      {blocked().reason ? `Blocked by ${blocked().by}: ${blocked().reason}` : `Blocked by ${blocked().by}.`}
+                    </Alert>
+                  )}
+                </Show>
+                <Show when={!asked().blocked && askedQuestions(asked(), props.request).length} fallback={
+                  <Show when={!asked().blocked}><Text emphasis="muted">No answer</Text></Show>
                 }>
                 <For each={askedQuestions(asked(), props.request)}>
                   {(entry) => (

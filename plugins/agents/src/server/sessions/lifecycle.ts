@@ -1,7 +1,7 @@
 import { and, asc, eq } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { AgentRequest, AgentSession, AgentTurn } from '../../contract/wire.ts'
+import type { AgentRequest, AgentRequestBlocked, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type {
   AgentLifecyclePublisher,
   AgentRequestState,
@@ -164,6 +164,8 @@ export class AgentLifecycle {
   }
 
   private requestState(taskId: string, request: AgentRequest): AgentRequestState {
+    // Only the refusal leaves; the rest of the resolution is what the person answered and stays private.
+    const blocked = request.status === 'resolved' ? blockedOf(request.resolution) : null
     return {
       taskId,
       sessionId: request.sessionId,
@@ -177,6 +179,14 @@ export class AgentLifecycle {
       expiresAt: request.expiresAt,
       createdAt: request.createdAt,
       resolvedAt: request.resolvedAt,
+      ...(blocked ? { blocked } : {}),
     }
   }
+}
+
+const blockedOf = (resolution: unknown): AgentRequestBlocked | null => {
+  const blocked = (resolution as { blocked?: Partial<AgentRequestBlocked> } | null)?.blocked
+  return typeof blocked?.by === 'string' && typeof blocked.reason === 'string'
+    ? { by: blocked.by, reason: blocked.reason }
+    : null
 }

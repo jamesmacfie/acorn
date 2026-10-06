@@ -7,15 +7,15 @@ import { Readable, Writable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
 import { brokerEnv, AGENT_TOOL_PASSTHROUGH, createLogger } from '@acorn/plugin-api/node'
 import { spawnOwnedProcess } from '../processes/ownedProcess'
-import type { AgentInputPart, AgentNormalizedEvent } from '../../contract/wire.ts'
-import { normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
+import type { AgentInputPart } from '../../contract/wire.ts'
+import { acpPermissionSubject, type AcpToolCallFacts, normalizeAcpConfig, normalizeAcpElicitation, normalizeAcpPermission, normalizeAcpUpdate, acpElicitationResponse } from './acpNormalizer'
 import { providerStderrNotice } from './diagnostics'
 import { measureAgentStartup } from './startupTelemetry'
 import { contextBlock } from './contextBlock'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import type { HarnessLaunchSpec } from './harness'
 import type { AcpLaunch } from './acpDriver'
-import type { AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
+import type { AgentDriverEvent, AgentDriverMcpServer, AgentDriverSession, AgentDriverStartOptions, AgentDriverTurnOptions } from './types'
 
 const log = createLogger('agents:provider', 'agents')
 
@@ -31,6 +31,15 @@ const ACP_INVALID_PARAMS = -32602
 export type PendingRequest = {
   resolve(resolution: unknown): void
   drain(): void
+}
+
+// The one way a parked request is answered, whether by the person through the session handle or by a
+// policy veto that may arrive before the handle exists.
+const resolvePending = (pending: Map<string, PendingRequest>, requestId: string, resolution: unknown, label: string): void => {
+  const request = pending.get(requestId)
+  if (!request) throw new Error(`The ${label} request is no longer pending.`)
+  pending.delete(requestId)
+  request.resolve(resolution)
 }
 
 const drain = (pending: Map<string, PendingRequest>): void => {
@@ -80,7 +89,7 @@ const announce = async (
   pending: Map<string, PendingRequest>,
   requestId: string,
   options: AgentDriverStartOptions,
-  event: AgentNormalizedEvent,
+  event: AgentDriverEvent,
 ): Promise<void> => {
   try {
     await options.onEvent(event)
@@ -99,8 +108,24 @@ export function clientFor(
   pending: Map<string, PendingRequest>,
   replaying: () => boolean,
 ): Client {
+  // What each tool call announced before it asked. DeepSeek's permission request carries only the call's
+  // id and leaves the command on the earlier `tool_call` update, so the subject is read from both. Capped
+  // to the most recent calls: one that asks does so while it is still current.
+  const toolCalls = new Map<string, AcpToolCallFacts>()
+  const remember = (update: AcpToolCallFacts): void => {
+    const known = toolCalls.get(update.toolCallId)
+    toolCalls.delete(update.toolCallId)
+    toolCalls.set(update.toolCallId, {
+      toolCallId: update.toolCallId,
+      kind: update.kind ?? known?.kind,
+      rawInput: update.rawInput ?? known?.rawInput,
+      locations: update.locations ?? known?.locations,
+    })
+    if (toolCalls.size > 100) toolCalls.delete(toolCalls.keys().next().value!)
+  }
   return {
     async requestPermission(params) {
+      remember(params.toolCall)
       const requestId = randomUUID()
       const response = new Promise<RequestPermissionResponse>((resolve) => pending.set(requestId, {
         resolve: (resolution) => {
@@ -110,7 +135,13 @@ export function clientFor(
         },
         drain: () => resolve({ outcome: { outcome: 'cancelled' } }),
       }))
-      await announce(pending, requestId, options, normalizeAcpPermission(requestId, params))
+      await announce(pending, requestId, options, {
+        type: 'permission_request',
+        request: normalizeAcpPermission(requestId, params),
+        subject: acpPermissionSubject(toolCalls.get(params.toolCall.toolCallId)!),
+        open: () => pending.has(requestId),
+        respond: (resolution) => resolvePending(pending, requestId, resolution, label),
+      })
       return response
     },
     // Claude Code's AskUserQuestion and any MCP server's own form both arrive here. A url-mode
@@ -134,6 +165,8 @@ export function clientFor(
     },
     async sessionUpdate(params) {
       if (replaying()) return
+      const update = params.update
+      if (update.sessionUpdate === 'tool_call' || update.sessionUpdate === 'tool_call_update') remember(update)
       for (const event of normalizeAcpUpdate(params.update, label)) await options.onEvent(event)
     },
   }
@@ -426,10 +459,7 @@ export async function startAcpSession(
       drain(pending)
     },
     async resolveRequest(providerRequestId, resolution) {
-      const request = pending.get(providerRequestId)
-      if (!request) throw new Error(`The ${label} request is no longer pending.`)
-      pending.delete(providerRequestId)
-      request.resolve(resolution)
+      resolvePending(pending, providerRequestId, resolution, label)
     },
     async setConfig(optionId, value) {
       if (!providerSessionRef || !agent.setSessionConfigOption) return

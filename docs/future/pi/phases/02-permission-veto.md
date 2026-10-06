@@ -1,14 +1,120 @@
 # Phase 02: permission veto and policy plugin
 
-Status: proposed, 2026-10-03. Entry: phase 01 disposition recorded. Next:
-[phase 03](./03-session-messages.md).
+Status: done with recorded limitations, 2026-10-07. Proposed 2026-10-03. Entry: phase 01 disposition
+recorded. Next: [phase 03](./03-session-messages.md).
+
+## Completion note, 2026-10-07
+
+**What landed.** On branch `phase-02-permission-veto`, at the commit titled "Phase 02: Permission veto
+and policy plugin". [Permission policy](../../../managed-agents/permission-policy.md) is the owning
+contract.
+
+- `agents:before-permission`, declared beside `before-send` from `BEFORE_PERMISSION_HOOK` in
+  `plugins/agents/src/contract/permissionHook.ts`. Observe and veto, install order, 5,000 ms,
+  `onTimeout: 'allow'`. The payload carries the Mods fields plus `requestId` and `toolCallId`. The
+  subject fields are the public `AgentPermissionSubject` type for phase 10 to reuse.
+- Both drivers emit a driver-only `permission_request` event (`drivers/types.ts`) that carries the
+  normalized request, the subject, and `open()` and `respond()` closures over the parked entry. A veto
+  reaches the request even while `start` is still running. The materializer keeps only the request,
+  so the subject never reaches the wire, SQLite, or telemetry.
+- `server/sessions/permissionPolicy.ts` runs the hook before the provider event queue. It's loaded on
+  the first permission request to stay inside the service boot budget.
+- The request event and its row gain optional `blocked: { by, reason }`. A blocked row is inserted
+  `resolved`. Both state reducers, the webhook and `agent-session:changed` filter, and the bounds treat
+  it as answered. `agents.requests` adds `blocked` on resolved rows. Raw resolution stays private.
+- The resolved card on both hosts says "Blocked by `<plugin>`: `<reason>`", and the thread keeps a
+  blocked permission that it would otherwise drop once resolved.
+- The policy package is
+  [`docs/future/pi/packages/permission-policy/`](../packages/permission-policy/README.md), with
+  `node --test` coverage of every command form it claims.
+
+No migration: `blocked` lives in the existing `resolution_json`. The wire change is additive, and an
+older client draws a blocked row as an ordinary resolved request.
+
+**Decisions and deviations.**
+
+- **Two pre-existing bugs fixed, both found by the real-host run.** First, `loadedPluginBinding` in
+  `packages/node-core/src/server/plugins/loader.ts` had dropped `extensionPoints` and `extensions`
+  since the Findings removal (`aa91856aa`). Every manifest hook handler and loaded hook point installed,
+  showed its grant, and never ran. `reload.test.ts` now drives a folder package's route-backed veto
+  through the loader and the host. Second, a node-only package never reaches the device trust prompt,
+  so its cross-plugin grants appeared nowhere. The plugin's **Permissions** tab
+  (`PluginPage.tsx`) lists them. Harness grants are still missing from that tab; that's out of scope.
+- **The trust line quotes the contributor's label, not the owner's.** "Stop agents from doing “…”"
+  reads the extension's own `label`, so the package uses the point's verb phrase,
+  `run a tool the agent asks permission for`.
+- **DeepSeek needs a join.** Its permission request names only the tool call. The command arrives on
+  the earlier `tool_call` update, and every tool is kind `other` with no `locations`. The ACP driver
+  merges request and update by `toolCallId`, capped at 100 recent calls. The policy reads `command`
+  whatever the kind.
+- **A Codex command's `cwd` goes in `paths`.** The policy doesn't read it.
+- **The summary omits a separate request ID.** `agents.requests` gives `blocked: { by, reason }`.
+  The canonical provider request ID is already the row's `requestId`.
+- **A failed or withdrawn veto writes a warning and no request row.** The request was never shown,
+  so there's nothing to resolve. An allowed request the harness withdrew during the wait is dropped
+  the same way. This avoids a pending row recorded after its own turn ended.
+- **The service boot budget rose 2 KB to 3,118,000 B.** The policy step is lazy; the remaining 2 KB
+  is the declaration and the `blocked` branches that run on every event.
+
+**Verification.**
+
+- `pnpm lint` passes.
+- `@acorn/plugin-agents`: 1,121 passed. `permissionPolicy.test.ts` drives the real hook chain across
+  two plugin contexts. It covers veto picking reject-once, cancel with no reject-once option, veto
+  during driver startup, a throwing handler, a 5 s stall with traffic still streaming then pending,
+  the asking turn kept after it completes, a withdrawn request, and a replaced generation. A mutation
+  check confirmed that removing the generation guard or the resolved insert fails a test.
+- `@acorn/tui`: 676 passed, including the blocked card in a 120 by 40 render. Run with patched Node
+  26.8.1.
+- `@acorn/node-core`: all pass but `storage/backup.test.ts`, which times out under Node 26.8.1 and
+  passes under 24.11. This change doesn't touch it.
+- `@acorn/client-core`: 2,453 passed. Two failures are in files this change doesn't touch:
+  `scopes.test.ts` (the `workspaceProjectOrderRoute` classification) and the `cssHygiene` box-shadow
+  ratchet.
+- `@acorn/arch-tests`: 86 passed.
+
+Real host, `pnpm dev:agent -- --session pi-phase-02`, Claude Code through ACP, Opus 5.5:
+
+- With the package installed and the Node restarted, the **Permissions** tab reads "Stop agents from
+  doing “run a tool the agent asks permission for”", marked **Broad access**.
+- In **Default** mode, `rm -rf /tmp/acorn-pi02-outside` drew no card. The transcript shows a resolved
+  permission, "Blocked by acorn-permission-policy: rm would remove /tmp/acorn-pi02-outside, outside
+  this task's worktree.", the Bash call failed, the session returned to **ready**, and the directory
+  survived.
+- Screenshots `pi02-policy-permissions.png` and `pi02-claude-blocked.png` are in the session's
+  ignored `.acorn/agent-dev/pi-phase-02/screenshots/`.
+
+**Limitations.**
+
+- **Claude `git push --force` never reached the hook on this machine.** James's
+  `~/.claude/settings.json` has an `rtk` `PreToolUse` hook on Bash that approves the git commands it
+  rewrites, and his `defaultMode` is `auto`. That's the documented limit: an already-allowed tool
+  never asks. The force-push rule is covered by `policy.test.mjs`, and the deletion rule proved the
+  same path end to end.
+- **Codex wasn't run.** codex-cli 0.159.2 is installed, but its account hit its usage limit until
+  2026-10-10. The Codex mapping, `decline` answer, and parked-request path are covered by
+  `codexNormalizer.test.ts` and the shared runtime tests. Manual check 156 in
+  [agents and providers](../../../testing/agents-and-providers.md) is owed for Codex.
+- **DeepSeek and `omp` weren't run.** Neither `dsh` nor `omp` is on this machine. DeepSeek's request
+  shape comes from its source (`references/deepseek-harness/packages/acp/acp/src/index.ts:155-172`
+  and `updates.ts:52-61`), and the driver test covers it. `omp`'s permission input is unverified,
+  which the package README records as a policy coverage limitation.
+- **No terminal-client PTY run.** The TUI driver's fixtures don't seed a blocked request. The
+  shared card's terminal render is covered by `apps/tui/src/agents.test.tsx` at 120 by 40.
+- **`order: 'install'` sorts by handler ID.** `hookHandlersFor` breaks ties with `localeCompare`,
+  not install time. With vetoes only, that changes nothing but which reason shows first.
+
+**For phase 03.** Explain a refusal only after the resolved `plugin:agents:request-changed` event,
+by reading `agents.requests` for a row whose `blocked.by` is the policy's own ID. Key each explanation
+on the row's `requestId`. The package's `node.js` is where the optional explanation goes, behind its
+own setting.
 
 ## Outcome
 
 A loaded policy plugin refuses a harness permission request before Acorn shows it as pending.
 Both clients show a resolved request naming the blocking plugin and reason. The plugin tightens
 approval without acquiring the power to approve. Source design:
-[Mods permission hook](../../mods.md#the-design-agentsbefore-permission), with
+[Mods permission hook](../../mods.md#the-design-delivered), with
 [Pi additions](../02-before-permission.md).
 
 ## Ownership and data flow

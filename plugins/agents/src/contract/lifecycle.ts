@@ -1,5 +1,6 @@
 import type {
   AgentAttentionReason,
+  AgentRequestBlocked,
   AgentRequestKind,
   AgentRequestStatus,
   AgentRuntimeState,
@@ -62,6 +63,9 @@ export type AgentRequestState = AgentRequestChangedEvent & {
   expiresAt: number | null
   createdAt: number
   resolvedAt: number | null
+  /** Present on a resolved row a policy plugin refused at `agents:before-permission`. With `requestId`,
+   *  it is how a consumer confirms its veto took effect; the handler's own verdict is not that proof. */
+  blocked?: AgentRequestBlocked
 }
 
 export type AgentSessionRosterEntry = Omit<AgentSessionsChangedEvent, 'changes' | 'renameSource'> & {

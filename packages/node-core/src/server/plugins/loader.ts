@@ -61,6 +61,11 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   customAgents: entry.manifest.contributions.customAgents,
   agentTools: entry.manifest.contributions.agentTools,
   contextSections: entry.manifest.contributions.contextSections,
+  // Hook points this package opens and the route-backed handlers it adds to other plugins' hooks
+  // (../pluginHost/manifestWork.ts § registerManifestHooks). Without these a manifest hook handler
+  // installs, shows its grant, and never runs.
+  extensionPoints: entry.manifest.contributions.extensionPoints,
+  extensions: entry.manifest.contributions.extensions,
   destinations: entry.manifest.contributions.frames.flatMap((surface) => surface.destinations ?? []),
   // The package directory, for the one manifest path the host has to resolve on someone else's
   // behalf: a harness's ACP adapter entry (../pluginHost/host.ts).

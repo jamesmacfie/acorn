@@ -84,6 +84,8 @@ export function projectAgentEvent(
       // just not evidence that work is in flight.
       return turnId ? { runtimeState: 'working', attention: 'unread' } : { attention: 'unread' }
     case 'request':
+      // Refused by a policy plugin before anyone saw it: something to read, not something waiting.
+      if (event.blocked) return turnId ? { runtimeState: 'working', attention: 'unread' } : { attention: 'unread' }
       return {
         runtimeState: 'waiting',
         attention: event.kind === 'permission'
@@ -305,7 +307,11 @@ export function evolveAgentState(
       if (!active) return { ...state, attention: 'unread' }
       return { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active }
     }
-    case 'request':
+    case 'request': {
+      if (event.blocked) {
+        const active = turnId ?? state.activeTurnId
+        return active ? { ...state, runtimeState: 'working', attention: 'unread', activeTurnId: active } : { ...state, attention: 'unread' }
+      }
       return {
         ...state,
         runtimeState: 'waiting',
@@ -318,6 +324,7 @@ export function evolveAgentState(
           ? state.pendingRequestIds
           : [...state.pendingRequestIds, event.requestId],
       }
+    }
     case 'request_resolved': {
       const pendingRequestIds = state.pendingRequestIds.filter((id) => id !== event.requestId)
       return {

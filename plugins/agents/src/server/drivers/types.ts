@@ -7,6 +7,7 @@ import type {
   AgentSession,
   AgentTurn,
 } from '../../contract/wire.ts'
+import type { AgentPermissionSubject } from '../../contract/permissionHook.ts'
 import type { AgentMcpReportedServer } from '../../shared/mcpServers'
 import type { MeasureAgentStartup } from './startupTelemetry'
 
@@ -23,7 +24,25 @@ export type AgentDriverGeneratedArtifact = {
   bytes: Uint8Array
 }
 
-export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact
+/**
+ * A parked permission request, with what a policy hook needs to judge it. Driver-only like the artifact
+ * above: the runtime runs `agents:before-permission` on it, and ProviderEventMaterializer keeps only
+ * `request`, so the subject never reaches the wire, SQLite, or telemetry.
+ *
+ * `open` and `respond` reach the request where the driver parked it, so a veto works even while
+ * `start` is still running and the runtime holds no session handle yet.
+ */
+export type AgentDriverPermissionRequest = {
+  type: 'permission_request'
+  request: Extract<AgentNormalizedEvent, { type: 'request' }>
+  subject: AgentPermissionSubject
+  /** False once the request was answered, or the harness withdrew it. */
+  open(): boolean
+  /** Answers the request. Throws when it's no longer open. */
+  respond(resolution: unknown): void
+}
+
+export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest
 
 /**
  * An MCP server acorn asks the agent to connect to, for the session it is starting.

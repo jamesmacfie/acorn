@@ -16,7 +16,7 @@ acorn's own tools, on the agent tools route, and withholds their arguments on pu
 
 The permission request is the one place every harness stops and asks acorn before running a risky
 tool. [mods.md § The gap](../mods.md#the-gap-harness-permission-requests) traces it through both
-drivers, and [mods.md § The design](../mods.md#the-design-agentsbefore-permission) puts a veto-only
+drivers, and [mods.md § The design](../mods.md#the-design-delivered) puts a veto-only
 hook there. That is the closest acorn can get to `tool_call` from outside the loop, and it works the
 same for Claude, Codex, DeepSeek, and `omp` from [01](./01-omp-harness.md).
 

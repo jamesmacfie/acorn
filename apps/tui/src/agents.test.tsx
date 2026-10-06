@@ -37,6 +37,7 @@ describe('running an agent from a terminal', () => {
       await enterDetail(screen)
       const frame = await screen.until('Implement plan')
       expect(frame).toContain('Update the API')
+      expect(frame).toContain('Blocked by acorn-permission-policy')
       expect(posts()).toEqual([])
       await stopSaying(screen, 'Implement plan')
       await screen.press('RETURN')

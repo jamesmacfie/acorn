@@ -277,3 +277,46 @@ describe('a folder plugin through the loader, the host, and the reloader', () =>
     }
   })
 })
+
+// The manifest carrier for hooks: a folder package's route-backed handler joins another plugin's hook
+// and its answer reaches the owner. The binding once dropped `extensions`, and every such handler
+// installed, showed its grant, and never ran.
+describe('a folder plugin’s hook handler through the loader and the host', () => {
+  it('vetoes through its route', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { installPlugin } = await import('./installer')
+    const { loadExternalPlugins, loadedPluginBinding } = await import('./loader')
+    const { PLUGIN_API_MAJOR } = await import('./manifest')
+    const { registerHookPoint, runHook } = await import('../pluginHost/hooks')
+    const { testEnv } = await import('../../testkit/db')
+    const root = mkdtempSync(join(tmpdir(), 'acorn-hook-folder-'))
+    const point = registerHookPoint({
+      id: 'owner:before-thing', ownerId: 'owner', payload: { command: 'string' }, allows: ['veto'],
+      timeoutMs: 5_000, onTimeout: 'allow', order: 'install', collect: false,
+    })
+    try {
+      const source = join(root, 'source')
+      mkdirSync(join(source, 'dist'), { recursive: true })
+      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
+        id: 'hook-fixture', name: 'Hook fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+        contributions: { extensions: [{ id: 'rule', point: 'owner:before-thing', label: 'do the thing', route: '/v1/p/hook-fixture/check', mode: 'veto' }] },
+      }))
+      writeFileSync(join(source, 'dist', 'node.js'), 'export default { name: "hook-fixture", init(ctx) { ctx.routes.fetch(async (request) => Response.json({ ok: false, reason: `no ${(await request.json()).command}` })) } }\n')
+      await installPlugin(root, { path: source })
+      const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+      const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: shared.db, activeIdentity: memoryIdentityStore('owner') })
+      const host = await initPlugins(loaded.map((entry) => entry.plugin), {
+        ...hostOptions(), core, dataDir: root, env: testEnv({ ACTIVE_IDENTITY: memoryIdentityStore('owner') }),
+        loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+      })
+      expect(await runHook('owner:before-thing', { command: 'push' })).toMatchObject({ ok: false, by: 'hook-fixture', reason: 'no push' })
+      await host.dispose()
+    } finally {
+      point.dispose()
+      clearRegistrations('hook-fixture')
+      rmSync(root, { recursive: true, force: true })
+    }
+  })
+})

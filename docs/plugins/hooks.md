@@ -89,6 +89,7 @@ Core declares four hooks, because core owns those choke points:
 | changes | `changes:before-commit` | observe, transform, veto | Commit lint and message helpers |
 | changes | `changes:before-push` | observe, veto | Secret scanning, changesets, and branch protection |
 | agents | `agents:before-send` | observe, transform, veto | Prompt policy, redaction, and context injectors |
+| agents | `agents:before-permission` | observe, veto | Refusing a harness permission request before anyone sees it. Install order, 5 seconds, `onTimeout: allow`, so a timeout means the person decides. Only requests the harness asks about arrive ([permission policy](../managed-agents/permission-policy.md)) |
 | terminal | `terminal:before-run-target` | observe, veto | Change freezes and environment checks. Runs after the repo-config trust gate and before the session starts |
 | workflows | `workflows:before-step` | observe, veto | "No deploys today" from an incident tool |
 | editor | `editor:before-save` | observe, transform, veto | Format and lint on save |

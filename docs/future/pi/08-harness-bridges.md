@@ -52,7 +52,7 @@ Agents declares both beside `before-send` and `before-permission`, with `ctx.hoo
 
 `agents:before-tool` allows `observe`, `veto`, and a new `ask` mode. It uses `onTimeout: 'allow'`,
 `order: 'install'`, and a 5,000 ms timeout, for the reasons
-[mods.md](../mods.md#timeouts-fail-open-and-that-is-safe-here) gives for the permission hook. Its
+[permission policy](../../managed-agents/permission-policy.md#where-it-runs) gives for the permission hook. Its
 payload is the tool subject phase 02 defines for `agents:before-permission`, so a policy plugin
 registers one function and points it at both:
 
@@ -61,7 +61,7 @@ registers one function and points it at both:
 | `sessionId`, `taskId`, `providerId`, `unattended`, `root` | As on `before-permission`. |
 | `toolCallId` | The harness's tool call ID when the bridge has one, otherwise `''`. A handler uses it to recognize the same call when the permission hook fires for it afterward. |
 | `toolName` | The harness's own tool name, such as `Bash`. |
-| `kind`, `title`, `command`, `paths` | The shared subject vocabulary from [mods.md](../mods.md#the-payload). |
+| `kind`, `title`, `command`, `paths` | The shared subject vocabulary, `AgentPermissionSubject` ([permission policy](../../managed-agents/permission-policy.md#the-payload)). |
 
 `agents:after-tool` allows `observe` and `transform`. Its payload is the same subject plus
 `succeeded: boolean` and `note: string`, which starts empty. A transform may set `note`, bounded to

@@ -1,13 +1,15 @@
 # What acorn takes from Claude Mods
 
-Proposal, 2026-09-29. Not started.
+Proposal, 2026-09-29. The permission hook shipped on 2026-10-07 through
+[Pi phase 02](./pi/phases/02-permission-veto.md). Its contract lives in
+[permission policy](../managed-agents/permission-policy.md); this file keeps the comparison.
 
 Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/phases/02-permission-veto.md) delivers this
 hook and its policy consumer; [Pi phase 03](./pi/phases/03-session-messages.md) adds optional
 explanations through a separate messaging grant. On 2026-10-07,
 [Pi phase 10](./pi/phases/10-harness-bridges.md) added bridges through each harness's own hooks,
 which reach the tool calls this hook can't see. Use the [phase plan](./pi/phases/README.md) for
-execution order and acceptance. This file owns the base hook design and comparison.
+execution order and acceptance.
 
 Claude Code is adding *function hooks*, marketed as Claude Mods: a plugin ships a TypeScript module
 that wraps Claude Code's own methods like Express middleware. This file records how that model
@@ -43,6 +45,7 @@ Most of the Mods feature list has an acorn equivalent, built on the owner-declar
 | `prompt.context`, `prompt.section` | Context sections and `core:before-snapshot` | [agent-tools.md](../agent-tools/context-sections.md#context-sections) |
 | `tool.register` | Agent tool contributions | [agent-tools.md](../agent-tools.md) |
 | `tool.check` on acorn's own tools | `core:before-tool-call` | [node-side-extension-points.md](../plugins/hooks.md#hooks) |
+| `tool.check` on a harness's permission request | `agents:before-permission`, with observe and veto | [permission policy](../managed-agents/permission-policy.md) |
 | `$` as the only door, in a worker | The permission-scoped worker and its owner-bound context | [extensibility.md](../extensibility.md#the-node-half-is-isolated) |
 | Adding a noun to `$` | Capabilities with a `contract/` folder | [plugin-map.md](../plugin-map.md#talking-to-another-plugin) |
 | `turn.complete`, `agent.spawn` | Agents lifecycle events and managed delegation | [managed-agents.md](../managed-agents.md) |
@@ -87,114 +90,18 @@ arguments on purpose.
 Because every driver already parks the request before announcing it, the runtime can answer the
 request right there. A hook at that one point covers every harness.
 
-## The design: `agents:before-permission`
+## The design, delivered
 
-The agents plugin owns the point, because it owns sessions and requests. It's declared beside
-`before-send` in `plugins/agents/src/node/index.ts`:
+The agents plugin owns `agents:before-permission`, declared beside `before-send`. It allows observe and
+veto, runs in install order with 5 seconds per handler, and passes the request to the person on
+timeout. A veto answers the parked request with its first `reject_once` option and records the request
+already resolved with `blocked: { by, reason }`. [Permission policy](../managed-agents/permission-policy.md)
+owns the payload, the per-harness mapping, and the failure cases.
 
-```ts
-ctx.hooks.declare({
-  id: 'before-permission',
-  label: 'allow a tool',
-  payload: {
-    sessionId: 'string', taskId: 'string', requestId: 'string', providerId: 'string', unattended: 'boolean',
-    kind: 'string', title: 'string', command: 'string', paths: 'string[]', root: 'string',
-  },
-  allows: ['observe', 'veto'],
-  timeoutMs: 5_000,
-  onTimeout: 'allow',
-  order: 'install',
-})
-```
-
-### The payload
-
-| Field | Meaning |
-| --- | --- |
-| `requestId` | The parked provider request's canonical ID, scoped to the session. A policy consumer uses it to deduplicate explanation messages without merging distinct permission requests. Added by the sequential Pi plan on 2026-10-03. |
-| `unattended` | True for `workflow` and `delegated` sessions, the set `claudeHarness.ts` already calls unattended. "No pushes from a workflow run" is the main case for this field. |
-| `kind` | One of `command`, `edit`, `read`, `fetch`, `permissions`, or `other`. ACP's `execute` maps to `command`; `edit`, `delete`, and `move` map to `edit`; `read` and `search` map to `read`. Codex maps by method. |
-| `title` | The harness's own summary, as the card shows it. |
-| `command` | The command line when the harness sent one, otherwise `''`. |
-| `paths` | The paths the call touches when the harness says, otherwise `[]`. |
-| `root` | The task's worktree root, so a handler can refuse anything outside it without a second lookup. |
-
-Payload matching is exact, so every field is on every call, empty when the harness gave nothing.
-
-The command and paths are the point of this hook. `core:before-tool-call` withholds arguments so a
-handler can't read the agent's work, and that choice is right there. It would make this hook useless:
-a policy that can't see `git push --force` can't refuse it. So a veto here is a high grant, like every
-veto. An observer here sees every command the agent asks to run. That's the same kind of access an
-observer on `before-send` has to every prompt, and neither is marked high. Keep them consistent
-rather than adding a per-point flag.
-
-### The modes
-
-Observe and veto only.
-
-- **No transform.** The harness runs its own command. Changing the payload changes nothing the
-  harness does.
-- **No auto-allow.** A plugin that says no only makes a session stricter. A plugin that says yes on
-  the person's behalf is a different, much larger grant.
-
-### Timeouts fail open, and that is safe here
-
-`onTimeout: 'allow'` means "no objection". The request goes on to the person as it does without the
-hook. So a stalled handler costs up to five seconds before the card appears, never an approval
-nobody gave. This is the opposite of `core:before-tool-call`, which denies on timeout because nobody
-stands behind it.
-
-### Order
-
-`install`, not `priority`. With vetoes only, order changes nothing but which reason is shown first,
-and it doesn't earn a handler-chosen number (see [Later](#later-each-with-its-trigger)).
-
-### Where it runs
-
-In `onProviderEvent`, for a `request` of kind `permission`, before the event enters the provider
-event queue. Two reasons:
-
-- The queue commits a session's events in order. A handler that takes five seconds there would stall
-  every other event from that session, including parallel tool calls.
-- The harness is already blocked on this answer, so waiting here costs nothing extra.
-
-### What a veto does
-
-1. The runtime answers the parked request through `live.handle.resolveRequest` with the first option
-   of kind `reject_once`. That's `decline` for Codex, never `cancel`, which ends the turn. If no
-   option has that kind, the runtime cancels the request. It never picks `reject_always`, because a
-   plugin must not write a lasting rule into the harness's own settings.
-2. The runtime records the `request` event carrying a new optional field,
-   `blocked: { by, reason }`. `by` is the handler's plugin id, taken from the verdict the host
-   returns. `applyEventProjection` writes that row as `resolved`, with `blocked` in its resolution.
-   The row is never `pending`, so it raises no notification, adds no attention badge, and doesn't
-   wake a delegated child's parent.
-   A bounded blocked summary is readable through `agents.requests`, including the canonical provider
-   request ID, while raw resolution stays private. This lets the separately granted Pi explanation
-   consumer react to a confirmed refusal rather than a hook verdict that might be ignored on timeout.
-3. `AgentRequestCard.tsx` draws a blocked request as resolved and names who blocked it and why.
-
-The field is optional on the wire type in `plugins/agents/src/contract/wire.ts`. An older client
-draws the row as an ordinary resolved request, so the cached query shape needs no new key.
-
-The permission reply gives the model a plain rejection, because neither ACP's nor Codex's reply has
-room for a reason. Optional explanation delivery is a separate grant and later queued turn in
-[Pi phase 03](./pi/phases/03-session-messages.md). The hook itself never sends that turn.
-
-### Getting the command and paths out of each harness
-
-Each normalizer knows its own protocol, so the extraction lives there and the runtime stays neutral.
-The request gains a driver-only `subject`, following the precedent `AgentDriverGeneratedArtifact`
-set in `plugins/agents/src/server/drivers/types.ts`. The runtime reads it for the hook, and the event
-materializer drops it before the ledger. The command is already in the ledger on the matching tool
-call, so storing it twice buys nothing.
-
-- **ACP.** `request.toolCall` carries `kind`, `locations`, and `rawInput`. `paths` comes from
-  `locations`. `command` comes from `rawInput.command` when it's a string, which holds for Claude
-  Code's Bash tool. Check DeepSeek's shape before relying on it.
-- **Codex.** `commandExecution` carries `command` and `cwd`. `fileChange` carries only `reason` and
-  `grantRoot`, so `paths` is `[grantRoot]` or `[]` unless the file-change item seen earlier in the turn
-  is easy to reach.
+Two things differ from this file's first design. The payload carries a canonical `requestId` and a
+`toolCallId`, and the subject fields are one public type that Pi phase 10's `agents:before-tool` will
+reuse. And the ACP driver merges a permission request with the tool call announced before it, because
+DeepSeek's request names only the call and leaves the command on the earlier update.
 
 ## What it does not do
 
@@ -215,27 +122,9 @@ Say these plainly in the owning docs, because a policy people trust too far is w
 
 ## The phases
 
-1. **Subject extraction.** Add `subject` in both normalizers and drop it in the materializer. Cover
-   the mappings in `acpNormalizer.test.ts` and `codexNormalizer.test.ts`, including a request with no
-   raw input.
-2. **The hook and the veto path.** Declare the point, run it in `onProviderEvent`, answer the driver,
-   and record the request already resolved. Test with the fake driver (`drivers/fake.ts`):
-   - A veto picks the first `reject_once` option.
-   - A timeout lets the request through to the person.
-   - A blocked request is never published as `pending`.
-   - A delegated child's blocked request doesn't wake its parent.
-3. **The card.** Draw `blocked` in `AgentRequestCard.tsx` on desktop and in the terminal.
-4. **A first consumer.** A small loaded plugin kept outside this repo, the way the machine stats
-   plugin is, with two hard-coded rules: no force-push, and no destructive command outside `root`. A
-   seam no real plugin uses goes stale ([extensibility.md § Unexercised seams rot](../extensibility.md#unexercised-seams-rot)),
-   and a loaded consumer exercises the route carrier, not just `ctx.hooks.handle`. Add a numbered
-   manual check to [testing/agents-and-providers.md](../testing/agents-and-providers.md) that drives
-   one blocked command through each of Claude, Codex, and DeepSeek.
-5. **The owning docs.** Add the row to the hook table in
-   [node-side-extension-points.md § Hooks](../plugins/hooks.md#hooks), the
-   blocked path and the limits above to [managed-agents.md](../managed-agents.md), and the timeout
-   reasoning beside the `core:before-tool-call` exception in [security.md](../security.md). Then
-   delete this file's design section and keep the comparison.
+All five shipped in Pi phase 02. The first consumer is
+[`docs/future/pi/packages/permission-policy/`](./pi/packages/permission-policy/README.md), and manual
+check 156 in [agents and providers](../testing/agents-and-providers.md) drives it through each harness.
 
 ## Later, each with its trigger
 

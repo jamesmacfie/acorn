@@ -20,6 +20,7 @@ import type {
   AgentWebActivity,
   AgentWebResult,
 } from '../../contract/wire.ts'
+import type { AgentPermissionSubject } from '../../contract/permissionHook.ts'
 import { formElicitationResponse, normalizeFormElicitation } from './formElicitation'
 import { webToolTitle } from './webActivity'
 import { diffHunks, hunksText } from './patchText'
@@ -32,7 +33,7 @@ const permissionKind = (kind: string): AgentPermissionOption['kind'] =>
 export function normalizeAcpPermission(
   requestId: string,
   request: RequestPermissionRequest,
-): AgentNormalizedEvent {
+): Extract<AgentNormalizedEvent, { type: 'request' }> {
   return {
     type: 'request',
     requestId,
@@ -44,6 +45,34 @@ export function normalizeAcpPermission(
       label: option.name,
       kind: permissionKind(option.kind),
     })),
+  }
+}
+
+const SUBJECT_KINDS: Record<string, AgentPermissionSubject['kind']> = {
+  execute: 'command',
+  edit: 'edit',
+  delete: 'edit',
+  move: 'edit',
+  read: 'read',
+  search: 'read',
+  fetch: 'fetch',
+}
+
+/** The parts of a tool call a permission subject reads. A permission request's `toolCall` is an update to
+ *  a call the agent may have announced earlier, so the driver merges the two before reading it. */
+export type AcpToolCallFacts = Pick<RequestPermissionRequest['toolCall'], 'toolCallId' | 'kind' | 'rawInput' | 'locations'>
+
+// What `agents:before-permission` reads. `command` is taken only when the harness sent it as a string,
+// which is Claude Code's and DeepSeek's shell input; anything else stays empty rather than rebuilt from
+// the title.
+export function acpPermissionSubject(toolCall: AcpToolCallFacts): AgentPermissionSubject {
+  const input = toolCall.rawInput
+  const command = typeof input === 'object' && input != null && 'command' in input ? input.command : undefined
+  return {
+    toolCallId: toolCall.toolCallId ?? '',
+    kind: SUBJECT_KINDS[toolCall.kind ?? ''] ?? 'other',
+    command: typeof command === 'string' ? command : '',
+    paths: (toolCall.locations ?? []).flatMap((location) => typeof location.path === 'string' ? [location.path] : []),
   }
 }
 

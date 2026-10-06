@@ -8,7 +8,8 @@ import { forgetPluginTrust, installPluginOnDevice, setPluginDevGrant } from '../
 import { distribution, refreshPluginTrust, resolvePendingTrust, reviewPendingTrust } from '../../../host/plugins/distribution'
 import { awaitingInputApproval } from '../../../host/plugins/distributionModel'
 import {
-  agentToolGrants, agentToolPermissionLines, navigationDestinationGrants, navigationDestinationPermissionLines, nodePermissionLines,
+  agentToolGrants, agentToolPermissionLines, extensionGrants, extensionPermissionLines, navigationDestinationGrants,
+  navigationDestinationPermissionLines, nodePermissionLines,
   scheduleGrants, schedulePermissionLines, uiPermissionLines, webviewGrants, webviewPermissionLines,
 } from '../../../host/trust/permissions'
 import { confirmAction } from '../../../host/registries/shell/willPhase'
@@ -272,6 +273,9 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
       ...navigationDestinationPermissionLines(navigationDestinationGrants(declared.contributions)),
       ...webviewPermissionLines(webviewGrants(declared.contributions)),
       ...agentToolPermissionLines(agentToolGrants(declared.contributions)),
+      // Hooks, rows, and other cross-plugin grants. A package with no client never reaches the trust
+      // prompt, so this tab is the only place its "Stop agents from …" line appears.
+      ...extensionPermissionLines(extensionGrants(row().name, declared.contributions)),
     ]
   }
   // Approvals for the bytes this node offers now, running or waiting on disk. A built-in's bundle ships in

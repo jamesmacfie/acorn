@@ -164,6 +164,10 @@ export type AgentAppApproval = {
   warning?: string
 }
 
+/** Who refused a permission request at `agents:before-permission`, and why. `by` is the plugin id the
+ *  host stamped on the verdict, never a value the handler chose. `reason` is capped display text. */
+export type AgentRequestBlocked = { by: string; reason: string }
+
 export type AgentQuestion = {
   id: string
   header?: string
@@ -307,7 +311,9 @@ export type AgentNormalizedEvent =
   /** Codex's completed plan item, separate from turn/plan/updated progress steps. */
   | { type: 'plan_proposal'; itemId: string; providerTurnId: string; text: string }
   | { type: 'usage'; usage: AgentUsage }
-  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval }
+  /** `blocked` marks a permission a policy plugin refused before anyone saw it. The row is written
+   *  resolved, never pending, and an older client draws it as an ordinary resolved request. */
+  | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval; blocked?: AgentRequestBlocked }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
   | { type: 'artifact'; artifactId: string; kind: AgentArtifactKind; title: string; mediaType?: string; byteSize?: number }
   /** `patch` is the unified hunks for `path`, from the first `@@` on, with no file header. A change
