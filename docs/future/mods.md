@@ -4,7 +4,9 @@ Proposal, 2026-09-29. Not started.
 
 Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/phases/02-permission-veto.md) delivers this
 hook and its policy consumer; [Pi phase 03](./pi/phases/03-session-messages.md) adds optional
-explanations through a separate messaging grant. Use the [phase plan](./pi/phases/README.md) for
+explanations through a separate messaging grant. On 2026-10-07,
+[Pi phase 10](./pi/phases/10-harness-bridges.md) added bridges through each harness's own hooks,
+which reach the tool calls this hook can't see. Use the [phase plan](./pi/phases/README.md) for
 execution order and acceptance. This file owns the base hook design and comparison.
 
 Claude Code is adding *function hooks*, marketed as Claude Mods: a plugin ships a TypeScript module
@@ -200,7 +202,8 @@ Say these plainly in the owning docs, because a policy people trust too far is w
 
 - **It sees only what the harness asks about.** A session in a bypass mode, a tool the harness's own
   settings already allow, or an earlier "allow for session" never reaches acorn. This hook applies a
-  policy to questions. It doesn't gate every action. acorn chooses the permission mode a session
+  policy to questions. It doesn't gate every action. For harnesses with a bridge,
+  `agents:before-tool` ([Pi topic 08](./pi/08-harness-bridges.md)) sees every call. acorn chooses the permission mode a session
   starts in, which is the lever for asking more often.
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
   about. [Security](../security.md) owns the shipped boundaries and their limits; local task
@@ -248,9 +251,10 @@ Say these plainly in the owning docs, because a policy people trust too far is w
 - **Handlers a person can't turn off.** This would need an administrator policy and a separate
   proposal. Nothing here builds it. [Cloud team policy](./cloud/isolation.md#team-policy) applies
   to hosted workers and does not require named handlers.
-- **Shipping a mod into the Claude sessions acorn starts.** That would reach what acorn can't, like
-  output redaction, but only for Claude. Trigger: Mods leaves early access, since its API can change
-  without notice until then.
+- **Shipping a mod into the Claude sessions acorn starts.** Superseded on 2026-10-07 by
+  [harness bridges](./pi/08-harness-bridges.md). Codex shipped command hooks shaped like Claude's, so
+  acorn installs one bridge per harness through command hooks first and keeps a Claude mod as the
+  fallback if per-call process cost is too high. Output redaction remains Claude-only and deferred.
 
 ## Refused
 

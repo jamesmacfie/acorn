@@ -97,7 +97,7 @@ Update [managed agents](../../../managed-agents.md),
 [workflow execution](../../../workflows/execution.md), [security](../../../security.md),
 [node extension points](../../../plugins/node-side-extension-points.md), and
 [workflow acceptance](../../../testing/workflows.md). Record the completion point's shipped name,
-deadline, operation correlation, usage semantics, and cancellation ownership. Give phase 09 the
+deadline, operation correlation, usage semantics, and cancellation ownership. Give phase 11 the
 real unattended-run evidence and exact consumer revisions.
 
 ## Verify before building

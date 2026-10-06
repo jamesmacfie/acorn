@@ -55,6 +55,9 @@ loaded-worker RPC membrane, including a returned sender's asynchronous `queue` m
    veto route: a timeout may ignore its late verdict, and another handler may supply the actual veto.
    Queue failure must not undo a veto.
    Refusals in unattended sessions remain effective but have no automatic explanation until phase 05.
+   This explanation turn is the fallback for harnesses without a bridge. Where
+   [phase 10](./10-harness-bridges.md) installs one, a bridge veto carries its reason to the model
+   inside the turn.
 
 Do not make the hook queue notes, grant messaging implicitly with veto, steer a running turn,
 cancel/restart to simulate steering, or add held-message delivery. Keep those refusals visible.

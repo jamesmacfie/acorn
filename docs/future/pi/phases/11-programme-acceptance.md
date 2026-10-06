@@ -1,6 +1,6 @@
-# Phase 09: programme acceptance
+# Phase 11: programme acceptance
 
-Status: proposed, 2026-10-03. Entry: phases 01–08 have accepted handoffs or their expressly permitted
+Status: proposed, 2026-10-03. Entry: phases 01–10 have accepted handoffs or their expressly permitted
 fallback/removal outcomes. This is the final phase.
 
 ## Outcome
@@ -19,13 +19,15 @@ between accepted slices; it does not widen the programme.
 | Model grant and advisor | Unconfigured/off makes no call; correct backend/model, conservative allowance, repeat suppression, and one correction. |
 | Unattended ownership | Workflow/delegation final result waits for admitted corrections; cancel/timeout/budget/restart leave no orphan turn. |
 | Plugin skills | Manifest-only package, trust update, supporting asset load, disable/resume, portable/native matrix, and no worktree writes. |
+| Session reach | Activity pane rebuilds mid-session on each harness, option change validated and attributed, warn-only note on a pending request. |
+| Harness bridges | Bridge veto, `ask`, and after-tool note on Claude and Codex, or a recorded Codex limitation; no bridge reply ever approves; coverage shown per harness. |
 | Resource experiment | Reproducible pass with default off, or complete removal with paired evidence retained. |
 | Node and client scope | Headless execution, disconnected clients, remote/selected-Node separation, and additive stored-state compatibility. |
 
 ## Implementation and review
 
 1. Reconcile every handoff's contract names, migrations, loaded consumer revisions, and provider
-   versions. Build/install policy, advisor, skills, and `omp` packages from the supplied source into
+   versions. Build/install policy, advisor, skills, session meter, and `omp` packages from the supplied source into
    a fresh isolated profile. Verify required scaffold/type/SDK changes are available to an external
    developer; local compiled consumers must not mask missing published declarations.
 2. Run one combined interactive flow: select a skill, perform work, trigger a denied command, read
@@ -39,8 +41,9 @@ between accepted slices; it does not widen the programme.
    messages do not cross Node scope. Restore older data without resetting it and check ordinary
    sessions, approvals, configured Generate buttons, MCP tools, and user-provided skills.
 5. Review the final trust prompts and owning docs against the implementation. Keep hook veto,
-   messaging, review participation, model generation, and skill instructions as distinct grants.
-   State the permission hook's coverage limit, the model cap's managed-path limit, advisor latency,
+   `ask`, messaging, review participation, model generation, session option changes, and skill
+   instructions as distinct grants. State the permission hook's coverage limit, each harness's
+   bridge coverage, the model cap's managed-path limit, advisor latency,
    unknown cost reporting, and unsupported native skill doors in user-visible copy where relevant.
 6. Resolve integration failures at the owning layer and rerun the affected evidence. Do not repeat
    every benchmark or provider test without a concrete reason. A missing graphical/provider check

@@ -58,7 +58,10 @@ Say these in the owning docs when the hook ships:
 - `omp` can rewrite a tool's input. This hook cannot, because the harness runs its own command.
 - `omp` can patch a tool's result before the model reads it. Acorn cannot reach a result at all.
 
-For those, the answer is [01](./01-omp-harness.md): run an agent whose loop takes extensions.
+For the first and the second, [08](./08-harness-bridges.md) proposes a bridge through each harness's
+own hooks: Claude Code and Codex now offer `PreToolUse`, so acorn can see every tool call there too.
+It still refuses input rewriting. For patching results, the answer is [01](./01-omp-harness.md): run
+an agent whose loop takes extensions.
 
 ## Verify before building
 

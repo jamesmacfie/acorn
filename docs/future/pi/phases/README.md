@@ -1,6 +1,7 @@
 # Sequential implementation plan
 
-Status: proposed, 2026-10-03. No phase is implemented by this plan. Execute these handoffs in
+Status: proposed, 2026-10-03; phases 09 and 10 added and acceptance moved to phase 11 on 2026-10-07.
+No phase is implemented by this plan. Execute these handoffs in
 order, using one phase as the developer's assignment. The numbered files in the parent folder are
 topic proposals, not execution phases.
 
@@ -21,7 +22,9 @@ documents remain authoritative about implemented behavior.
 | 06 | [Portable plugin skills](./06-portable-skills.md) | A skills-only plugin delivers a validated, readable index on start and resume. |
 | 07 | [Native skill delivery](./07-native-skills.md) | Claude uses native skills; Codex uses a verified native door or the documented portable fallback. |
 | 08 | [Resource-read experiment](./08-resource-read-experiment.md) | Paired results justify retaining the experiment, or its implementation is removed. |
-| 09 | [Programme acceptance](./09-programme-acceptance.md) | Combined real-host evidence, published owning contracts, and a recorded disposition for every phase. |
+| 09 | [Activity feed, session options, and request notes](./09-session-reach.md) | A loaded meter reads activity on every harness and changes options; the policy plugin notes risky requests. |
+| 10 | [Harness bridges](./10-harness-bridges.md) | Bridged harnesses run acorn's hooks on every tool call; Codex has a bridge or an evidenced limitation. |
+| 11 | [Programme acceptance](./11-programme-acceptance.md) | Combined real-host evidence, published owning contracts, and a recorded disposition for every phase. |
 
 Each phase assumes the previous phase's accepted handoff, even where the underlying feature could
 be implemented independently. Phase 01 may finish with an evidenced harness limitation rather than
@@ -48,6 +51,10 @@ licenses silently omitting verification.
   Explain this distinction in settings and the owning contract.
 - Deliver skills as named procedures. Always-on instructions remain context sections. Native
   delivery is per harness, and an unavailable native door uses the portable delivery result.
+- Give the permission hook's subject a named public type. Phase 10's `agents:before-tool` reuses it,
+  so one policy handler covers asked questions and bridged calls.
+- Bridges install through each harness's own hook system and never return allow. They are acorn's
+  answer to in-loop extension; acorn still builds no loop of its own.
 - Treat resource reads as a measured experiment. Keep writes and search as tools, preserve task
   authorization, and require the original 15% context saving without losing completed tasks.
 

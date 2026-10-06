@@ -1,7 +1,7 @@
 # Phase 08: resource-read experiment
 
 Status: proposed, 2026-10-03. Entry: phase 07 accepted. Next:
-[phase 09](./09-programme-acceptance.md).
+[phase 09](./09-session-reach.md).
 
 ## Outcome
 
@@ -73,7 +73,7 @@ intact. A subjective report that resource reads feel simpler is insufficient.
 
 Update [MCP](../../../mcp.md) and [agent tools](../../../agent-tools.md) only for retained implemented
 behavior. Keep experimental measurements and the disposition in this phase and
-[the source experiment](../07-resource-reads.md). Supply phase 09 with the benchmark artifacts,
+[the source experiment](../07-resource-reads.md). Supply phase 11 with the benchmark artifacts,
 configuration revision, and any code-removal revision.
 
 ## Verify before building

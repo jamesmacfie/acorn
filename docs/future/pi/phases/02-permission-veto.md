@@ -26,7 +26,9 @@ carrier. Raw subject extraction belongs to the driver; policy and session state 
 ## Implementation
 
 1. Add a driver-only permission subject with kind, command, and paths. Use the Mods mapping and
-   bound provider-owned values. Unknown fields become empty values; do not reconstruct commands from
+   bound provider-owned values. Name the hook-facing subject fields as one public type in agents'
+   contract, with `toolCallId` (`''` when unknown), because
+   [phase 10](./10-harness-bridges.md)'s `agents:before-tool` reuses it. Unknown fields become empty values; do not reconstruct commands from
    display titles. Strip the subject before wire serialization, SQLite, and telemetry.
 2. Declare `agents:before-permission` beside `before-send`. Retain the Mods fields and add
    `requestId`, the canonical provider request ID scoped to the session. It enables the phase 03

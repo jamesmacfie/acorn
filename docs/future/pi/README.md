@@ -1,6 +1,7 @@
 # What acorn takes from oh-my-pi
 
-Status: proposed, 2026-10-02; sequential handoffs added 2026-10-03. Nothing in this programme is built
+Status: proposed, 2026-10-02; sequential handoffs added 2026-10-03; harness bridges and the Mods
+directory survey added 2026-10-07. Nothing in this programme is built
 or scheduled. Where a file here disagrees with a shipped contract, the owning reference document
 wins until the implementation
 changes that contract.
@@ -26,8 +27,10 @@ contributed harness over ACP. An acorn plugin sits outside the loop and reaches 
 
 That difference is structural. No amount of plugin API widening lets an acorn plugin rewrite what
 Claude Code sends to Anthropic, because that happens in Claude Code's process. So the programme does
-two things: it widens the edges acorn does own, and it tests whether acorn needs a loop of its own
-at all by running `omp` as a harness first.
+three things: it widens the edges acorn does own, it tests whether acorn needs a loop of its own at
+all by running `omp` as a harness first, and it reaches inside each harness's loop through that
+harness's own hook system ([08](./08-harness-bridges.md)). Claude Code, Codex, and `omp` each publish
+one, so a plugin can write against acorn's points once.
 
 ## What `omp` extensions can do
 
@@ -83,11 +86,13 @@ everything inside the loop.
 | [05-advisor.md](./05-advisor.md) | A loaded advisor plugin: a second model that reviews each finished turn and sends a note back. The consumer for 03 and 04. |
 | [06-agent-content.md](./06-agent-content.md) | Plugin skills delivered through a portable index and verified native harness interfaces; rules and importers remain outside this scope. |
 | [07-resource-reads.md](./07-resource-reads.md) | An experiment: expose acorn's read-only tools as MCP resources behind one read, the way `omp` treats `pr://` as a path. |
+| [08-harness-bridges.md](./08-harness-bridges.md) | Small bridges acorn installs through Claude's, Codex's, and `omp`'s own hooks, so a plugin can veto, hold, or annotate every tool call. |
+| [09-session-reach.md](./09-session-reach.md) | What the Claude Mods directory asks for that needs no bridge: an activity feed, session option changes, and notes on a pending request. |
 | [refused.md](./refused.md) | What this programme decided not to take from `omp`, and why. |
 
 ## The order of work
 
-Execute the [nine phases](./phases/README.md#the-phases) in order. Phase 01 tests whether `omp`
+Execute the [eleven phases](./phases/README.md#the-phases) in order. Phase 01 tests whether `omp`
 provides the deep-loop features without Acorn building another agent loop. The harness-neutral
 features remain useful for Claude, Codex, and DeepSeek regardless of that outcome.
 
@@ -97,7 +102,8 @@ review reader, and the interactive advisor together. Phase 05 integrates unatten
 lifetime, cancellation, and accounting before enabling automatic workflow/delegation notes.
 
 Phases 06 and 07 deliver portable and native skills in order. Phase 08 measures resource reads and
-may remove the experiment. Phase 09 accepts the combined programme on real clients and a headless
+may remove the experiment. Phase 09 gives plugins the activity feed, option changes, and request
+notes. Phase 10 installs harness bridges. Phase 11 accepts the combined programme on real clients and a headless
 Node. The [execution rules](./phases/README.md) define each handoff and permitted fallback.
 
 The rule in [extensibility.md § Unexercised seams rot](../../extensibility.md#unexercised-seams-rot)

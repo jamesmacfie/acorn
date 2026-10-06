@@ -1,6 +1,6 @@
 # What this programme refuses
 
-Status: proposed, 2026-10-02. Each entry says what `omp` does, why acorn does not take it, and what
+Status: proposed, 2026-10-02; revised for harness bridges on 2026-10-07. Each entry says what `omp` does, why acorn does not take it, and what
 would make it worth revisiting.
 
 ## Plugins in-process with no isolation
@@ -32,6 +32,9 @@ what the person sees, never what the model wrote, so a stream hook would make th
 with the provider's record of the turn.
 
 Revisit: if acorn ever owns a loop. Until then, people who want stream rules use `omp` as a harness.
+Harness bridges ([08](./08-harness-bridges.md)) don't change this. Claude's Mods has a stream event,
+but Codex's hooks don't, and a transcript that disagrees with the provider's record is the same
+problem from inside the loop.
 
 ## Building acorn's own agent loop now
 
@@ -39,8 +42,9 @@ Owning a loop is the only way to offer context rewriting, tool shadowing, and st
 session. It is also a second agent product to maintain against every provider's quirks, which is the
 work `omp` documents in a 338 KB provider-quirks file.
 
-Revisit: after [01](./01-omp-harness.md). If `omp` as a harness covers what people ask for, the answer
-stays no. If the generic ACP driver turns out to be the limit, fix the driver first.
+Revisit: after [01](./01-omp-harness.md) and [08](./08-harness-bridges.md). If `omp` as a harness and
+bridges through each harness's own hooks cover what people ask for, the answer stays no. If the
+generic ACP driver turns out to be the limit, fix the driver first.
 
 ## Mid-turn steering
 
@@ -49,6 +53,16 @@ that, and cancelling and restarting a turn to fake it loses the work in flight. 
 queues behind the running turn instead.
 
 Revisit: when a harness protocol gains a steer call. Add it as a second delivery mode, per driver.
+
+## Replacing a tool's call or result
+
+`omp` lets an extension shadow a built-in tool, and Claude's Mods lets `tool.call` answer with a
+result instead of running the tool. A bridge could pass either through. Acorn doesn't, because the
+transcript would show a call that never ran, or a result the tool never produced. Bridges also
+refuse rewriting a tool's input, which changes the command a person approved.
+
+Revisit: input rewriting, when a real consumer needs it, as its own mode with its own grant. Result
+replacement, never.
 
 ## Model choice by family
 
