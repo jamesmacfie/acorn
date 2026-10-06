@@ -2,7 +2,6 @@ import type { Env } from '../bindings'
 import { pruneAudit } from '../audit'
 import { routeCapability } from '../bridge'
 import { compactHistory } from '../dashboards/history'
-import { definedPanelIds, describeSamplePass, readDashboardPrefs, runSamplePass } from '../dashboards/sampler'
 import type { AppDatabase } from '../db'
 import { registerNodeActionTarget } from './nodeAction'
 import { registerDatasetCaptureTarget } from '../datasets/schedule'
@@ -64,7 +63,10 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       name: 'Record dashboard measures',
       cadence: { every: 60 * 60 },
       timeoutMs: 120_000,
-      run: async (signal) => describeSamplePass(await runSamplePass(db, env, signal)),
+      run: async (signal) => {
+        const { describeSamplePass, runSamplePass } = await import('../dashboards/sampler')
+        return describeSamplePass(await runSamplePass(db, env, signal))
+      },
     })
 
     // core:compact-history (docs/schedules.md § What is registered today).
@@ -73,6 +75,7 @@ export function createScheduler(db: AppDatabase, options: CreateSchedulerOptions
       name: 'Compact dashboard history',
       cadence: { daily: '03:40' },
       run: async () => {
+        const { definedPanelIds, readDashboardPrefs } = await import('../dashboards/sampler')
         // `null` when the blob could not be read, which skips the orphan sweep. Deleting every series
         // over a failed preference read is the worst available response to a transient error.
         const prefs = await readDashboardPrefs(db, env)
