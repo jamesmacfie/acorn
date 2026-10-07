@@ -53,6 +53,9 @@ Other ways to run it:
 | `pnpm dev:agent -- --session <name>` | Starts an isolated desktop session you can drive. See [agent drivers](./local-development/agent-drivers.md). |
 | `pnpm dev:tui:agent -- --session <name>` | Starts an isolated terminal client you can drive. |
 
+Pass `--workspaces on` or `--workspaces off` to either agent launcher to seed its workspace mode
+before it adds a project. See [agent drivers](./local-development/agent-drivers.md).
+
 `tauri dev` rebuilds and relaunches the app on every change under `src-tauri`, which takes the window
 away from whoever is using it. Use `pnpm dev:no-watch` when someone is working in the app while you
 edit the shell. To pick up the new binary, stop it and run `pnpm dev` again. Vite's hot reload of the

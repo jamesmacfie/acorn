@@ -45,9 +45,9 @@ export function validateCommand(args: ParsedArgs): void {
     workspace: { list: { count: 2 }, show: { count: 3 }, create: { count: 2, options: ['name', 'request-id'] }, rename: { count: 3, options: ['name', 'request-id'] }, remove: { count: 3, options: ['request-id'] }, 'external-projects': { count: 4, options: ['file', 'request-id'] } },
     project: { list: { count: 2, options: ['workspace', 'include-hidden'] }, show: { count: 3 }, add: { count: 2, options: ['workspace', 'path', 'name', 'request-id'] }, rename: { count: 3, options: ['name', 'request-id'] }, move: { count: 3, options: ['workspace', 'request-id'] }, hide: { count: 3, options: ['request-id'] }, unhide: { count: 3, options: ['request-id'] }, detect: { count: 3, options: ['request-id'] }, remove: { count: 3, options: ['request-id'] }, config: { count: 4, options: ['patch-file', 'request-id'] } },
     task: { list: { count: 2, options: ['project', 'status'] }, show: { count: 3 }, create: { count: 2, options: ['project', 'title', 'branch', 'base', 'skip-setup', 'request-id'] } },
-    agent: { providers: { count: 2 }, list: { count: 2, options: ['task', 'workspace', 'limit'] }, show: { count: 3 }, start: { count: 2, options: ['task', 'provider', 'profile', 'prompt', 'prompt-file', 'request-id'] }, send: { count: 3, options: ['prompt', 'prompt-file', 'request-id'] }, events: { count: 3, options: ['after-seq', 'limit', 'follow'] }, wait: { count: 3, options: ['until', 'timeout', 'check'] } },
+    agent: { providers: { count: 2 }, list: { count: 2, options: ['task', 'workspace', 'project', 'limit'] }, show: { count: 3 }, start: { count: 2, options: ['task', 'provider', 'profile', 'prompt', 'prompt-file', 'request-id'] }, send: { count: 3, options: ['prompt', 'prompt-file', 'request-id'] }, events: { count: 3, options: ['after-seq', 'limit', 'follow'] }, wait: { count: 3, options: ['until', 'timeout', 'check'] } },
     workflow: { list: { count: 2, options: ['task'] }, start: { count: 2, options: ['task', 'definition', 'inputs-file', 'request-id'] } },
-    run: { list: { count: 2, options: ['workspace'] } },
+    run: { list: { count: 2, options: ['workspace', 'project'] } },
     plugin: { list: { count: 2 } },
   }
   const spec = subject && verb ? grammar[subject]?.[verb] : undefined
@@ -57,7 +57,8 @@ export function validateCommand(args: ParsedArgs): void {
   if (subject === 'project' && verb === 'config' && !['show', 'set'].includes(id ?? '')) throw new CliError('usage', 'project config needs show or set.', 2)
   if (subject === 'workspace' && verb === 'external-projects' && id === 'replace' && !args.options.file) throw new CliError('usage', '--file is required.', 2)
   if (subject === 'project' && verb === 'config' && id === 'set' && !args.options['patch-file']) throw new CliError('usage', '--patch-file is required.', 2)
-  if (subject === 'agent' && verb === 'list' && args.options.task && args.options.workspace) throw new CliError('usage', 'Use either --task or --workspace.', 2)
+  if (subject === 'agent' && verb === 'list' && [args.options.task, args.options.workspace, args.options.project].filter(Boolean).length > 1) throw new CliError('usage', 'Use only one of --task, --workspace, or --project.', 2)
+  if (subject === 'run' && verb === 'list' && args.options.workspace && args.options.project) throw new CliError('usage', 'Use either --workspace or --project.', 2)
   if (subject === 'agent' && ['start', 'send'].includes(verb) && (!!args.options.prompt === !!args.options['prompt-file'])) throw new CliError('usage', 'Provide exactly one of --prompt or --prompt-file.', 2)
   if (subject === 'agent' && verb === 'wait' && args.options.until && !['ready', 'attention', 'turn-completed', 'stopped'].includes(args.options.until)) throw new CliError('usage', 'Invalid --until value.', 2)
   if (subject === 'agent' && verb === 'events' && args.options.follow && args.output !== 'jsonl') throw new CliError('usage', 'agent events --follow requires --output jsonl.', 2)

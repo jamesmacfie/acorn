@@ -11,6 +11,8 @@ import { getConnection } from '../../integrations/connections'
 import { broadcastProjectChanged, broadcastWorkspaceChanged, broadcastWorkspaceProjectsChanged } from '../../notify'
 import { workspaceProjectOrderBody } from '@acorn/protocol/api.ts'
 import { reorderWorkspaceProjects } from '../../projects'
+import { nodeWorkspacesMode, WORKSPACES_OFF_MESSAGE } from '../../workspacesMode'
+import { notifyWorkspaceRemoved, removeWorkspaceRows } from '../../workspaceRemoval'
 
 // Workspaces (docs/workspaces-and-tasks.md): named groups of Projects, the top-level unit.
 
@@ -108,14 +110,16 @@ export const workspaces = new Hono<AppEnv>()
   // projection into application-owned project state.
   .post('/bootstrap', async (c) => {
     const db = getDb(c.env)
+    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return c.json(await listWorkspaces(db))
     const ensured = await ensureDefault(db)
     if (ensured.created) broadcastWorkspaceChanged({ workspaceId: ensured.id })
     return c.json(await listWorkspaces(db))
   })
   .post('/', async (c) => {
+    const db = getDb(c.env)
+    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const body = (await c.req.json().catch(() => ({}))) as Partial<WorkspaceSeed>
     if (!body.name?.trim()) return respondError(c, 400, 'bad_request')
-    const db = getDb(c.env)
     const [{ value }] = await db.select({ value: max(schema.workspaces.sort) }).from(schema.workspaces)
     const now = Date.now()
     const id = randomUUID()
@@ -125,6 +129,7 @@ export const workspaces = new Hono<AppEnv>()
   })
   // Workspace identity is its name. Project colour and project configuration belong to project routes.
   .patch('/:id', async (c) => {
+    if (nodeWorkspacesMode(getDb(c.env), ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const parsed = workspacePatchBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
@@ -148,23 +153,20 @@ export const workspaces = new Hono<AppEnv>()
   .delete('/:id', async (c) => {
     const id = c.req.param('id')
     const db = getDb(c.env)
+    if (nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const row = (await db.select().from(schema.workspaces).where(eq(schema.workspaces.id, id)).limit(1))[0]
     if (!row) return respondError(c, 404, 'not_found')
     if (row.isDefault) return respondError(c, 400, 'cannot_delete_default')
     const reassignedProjects = await db.select({ id: schema.projects.id }).from(schema.projects).where(eq(schema.projects.workspaceId, id))
-    const removedMappings = await db.select({ integrationId: schema.workspaceExternalProjects.integrationId }).from(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
-    const removedProviders = await mappingProviders(db, ownerId(c), removedMappings.map((mapping) => mapping.integrationId))
     const defaultWorkspace = await ensureDefault(db)
     // Reassign this workspace's projects back to Default rather than orphaning them.
-    await db.update(schema.projects).set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id))
-    await db.delete(schema.workspaceExternalProjects).where(eq(schema.workspaceExternalProjects.workspaceId, id))
-    const { deleteWorkspaceDatasets } = await import('../../datasets/store')
-    deleteWorkspaceDatasets(db, id)
-    await db.delete(schema.workspaces).where(eq(schema.workspaces.id, id))
+    const removedProviders = db.transaction((tx) => {
+      tx.update(schema.projects).set({ workspaceId: defaultWorkspace.id, updatedAt: Date.now() }).where(eq(schema.projects.workspaceId, id)).run()
+      return removeWorkspaceRows(tx, db, id, ownerId(c))
+    })
     if (defaultWorkspace.created) broadcastWorkspaceChanged({ workspaceId: defaultWorkspace.id })
     for (const project of reassignedProjects) broadcastProjectChanged({ projectId: project.id })
-    for (const providerId of removedProviders) broadcastWorkspaceProjectsChanged({ providerId, workspaceIds: [id] })
-    broadcastWorkspaceChanged({ workspaceId: id })
+    notifyWorkspaceRemoved(id, removedProviders)
     return c.json({ ok: true })
   })
   // External projects (Linear/Rollbar/…) linked to this workspace: (integrationId, externalId) pairs.

@@ -1,6 +1,33 @@
 # Phase 01: Node switch
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: none.
+## Completion note — October 7, 2026
+
+Status: implemented on `phase-01-node-switch`.
+
+- The protocol owns `core.workspaces` and its unset-value rule. Node project creation settles the
+  preference, inserts a project, and creates either its own workspace or Default in one transaction.
+  Routes and the plugin project seam use the active owner ID. Broadcasts follow commit.
+- The Node refuses explicit membership, project moves, and workspace create, rename, and delete while
+  off. The rename refusal is an extra guard so a paired workspace cannot diverge from its project.
+  Project rename and delete keep that pair in sync; deletion removes links and datasets.
+- The CLI accepts `project add` without `--workspace`, resolves `agent list` and `run list`
+  `--project` filters, and reports `workspaces_off` as a usage error. Both dev drivers pass
+  `--workspaces on|off` to the seed. The `tui-navigation` fixture creates a second paired workspace
+  while off and retains its grouped layout with `--workspaces on`.
+- The grouped Default fallback now lives inside the project transaction rather than calling the old
+  `defaultWorkspaceId` helper. Its observable behavior is unchanged. The preboot seed writes the
+  preference under the empty owner ID; Node boot adopts it into the bound owner as it does other
+  preferences.
+- Later phases should read `core.workspaces` through the protocol helper, omit explicit workspace IDs
+  from project creation while off, and account for the existing workspace-scoped records that both
+  workspace and project deletion leave behind. The desktop and terminal UI still use grouped-mode
+  controls until their phases land.
+- Focused Node, CLI, protocol, and seed checks pass. The CLI and protocol package suites pass. The
+  Node package suite passes 1,633 tests; three unrelated storage backup tests time out under Node 26,
+  including when run alone. The architecture doc check reports three missing generated Tauri schema
+  files cited by the security plan, outside this phase.
+
+Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md) first, especially [decisions](./README.md#decisions) 1 to 5 and
 [facts from the code](./README.md#facts-from-the-code).
 

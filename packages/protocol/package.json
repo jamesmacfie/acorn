@@ -13,6 +13,7 @@
     "./authoring.ts": "./src/data/authoring.ts",
     "./baseline.ts": "./src/baseline.ts",
     "./branch.ts": "./src/projects/branch.ts",
+    "./workspacesMode.ts": "./src/projects/workspacesMode.ts",
     "./broker.ts": "./src/transport/broker.ts",
     "./browserRules.ts": "./src/integrations/browserRules.ts",
     "./chrome.ts": "./src/chrome/surfaces.ts",

@@ -8,14 +8,17 @@ import { expect, test } from 'vitest'
 
 const run = promisify(execFile)
 
-test('the navigation fixture gives both hosts tasks in two workspaces', async () => {
+test.each([
+  { mode: 'off', names: ['repo', 'side-project'] },
+  { mode: 'on', names: ['Default', 'Side project'] },
+])('the navigation fixture gives both hosts tasks in two workspaces with mode $mode', async ({ mode, names }) => {
   const directory = await mkdtemp(join(tmpdir(), 'acorn-tui-fixture-'))
   const dataDir = join(directory, 'data')
   const project = join(directory, 'fixture', 'repo')
   try {
     const { stdout } = await run(process.execPath, ['--import', 'tsx', 'scripts/agent/seed.ts',
       '--data-dir', dataDir, '--project', project, '--fixture', 'tui-navigation',
-      '--profile', 'small', '--seed', '1'], {
+      '--profile', 'small', '--seed', '1', '--workspaces', mode], {
       cwd: resolve(import.meta.dirname, '../..'),
       maxBuffer: 1024 * 1024,
     })
@@ -29,7 +32,7 @@ test('the navigation fixture gives both hosts tasks in two workspaces', async ()
       const tasks = db.prepare('select title from tasks order by sort').all().map((row) => row.title)
       expect(tasks).toEqual(['Review changed files', 'Plan follow-up work', 'Check workspace switch'])
       const workspaces = db.prepare('select name from workspaces order by sort').all().map((row) => row.name)
-      expect(workspaces).toEqual(['Default', 'Side project'])
+      expect(workspaces).toEqual(names)
     } finally {
       db.close()
     }

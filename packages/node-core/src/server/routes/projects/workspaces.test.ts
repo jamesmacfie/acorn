@@ -2,6 +2,8 @@ import { Hono } from 'hono'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Workspace } from '@acorn/protocol/api.ts'
 import { getDb } from '../../db'
+import { schema } from '../../db'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import type { AppEnv } from '../../middleware/auth'
 import { workspaces } from './workspaces'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
@@ -31,6 +33,7 @@ describe('workspace identity', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    t.db.insert(schema.prefs).values({ userId: 'james', key: WORKSPACES_PREF_KEY, value: 'on' }).run()
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()
   })

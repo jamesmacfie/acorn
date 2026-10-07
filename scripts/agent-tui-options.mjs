@@ -7,7 +7,7 @@ const PROFILES = new Set(['small', 'scale', 'canonical'])
 export function parseTuiAgentOptions(argv) {
   const options = {
     session: null, fixture: null, project: null, profile: 'small', seed: 1,
-    reuse: false, onboarding: false, cols: 80, rows: 24, keyboard: 'kitty',
+    reuse: false, onboarding: false, cols: 80, rows: 24, keyboard: 'kitty', workspaces: null,
   }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -24,6 +24,7 @@ export function parseTuiAgentOptions(argv) {
     else if (arg === '--cols') options.cols = Number(argv[++index])
     else if (arg === '--rows') options.rows = Number(argv[++index])
     else if (arg === '--keyboard') options.keyboard = argv[++index] ?? ''
+    else if (arg === '--workspaces') options.workspaces = argv[++index] ?? ''
     else if (arg === '--reuse') options.reuse = true
     else if (arg === '--onboarding') options.onboarding = true
     else throw new Error(`Unknown option: ${arg}`)
@@ -37,7 +38,9 @@ export function parseTuiAgentOptions(argv) {
     throw new Error('Terminal size must be 40–500 columns by 20–500 rows.')
   }
   if (!['kitty', 'legacy'].includes(options.keyboard)) throw new Error('Keyboard must be kitty or legacy.')
+  if (options.workspaces !== null && !['on', 'off'].includes(options.workspaces)) throw new Error('--workspaces must be on or off.')
   if (options.onboarding && (options.fixture || options.project)) throw new Error('Onboarding cannot use a fixture or project.')
+  if (options.onboarding && options.workspaces) throw new Error('--workspaces cannot be used with --onboarding.')
   if (options.fixture && options.project) throw new Error('A fixture supplies its own project.')
   if (!options.fixture && (argv.includes('--profile') || argv.includes('--seed'))) {
     throw new Error('--profile and --seed require --fixture.')

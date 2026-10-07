@@ -8,6 +8,8 @@ import { schema } from './db'
 import { git } from './core/git'
 import { retireTaskHead } from './worktrees/taskHeadObserver'
 import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChanged } from './notify'
+import { nodeWorkspacesMode, settleWorkspacesMode, WORKSPACES_OFF_MESSAGE } from './workspacesMode'
+import { notifyWorkspaceRemoved, removeWorkspaceRows } from './workspaceRemoval'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
@@ -142,7 +144,7 @@ export async function detectFacets(path: string): Promise<ProjectFacets> {
   }
 }
 
-export type CreateProjectResult = { ok: true; project: ProjectRow } | { ok: false; reason: string }
+export type CreateProjectResult = { ok: true; project: ProjectRow } | { ok: false; reason: string; code?: 'workspaces_off' }
 
 const isDir = (p: string): boolean => {
   try {
@@ -152,19 +154,55 @@ const isDir = (p: string): boolean => {
   }
 }
 
-export async function defaultWorkspaceId(db: AppDatabase): Promise<string> {
-  const [existing] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.isDefault, true))
-  if (existing) return existing.id
-  const id = randomUUID()
-  const now = Date.now()
-  await db.insert(schema.workspaces).values({ id, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now })
-  broadcastWorkspaceChanged({ workspaceId: id })
-  return id
+type NewProject = Omit<typeof schema.projects.$inferInsert, 'id' | 'workspaceId' | 'sort' | 'createdAt' | 'updatedAt'>
+
+function insertProject(db: AppDatabase, ownerId: string, input: NewProject, requestedWorkspaceId?: string): CreateProjectResult {
+  const result = db.transaction((tx) => {
+    const mode = settleWorkspacesMode(tx, ownerId)
+    if (mode === 'off' && requestedWorkspaceId !== undefined) {
+      // An explicit membership would let another caller bypass the one-project rule.
+      throw new WorkspacesOffError()
+    }
+    const now = Date.now()
+    let workspaceId = requestedWorkspaceId
+    let createdWorkspace = false
+    if (workspaceId) {
+      if (!tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId)).get()) {
+        throw new Error('No such workspace.')
+      }
+    } else if (mode === 'off') {
+      workspaceId = randomUUID()
+      const sort = tx.select({ value: max(schema.workspaces.sort) }).from(schema.workspaces).get()?.value ?? -1
+      tx.insert(schema.workspaces).values({ id: workspaceId, name: input.name, isDefault: false, sort: sort + 1, createdAt: now, updatedAt: now }).run()
+      createdWorkspace = true
+    } else {
+      const existing = tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.isDefault, true)).get()
+      if (existing) workspaceId = existing.id
+      else {
+        workspaceId = randomUUID()
+        tx.insert(schema.workspaces).values({ id: workspaceId, name: 'Default', isDefault: true, sort: 0, createdAt: now, updatedAt: now }).run()
+        createdWorkspace = true
+      }
+    }
+    const id = randomUUID()
+    const sort = tx.select({ value: max(schema.projects.sort) }).from(schema.projects).where(eq(schema.projects.workspaceId, workspaceId)).get()?.value ?? -1
+    tx.insert(schema.projects).values({ ...input, id, workspaceId, sort: sort + 1, createdAt: now, updatedAt: now }).run()
+    return { project: tx.select().from(schema.projects).where(eq(schema.projects.id, id)).get()!, createdWorkspace }
+  })
+  if (result.createdWorkspace) broadcastWorkspaceChanged({ workspaceId: result.project.workspaceId })
+  broadcastProjectChanged({ projectId: result.project.id })
+  return { ok: true, project: result.project }
+}
+
+export class WorkspacesOffError extends Error {
+  readonly code = 'workspaces_off'
+  constructor() { super(WORKSPACES_OFF_MESSAGE) }
 }
 
 export async function createProject(
   db: AppDatabase,
   input: { path: string; workspaceId?: string; name?: string },
+  ownerId = '',
 ): Promise<CreateProjectResult> {
   if (!isAbsolute(input.path)) return { ok: false, reason: 'Path must be absolute.' }
   if (!isDir(input.path)) return { ok: false, reason: 'Directory does not exist.' }
@@ -174,29 +212,18 @@ export async function createProject(
   const already = await projectAtPath(db, input.path)
   if (already) return { ok: true, project: already }
 
-  let workspaceId = input.workspaceId
-  if (workspaceId !== undefined) {
-    const [workspace] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId))
-    if (!workspace) return { ok: false, reason: 'No such workspace.' }
-  } else {
-    workspaceId = await defaultWorkspaceId(db)
-  }
-
   const facets = await detectFacets(input.path)
-  const now = Date.now()
-  const project: typeof schema.projects.$inferInsert = {
-    id: randomUUID(),
+  const project: NewProject = {
     name: input.name?.trim() || facets.githubName || basename(input.path),
     path: input.path,
-    workspaceId,
-    sort: nextProjectSort(db, workspaceId),
     ...facets,
-    createdAt: now,
-    updatedAt: now,
   }
-  await db.insert(schema.projects).values(project)
-  broadcastProjectChanged({ projectId: project.id })
-  return { ok: true, project: (await getProject(db, project.id))! }
+  try { return insertProject(db, ownerId, project, input.workspaceId) }
+  catch (error) {
+    if (error instanceof WorkspacesOffError) return { ok: false, code: 'workspaces_off', reason: error.message }
+    if (error instanceof Error && error.message === 'No such workspace.') return { ok: false, reason: error.message }
+    throw error
+  }
 }
 
 export async function getProject(db: AppDatabase, id: string): Promise<ProjectRow | null> {
@@ -251,9 +278,13 @@ export async function detectProject(db: AppDatabase, id: string): Promise<Projec
 
 export type PatchProjectInput = Partial<{ name: string; workspaceId: string; hidden: boolean; color: string | null; sort: number; path: string }>
 
-export async function patchProject(db: AppDatabase, id: string, patch: PatchProjectInput): Promise<CreateProjectResult> {
+export async function patchProject(db: AppDatabase, id: string, patch: PatchProjectInput, ownerId = ''): Promise<CreateProjectResult> {
   const project = await getProject(db, id)
   if (!project) return { ok: false, reason: 'No such project.' }
+  const mode = nodeWorkspacesMode(db, ownerId)
+  if (mode === 'off' && patch.workspaceId !== undefined && patch.workspaceId !== project.workspaceId) {
+    return { ok: false, code: 'workspaces_off', reason: WORKSPACES_OFF_MESSAGE }
+  }
   const set: Record<string, unknown> = {}
   if (patch.name !== undefined) {
     const name = patch.name.trim()
@@ -279,10 +310,14 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
     set.path = patch.path
   }
   if (Object.keys(set).length === 0) return { ok: true, project }
-  await db
-    .update(schema.projects)
-    .set({ ...set, updatedAt: Date.now() })
-    .where(eq(schema.projects.id, id))
+  db.transaction((tx) => {
+    tx.update(schema.projects).set({ ...set, updatedAt: Date.now() }).where(eq(schema.projects.id, id)).run()
+    if (mode === 'off' && set.name !== undefined) {
+      tx.update(schema.workspaces).set({ name: set.name as string, updatedAt: Date.now() })
+        .where(eq(schema.workspaces.id, project.workspaceId)).run()
+    }
+  })
+  if (mode === 'off' && set.name !== undefined) broadcastWorkspaceChanged({ workspaceId: project.workspaceId })
   broadcastProjectChanged({ projectId: id })
   if (patch.path !== undefined) return { ok: true, project: (await detectProject(db, id))! }
   return { ok: true, project: (await getProject(db, id))! }
@@ -292,17 +327,24 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
  * Delete a project and the tasks that belong to it (docs/workspaces-and-tasks/projects.md
  * § Delete a project). Row-only: the project's folder and any task worktrees are never touched from here.
  */
-export async function deleteProject(db: AppDatabase, id: string): Promise<void> {
+export async function deleteProject(db: AppDatabase, id: string, ownerId = ''): Promise<void> {
+  const project = await getProject(db, id)
+  if (!project) return
+  const removeWorkspace = nodeWorkspacesMode(db, ownerId) === 'off'
   const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
-  if (taskIds.length) {
-    await db.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds))
-    for (const taskId of taskIds) taskScripts(db).interruptTask(taskId, 'cancelled')
-    await db.delete(schema.taskScriptAttempts).where(inArray(schema.taskScriptAttempts.taskId, taskIds))
-    await db.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds))
-    await db.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds))
-    for (const taskId of taskIds) retireTaskHead(taskId)
-  }
-  await db.delete(schema.projects).where(eq(schema.projects.id, id))
+  for (const taskId of taskIds) taskScripts(db).interruptTask(taskId, 'cancelled')
+  const removedProviders = db.transaction((tx) => {
+    if (taskIds.length) {
+      tx.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds)).run()
+      tx.delete(schema.taskScriptAttempts).where(inArray(schema.taskScriptAttempts.taskId, taskIds)).run()
+      tx.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds)).run()
+      tx.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds)).run()
+    }
+    tx.delete(schema.projects).where(eq(schema.projects.id, id)).run()
+    return removeWorkspace ? removeWorkspaceRows(tx, db, project.workspaceId, ownerId) : []
+  })
+  for (const taskId of taskIds) retireTaskHead(taskId)
+  if (removeWorkspace) notifyWorkspaceRemoved(project.workspaceId, removedProviders)
   // The rail's task list just lost a batch of tasks in this project (./notify.ts §
   // broadcastTasksChanged). No task event when the project had none: public task state did not move.
   if (taskIds.length) broadcastTasksChanged({ taskId: null })
@@ -312,13 +354,13 @@ export async function deleteProject(db: AppDatabase, id: string): Promise<void> 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config
 // surface; this pair covers only the fields a later importer needs to create a deferred remote
 // project and map it to a folder, not a general-purpose project mutation API.
-export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefInput): Promise<ProjectRef> {
+export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefInput, ownerId = ''): Promise<ProjectRef> {
   const name = input.name.trim()
   if (!name) throw new Error('Project name cannot be blank.')
   if (input.github && (!input.github.owner.trim() || !input.github.name.trim())) throw new Error('GitHub owner and name cannot be blank.')
   if (input.path !== undefined && input.path !== null) {
-    const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name })
-    if (!result.ok) throw new Error(result.reason)
+    const result = await createProject(db, { path: input.path, workspaceId: input.workspaceId, name }, ownerId)
+    if (!result.ok) throw result.code === 'workspaces_off' ? new WorkspacesOffError() : new Error(result.reason)
     if (input.github) {
       await db.update(schema.projects).set({
         githubOwner: normalizeGithubPart(input.github.owner),
@@ -331,26 +373,16 @@ export async function createProjectRef(db: AppDatabase, input: ProjectCreateRefI
     return toProjectRef((await getProject(db, result.project.id))!)
   }
 
-  const workspaceId = input.workspaceId ?? (await defaultWorkspaceId(db))
-  const [workspace] = await db.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId))
-  if (!workspace) throw new Error('No such workspace.')
   if (!input.github?.owner.trim() || !input.github.name.trim()) throw new Error('Deferred projects need a GitHub facet.')
-  const now = Date.now()
-  const id = randomUUID()
-  await db.insert(schema.projects).values({
-    id,
+  const result = insertProject(db, ownerId, {
     name,
     path: null,
-    workspaceId,
-    sort: nextProjectSort(db, workspaceId),
     githubOwner: normalizeGithubPart(input.github.owner),
     githubName: normalizeGithubPart(input.github.name),
     githubRepoId: input.github.repoId ?? null,
-    createdAt: now,
-    updatedAt: now,
-  })
-  broadcastProjectChanged({ projectId: id })
-  return toProjectRef((await getProject(db, id))!)
+  }, input.workspaceId)
+  if (!result.ok) throw new Error(result.reason)
+  return toProjectRef(result.project)
 }
 
 export async function updateProjectRef(db: AppDatabase, id: string, patch: ProjectUpdateRefInput): Promise<ProjectRef | null> {

@@ -25,7 +25,7 @@ const FIXTURES = ['large-surfaces', 'tui-navigation']
 const PROFILES = ['small', 'scale', 'canonical']
 
 function parseArgs(argv) {
-  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, fixture: null, profile: 'small', seed: 1 }
+  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, fixture: null, profile: 'small', seed: 1, workspaces: null }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--') continue
@@ -38,9 +38,12 @@ function parseArgs(argv) {
     else if (arg === '--fixture') options.fixture = argv[++index] ?? ''
     else if (arg === '--profile') options.profile = argv[++index] ?? ''
     else if (arg === '--seed') options.seed = Number(argv[++index])
+    else if (arg === '--workspaces') options.workspaces = argv[++index] ?? ''
     else throw new Error(`Unknown option: ${arg}`)
   }
   if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
+  if (options.workspaces !== null && !['on', 'off'].includes(options.workspaces)) throw new Error('--workspaces must be on or off.')
+  if (options.onboarding && options.workspaces) throw new Error('--workspaces cannot be used with --onboarding.')
   if (options.fixture !== null) {
     if (!FIXTURES.includes(options.fixture)) throw new Error(`Unknown fixture: ${options.fixture}. Known: ${FIXTURES.join(', ')}.`)
     if (options.onboarding || argv.includes('--project') || argv.includes('--smoke')) throw new Error('A fixture brings its own project; drop --onboarding, --project and --smoke.')
@@ -159,6 +162,7 @@ async function main() {
     try { previous = await readJson(manifestFile) } catch {}
     if (previous && processIsAlive(previous.launcherPid)) throw new Error(`Agent session ${name} is already running.`)
     if (!options.reuse) throw new Error(`Agent session ${name} already exists. Choose another name or pass --reuse to keep its data.`)
+    if (options.workspaces && previous?.workspaces !== options.workspaces) throw new Error('This session was seeded with different --workspaces options. Choose a new session name.')
   }
 
   await mkdir(logDir, { recursive: true, mode: 0o700 })
@@ -186,14 +190,16 @@ async function main() {
       const project = join(directory, 'fixture', 'repo')
       console.log(`[agent-dev:${name}] generating the ${options.fixture} fixture (${options.profile}, seed ${options.seed})`)
       const out = await capture(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', project,
-        '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed)], desktopRoot)
+        '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed),
+        ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
       const seeded = JSON.parse(out.trim().split('\n').at(-1))
       fixture = { name: options.fixture, project, ...seeded }
       delete fixture.fixture
       options.project = project
     } else if (!options.onboarding) {
       console.log(`[agent-dev:${name}] adding ${options.project}`)
-      await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project], desktopRoot)
+      await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project,
+        ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
     }
 
     let viteUrl = null
@@ -242,6 +248,7 @@ async function main() {
       dataDir,
       project: options.onboarding ? null : options.project,
       fixture,
+      workspaces: options.workspaces,
       viteUrl,
       webdriverEndpoint: endpoint,
       webdriverSessionId: driver.sessionId,
@@ -273,6 +280,7 @@ async function main() {
       directory,
       dataDir,
       fixture,
+      workspaces: options.workspaces,
       stoppedAt: new Date().toISOString(),
     })
   }

@@ -126,7 +126,8 @@ export async function openCliNode(target?: string): Promise<CliNode> {
       if (response.status >= 400) {
         const api = result as { error?: { code?: string; message?: string; requestId?: string; retryable?: boolean } }
         const error = api.error
-        const exitCode = response.status === 401 || error?.code === 'protocol_mismatch' ? 3
+        const exitCode = error?.code === 'workspaces_off' ? 2
+          : response.status === 401 || error?.code === 'protocol_mismatch' ? 3
           : response.status < 500 || error?.code === 'bridge-unavailable' ? 4 : method === 'GET' ? 1 : 7
         throw new CliError(error?.code ?? 'node_error', error?.message ?? `Node returned HTTP ${response.status}.`, exitCode, error?.requestId ?? key, error?.retryable)
       }

@@ -13,14 +13,16 @@ pick a folder and add it to the active workspace (`addProjectFromFolder`). The t
 through the `addProject` verb, gated by `canAddProject`, so a replacement topbar can offer the same
 thing. If the folder belongs to a project in another workspace, the action names that workspace
 and directs you to Settings → Overview to move it. Changing Nodes while the picker is open cancels
-the add. The `Default` workspace doesn't exist until the first project needs it:
-`createProject` and `createProjectRef` fall back to it when no workspace is named.
+the add. With workspaces on, `createProject` and `createProjectRef` use `Default` when no workspace
+is named. With workspaces off, the Node creates a workspace named after each project in the same
+transaction and publishes `workspace:changed` after commit. An explicit workspace returns 409
+`workspaces_off`.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an
 optional `.git` suffix. HTTPS and SSH URLs require a single slash after the host.
 
-The CLI registers a local folder only with an explicit workspace and an absolute path on the Node's
+The CLI registers a local folder with an absolute path on the Node's
 machine. Core compares the resolved path with registered project paths, so a symlink or `..` alias
 reuses the project ID it finds. The row keeps the path as first registered.
 [Command-line client](../cli.md) has the commands.
@@ -39,6 +41,10 @@ A workspace's own page renames and deletes it. The default workspace can't be re
 because a deleted workspace's projects move there. A project whose workspace has vanished shows under
 `Unassigned`, so you can rescue it. [Frontend](../frontend/settings-groups.md) § Workspaces and
 projects has the pages.
+
+With workspaces off, the Node refuses workspace create, rename, and delete, and project moves to
+another workspace with 409 `workspaces_off`. Renaming a project renames its workspace. Bootstrap
+lists workspaces without creating `Default`.
 
 Drag a project's grip in Settings → Overview or a workspace's Projects table to reorder it within
 that workspace. The insertion line shows where it will land. You can also open the grip's menu and
@@ -65,7 +71,9 @@ the left of its rail tab. With no color there's no strip, and an active tab uses
 Deleting a project deletes its tasks and task links, because `tasks.project_id` has no foreign key,
 and leftover rows would be invisible in every rail and impossible to remove. The confirmation names
 the task count first. acorn doesn't touch the disk: the folder and any task worktrees stay. Moving or
-hiding a project changes only its core row.
+hiding a project changes only its core row. With workspaces off, deletion also removes the project's
+workspace, its external project links, and its datasets. Other workspace-scoped records remain,
+as with workspace deletion while workspaces are on.
 
 ## The first-run wizard
 

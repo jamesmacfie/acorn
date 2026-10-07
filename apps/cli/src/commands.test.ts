@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { CliNode } from './node'
 import { runCommand } from './commands'
 import { parseCliArgs } from './args'
+import { CliError } from './error'
 
 function fakeNode(routes: Record<string, unknown>): CliNode {
   return {
@@ -50,5 +51,41 @@ describe('CLI read projections', () => {
   it('does not silently ignore a filter on the wrong command', async () => {
     const node = fakeNode({})
     await expect(runCommand(node, parseCliArgs(['workspace', 'list', '--project', 'p']))).rejects.toMatchObject({ code: 'usage', exitCode: 2 })
+  })
+
+  it('adds a project without naming a workspace', async () => {
+    let body: unknown
+    const node = { ...fakeNode({}), mutate: async (_method: string, _path: string, input: unknown) => {
+      body = input
+      return { project: { id: 'p', name: 'App', path: '/srv/app', workspaceId: 'w', hidden: false } }
+    } } as CliNode
+    expect(await runCommand(node, parseCliArgs(['project', 'add', '--path', '/srv/app']))).toMatchObject({ id: 'p' })
+    expect(body).toEqual({ path: '/srv/app' })
+  })
+
+  it('resolves project filters and rejects conflicting filters', async () => {
+    const node = fakeNode({
+      '/v1/core/projects/p': { id: 'p', workspaceId: 'w' },
+      '/v1/p/agents/sessions?workspaceId=w&limit=100': { sessions: [], nextCursor: null },
+      '/v1/core/runs': { runs: [], failed: [] },
+      '/v1/core/projects': { projects: [{ id: 'p', workspaceId: 'w' }] },
+      '/v1/core/tasks': [],
+      '/v1/core/tasks?status=archived': [],
+    })
+    expect(await runCommand(node, parseCliArgs(['agent', 'list', '--project', 'p']))).toEqual([])
+    expect(await runCommand(node, parseCliArgs(['run', 'list', '--project', 'p']))).toMatchObject({ workspaceId: 'w' })
+    await expect(runCommand(node, parseCliArgs(['agent', 'list', '--project', 'p', '--task', 't']))).rejects.toMatchObject({ code: 'usage', exitCode: 2 })
+    await expect(runCommand(node, parseCliArgs(['run', 'list', '--project', 'p', '--workspace', 'w']))).rejects.toMatchObject({ code: 'usage', exitCode: 2 })
+  })
+
+  it.each([
+    ['workspace', 'create', '--name', 'Extra'],
+    ['workspace', 'remove', 'w'],
+    ['project', 'move', 'p', '--workspace', 'w'],
+  ])('preserves the Node refusal for %s %s', async (...argv) => {
+    const message = 'Workspaces are off on this Node, so each project has its own. Add a project instead.'
+    const node = { ...fakeNode({ '/v1/core/workspaces': [{ id: 'w', name: 'One', projects: [] }] }),
+      mutate: async () => { throw new CliError('workspaces_off', message, 2) } } as CliNode
+    await expect(runCommand(node, parseCliArgs(argv))).rejects.toMatchObject({ code: 'workspaces_off', message, exitCode: 2 })
   })
 })

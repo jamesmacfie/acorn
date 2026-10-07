@@ -12,6 +12,7 @@ import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { respondError } from '../../respond'
 import { isTaskConfined } from '../../middleware/requireUser'
+import { ownerId } from '../../middleware/requireUser'
 import { unclaimedWorktrees } from '../../worktrees/taskWorktree'
 import { taskBranchAvailability, TaskBranchError } from '../../worktrees/taskBranch'
 import { projectBranches } from '../../worktrees/branches'
@@ -97,8 +98,8 @@ export const projects = new Hono<AppEnv>()
   .post('/', async (c) => {
     const parsed = createBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['path is required.'])
-    const result = await createProject(getDb(c.env), parsed.data)
-    if (!result.ok) return respondError(c, 400, 'bad_request', [result.reason])
+    const result = await createProject(getDb(c.env), parsed.data, ownerId(c))
+    if (!result.ok) return respondError(c, result.code ? 409 : 400, result.code ?? 'bad_request', [result.reason])
     return c.json({ project: toWireProject(result.project) })
   })
   .get('/:id', async (c) => {
@@ -191,11 +192,11 @@ export const projects = new Hono<AppEnv>()
   .patch('/:id', async (c) => {
     const parsed = patchBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['Invalid project patch.'])
-    const result = await patchProject(getDb(c.env), c.req.param('id'), parsed.data)
+    const result = await patchProject(getDb(c.env), c.req.param('id'), parsed.data, ownerId(c))
     if (!result.ok) {
       return result.reason === 'No such project.'
         ? respondError(c, 404, 'not_found', [result.reason])
-        : respondError(c, 400, 'bad_request', [result.reason])
+        : respondError(c, result.code ? 409 : 400, result.code ?? 'bad_request', [result.reason])
     }
     return c.json({ project: toWireProject(result.project) })
   })
@@ -208,6 +209,6 @@ export const projects = new Hono<AppEnv>()
     const db = getDb(c.env)
     if (!(await getProject(db, c.req.param('id')))) return respondError(c, 404, 'not_found', ['No such project.'])
     // Row only. The folder and any worktrees on disk are never touched from here.
-    await deleteProject(db, c.req.param('id'))
+    await deleteProject(db, c.req.param('id'), ownerId(c))
     return c.json({ ok: true })
   })

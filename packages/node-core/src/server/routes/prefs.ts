@@ -5,6 +5,8 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
+import { nodeWorkspacesMode, projectCount, storedWorkspacesMode } from '../workspacesMode'
 
 // A preference row is one key and one string. `value` is a string even when the client is storing
 // JSON, because the column is a string and the reader parses it; a schema that accepted `unknown`
@@ -24,7 +26,16 @@ export const prefs = new Hono<AppEnv>()
     const parsed = prefBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const { key, value } = parsed.data
-    await getDb(c.env)
+    const db = getDb(c.env)
+    if (key === WORKSPACES_PREF_KEY) {
+      if (value !== 'on' && value !== 'off') return respondError(c, 400, 'bad_request', ['core.workspaces must be on or off.'])
+      const stored = storedWorkspacesMode(db, uid)
+      if (stored !== null && stored !== value) return respondError(c, 409, 'workspaces_fixed', ['Workspace mode is fixed once set.'])
+      if (stored === null && projectCount(db) > 0 && nodeWorkspacesMode(db, uid) !== value) {
+        return respondError(c, 409, 'workspaces_fixed', ['Existing projects use grouped workspaces.'])
+      }
+    }
+    await db
       .insert(schema.prefs)
       .values({ userId: uid, key, value })
       .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } })

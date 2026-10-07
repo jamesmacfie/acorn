@@ -19,6 +19,9 @@ count. `agent events` pages the durable event ledger. `--follow --output jsonl` 
 WebSocket notice arrives, with a periodic refresh in case one is missed, and resumes from the last
 durable sequence after a gap or reconnect. Ctrl+C stops only the local follow.
 
+`agent list --project ID` selects sessions in the project's workspace. Use one of `--project`,
+`--workspace`, or `--task`.
+
 `agent wait` composes the Node's bounded long polls under one CLI timeout. A timeout exits 5. `--check`
 exits 6 when the most recent turn failed or was cancelled, and prints the session. Attention is reported,
 never approved for you.
@@ -62,3 +65,5 @@ JSON includes `failedSources`, `complete: false`, `sourceLimit: 200`, and `trunc
 source can impose a lower limit. Text output says it's bounded and names failed sources. `--workspace`
 selects runs whose task belongs to the workspace, so taskless schedule runs drop out. For an owner's full
 history, use `workflow run list --task ID` or `agent list`.
+`--project ID` resolves the project's workspace and uses that same filter. Use only one of
+`--project` and `--workspace`.

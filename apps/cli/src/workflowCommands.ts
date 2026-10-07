@@ -2,6 +2,7 @@ import type { ParsedArgs } from './args'
 import { CliError } from './error'
 import { readJsonFile, rejectDoubleStdin, requestKey, requireOption, typedId } from './input'
 import type { CliNode } from './node'
+import { workspaceForProject } from './projectWorkspace'
 
 const base = '/v1/p/workflows'
 const version = 'acorn.cli/v1'
@@ -134,8 +135,9 @@ export async function runWorkflowCommand(node: CliNode, args: ParsedArgs): Promi
   const [subject, verb, action, rawId] = args.positionals
   const o = args.options
   if (subject === 'run') {
-    rejectDoubleStdin([o.workspace])
-    const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace') : undefined
+    rejectDoubleStdin([o.workspace, o.project])
+    const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace')
+      : o.project ? await workspaceForProject(node, o.project) : undefined
     return mergedRuns(node, workspaceId)
   }
   if (verb === 'list') {
