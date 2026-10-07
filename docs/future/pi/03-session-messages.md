@@ -159,7 +159,7 @@ reactive extensions possible. Something outside the conversation notices a probl
 
 An acorn plugin can watch a session through lifecycle events and change a prompt the person is
 sending through `agents:before-send`. The bounded `agents.reviewInput.v1` reader was removed with
-Findings; [phase 04](./04-model-grants-and-advisor.md) introduces a replacement. It cannot
+Findings; [phase 04](./04-model-grants-and-advisor.md) introduced a replacement. It cannot
 speak first. The only
 code that queues a turn on a session without the person is first-party: delegation reports
 (`plugins/agents/src/server/delegation/reports.ts`) and workflows through `agents.sessionExecute`.

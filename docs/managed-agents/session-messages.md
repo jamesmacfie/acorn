@@ -23,6 +23,10 @@ ctx.extensionPoints.handle('agents:session-messenger', {
 const result = await messenger.queue({ taskId, sessionId, subject: 'concern', text, idempotencyKey })
 ```
 
+In TypeScript outside this repository, import `SessionMessengerContribution`, `SessionMessenger`,
+`SessionMessage`, and `SessionMessageResult` from `acorn-plugin-types`, and name the point as an
+`ExtensionPointId<SessionMessengerContribution>`.
+
 A loaded package must also name the point in its manifest, with no carrier, so the grant is in front
 of the person before anything runs:
 

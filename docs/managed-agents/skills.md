@@ -169,4 +169,4 @@ opens plugin pages in the desktop app.
 - [Custom agents](./custom-agents.md): the other way a plugin puts its words in front of an agent.
 - [Harnesses](./harnesses.md): the drivers that receive the index.
 - [Phase 06](../future/pi/06-portable-skills.md) and [phase 07](../future/pi/07-native-skills.md): the
-  portable delivery here, and native delivery through each harness's own skill support.
+  portable delivery here, and native delivery through Claude Code's and Codex's own skill support.

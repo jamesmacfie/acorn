@@ -101,7 +101,9 @@ back as an asynchronous function, so the contributor can call it after the first
 
 ## Hooks inside a harness's loop
 
-Two of agents' hooks reach inside a harness's own loop rather than an edge acorn owns.
+Agents' `agents:before-permission` hook sees only the permission requests a harness sends acorn, on
+every harness ([permission policy](../managed-agents/permission-policy.md)). Two more of agents' hooks
+reach inside a harness's own loop rather than an edge acorn owns.
 `agents:before-tool` and `agents:after-tool` run on every tool call a bridged harness makes, through a
 command hook acorn installs in that harness. Only Claude Code has a bridge. A handler registered while
 a session runs reaches it after the session's next resume, because the bridge is installed at start

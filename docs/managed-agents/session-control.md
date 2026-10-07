@@ -7,7 +7,8 @@ it to cycle effort from a command or move to a cheaper model past a budget. It's
 
 The contract is `AgentSessionControl` in `plugins/agents/src/contract/sessionExecute.ts`. The
 implementation is `plugins/agents/src/server/sessions/sessionControl.ts`, and `setConfig`'s checks are
-in `sessionConfig.ts` beside it, loaded on the first change.
+in `sessionConfig.ts` beside it, loaded on the first change. A plugin outside this repository imports
+the same `AgentSessionControl` from `acorn-plugin-types`.
 
 ## Calls
 

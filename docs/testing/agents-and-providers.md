@@ -179,3 +179,15 @@ acceptance pass.
     fails the call with "The person refused this…". Repeat and press **Allow**: git runs and fails on
     the missing remote. Ask for one edit to a source file: the agent quotes the "Test first: …" note.
     `~/.claude/settings.json` is unchanged ([harness bridges](../managed-agents/loop-hooks.md)).
+
+165. The combined plugin flow. Install the four packages in `docs/future/pi/packages/` (permission
+    policy, advisor, skills, and session meter), restart the Node, and accept each prompt. Give the
+    advisor a Claude Code grant and set its reviews to **Every session**. In a throwaway repository,
+    ask a Claude Code session for a small change and a release note with the skill: the note ends with
+    the line from `format.md`, and the transcript says "(native)". Ask it to run `rm -rf` on a folder
+    outside the repository: it quotes "Blocked by acorn-permission-policy" in the same turn, and the
+    folder survives. Commit, change `add` to `a - b` by hand, and ask for one more function: a turn
+    labelled **From acorn-advisor** follows, the agent answers it, and the advisor reviews no plugin
+    turn. Run a one-step workflow on the same tree: its review window closes before the run reports,
+    and the step's result is the reply to the note. Restart the Node: no note or review repeats
+    ([phase 11](../future/pi/11-programme-acceptance.md)).

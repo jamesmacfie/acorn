@@ -40,7 +40,9 @@ display text.
 | `paths` | The paths the call touches when the harness named them, otherwise `[]`. |
 
 `toolCallId`, `kind`, `command`, and `paths` are the public `AgentPermissionSubject` type. The
-runtime caps the command at 16 KiB and the paths at 100 entries of 4 KiB each.
+runtime caps the command at 16 KiB and the paths at 100 entries of 4 KiB each. A plugin outside this
+repository imports `AgentBeforePermissionPayload` from `acorn-plugin-types` and casts its handler's
+payload to it.
 
 How each harness fills them:
 
@@ -109,8 +111,10 @@ The explanation itself is a note through `agents:session-messenger`, a separate 
 ## What it doesn't do
 
 - **It sees only what the harness asks about.** A session in a bypass mode, a tool the harness's own
-  settings already allow, or an earlier "allow for session" never reaches acorn. On a harness with a
-  bridge, `agents:before-tool` sees every call and takes the same subject
+  settings already allow, or an earlier "allow for session" never reaches acorn. Nor does a request
+  the harness answers itself: with `approvals_reviewer = "auto_review"` in `~/.codex/config.toml`,
+  Codex's own reviewer approves and the transcript shows only "Automatic approval review approved".
+  On a harness with a bridge, `agents:before-tool` sees every call and takes the same subject
   ([harness bridges](./loop-hooks.md)).
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
   about. [Security](../security.md) owns the boundaries that exist.

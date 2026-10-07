@@ -71,8 +71,9 @@ consent, updated within five seconds. Don't read `telemetry.enabled` through `ct
 is scoped to your own namespace.
 
 `models` is one token, and it doesn't choose what gets spent. The trust prompt reads "Generate text
-with your model providers and installed agent CLIs", because the list holds both a connected API key
-and any agent CLI that declares a one-shot mode ([model providers](../integrations/model-providers.md)).
+with your model providers and installed agent CLIs, which spends their usage", marked high, because
+the list holds both a connected API key and any agent CLI that declares a one-shot mode
+([model providers](../integrations/model-providers.md)).
 When your route passes a `backendId` the person picked, that backend runs. You can't name a CLI the
 owner doesn't have, or make one run with tools or in a worktree.
 

@@ -750,6 +750,7 @@ describe('architecture boundaries', () => {
       ['packages/protocol/src/data/dataSources.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/plugin-types/src/contracts/data.ts', 'preview is a published query mode, not the preview plugin'],
       ['packages/plugin-types/src/contracts/coreProjects.ts', "'terminal' is a project setup-script trigger"],
+      ['packages/plugin-types/src/contracts/agents.ts', "'context' is a review-input provenance kind"],
       ['packages/node-core/src/server/dataSources/runtime.ts', 'preview is a query mode, not the preview plugin'],
       ['packages/client-core/src/features/dataSources/SourceQueryEditor.tsx', 'preview is a data-query mode, not the preview plugin'],
       ['packages/client-core/src/features/dashboards/studio/PanelStudio.tsx', 'preview is a dashboard run mode'],

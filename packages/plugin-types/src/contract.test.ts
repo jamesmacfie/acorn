@@ -3,7 +3,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { expect, it } from 'vitest'
 import ts from 'typescript'
-import type { CoreServices } from '@acorn/node-core/server/core/index.ts'
+import type { CompiledCoreServices, CoreServices } from '@acorn/node-core/server/core/index.ts'
 import type { ProjectRef } from '@acorn/node-core/server/projects.ts'
 import type { TaskRef } from '@acorn/node-core/server/worktrees'
 import type { NodePluginContext, PluginRequestContext } from '@acorn/node-core/server/pluginHost'
@@ -25,8 +25,9 @@ import type { DataSourceRequest, DataSourceResult, DataSourceDescription } from 
 // published type is a subset, so dropping a method from `core.tasks` would still let the published
 // service accept a real one.
 
-/** Both directions means structurally identical. A type error here is the point of the file. */
-type Mutual<A, B> = [A extends B ? true : never, B extends A ? true : never]
+/** Both directions means structurally identical. A type error here is the point of the file. The
+ *  brackets compare a union whole; bare, one matching member would pass for all of them. */
+type Mutual<A, B> = [[A] extends [B] ? true : never, [B] extends [A] ? true : never]
 const _dataValue: Mutual<DataValue, Published.DataValue> = [true, true]
 const _versionedData: Mutual<VersionedDataValue, Published.VersionedDataValue> = [true, true]
 const _dataSchema: Mutual<DataSchema, Published.DataSchema> = [true, true]
@@ -92,6 +93,12 @@ const _capabilityId: Mutual<CapabilityId<string>, Published.CapabilityId<string>
 const _capabilities: Mutual<NodePluginContext['capabilities'], Published.PluginCapabilities> = [true, true]
 const _modelAdapter: Mutual<ModelProviderAdapter, Published.ModelProviderAdapter> = [true, true]
 const _modelRegistration: Mutual<NodePluginContext['providers']['model'], Published.PluginProviderRegistry['model']> = [true, true]
+// `core.models` as a loaded plugin receives it: the owner-bound facet, where `backendId` is optional.
+// `available` stays out because its rows are protocol's `ModelBackend`, opaque on the published side.
+type PluginModels = ReturnType<CompiledCoreServices['models']['forPlugin']>
+const _modelRequest: Mutual<Parameters<PluginModels['generateText']>[0], Published.PluginGenerateTextRequest> = [true, true]
+const _modelResult: Mutual<Awaited<ReturnType<PluginModels['generateText']>>, Published.GenerateTextResult> = [true, true]
+void [_modelRequest, _modelResult]
 const _fs: Mutual<CoreServices['fs'], Published.CoreServices['fs']> = [true, true]
 const _git: Mutual<WidenNumbers<CoreServices['git']>, WidenNumbers<Published.CoreServices['git']>> = [true, true]
 const _prefs: Mutual<CoreServices['prefs'], Published.CoreServices['prefs']> = [true, true]

@@ -34,6 +34,9 @@ payload is the same subject plus `succeeded` and `note`, which starts empty. A t
 note and caps it at 4,096 characters, and ignores any other field a transform changes. Claude Code
 sends this event only for a call that finished, so `succeeded` is always `true` there.
 
+A plugin outside this repository imports `AgentBeforeToolPayload` and `AgentAfterToolPayload` from
+`acorn-plugin-types` and casts its handler's payload to the one for its point.
+
 ## What each answer does
 
 | Verdict | What the harness hears |

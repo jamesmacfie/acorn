@@ -46,6 +46,13 @@ describe('the two permission groups', () => {
     ])
   })
 
+  it('marks model generation high, because it spends the owner’s provider usage', () => {
+    const lines = nodePermissionLines(permissions({ node: { core: ['models'], capabilities: [], secrets: false, exec: false, net: [], sockets: false } }))
+    expect(lines.map(({ text, high }) => ({ text, high }))).toEqual([
+      { text: 'Generate text with your model providers and installed agent CLIs, which spends their usage', high: true },
+    ])
+  })
+
   it('shows an any-host fetch grant explicitly', () => {
     const all = permissions({ node: { core: [], capabilities: [], secrets: false, exec: false, net: ['*'], sockets: false } })
     expect(texts(nodePermissionLines(all))).toEqual(['Send requests to any network host'])

@@ -36,7 +36,9 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   git: { text: 'Read repository history and run Git commands', icon: 'git-branch' },
   tasks: { text: 'Read task details', icon: 'list' },
   context: { text: 'Read task launch context', icon: 'info' },
-  models: { text: 'Generate text with your model providers and installed agent CLIs', icon: 'sparkles' },
+  // High because it spends the owner's provider usage. The daily allowance on the plugin's page bounds
+  // only the calls that let acorn pick the backend (docs/integrations/model-providers.md § Plugin model grants).
+  models: { text: 'Generate text with your model providers and installed agent CLIs, which spends their usage', icon: 'sparkles', high: true },
   'data:query': { text: 'Query the databases you’ve connected', icon: 'database' },
   'data:write': { text: 'Change data in the databases you’ve connected', icon: 'database', high: true },
   prefs: { text: 'Read and write this plugin’s saved state', icon: 'database' },

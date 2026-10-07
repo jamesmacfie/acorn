@@ -1,9 +1,29 @@
 import type { HostOwned } from './shared.js'
+import type { GenerateTextInput, GenerateTextUsage } from './providers.js'
 
 export type CoreContextService = {
   /** The owner's `startup_context_injection` pref. Absent means true. */
   injectionEnabled(userId: string): Promise<boolean>
   assemble(userLogin: string, taskId: string, include: Set<string>): Promise<HostOwned<'protocol/api.TaskContext'> | null>
+}
+
+/** What `generateText` takes. Leave `backendId` out to spend your plugin's model grant
+ *  (docs/integrations/model-providers.md § Plugin model grants). */
+export type PluginGenerateTextRequest = {
+  userId: string
+  /** `connection:<uuid>` or `harness:<profileId>`. */
+  backendId?: string
+  input: GenerateTextInput
+  timeoutMs?: number
+}
+
+export type GenerateTextResult = {
+  text: string
+  providerId: string
+  /** Which backend answered: `connection:<id>` or `harness:<profileId>`. */
+  backendId: string
+  modelId: string
+  usage?: GenerateTextUsage
 }
 
 /** Text generation through a stored model-provider connection or an installed agent CLI. You own the
@@ -19,9 +39,7 @@ export type CoreModelService = {
    *  `ctx.core.identity.active()`, and `input.modelId` must be absent. With no grant this throws
    *  `provider_not_configured`; past today's allowance, `provider_budget_exhausted`. Neither spends.
    *  The allowance covers this path only, not calls that name a backend. */
-  generateText(
-    request: HostOwned<'node-core/server/core/models.PluginGenerateTextRequest'>,
-  ): Promise<HostOwned<'node-core/server/modelProviders/types.GenerateTextResult'>>
+  generateText(request: PluginGenerateTextRequest): Promise<GenerateTextResult>
   /** Which backends this owner could generate with — a stored API key, or an agent CLI installed on
    *  this machine — as ids and labels only. Connections come first, so a plugin that falls back to
    *  `[0]` keeps spending the key the owner configured. Prefer leaving `backendId` out over `[0]`. */

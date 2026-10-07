@@ -109,11 +109,40 @@ export type {
 } from './contracts/coreProjects.js'
 export type {
   CoreContextService,
+  PluginGenerateTextRequest,
+  GenerateTextResult,
   CoreModelService,
   CorePrefService,
   CoreIdentityService,
 } from './contracts/coreMisc.js'
 export type { DraftAttachment, DraftAttachmentsCapability } from './contracts/attachments.js'
+export type {
+  AgentPermissionSubject,
+  AgentBeforePermissionPayload,
+  AgentBeforeToolPayload,
+  AgentAfterToolPayload,
+  SessionMessage,
+  SessionMessageResult,
+  SessionMessenger,
+  SessionMessengerContribution,
+  TurnFollowUpWindow,
+  TurnFollowUpContribution,
+  AgentTurnSource,
+  AgentSessionControl,
+  AgentRequestState,
+  AgentRequestsCapability,
+  AgentReviewProvenance,
+  AgentReviewText,
+  AgentReviewInput,
+  AgentReviewInputResult,
+  AgentReviewInputCapability,
+  AgentActivityTool,
+  AgentActivitySubagent,
+  AgentActivityUsage,
+  AgentActivityFrame,
+  AgentActivityState,
+  AgentActivityCapability,
+} from './contracts/agents.js'
 export type {
   TelemetryAttrs,
   TelemetrySpanHandle,

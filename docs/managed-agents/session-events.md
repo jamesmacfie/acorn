@@ -50,7 +50,8 @@ completion and attention event, and `agent:*` is the transcript stream.
 `plugin:agents:activity` and `agents.activity.v1` let a plugin draw a live view of a session on any
 harness, from the ledger every driver already fills. The types are in
 `plugins/agents/src/contract/lifecycle.ts`, and `server/sessions/activity.ts` is the one projection
-the frames and the read share.
+the frames and the read share. Outside this repository, import `AgentActivityCapability` from
+`acorn-plugin-types`, and cast each `events.on` frame to `AgentActivityFrame` from the same package.
 
 A frame names its task and session and carries one item's whole current state, keyed by its id, so a
 later frame for the same item replaces it:
@@ -91,7 +92,8 @@ frame.
 ## Review input
 
 `agents.reviewInput.v1` reads one completed turn for a reviewer, such as the advisor package in
-`docs/future/pi/packages/advisor/`. The contract is in `plugins/agents/src/contract/lifecycle.ts`.
+`docs/future/pi/packages/advisor/`. The contract is in `plugins/agents/src/contract/lifecycle.ts`,
+and a plugin outside this repository imports `AgentReviewInputCapability` from `acorn-plugin-types`.
 `read({ taskId, sessionId, turnId })` checks that the turn belongs to that session and the session
 to that task. A turn outside them, or a missing one, answers `{ available: false, reason:
 'not-found' }`, so a reader learns nothing about turns it may not see. A turn that hasn't completed

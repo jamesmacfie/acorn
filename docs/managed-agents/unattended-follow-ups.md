@@ -57,7 +57,8 @@ ctx.extensionPoints.handle('agents:turn-follow-up', {
 
 The window is `{ taskId, sessionId, turnId, owner, deadline, signal }`. `owner` is `workflow` or
 `delegation`. It carries the turn's address, not its transcript. Read the turn with
-`agents.reviewInput.v1`, and send a note with `originTurnId: window.turnId`.
+`agents.reviewInput.v1`, and send a note with `originTurnId: window.turnId`. Outside this repository,
+import `TurnFollowUpWindow` and `TurnFollowUpContribution` from `acorn-plugin-types`.
 
 The owner opens one window per operation, after its own turns finish with an answer, and only for a
 `completed` turn. It snapshots the reviewers filed at that moment and calls each one. The window

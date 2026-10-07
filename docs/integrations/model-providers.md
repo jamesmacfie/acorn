@@ -104,7 +104,9 @@ that leaves out `backendId` spends the grant:
   only, not everything the broad `models` permission lets a plugin spend. The settings page says so,
   and counts the explicit calls.
 
-Core's own callers and built-in plugins keep `GenerateTextRequest`, which must name a backend.
+Core's own callers and built-in plugins keep `GenerateTextRequest`, which must name a backend. A
+plugin outside this repository types its call with `PluginGenerateTextRequest` and
+`GenerateTextResult` from `acorn-plugin-types`.
 
 ### Accounting
 

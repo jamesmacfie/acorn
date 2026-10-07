@@ -62,7 +62,8 @@ Three checks hold the published names to the host:
   in both directions, so `tsc --noEmit` fails when an upstream shape moves under
   a stable name.
 - `packages/plugin-types/src/contract.test.ts` does the same for the node context and core facets,
-  member for member.
+  member for member. `tools/arch/agentContract.test.ts` does it for the Agents plugin's published
+  hook payloads, entries, and capabilities, so neither package imports the other.
 
 Review a signature change as a compatibility change even when every name stays.
 

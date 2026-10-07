@@ -2,9 +2,11 @@
 
 Status: proposed, 2026-10-02; sequential phases added 2026-10-03; harness bridges and the Mods
 directory survey added 2026-10-07. On 2026-10-07 the separate design topics and the `phases/` folder
-were merged, so each numbered file here now holds one phase's design and its handoff. Phases 01 to
-04 are done with recorded limitations; 05 to 11 are proposed. Where a file here disagrees with a
-shipped contract, the owning reference document wins until the implementation changes that contract.
+were merged, so each numbered file here now holds one phase's design and its handoff. All eleven
+phases finished on 2026-10-07. Phases 01 to 07, 09, and 10 are done with recorded limitations, phase
+08 ended by removing the experiment, and [phase 11](./11-programme-acceptance.md) holds the combined
+acceptance record and the checks still owed. Where a file here disagrees with a shipped contract, the
+owning reference document wins until the implementation changes that contract.
 
 Give a developer one phase at a time and require its acceptance record before continuing. Each
 phase file holds the design behind it, the implementation steps, and the acceptance gate. The phase
@@ -71,6 +73,19 @@ A loaded acorn plugin runs in a permission-scoped worker and reaches the agent t
   ([unattended follow-ups](../../managed-agents/unattended-follow-ups.md)).
 - `ctx.core.models.generateText` under the `models` grant, which spends a backend the caller names,
   or with no backend the owner's model grant for that plugin, delivered in phase 04.
+- `agents:before-permission`, a veto on the permission requests every harness sends, delivered in
+  phase 02 ([permission policy](../../managed-agents/permission-policy.md)).
+- `agents:session-messenger`, an attributed and capped note on a session, delivered in phase 03
+  ([session messages](../../managed-agents/session-messages.md)).
+- `contributions.skills`, named procedures approved on the Node, delivered natively to Claude Code and
+  Codex and as an index to other harnesses, delivered in phases 06 and 07
+  ([skills](../../managed-agents/skills.md)).
+- `plugin:agents:activity`, `agents.activity.v1`, `agents.sessionControl.setConfig`, and the
+  `agents:request-card` point, delivered in phase 09
+  ([session control](../../managed-agents/session-control.md)).
+- `agents:before-tool` and `agents:after-tool`, run inside Claude Code's loop through a command hook
+  acorn installs, delivered in phase 10 ([harness bridges](../../managed-agents/loop-hooks.md)).
+  Codex, DeepSeek, and `omp` have no bridge.
 - UI points such as `agents:tool-card`, `agents:session-header`, and `agents:composer-actions`.
 - Custom agents, MCP servers, and harness contributions.
 
@@ -80,19 +95,19 @@ everything inside the loop.
 
 ## The phases
 
-| Phase | Handoff | Result required before the next phase |
-| --- | --- | --- |
-| 01 | [Contributed omp harness](./01-omp-harness.md) | A tested loaded harness, or a recorded unsupported capability with a bounded driver fix. |
-| 02 | [Permission veto and policy plugin](./02-permission-veto.md) | Permission refusals work through a real loaded plugin, with resolved cards on both hosts. |
-| 03 | [Attributed session messages](./03-session-messages.md) | Interactive sessions accept bounded, attributed notes; the policy plugin explains its refusals. |
-| 04 | [Model grants and interactive advisor](./04-model-grants-and-advisor.md) | A real advisor proves host-held model choices, accounting, and a bounded completed-turn reader. |
-| 05 | [Unattended follow-ups](./05-unattended-follow-ups.md) | Workflow and delegation owners account for and cancel plugin follow-ups before unattended delivery is enabled. |
-| 06 | [Portable plugin skills](./06-portable-skills.md) | A skills-only plugin delivers a validated, readable index on start and resume. |
-| 07 | [Native skill delivery](./07-native-skills.md) | Claude uses native skills; Codex uses a verified native door or the documented portable fallback. |
-| 08 | [Resource-read experiment](./08-resource-read-experiment.md) | Paired results justify retaining the experiment, or its implementation is removed. |
-| 09 | [Activity feed, session options, and request notes](./09-session-reach.md) | A loaded meter reads activity on every harness and changes options; the policy plugin notes risky requests. |
-| 10 | [Harness bridges](./10-harness-bridges.md) | Bridged harnesses run acorn's hooks on every tool call; Codex has a bridge or an evidenced limitation. |
-| 11 | [Programme acceptance](./11-programme-acceptance.md) | Combined real-host evidence, published owning contracts, and a recorded disposition for every phase. |
+| Phase | Handoff | Result required before the next phase | Outcome, 2026-10-07 |
+| --- | --- | --- | --- |
+| 01 | [Contributed omp harness](./01-omp-harness.md) | A tested loaded harness, or a recorded unsupported capability with a bounded driver fix. | Done with limitations: works as a loaded harness; no real-host card, provider not signed in. |
+| 02 | [Permission veto and policy plugin](./02-permission-veto.md) | Permission refusals work through a real loaded plugin, with resolved cards on both hosts. | Done with limitations: shipped; Codex, DeepSeek, and `omp` not run. |
+| 03 | [Attributed session messages](./03-session-messages.md) | Interactive sessions accept bounded, attributed notes; the policy plugin explains its refusals. | Done with limitations: shipped; Codex not run. |
+| 04 | [Model grants and interactive advisor](./04-model-grants-and-advisor.md) | A real advisor proves host-held model choices, accounting, and a bounded completed-turn reader. | Done with limitations: shipped; agent CLI backends only. |
+| 05 | [Unattended follow-ups](./05-unattended-follow-ups.md) | Workflow and delegation owners account for and cancel plugin follow-ups before unattended delivery is enabled. | Done with limitations: shipped; the advisor correction was shown in phase 11; no delegated run. |
+| 06 | [Portable plugin skills](./06-portable-skills.md) | A skills-only plugin delivers a validated, readable index on start and resume. | Done with limitations: shipped; Claude on the real host. |
+| 07 | [Native skill delivery](./07-native-skills.md) | Claude uses native skills; Codex uses a verified native door or the documented portable fallback. | Done with limitations: Claude and Codex native on the real host; others keep the index. |
+| 08 | [Resource-read experiment](./08-resource-read-experiment.md) | Paired results justify retaining the experiment, or its implementation is removed. | Removed: both harnesses failed the stop rule; no product code shipped. |
+| 09 | [Activity feed, session options, and request notes](./09-session-reach.md) | A loaded meter reads activity on every harness and changes options; the policy plugin notes risky requests. | Done with limitations: Claude and Codex on the real host. |
+| 10 | [Harness bridges](./10-harness-bridges.md) | Bridged harnesses run acorn's hooks on every tool call; Codex has a bridge or an evidenced limitation. | Done with limitations: Claude only; Codex refuses an untrusted hook. |
+| 11 | [Programme acceptance](./11-programme-acceptance.md) | Combined real-host evidence, published owning contracts, and a recorded disposition for every phase. | Done with limitations: combined real-host flow, published agents types; Node switching and a Codex refusal still open. |
 
 [refused.md](./refused.md) records what this programme decided not to take from `omp`, and why.
 

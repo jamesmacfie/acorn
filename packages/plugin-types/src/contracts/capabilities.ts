@@ -1,5 +1,11 @@
 import type { HostOwned } from './shared.js'
 import type { DraftAttachmentsCapability } from './attachments.js'
+import type {
+  AgentActivityCapability,
+  AgentRequestsCapability,
+  AgentReviewInputCapability,
+  AgentSessionControl,
+} from './agents.js'
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────────────────────
 
@@ -49,21 +55,21 @@ export type CapabilityCatalogue = {
   'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
   /** Stop a session's turn, or pick one of the values its harness advertised for an option such as the
    *  model or reasoning effort. The host binds your plugin id, which the transcript names. */
-  'agents.sessionControl': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionControl'>
+  'agents.sessionControl': AgentSessionControl
   /** Ask the agent runtime to reconcile after a restart. */
   'agents.runtime': { reconcile(): Promise<void> }
   /** Read durable turn lifecycle state within one task, without prompt or transcript content. */
   'agents.turns': HostOwned<'plugins/agents/contract/lifecycle.AgentTurnsCapability'>
   /** Rebuild one task's agent input-request inbox. */
-  'agents.requests': HostOwned<'plugins/agents/contract/lifecycle.AgentRequestsCapability'>
+  'agents.requests': AgentRequestsCapability
   /** Rebuild one task's active and archived managed-session roster. */
   'agents.sessions': HostOwned<'plugins/agents/contract/lifecycle.AgentSessionsCapability'>
   /** Read one completed turn of a task for review: its text and context with provenance, and the
    *  agent's final message, bounded at 16 and 32 KiB. Never the ledger, tool output, or a path. */
-  'agents.reviewInput.v1': HostOwned<'plugins/agents/contract/lifecycle.AgentReviewInputCapability'>
+  'agents.reviewInput.v1': AgentReviewInputCapability
   /** Rebuild one session's tool calls, subagents, and context fill: the state `plugin:agents:activity`
    *  frames carry. Never tool input or output, message text, reasoning, or a command line. */
-  'agents.activity.v1': HostOwned<'plugins/agents/contract/lifecycle.AgentActivityCapability'>
+  'agents.activity.v1': AgentActivityCapability
   /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
    *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
   'agents.draftAttachments': DraftAttachmentsCapability
