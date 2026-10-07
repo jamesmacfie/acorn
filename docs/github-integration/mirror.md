@@ -81,7 +81,7 @@ resource and the same refresh as the files route, reads the file rows in provide
 available file's descriptor blob, and parses nothing. A descriptor blob that is missing, which is
 every file of a mirror written before documents existed, is cut from the patch body and stored on
 that read. A missing patch body is the same integrity failure the files route repairs, and it repairs
-the same way. The answer is `{ document, completeness }`, with no patch text in it. A 2,200-file,
+the same way. The answer is `{ document, completeness, revision }`, with no patch text in it. A 2,200-file,
 million-row pull request is about 27,000 segments and a 2.5 MB document.
 
 Segments and search are two repository routes, because a segment is addressed by its patch digest and
@@ -98,9 +98,38 @@ and knows a digest can read that patch from any repository the node has mirrored
 per node that grants nothing new. It matters if one node serves several identities with different
 access, and the fix is to check the digest against that repository's file rows or compare record.
 
+## Review locations
+
+The GraphQL selection reads `isOutdated`, `isResolved`, `line`, and `originalLine` on every thread page.
+GitHub defines these fields in its [review thread reference](https://docs.github.com/en/graphql/reference/pulls#pullrequestreviewthread).
+The mirror stores these independently on each comment row. `Thread.line` is the nullable current line
+without a historical fallback. `Thread.originalLine` is historical metadata, and `Thread.outdated`
+is true, false, or null for an unverified legacy location. Resolution does not change location validity.
+
+The location migration retains comment IDs, replies, and ordering. It marks detail and file resources
+stale. Legacy rows keep unknown outdated status and expose no current line until a provider refresh.
+Offline reads retain the conversation. Missing status in a cached client response also excludes inline
+placement, without labeling the thread outdated.
+
+Detail, files, diff, and batch responses carry a nullable `revision`, the provider's base and head commit
+pair. The detail fetch rechecks those commits and `updatedAt` after walking every connection. The files
+fetch checks the REST comparison before and after its pages. A comparison that changes during a fetch
+fails with `github_revision_changed` and leaves the mirror intact. A refresh with missing comparison
+metadata carries no verified revision.
+
+Each resource writes its revision with its rows. Reads capture rows and revision before yielding to
+asynchronous blob reads. A refresh makes a resource with a different revision stale. Completed detail
+and file refreshes announce `plugin:github:pr-synced`; the active pull model invalidates detail, file
+summaries, and the diff document. This lets open panes converge through the Node's refresh mechanism.
+
+`plugins/github/src/client/reviewThreadLocation.ts` owns eligibility. A thread needs explicit
+`outdated: false`, a current path, a LEFT or RIGHT side, and a current line. Detail and diff must carry
+the same verified revision before the plugin supplies inline threads or requests conversation snippets.
+Outdated and unverified threads remain in history. No client timer, file-body scan, or historical
+remapping decides whether a review applies.
+
 Inline threads are not in the document. They come with the PR detail, which is complete when it is
 served, and the viewer places each one by its line number from the document's segment line spans, so
 its space is reserved before its segment loads. The diff source reports loading until both the
-document and the detail are in. The two mirrors refresh separately, so for one refresh interval the
-threads can describe an older head than the files; the thread whose line no longer exists in any
-segment is simply not drawn.
+document and the detail are in. The plugin withholds inline threads while the two resources describe
+different comparisons. A thread without a matching file or rendered line receives no substitute anchor.

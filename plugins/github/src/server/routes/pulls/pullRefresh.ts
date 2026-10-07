@@ -3,7 +3,6 @@ import { chunkRowsByColumnBudget, type CoreServices, type PluginDatabase, type R
 import { pullsResource } from '../../resourceKeys'
 import { gh, ghError } from '../../githubApi'
 import { mirrorFiles, mirrorPr, type PatchBlobStore } from '../mirror/prMirror'
-import { fetchFiles, fetchPullComposite } from '../mirror/prFetch'
 import { deletePullMirrorStatements } from '../../mirrorRetention'
 import { pullRequests, syncState } from '../../../node/schema'
 import { type GithubEmit, NO_EMIT } from '../../events'
@@ -130,12 +129,14 @@ export async function refreshOpenPulls(
 }
 
 /** Force-refresh one PR's GraphQL composite. Every connection is walked before anything is written. */
+// Load provider pagination on demand to keep it out of the Node service's startup graph.
 export async function refreshPullDetail(
   token: string,
   db: PluginDatabase,
   key: PullRefreshKey & { number: number },
   emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
+  const { fetchPullComposite } = await import('../mirror/prFetch')
   const pull = await fetchPullComposite(token, key.owner, key.repo, key.number)
   if (!pull.ok) return pull
   const { checksChanged } = await mirrorPr(db, { userId: key.userId, repoId: key.repoId, number: key.number }, pull.value, Date.now())
@@ -151,6 +152,7 @@ export async function refreshPullWithFiles(
   key: PullRefreshKey & { number: number },
   emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
+  const { fetchFiles, fetchPullComposite } = await import('../mirror/prFetch')
   const [pull, files] = await Promise.all([
     fetchPullComposite(token, key.owner, key.repo, key.number),
     fetchFiles(token, key.owner, key.repo, key.number),
@@ -171,10 +173,13 @@ export async function refreshPullFiles(
   db: PluginDatabase,
   blobs: PatchBlobStore,
   key: PullRefreshKey & { number: number },
+  emit: GithubEmit = NO_EMIT,
 ): Promise<RefreshResult> {
+  const { fetchFiles } = await import('../mirror/prFetch')
   const files = await fetchFiles(token, key.owner, key.repo, key.number)
   if (!files.ok) return files
   await mirrorFiles(blobs, db, { userId: key.userId, repoId: key.repoId, number: key.number }, files.value)
+  announcePrSynced(emit, key, null, false)
   return { ok: true }
 }
 

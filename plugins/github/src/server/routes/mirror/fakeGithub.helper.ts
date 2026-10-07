@@ -51,6 +51,7 @@ export function makeFakePull(counts: {
     isDraft: false,
     bodyHTML: '<p>body</p>',
     headRefOid: 'head-sha',
+    baseRefOid: 'base-sha',
     author: { login: 'ada' },
     baseRefName: 'main',
     headRefName: 'feature',
@@ -66,6 +67,7 @@ export function makeFakePull(counts: {
     threads: range(counts.threads ?? 0).map((t) => ({
       id: `thread-${t}`,
       isResolved: false,
+      isOutdated: false,
       path: `src/file-${t % Math.max(files, 1)}.ts`,
       line: 1,
       originalLine: 1,
@@ -156,7 +158,7 @@ export function fakeGithub(
       const more = start + PAGE < served.length
       return json(body, more ? { link: `<https://api.github.com/x?page=${request.page + 1}>; rel="next"` } : {})
     }
-    return json(pull.changedFiles === null ? {} : { changed_files: pull.changedFiles })
+    return json({ base: { sha: pull.baseRefOid }, head: { sha: pull.headRefOid }, updated_at: pull.updatedAt, ...(pull.changedFiles === null ? {} : { changed_files: pull.changedFiles }) })
   }
 
   const fetch = async (input: string | URL | Request, init?: RequestInit): Promise<Response> => {

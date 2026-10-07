@@ -4,7 +4,7 @@ import type { PullBatchFilesMode, PullBatchItem, PullBatchRequest } from '../../
 import { filesResource, prResource } from '../../resourceKeys'
 import { type AppEnv, createLogger, ownerId, type PluginDatabase, respondError } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
-import { filesCompleteness, readComposite, readFiles } from '../mirror/prMirror'
+import { readComposite, readFiles } from '../mirror/prMirror'
 import { refreshPullDetail, refreshPullFiles } from './pullRefresh'
 import { mapLimited } from '../../mapLimited'
 import { type GithubEmit, NO_EMIT } from '../../events'
@@ -73,7 +73,7 @@ export const pullsBatch = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => ne
   const key = (number: number) => ({ userId, repoId, owner, repo, number })
   const [details, files] = await Promise.all([
     mapLimited(staleDetail, REFRESH_CONCURRENCY, (n) => refreshPullDetail(token, db, key(n), emit)),
-    mapLimited(staleFiles, REFRESH_CONCURRENCY, (n) => refreshPullFiles(token, db, c.env.BLOBS, key(n))),
+    mapLimited(staleFiles, REFRESH_CONCURRENCY, (n) => refreshPullFiles(token, db, c.env.BLOBS, key(n), emit)),
   ])
   for (const result of [...details, ...files]) {
     if (result.ok) continue
@@ -94,7 +94,7 @@ export const pullsBatch = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => ne
         readComposite(db, key),
         filesMode === 'none' || !sync ? null : readFiles(c.env.BLOBS, db, key, { includePatches: filesMode === 'full' }),
       ])
-      return { number, detail, ...(sync && files?.ok ? { files: { files: files.files, completeness: filesCompleteness(sync) } } : {}) }
+      return { number, detail, ...(sync && files?.ok ? { files: { files: files.files, completeness: files.completeness, revision: files.revision } } : {}) }
     }),
   )
   return c.json(items)

@@ -47,12 +47,16 @@ anyway, so a separate body route would fetch them twice.
 - **Thread snippets.** A thread quotes five lines around its line, from the one segment of the pull's
   diff document that holds it (§ Diff documents), so a line at a segment's edge gets less context on
   that side. The conversation loads the document when any thread
-  has a line, and `createDiffSnippets` from `@acorn/plugin-api/ui/diff` reads a thread's segment through
+  has an eligible current location. `createDiffSnippets` from `@acorn/plugin-api/ui/diff` reads a thread's segment through
   the diff viewer's loader and node cache once its turn comes near. A segment already seen in the diff
   costs no request, and one read here is resident when the diff opens. A file missing from the document
   because GitHub capped the list, a file with no patch, a line in no segment, and a failed load all
-  draw **Snippet unavailable.** and load nothing else. An outdated thread has no line and draws no
-  snippet. No patch is parsed on the client.
+  draw **Snippet unavailable.** and load nothing else. An outdated or unverified thread draws no
+  current snippet or diff navigation.
+  Outdated threads retain every comment with an **Outdated** badge. Resolved outdated threads also
+  show **Resolved**. Historical locations say **Original line**. Unverified locations say
+  **Location unavailable**. The [review location contract](./mirror.md#review-locations) owns eligibility.
+  No patch is parsed on the client.
 - **No window.** The conversation draws every turn. Its cost per turn is a byline until a turn comes
   near, and it scrolls in the navigator's region rather than a followed timeline of its own, so it does
   not use the transcript's "Show earlier" window.

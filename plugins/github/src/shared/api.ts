@@ -95,10 +95,10 @@ export type PullFile = {
 }
 // The files route's response. The list is in `position` order, and whether it is everything GitHub
 // has is stated here rather than guessed from its length.
-export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness }
+export type PullFilesResponse = { files: PullFile[]; completeness: PullTopologyCompleteness; revision?: string | null }
 // The diff route's answer: the pull's files as a segmented document, with no patch text in it, and
 // whether that is every file GitHub has (docs/github-integration/mirror.md § Diff documents).
-export type PullDiffResponse = { document: DiffDocumentTopology; completeness: PullTopologyCompleteness }
+export type PullDiffResponse = { document: DiffDocumentTopology; completeness: PullTopologyCompleteness; revision?: string | null }
 // A batch of segments by patch digest and ordinal, from a pull's document or a compare preview's.
 export type DiffSegmentsBody = { requests: DiffSegmentRequest[] }
 // A search over the files the request names, by path and patch digest, in document order.
@@ -121,11 +121,14 @@ export type Thread = {
   threadId: string
   path: string | null
   line: number | null
+  originalLine?: number | null
+  outdated?: boolean | null
   side: string | null
   resolved: boolean
   comments: ThreadComment[]
 }
 export type PullDetail = {
+  revision?: string | null
   pull: (Pull & { number: number; body: string | null; headSha: string | null }) | null
   labels: Label[]
   reviews: Review[]
@@ -212,3 +215,5 @@ export const pinsKey = ['pins'] as const
 export const mentionsKey = (owner: string, repo: string) => ['mentions', owner, repo] as const
 export const runJobsKey = (owner: string, repo: string, runId: number) => ['run-jobs', owner, repo, runId] as const
 export const jobLogKey = (owner: string, repo: string, jobId: number) => ['job-log', owner, repo, jobId] as const
+
+export const completePullTopology = { kind: 'complete' } as const satisfies PullTopologyCompleteness

@@ -6,6 +6,7 @@ import {
 } from '@acorn/plugin-api/ui'
 import { createDiffSnippets, type DiffSnippetAnchor, type DiffSnippetLine, type DiffSnippets } from '@acorn/plugin-api/ui/diff'
 import { ProviderHtml } from '@acorn/plugin-api/ui/host'
+import { reviewRevisionsMatch, reviewThreadLocation } from '../reviewThreadLocation'
 import type { PrModel } from './prModel'
 import type { PullCommit, Thread, ThreadComment } from '../../shared/api'
 import { fetchDiffSegments, pullDiffOptions } from '../queries'
@@ -28,6 +29,7 @@ export function ConversationEntryItem(props: {
   entry: ConversationEntry
   near: Accessor<boolean>
   snippets: DiffSnippets
+  locationsVerified: Accessor<boolean>
   onOpenFile: (path: string) => void
   onLinkClick: (event: MouseEvent) => void
 }) {
@@ -63,6 +65,7 @@ export function ConversationEntryItem(props: {
           thread={props.entry.thread}
           near={props.near}
           snippets={props.snippets}
+          locationsVerified={props.locationsVerified}
           onOpenFile={props.onOpenFile}
           onLinkClick={props.onLinkClick}
         />
@@ -152,6 +155,7 @@ function FileThreadItem(props: {
   thread: Thread
   near: Accessor<boolean>
   snippets: DiffSnippets
+  locationsVerified: Accessor<boolean>
   onOpenFile: (path: string) => void
   onLinkClick: (event: MouseEvent) => void
 }) {
@@ -161,12 +165,8 @@ function FileThreadItem(props: {
   const first = () => comments()[0]
   const path = () => props.thread.path ?? 'Unknown file'
   const fileName = () => path().split('/').pop() || path()
-  // Where the thread sits in the diff, by the rule the diff viewer places it with: the new side unless
-  // GitHub said LEFT. An outdated thread has no line, and so no snippet.
   const anchor = createMemo((): DiffSnippetAnchor | null =>
-    props.thread.path && props.thread.line != null
-      ? { path: props.thread.path, side: props.thread.side === 'LEFT' ? 'old' : 'new', line: props.thread.line }
-      : null)
+    props.locationsVerified() ? reviewThreadLocation(props.thread) : null)
   // Its segment is read once the turn comes near, and let go when the turn leaves the DOM.
   createEffect(() => {
     const at = anchor()
@@ -186,12 +186,18 @@ function FileThreadItem(props: {
       <Stack gap="row">
         <Inline>
           <Byline author={first()?.author} action="commented" createdAt={first()?.createdAt ?? null} />
+          <Show when={props.thread.outdated === true}><Badge size="xs" tone="neutral">Outdated</Badge></Show>
+          <Show when={props.thread.outdated !== true && !anchor()}><Badge size="xs" tone="neutral">Location unavailable</Badge></Show>
           <Show when={props.thread.resolved}><Badge size="xs" tone="ok">Resolved</Badge></Show>
         </Inline>
         {/* The file's name and line, which fit the column; the path is in the tip. */}
-        <Link tip={path()} onPress={() => props.thread.path && props.onOpenFile(props.thread.path)}>
-          {fileName()}{props.thread.line != null ? `, line ${props.thread.line}` : ''}
-        </Link>
+        <Show when={anchor()} fallback={
+          <Text>{fileName()}{props.thread.originalLine != null ? `, Original line ${props.thread.originalLine}` : ''}</Text>
+        }>
+          <Link tip={path()} onPress={() => props.onOpenFile(props.thread.path!)}>
+            {fileName()}, line {props.thread.line}
+          </Link>
+        </Show>
         <Show
           when={lines()}
           fallback={<Show when={snippet()?.state === 'unavailable'}><Text emphasis="muted">Snippet unavailable.</Text></Show>}
@@ -252,8 +258,9 @@ export function PrConversation(props: {
   // The diff's document says which segment holds each thread's line, so a thread's snippet reads one
   // segment rather than a parsed patch (docs/github-integration/surfaces.md § Conversation). Only asked for
   // when some thread has a line to quote.
-  const anchored = createMemo(() => entries().some((entry) => entry.kind === 'thread' && entry.thread.line != null))
+  const anchored = createMemo(() => entries().some((entry) => entry.kind === 'thread' && reviewThreadLocation(entry.thread) != null))
   const diff = createQuery(() => pullDiffOptions(owner, repo, number, anchored()))
+  const locationsVerified = () => reviewRevisionsMatch(model().detail.data, diff.data)
   const snippets = createDiffSnippets({
     files: () => diff.data?.document.files,
     load: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
@@ -305,6 +312,7 @@ export function PrConversation(props: {
                     entry={entry()}
                     near={near}
                     snippets={snippets}
+                    locationsVerified={locationsVerified}
                     onOpenFile={props.onOpenFile}
                     onLinkClick={props.onLinkClick}
                   />

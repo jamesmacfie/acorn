@@ -137,6 +137,8 @@ export const reviewThreads = sqliteTable(
     databaseId: integer('database_id'),
     path: text('path'),
     line: integer('line'),
+    originalLine: integer('original_line'),
+    outdated: integer('outdated', { mode: 'boolean' }), // null means legacy, unverified location
     side: text('side'), // RIGHT | LEFT
     resolved: integer('resolved', { mode: 'boolean' }).notNull().default(false),
     author: text('author'),
@@ -196,6 +198,7 @@ export const syncState = sqliteTable(
     userId: text('user_id').notNull(),
     resource: text('resource').notNull(),
     etag: text('etag'),
+    revision: text('revision'), // verified base/head pair for detail and files resources
     fetchedAt: integer('fetched_at').notNull(),
     // Only a pull's files resource (`files:<repoId>:<number>`) sets these, and only when GitHub's
     // 3,000-file ceiling cut the list short. All null means the resource is complete. They change in

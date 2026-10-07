@@ -21,7 +21,8 @@ describe('fetchFiles', () => {
     expect(result.value.files.map((f) => f.filename)).toEqual(Array.from({ length: 2200 }, (_, i) => `src/file-${i}.ts`))
     expect(result.value.completeness).toEqual({ kind: 'complete' })
     expect(filePages(fake.requests)).toBe(22)
-    expect(fake.requests.some((r) => r.kind === 'pull')).toBe(false)
+    expect(fake.requests.filter((r) => r.kind === 'pull')).toHaveLength(2)
+    expect(result.value.revision).toBe('base-sha:head-sha')
   })
 
   it('calls 3,000 of a reported 3,000 complete', async () => {
@@ -50,6 +51,17 @@ describe('fetchFiles', () => {
     expect(result.ok && result.value.completeness).toEqual({
       kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: 3000, reportedTotal: null, limit: 3000,
     })
+  })
+
+  it('rejects file pages that span a push or base change', async () => {
+    for (const field of ['headRefOid', 'baseRefOid'] as const) {
+      const pull = makeFakePull({ files: 120 })
+      vi.stubGlobal('fetch', fakeGithub(pull, { override: (request) => {
+        if (request.kind === 'files' && request.page === 2) pull[field] = 'changed'
+        return undefined
+      } }).fetch)
+      expect(await fetchFiles('token', 'acme', 'web', 7)).toMatchObject({ ok: false, failure: { error: 'github_revision_changed' } })
+    }
   })
 
   it('fails when a middle page fails, a path repeats, or a page is malformed', async () => {
@@ -102,6 +114,33 @@ describe('fetchPullComposite', () => {
     const pages = fake.requests.filter((r): r is Extract<FakeRequest, { kind: 'graphql-page' }> => r.kind === 'graphql-page')
     expect(pages.filter((r) => r.field === 'reviewThreads').map((r) => r.after)).toEqual(['100', '200', '300'])
     expect(pages.filter((r) => r.ownerType === 'PullRequestReviewThread').map((r) => r.after)).toEqual(['100', '200'])
+  })
+
+  it('preserves outdated status and both locations beyond the first thread and reply pages', async () => {
+    const pull = makeFakePull({ threads: 151, commentsPerThread: (t) => t === 150 ? 120 : 1 })
+    Object.assign(pull.threads[150]!, { isOutdated: true, line: null, originalLine: 275 })
+    const fake = fakeGithub(pull)
+    const fetch = vi.fn(fake.fetch)
+    vi.stubGlobal('fetch', fetch)
+    const result = await fetchPullComposite('token', 'acme', 'web', 7)
+    expect(result.ok && result.value.threads[150]).toMatchObject({ isOutdated: true, line: null, originalLine: 275 })
+    expect(result.ok && result.value.threads[150]?.comments).toHaveLength(120)
+    for (const [input, init] of fetch.mock.calls) {
+      if (!String(input).endsWith('/graphql')) continue
+      const { query } = JSON.parse(String(init?.body)) as { query: string }
+      if (query.includes('reviewThreads(')) expect(query).toContain('isOutdated')
+    }
+  })
+
+  it('rejects a detail that changes revision during pagination', async () => {
+    const pull = makeFakePull({ threads: 151 })
+    let first = true
+    vi.stubGlobal('fetch', fakeGithub(pull, { override: (request) => {
+      if (request.kind === 'graphql-first' && first) { first = false; return undefined }
+      if (request.kind === 'graphql-page') pull.headRefOid = 'force-pushed'
+      return undefined
+    } }).fetch)
+    expect(await fetchPullComposite('token', 'acme', 'web', 7)).toMatchObject({ ok: false, failure: { error: 'github_revision_changed' } })
   })
 
   it('keeps thread comment requests within the concurrency bound', async () => {

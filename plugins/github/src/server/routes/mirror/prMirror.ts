@@ -1,11 +1,11 @@
 import { createHash } from 'node:crypto'
-import { and, asc, eq, inArray } from 'drizzle-orm'
+import { and, asc, eq, inArray, sql } from 'drizzle-orm'
 import type { SQLiteColumn } from 'drizzle-orm/sqlite-core'
-import type { Check, Comment, Label, PullCommit, PullDetail, PullFile, PullTopologyCompleteness, Review, Thread } from '../../../shared/api'
+import { completePullTopology, type Check, type Comment, type Label, type PullCommit, type PullDetail, type PullFile, type PullTopologyCompleteness, type Review, type Thread } from '../../../shared/api'
 import { chunkRowsByColumnBudget, createLogger, patchBlobKey, type PluginDatabase } from '@acorn/plugin-api/node'
 import { filesResource, prResource } from '../../resourceKeys'
 import { mapLimited } from '../../mapLimited'
-import { COMPLETE, type FilesFetch, type PullComposite } from './prFetch'
+import type { FilesFetch, PullComposite } from './prFetch'
 import { writePatchDocument } from './prDocument'
 import { checks as checksTable, comments as commentsTable, prCommits as prCommitsTable, prFiles as prFilesTable, prLabels as prLabelsTable, pullRequests as pullRequestsTable, reviewRequests as reviewRequestsTable, reviewThreads as reviewThreadsTable, reviews as reviewsTable, syncState as syncStateTable, viewedFiles as viewedFilesTable } from '../../../node/schema'
 
@@ -99,7 +99,9 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: PullComposite, now: numbe
         id: cm.id,
         databaseId: cm.databaseId,
         path: t.path,
-        line: t.line ?? t.originalLine,
+        line: t.line,
+        originalLine: t.originalLine,
+        outdated: t.isOutdated,
         side: t.diffSide,
         resolved: t.isResolved,
         author: cm.author?.login ?? null,
@@ -148,10 +150,16 @@ export const mirrorPr = async (db: Db, key: PrKey, pr: PullComposite, now: numbe
     ...chunk(prCommitsTable, commitRows),
     ...chunk(checksTable, checkRows),
     ...chunk(reviewThreadsTable, threadRows),
+    // A newly verified detail makes a different files comparison stale. The existing refresh edge
+    // re-reads it; no client timer or whole-patch read is needed.
+    ...(pr.revision ? [db.update(syncStateTable).set({ fetchedAt: 0 }).where(and(
+      eq(syncStateTable.userId, key.userId), eq(syncStateTable.resource, filesResource(key.repoId, key.number)),
+      sql`${syncStateTable.revision} IS NOT ${pr.revision}`,
+    ))] : []),
     db
       .insert(syncStateTable)
-      .values({ userId: key.userId, resource, etag: null, fetchedAt: now })
-      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now } }),
+      .values({ userId: key.userId, resource, etag: null, fetchedAt: now, revision: pr.revision ?? null })
+      .onConflictDoUpdate({ target: [syncStateTable.userId, syncStateTable.resource], set: { fetchedAt: now, revision: pr.revision ?? null } }),
   ])
   return { checksChanged }
 }
@@ -160,7 +168,9 @@ const toThread = (row: typeof reviewThreadsTable.$inferSelect) =>
   ({
     threadId: row.threadId,
     path: row.path,
-    line: row.line,
+    line: row.outdated == null ? null : row.line,
+    originalLine: row.originalLine,
+    outdated: row.outdated,
     side: row.side,
     resolved: row.resolved,
     comments: [] as Thread['comments'],
@@ -190,23 +200,28 @@ export const readComposite = async (db: Db, key: PrKey): Promise<PullDetail> => 
     eq(pullRequestsTable.repoId, key.repoId),
     eq(pullRequestsTable.number, key.number),
   )
-  const [pull] = await db.select().from(pullRequestsTable).where(prWhere)
-  const [labels, reviewRows, reviewRequestRows, commentRows, commits, checkRows, threadRows] = await Promise.all([
-    db.select().from(prLabelsTable).where(childWhere(prLabelsTable, key)).orderBy(asc(prLabelsTable.position)),
-    db.select().from(reviewsTable).where(childWhere(reviewsTable, key)).orderBy(asc(reviewsTable.position)),
-    db.select().from(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)).orderBy(asc(reviewRequestsTable.position)),
-    db.select().from(commentsTable).where(childWhere(commentsTable, key)).orderBy(asc(commentsTable.position)),
-    db.select().from(prCommitsTable).where(childWhere(prCommitsTable, key)).orderBy(asc(prCommitsTable.position)),
-    db.select().from(checksTable).where(childWhere(checksTable, key)).orderBy(asc(checksTable.position)),
-    db.select().from(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)).orderBy(asc(reviewThreadsTable.position)),
-  ])
+  const pull = db.select().from(pullRequestsTable).where(prWhere).get()
+  // Synchronous reads keep the rows and revision in one event-loop turn, between atomic swaps.
+  const [labels, reviewRows, reviewRequestRows, commentRows, commits, checkRows, threadRows] = [
+    db.select().from(prLabelsTable).where(childWhere(prLabelsTable, key)).orderBy(asc(prLabelsTable.position)).all(),
+    db.select().from(reviewsTable).where(childWhere(reviewsTable, key)).orderBy(asc(reviewsTable.position)).all(),
+    db.select().from(reviewRequestsTable).where(childWhere(reviewRequestsTable, key)).orderBy(asc(reviewRequestsTable.position)).all(),
+    db.select().from(commentsTable).where(childWhere(commentsTable, key)).orderBy(asc(commentsTable.position)).all(),
+    db.select().from(prCommitsTable).where(childWhere(prCommitsTable, key)).orderBy(asc(prCommitsTable.position)).all(),
+    db.select().from(checksTable).where(childWhere(checksTable, key)).orderBy(asc(checksTable.position)).all(),
+    db.select().from(reviewThreadsTable).where(childWhere(reviewThreadsTable, key)).orderBy(asc(reviewThreadsTable.position)).all(),
+  ]
   const tmap = new Map<string, ReturnType<typeof toThread>>()
   for (const row of threadRows) {
     let t = tmap.get(row.threadId)
     if (!t) tmap.set(row.threadId, (t = toThread(row)))
     t.comments.push({ id: row.id, databaseId: row.databaseId, author: row.author, body: row.body, createdAt: row.createdAt })
   }
+  const sync = db.select().from(syncStateTable).where(and(
+    eq(syncStateTable.userId, key.userId), eq(syncStateTable.resource, prResource(key.repoId, key.number)),
+  )).get()
   return {
+    revision: sync?.revision ?? null,
     pull: pull ? toPublicPull(pull) : null,
     labels: labels.map((l) => ({ name: l.name, color: l.color }) satisfies Label),
     reviews: reviewRows.map((r) => ({ id: r.id, author: r.author, state: r.state, body: r.body, submittedAt: r.submittedAt }) satisfies Review),
@@ -260,11 +275,15 @@ export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fet
     await writePatchDocument(blobs, patchKey, f.filename, f.patch as string)
   })
   const c = fetched.completeness
-  const state = c.kind === 'complete'
+  const state = { revision: fetched.revision ?? null, ...(c.kind === 'complete'
     ? { incompleteCause: null, received: null, reportedTotal: null, upstreamLimit: null }
-    : { incompleteCause: c.cause, received: c.received, reportedTotal: c.reportedTotal, upstreamLimit: c.limit }
+    : { incompleteCause: c.cause, received: c.received, reportedTotal: c.reportedTotal, upstreamLimit: c.limit }) }
   const resource = filesResource(key.repoId, key.number)
   await db.batch([
+    ...(fetched.revision ? [db.update(syncStateTable).set({ fetchedAt: 0 }).where(and(
+      eq(syncStateTable.userId, key.userId), eq(syncStateTable.resource, prResource(key.repoId, key.number)),
+      sql`${syncStateTable.revision} IS NOT ${fetched.revision}`,
+    ))] : []),
     db.delete(prFilesTable).where(childWhere(prFilesTable, key)),
     ...chunkRowsByColumnBudget(rows).map((part) => db.insert(prFilesTable).values(part)),
     db
@@ -278,13 +297,13 @@ export const mirrorFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, fet
 export const filesCompleteness = (row: typeof syncStateTable.$inferSelect): PullTopologyCompleteness =>
   row.incompleteCause === 'upstream-cap' && row.received != null && row.upstreamLimit != null
     ? { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: row.received, reportedTotal: row.reportedTotal, limit: row.upstreamLimit }
-    : COMPLETE
+    : completePullTopology
 
 type ReadFilesOptions = { includePatches?: boolean; paths?: string[] }
 
 // `missing` counts available patches whose body was not in BLOBS. That is a broken cache, not a file
 // without a diff, so the caller repairs it with a refresh rather than serving `patch: null`.
-export type ReadFilesResult = { ok: true; files: PullFile[] } | { ok: false; missing: number }
+export type ReadFilesResult = { ok: true; files: PullFile[]; revision: string | null; completeness: PullTopologyCompleteness } | { ok: false; missing: number }
 
 // Read one PR's files back out of the mirror, in provider order. `viewed` is app-state
 // (viewed_files), merged in fresh on every read so it survives mirror re-syncs. Callers can skip
@@ -293,10 +312,11 @@ export const readFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, optio
   const includePatches = options.includePatches ?? true
   const paths = options.paths?.length ? Array.from(new Set(options.paths)) : undefined
   const fileWhere = and(childWhere(prFilesTable, key), ...(paths ? [inArray(prFilesTable.path, paths)] : []))
-  const [files, viewed] = await Promise.all([
-    db.select().from(prFilesTable).where(fileWhere).orderBy(asc(prFilesTable.position)),
-    db.select({ path: viewedFilesTable.path }).from(viewedFilesTable).where(childWhere(viewedFilesTable, key)),
-  ])
+  const files = db.select().from(prFilesTable).where(fileWhere).orderBy(asc(prFilesTable.position)).all()
+  const viewed = db.select({ path: viewedFilesTable.path }).from(viewedFilesTable).where(childWhere(viewedFilesTable, key)).all()
+  const sync = db.select().from(syncStateTable).where(and(
+    eq(syncStateTable.userId, key.userId), eq(syncStateTable.resource, filesResource(key.repoId, key.number)),
+  )).get()
   const seen = new Set(viewed.map((v) => v.path))
   let missing = 0
   const out = await Promise.all(
@@ -322,5 +342,5 @@ export const readFiles = async (blobs: PatchBlobStore, db: Db, key: PrKey, optio
     log.warn(`pull files read found ${missing} available patch bodies missing from the blob cache`)
     return { ok: false, missing }
   }
-  return { ok: true, files: out }
+  return { ok: true, files: out, revision: sync?.revision ?? null, completeness: sync ? filesCompleteness(sync) : completePullTopology }
 }

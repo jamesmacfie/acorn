@@ -25,6 +25,7 @@ const jsonRequest = (body: unknown) =>
 let plugin: TestPluginDb
 let blobs: Map<string, string>
 let app: Hono<AppEnv>
+const emit = vi.fn()
 const env = () => ({
   BLOBS: { get: async (k: string) => blobs.get(k) ?? null, put: async (k: string, v: string) => void blobs.set(k, v) },
 }) as unknown as Env
@@ -32,13 +33,14 @@ const env = () => ({
 describe('pulls batch route', () => {
   beforeEach(() => {
     plugin = makeTestPluginDb('github')
+    emit.mockClear()
     blobs = new Map()
     app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
       c.set('principal', { kind: 'device', userId: 'james' })
       await next()
     })
-    app.route('/api/repos', pullsBatch(plugin.db))
+    app.route('/api/repos', pullsBatch(plugin.db, emit))
     vi.mocked(resolveRepoForUser).mockResolvedValue({ ok: true, value: { repoId: 19847 } })
   })
   afterEach(() => {
@@ -47,7 +49,9 @@ describe('pulls batch route', () => {
   })
 
   it('refreshes a stale pull through the complete helpers and answers with both envelopes', async () => {
-    const fake = fakeGithub(makeFakePull({ threads: 150, files: 250 }))
+    const pull = makeFakePull({ threads: 150, files: 250 })
+    Object.assign(pull.threads[149]!, { isOutdated: true, line: null, originalLine: 275 })
+    const fake = fakeGithub(pull)
     vi.stubGlobal('fetch', fake.fetch)
 
     const res = await app.fetch(jsonRequest({ numbers: [7], files: 'summary' }), env())
@@ -55,11 +59,15 @@ describe('pulls batch route', () => {
     expect(res.status).toBe(200)
     const [item] = (await res.json()) as PullBatchItem[]
     expect(item!.detail.threads).toHaveLength(150)
+    expect(item!.detail.threads[149]).toMatchObject({ outdated: true, line: null, originalLine: 275 })
+    expect(item!.detail.revision).toBe('base-sha:head-sha')
+    expect(item!.files?.revision).toBe(item!.detail.revision)
     expect(item!.files?.completeness).toEqual({ kind: 'complete' })
     expect(item!.files?.files).toHaveLength(250)
     expect(item!.files?.files[0]).toMatchObject({ position: 0, patchState: 'available', patch: null })
     expect(fake.requests.filter((r) => r.kind === 'graphql-page')).toHaveLength(1)
     expect(fake.requests.filter((r) => r.kind === 'files')).toHaveLength(3)
+    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7, headSha: null }))
   })
 
   it('serves a fresh pull from the mirror without calling GitHub, with full patches when asked', async () => {

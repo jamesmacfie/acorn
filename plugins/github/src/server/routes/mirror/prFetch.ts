@@ -1,5 +1,5 @@
 import { createLogger, type RouteFailure, type RouteResult } from '@acorn/plugin-api/node'
-import type { PullTopologyCompleteness } from '../../../shared/api'
+import { completePullTopology, type PullTopologyCompleteness } from '../../../shared/api'
 import { gh, ghError, ghGraphQL, ghGraphQLResult } from '../../githubApi'
 import { mapLimited } from '../../mapLimited'
 
@@ -12,7 +12,6 @@ import { mapLimited } from '../../mapLimited'
 // Telemetry and logging).
 const log = createLogger('github', 'github')
 
-export const COMPLETE = { kind: 'complete' } as const satisfies PullTopologyCompleteness
 
 // GraphQL's largest page. Every connection asks for it.
 const PAGE_SIZE = 100
@@ -38,7 +37,7 @@ export type GqlCommit = {
   }
 }
 export type GqlThreadComment = { id: string; databaseId: number | null; author: GqlActor; bodyHTML: string | null; createdAt: string | null }
-type GqlThreadFields = { id: string; isResolved: boolean; path: string | null; line: number | null; originalLine: number | null; diffSide: string | null }
+type GqlThreadFields = { id: string; isResolved: boolean; isOutdated: boolean; path: string | null; line: number | null; originalLine: number | null; diffSide: string | null }
 export type GqlThread = GqlThreadFields & { comments: GqlThreadComment[] }
 export type GqlContext =
   | {
@@ -59,6 +58,7 @@ export type PullScalars = {
   state: string
   isDraft: boolean
   bodyHTML: string | null
+  baseRefOid?: string | null
   headRefOid: string | null
   author: GqlActor
   baseRefName: string | null
@@ -71,6 +71,7 @@ export type PullScalars = {
 
 // The staged aggregate: every connection walked to its end, in the order GitHub returned it.
 export type PullComposite = PullScalars & {
+  revision?: string | null
   labels: GqlLabel[]
   reviews: GqlReview[]
   reviewRequests: GqlReviewRequest[]
@@ -95,7 +96,7 @@ const CONTEXT_NODES = `__typename
 const page = (field: string, nodes: string, after: boolean) =>
   `${field}(first: ${PAGE_SIZE}${after ? ', after: $after' : ''}) { ${PAGE_INFO} nodes { ${nodes} } }`
 
-const THREAD_NODES = `id isResolved path line originalLine diffSide ${page('comments', THREAD_COMMENT_NODES, false)}`
+const THREAD_NODES = `id isResolved isOutdated path line originalLine diffSide ${page('comments', THREAD_COMMENT_NODES, false)}`
 
 // The pull request's own connections: which field, which node selection, and which value names a
 // node, so a node that appears on two pages is kept once, where it first appeared.
@@ -108,7 +109,7 @@ const PULL_CONNECTIONS = {
   reviewThreads: { field: 'reviewThreads', nodes: THREAD_NODES, identity: (n: GqlThreadFields) => n.id },
 } as const
 
-const SCALARS = `id number title state isDraft bodyHTML headRefOid author { login } baseRefName headRefName updatedAt
+const SCALARS = `id number title state isDraft bodyHTML headRefOid baseRefOid author { login } baseRefName headRefName updatedAt
       mergeable mergeStateStatus autoMergeRequest { mergeMethod }`
 
 // The first request: the scalars and the first page of every connection. Its worst case is 100 review
@@ -235,12 +236,23 @@ export async function fetchPullComposite(token: Token, owner: string, repo: stri
     threads.push({ ...(threadPages.value[i] as GqlThreadFields), comments: result.value })
   }
 
+  const verified = await graphql<{ repository?: { pullRequest?: PullScalars | null } | null }>(token,
+    `query Revision($owner: String!, $repo: String!, $number: Int!) {
+      repository(owner: $owner, name: $repo) { pullRequest(number: $number) { headRefOid baseRefOid updatedAt } }
+    }`, { owner, repo, number })
+  if (!verified.ok) return verified
+  const end = verified.value?.repository?.pullRequest
+  if (!end || pull.headRefOid !== end.headRefOid || pull.baseRefOid !== end.baseRefOid || pull.updatedAt !== end.updatedAt) {
+    return failure('github_revision_changed', 'pull detail changed during pagination; refresh again')
+  }
+
   // The connection fields are overwritten with their walked lists; the first-page objects that
   // remain on the spread are not part of PullComposite and nothing reads them.
   return {
     ok: true,
     value: {
       ...pull,
+      revision: pullRevision(pull.baseRefOid, pull.headRefOid),
       labels: labels.value as GqlLabel[],
       reviews: reviews.value as GqlReview[],
       reviewRequests: reviewRequests.value as GqlReviewRequest[],
@@ -268,7 +280,7 @@ export const FILES_PAGE_SIZE = 100
 export const FILES_UPSTREAM_LIMIT = 3000
 const FILES_MAX_PAGES = FILES_UPSTREAM_LIMIT / FILES_PAGE_SIZE
 
-export type FilesFetch = { files: GitHubFile[]; completeness: PullTopologyCompleteness }
+export type FilesFetch = { files: GitHubFile[]; completeness: PullTopologyCompleteness; revision?: string | null }
 
 const isGitHubFile = (value: unknown): value is GitHubFile => {
   if (!value || typeof value !== 'object') return false
@@ -289,7 +301,7 @@ const hasNextLink = (link: string | null) => !!link && /rel="next"/.test(link)
  * GitHub lists nothing, so there the pull's own `changed_files` decides whether the list is complete.
  * A duplicate path or a malformed page fails the whole fetch. Nothing is written.
  */
-export async function fetchFiles(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<FilesFetch>> {
+async function fetchFilesPages(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<FilesFetch>> {
   const files: GitHubFile[] = []
   const seen = new Set<string>()
   for (let pageNo = 1; pageNo <= FILES_MAX_PAGES; pageNo++) {
@@ -303,9 +315,9 @@ export async function fetchFiles(token: Token, owner: string, repo: string, numb
       seen.add(file.filename)
       files.push(file)
     }
-    if (body.length < FILES_PAGE_SIZE) return { ok: true, value: { files, completeness: COMPLETE } }
+    if (body.length < FILES_PAGE_SIZE) return { ok: true, value: { files, completeness: completePullTopology } }
     if (pageNo === FILES_MAX_PAGES) break
-    if (!hasNextLink(res.headers.get('link'))) return { ok: true, value: { files, completeness: COMPLETE } }
+    if (!hasNextLink(res.headers.get('link'))) return { ok: true, value: { files, completeness: completePullTopology } }
   }
 
   // Thirty full pages. A full last page does not prove there is nothing after it.
@@ -314,7 +326,7 @@ export async function fetchFiles(token: Token, owner: string, repo: string, numb
   if (err) return { ok: false, failure: err }
   const pull = (await res.json().catch(() => null)) as { changed_files?: unknown } | null
   const reportedTotal = typeof pull?.changed_files === 'number' ? pull.changed_files : null
-  if (reportedTotal !== null && reportedTotal <= files.length) return { ok: true, value: { files, completeness: COMPLETE } }
+  if (reportedTotal !== null && reportedTotal <= files.length) return { ok: true, value: { files, completeness: completePullTopology } }
   return {
     ok: true,
     value: {
@@ -322,4 +334,33 @@ export async function fetchFiles(token: Token, owner: string, repo: string, numb
       completeness: { kind: 'incomplete', cause: 'upstream-cap', resource: 'files', received: files.length, reportedTotal, limit: FILES_UPSTREAM_LIMIT },
     },
   }
+}
+
+// A revision identifies the provider comparison, independently of fetch times and patch digests.
+const pullRevision = (base: string | null | undefined, head: string | null | undefined): string | null =>
+  base && head ? `${base}:${head}` : null
+
+type RestPullRevision = { base?: { sha?: string }; head?: { sha?: string }; updated_at?: string }
+
+async function fetchRevision(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<RestPullRevision>> {
+  const res = await gh(token, `/repos/${owner}/${repo}/pulls/${number}`)
+  const error = ghError(res)
+  if (error) return { ok: false, failure: error }
+  const value = await res.json().catch(() => null) as RestPullRevision | null
+  return value && typeof value === 'object' ? { ok: true, value } : failure('github_malformed', 'pull revision')
+}
+
+/** REST file pages are mutable. Bracket them with the comparison's identity before publishing. */
+export async function fetchFiles(token: Token, owner: string, repo: string, number: number): Promise<RouteResult<FilesFetch>> {
+  const before = await fetchRevision(token, owner, repo, number)
+  if (!before.ok) return before
+  const files = await fetchFilesPages(token, owner, repo, number)
+  if (!files.ok) return files
+  const after = await fetchRevision(token, owner, repo, number)
+  if (!after.ok) return after
+  const revision = (pull: RestPullRevision) => pullRevision(pull.base?.sha, pull.head?.sha)
+  if (revision(before.value) !== revision(after.value) || before.value.updated_at !== after.value.updated_at) {
+    return failure('github_revision_changed', 'pull files changed during pagination; refresh again')
+  }
+  return { ok: true, value: { ...files.value, revision: revision(after.value) } }
 }
