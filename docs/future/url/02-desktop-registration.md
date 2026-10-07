@@ -2,6 +2,53 @@
 
 ## Completion note, October 7, 2026
 
+### Review follow-up, October 7, 2026
+
+The `open` address now hands recognised project routes and their resolved source to the shell's
+explicit project opener. This preserves a GitHub repository or pull request destination across a
+workspace transition when the destination workspace remembers a different task. The route/source
+resolution remains in the content-link owner; other content presentations retain their existing
+navigation behavior. A client-core regression opens a recognised pull request through `openLink`
+and checks both the retained route and source after the workspace transition.
+
+The renderer's production delivery owner now has a focused lifecycle test for native URLs queued
+before subscription, an event during subscription, concurrent wakeups, ordered dispatch while a
+Node switch waits, and a failed content click dispatch. Failures create the normal refusal notice;
+the void event callback consumes the promise rejection. A separate test holds a cold loaded-plugin
+route until the selected Node's contribution pass completes. Rust subscribes to `on_open_url`
+before reading `get_current`, then prepends the cold URL to the pending queue and avoids replaying
+the same URL if the event arrived during that read. A Rust queue test covers that interleaving.
+Tauri supplies parsed `Url` values to both APIs. Serializing them preserves link meaning but may
+normalize the input; Rust cannot forward the byte-identical raw OS string through this plugin API.
+
+Installed-bundle verification was attempted with an isolated `Acorn Phase02 Test.app` build,
+identifier `com.acorn.desktop.phase02-test`, scheme declaration only in its one-off Tauri config,
+and Cargo targets under `/private/tmp` and this worktree. The exact build command was
+`pnpm --filter @acorn/desktop exec tauri build --bundles app --config '{"productName":"Acorn Phase02 Test","identifier":"com.acorn.desktop.phase02-test","build":{"beforeBuildCommand":""},"bundle":{"targets":["app"],"createUpdaterArtifacts":false},"plugins":{"deep-link":{"desktop":{"schemes":["acorn"]}}}}'`.
+The default, isolated, and limited-parallelism attempts failed in host Rust compilation before
+creating an `.app`: `E0463 can't find crate for ctor_proc_macro` or `zerofrom_derive`; the escalated
+isolated attempt also reported a malformed proc-macro dylib (`mis-aligned LINKEDIT string pool`).
+The targeted `open -a "$PWD/apps/desktop/src-tauri/target/release/bundle/macos/Acorn Phase02 Test.app"
+'acorn://local/settings/connections'` attempt returned macOS `NSCocoaErrorDomain Code=260` with
+underlying `NSPOSIXErrorDomain Code=2` because that bundle file did not exist.
+Logs are `/private/tmp/acorn-phase02-followup-bundle.log`,
+`/private/tmp/acorn-phase02-followup-bundle-isolated.log`,
+`/private/tmp/acorn-phase02-followup-bundle-escalated.log`, and
+`/private/tmp/acorn-phase02-followup-bundle-worktree.log`. Consequently `open -a` delivery while
+closed, running, or minimised and cold loaded-plugin delivery remain unverified on an installed
+bundle. No installed Acorn or default scheme handler was changed. Once the host Rust toolchain can
+produce the disposable bundle, launch that explicit `.app` path with `open -a` in each state and
+inspect its separate Application Support data root. The agent `link` check below verifies the
+renderer but not Launch Services.
+
+Follow-up scoped checks: client-core and desktop lint, focused client-core route test, focused
+desktop delivery and delayed-registration tests, Rust link queue test, architecture tests, and
+the agent web activity link test passed. The four focused client-core content and address tests
+also passed. Logs: `/private/tmp/acorn-phase02-followup-client-tests.log`,
+`/private/tmp/acorn-phase02-followup-arch.log`,
+`/private/tmp/acorn-phase02-followup-agents.log`, and
+`/private/tmp/acorn-phase02-followup-rust.log`.
+
 Implemented installed-bundle `acorn` scheme registration through `apps/desktop/src-tauri/tauri.release.json`, included only
 by `apps/desktop/scripts/dist.mjs`. Tauri's deep-link plugin receives cold and running-app URLs. Rust stores each
 URL until the renderer subscribes, emits a wake event carrying the URL, and leaves parsing and routing

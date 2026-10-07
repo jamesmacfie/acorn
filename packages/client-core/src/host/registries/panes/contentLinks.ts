@@ -317,17 +317,23 @@ export type ContentLinkPresentation = {
   // The shell's navigator, for the `route` rung. Absent is normal: a surface with no navigator in scope
   // has one fewer destination, and the others still work.
   navigate?: (to: string) => void
+  /** A host with project restore rules can handle the resolved route and source together. */
+  openRoute?: (path: string, sourceId: string | null) => void
 }
 
 // The route rung. Navigating is only half of arriving, because the shell draws from the rail selection
 // rather than from the location, so a path whose source is not selected moves the address bar and leaves
 // the previous surface on screen. A path no source claims is left alone, since core's own routes are not
 // rail sources.
-function openRouteTarget(path: string | null | undefined, navigate: ((to: string) => void) | undefined): boolean {
-  if (!path || !navigate) return false
+function openRouteTarget(path: string | null | undefined, presentation: ContentLinkPresentation): boolean {
+  if (!path || (!presentation.navigate && !presentation.openRoute)) return false
   const source = sourceIdForPath(path)
+  if (presentation.openRoute) {
+    presentation.openRoute(path, source ?? null)
+    return true
+  }
   if (source) setSelectedSource(source)
-  navigate(path)
+  presentation.navigate!(path)
   return true
 }
 
@@ -350,7 +356,7 @@ function openClaim(target: InAppTarget, path: string | null | undefined, present
     if (contribution?.presentations && !contribution.presentations.includes(rung)) continue
     if (rung === 'pane' && openPluginContentTarget(target, presentation.taskId)) return 'pane'
     if (rung === 'refPanel' && openRefPanelTarget(target)) return 'refPanel'
-    if (rung === 'route' && openRouteTarget(path, presentation.navigate)) return 'route'
+    if (rung === 'route' && openRouteTarget(path, presentation)) return 'route'
     if (rung === 'overlay' && contribution?.overlay && typeof target.providerId === 'string') {
       openPluginOverlay(target.providerId, contribution.overlay)
       return 'overlay'

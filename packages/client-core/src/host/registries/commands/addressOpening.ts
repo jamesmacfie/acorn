@@ -9,7 +9,7 @@ import { projectSurfaceRoutes } from '../panes/projectSurfaces'
 import { paneContribution } from '../panes/panes'
 import { openInAppUrl } from '../panes/contentLinks'
 import { clientEvents } from './clientEvents'
-import { projectPath, taskPath } from './corePaths'
+import { isProjectPath, projectPath, taskPath } from './corePaths'
 import { buildLink, parseLink, type Address, type LinkRefusal } from './addresses'
 
 export type AddressHost = {
@@ -58,7 +58,7 @@ function waitForInitialFleet(): Promise<void> {
   })
 }
 
-function refused(link: string, reason: string): LinkRefusal {
+export function reportLinkFailure(link: string, reason: string): LinkRefusal {
   const detail = `${reason}: ${link.length > 500 ? `${link.slice(0, 500)}…` : link}`
   pushNotice({ taskId: '', kind: 'error', title: 'Could not open Acorn link', detail, at: Date.now() })
   toast(detail, { tone: 'danger' })
@@ -78,27 +78,27 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
   // starts that read; wait for its result instead of treating an empty projection as unpaired.
   if (!nodes().length) await waitForInitialFleet()
   const nodeId = address.nodeId === 'local' ? homeNodeId() : address.nodeId
-  if (!nodeId || !nodes().some((node) => node.nodeId === nodeId)) return refused(shownLink, 'Node is not paired on this device')
-  if (address.kind === 'new-task') return refused(shownLink, 'Creating a task from a link is not available yet')
+  if (!nodeId || !nodes().some((node) => node.nodeId === nodeId)) return reportLinkFailure(shownLink, 'Node is not paired on this device')
+  if (address.kind === 'new-task') return reportLinkFailure(shownLink, 'Creating a task from a link is not available yet')
   if (activeNodeId() !== nodeId) setActiveNode(nodeId)
   const shell = await readyHost(nodeId)
-  if (!shell || activeNodeId() !== nodeId) return refused(shownLink, 'Node did not become ready to open the link')
+  if (!shell || activeNodeId() !== nodeId) return reportLinkFailure(shownLink, 'Node did not become ready to open the link')
 
   switch (address.kind) {
     case 'task': {
       const path = taskPath(address.taskId)
       if (address.pane && !paneContribution(address.pane)) {
-        if (!shell.openTask(address.taskId, path)) return refused(shownLink, 'Task was not found')
-        return refused(shownLink, 'Pane is unavailable; opened the task')
+        if (!shell.openTask(address.taskId, path)) return reportLinkFailure(shownLink, 'Task was not found')
+        return reportLinkFailure(shownLink, 'Pane is unavailable; opened the task')
       }
       const query = address.pane
         ? `?${new URLSearchParams({ pane: address.pane, ...(address.item ? { item: address.item } : {}) })}`
         : ''
-      if (!shell.openTask(address.taskId, `${path}${query}`)) return refused(shownLink, 'Task was not found')
+      if (!shell.openTask(address.taskId, `${path}${query}`)) return reportLinkFailure(shownLink, 'Task was not found')
       break
     }
     case 'project': {
-      if (!shell.hasProject(address.projectId)) return refused(shownLink, 'Project was not found')
+      if (!shell.hasProject(address.projectId)) return reportLinkFailure(shownLink, 'Project was not found')
       const base = projectPath(address.projectId)
       const path = `${base}${address.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`
       const routeSource = sourceIdForPath(path)
@@ -108,7 +108,7 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
         entry.projectSurfaceId === surface.id && entry.when?.() !== false)?.id
       if (address.rest.length && !source && !surfaceSource) {
         shell.openProject(base, defaultSourceId() ?? null)
-        return refused(shownLink, 'Project page is unavailable; opened the project')
+        return reportLinkFailure(shownLink, 'Project page is unavailable; opened the project')
       }
       shell.openProject(path, source ?? surfaceSource ?? defaultSourceId() ?? null)
       break
@@ -120,13 +120,19 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
     }
     case 'source':
       if (!sourceRegistry.get(address.sourceId) || sourceRegistry.get(address.sourceId)?.when?.() === false) {
-        return refused(shownLink, 'Source is unavailable')
+        return reportLinkFailure(shownLink, 'Source is unavailable')
       }
       setSelectedSource(address.sourceId)
       break
     case 'open':
-      if (!openInAppUrl(address.url, { prefer: 'route', navigate: shell.navigate })) {
-        return refused(shownLink, 'No Acorn destination claims this URL')
+      if (!openInAppUrl(address.url, { prefer: 'route', openRoute: (path, source) => {
+        if (isProjectPath(path)) shell.openProject(path, source ?? defaultSourceId() ?? null)
+        else {
+          if (source) setSelectedSource(source)
+          shell.navigate(path)
+        }
+      } })) {
+        return reportLinkFailure(shownLink, 'No Acorn destination claims this URL')
       }
       break
   }
@@ -135,5 +141,5 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
 
 export async function openLink(href: string): Promise<LinkRefusal | { kind: 'opened' }> {
   const parsed = parseLink(href)
-  return parsed.kind === 'refused' ? refused(href, parsed.reason) : openAddress(parsed.address, href)
+  return parsed.kind === 'refused' ? reportLinkFailure(href, parsed.reason) : openAddress(parsed.address, href)
 }
