@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [security/](./security/README.md) | Five product requirement documents from a hardening pass: desktop command authorization, plugin realm policy tampering, the bundled-runtime network and filesystem backstop, internal-token confinement when advertised, and the automation-driver release fence. | Proposed, October 7, 2026; implementation not started. |
 | [editor/](./editor/README.md) | Six product requirement phases for document conflicts, file management, Git status, tabs/navigation, editing controls, and scoped search, with combined acceptance and scope boundaries. | Proposed, October 7, 2026; implementation not started. |
 | [url/](./url/README.md) | `acorn://` links that open the desktop app on a task, project page, plugin page, settings page, or rail source, plus **Copy link**, a confirmed new-task action, and `acorn --link` for the terminal client. Six sequential phases. | Planned, October 7, 2026; implementation not started. |
 | [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
