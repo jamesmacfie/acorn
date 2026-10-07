@@ -312,6 +312,22 @@ Keep one owning page for each contract, and add every new page to this index in 
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
 
+## Future editor improvements
+
+These product requirements keep everyday file management and editing small. Implement the six phases
+in order; plugin file viewers, inline find controls, and Git merge resolution keep their separate owners.
+
+| Document | What it holds |
+| --- | --- |
+| [Editor programme](./future/editor/README.md) | Product goal, phase order, ownership, related plans, research, and verification. |
+| [Scope boundaries](./future/editor/refused.md) | Deferred functionality and its reasons. |
+| [Phase 01](./future/editor/01-document-lifecycle.md) | Disk revisions, external-change freshness, save conflicts, recovery, and writer suspension. |
+| [Phase 02](./future/editor/02-file-management.md) | Create, rename, and move to trash through file/folder menus, with document reconciliation. |
+| [Phase 03](./future/editor/03-git-status.md) | Optional Git status provider, file/tab marks, folder summaries, and batched refresh. |
+| [Phase 04](./future/editor/04-tabs-and-navigation.md) | Tab menus, guarded bulk close, reopen, recent quick open, position input, and back/forward. |
+| [Phase 05](./future/editor/05-editing-controls.md) | File status, word wrap, indentation controls, and engine command discovery. |
+| [Phase 06](./future/editor/06-search-and-acceptance.md) | Folder search, include/exclude patterns, ignored-file visibility, tree controls, and release acceptance. |
+
 ## Future UI extension handoffs
 
 These planned handoffs follow Editor file viewers. They do not describe shipped behavior.
