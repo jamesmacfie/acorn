@@ -115,7 +115,7 @@ acceptance pass.
     `session/resume`. Run a one-step workflow on `omp:omp` and have a Claude Code session delegate to
     it with `agent_spawn`. Both run as managed `omp` sessions. Last, read the turn after a provider
     error, such as an over-long prompt: `omp` sends it as an ordinary answer ending in `end_turn`, so
-    a workflow step reads it as success ([the omp harness phase](../future/pi/phases/01-omp-harness.md)).
+    a workflow step reads it as success ([the omp harness phase](../future/pi/01-omp-harness.md)).
 
 156. A loaded permission policy. Install `docs/future/pi/packages/permission-policy/` from its folder,
     restart the Node, and read the trust prompt: it says the plugin can stop the agents plugin from

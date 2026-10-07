@@ -168,7 +168,7 @@ export class SessionMessages {
 
   #sessionRefusal(session: AgentSession): SessionMessageResult | null {
     if (session.archivedAt) return refusal('archived')
-    // Workflow and delegated runs wait for operation accounting (docs/future/pi/phases/05-unattended-follow-ups.md).
+    // Workflow and delegated runs wait for operation accounting (docs/future/pi/05-unattended-follow-ups.md).
     if (session.kind === 'workflow' || session.kind === 'delegated') return refusal('unattended-not-supported')
     if (session.kind !== 'interactive' || session.controller !== 'acorn') return refusal('not-controlled')
     return null

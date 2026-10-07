@@ -82,7 +82,7 @@ no provider key passes through. `OMP_*` carries `OMP_PROFILE`, which picks one o
 profiles. Most of `omp`'s other environment settings are named `PI_*` and don't pass through. Leave
 `--auto-approve` and `--approval-mode` out of `args`: in ACP mode `omp` sends a permission request for
 `bash` and other risky calls, and either flag would skip acorn's permission card. The tested package
-and its results are in [the omp harness phase](../future/pi/phases/01-omp-harness.md).
+and its results are in [the omp harness phase](../future/pi/01-omp-harness.md).
 
 ## Spawn
 

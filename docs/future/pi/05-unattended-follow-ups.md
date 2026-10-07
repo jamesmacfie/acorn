@@ -8,8 +8,8 @@ Status: proposed, 2026-10-03. Entry: phase 04 accepted with its advisor consumer
 Workflow and delegated operations can receive policy explanations and advisor notes while retaining
 control of lifetime, completion, cancellation, and accounting. Enable the advisor's unattended mode
 only after this phase passes. Sources: the unattended claims in
-[session messages](../03-session-messages.md), [advisor](../05-advisor.md), and
-[workflow execution](../../../workflows/execution.md).
+[session messages](./03-session-messages.md), [advisor](./04-model-grants-and-advisor.md), and
+[workflow execution](../../workflows/execution.md).
 
 ## Why this is its own phase
 
@@ -88,15 +88,17 @@ contract boundary with a deterministic reviewer and fake driver:
 
 Run a real workflow and delegated job with seeded bad changes and an enabled loaded advisor. Cancel
 another run during generation. On desktop and terminal, inspect correction turns, usage, owner
-status, and parent reports. Run with clients disconnected to prove Node ownership. Do not mark this
-phase accepted if notes merely run after a workflow has already reported success.
+status, and parent reports. Run with clients disconnected to prove Node ownership. Run the advisor
+on one workflow and one interactive session for a day and read its recorded notes, to judge
+whether it is worth its cost. Do not mark this phase accepted if notes merely run after a workflow
+has already reported success.
 
 ## Documentation and handoff
 
-Update [managed agents](../../../managed-agents.md),
-[workflow execution](../../../workflows/execution.md), [security](../../../security.md),
-[node extension points](../../../plugins/node-side-extension-points.md), and
-[workflow acceptance](../../../testing/workflows.md). Record the completion point's shipped name,
+Update [managed agents](../../managed-agents.md),
+[workflow execution](../../workflows/execution.md), [security](../../security.md),
+[node extension points](../../plugins/node-side-extension-points.md), and
+[workflow acceptance](../../testing/workflows.md). Record the completion point's shipped name,
 deadline, operation correlation, usage semantics, and cancellation ownership. Give phase 11 the
 real unattended-run evidence and exact consumer revisions.
 

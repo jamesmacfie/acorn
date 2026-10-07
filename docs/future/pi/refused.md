@@ -14,7 +14,7 @@ realm, the manifest grants, and the trust prompt exist so a person can read what
 it runs ([extensibility.md](../../extensibility.md)). Nothing in this programme widens that.
 
 Revisit: never for loaded plugins. A person who wants `omp`'s model runs `omp` as a harness
-([01](./01-omp-harness.md)), where its extensions run in `omp`'s process under `omp`'s rules.
+([phase 01](./01-omp-harness.md)), where its extensions run in `omp`'s process under `omp`'s rules.
 
 ## Wrapping any method without an invitation
 
@@ -32,7 +32,7 @@ what the person sees, never what the model wrote, so a stream hook would make th
 with the provider's record of the turn.
 
 Revisit: if acorn ever owns a loop. Until then, people who want stream rules use `omp` as a harness.
-Harness bridges ([08](./08-harness-bridges.md)) don't change this. Claude's Mods has a stream event,
+Harness bridges ([phase 10](./10-harness-bridges.md)) don't change this. Claude's Mods has a stream event,
 but Codex's hooks don't, and a transcript that disagrees with the provider's record is the same
 problem from inside the loop.
 
@@ -42,14 +42,14 @@ Owning a loop is the only way to offer context rewriting, tool shadowing, and st
 session. It is also a second agent product to maintain against every provider's quirks, which is the
 work `omp` documents in a 338 KB provider-quirks file.
 
-Revisit: after [01](./01-omp-harness.md) and [08](./08-harness-bridges.md). If `omp` as a harness and
+Revisit: after [phase 01](./01-omp-harness.md) and [phase 10](./10-harness-bridges.md). If `omp` as a harness and
 bridges through each harness's own hooks cover what people ask for, the answer stays no. If the
 generic ACP driver turns out to be the limit, fix the driver first.
 
 ## Mid-turn steering
 
 `omp` can add a message to a turn while it runs. Neither ACP nor the Codex app-server has a call for
-that, and cancelling and restarting a turn to fake it loses the work in flight. [03](./03-session-messages.md)
+that, and cancelling and restarting a turn to fake it loses the work in flight. [phase 03](./03-session-messages.md)
 queues behind the running turn instead.
 
 Revisit: when a harness protocol gains a steer call. Add it as a second delivery mode, per driver.
@@ -67,7 +67,7 @@ replacement, never.
 ## Model choice by family
 
 `omp`'s `ctx.models.family` lets an extension pick a model from a different family from the session's.
-[04](./04-unattended-model-calls.md) makes the owner pick a plugin's model in settings instead, because
+[phase 04](./04-model-grants-and-advisor.md) makes the owner pick a plugin's model in settings instead, because
 a plugin choosing what to spend is the decision the `models` grant deliberately leaves to the person.
 
 Revisit: if owners ask for "always a different family" often enough that picking by hand is a chore.
@@ -88,11 +88,11 @@ Revisit: if acorn owns a loop.
 other formats. Acorn starts those tools rather than replacing them, so each harness already reads its
 own files.
 
-Revisit: if [06](./06-agent-content.md)'s Claude Code plugin importer ships and people want the same
+Revisit: if [phase 06](./06-portable-skills.md#later-claude-code-plugin-folders)'s Claude Code plugin importer ships and people want the same
 for Cursor rules in Codex sessions.
 
 ## A marketplace in this programme
 
 `omp` installs plugins from Claude Code-compatible marketplace catalogs. Acorn's discovery waits on
-package signing, and [ecosystem](../ecosystem/README.md) owns that order. File 06 names the importer as
+package signing, and [ecosystem](../ecosystem/README.md) owns that order. Phase 06 names the importer as
 a later step and leaves catalogs to ecosystem.

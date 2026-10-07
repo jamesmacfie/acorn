@@ -6,7 +6,7 @@ recorded. Next: [phase 03](./03-session-messages.md).
 ## Completion note, 2026-10-07
 
 **What landed.** On branch `phase-02-permission-veto`, at the commit titled "Phase 02: Permission veto
-and policy plugin". [Permission policy](../../../managed-agents/permission-policy.md) is the owning
+and policy plugin". [Permission policy](../../managed-agents/permission-policy.md) is the owning
 contract.
 
 - `agents:before-permission`, declared beside `before-send` from `BEFORE_PERMISSION_HOOK` in
@@ -25,7 +25,7 @@ contract.
 - The resolved card on both hosts says "Blocked by `<plugin>`: `<reason>`", and the thread keeps a
   blocked permission that it would otherwise drop once resolved.
 - The policy package is
-  [`docs/future/pi/packages/permission-policy/`](../packages/permission-policy/README.md), with
+  [`docs/future/pi/packages/permission-policy/`](./packages/permission-policy/README.md), with
   `node --test` coverage of every command form it claims.
 
 No migration: `blocked` lives in the existing `resolution_json`. The wire change is additive, and an
@@ -94,7 +94,7 @@ Real host, `pnpm dev:agent -- --session pi-phase-02`, Claude Code through ACP, O
 - **Codex wasn't run.** codex-cli 0.159.2 is installed, but its account hit its usage limit until
   2026-10-10. The Codex mapping, `decline` answer, and parked-request path are covered by
   `codexNormalizer.test.ts` and the shared runtime tests. Manual check 156 in
-  [agents and providers](../../../testing/agents-and-providers.md) is owed for Codex.
+  [agents and providers](../../testing/agents-and-providers.md) is owed for Codex.
 - **DeepSeek and `omp` weren't run.** Neither `dsh` nor `omp` is on this machine. DeepSeek's request
   shape comes from its source (`references/deepseek-harness/packages/acp/acp/src/index.ts:155-172`
   and `updates.ts:52-61`), and the driver test covers it. `omp`'s permission input is unverified,
@@ -113,9 +113,68 @@ own setting.
 
 A loaded policy plugin refuses a harness permission request before Acorn shows it as pending.
 Both clients show a resolved request naming the blocking plugin and reason. The plugin tightens
-approval without acquiring the power to approve. Source design:
-[Mods permission hook](../../mods.md#the-design-delivered), with
-[Pi additions](../02-before-permission.md).
+approval without acquiring the power to approve. The base design is the
+[Mods permission hook](../mods.md#the-design-delivered); the Pi additions are below.
+
+## Design
+
+The design as proposed on 2026-10-02. Where it differs from the completion note above, the completion
+note records what was built.
+
+### Why it belongs in this programme
+
+`omp`'s most used extension event is `tool_call`. Its own quick-start example blocks `rm -rf` with
+it. An acorn plugin has no equivalent for the harness's tools: `core:before-tool-call` guards only
+acorn's own tools, on the agent tools route, and withholds their arguments on purpose.
+
+The permission request is the one place every harness stops and asks acorn before running a risky
+tool. [mods.md § The gap](../mods.md#the-gap-harness-permission-requests) traces it through both
+drivers, and [mods.md § The design](../mods.md#the-design-delivered) puts a veto-only
+hook there. That is the closest acorn can get to `tool_call` from outside the loop, and it works the
+same for Claude, Codex, DeepSeek, and `omp` from [phase 01](./01-omp-harness.md).
+
+Build it exactly as `mods.md` describes: observe and veto only, `onTimeout: 'allow'`, run in
+`onProviderEvent` before the event queue, and answer a veto with the first `reject_once` option.
+
+### Addition 1: tell the model why
+
+The first Mods design deferred explanations until agents retried blocked commands. The sequential
+plan instead makes them an optional consumer when messaging lands.
+`omp` answers the same problem with `additionalContext` on `tool_call`: a handler adds
+trusted text that the host places after the tool results, before the next model request.
+
+Acorn cannot place text inside the harness's turn. It can queue a turn after it. Once
+[phase 03](./03-session-messages.md) ships, the handler's plugin can follow a confirmed veto with a session
+message that says what was refused and why. Phase 03 reads committed blocked state before delivery;
+a late hook verdict ignored after timeout is not proof of refusal. Keep the two separate:
+
+- The veto stays a hook verdict with a short display reason, capped by the host.
+- The explanation is a session message from the same plugin, under the same per-session cap as any
+  other, so a plugin that vetoes in a loop cannot also talk in a loop.
+
+Do not make the hook queue the message itself. A hook that has side effects on another plugin's
+session is a different grant from a veto, and the trust prompt would have to say so.
+
+### Addition 2: the first consumer
+
+`mods.md` phase 4 asks for a small loaded plugin with two hard-coded rules: no force-push, and no
+destructive command outside the task root. Write it so it also exercises [phase 03](./03-session-messages.md)
+once that lands, by queuing one explanation per blocked command. That gives 03 a second real consumer
+besides [phase 04](./04-model-grants-and-advisor.md), at almost no cost.
+
+### What `omp` does that this still does not
+
+Say these in the owning docs when the hook ships:
+
+- `omp` sees every tool call. This hook sees only the calls a harness asks about. A harness in a bypass
+  mode, or a tool its own settings allow, never reaches acorn.
+- `omp` can rewrite a tool's input. This hook cannot, because the harness runs its own command.
+- `omp` can patch a tool's result before the model reads it. Acorn cannot reach a result at all.
+
+For the first and the second, [phase 10](./10-harness-bridges.md) proposes a bridge through each harness's
+own hooks: Claude Code and Codex now offer `PreToolUse`, so acorn can see every tool call there too.
+It still refuses input rewriting. For patching results, the answer is [phase 01](./01-omp-harness.md): run
+an agent whose loop takes extensions.
 
 ## Ownership and data flow
 
@@ -183,9 +242,9 @@ Apply [shared verification](./README.md#verification-for-every-phase). Prove:
 
 ## Documentation and handoff
 
-Update the hook table in [node extension points](../../../plugins/node-side-extension-points.md),
-[managed agents](../../../managed-agents.md), [security](../../../security.md), and
-[provider checks](../../../testing/agents-and-providers.md). Explain that timeout means human review,
+Update the hook table in [node extension points](../../plugins/node-side-extension-points.md),
+[managed agents](../../managed-agents.md), [security](../../security.md), and
+[provider checks](../../testing/agents-and-providers.md). Explain that timeout means human review,
 and that already-allowed tools and bypass modes do not reach this hook. Retain the comparison in
 Mods and link its delivered contract to the owning docs. Supply the policy package to phase 03.
 
@@ -194,3 +253,8 @@ Mods and link its delivered contract to the owning docs. Supply the policy packa
 Recheck parked-request ordering in both drivers, event bounding, resolved-row lifecycle publication,
 loaded hook routing, host reason limits, and DeepSeek's actual shell input. Inspect existing approval
 metadata before adding the subject so the change preserves all shipped approval forms.
+
+From the design:
+
+Everything in [mods.md § Verify before building](../mods.md#verify-before-building), plus whether
+[phase 03](./03-session-messages.md) has shipped, which decides whether the explanation path is in scope.

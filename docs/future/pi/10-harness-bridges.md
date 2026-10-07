@@ -1,10 +1,19 @@
-# 08. Reach inside a harness loop through the harness's own hooks
+# Phase 10: harness bridges
 
-Status: proposed, 2026-10-07. Not started.
+Status: proposed, 2026-10-07. Entry: phase 09 accepted with its loaded consumers. Next:
+[phase 11](./11-programme-acceptance.md).
 
-Execution handoff: [phase 10](./phases/10-harness-bridges.md).
+## Outcome
 
-## Why
+A loaded policy plugin refuses, holds for the person, or annotates every tool call a bridged harness
+makes, not only the calls it asks about. Claude Code has a bridge. Codex has one, or an evidenced
+limitation explaining why a host can't install a trusted hook. No bridge reply ever approves a tool.
+
+## Design
+
+The design as proposed on 2026-10-07. The implementation steps below refine it and win where they differ.
+
+### Why
 
 This programme's [README](./README.md) rests on one finding: the agent loop belongs to the harness, so
 an acorn plugin reaches only its edges. That is still true of acorn's own process. What changed is
@@ -19,7 +28,7 @@ that every harness family acorn drives now publishes hooks inside its own loop:
   `SubagentStop`, and others. Its documentation says hooks run under `app-server` as well as the
   interactive CLI.
 - `omp` loads TypeScript extensions with `tool_call` and `tool_result` events
-  ([01](./01-omp-harness.md)).
+  ([phase 01](./01-omp-harness.md)).
 
 Acorn already passes data into every session it starts. `claudeHarness.ts` sends
 `claudeCode.options` through `acpSessionMeta`, and the ACP adapter spreads those options into the
@@ -34,7 +43,7 @@ once. The bridge, not the plugin, knows each harness's spelling. Acorn still own
 A person-installed Claude Code mod that reports to acorn is planned outside this programme. It is
 the same idea from the other side, so the ingress below is a versioned contract that mod can target.
 
-## What each harness offers at the two first points
+### What each harness offers at the two first points
 
 | Acorn point | Claude Code | Codex | `omp` |
 | --- | --- | --- | --- |
@@ -44,9 +53,9 @@ the same idea from the other side, so the ingress below is a versioned contract 
 Prompt context, compaction, subagent start, and stop-blocking exist in two or more harnesses too.
 They are left for later, each with a trigger, in [Later](#later-each-with-its-trigger).
 
-## The design
+### The shape
 
-### Two new points, owned by agents
+#### Two new points, owned by agents
 
 Agents declares both beside `before-send` and `before-permission`, with `ctx.hooks.declare`.
 
@@ -69,7 +78,7 @@ registers one function and points it at both:
 packages in the Claude ecosystem: run the linter or the tests after an edit and tell the model what
 broke, inside the turn rather than in a later one.
 
-### The `ask` verdict
+#### The `ask` verdict
 
 `ask` is a fourth hook mode in core's registry, and a point opts into it through `allows`. A handler
 answers `{ ask: true, reason }`. Agents then raises an ordinary permission request on the session,
@@ -80,14 +89,14 @@ to the harness as a deny. An approval goes back as no decision, so the harness's
 Claude's `tool.check` returning `ask`, and of community mods that make a person confirm destructive
 commands. The trust prompt names it separately from veto: "can make a tool wait for you".
 
-### The bridge never approves
+#### The bridge never approves
 
 Every bridge reply is one of: deny with a reason, a context note, or no decision. It never returns
 allow, even when the person approved an `ask`. A timeout, a crash, an unreachable Node, or a bad
 reply is no decision. So a broken bridge leaves the session exactly as strict as the harness made
 it, and acorn's rule that no plugin approves on the person's behalf holds inside the loop too.
 
-### How each bridge is installed
+#### How each bridge is installed
 
 Acorn owns one small bridge program, built as an entry beside `mcp.js`, the way
 `apps/node/src/entries/mcp.ts` is. The program does nothing but forward. It reads the harness's hook
@@ -106,17 +115,17 @@ normalizer, where phase 02 puts permission subject extraction, so it is tested i
   for a host to install a hook, such as a managed layer, or ship Codex without a bridge and record the
   limitation. Never pass the bypass flag.
 - **`omp`.** An `omp` extension in the contributed harness package from
-  [01](./01-omp-harness.md), posting to the same route.
+  [phase 01](./01-omp-harness.md), posting to the same route.
 - **DeepSeek and other ACP harnesses.** No bridge. They keep `before-permission` only.
 
-### Install only what has a handler
+#### Install only what has a handler
 
 A command hook is a process spawn and a round trip on every tool call. At session start and resume,
 agents installs a bridge entry only for a point with at least one enabled handler. A handler that
 registers mid-session takes effect at the next resume. Say so in the plugin authoring docs. A bridge
 call that arrives with no handler registered returns no decision without running the chain.
 
-### The ingress
+#### The ingress
 
 One agents route under the task principal acorn's MCP server already uses. The bridge inherits the
 same launch environment ([MCP § Launch environment](../../mcp.md#launch-environment)). The token,
@@ -128,7 +137,7 @@ shape a person-installed acorn mod would post too. Sessions acorn didn't start h
 so admitting them needs its own principal. That's an open decision for whoever builds the mod, not
 part of phase 10.
 
-### Coverage is visible
+#### Coverage is visible
 
 Add `loop_before_tool` and `loop_after_tool` to `AgentCapability` in
 `plugins/agents/src/contract/wire.ts`. A driver reports them only when its bridge is installed and
@@ -136,7 +145,7 @@ verified for the running harness version. **Settings → Plugins** shows, for a 
 these points, which harnesses each one reaches. A policy that applies to every Claude and Codex tool
 call but only to asked questions in DeepSeek must say so where the person turns it on.
 
-### Relation to the permission hook and explanations
+#### Relation to the permission hook and explanations
 
 `before-permission` stays. It's the only coverage for harnesses without a bridge, and it still sees
 questions a bridge wouldn't, such as a Codex network grant. A handler registered on both sees a call
@@ -144,10 +153,10 @@ twice when the bridge lets it through and the harness then asks. `toolCallId` le
 way both times.
 
 A bridge deny carries its reason to the model inside the turn. Where a bridge exists, the separate
-explanation turn from [phase 03](./phases/03-session-messages.md) is unnecessary. It remains the
+explanation turn from [phase 03](./03-session-messages.md) is unnecessary. It remains the
 fallback for harnesses without one.
 
-## What stays refused
+### What stays refused
 
 - **Returning a tool's result instead of running it.** Mods' `{ result }` and `omp`'s tool shadowing.
   The transcript would show a call that never ran.
@@ -159,7 +168,7 @@ fallback for harnesses without one.
   supports it and a secret-redaction consumer asks.
 - **Hooks on the token stream and generic middleware.** Unchanged from [refused.md](./refused.md).
 
-## Later, each with its trigger
+### Later, each with its trigger
 
 - **Prompt context inside the harness.** `agents:before-send` and context sections already cover
   every prompt acorn sends. Add a bridge point only for prompts acorn doesn't send, such as a
@@ -172,7 +181,67 @@ fallback for harnesses without one.
   the unattended turn-ending instruction in `claudeHarness.ts`. Trigger: evidence the instruction
   isn't enough.
 
+## Ownership and data flow
+
+Harness hook fires → acorn's bridge program forwards the raw input → agents ingress under the task
+token → per-harness mapping beside the normalizer → `agents:before-tool` or `agents:after-tool` →
+verdict → reply composed in the harness's own words → bridge prints it. An `ask` verdict detours
+through an agents permission request and the shared card before the reply.
+
+Read `claudeHarness.ts`, `codexStart.ts`, both normalizers, phase 02's subject type and hook,
+`packages/node-core/src/server/pluginHost/hooks.ts`, `apps/node/src/entries/mcp.ts`, and
+[MCP § Launch environment](../../mcp.md#launch-environment). Core owns hook modes. Agents owns the
+points, ingress, mapping, and installation. The bridge program owns nothing but forwarding.
+
+## Implementation
+
+1. Add the `ask` mode to core's hook registry. A point opts in through `allows`. Add its trust copy
+   and its verdict shape, and keep it out of every existing point.
+2. Declare `agents:before-tool` and `agents:after-tool` with the payloads in the design above.
+   Reuse phase 02's subject type and add `toolCallId`.
+3. Build the bridge program as an entry beside `mcp.js`. It reads stdin, posts to the Node, and
+   prints the reply. Any failure prints the harness's no-decision reply and exits zero.
+4. Add the ingress route and the `agents.loopHook.v1` request and reply types. Authenticate with the
+   task token. Map each harness's input into the subject beside its normalizer, with tests from
+   recorded hook input.
+5. Install for Claude through `settings.hooks` in `claudeCode.options`, merged with the settings
+   acorn already sends, and only for points with an enabled handler. Measure per-call latency.
+6. Find a supported way for a host to install a trusted Codex hook under `app-server`. If there is
+   none, ship Codex without a bridge, report no loop capability, and record the evidence. Never pass
+   Codex's trust bypass flag.
+7. Implement `ask` end to end: raise a permission request naming the plugin, hold the bridge call,
+   and answer deny on refusal or no decision on approval. Bound the hold by the harness's hook
+   timeout and say what happens when it expires.
+8. Report `loop_before_tool` and `loop_after_tool` per verified harness version, and show coverage in
+   **Settings → Plugins** for a plugin that handles these points.
+9. Extend phase 02's policy plugin to register on `before-tool` and add a test-first guard on
+   `after-tool` that returns a note. Keep its rules hard-coded.
+
+## Verification and acceptance
+
+Apply [shared verification](./README.md#verification-for-every-phase). Prove:
+
+- In a Claude session that allows every tool, a bridge veto stops a forced push and the model reads
+  the reason in the same turn.
+- An `ask` verdict raises a card, a refusal denies the call, and an approval lets the harness's own
+  checks run.
+- A killed bridge, a stopped Node, and a slow handler all leave the call to the harness unchanged.
+- A session with no registered handler installs no bridge entries.
+- The same call reaching both `before-tool` and `before-permission` carries one `toolCallId`.
+- Coverage shown in Settings matches what each harness reports.
+
+## Documentation and handoff
+
+Update [node extension points](../../plugins/node-side-extension-points.md), the hook table in
+[hooks](../../plugins/hooks.md#hooks), [managed agents](../../managed-agents.md),
+[MCP](../../mcp.md), and [security](../../security.md). Record the Claude and Codex versions
+tested and the measured per-call latency. Mark [mods.md](../mods.md)'s "shipping a mod into
+Claude sessions" item as delivered or replaced.
+
 ## Verify before building
+
+Check Claude's and Codex's hook timeouts, whether a hook added through `settings` runs before or
+after the person's own hooks, and these:
 
 - The Claude adapter still spreads `claudeCode.options`, including `settings` and `plugins`, into the
   SDK's options. Checked in `acp-agent.js` of `claude-agent-acp` 0.54.1 and SDK 0.3.197.

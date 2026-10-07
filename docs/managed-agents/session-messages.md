@@ -72,7 +72,7 @@ A malformed message throws. Every other refusal is a result:
 | --- | --- |
 | `unknown-session` | No session with that id in that task. It's coarse on purpose, so a plugin learns nothing about another task's session. |
 | `archived` | The session is archived. |
-| `unattended-not-supported` | A workflow or delegated session. Nobody is watching it, and unattended notes wait for [phase 05](../future/pi/phases/05-unattended-follow-ups.md). |
+| `unattended-not-supported` | A workflow or delegated session. Nobody is watching it, and unattended notes wait for [phase 05](../future/pi/05-unattended-follow-ups.md). |
 | `not-controlled` | A terminal holds the session's input, or it isn't an interactive session. |
 | `cap` | The plugin already has 20 accepted notes on this session. |
 | `vetoed` | An `agents:before-send` handler refused the turn. Nothing is kept, and the note doesn't count. |

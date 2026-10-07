@@ -22,7 +22,7 @@ acorn doesn't have on a single-owner Node.
 
 DeerFlow installs, enables, exports, and scans skills, and mounts them into its sandbox. In acorn,
 the harness loads skills from its own folders. Acorn draws `$skill` mentions the session advertises
-and doesn't install anything. The [oh-my-pi programme](../pi/phases/06-portable-skills.md) covers
+and doesn't install anything. The [oh-my-pi programme](../pi/06-portable-skills.md) covers
 plugin-shipped skills.
 
 ## Chat-app channels

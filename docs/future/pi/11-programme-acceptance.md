@@ -55,12 +55,12 @@ between accepted slices; it does not widen the programme.
 
 ## Documentation disposition
 
-Update [programme overview](../README.md) and [future index](../../README.md) with delivered phases
+Update [programme overview](./README.md) and [future index](../README.md) with delivered phases
 and remaining acceptance. Keep the Mods comparison; move the implemented hook contract to
-[node extension points](../../../plugins/node-side-extension-points.md) and
-[managed agents](../../../managed-agents.md), linking rather than duplicating it.
+[node extension points](../../plugins/node-side-extension-points.md) and
+[managed agents](../../managed-agents.md), linking rather than duplicating it.
 
-Each source proposal must point to its shipped owning contract or its refused/deferred outcome.
+Each phase's design must point to its shipped owning contract or its refused/deferred outcome.
 Retain benchmark results and provider limitations as dated evidence. Remove stale claims that the
 review reader ships before phase 04, that every harness receives native skills, or that all plugin
 spending is capped. Index every retained phase and document through the existing docs indexes.

@@ -8,7 +8,7 @@ Status: proposed, 2026-10-03. Entry: phase 06 accepted with the portable deliver
 Claude receives the enabled skills through its verified local-plugin interface. Codex receives them
 natively if its app-server supports an additive skill root; otherwise its tested portable delivery
 remains the accepted outcome. The composer presents only choices the running session actually has.
-Source: [native delivery design](../06-agent-content.md#delivery-in-two-layers).
+Source: [native delivery design](./06-portable-skills.md#delivery-in-two-layers).
 
 ## Ownership and data flow
 
@@ -18,7 +18,7 @@ Keep native protocol knowledge in the drivers and reuse the core catalogue and h
 
 Read `plugins/agents/src/server/drivers/claudeHarness.ts`, `codexDriver.ts`, `codexConfiguration.ts`,
 `plugins/agents/src/contract/wire.ts`, and composer skill handling. Inspect the pinned SDK/adapter
-and app-server schemas before deciding supported configuration; the source proposal leaves Codex's
+and app-server schemas before deciding supported configuration; phase 06's design leaves Codex's
 door unverified.
 
 ## Implementation
@@ -59,11 +59,12 @@ composer and plugin status on desktop and terminal; record any provider-specific
 
 ## Documentation and handoff
 
-Update [managed agents](../../../managed-agents.md),
-[client surfaces](../../../managed-agents/client-surfaces.md),
-[manifest authoring](../../../plugin-authoring/the-manifest.md), and provider checks. Publish the
+Update [managed agents](../../managed-agents.md),
+[client surfaces](../../managed-agents/client-surfaces.md),
+[manifest authoring](../../plugin-authoring/the-manifest.md), and provider checks. Publish the
 portable/native/unavailable matrix, refresh timing, and credential-preserving Codex disposition.
-Retain importer/discovery work under the original topic's deferred section, not as a phase task.
+Retain importer/discovery work under phase 06's
+[deferred section](./06-portable-skills.md#later-claude-code-plugin-folders), not as a phase task.
 
 ## Verify before building
 

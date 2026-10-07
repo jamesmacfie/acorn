@@ -6,8 +6,8 @@ Next: [phase 05](./05-unattended-follow-ups.md).
 ## Completion note, 2026-10-07
 
 **What landed.** On branch `phase-04-model-grants-and-advisor`, at the commit titled "Phase 04: Model
-grants and interactive advisor". [Plugin model grants](../../../integrations/model-providers.md#plugin-model-grants)
-and [review input](../../../managed-agents/session-events.md#review-input) are the owning contracts.
+grants and interactive advisor". [Plugin model grants](../../integrations/model-providers.md#plugin-model-grants)
+and [review input](../../managed-agents/session-events.md#review-input) are the owning contracts.
 
 - **Grant tables.** Core migration `0004_plugin_model_grants` adds `plugin_model_grants`, keyed by
   owner ID and plugin ID with backend, model, and daily output-token allowance, and
@@ -29,7 +29,7 @@ and [review input](../../../managed-agents/session-events.md#review-input) are t
 - **Reader.** `agents.reviewInput.v1` in `plugins/agents/src/contract/lifecycle.ts`, provided in
   `node/index.ts`, read by `AgentLifecycle.reviewInput`, shaped by `server/sessions/reviewInput.ts`.
   It's in the published capability catalogue, the surface pin, and the plugin-disable snapshot.
-- **Advisor.** [`docs/future/pi/packages/advisor/`](../packages/advisor/README.md), version 0.1.0,
+- **Advisor.** [`docs/future/pi/packages/advisor/`](./packages/advisor/README.md), version 0.1.0,
   no build step. Install it by folder and restart the Node.
 
 **Decisions and deviations.**
@@ -140,8 +140,232 @@ sessions.
 
 The owner configures a model and daily allowance for a loaded advisor. The advisor reviews completed
 interactive turns and sends a bounded note when warranted. This phase delivers the model seam and
-its consumer together. Sources: [model calls](../04-unattended-model-calls.md) and
-[advisor](../05-advisor.md). Unattended delivery is phase 05.
+its consumer together. Unattended delivery is phase 05.
+
+## Design: model grants
+
+The design as proposed on 2026-10-02. Where it differs from the completion note above, the completion
+note records what was built.
+
+### Why
+
+`omp` gives an extension `ctx.runEphemeralTurn`, a side question over the live conversation that does
+not add to it, and `ctx.models`, a read-only way to list models and pick one from a different family.
+Its advisor, its commit-message generator, and any extension that judges or summarizes are built on
+those two.
+
+Acorn already has the call. A loaded node plugin with `permissions.node.core: ["models"]` gets
+`ctx.core.models.generateText` and `available`
+(`packages/plugin-types/src/contracts/coreMisc.ts`), and core resolves the key or runs the CLI
+contained ([integrations.md § Model providers](../../integrations/model-providers.md#model-providers)). What it
+assumes is a person in front of a picker: the caller passes the `backendId` the person picked.
+
+A plugin that reacts to an event has no person and no picker. That leaves three gaps.
+
+1. **Which backend.** The owner's choice for every Generate control, `models.generatePick`, is a
+   device preference ([state-ownership.md](../../state-ownership.md)). A node plugin cannot read it,
+   and a loaded plugin's prefs are confined to its own namespace. Falling back to `available()[0]`
+   quietly spends the first connected key on work nobody asked for in that moment.
+2. **How much.** Nothing bounds how often a plugin calls. `generateText` validates the size of one
+   call, not the number of calls.
+3. **Who spent it.** The result carries `usage`, but nothing records it against the plugin, so the
+   owner cannot see that a plugin cost them anything.
+
+Findings already solved all three for itself. It keeps its own saved backend and model from a settings
+page, never falls back to another paid backend, and stores the backend, model, and usage on each job
+(findings.md (retired; see Git history for docs/findings.md)). That works, and it is a private copy of something every unattended
+consumer needs. The advisor would be the second copy, which is the point to
+lift it into the host.
+
+### The shape
+
+#### A model grant per plugin, held by the host
+
+Add one row per plugin to the owner's settings: a backend id, a model id, and a daily cap. It lives on
+the node, because the caller does, beside the plugin's other node-held settings. It is set in
+**Settings > Plugins > {plugin}**, in a section the host draws whenever the plugin's manifest holds the
+`models` grant.
+
+```ts
+// Shape only. Where it lives is a decision for the build.
+type PluginModelGrant = {
+  pluginId: string
+  backendId: string        // connection:<uuid> or harness:<profileId>
+  modelId: string          // '' means the backend's default
+  dailyOutputTokens: number
+}
+```
+
+`generateText` gains one optional behaviour: a call with no `backendId` uses the plugin's grant. A
+call with no `backendId` and no grant fails with a new `provider_not_configured` error that names the
+settings page. It never falls back. A call that names a `backendId` keeps working as it does, so the
+picker path every shipped plugin uses does not change.
+
+#### The cap
+
+Count output tokens per plugin per day from the `usage` each result returns, with atomic reservations
+as specified in phase 04. Harness generation may report usage but does not enforce `maxOutputTokens`
+in the runtime inspected on 2026-10-03. Its allowance counts calls at a fixed estimate stated in
+settings; retain any reported usage separately without claiming a strict harness token bound.
+
+The cap applies to the omitted-backend path. Calls naming a backend preserve their behavior, so
+this is not a total spending cap for every call allowed by the broad `models` permission.
+Past the cap, `generateText` fails with `provider_budget_exhausted` until midnight in the node's time
+zone, and the plugin's roster row shows why.
+
+Output tokens rather than money, because acorn does not know every connection's price and a harness
+backend has no price at all. The agent-cost plugin's price table is a client preference and cannot be
+read here.
+
+#### The record
+
+Record each call as a telemetry span with the plugin id, backend kind, model id, and token counts,
+and keep a per-plugin daily total for the settings page. No prompt or response text, the same rule
+the model-provider plugin keeps today.
+
+#### Which user
+
+`generateText` needs a `userId`. An event handler has a task id. Resolve the owner through
+`ctx.core.identity.active()` on a single-owner node, and check whether that is the same id
+`generateText` expects. A team node in the cloud programme will need the task's owner instead; that
+waits on [cloud phase 9](../cloud/phases/09-teams.md).
+
+#### A side turn over a session
+
+`omp`'s `runEphemeralTurn` sends the whole live conversation. Acorn uses a bounded completed-turn
+reader instead. The previous `agents.reviewInput.v1` was removed with Findings. Phase 04 introduces
+its replacement, returning task-checked user messages and final assistant text with truncation and
+provenance. A plugin builds its own prompt from that result and calls `generateText`. A richer read
+requires bounded contract fields rather than access to the event ledger.
+
+### What this does not do
+
+- It does not let a plugin pick a model family relative to the session's model, the way
+  `ctx.models.family` does. The owner picks the advisor's model in settings. If they want a different
+  family from the session's, they pick one.
+- It does not let an agent tool handler spend a credential. That stays refused: the handler runs as a
+  task principal, and `principalMayUseProviderCredential` admits only a device or the `service`
+  scope. A tool that needs a model call is core's, with a provider hook, as `issue_detail` is.
+- It does not stream. `generateText` returns one result.
+
+## Design: the advisor
+
+The design as proposed on 2026-10-02, with the same caveat as the model grant design above.
+
+### Why
+
+`omp`'s advisor pairs a second model with the session. It reads each turn the main agent takes and
+injects a note when it sees a problem: a quiet aside, a concern, or a blocker. It runs on its own
+context and often on a different model family, so it catches what the agent rushed past. The agent
+reads the note and corrects course, or says why it will not.
+
+Two reasons to build one for acorn, beyond wanting the feature:
+
+- It is the consumer that proves [phase 03](./03-session-messages.md)'s messages and the model grant above.
+  Both are seams a third party would use, and an unexercised seam rots
+  ([extensibility.md § Unexercised seams rot](../../extensibility.md#unexercised-seams-rot)).
+- It works for every harness. `omp`'s advisor only watches `omp`. An acorn advisor watches Claude,
+  Codex, DeepSeek, and `omp` sessions the same way, which is the advantage of sitting outside the loop.
+
+### What `omp` learned that this copies
+
+From `advisor-watchdog.md` in the `omp` repository's docs folder, at the commit cloned on 2026-10-02:
+
+- **Three severities.** `nit` is a non-interrupting aside, `concern` is material risk, and `blocker`
+  means continuing would clearly waste work. Only blockers may interrupt.
+- **A concern after a finished answer does not wake the agent.** `omp` shows it as a card instead,
+  because waking an agent that already answered makes it restate the answer. Only a blocker, or work
+  the agent left half done, earns a new turn.
+- **An emission guard.** A repeated note is dropped at equal or lower severity, a real escalation is
+  allowed through, and each review may produce at most four non-blocker notes.
+- **Cooldown after an interruption.** After a concern or blocker is delivered, later concerns are held
+  for a number of turns, so the advisor does not argue with every step.
+- **Stop when the person stops.** When the person cancels a run, the advisor stops resuming it.
+
+### The shape
+
+A loaded plugin, kept in its own folder outside this repository like the machine-stats plugin, with a
+node half and a small tree for its settings page. Nothing about it is first-party.
+
+#### Manifest grants
+
+- `permissions.events`: `plugin:agents:turn-changed`.
+- `permissions.node.capabilities`: the phase 04 replacement `agents.reviewInput.v1`, `agents.turns`,
+  and `agents.sessions`.
+- `permissions.node.core`: `models`, `tasks`, `git`.
+- A contribution to `agents:session-messenger` ([phase 03](./03-session-messages.md)).
+- `requires.plugins`: `agents`.
+
+The trust prompt will show three high lines: generate text, read task git state, and send notes to
+agent sessions. That is honest. Each is something the plugin does.
+
+#### The flow
+
+1. On `plugin:agents:turn-changed` with `status: 'completed'`, skip the turn when its source is
+   `plugin` or `delegation_report`. A note answering a note is a loop, and a report is another agent
+   talking, not the agent at work. Skip sessions the person has not opted in (see below).
+   This event flow is for interactive sessions. Unattended review uses phase 05's bounded
+   completion participation so a workflow cannot publish success before admitted corrections.
+2. Read the turn with `agents.reviewInput.v1`'s `read({ taskId, sessionId, turnId })`. If it is
+   `unavailable`, stop.
+3. Read the task root with `ctx.core.tasks`, then `git diff --stat` and a bounded `git diff` with
+   `ctx.core.git.gitText` against the task's root. Cap the diff at 32 KiB and say in the prompt when it
+   was cut.
+4. Call `ctx.core.models.generateText` with no `backendId`, so the plugin's model grant
+   decides the backend, model, and cap. Ask for one JSON object:
+   `{ "severity": "none" | "nit" | "concern" | "blocker", "note": string }`.
+5. Pass the answer through the guard: drop a repeat at equal or lower severity, drop a concern inside
+   the cooldown, and drop anything when the person cancelled the session's last turn.
+6. Deliver by severity:
+   - `none` and `nit`: record in the plugin's own database, deliver nothing.
+   - `concern`: queue a message only when the turn ended mid-work or the session is unattended.
+     Otherwise record it.
+   - `blocker`: queue a message through the session messenger with the turn id as the idempotency key.
+
+`nit` delivers nothing in the first version because the only delivery acorn can offer is a turn, and
+a turn costs the owner money for a cleanup hint. If [phase 03](./03-session-messages.md) gains its held
+mode, nits and finished-answer concerns can ride along with the person's next message.
+
+#### What "ended mid-work" means
+
+The review input does not say whether the agent finished or stopped to ask. Use `stopReason` from
+`agents.turns` and treat a turn that ended with a question to the person as finished. Check what each
+harness reports before relying on it.
+
+#### Opting in
+
+Off by default. The settings page has three choices: off, unattended sessions only (workflow and
+delegated), and every session. A remote tree on `agents:session-header` can add a per-session mute
+later. The first version keeps the choice global, because a per-session control needs the
+plugin to store session ids it does not own, which is fine but is more to build.
+
+#### The prompt
+
+Write the system prompt fresh rather than copying `omp`'s. `omp`'s prompt assumes the advisor can call
+`read` and `grep` tools and steer live. This one gets a fixed bundle (the person's messages, the
+agent's final message, the diff) and answers once. Tell it to stay silent unless it is sure, to prefer
+`none`, and to quote the line it objects to. Put the bundle inside `pastedContent`-style fences so a
+diff containing instructions reads as data.
+
+#### What the owner sees
+
+A blocker or a qualifying concern appears in the transcript as the plugin's note, drawn by
+[phase 03](./03-session-messages.md), followed by the agent's reply. The settings page lists recorded notes
+per task with their severity, so the owner can judge whether the advisor is worth its cost. That list
+is also the evidence for whether the held mode is worth building.
+
+### Cost
+
+One generate per completed turn in an opted-in session, capped by its model grant.
+A workflow with 30 agent turns spends 30 advisor calls plus one
+extra turn per delivered blocker. The settings page should show the day's count beside the cap.
+
+### What this does not do
+
+- It does not interrupt a running turn. It reviews completed turns only.
+- It cannot see tool calls the agent made or read files beyond the diff. If that proves to matter,
+  extend `AgentReviewInput` with bounded fields in the agents plugin, not in the advisor.
+- It does not approve or refuse anything. That is [phase 02](./02-permission-veto.md).
 
 ## Ownership and data flow
 
@@ -239,9 +463,9 @@ case. Prove a disabled or unconfigured advisor makes no paid call.
 
 ## Documentation and handoff
 
-Update [integrations](../../../integrations.md), [state ownership](../../../state-ownership.md),
-[data layer](../../../data-layer.md), [model grant authoring](../../../plugin-authoring/permissions.md#permissions),
-[managed agents](../../../managed-agents.md), [plugin map](../../../plugin-map.md), and provider checks.
+Update [integrations](../../integrations.md), [state ownership](../../state-ownership.md),
+[data layer](../../data-layer.md), [model grant authoring](../../plugin-authoring/permissions.md#permissions),
+[managed agents](../../managed-agents.md), [plugin map](../../plugin-map.md), and provider checks.
 Document the review-reader limits, conservative accounting, broad grant limitation, and interactive
 scope. Supply the advisor package and grant schema revisions to phase 05.
 
@@ -250,3 +474,19 @@ scope. Supply the advisor package and grant schema revisions to phase 05.
 Inspect model facade ownership, migration placement, current identity semantics, provider usage
 reporting, byte-bound transcript extraction, event subscription delivery, and generation cancellation
 through the worker. Check the public declaration generator/export map whenever request types change.
+
+From the design:
+
+- `CoreModelService` in `packages/plugin-types/src/contracts/coreMisc.ts` and how the loaded worker
+  forwards it.
+- How Findings stores its review backend, in plugins/findings/src/server/runtime.ts (retired; read from Git history), before copying
+  or replacing the pattern.
+- What `ctx.core.identity.active()` returns and whether `generateText` takes that value as `userId`.
+- Where node-held per-plugin settings already live, so the grant does not become a second store.
+
+- `AgentReviewInputCapability` in `plugins/agents/src/contract/lifecycle.ts`, and that a loaded plugin
+  can be granted it.
+- That `turn-changed` reaches a loaded subscriber, from the `emits` list in
+  `plugins/agents/src/node/index.ts`.
+- What `stopReason` each harness reports on a turn that ends with a question.
+- That 03 and 04 shipped as described here, and the names they shipped under.

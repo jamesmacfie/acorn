@@ -1,14 +1,14 @@
 # What acorn takes from Claude Mods
 
 Proposal, 2026-09-29. The permission hook shipped on 2026-10-07 through
-[Pi phase 02](./pi/phases/02-permission-veto.md). Its contract lives in
+[Pi phase 02](./pi/02-permission-veto.md). Its contract lives in
 [permission policy](../managed-agents/permission-policy.md); this file keeps the comparison.
 
-Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/phases/02-permission-veto.md) delivers this
-hook and its policy consumer; [Pi phase 03](./pi/phases/03-session-messages.md) adds optional
+Implementation handoffs, 2026-10-03: [Pi phase 02](./pi/02-permission-veto.md) delivers this
+hook and its policy consumer; [Pi phase 03](./pi/03-session-messages.md) adds optional
 explanations through a separate messaging grant. On 2026-10-07,
-[Pi phase 10](./pi/phases/10-harness-bridges.md) added bridges through each harness's own hooks,
-which reach the tool calls this hook can't see. Use the [phase plan](./pi/phases/README.md) for
+[Pi phase 10](./pi/10-harness-bridges.md) added bridges through each harness's own hooks,
+which reach the tool calls this hook can't see. Use the [phase plan](./pi/README.md) for
 execution order and acceptance.
 
 Claude Code is adding *function hooks*, marketed as Claude Mods: a plugin ships a TypeScript module
@@ -110,7 +110,7 @@ Say these plainly in the owning docs, because a policy people trust too far is w
 - **It sees only what the harness asks about.** A session in a bypass mode, a tool the harness's own
   settings already allow, or an earlier "allow for session" never reaches acorn. This hook applies a
   policy to questions. It doesn't gate every action. For harnesses with a bridge,
-  `agents:before-tool` ([Pi topic 08](./pi/08-harness-bridges.md)) sees every call. acorn chooses the permission mode a session
+  `agents:before-tool` ([Pi phase 10](./pi/10-harness-bridges.md)) sees every call. acorn chooses the permission mode a session
   starts in, which is the lever for asking more often.
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
   about. [Security](../security.md) owns the shipped boundaries and their limits; local task
@@ -133,7 +133,7 @@ check 156 in [agents and providers](../testing/agents-and-providers.md) drives i
   every author claims the top number. Once two third-party transforms compete on one point, replace
   the number with install order plus a reorder control in **Settings → Plugins**.
 - **Telling the model why.** The Pi plan schedules an optional policy explanation consumer once
-  attributed messaging lands in [phase 03](./pi/phases/03-session-messages.md). It uses a separate
+  attributed messaging lands in [phase 03](./pi/03-session-messages.md). It uses a separate
   grant and capped queued turn; unattended delivery waits for phase 05's operation ownership.
 - **Auto-allow.** Trigger: a real request for it. It would be a separate mode with its own high grant,
   and never for unattended sessions.
@@ -141,7 +141,7 @@ check 156 in [agents and providers](../testing/agents-and-providers.md) drives i
   proposal. Nothing here builds it. [Cloud team policy](./cloud/isolation.md#team-policy) applies
   to hosted workers and does not require named handlers.
 - **Shipping a mod into the Claude sessions acorn starts.** Superseded on 2026-10-07 by
-  [harness bridges](./pi/08-harness-bridges.md). Codex shipped command hooks shaped like Claude's, so
+  [harness bridges](./pi/10-harness-bridges.md). Codex shipped command hooks shaped like Claude's, so
   acorn installs one bridge per harness through command hooks first and keeps a Claude mod as the
   fallback if per-call process cost is too high. Output redaction remains Claude-only and deferred.
 

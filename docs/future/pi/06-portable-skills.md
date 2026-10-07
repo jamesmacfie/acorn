@@ -1,12 +1,19 @@
-# 06. Skills a plugin ships, delivered to every harness
+# Phase 06: portable plugin skills
 
-Status: proposed, 2026-10-02. Not started.
+Status: proposed, 2026-10-03. Entry: phase 05 accepted. Next:
+[phase 07](./07-native-skills.md).
 
-Execution handoffs, 2026-10-03: [phase 06](./phases/06-portable-skills.md) delivers the portable
-catalogue, trust, and index; [phase 07](./phases/07-native-skills.md) adds verified native delivery.
-Codex's portable fallback is an accepted outcome when no supported native skill root exists.
+## Outcome
 
-## Why
+A manifest-only loaded plugin supplies named procedures to supported managed harnesses. The agent
+sees names, descriptions, and readable body locations; it loads a body only when needed. A settings
+row explains which harnesses receive each enabled skill.
+
+## Design
+
+The design as proposed on 2026-10-02. The implementation steps below refine it and win where they differ.
+
+### Why
 
 An `omp` plugin is a folder that can hold skills, slash commands, rules, prompts, subagent
 definitions, MCP servers, and language-server setups, in a format shared with Claude Code's plugin
@@ -27,16 +34,16 @@ This is also where acorn can beat `omp`. An `omp` skill reaches `omp`. An acorn 
 Claude, Codex, DeepSeek, `omp`, and any contributed harness from one manifest, the way an MCP server
 added in Settings reaches all of them.
 
-## What a skill is
+### What a skill is
 
 A folder holding a `SKILL.md` file: YAML frontmatter with `name` and `description`, then a Markdown
 body, with optional supporting files beside it. Claude Code reads this shape from `.claude/skills/`,
 and Codex reads a compatible one. Use the shape as published, with no acorn additions, so a skill
 written for Claude Code drops into an acorn plugin unchanged.
 
-## The design
+### The shape
 
-### The manifest
+#### The manifest
 
 ```json
 {
@@ -56,7 +63,7 @@ named reason when either fails. The skill's runtime name is `<pluginId>:<id>`, m
 No node or client bundle is needed. A skills-only plugin is a manifest and folders, like a data-only
 harness.
 
-### Delivery, in two layers
+#### Delivery, in two layers
 
 **Layer 1, every harness: an index plus a readable path.** This is how skills already work inside
 Claude Code: the agent sees each skill's name and description, and reads the body when it needs it.
@@ -89,19 +96,19 @@ in the composer and lets the harness's own skill tool load it.
 When a harness receives a skill natively, leave it out of that session's layer 1 index so the agent
 does not see it twice.
 
-### Trust
+#### Trust
 
 A skill is text that tells an agent what to do, so it is a prompt-injection path by design. Disclose it
 in the trust prompt as a medium line: "Adds 3 procedures your agents can load", with the names. The
 bytes are already covered by the bundle hash the device checks, so an update that changes a skill's
 body asks again like any other change.
 
-### Settings
+#### Settings
 
 **Settings > Plugins > {plugin}** lists the plugin's skills, each with a switch and the harnesses it
 reached. Disabling one removes it at the next start or resume.
 
-## What this leaves out, and why
+### What this leaves out, and why
 
 - **Rules.** `omp` rules can apply by file glob or interrupt a stream. A glob-scoped rule needs the
   harness to tell acorn which file it is about to edit, and stream rules need the loop. An always-on
@@ -114,10 +121,10 @@ reached. Disabling one removes it at the next start or resume.
 - **Hooks.** Claude Code plugin hooks run shell commands inside Claude only. They are code, and they
   belong to the harness's trust model, not acorn's.
 
-## Later: Claude Code plugin folders
+### Later: Claude Code plugin folders
 
 Most published skills ship inside Claude Code plugin folders: `.claude-plugin/plugin.json` beside
-`skills/`, `commands/`, `agents/`, and `.mcp.json`. Once this file ships, an importer could install
+`skills/`, `commands/`, `agents/`, and `.mcp.json`. Once phases 06 and 07 ship, an importer could install
 such a folder as an acorn content plugin: skills as skills, agents as custom agents, `.mcp.json`
 entries as MCP servers, and hooks refused with a visible reason. Discovery from a marketplace catalog
 belongs to [ecosystem](../ecosystem/README.md), which waits on signing.
@@ -125,19 +132,84 @@ belongs to [ecosystem](../ecosystem/README.md), which waits on signing.
 Trigger: a person asks to use a published Claude Code plugin in Codex or another harness. In Claude
 sessions it already works, because Claude loads its own plugins.
 
-## Steps
+## Ownership and data flow
 
-1. Add `contributions.skills` to the manifest contract and schema, with the path and size checks.
-2. Build layer 1: the `skills` context section, delivery on start and resume, and the per-harness
-   readability check. Test that a disabled plugin's skill leaves the next resume's index.
-3. Build layer 2 for Claude Code. Confirm the SDK option in a live session and that `$` lists the skill.
-4. Investigate Codex's door and record the answer in this file before building it.
-5. Add the trust line and the settings rows.
-6. Prove it with one skills-only plugin outside the repository.
-7. Document in [the manifest](../../plugin-authoring/the-manifest.md), [contribution
-   kinds](../../contribution-kinds.md), and [managed-agents.md](../../managed-agents.md).
+Installed package bytes → core manifest validation and trust → Node skill catalogue → agents'
+per-start delivery plan → harness-readable index and files → model context. Device-only settings
+change Node-held enablement; Node routes, broker events, and selected-Node cache update the shared UI.
+
+Read the manifest/schema pipeline, loaded-plugin active-versus-installed selection, trust hash and
+resource grants, context assembly, agents start/resume, and standing context. In the inspected code,
+standing context is captured on session creation. Do not assume saving an index there refreshes it
+on resume. MCP declaration refresh is a lifecycle precedent, not a skill delivery implementation.
+
+## Implementation
+
+1. Add `contributions.skills` with `id` and package-relative `path` to the manifest contract,
+   runtime parser, published schema, and authoring types. Keep the standard `SKILL.md` shape and
+   namespaced runtime name `<pluginId>:<id>`. Validate UTF-8 byte sizes: 1,024 characters for the
+   description and 64 KiB for the body, preserving the original proposal's units. Validate name,
+   required frontmatter, duplicates, control characters, and malformed content with named failures.
+2. Confine both the declared folder and resolved `SKILL.md` to the immutable accepted package.
+   Reject symlink escapes and traversal. Supporting files must remain under the skill folder when
+   delivered. Track content by the active trusted bundle hash; do not present an installed candidate
+   as content from the running accepted plugin. Ensure manifest-only content participates in hash
+   verification, packaging, distribution, and update reapproval.
+3. Build a core-owned catalogue projected through a narrow public contract. Agents consumes it
+   without reading core internals or another plugin's database. Keep Node-held enablement and
+   installation state distinct. A disabled/unaccepted skill is excluded from the next delivery.
+4. Build the agents-owned index for every provider process start and resume. Merge it into the
+   harness startup instructions through the driver's supported seam, separately from persisted
+   standing context. Names, descriptions, and absolute body locations are data, with fixed host
+   instructions to read matching procedures. Bound total index delivery and surface omissions;
+   do not silently truncate a skill into invalid text or send every body eagerly.
+5. Prove body readability using least access. A local harness may receive read access to immutable
+   enabled skill folders; never grant the whole data root, which contains private state and secrets.
+   Do not widen write access or mutate the user's worktree. A host-held session staging folder is
+   permitted if required by the harness, provided copied files are confined and immutable for that
+   delivery generation. Unsupported readability produces no index and a named status.
+6. Keep a per-session delivery generation: enabling/disabling changes take effect at the next actual
+   start/resume, not an active turn. Report eligibility separately from verified delivery. A process
+   resumed with stale skills must not claim refreshed delivery. Handle remote Nodes using their
+   paths and install bytes, rather than the client's filesystem.
+7. Add host-owned medium trust copy listing procedure names/count, per-skill switches, and delivery
+   status on both hosts. Use Node routes and shared UI kit. A skills-only package must install
+   without requiring a Node or client entry bundle.
+8. Supply one standalone skills-only package, with a supporting file, and exercise its procedure in
+   Claude, Codex, DeepSeek, and `omp` where supported. Record precise reasons for any unsupported
+   harness rather than inventing a generic ACP skill feature.
+
+Always-on rules remain context sections. Do not add glob-triggered rules, marketplace discovery,
+Claude shell hooks, language-server setup, subagent formats, or worktree configuration writes.
+
+## Verification and acceptance
+
+Apply [shared verification](./README.md#verification-for-every-phase). Prove package path confinement,
+symlink escape rejection, malformed frontmatter, size bounds, duplicate IDs, and update hash changes.
+Cover a manifest-only package, disabled skills on next resume, active-versus-installed mismatch,
+limited filesystem grants, missing body readability, and total-index omission reporting.
+
+In real sessions the agent loads the procedure and supporting file without eager body injection.
+Enable/disable and restart one session, inspect settings/transcript on both hosts, and verify the
+worktree stays free of generated configuration. Test a remote/selected-Node change so no client-local
+path or cached delivery status is reused for another Node.
+
+## Documentation and handoff
+
+Update [manifest authoring](../../plugin-authoring/the-manifest.md),
+[contribution kinds](../../contribution-kinds.md), [managed agents](../../managed-agents.md),
+[security](../../security.md), and [state ownership](../../state-ownership.md).
+Record the public catalogue/delivery contract, trust-hash coverage, portable per-harness matrix,
+staging lifetime, and consumer package. Phase 07 consumes that contract rather than inventing a
+second skill registry.
 
 ## Verify before building
+
+Read official frontmatter rules when implementing, inspect bundle hashing of content-only packages,
+current startup instruction transport, context injection preferences, and read-only filesystem
+grant support. Confirm optional context selection cannot accidentally make delivery status lie.
+
+From the design:
 
 - The Agent SDK's option name for local plugin folders and additional readable directories, and that
   the Claude ACP adapter passes `_meta.claudeCode.options` through for both.
