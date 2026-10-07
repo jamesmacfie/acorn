@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest'
 import type { CliNode } from './node'
 import { runCommand } from './commands'
 import { parseCliArgs } from './args'
-import { CliError } from './error'
 
 function fakeNode(routes: Record<string, unknown>): CliNode {
   return {
@@ -78,14 +77,4 @@ describe('CLI read projections', () => {
     await expect(runCommand(node, parseCliArgs(['run', 'list', '--project', 'p', '--workspace', 'w']))).rejects.toMatchObject({ code: 'usage', exitCode: 2 })
   })
 
-  it.each([
-    ['workspace', 'create', '--name', 'Extra'],
-    ['workspace', 'remove', 'w'],
-    ['project', 'move', 'p', '--workspace', 'w'],
-  ])('preserves the Node refusal for %s %s', async (...argv) => {
-    const message = 'Workspaces are off on this Node, so each project has its own. Add a project instead.'
-    const node = { ...fakeNode({ '/v1/core/workspaces': [{ id: 'w', name: 'One', projects: [] }] }),
-      mutate: async () => { throw new CliError('workspaces_off', message, 2) } } as CliNode
-    await expect(runCommand(node, parseCliArgs(argv))).rejects.toMatchObject({ code: 'workspaces_off', message, exitCode: 2 })
-  })
 })

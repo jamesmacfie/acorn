@@ -44,7 +44,7 @@ describe('workspace mode at Node routes and plugin seam', () => {
 
   const add = async (name: string, workspaceId?: string) => {
     const path = join(dir, name)
-    mkdirSync(path)
+    mkdirSync(path, { recursive: true })
     return request('/projects', 'POST', { path, ...(workspaceId ? { workspaceId } : {}) })
   }
 
@@ -80,6 +80,32 @@ describe('workspace mode at Node routes and plugin seam', () => {
     expect(t.db.select().from(schema.prefs).get()?.value).toBe('on')
     expect(t.db.select().from(schema.workspaces).all()).toHaveLength(1)
     expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'off' }))).error.code).toBe('workspaces_fixed')
+  })
+
+  it('honours an explicit on preference on an empty Node and keeps Default', async () => {
+    expect((await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'on' })).status).toBe(200)
+    const response = await add('one')
+    expect(response.status).toBe(200)
+    const project = ((await response.json()) as { project: { workspaceId: string } }).project
+    expect(t.db.select().from(schema.workspaces).all()).toMatchObject([{ id: project.workspaceId, name: 'Default', isDefault: true }])
+    expect((await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'on' })).status).toBe(200)
+    expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'off' }))).error.code).toBe('workspaces_fixed')
+  })
+
+  it('rejects invalid preferences without settling an empty Node', async () => {
+    expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'sometimes' }))).error.code).toBe('bad_request')
+    expect(t.db.select().from(schema.prefs).all()).toEqual([])
+  })
+
+  it('refuses explicit membership on a re-add while off but keeps the plain re-add idempotent', async () => {
+    const first = await add('one')
+    const project = ((await first.json()) as { project: { id: string; workspaceId: string } }).project
+    const refused = await add('one', project.workspaceId)
+    expect(refused.status).toBe(409)
+    expect((await error(refused)).error.code).toBe('workspaces_off')
+    const repeated = await add('one')
+    expect(((await repeated.json()) as { project: { id: string } }).project.id).toBe(project.id)
+    expect(t.db.select().from(schema.projects).all()).toHaveLength(1)
   })
 
   it('uses the same rule for deferred plugin projects', async () => {

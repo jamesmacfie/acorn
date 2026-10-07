@@ -204,6 +204,9 @@ export async function createProject(
   input: { path: string; workspaceId?: string; name?: string },
   ownerId = '',
 ): Promise<CreateProjectResult> {
+  if (input.workspaceId !== undefined && nodeWorkspacesMode(db, ownerId) === 'off') {
+    return { ok: false, code: 'workspaces_off', reason: WORKSPACES_OFF_MESSAGE }
+  }
   if (!isAbsolute(input.path)) return { ok: false, reason: 'Path must be absolute.' }
   if (!isDir(input.path)) return { ok: false, reason: 'Directory does not exist.' }
 

@@ -5,7 +5,9 @@ import { dirname, isAbsolute, join } from 'node:path'
 import { max } from 'drizzle-orm'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { largeDiffFiles, largeDiffSummary, type LargeDiffFile, type LargeSurfaceProfile } from '@acorn/client-core/testkit/large-diff'
+import { activeIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { openDb } from '@acorn/node-core/server/bindings.ts'
+import { writePreference } from '@acorn/node-core/server/core/prefs.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createProject } from '@acorn/node-core/server/projects.ts'
 import { openDataRoot } from '@acorn/node-core/server/storage'
@@ -77,8 +79,9 @@ try {
   if (fixture) writeRepository(projectPath)
   const db = openDb(join(dataDir, 'core.sqlite'))
   try {
-    if (workspaces) await db.insert(schema.prefs).values({ userId: '', key: WORKSPACES_PREF_KEY, value: workspaces })
-    const result = await createProject(db, { path: projectPath })
+    const ownerId = activeIdentityStore(dataDir).get() ?? ''
+    if (workspaces) writePreference(db, ownerId, WORKSPACES_PREF_KEY, workspaces)
+    const result = await createProject(db, { path: projectPath }, ownerId)
     if (!result.ok) throw new Error(result.reason)
     if (!fixture) {
       process.stdout.write(`${result.project.id}\n`)
@@ -119,7 +122,7 @@ try {
         const otherPath = join(dirname(projectPath), 'side-project')
         mkdirSync(otherPath, { recursive: true })
         writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
-        const otherProject = await createProject(db, { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) })
+        const otherProject = await createProject(db, { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) }, ownerId)
         if (!otherProject.ok) throw new Error(otherProject.reason)
         otherWorkspaceTaskId = randomUUID()
         await db.insert(schema.tasks).values({

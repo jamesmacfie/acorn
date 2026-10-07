@@ -4,7 +4,7 @@ import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
 import { FleetStore } from '@acorn/custody/broker'
 import type { DeviceTokens } from '@acorn/custody/custody/deviceTokenStore.ts'
-import { matchingNode, probeFailure } from './node'
+import { decodeNodeResponse, matchingNode, probeFailure } from './node'
 
 const dirs: string[] = []
 afterEach(() => { for (const dir of dirs.splice(0)) rmSync(dir, { recursive: true, force: true }) })
@@ -38,5 +38,20 @@ describe('probe failures', () => {
     expect(probeFailure(new Error('connect ECONNREFUSED')).code).toBe('node_unreachable')
     expect(probeFailure(new Error('certificate presented does not match fingerprint')).code).toBe('identity_mismatch')
     expect(probeFailure(new Error('protocol version differs')).code).toBe('protocol_mismatch')
+  })
+})
+
+describe('Node HTTP errors', () => {
+  it('maps a workspace-mode 409 envelope to usage exit code and preserves its message', () => {
+    const message = 'Workspaces are off on this Node, so each project has its own. Add a project instead.'
+    const response = { status: 409, body: new TextEncoder().encode(JSON.stringify({ error: {
+      code: 'workspaces_off', message, requestId: 'request-one', retryable: false,
+    } })) }
+    try {
+      decodeNodeResponse(response, 'POST', '/v1/core/workspaces')
+      throw new Error('Expected the Node refusal')
+    } catch (error) {
+      expect(error).toMatchObject({ code: 'workspaces_off', message, exitCode: 2, requestId: 'request-one', retryable: false })
+    }
   })
 })

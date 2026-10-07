@@ -4,6 +4,17 @@
 
 Status: implemented on `phase-01-node-switch`.
 
+- Review follow-up (October 7, 2026): `core.workspaces` validation and its write now run together
+  in the synchronous preference transaction shared by HTTP and the raw plugin service seam. The
+  first write, same-value write, and legacy-project fallback use the same rule. Off mode refuses
+  explicit workspace membership even when re-adding an existing project path; plain re-adds remain
+  idempotent. The CLI's HTTP decoder is tested with a 409 Node error envelope. Driver parsers cover
+  both flag values, invalid values, and onboarding conflicts. Repeat desktop seeding reads the bound
+  owner ID after identity adoption, preserving one preference row and the saved mode on `--reuse`.
+- Follow-up checks: Node `workspacesMode.test.ts` (6) and `core/prefs.test.ts` (2), CLI `node.test.ts`
+  (4) and `commands.test.ts` (6), desktop `options.test.mjs` (3) and `seed.test.mjs` (4) all pass.
+  Typechecks for `@acorn/node-core`, `@acorn/cli`, `@acorn/desktop`, and `@acorn/tui` pass; oxlint
+  passes on changed TypeScript files. The full repository gate was not rerun for this follow-up.
 - The protocol owns `core.workspaces` and its unset-value rule. Node project creation settles the
   preference, inserts a project, and creates either its own workspace or Default in one transaction.
   Routes and the plugin project seam use the active owner ID. Broadcasts follow commit.
@@ -17,15 +28,15 @@ Status: implemented on `phase-01-node-switch`.
 - The grouped Default fallback now lives inside the project transaction rather than calling the old
   `defaultWorkspaceId` helper. Its observable behavior is unchanged. The preboot seed writes the
   preference under the empty owner ID; Node boot adopts it into the bound owner as it does other
-  preferences.
+  preferences. Subsequent seed calls use that bound owner.
 - Later phases should read `core.workspaces` through the protocol helper, omit explicit workspace IDs
   from project creation while off, and account for the existing workspace-scoped records that both
   workspace and project deletion leave behind. The desktop and terminal UI still use grouped-mode
   controls until their phases land.
-- Focused Node, CLI, protocol, and seed checks pass. The CLI and protocol package suites pass. The
-  Node package suite passes 1,633 tests; three unrelated storage backup tests time out under Node 26,
-  including when run alone. The architecture doc check reports three missing generated Tauri schema
-  files cited by the security plan, outside this phase.
+- Initial focused Node, CLI, protocol, and seed checks passed; the CLI and protocol package suites
+  passed. Three Node 26 storage backup tests timed out, including when run alone. Their cause remains
+  unresolved for the final combined gate. The architecture doc check reported three missing
+  generated Tauri schema files cited by the security plan; that check is pending desktop staging.
 
 Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md) first, especially [decisions](./README.md#decisions) 1 to 5 and
