@@ -301,6 +301,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
   code on first use, to keep heavy, rarely used routes out of the node's boot graph.
+- [Find in file](./future/find-in-file.md): product requirements for shared inline find and replace
+  controls built from Acorn components across the graphical editors.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
