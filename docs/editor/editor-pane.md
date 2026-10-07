@@ -69,6 +69,27 @@ changes, and reads the image again when the window regains focus.
 
 ## The file tree
 
+### Git status
+
+Changes supplies a task-wide, read-only Git status snapshot through Editor's optional
+`editor:file-status` Node point. Editor serves it at
+`GET /v1/p/editor/tasks/:id/editor/file-status` and groups paths for its tree and tabs. The
+tree lists files independently of this read. A missing provider or a checkout without Git
+shows ordinary names. A transient read failure keeps the previous marks and shows a stale
+explanation. A plugin roster change clears marks before the next read.
+
+The badges use Changes' status words: `M` modified, `A` added, `?` untracked, `R` renamed,
+`!` conflicted, and `D` deleted. A deleted file has no phantom tree row, but an open tab may
+carry `D`. The tooltip names staged, unstaged, or both scopes and gives the source path for
+a rename. One path has one badge even when both scopes change. Conflict wins over rename,
+then added, untracked, modified, and deleted. The dirty-buffer dot remains separate.
+
+Folders count distinct changed descendant paths, including deleted files absent from a
+listing. A conflict gives its parent folders the danger tone. Editor computes these counts
+from the snapshot without opening folders. The terminal draws the same letters and names
+the active tab's status. Git deletion does not decide whether a document can save: the
+disk revision read still owns **Deleted on disk** and recovery.
+
 The file tree uses the kit's virtual `Rows` and passes measured placement to `TreeRow`. Rows follow
 stable keys when expanding moves them. Before viewport geometry arrives, the tree admits at most 12
 rows. A reveal waits for usable geometry, including in a restored hidden pane. The terminal client

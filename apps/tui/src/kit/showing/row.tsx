@@ -171,6 +171,7 @@ export function TreeRow(props: {
   meta?: JSX.Element
   reveal?: boolean
   collapsed?: JSX.Element
+  label?: string
   title?: string
   children: JSX.Element
 }) {
@@ -182,6 +183,7 @@ export function TreeRow(props: {
       density="compact"
       variant="tree"
       meta={props.meta}
+      label={props.label}
       trailing={props.trailing}
       keepTrailing={props.keepTrailing}
       onPress={props.onPress}

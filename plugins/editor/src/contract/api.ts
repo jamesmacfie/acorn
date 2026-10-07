@@ -20,6 +20,7 @@ export type EditorWriteResult =
   | { ok: false; kind: 'conflict' | 'deleted' | 'failure'; reason: string }
 export const editorRootRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/root`
 export const editorFilesRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/files`
+export const editorFileStatusRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/file-status`
 export const editorListRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`
 export const editorReadRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/read?path=${encodeURIComponent(relPath)}`
 export const editorImageRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/image?path=${encodeURIComponent(relPath)}`

@@ -412,6 +412,24 @@ describe('editor routes over a real worktree', () => {
     ])
   })
 
+  it('serves task status through an optional provider and drops an unloaded provider response', async () => {
+    let release!: (value: { kind: 'ready'; changes: [] }) => void
+    let entered!: () => void
+    const started = new Promise<void>((resolve) => { entered = resolve })
+    const provider = { read: () => new Promise<{ kind: 'ready'; changes: [] }>((resolve) => { release = resolve; entered() }) }
+    let loaded = true
+    setEditorBridge(editorBridge({ tasks: createTaskService(t.db), fs: coreFs, proc: testProc }, undefined, undefined, undefined,
+      () => loaded ? [provider] : []))
+    const app = authed()
+    const route = '/api/tasks/task1/editor/file-status'
+    const pending = app.fetch(req(route), {} as Env)
+    await started
+    loaded = false
+    release({ kind: 'ready', changes: [] })
+    expect(await (await pending).json()).toEqual({ kind: 'unavailable' })
+    expect(await (await app.fetch(req(route), {} as Env)).json()).toEqual({ kind: 'unavailable' })
+  })
+
   it('pairs exact UTF-8 marker bodies and isolates failed and legacy providers', async () => {
     const text = '\ufeff😀 café\r\nsecond\n'
     writeFileSync(join(work, 'markers.txt'), text)

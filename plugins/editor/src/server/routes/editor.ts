@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { BridgeError, type AppEnv, requireDevice, respondError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '@acorn/plugin-api/node'
 import type { EditorLineMarkerSet, EditorLineMarkerSnapshot } from '../../contract/lineMarkers'
 import { imageTypeForPath } from '../../contract/imagePreview'
+import type { EditorFileStatusSnapshot } from '../../contract/fileStatus'
 
 // Editor pane: read, write, and list files on the task's worktree. Task-scoped HTTP behind the
 // EditorBridge (../editor.ts). The bridge confines every relative path to the worktree root
@@ -20,6 +21,7 @@ export type EditorBridge = {
   readImage(taskId: string, relPath: string): Promise<Uint8Array>
   lineMarkers(taskId: string, relPath: string): Promise<EditorLineMarkerSet[]>
   markerSnapshot?(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot>
+  fileStatus(taskId: string): Promise<EditorFileStatusSnapshot>
   write(taskId: string, relPath: string, content: string, expectedRevision: string | null): Promise<EditorWriteResult>
   entry(taskId: string, path: string): Promise<FileTarget>
   trashAvailability(taskId: string): Promise<TrashAvailability>
@@ -43,6 +45,7 @@ const trashBody = z.object({ source: targetBody })
 export const editor = new Hono<AppEnv>()
   .get('/:id/editor/root', (c) => viaBridge(c, EDITOR, async (b) => ({ root: await b.root(c.req.param('id')) })))
   .get('/:id/editor/files', (c) => viaBridge(c, EDITOR, (b) => b.files(c.req.param('id'))))
+  .get('/:id/editor/file-status', (c) => viaBridge(c, EDITOR, (b) => b.fileStatus(c.req.param('id'))))
   // relPath rides a query param ('' = worktree root); the bridge validates it, so no schema here.
   .get('/:id/editor/list', (c) => viaBridge(c, EDITOR, (b) => b.list(c.req.param('id'), c.req.query('path') ?? '')))
   .get('/:id/editor/read', (c) => {

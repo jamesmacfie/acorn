@@ -5,6 +5,8 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorEntry } from './editorClient'
 import type { createFileActionModel } from './fileActionModel'
 import { evictEditorTreeState, setEditorTreeDirectoryOpen } from './editorTreeState'
+import { projectFileStatus } from './fileStatusModel'
+import type { FileStatusProjection } from './fileStatusModel'
 
 Element.prototype.scrollIntoView ??= () => {}
 
@@ -133,12 +135,15 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
 
-const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void }) => {
+const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection }) => {
   host = document.createElement('div')
   document.body.append(host)
   dispose = render(() => (
     <QueryClientProvider client={new QueryClient()}><FileTree
       taskId={options?.task?.() ?? taskId}
+      fileStatus={() => options?.fileStatus ?? { files: new Map(), folders: new Map() }}
+      statusStale={() => false}
+      onStatusChanged={() => {}}
       openPath={null}
       reveal={options?.reveal?.() ?? null}
       onOpen={onOpen}
@@ -150,6 +155,16 @@ const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () =>
 }
 
 describe('the editor file tree', () => {
+  it('keeps a large listing virtual and shows a status badge without opening the file', async () => {
+    listing.mockResolvedValueOnce(Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false })))
+    const status = projectFileStatus({ kind: 'ready', changes: [{ path: '0.txt', status: 'untracked', staged: false }] })
+    const onOpen = mount(vi.fn(), { fileStatus: status })
+    await vi.waitFor(() => expect(host.querySelector('[title^="0.txt"]')).not.toBeNull())
+    expect(host.querySelectorAll('[role="treeitem"]').length).toBeLessThan(100)
+    expect(host.textContent).toContain('?')
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it('reloads retained expanded branches when the tree mounts again', async () => {
     setEditorTreeDirectoryOpen(taskId, 'src', true)
     setEditorTreeDirectoryOpen(taskId, 'src/nested', true)

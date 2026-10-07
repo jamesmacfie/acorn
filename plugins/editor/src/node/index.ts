@@ -5,6 +5,7 @@ import { searchBridge } from '../server/search'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
 import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
+import { EDITOR_FILE_STATUS } from '../contract/fileStatus'
 
 export const editorPlugin = (): NodePlugin => {
   let routeDisposables: { dispose(): void }[] = []
@@ -13,6 +14,7 @@ export const editorPlugin = (): NodePlugin => {
     label: 'Editor',
     init: (ctx) => {
       ctx.extensionPoints.declare(EDITOR_LINE_MARKERS, 'Editor line markers')
+      ctx.extensionPoints.declare(EDITOR_FILE_STATUS, 'Editor file status')
       // The one decision this plugin opens to other plugins (docs/plugins/hooks.md § Hooks): a formatter's
       // turn at the text on its way to disk. A veto is allowed too, so a lint-on-save can refuse.
       ctx.hooks.declare({
@@ -30,6 +32,7 @@ export const editorPlugin = (): NodePlugin => {
           ctx.events.worktreeStatus,
           ctx.hooks,
           () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
+          () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
         )),
         ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
       ]

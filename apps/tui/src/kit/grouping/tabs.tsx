@@ -104,7 +104,7 @@ export function TabPanel(props: {
 }
 /** One line of tab labels with a `×` on the current one. */
 export function DocumentTabs(props: {
-  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string }[]
+  tabs: readonly { id: string; label: string; dirty?: boolean; status?: 'ok' | 'warn' | 'muted'; ephemeral?: boolean; pending?: boolean; title?: string; fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' } }[]
   active: string
   onActivate: (id: string) => void
   onClose?: (id: string) => void
@@ -159,10 +159,11 @@ export function DocumentTabs(props: {
             role={props.active === tab.id ? 'strong' : 'body'}
             tone={tab.dirty ? 'accent' : tab.status === 'warn' ? 'warn' : undefined}
           >
-            {tab.label}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
+            {tab.label}{tab.fileStatus ? ` [${tab.fileStatus.letter}]` : ''}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
           </Line>
         )}
       </For>
+      <Line role="muted">{props.tabs.find((tab) => tab.id === props.active)?.fileStatus?.label ?? ''}</Line>
       <box flexGrow={1} />
       {slot(props.actions)}
     </box>

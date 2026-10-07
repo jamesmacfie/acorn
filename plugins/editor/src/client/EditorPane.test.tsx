@@ -45,6 +45,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     root: () => root(),
     list: async () => [],
     files: async () => [...disk.keys()],
+    fileStatus: async () => ({ kind: 'unavailable' }),
     read: async (taskId: string, path: string) => {
       const text = await read(taskId, path)
       return { text, revision: createHash('sha256').update(text).digest('hex') }

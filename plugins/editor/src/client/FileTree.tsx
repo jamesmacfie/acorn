@@ -1,7 +1,7 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
 import { activeNodeId, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, TreeRow } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, TreeRow } from '@acorn/plugin-api/ui'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { editorApi, type EditorEntry } from './editorClient'
 import type { FileTarget, TrashAvailability } from '../contract/api'
@@ -9,12 +9,19 @@ import type { ArmedFileAction } from './fileActionModel'
 import { createFileActionModel } from './fileActionModel'
 import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { type FileTreeRevealRequest } from './fileTreeReveal'
+import type { FileStatusProjection } from './fileStatusModel'
+
+const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
+  tone === 'muted' ? 'neutral' : tone
 
 /** The collection id, so the reveal below and the host's stored place agree on one name. */
 const TREE = 'editor.file-tree'
 
 export default function FileTree(props: {
   taskId: string
+  fileStatus: () => FileStatusProjection
+  statusStale: () => boolean
+  onStatusChanged: () => void
   onOpen: (path: string, ephemeral: boolean) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
@@ -192,6 +199,7 @@ export default function FileTree(props: {
       else await actions.trash(current, saveDrafts)
       if (disposed || taskId !== operationTask || activeNodeId() !== nodeId) return
       await refresh()
+      props.onStatusChanged()
       if (reveal) {
         const segments = reveal.split('/').slice(0, -1)
         let parent = ''
@@ -295,6 +303,7 @@ export default function FileTree(props: {
   return (
     <Stack grow>
       {actionError() && <Alert tone="danger">{actionError()}</Alert>}
+      {props.statusStale() && <Alert tone="warn">Git status may be stale. Files remain available.</Alert>}
       {rootEntry() && (HOST !== 'tui' || !dialog() && (menuPath() === null || menuPath() === '')) && <Menu ariaLabel="Worktree actions" open={() => menuPath() === ''}
         onBeforeOpen={() => prepareMenu(rootEntry()!)} onOpenChange={(open) => {
         if (open) openMenu(rootEntry()!)
@@ -359,8 +368,11 @@ export default function FileTree(props: {
         if (target) openMenu(target)
       }}
     >
-      {(item, itemProps, selected, place) => (
-        <TreeRow
+      {(item, itemProps, selected, place) => {
+        const folderMark = () => item.dir ? props.fileStatus().folders.get(item.key) : undefined
+        const fileMark = () => item.dir ? undefined : props.fileStatus().files.get(item.key)
+        const statusLabel = () => folderMark()?.label ?? fileMark()?.label
+        return <TreeRow
           item={itemProps}
           offset={place.offset}
           height={place.height}
@@ -382,9 +394,17 @@ export default function FileTree(props: {
               else dismissMenu()
             }}>{menuItems}</RowActions></Only>
             <Only hosts={['tui']}><Button onPress={() => { const target = targetOf(item); if (target) openMenu(target) }}>Actions</Button></Only></>}
-          title={item.key}
+          title={`${item.key}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
+          label={`${item.key}${statusLabel() ? `, ${statusLabel()}` : ''}`}
+          meta={item.dir
+            ? folderMark() && <><Badge size="xs" tone={folderMark()!.tone === 'danger' ? 'danger' : 'neutral'}
+                tip={folderMark()!.label}>{folderMark()!.count}</Badge>
+                <Only hosts={['tui']}><Text emphasis="muted">{` ${folderMark()!.label}`}</Text></Only></>
+            : fileMark() && <><Badge size="xs" tone={badgeTone(fileMark()!.tone)}
+                tip={fileMark()!.label}>{fileMark()!.letter}</Badge>
+                <Only hosts={['tui']}><Text emphasis="muted">{` ${fileMark()!.label}`}</Text></Only></>}
         >
-          {item.label}
+          <Text tone={folderMark()?.tone ?? fileMark()?.tone}>{item.label}</Text>
           {inlinePath() === item.key && <Input label={dialog() === 'rename' ? 'Rename entry' : 'New name'}
             value={name()} onInput={setName} onSubmit={(value) => void act(false, value)}
             onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); finish() } }}
@@ -399,7 +419,7 @@ export default function FileTree(props: {
               }
             })} />}
         </TreeRow>
-      )}
+      }}
     </Rows>}
     </Stack>
   )

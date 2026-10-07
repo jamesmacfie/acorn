@@ -4,6 +4,7 @@
 // returns null now that the surface is server-backed.
 import {
   editorFilesRoute,
+  editorFileStatusRoute,
   editorImageRoute,
   editorListRoute,
   editorLineMarkersRoute,
@@ -20,6 +21,7 @@ import {
 import type { QueryClient } from '@tanstack/solid-query'
 import { activeNodeId, queryOwner, readBytes, readJson, writeJson } from '@acorn/plugin-api/client'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
+import type { EditorFileStatusSnapshot } from '../contract/fileStatus'
 
 export type { EditorEntry } from '../contract/api'
 
@@ -27,6 +29,7 @@ export type EditorApi = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
+  fileStatus(taskId: string): Promise<EditorFileStatusSnapshot>
   read(taskId: string, relPath: string): Promise<EditorReadResult>
   readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
   lineMarkers(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot | null>
@@ -46,6 +49,7 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
   root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
+  fileStatus: (taskId) => readJson<EditorFileStatusSnapshot>(editorFileStatusRoute(taskId), { nodeId }),
   read: (taskId, relPath) => readJson<EditorReadResult>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => {
     if (typeof r.revision !== 'string' || !/^[a-f0-9]{64}$/.test(r.revision)) throw new Error('This Node does not support guarded document saves. Update the Node to edit this file.')
     return r

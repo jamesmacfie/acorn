@@ -1681,6 +1681,16 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
 const every = (from: Renderable): Renderable[] =>
   from.getChildren().flatMap((child) => [child, ...every(child)])
 
+it('keeps terminal Git status text and the unsaved dot distinct in document tabs', async () => {
+  const screen = await renderCells(() => <DocumentTabs idPrefix="status" ariaLabel="Open files" active="a" onActivate={() => {}}
+    tabs={[{ id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified — Staged and unstaged', tone: 'muted' } }]} />,
+  { width: 80, height: 4 })
+  try {
+    expect(screen.text).toContain('a.ts [M] ●')
+    expect(screen.text).toContain('Modified — Staged and unstaged')
+  } finally { screen.done() }
+})
+
 describe('every control is a stop', () => {
   const behaviours = BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const)
   const driveCase = async (_name: string, entry: Behaviour): Promise<void> => {

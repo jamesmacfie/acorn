@@ -15,6 +15,7 @@ export type DocTabDef = {
   /** Still starting. Renders a pulsing dot, reduced-motion guarded. */
   pending?: boolean
   title?: string
+  fileStatus?: { letter: string; label: string; tone: 'muted' | 'ok' | 'accent' | 'danger' }
 }
 
 // The closable tab strip: editor documents and terminal sessions. Distinct from `Tabs`, which
@@ -77,6 +78,7 @@ export function DocumentTabs(props: {
               type="button"
               role="tab"
               class="ui-doctab-label"
+              aria-label={`${tab.label}${tab.fileStatus ? `, ${tab.fileStatus.label}` : ''}${tab.dirty ? ', Unsaved changes' : ''}`}
               aria-selected={props.active === tab.id}
               aria-controls={`${props.idPrefix}-panel-${tab.id}`}
               tabindex={props.active === tab.id ? 0 : -1}
@@ -96,7 +98,9 @@ export function DocumentTabs(props: {
               <Show when={tab.status || tab.pending}>
                 <StatusDot tone={tab.status ?? 'ok'} pulse={tab.pending} />
               </Show>
-              <span class="ui-doctab-text">{tab.label}</span>
+              <span class="ui-doctab-text" data-file-status-tone={tab.fileStatus?.tone}>{tab.label}</span>
+              <Show when={tab.fileStatus}><span class="ui-doctab-file-status" data-tone={tab.fileStatus!.tone} title={tab.fileStatus!.label}
+                aria-label={tab.fileStatus!.label}>{tab.fileStatus!.letter}</span></Show>
               <Show when={tab.dirty}>
                 <StatusDot tone="accent" label="Unsaved changes" />
               </Show>

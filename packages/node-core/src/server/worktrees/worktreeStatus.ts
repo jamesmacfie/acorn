@@ -21,6 +21,7 @@
 // `worktreeStatus.test.ts` holds the test that says so: a file written 100 ms ago still blocks a
 // removal without `force`.
 import { gitOrThrow } from '../core/git'
+import { realpathSync } from 'node:fs'
 
 /** How long a read is answered from the last run. Short enough that a change made outside acorn shows
  *  up on the next client tick, long enough that a ping from every connected client costs one process. */
@@ -32,6 +33,9 @@ export type WorktreeStatus = { dirty: boolean; count: number; branch: string | n
 // path drops every read of it at once, the status and the changes pane's line counts together.
 type Read = { text: string | null; at: number; running: Promise<string | null> | null }
 const reads = new Map<string, Map<string, Read>>()
+const checkoutKey = (path: string): string => {
+  try { return realpathSync(path) } catch { return path }
+}
 let expiryTimer: ReturnType<typeof setTimeout> | undefined
 let expiryAt = Infinity
 
@@ -108,6 +112,7 @@ const run = async (path: string, args: readonly string[], timeoutMs: number): Pr
  *  and its `rev-parse --git-dir` come through here; before, two clients on one task cost four
  *  numstat processes a poll where the status beside them cost one. */
 export async function worktreeGitText(path: string, args: readonly string[], opts: { fresh?: boolean; timeoutMs?: number } = {}): Promise<string | null> {
+  path = checkoutKey(path)
   const key = args.join('\0')
   const known = reads.get(path)?.get(key)
   if (known && !opts.fresh) {
@@ -190,6 +195,7 @@ export function invalidateWorktreeStatus(path?: string): void {
     return
   }
   reads.delete(path)
+  reads.delete(checkoutKey(path))
   rescheduleExpiry()
 }
 

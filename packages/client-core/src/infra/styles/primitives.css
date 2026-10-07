@@ -1709,6 +1709,11 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
    Two of the three strips were relying on the browser's default outline. */
 .ui-doctab-label:focus-visible { outline: var(--focus-ring-w) var(--focus-ring-style) var(--focus); outline-offset: -3px; }
 .ui-doctab-text { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ui-doctab-text[data-file-status-tone='muted'], .ui-doctab-file-status[data-tone='muted'] { color: var(--text-muted); }
+.ui-doctab-text[data-file-status-tone='ok'], .ui-doctab-file-status[data-tone='ok'] { color: var(--state-ok); }
+.ui-doctab-text[data-file-status-tone='accent'], .ui-doctab-file-status[data-tone='accent'] { color: var(--accent); }
+.ui-doctab-text[data-file-status-tone='danger'], .ui-doctab-file-status[data-tone='danger'] { color: var(--state-bad); }
+.ui-doctab-file-status { flex: none; font-size: var(--fs-xs); font-weight: 700; font-style: normal; }
 .ui-doctab > .ui-btn { flex: none; padding: 0 var(--space-3); opacity: 0; }
 /* Keyboard-reachable, unlike the mouse-only ✕ this replaces. */
 .ui-doctab:hover > .ui-btn,

@@ -18,6 +18,7 @@ const pool = (): EditorPool => ({ retired: false, files: new Map(), saved: new M
 const api = (overrides: Partial<EditorApi> = {}): EditorApi => ({
   root: async () => '/work', list: async () => [], files: async () => [], read: async () => ({ text: '', revision: 'rev0' }),
   readImage: async () => ({ bytes: new Uint8Array(), type: 'image/png' }), lineMarkers: async () => null,
+  fileStatus: async () => ({ kind: 'unavailable' }),
   write: async (_task, _path, text) => ({ ok: true, text, revision: 'rev1' }), entry: async (_task, path) => target(path),
   trashAvailability: async () => ({ available: true }), renameAvailability: async () => ({ available: true }), create: async () => ({ ok: true, path: 'new.ts' }),
   rename: async () => ({ ok: true, path: 'renamed' }), trash: async () => ({ ok: true, path: 'gone' }),

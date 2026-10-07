@@ -9,6 +9,7 @@ import { lstat, open, readdir, readFile, stat, writeFile } from 'node:fs/promise
 import { join } from 'node:path'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
+import type { EditorFileStatusProvider } from '../contract/fileStatus'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
 import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
@@ -53,6 +54,7 @@ export const editorBridge = (
   hooks?: Pick<PluginHookRegistry, 'run'>,
   /** Providers are resolved per read because plugin init order and unload are runtime facts. */
   markerProviders: () => readonly EditorLineMarkerProvider[] = () => [],
+  fileStatusProviders: () => readonly EditorFileStatusProvider[] = () => [],
 ): EditorBridge => ({
   ...createFileActions(core, changed),
   root: (taskId) => core.tasks.root(taskId),
@@ -133,6 +135,16 @@ export const editorBridge = (
     revision,
     (root) => readMarkerProviders(markerProviders(), taskId, relPath, root),
   ),
+
+  fileStatus: async (taskId) => {
+    const root = await core.tasks.root(taskId)
+    if (!root) return { kind: 'unavailable' }
+    const provider = fileStatusProviders()[0]
+    if (!provider) return { kind: 'unavailable' }
+    const result = await provider.read(taskId, { root })
+    return fileStatusProviders()[0] === provider && await core.tasks.root(taskId) === root
+      ? result : { kind: 'unavailable' }
+  },
 
   // The additive acknowledgement names the exact body written after hooks. Path and filesystem
   // failures retain the {ok:false, reason} response used by file-pane recovery.

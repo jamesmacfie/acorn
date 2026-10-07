@@ -2,7 +2,7 @@ import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, S
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
@@ -20,6 +20,7 @@ import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
 import type { EditorReadResult } from '../contract/api'
+import { createFileStatusReader } from './fileStatusReader'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -48,6 +49,7 @@ export default function EditorPane(props: { task: Task }) {
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
   const api = editorApi(queryClient)
   const taskId = props.task.id
+  const fileStatus = createFileStatusReader(api, taskId, () => !disposed && activeNodeId() === nodeId)
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
   const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | 'recovered' | null>(null)
@@ -89,7 +91,10 @@ export default function EditorPane(props: { task: Task }) {
   const documentTabs = createMemo(() => files().map((file) => ({
     id: file.path,
     label: file.path.split('/').pop() ?? file.path,
-    title: file.path,
+    title: fileStatus.projection().files.get(file.path)
+      ? `${file.path} — ${fileStatus.projection().files.get(file.path)!.label}${fileStatus.stale() ? ' (Git status may be stale)' : ''}`
+      : file.path,
+    fileStatus: fileStatus.projection().files.get(file.path),
     dirty: file.dirty,
     ephemeral: file.ephemeral,
   })))
@@ -304,7 +309,9 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   onMount(() => {
+    fileStatus.refresh()
     onCleanup(() => {
+      fileStatus.stop()
       // Flush first, then mark this mount gone: the flush is a save, and `save` below finishes its
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
@@ -599,6 +606,7 @@ export default function EditorPane(props: { task: Task }) {
       }
       if (live()) setSaveErr('')
       if (needsMarkers && live() && !custody.dirty) void refreshLineMarkers(p)
+      if (live()) fileStatus.refresh()
       return !custody.dirty
     } catch (cause) {
       if (live()) setSaveErr(custody.writeBlock ? '' : cause instanceof Error ? cause.message : "Couldn't save this file.")
@@ -757,14 +765,15 @@ export default function EditorPane(props: { task: Task }) {
     const path = currentPath
     if (path) refreshQueue.request(path)
   }
-  function onFocus() { invalidate() }
+  function onFocus() { invalidate(); fileStatus.refresh() }
 
   onMount(() => {
     const offWorktree = wsOnNodeEvent('worktree:status-changed', (event) => {
-      if (event.taskId === taskId && activeNodeId() === nodeId) invalidate()
+      if (event.taskId === taskId && activeNodeId() === nodeId) { invalidate(); fileStatus.refresh() }
     })
-    const offReconnect = wsOnReconnect(() => { if (activeNodeId() === nodeId) invalidate() })
-    onCleanup(() => { offWorktree(); offReconnect() })
+    const offReconnect = wsOnReconnect(() => { if (activeNodeId() === nodeId) { invalidate(); fileStatus.refresh() } })
+    const offPlugins = wsOnPluginsChanged(() => { if (activeNodeId() === nodeId) fileStatus.providerChanged() })
+    onCleanup(() => { offWorktree(); offReconnect(); offPlugins() })
   })
 
   createEffect(() => {
@@ -819,6 +828,9 @@ export default function EditorPane(props: { task: Task }) {
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
+                  fileStatus={fileStatus.projection}
+                  statusStale={fileStatus.stale}
+                  onStatusChanged={fileStatus.refresh}
                   actions={fileActions}
                   onOpen={openPath}
                   openPath={active()}
