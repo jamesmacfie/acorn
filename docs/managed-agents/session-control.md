@@ -50,4 +50,4 @@ A loaded plugin names `agents.sessionControl` in `permissions.node.capabilities`
 shows it in the host's words, marked high: "Stop your agent sessions’ turns, and change their model,
 reasoning effort, and other options, which changes what they spend". One grant covers both calls.
 
-The session meter in `docs/future/pi/packages/session-meter/` is the first loaded consumer.
+The `acorn-session-meter` plugin, kept in its own repository, is the first loaded consumer.

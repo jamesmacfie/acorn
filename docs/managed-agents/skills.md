@@ -29,7 +29,7 @@ with nothing added, so a skill written for Claude Code drops into a package unch
 A plugin declares up to 16. The host names each `<pluginId>:<id>`. A package with only skills needs no
 Node or client bundle. The loader runs it as a plugin with an empty `init`, the way it runs a
 data-only harness, so it gets a row in **Settings > Plugins** and can be turned off. The standalone
-example is [`docs/future/pi/packages/skills/`](../future/pi/packages/skills/README.md).
+example is the `acorn-skills` plugin, kept in its own repository.
 
 ### The checks
 
@@ -168,5 +168,5 @@ opens plugin pages in the desktop app.
 
 - [Custom agents](./custom-agents.md): the other way a plugin puts its words in front of an agent.
 - [Harnesses](./harnesses.md): the drivers that receive the index.
-- [Phase 06](../future/pi/06-portable-skills.md) and [phase 07](../future/pi/07-native-skills.md): the
+- [Phase 06](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/06-portable-skills.md) and [phase 07](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/07-native-skills.md): the
   portable delivery here, and native delivery through Claude Code's and Codex's own skill support.

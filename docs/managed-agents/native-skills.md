@@ -47,4 +47,4 @@ Codex. Acorn adds no slash-command expansion of its own, and the index offers no
 
 - [Skills](./skills.md): the shape, the checks, approval, the catalogue, and the index.
 - [The composer](./composer.md): where the harness's commands and skills are offered.
-- [Phase 07](../future/pi/07-native-skills.md): the evidence behind each harness's door.
+- [Phase 07](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/07-native-skills.md): the evidence behind each harness's door.
