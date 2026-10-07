@@ -47,7 +47,7 @@ describe('the task service workspace lookups', () => {
 
   it('answers null where the throwing form throws — unknown task, and a repo in no workspace', async () => {
     await expect(tasks.workspaceId('nope')).rejects.toThrow(/Task not found/)
-    await expect(tasks.workspaceId('no-workspace')).rejects.toThrow(/no workspace/)
+    await expect(tasks.workspaceId('no-workspace')).rejects.toThrow(/no project scope/)
     expect(await tasks.workspaceIdOrNull('nope')).toBeNull()
     expect(await tasks.workspaceIdOrNull('no-workspace')).toBeNull()
   })

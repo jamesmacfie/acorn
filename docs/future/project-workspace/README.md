@@ -11,6 +11,22 @@ documented in [projects](../../workspaces-and-tasks/projects.md),
 [Settings](../../frontend/settings.md), and [terminal chrome](../../tui/chrome.md).
 The research below describes the code as it stood when the plan was written on October 7, 2026.
 
+## Combined validation
+
+October 8, 2026: full lint passed all 37 tasks. The full test gate completed with 28 of 36 tasks
+passing. Focused reruns resolved the missed wording consumers, the architecture scan's test rename,
+and the following integration drift:
+
+- The project-order endpoint has an explicit frame permission rule that denies plugin access.
+- Reorder indicators use the border-width token without literal shadow geometry.
+- The Node route and desktop contribution goldens include the terminal setup endpoint and command,
+  agent loop coverage, and Changes rail marker already present in their registration code.
+- The scaffolder task-source label matches the Node and SDK label. Error assertions and the workflow
+  example prompt digest match the reviewed wording changes.
+
+All 87 architecture checks and the focused failure checks passed. The desktop package gate is
+finishing its boot and Rust checks. Three storage backup timeouts remain under investigation.
+
 ## Goal
 
 People who never group projects end up with every project in the Default workspace. The whole UI is

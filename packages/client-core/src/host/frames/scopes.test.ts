@@ -59,7 +59,7 @@ describe('the route table covers every core route', () => {
       ['core.projects:write', 'Create and update projects, including their on-disk locations'],
       ['core.tasks:read', 'Read tasks'],
       ['core.tasks:write', 'Create and update tasks'],
-      ['core.workspaces:read', 'Read workspaces'],
+      ['core.workspaces:read', 'Read project collections'],
     ])
     expect(GRANTABLE_SCOPES.every((scope) => (describeScope(scope)?.icon.length ?? 0) > 0)).toBe(true)
     expect(GRANTABLE_SCOPES.filter((scope) => describeScope(scope)?.high)).toEqual([

@@ -138,6 +138,7 @@ const RULES: readonly RouteRule[] = [
     note: 'A project collection mutation is unmappable: it changes the top-level unit a user organises by hand.',
   },
   { path: shape(`/v1/core/workspaces/${SEG}/external-projects`), scopes: { GET: 'core.workspaces:read' } },
+  { path: shape(`/v1/core/workspaces/${SEG}/project-order`), scopes: {}, note: 'Project order is an owner-controlled mutation.' },
 
   // ── Permanently unmappable ──────────────────────────────────────────────────────────────────────
   // Node administration and owner surfaces. Nothing here has a read a plugin needs, and several would
