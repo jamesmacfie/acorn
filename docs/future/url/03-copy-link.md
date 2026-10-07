@@ -34,11 +34,15 @@ The desktop package suite passed 174 tests and retained 11 baseline plugin-disab
 failures when run with loopback access (`/private/tmp/acorn-phase03-desktop-escalated.log`). The
 client-core suite passed 2,519 tests and retained its two baseline scope and CSS assertions; one
 pane timing failure in an earlier loaded run passed on a focused rerun
-(`/private/tmp/acorn-phase03-client-core-final.log`). The TUI
-suite passed 676 tests with host access and has one `sourceSwitch.test.tsx` failure that
-also fails when run alone (`/private/tmp/acorn-phase03-tui-escalated.log`). The coordinator owns the
-final gate and the phase 02 installed-bundle check. Phase 05 can use the same address builder without
-changing this copy action.
+(`/private/tmp/acorn-phase03-client-core-final.log`). The initial TUI suite passed 676 tests and
+failed `sourceSwitch.test.tsx` (`/private/tmp/acorn-phase03-tui-escalated.log`). A pre-phase shell
+passed that test, while the phase 03 shell exposed a setup race: the test registered its probe
+sources after rendering, then pressed End while the Menu still held its original rows. The next key
+landed on Second probe instead of First probe. The test now registers those sources before rendering,
+as the production roster does; its lazy source replacement assertions are unchanged. Both the
+source-switch test and the Copy link palette test pass together. This timing issue did not show a
+runtime source-switch regression. The coordinator owns the final gate and the phase 02
+installed-bundle check. Phase 05 can use the same address builder without changing this copy action.
 
 Date: October 8, 2026. Status: implemented. Dependencies: phase 01.
 Read the [plan](./README.md), especially the decision that

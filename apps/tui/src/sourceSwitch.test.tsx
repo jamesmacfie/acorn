@@ -7,7 +7,8 @@ import { Stack } from './kit/grouping'
 import { Heading, Text } from './kit/showing'
 
 it('replaces a resolved source when the next lazy source starts a resource', async () => {
-  const screen = await renderFixture({ width: 120, height: 40 })
+  // Install the roster before the shell mounts, as production does. This test is about switching
+  // lazy surfaces; registering after render let End run against the old Menu rows.
   const { sourceRegistry } = await import('@acorn/client-core/host/registries/sources')
   const first = sourceRegistry.register({ id: 'first-probe', label: 'First probe', glyph: 'x', order: 9000,
     component: lazy(async () => ({ default: () => <Stack><Heading>Previous source</Heading><Button>Previous action</Button></Stack> })),
@@ -18,7 +19,9 @@ it('replaces a resolved source when the next lazy source starts a resource', asy
       return <Stack><Heading>New source</Heading><Text>{body()}</Text><Button>Current action</Button></Stack>
     } })),
   })
+  let screen: Awaited<ReturnType<typeof renderFixture>> | undefined
   try {
+    screen = await renderFixture({ width: 120, height: 40 })
     await screen.press('END')
     await screen.press('ARROW_UP')
     await screen.until('Previous source')
@@ -28,5 +31,5 @@ it('replaces a resolved source when the next lazy source starts a resource', asy
     expect(frame).not.toContain('Previous action')
     await screen.press('RETURN')
     expect((await screen.caret()).text, await screen.frame()).toContain('Current action')
-  } finally { screen.done(); first.dispose(); second.dispose() }
+  } finally { screen?.done(); first.dispose(); second.dispose() }
 }, 30_000)
