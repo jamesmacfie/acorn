@@ -45,10 +45,19 @@ vi.mock('./editorClient', async (importOriginal) => ({
     root: () => root(),
     list: async () => [],
     files: async () => [...disk.keys()],
-    read: (taskId: string, path: string) => read(taskId, path),
+    read: async (taskId: string, path: string) => {
+      const text = await read(taskId, path)
+      return { text, revision: createHash('sha256').update(text).digest('hex') }
+    },
     readImage: (taskId: string, path: string) => readImage(taskId, path),
     lineMarkers: (taskId: string, path: string, revision: string) => lineMarkers(taskId, path, revision),
-    write: (taskId: string, path: string, content: string) => write(taskId, path, content),
+    write: async (taskId: string, path: string, content: string) => {
+      const result = await write(taskId, path, content)
+      if (!result.ok) return result
+      const text = 'text' in result && typeof result.text === 'string' ? result.text : content
+      disk.set(path, text)
+      return { ok: true, text, revision: createHash('sha256').update(text).digest('hex') }
+    },
   }),
 }))
 // The sidebar's two panels fetch a tree and run ripgrep. Neither is this file's subject.
@@ -219,7 +228,7 @@ describe('the editor pane', () => {
     resolve({ revision: '', markers: [] })
   })
 
-  it('rejects a different disk body without clearing matching displayed markers', async () => {
+  it('keeps displayed markers and the editor state after an unchanged disk read', async () => {
     const { host } = mount()
     const view = await editor(host)
     editorOpen(taskId, 'a.ts', false)
@@ -227,11 +236,68 @@ describe('the editor pane', () => {
     const marked = () => view.contentDOM.querySelector('.cm-line-pull-request')
     await vi.waitFor(() => expect(marked()).not.toBeNull())
     const calls = lineMarkers.mock.calls.length
-    lineMarkers.mockResolvedValueOnce({ revision: 'different-body', markers: [] })
+    const reads = read.mock.calls.length
     window.dispatchEvent(new Event('focus'))
-    await vi.waitFor(() => expect(lineMarkers.mock.calls.length).toBeGreaterThan(calls))
+    await vi.waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads))
     await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(lineMarkers.mock.calls.length).toBe(calls)
     expect(marked()).not.toBeNull()
+  })
+
+  it('keeps selection and undo history when disk bytes are unchanged', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// undoable\n' } })
+    view.dispatch({ selection: { anchor: 4 } })
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(2))
+    expect(view.state.selection.main.anchor).toBe(4)
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', keyCode: 90, ctrlKey: true, bubbles: true }))
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const a = 1\n'))
+  })
+
+  it('keeps a dirty draft and opens a read-only comparison when disk changes', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// my draft\n' } })
+    disk.set('a.ts', '// external writer\n')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Changed on disk'))
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    expect(write).not.toHaveBeenCalled()
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    expect(view.state.doc.toString()).toContain('// my draft')
+    const compare = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Compare')!
+    compare.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('Disk snapshot → Live draft'))
+    expect(host.textContent).toContain('external writer')
+    expect(host.textContent).toContain('my draft')
+  })
+
+  it('pauses blur and close saves after external deletion and recreates only by confirmation', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// keep me\n' } })
+    disk.delete('a.ts')
+    read.mockRejectedValueOnce(Object.assign(new Error('File not found.'), { status: 404, code: 'not_found' }))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Deleted on disk'))
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    expect(write).not.toHaveBeenCalled()
+    expect(disk.has('a.ts')).toBe(false)
+    const recreate = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Recreate file…')!
+    recreate.click()
+    expect(disk.has('a.ts')).toBe(false)
+    recreate.click()
+    await vi.waitFor(() => expect(disk.get('a.ts')).toContain('// keep me'))
   })
 
   it('requests the exact displayed UTF-8 body including BOM, Unicode, and CRLF', async () => {

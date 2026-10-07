@@ -1,6 +1,35 @@
 # Phase 01: protect documents from external changes
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+> **Completion note — October 7, 2026.** Landed revision-bearing Editor file reads and guarded
+> saves, canonical-path serialization for Editor writes, custody suspension and recovery baselines,
+> active and cached document revalidation, and explicit conflict, deletion, read-failure, comparison,
+> reload, overwrite, recreate, and save-as flows. Existing file-list and host-document routes remain
+> unchanged. A missing revision now fails closed, so an older Node requires an update before this
+> Editor can save. A null revision is reserved for explicit creation; existing-file overwrites use the
+> revision shown when the person confirms. Recovery records without revision metadata require a
+> deliberate resolution. The Editor filesystem bridge loads on first request to keep the Node's
+> service bundle within its size budget. Later file-operation phases should use the pool's narrow
+> suspend/rebind/retire operations and acquire descendant locks in sorted canonical-path order.
+> External CLI and terminal-editor writes remain outside these locks, so the final hash check and
+> write cannot provide an atomic compare-and-swap against them. External changes without an Acorn
+> worktree event become visible on focus or explicit reload.
+
+> **Verification.** `pnpm test --filter=@acorn/plugin-editor` passed 112 tests;
+> `pnpm test --filter=@acorn/node-core` passed 1,633; `pnpm test --filter=@acorn/tui`
+> passed 676 with 2 skipped using the staged Node 24.21 runtime. The database, workflow, and
+> plugin API suites passed together. The focused custody test passed 9 tests. The architecture
+> suite and lint passed. Full client-core had 2,463 passes and two unrelated existing failures
+> (workspace route classification and CSS token count). Full Node had 272 passes and one unrelated
+> golden-route failure for terminal task setup. The desktop package suite built and ran 171 passing
+> tests; 11 client activation snapshots failed on unrelated terminal, agents, and changes
+> contributions. The isolated desktop driver showed a preserved draft,
+> conflict comparison, and a deleted-file draft restored after restart; screenshots are in
+> `.acorn/agent-dev/phase01-document3/screenshots/`. The isolated terminal `tui-navigation` flow
+> passed; its report is under `.acorn/agent-dev/tui/phase01-tui/reports/`. The desktop driver cannot
+> reach native dialogs or child webviews, so Save as and PTY behavior were checked through routes,
+> focused tests, build/import gates, and the terminal driver rather than native dialog automation.
+
+Date: October 7, 2026. Status: implemented.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`. Dependency: none.
 
 This PRD defines disk freshness, save conflicts, and document write suspension for worktree files.

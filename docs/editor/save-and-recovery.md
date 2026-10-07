@@ -11,12 +11,18 @@ Node, scope kind, scope ID, URI, and its declared routes. A document admits one 
 Repeated flushes join that write, and later edits wait in one follow-up slot. Separate documents save
 separately. A clean document skips the request, its hooks, and its invalidation.
 
-The file write response carries optional `text` and `revision` fields beside `ok` and `reason`. `text`
-is the exact body written after the before-save hook, and `revision` is its SHA-256 over UTF-8 bytes.
-The Node doesn't read the file back, because another writer might have changed it. If a formatter
-changed the text, the pane replaces what you see only if your local edit revision still matches, so
-later edits stay dirty. When an older Node leaves out the saved body, the client keeps the text dirty
-and asks for a Node update before closing.
+The Editor file read carries text and an opaque revision of the original UTF-8 bytes. Every file
+save sends that revision. The Node runs before-save hooks, compares the revision immediately before
+writing, and returns a typed conflict if the disk changed or disappeared. A null expected revision
+creates a file only while it remains absent. The successful response carries the exact post-hook text
+and revision. A formatter replaces the submitted edit only when nobody typed after admission.
+Graphical clients refuse a Node that omits the read revision or save acknowledgement.
+
+Editor file writes to the same canonical checkout path queue behind one another, including writes
+through task-root aliases. File operations join the admitted write and suspend follow-up saves.
+Folder operations must acquire descendant file locks in sorted canonical-path order. External CLI
+writers do not use these locks. The hash comparison and write have a remaining filesystem race
+against those writers; they are not an atomic compare-and-swap.
 
 Closing a file waits for its save, and keeps the tab if the save fails or you edit during the wait.
 Retiring a pane model sends the final write through its captured Node.
@@ -27,7 +33,9 @@ Dirty text and CodeMirror undo state stay in device memory after the pane and mo
 cursor and scroll. Device recovery storage keeps the full dirty and saved text, cursor, and scroll,
 with no eviction limit. Storage can fail or run out of quota. The full document stays in memory, but a
 restart can't bring back undo history or a record storage refused. Reopening the same file restores
-recovery without reading from an offline Node. Recovery never replays a write on its own.
+recovery without reading from an offline Node. Recovery never replays a write on its own. A file
+recovery record also keeps the acknowledged disk revision. A record written before that field existed
+has an unknown baseline and requires a deliberate reload or overwrite after a disk read.
 
 A host document flush rejects when saving fails. A surface action runs only after its revision is
 acknowledged and still current. Autosave and retirement absorb that rejection and keep the recovery

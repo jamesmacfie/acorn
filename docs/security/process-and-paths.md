@@ -23,6 +23,11 @@ the open, so an agent that can write in its own worktree can swap a path compone
 that window. It's hard to hit, and the fix is an `O_NOFOLLOW`-style open rather than a tighter check.
 Process isolation wouldn't fix a race in the Node's own filesystem service.
 
+Editor file saves repeat confinement after before-save hooks and compare the original byte revision
+before writing. Editor-owned writes to the same canonical path serialize. A process outside Editor
+can still change the file between comparison and write. The revision check is not an atomic
+compare-and-swap against an arbitrary writer.
+
 ## Processes
 
 Short-lived work goes through the process broker, `packages/node-core/src/server/core/proc.ts`. It

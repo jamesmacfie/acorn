@@ -1,5 +1,5 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
-import { editorBridge } from '../server/editor'
+import { lazyEditorBridge } from '../server/lazyEditorBridge'
 import { registerEditorWsChannel } from '../server/wsChannel'
 import { searchBridge } from '../server/search'
 import { editor, EDITOR } from '../server/routes/editor'
@@ -25,7 +25,7 @@ export const editorPlugin = (): NodePlugin => {
         timeoutMs: 2_000,
       })
       routeDisposables = [
-        ctx.capabilities.provide(EDITOR, editorBridge(
+        ctx.capabilities.provide(EDITOR, lazyEditorBridge(
           ctx.core,
           ctx.events.worktreeStatus,
           ctx.hooks,

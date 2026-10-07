@@ -10,7 +10,10 @@ export const searchRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/sea
 // Editor pane: read, write, and list worktree files. relPath rides a query param so a nested path
 // never collides with the route segments.
 export type EditorEntry = { name: string; dir: boolean }
-export type EditorWriteResult = { ok: boolean; reason?: string; text?: string; revision?: string }
+export type EditorReadResult = { text: string; revision: string }
+export type EditorWriteResult =
+  | { ok: true; text: string; revision: string }
+  | { ok: false; kind: 'conflict' | 'deleted' | 'failure'; reason: string }
 export const editorRootRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/root`
 export const editorFilesRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/files`
 export const editorListRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/list?path=${encodeURIComponent(relPath)}`

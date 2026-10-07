@@ -82,11 +82,18 @@ refresh keeps the last listing and shows **Retry**.
 
 ## Reload on focus
 
-When the window regains focus, the pane reads the open file again, because an agent edits the same
-worktree. A clean document reloads quietly. A dirty or saving one is left alone, so a reload never
-overwrites your unsaved edits. The reload checks its read generation, the document, its text, edit
-revision, and dirty state after the response. Applying text from disk doesn't schedule an autosave.
-It's a plain window listener, because the platform seam carries no focus signal.
+Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text
+file. Inactive cached files become stale and revalidate before the pane shows them. An unchanged
+read leaves the buffer, undo history, selection, and save timer alone. Changed disk text replaces a
+clean buffer and clamps its cursor and scroll. A dirty draft stays visible and pauses automatic saves
+when the disk revision diverges. A failed read retains the useful text. A missing file shows
+**Deleted on disk**; connection failures show a separate read error.
+
+**Compare** renders the disk snapshot against the live draft through the shared read-only diff rows.
+**Reload from disk** confirms before discarding a dirty draft. **Overwrite disk…** confirms the
+snapshot's revision, so another change makes it fail and refresh. **Recreate file…** uses an
+absence precondition. **Save as…** writes a separate path under the task root. **Retry save** handles
+ordinary write failures. None of these actions stages a file.
 
 ## Editing in your own editor
 

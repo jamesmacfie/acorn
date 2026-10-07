@@ -22,6 +22,7 @@
     "@tanstack/solid-query": "^5.101.0",
     "@vscode/ripgrep": "^1.15.9",
     "codemirror": "^6.0.2",
+    "diff": "^9.0.0",
     "hono": "catalog:",
     "node-pty": "^1.0.0",
     "solid-js": "catalog:",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@acorn/client-core": "workspace:*",
     "@acorn/node-core": "workspace:*",
+    "@types/diff": "^8.0.0",
     "@types/node": "^26.0.0",
     "typescript": "^6.0.3",
     "vite": "^8.0.16",

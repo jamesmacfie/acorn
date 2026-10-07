@@ -2,10 +2,10 @@ import { createEffect, createMemo, createSignal, lazy, on, onCleanup, onMount, S
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
-import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task } from '@acorn/plugin-api/client'
-import { Alert, DocumentTabs, EmptyState, Icon, IconButton, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { Alert, Button, ConfirmButton, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
-import { createEditorDocumentPool, flushEditorDocument, type EditorPool, type PooledFile } from './editorDocumentPool'
+import { createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -16,10 +16,12 @@ import { HOST } from '@acorn/plugin-api/ui/tokens'
 import SearchPanel from './search/SearchPanel'
 import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
+import type { EditorReadResult } from '../contract/api'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
 const ImagePreview = lazy(() => import('./ImagePreview'))
+const EditorComparison = lazy(() => import('./EditorComparison'))
 const log = createLogger('editor', 'editor')
 const telemetry = telemetryFor('editor')
 
@@ -36,7 +38,7 @@ const telemetry = telemetryFor('editor')
 export default function EditorPane(props: { task: Task }) {
   let engine: typeof import('./editorEngine') | undefined
   let surfaceGeneration = 0
-  const warmedText = new Map<string, Promise<string>>()
+  const warmedText = new Map<string, Promise<EditorReadResult>>()
   const graphical = HOST === 'dom'
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
@@ -45,6 +47,11 @@ export default function EditorPane(props: { task: Task }) {
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
+  const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | null>(null)
+  const [compare, setCompare] = createSignal(false)
+  const [comparisonDisk, setComparisonDisk] = createSignal<EditorReadResult | null>(null)
+  const [comparisonDraft, setComparisonDraft] = createSignal('')
+  const [saveAsPath, setSaveAsPath] = createSignal('')
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const [side, setSide] = createSignal<'files' | 'search'>('files')
@@ -71,6 +78,7 @@ export default function EditorPane(props: { task: Task }) {
 
   const files = createMemo(() => openFiles(taskId))
   const active = () => activeFile(taskId)
+  const activeTab = () => files().find((file) => file.path === active())
   // Keep tab definitions stable when only the active path changes. DocumentTabs reconciles by tab
   // object identity, so rebuilding every definition here would replace the focused tab on each
   // keyboard move even though the open files themselves had not changed.
@@ -205,11 +213,12 @@ export default function EditorPane(props: { task: Task }) {
       if (!entry) return
       entry.state = entry.custody.state = update.state
       entry.custody.edit(update.state.doc)
+      if (compare() && currentPath === path) setComparisonDraft(update.state.doc.toString())
       // Dirty derives from the text versus the last saved text, so undoing back to the saved state
       // clears it.
       const dirty = isDirty(path)
       editorSetDirty(taskId, path, dirty)
-      if (dirty || entry.custody.writing) {
+      if ((dirty || entry.custody.writing) && !entry.custody.writeBlock) {
         scheduleSave(path)
       } else {
         scheduleSave.cancel()
@@ -336,11 +345,13 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   createEffect(on(wantsTerminal, (path, previous) => {
-    if (previous) forget(previous) // left mid-edit: the pref was flipped, or the reader changed tabs
+    if (previous) { pool.externalEditors.delete(previous); forget(previous) } // the PTY stopped owning this path
+    if (path) pool.externalEditors.add(path)
     setPtyPath(path)
   }))
 
   const onEditorExit = (path: string, code: number) => {
+    pool.externalEditors.delete(path)
     forget(path)
     setPtyPath(null)
     setSaveErr(code ? `Your editor exited with status ${code}.` : '')
@@ -369,11 +380,12 @@ export default function EditorPane(props: { task: Task }) {
     const admitted = surfaceGeneration
     const address = [nodeId, 'file', taskId, relPath]
     const recovery = recoverDocumentCustody(address)
-    const content = recovery?.dirty ? recovery.acknowledged.toString() : await (warmedText.get(relPath) ?? api.read(taskId, relPath))
+    const loaded = recovery?.dirty ? undefined : await (warmedText.get(relPath) ?? api.read(taskId, relPath))
+    const content = loaded?.text ?? recovery!.acknowledged.toString()
     warmedText.delete(relPath)
     if (!live() || !view || admitted !== surfaceGeneration || !files().some((file) => file.path === relPath)) return null
     // Optional grammar and marker work never gate usable text.
-    const custody = recovery ?? documentCustody(address, content)
+    const custody = recovery ?? documentCustody(address, content, loaded?.revision)
     const language: Extension = []
     const pooled = pool.files.get(relPath)
     if (pooled) return adopt(relPath, pooled) // a concurrent read got there first
@@ -403,6 +415,11 @@ export default function EditorPane(props: { task: Task }) {
     pool.files.set(relPath, entry)
     watchCustody(relPath, entry)
     if (live()) editorSetDirty(taskId, relPath, custody.dirty)
+    if (recovery?.dirty) {
+      custody.writeBlock = 'Recovered draft: compare with disk before saving.'
+      if (active() === relPath) setDiskState('unknown')
+      void revalidate(relPath)
+    }
     void refreshLineMarkers(relPath)
     if (highlighted) void languageForPath(relPath).then((grammar) => {
       if (!live() || pool.files.get(relPath) !== entry || (Array.isArray(grammar) && !grammar.length)) return
@@ -425,6 +442,7 @@ export default function EditorPane(props: { task: Task }) {
       entry.state = entry.custody.state ?? entry.state
       if (!live()) return
       if (entry.custody.error) setSaveErr(entry.custody.error)
+      if (entry.custody.writeBlock && currentPath === path) scheduleSave.cancel()
       if (view && currentPath === path && !view.state.doc.eq(entry.custody.current)) {
         applyingAcknowledgement = true
         try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: entry.custody.current } }) }
@@ -433,6 +451,7 @@ export default function EditorPane(props: { task: Task }) {
       }
       editorSetDirty(taskId, path, entry.custody.dirty)
       if (!entry.custody.dirty) void refreshLineMarkers(path)
+      if (entry.stale && !entry.custody.writing) void revalidate(path)
     }))
   }
 
@@ -462,6 +481,9 @@ export default function EditorPane(props: { task: Task }) {
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
     saveViewState() // remember the outgoing file's scroll/cursor before we swap states
     setSaveErr('')
+    setDiskState(null)
+    setCompare(false)
+    setComparisonDisk(null)
     // The outgoing file's state, with whatever the reader typed in it. `setState` hands the view a
     // new one, so the old instance is what has to go back in the cache.
     if (currentPath) remember(currentPath, view.state)
@@ -476,10 +498,12 @@ export default function EditorPane(props: { task: Task }) {
     // the interaction boundary; a stale read must not put its document on screen afterward.
     if (disposed || !view || active() !== relPath) return
     if (!state) { view.setState(emptyState()); return }
-    currentPath = relPath
-    currentCustody = pool.files.get(relPath)?.custody
     const entryAtShow = pool.files.get(relPath)
     if (!entryAtShow) return
+    if (entryAtShow.stale) await revalidate(relPath)
+    if (!live() || !view || active() !== relPath || pool.files.get(relPath) !== entryAtShow) return
+    currentPath = relPath
+    currentCustody = entryAtShow.custody
     view.setState(adopt(relPath, entryAtShow))
     // A cached state carries the theme it was built with, so a file opened before a theme change
     // comes back wearing the old one until this line.
@@ -489,6 +513,7 @@ export default function EditorPane(props: { task: Task }) {
     maybeReveal(relPath)
     const entry = pool.files.get(relPath)
     if (entry && Date.now() - entry.markersReadAt > 2_000) void refreshLineMarkers(relPath)
+    if (entry?.custody.writeBlock) void revalidate(relPath)
   }
 
   // Consumes a pending cross-pane reveal for the file just shown: centers the target position and
@@ -547,9 +572,76 @@ export default function EditorPane(props: { task: Task }) {
       if (needsMarkers && live() && !custody.dirty) void refreshLineMarkers(p)
       return !custody.dirty
     } catch (cause) {
-      if (live()) setSaveErr(cause instanceof Error ? cause.message : "Couldn't save this file.")
+      if (live()) setSaveErr(custody.writeBlock ? '' : cause instanceof Error ? cause.message : "Couldn't save this file.")
+      if (custody.writeBlock && live()) void revalidate(p)
       return false
     }
+  }
+
+  async function reloadFromDisk(path: string): Promise<void> {
+    const entry = pool.files.get(path)
+    if (!entry) return
+    const generation = ++reloadGeneration
+    const editRevision = entry.custody.revision
+    try {
+      const disk = await api.read(taskId, path)
+      if (!live() || generation !== reloadGeneration || pool.files.get(path) !== entry || active() !== path) return
+      if (entry.custody.revision !== editRevision) { entry.stale = true; return }
+      if (entry.custody.writing) { entry.stale = true; return }
+      const place = view && currentPath === path ? captureViewState(view) : entry.custody.viewState
+      entry.custody.reload(disk.text, disk.revision)
+      entry.disk = disk
+      const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language) })
+      entry.state = entry.custody.state = state
+      if (view && currentPath === path) {
+        view.setState(state)
+        if (place) applyViewState(view, place)
+      }
+      setDiskState(null)
+      setCompare(false)
+      setSaveErr('')
+      editorSetDirty(taskId, path, false)
+    } catch (cause) {
+      if (live() && generation === reloadGeneration && pool.files.get(path) === entry && active() === path)
+        setSaveErr(cause instanceof Error ? cause.message : 'Unable to reload the file.')
+    }
+  }
+
+  async function resolveWrite(path: string, destination = path, recreate = false): Promise<void> {
+    const entry = pool.files.get(path)
+    if (!entry) return
+    const snapshot = destination === path ? entry.disk : null
+    if (destination === path && !snapshot && !recreate) { await revalidate(path); return }
+    const resume = await entry.custody.suspendWrites()
+    const admitted = entry.custody.revision
+    const draft = entry.custody.current.toString()
+    try {
+      const result = await api.write(taskId, destination, draft, recreate ? null : snapshot?.revision ?? null)
+      if (!live() || pool.files.get(path) !== entry) return
+      if (!result.ok) {
+        setSaveErr(result.reason)
+        if (destination === path) await revalidate(path)
+        return
+      }
+      entry.custody.acknowledgeResolved(result.text, result.revision, admitted)
+      if (destination === path) {
+        setDiskState(null)
+        setCompare(false)
+        setSaveErr('')
+        editorSetDirty(taskId, path, entry.custody.dirty)
+      } else {
+        rebindEditorFile(pool, path, destination, [nodeId, 'file', taskId, destination])
+        subscriptions.get(path)?.()
+        subscriptions.delete(path)
+        editorClose(taskId, path)
+        editorOpen(taskId, destination, false)
+        setSaveAsPath('')
+        setDiskState(null)
+        setSaveErr('')
+      }
+    } catch (cause) {
+      if (live()) setSaveErr(cause instanceof Error ? cause.message : 'Unable to write the file.')
+    } finally { resume() }
   }
 
   async function close(relPath: string) {
@@ -567,33 +659,83 @@ export default function EditorPane(props: { task: Task }) {
     forgetEditorViewState(taskId, relPath, nodeId)
   }
 
-  // External-change reload on window focus: the agent edits the same worktree. A clean document
-  // reloads silently; a dirty one is guarded so it never clobbers unsaved human edits.
-  //
-  // A raw window listener, and it stays one: this is a desktop-host fact about the app regaining
-  // focus, the platform seam carries no signal for it, and it is the same rectangle-adjacent
-  // territory as the editor's own DOM (docs/editor/editor-pane.md § Reload on focus).
-  async function onFocus() {
-    const p = currentPath
-    const entry = p ? pool.files.get(p) : undefined
-    if (!api || !p || !entry || !view || entry.custody.dirty || entry.custody.writing) return
+  // Worktree events have no path. Keep inactive entries stale and read only the visible file.
+  // A generation rejects late responses after a newer request, tab switch, or pane retirement.
+  async function revalidate(path: string): Promise<void> {
+    const entry = pool.files.get(path)
+    if (!entry || !live()) return
+    if (entry.custody.writing) { entry.stale = true; return }
     const generation = ++reloadGeneration
-    const revision = entry.custody.revision
-    const doc = view.state.doc
-    const disk = await api.read(taskId, p).catch(() => null)
-    if (!live() || !view || disk == null || currentPath !== p || pool.files.get(p) !== entry
-      || generation !== reloadGeneration || revision !== entry.custody.revision || entry.custody.dirty || !view.state.doc.eq(doc)) return
-    if (disk !== view.state.doc.toString()) {
-      entry.custody.reload(disk)
-      applyingAcknowledgement = true
-      try { view.dispatch({ changes: { from: 0, to: view.state.doc.length, insert: disk } }) }
-      finally { applyingAcknowledgement = false }
-      remember(p, view.state)
-      saved.set(p, entry.custody.acknowledged)
-      editorSetDirty(taskId, p, false)
+    const editRevision = entry.custody.revision
+    let disk: EditorReadResult
+    try { disk = await api.read(taskId, path) }
+    catch (cause) {
+      if (!live() || generation !== reloadGeneration || pool.files.get(path) !== entry || active() !== path) return
+      const missing = typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 404
+        && 'code' in cause && cause.code === 'not_found'
+      if (missing) entry.custody.writeBlock = 'Deleted on disk.'
+      setDiskState(missing ? 'deleted' : 'read-failed')
+      setCompare(false)
+      setComparisonDisk(null)
+      setSaveErr(missing ? '' : cause instanceof Error ? cause.message : 'Could not read this file.')
+      return
     }
-    void refreshLineMarkers(p)
+    if (!live() || generation !== reloadGeneration || pool.files.get(path) !== entry || active() !== path
+      || entry.custody.revision !== editRevision) { entry.stale = true; return }
+    entry.stale = false
+    entry.disk = disk
+    setComparisonDisk(disk)
+    const custody = entry.custody
+    if (custody.dirty) {
+      if (!custody.acknowledgedRevision) {
+        custody.writeBlock = 'The recovered draft has no known disk baseline.'
+        setDiskState('unknown')
+      } else if (disk.revision !== custody.acknowledgedRevision) {
+        custody.writeBlock = 'Changed on disk.'
+        setDiskState('changed')
+      } else {
+        custody.writeBlock = ''
+        setDiskState(null)
+      }
+      if (custody.writeBlock) scheduleSave.cancel()
+      return
+    }
+    custody.writeBlock = ''
+    setDiskState(null)
+    setSaveErr('')
+    if (disk.revision === custody.acknowledgedRevision) return
+    if (disk.text === custody.current.toString()) {
+      custody.acknowledgedRevision = disk.revision
+      return
+    }
+    const place = view && currentPath === path ? captureViewState(view) : custody.viewState
+    custody.reload(disk.text, disk.revision)
+    const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language) })
+    entry.state = custody.state = state
+    if (view && currentPath === path) {
+      view.setState(state)
+      if (place) applyViewState(view, place)
+      remember(path, view.state)
+    }
+    saved.set(path, custody.acknowledged)
+    editorSetDirty(taskId, path, false)
+    void refreshLineMarkers(path)
   }
+
+  const invalidate = () => {
+    for (const entry of pool.files.values()) entry.stale = true
+    const path = currentPath
+    if (path) void revalidate(path)
+  }
+  function onFocus() { invalidate() }
+
+  onMount(() => {
+    const offWorktree = wsOnNodeEvent('worktree:status-changed', (event) => {
+      if (event.taskId === taskId && activeNodeId() === nodeId) invalidate()
+    })
+    const offReconnect = wsOnReconnect(() => { if (activeNodeId() === nodeId) invalidate() })
+    onCleanup(() => { offWorktree(); offReconnect() })
+  })
 
   createEffect(() => {
     const open = new Set(files().map((file) => file.path))
@@ -685,6 +827,11 @@ export default function EditorPane(props: { task: Task }) {
                   onPressedChange={(pressed) => void saveEditorMode(queryClient, pressed ? 'terminal' : 'graphical')}
                 ><Icon name="square-terminal" /></ToggleButton>
                 <Show when={active() && !imagePath()}>
+                  <Show when={activeTab()?.dirty} fallback={
+                    <Button size="sm" variant="bare" onPress={() => { const path = active(); if (path) void revalidate(path) }}>Reload from disk</Button>
+                  }>
+                    <ConfirmButton size="sm" variant="bare" timeoutMs={10_000} confirmLabel="Discard draft and reload?" onConfirm={() => { const path = active(); if (path) void reloadFromDisk(path) }}>Reload from disk</ConfirmButton>
+                  </Show>
                   <IconButton
                     icon="send"
                     label="Add to your message to the agent"
@@ -708,6 +855,28 @@ export default function EditorPane(props: { task: Task }) {
           />
           {/* Under the strip rather than in it: a sentence does not fit a 48-pixel bar. */}
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
+          <Show when={active() && diskState()}>
+            <Alert variant="banner" tone="warn">
+              {diskState() === 'deleted' ? 'Deleted on disk' : diskState() === 'read-failed' ? 'Could not read disk' : 'Changed on disk'}
+              <Button onPress={() => { const path = active(); if (path) void revalidate(path) }}>Reload status</Button>
+              <Show when={diskState() !== 'deleted' && diskState() !== 'read-failed'}>
+                <Button onPress={() => { setComparisonDisk(pool.files.get(active()!)?.disk ?? null); setComparisonDraft(pool.files.get(active()!)?.custody.current.toString() ?? ''); setCompare((shown) => !shown) }}>Compare</Button>
+              </Show>
+              <ConfirmButton timeoutMs={10_000} confirmLabel="Discard draft and reload from disk?" onConfirm={() => { const path = active(); if (path) void reloadFromDisk(path) }}>Reload from disk</ConfirmButton>
+              <Show when={diskState() === 'changed' || diskState() === 'unknown'}>
+                <ConfirmButton timeoutMs={10_000} confirmLabel="Overwrite the disk version shown?" onConfirm={() => { const path = active(); if (path) void resolveWrite(path) }}>Overwrite disk…</ConfirmButton>
+              </Show>
+              <Show when={diskState() === 'deleted'}>
+                <ConfirmButton timeoutMs={10_000} confirmLabel="Recreate the missing file?" onConfirm={() => { const path = active(); if (path) void resolveWrite(path, path, true) }}>Recreate file…</ConfirmButton>
+                <Input label="Save as path" value={saveAsPath()} onInput={setSaveAsPath} />
+                <Button onPress={() => { const path = active(); if (path && saveAsPath()) void resolveWrite(path, saveAsPath()) }}>Save as…</Button>
+              </Show>
+            </Alert>
+          </Show>
+          <Show when={active() && saveErr() && !diskState()}><Button onPress={() => void save(active())}>Retry save</Button></Show>
+          <Show when={compare() ? comparisonDisk() : undefined}>
+            {(snapshot) => <EditorComparison path={active()!} disk={snapshot().text} draft={comparisonDraft()} />}
+          </Show>
           {/* CodeMirror owns these pixels — its own DOM, its own keyboard, its own scrolling — so the
               pane hands it a box rather than a tree. `mount` is the element it attaches to, drawn by
               the host (ui/Rectangle.tsx). In terminal mode the same box holds the reader's own editor

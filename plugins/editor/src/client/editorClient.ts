@@ -11,6 +11,7 @@ import {
   editorRootRoute,
   editorWriteRoute,
   type EditorEntry,
+  type EditorReadResult,
   type EditorLineMarkerSnapshot,
   type EditorWriteResult,
 } from '../contract/api'
@@ -24,10 +25,10 @@ export type EditorApi = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
   files(taskId: string): Promise<string[]>
-  read(taskId: string, relPath: string): Promise<string>
+  read(taskId: string, relPath: string): Promise<EditorReadResult>
   readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
   lineMarkers(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot | null>
-  write(taskId: string, relPath: string, content: string): Promise<EditorWriteResult>
+  write(taskId: string, relPath: string, content: string, expectedRevision: string | null): Promise<EditorWriteResult>
 }
 
 export const editorApi = (queryClient?: QueryClient): EditorApi => {
@@ -37,22 +38,30 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
   root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
-  read: (taskId, relPath) => readJson<{ text: string }>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => r.text),
+  read: (taskId, relPath) => readJson<EditorReadResult>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => {
+    if (typeof r.revision !== 'string' || !/^[a-f0-9]{64}$/.test(r.revision)) throw new Error('This Node does not support guarded document saves. Update the Node to edit this file.')
+    return r
+  }),
   readImage: (taskId, relPath) => readBytes(editorImageRoute(taskId, relPath), 'Unable to read image.', { nodeId, maxResponseBytes: MAX_IMAGE_PREVIEW_BYTES }),
   lineMarkers: async (taskId, relPath, revision) => {
     const result = await readJson<EditorLineMarkerSnapshot | unknown[]>(editorLineMarkersRoute(taskId, relPath, revision), { nodeId })
     // An old Node ignores the added query parameter and returns an unverifiable array.
     return !Array.isArray(result) && result.revision === revision ? result : null
   },
-  write: (taskId, relPath, content) =>
+  write: (taskId, relPath, content, expectedRevision) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',
       nodeId,
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ path: relPath, content }),
-    }).then((result) => result.ok && typeof result.text !== 'string'
-      ? { ok: false, reason: 'The Node did not acknowledge the saved text. Update the Node before closing this document.' }
-      : result),
+      body: JSON.stringify({ path: relPath, content, expectedRevision }),
+    }).then((result): EditorWriteResult => result.ok && (typeof result.text !== 'string' || !/^[a-f0-9]{64}$/.test(result.revision))
+      ? { ok: false, kind: 'failure', reason: 'The Node did not acknowledge the saved text and revision. Update the Node before closing this document.' }
+      : result).catch((cause: unknown) => {
+      if (typeof cause === 'object' && cause !== null && 'status' in cause && cause.status === 400) {
+        return { ok: false, kind: 'failure', reason: 'This Node does not support guarded document saves. Update the Node before closing this document.' }
+      }
+      throw cause
+    }),
 }
 }
 

@@ -17,6 +17,8 @@ export class DocumentCustody {
   acknowledged: Text
   revision = 0
   acknowledgedRevision?: string
+  /** A file conflict or missing file pauses automatic writes; host documents leave this empty. */
+  writeBlock = ''
   state?: EditorState
   viewState?: EditorViewState
   error = ''
@@ -26,19 +28,22 @@ export class DocumentCustody {
   private recoveryTimer?: ReturnType<typeof setTimeout>
   private readers = 0
   private listeners = new Set<() => void>()
+  private suspended = false
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
     return () => { this.listeners.delete(listener) }
   }
 
-  constructor(private readonly key: string, loaded: string) {
+  constructor(private key: string, loaded: string, diskRevision?: string) {
     this.current = this.acknowledged = textOf(loaded)
+    this.acknowledgedRevision = diskRevision
     try {
-      const recovery = JSON.parse(readLocal(key) ?? 'null') as { text?: unknown; acknowledged?: unknown; viewState?: EditorViewState } | null
+      const recovery = JSON.parse(readLocal(key) ?? 'null') as { text?: unknown; acknowledged?: unknown; acknowledgedRevision?: unknown; viewState?: EditorViewState } | null
       if (typeof recovery?.text === 'string') {
         this.current = textOf(recovery.text)
         if (typeof recovery.acknowledged === 'string') this.acknowledged = textOf(recovery.acknowledged)
+        this.acknowledgedRevision = typeof recovery.acknowledgedRevision === 'string' ? recovery.acknowledgedRevision : undefined
         if (validViewState(recovery.viewState)) this.viewState = recovery.viewState
       }
     } catch { /* A malformed recovery record cannot replace loaded text. */ }
@@ -74,13 +79,25 @@ export class DocumentCustody {
     if (!this.recoveryTimer) this.recoveryTimer = setTimeout(() => this.flushRecovery(), 250)
   }
 
-  reload(text: string): void {
+  reload(text: string, diskRevision?: string): void {
     this.current = this.acknowledged = textOf(text)
+    this.acknowledgedRevision = diskRevision
+    this.writeBlock = ''
     this.revision++
     this.flushRecovery()
   }
 
-  flushRecovery(): void {
+  /** A deliberate file resolution may finish after more typing; retain those newer edits. */
+  acknowledgeResolved(text: string, diskRevision: string, admittedRevision: number): void {
+    this.acknowledged = textOf(text)
+    this.acknowledgedRevision = diskRevision
+    if (this.revision === admittedRevision) this.current = this.acknowledged
+    this.writeBlock = ''
+    this.flushRecovery()
+    for (const listener of this.listeners) listener()
+  }
+
+  flushRecovery(): boolean {
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer)
     this.recoveryTimer = undefined
     // Keep the full document in memory if device storage is unavailable or out of quota.
@@ -88,17 +105,20 @@ export class DocumentCustody {
     try {
       const storage = deviceStorage()
       if (this.dirty && !storage) throw new Error('No recovery storage')
-      if (this.dirty) storage?.setItem(this.key, JSON.stringify({ text: this.current.toString(), acknowledged: this.acknowledged.toString(), viewState: this.viewState }))
+      if (this.dirty) storage?.setItem(this.key, JSON.stringify({ text: this.current.toString(), acknowledged: this.acknowledged.toString(), acknowledgedRevision: this.acknowledgedRevision, viewState: this.viewState }))
       else storage?.removeItem(this.key)
     } catch {
       this.error = 'Recovery storage is unavailable. Keep acorn open until this document saves.'
       for (const listener of this.listeners) listener()
+      return false
     }
     this.releaseClean()
+    return true
   }
 
   /** Matching flushes share one operation; later edits occupy one follow-up slot. Failures reject. */
   flush(write: DocumentWriter): Promise<void> {
+    if (this.suspended || this.writeBlock) return Promise.reject(new Error(this.writeBlock || 'Document writes are suspended.'))
     this.requested = true
     this.nextWrite = write
     if (this.pending) return this.pending
@@ -106,7 +126,7 @@ export class DocumentCustody {
     this.flushRecovery()
     const run = async () => {
       try {
-        while (this.requested) {
+        while (this.requested && !this.suspended && !this.writeBlock) {
           this.requested = false
           if (!this.dirty) continue
           const submitted = this.current
@@ -136,10 +156,34 @@ export class DocumentCustody {
         this.pending = undefined
         this.nextWrite = undefined
         this.releaseClean()
+        for (const listener of this.listeners) listener()
       }
     }
     this.pending = run()
     return this.pending
+  }
+
+  /** Stop new and queued writes, then join an admitted write before a file mutation. */
+  async suspendWrites(): Promise<() => void> {
+    this.suspended = true
+    this.requested = false
+    await this.pending?.catch(() => {})
+    return () => { this.suspended = false }
+  }
+
+  /** Move a suspended file's recovery identity after a successful path mutation. */
+  rebind(address: readonly (string | null)[]): void {
+    if (!this.suspended) throw new Error('Suspend document writes before rebinding.')
+    const next = recoveryKey(address)
+    const held = documents.get(next)
+    if (held && held !== this) throw new Error('The destination document is already open.')
+    const previous = this.key
+    if (documents.get(previous) === this) documents.delete(previous)
+    this.key = next
+    documents.set(next, this)
+    if (this.flushRecovery()) {
+      try { deviceStorage()?.removeItem(previous) } catch { /* The old copy is safe to retain. */ }
+    }
   }
 }
 
@@ -156,7 +200,7 @@ export function recoverDocumentCustody(address: readonly (string | null)[]): Doc
   return undefined
 }
 
-export function documentCustody(address: readonly (string | null)[], loaded: string): DocumentCustody {
+export function documentCustody(address: readonly (string | null)[], loaded: string, diskRevision?: string): DocumentCustody {
   const key = recoveryKey(address)
-  return documents.get(key) ?? new DocumentCustody(key, loaded)
+  return documents.get(key) ?? new DocumentCustody(key, loaded, diskRevision)
 }
