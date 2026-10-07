@@ -68,6 +68,7 @@
       "agents:attachment",
       "agents:composer-actions",
       "agents:session-header",
+      "agents:request-card",
       "changes:diff-line",
       "changes:push-actions",
       "context:section",

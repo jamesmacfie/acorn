@@ -163,13 +163,13 @@ it('names every capability the first-party plugins publish', () => {
   // The discovery half of the capability work: these ids are declared in
   // `plugins/*/src/contract/` modules a loaded plugin cannot import.
   const ids: Array<keyof Published.CapabilityCatalogue> = [
-    'agents.sessionExecute', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
-    'agents.reviewInput.v1', 'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
+    'agents.sessionExecute', 'agents.sessionControl', 'agents.runtime', 'agents.turns', 'agents.requests', 'agents.sessions',
+    'agents.reviewInput.v1', 'agents.activity.v1', 'agents.draftAttachments', 'agents.harnessRegistry', 'core.taskWorktreeCreated',
     'terminal.sessions', 'terminal.sendToAgent', 'terminal.runTargets', 'notes.store', 'notes.seedTask',
     'memory.library', 'browser.captures', 'github.mirror', 'preview.rules', 'preview.urls',
     'workflows.runner', 'workflows.gates', 'workflows.notices',
   ]
-  expect(new Set(ids).size).toBe(22)
+  expect(new Set(ids).size).toBe(24)
 })
 
 it('keeps every published declaration module free of runtime statements', () => {

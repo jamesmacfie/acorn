@@ -79,6 +79,10 @@ These pages cover harnesses and the work agents do:
   before it reports.
 - [Review input](./managed-agents/session-events.md#review-input): `agents.reviewInput.v1`, one
   completed turn's text and final answer for a reviewer, bounded and checked against its task.
+- [Activity](./managed-agents/session-events.md#activity): `plugin:agents:activity` and
+  `agents.activity.v1`, a session's tool calls, subagents, and context fill, without content.
+- [Session control](./managed-agents/session-control.md): `agents.sessionControl`, stopping a turn or
+  changing an advertised option from another plugin, named in the transcript.
 
 <a id="provider-native-subagents"></a>
 

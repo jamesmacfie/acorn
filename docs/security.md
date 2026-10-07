@@ -39,6 +39,12 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   Its notes join only the operation of a turn in the same session, inherit that turn's model and the
   session's tool ceiling, and are refused once the window or the operation closes
   ([unattended follow-ups](./managed-agents/unattended-follow-ups.md)).
+- **A loaded plugin with `agents.sessionControl`** can stop a session's turn and change its model or
+  effort, a high grant because it changes what a session spends. It can pick only values the harness
+  advertised, never in an archived or terminal-held session, and the transcript names it beside each
+  change from an id the host binds ([session control](./managed-agents/session-control.md)). Its
+  activity feed carries no tool output, message text, reasoning, or command line, and a note it draws
+  on a request card can't answer the request.
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

@@ -386,6 +386,20 @@ export type AgentToolFileChange = {
  *  because "everyone with something to offer this draft" is a real answer for a toolbar. */
 export const AGENT_COMPOSER_ACTIONS_POINT = 'agents:composer-actions'
 
+/** A note inside a request card that is waiting on the person, below the card's own controls. A
+ *  `stack` point, up to two. It decorates the card and never replaces it: no contributor draws or
+ *  presses the answer, so approval stays with the person (docs/plugins/remote-points.md). */
+export const AGENT_REQUEST_CARD_POINT = 'agents:request-card'
+
+export type AgentRequestCardProps = {
+  taskId: string
+  sessionId: string
+  /** The provider's request id, the one `agents.requests` and `agents:before-permission` name. */
+  requestId: string
+  kind: string
+  title: string
+}
+
 /** A compact contribution immediately after the managed session title. Agents projects its private
  *  ledger into these bounded, JSON-safe facts; contributors decide what those facts mean and draw.
  *  This is intentionally not a cost contract: a token counter, budget warning or provider badge can

@@ -11,6 +11,7 @@ describe('workflow session cancellation', () => {
           : undefined),
       } as never,
       cancelTurn,
+      patchSession: vi.fn(),
     })
 
     await control.cancel('task-1', 'session-1')

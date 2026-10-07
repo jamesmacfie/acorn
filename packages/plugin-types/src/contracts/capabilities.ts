@@ -47,6 +47,9 @@ export type PluginCapabilities = {
 export type CapabilityCatalogue = {
   /** Run a prompt in a managed agent session. */
   'agents.sessionExecute': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionExecute'>
+  /** Stop a session's turn, or pick one of the values its harness advertised for an option such as the
+   *  model or reasoning effort. The host binds your plugin id, which the transcript names. */
+  'agents.sessionControl': HostOwned<'plugins/agents/contract/sessionExecute.AgentSessionControl'>
   /** Ask the agent runtime to reconcile after a restart. */
   'agents.runtime': { reconcile(): Promise<void> }
   /** Read durable turn lifecycle state within one task, without prompt or transcript content. */
@@ -58,6 +61,9 @@ export type CapabilityCatalogue = {
   /** Read one completed turn of a task for review: its text and context with provenance, and the
    *  agent's final message, bounded at 16 and 32 KiB. Never the ledger, tool output, or a path. */
   'agents.reviewInput.v1': HostOwned<'plugins/agents/contract/lifecycle.AgentReviewInputCapability'>
+  /** Rebuild one session's tool calls, subagents, and context fill: the state `plugin:agents:activity`
+   *  frames carry. Never tool input or output, message text, reasoning, or a command line. */
+  'agents.activity.v1': HostOwned<'plugins/agents/contract/lifecycle.AgentActivityCapability'>
   /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
    *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
   'agents.draftAttachments': DraftAttachmentsCapability

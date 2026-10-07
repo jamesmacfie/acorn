@@ -236,8 +236,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   [From the command palette](./managed-agents/palette.md), [Native
   skills](./managed-agents/native-skills.md), [Permission
   policy](./managed-agents/permission-policy.md), [Providers and plan
-  usage](./managed-agents/providers.md), [Session events and
-  waits](./managed-agents/session-events.md), [Session
+  usage](./managed-agents/providers.md), [Session control](./managed-agents/session-control.md),
+  [Session events and waits](./managed-agents/session-events.md), [Session
   messages](./managed-agents/session-messages.md), [Sessions](./managed-agents/sessions.md),
   [Skills](./managed-agents/skills.md),
   [Subagents](./managed-agents/subagents.md), [Transcript

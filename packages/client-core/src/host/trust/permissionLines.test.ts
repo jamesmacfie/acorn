@@ -38,6 +38,14 @@ describe('the two permission groups', () => {
     expect(texts(uiPermissionLines(all))).toEqual(['Read tasks', 'Receive task archive events'])
   })
 
+  it('names session control in the host’s words, as high, and keeps other capabilities generic', () => {
+    const lines = nodePermissionLines(permissions({ node: { core: [], capabilities: ['agents.sessionControl', 'agents.activity.v1'], secrets: false, exec: false, net: [], sockets: false } }))
+    expect(lines.map(({ text, high }) => ({ text, high }))).toEqual([
+      { text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend', high: true },
+      { text: 'Use capability agents.activity.v1', high: false },
+    ])
+  })
+
   it('shows an any-host fetch grant explicitly', () => {
     const all = permissions({ node: { core: [], capabilities: [], secrets: false, exec: false, net: ['*'], sockets: false } })
     expect(texts(nodePermissionLines(all))).toEqual(['Send requests to any network host'])

@@ -432,6 +432,7 @@ export default function AgentEventCard(props: {
                 {(request) => (
                   <AgentRequestCard
                     request={request()}
+                    taskId={props.taskId}
                     focused={props.focusRequest}
                     onResolved={props.onRequestResolved}
                   />

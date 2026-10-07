@@ -45,6 +45,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `agents:attachment` | `replace`, keyed by media type | `{ attachment, taskId, sessionId }` |
 | `agents:composer-actions` | `stack`, up to four | `{ taskId, sessionId }` |
 | `agents:session-header` | `stack`, up to two | `{ taskId, sessionId, providerId, tokenAccounting, costAccounting, turns }` |
+| `agents:request-card` | `stack`, up to two | `{ taskId, sessionId, requestId, kind, title }` |
 | `changes:push-actions` | `stack`, up to two | `{ taskId, projectId, branch, upstream, ahead }` |
 | `context:section` | `stack`, up to two, keyed by section id | `{ task, onChanged, onPendingChange }` |
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
@@ -61,6 +62,13 @@ nobody filling it, a slot draws nothing and takes no space.
 resolves each turn's model against the reader's price preferences, and says whether a provider's
 counters replace or add. It doesn't calculate a cost. The `agent-cost` loaded plugin does that in its
 own worker.
+
+`agents:request-card` draws inside a request card while it waits on the person, below the card's own
+buttons. It decorates the card and never replaces it, so no contributor draws or presses an answer.
+The `requestId` is the one `agents:before-permission` and `agents.requests` name, so a policy plugin
+can draw why it let a risky request through. The permission policy package in
+`docs/future/pi/packages/permission-policy/` does. A flow that needs the person to type a code
+isn't a note: it waits on a hook verdict that asks.
 
 The host gives the contributor's tree the owner's `taskId` and `projectId` as its scope, read-only.
 Without them, `openPane`, in-app `openUrl`, and task-scoped key bindings would have no task. The scope

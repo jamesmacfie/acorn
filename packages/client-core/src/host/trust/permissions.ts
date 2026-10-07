@@ -52,6 +52,16 @@ const NODE_CORE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
 }
 
+// The capabilities that act on something the owner is doing rather than read it, in the host's words.
+// Any other id keeps the generic line.
+const CAPABILITY_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
+  'agents.sessionControl': {
+    text: 'Stop your agent sessions’ turns, and change their model, reasoning effort, and other options, which changes what they spend',
+    icon: 'sliders-horizontal',
+    high: true,
+  },
+}
+
 // One line for everything this acorn could not name.
 //
 // The count is part of the key, and that is the point of the line. One unrecognised request becoming
@@ -90,7 +100,7 @@ export const nodePermissionLines = (permissions: NodePluginPermissions): Permiss
         high: true,
       })),
     ...core,
-    ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, { text: `Use capability ${id}`, icon: 'puzzle' })),
+    ...permissions.node.capabilities.map((id) => line(`node.capability:${id}`, CAPABILITY_DESCRIPTIONS[id] ?? { text: `Use capability ${id}`, icon: 'puzzle' })),
     ...(ignored ? [ignoredLine('node.ignored', ignored, 'node permission')] : []),
   ]
 }

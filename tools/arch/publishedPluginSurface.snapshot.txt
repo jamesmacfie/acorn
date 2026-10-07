@@ -313,12 +313,14 @@ acorn-plugin-types: member Cadence.every
 acorn-plugin-types: member Cadence.weekly
 acorn-plugin-types: member Cadence.weekly.at
 acorn-plugin-types: member Cadence.weekly.day
+acorn-plugin-types: member CapabilityCatalogue.'agents.activity.v1'
 acorn-plugin-types: member CapabilityCatalogue.'agents.draftAttachments'
 acorn-plugin-types: member CapabilityCatalogue.'agents.harnessRegistry'
 acorn-plugin-types: member CapabilityCatalogue.'agents.requests'
 acorn-plugin-types: member CapabilityCatalogue.'agents.reviewInput.v1'
 acorn-plugin-types: member CapabilityCatalogue.'agents.runtime'
 acorn-plugin-types: member CapabilityCatalogue.'agents.runtime'.reconcile
+acorn-plugin-types: member CapabilityCatalogue.'agents.sessionControl'
 acorn-plugin-types: member CapabilityCatalogue.'agents.sessionExecute'
 acorn-plugin-types: member CapabilityCatalogue.'agents.sessions'
 acorn-plugin-types: member CapabilityCatalogue.'agents.turns'

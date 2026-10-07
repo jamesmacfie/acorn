@@ -17,7 +17,7 @@ import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
 import type { TurnFollowUps } from '../server/sessions/turnFollowUps'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
+import { AGENTS_ACTIVITY, AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionControl } from '../server/sessions/sessionControl'
 import { agentUsageCollectors } from '../server/usage/collectors'
@@ -121,6 +121,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       { verb: 'turn-changed', description: 'An agent turn changed queue or execution state' },
       { verb: 'request-changed', description: 'An agent input request was created or changed state' },
       { verb: 'sessions-changed', description: 'A managed agent session was created, renamed, archived, restored, or deleted' },
+      { verb: 'activity', description: 'A tool call or subagent started or finished, or the context fill changed' },
       { verb: 'usage-refreshed', description: 'The cached agent plan usage snapshot was refreshed' },
     ],
     // docs/data-layer/migrations.md § Migrations: this plugin's migration chain, opened and closed by the host.
@@ -292,6 +293,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         }),
         ctx.capabilities.provide(AGENTS_REVIEW_INPUT, {
           read: (ref) => runtime!.store.lifecycleReviewInput(ref),
+        }),
+        ctx.capabilities.provide(AGENTS_ACTIVITY, {
+          read: (ref) => runtime!.store.lifecycleActivity(ref),
         }),
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits

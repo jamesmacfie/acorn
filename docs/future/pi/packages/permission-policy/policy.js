@@ -1,8 +1,8 @@
 import { isAbsolute, relative, resolve } from 'node:path'
 
-// Two hard-coded rules over the command line a harness asked permission to run. These are examples,
-// not containment: a command the harness doesn't ask about, or a script that does the same thing,
-// never reaches them. README.md lists the forms they recognise.
+// Hard-coded rules over the command line a harness asked permission to run: two that refuse, and three
+// that only warn. These are examples, not containment: a command the harness doesn't ask about, or a
+// script that does the same thing, never reaches them. README.md lists the forms they recognise.
 
 const DESTRUCTIVE = new Set(['rm', 'rmdir', 'unlink', 'shred', 'truncate'])
 
@@ -42,13 +42,17 @@ const program = (words) => {
   return words.slice(start)
 }
 
-function isForcePush(words) {
-  if (words[0] !== 'git') return false
-  // Skip git's own options, and the values `-C` and `-c` take.
+// Whether this is `git … push`, past git's own options and the values `-C` and `-c` take. Returns the
+// push's arguments, or null.
+function gitPushArgs(words) {
+  if (words[0] !== 'git') return null
   let index = 1
   while (index < words.length && words[index].startsWith('-')) index += words[index] === '-C' || words[index] === '-c' ? 2 : 1
-  if (words[index] !== 'push') return false
-  return words.slice(index + 1).some((arg) =>
+  return words[index] === 'push' ? words.slice(index + 1) : null
+}
+
+function isForcePush(words) {
+  return !!gitPushArgs(words)?.some((arg) =>
     arg === '--force' || arg.startsWith('--force-with-lease') || arg === '--force-if-includes'
     || /^-[a-zA-Z]*f[a-zA-Z]*$/.test(arg)
     || (arg.startsWith('+') && arg.length > 1))
@@ -76,4 +80,22 @@ export function decide(payload) {
     if (outside) return { ok: false, reason: `${words[0]} would remove ${outside}, outside this task's worktree.` }
   }
   return { ok: true }
+}
+
+const SHELLS = new Set(['sh', 'bash', 'zsh'])
+
+/** A warning for a request the rules let through, or null. The person still decides. */
+export function warn(payload) {
+  const commands = simpleCommands(payload.command ?? '').map(program)
+  for (const [index, words] of commands.entries()) {
+    if (gitPushArgs(words)) return 'This pushes commits to a remote, where other people can see them.'
+    if (DESTRUCTIVE.has(words[0]) && words.slice(1).some((arg) => /^-[a-zA-Z]*[rR]/.test(arg) || arg === '--recursive')) {
+      return `${words[0]} deletes recursively. Check what it removes before you allow it.`
+    }
+    // `curl … | sh`: the split puts the shell in the next simple command.
+    if ((words[0] === 'curl' || words[0] === 'wget') && SHELLS.has(commands[index + 1]?.[0])) {
+      return 'This runs a downloaded script without saving it first.'
+    }
+  }
+  return null
 }

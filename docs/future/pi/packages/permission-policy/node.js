@@ -1,4 +1,4 @@
-import { decide } from './policy.js'
+import { decide, warn } from './policy.js'
 import { createExplanations } from './explanations.js'
 
 // Relative imports and `node:` builtins only. This folder has no node_modules.
@@ -12,6 +12,9 @@ export default {
       log: (line) => ctx.log.info(line),
     })
     const failed = (error) => ctx.log.warn(`explaining a refusal failed: ${error?.message ?? error}`)
+    // Warnings for requests the rules let through, by `<sessionId>:<requestId>`, for the request card to
+    // read. In memory: a Node restart ends the harness process, and with it every pending request.
+    const warnings = new Map()
 
     // The sender agents binds to this plugin. Kept past `connect`, and replaced when agents reconnects.
     ctx.extensionPoints.handle('agents:session-messenger', {
@@ -29,9 +32,20 @@ export default {
         const payload = await request.json()
         const verdict = decide(payload)
         if (!verdict.ok) explanations.refused(payload)
+        const warning = verdict.ok ? warn(payload) : null
+        if (warning) {
+          warnings.set(`${payload.sessionId}:${payload.requestId}`, warning)
+          // ponytail: a fixed cap, oldest first; a pending request older than 200 others has lost its note.
+          if (warnings.size > 200) warnings.delete(warnings.keys().next().value)
+        }
         return Response.json(verdict)
       }
-      // The palette's "explain refusals" setting: GET reads it, PUT writes `{ value }`.
+      // The request card's note (client.js).
+      if (pathname === '/warning' && request.method === 'GET') {
+        const query = new URL(request.url).searchParams
+        return Response.json({ warning: warnings.get(`${query.get('sessionId')}:${query.get('requestId')}`) ?? null })
+      }
+            // The palette's "explain refusals" setting: GET reads it, PUT writes `{ value }`.
       if (pathname === '/settings/explain' && request.method === 'GET') {
         return Response.json({ value: explanations.enabled() ? 'on' : 'off' })
       }

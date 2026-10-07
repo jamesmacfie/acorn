@@ -73,6 +73,7 @@ state or scope to avoid an unneeded broad read.
 | `plugin:agents:turn-changed` | Task, session, turn, source, status, attempt | `agents.turns` |
 | `plugin:agents:request-changed` | Task, session, request, kind, status | `agents.requests` |
 | `plugin:agents:sessions-changed` | Task, session, present, archived | `agents.sessions` |
+| `plugin:agents:activity` | Task, session, and one tool call's, subagent's, or context count's state | `agents.activity.v1` |
 | `plugin:agents:usage-refreshed` | The cached plan usage snapshot was refreshed | Agent usage routes |
 | `plugin:terminal:completed` | A task agent terminal exited | Terminal session routes |
 | `plugin:github:repos-changed` | None | User-scoped repositories from `github.mirror` |
@@ -100,6 +101,11 @@ An event is admitted only if all four hold:
 3. It carries state, not a delta, so a missed frame heals on the next read.
 4. One honest host-owned sentence describes it in the trust prompt.
 
+`plugin:agents:activity` is the one admitted at agent-step rate, and it's held to the rest of the
+rules. It sends a tool call's start and finish, never its output chunks, and a context count only when
+it changes. Each frame is one item's whole state, so a missed frame heals on the next frame for that
+item or on the read ([activity](../managed-agents/session-events.md#activity)).
+
 Rule 2 is partly a property of the pipe. `wsBroadcast` walks every open socket with no subscription
 filter and no backpressure, so a frame every few seconds is a stream. Streams stay with the one plugin
 that owns `ctx.events.streams`. Every new channel costs a `SUBSCRIBABLE_CHANNELS` entry and a sentence.
@@ -111,7 +117,7 @@ These are refused by name:
 - **File opened or saved.** A plugin that wants this wants a file watcher on its node half.
 - **Terminal output and other owned streams:** PTY output, Docker logs and stats, and the agent token
   stream. The lifecycle event is the event, and the stream stays with its owner.
-- **Anything per keystroke, selection, render, or agent step.**
+- **Anything per keystroke, selection, render, or agent step,** except the activity frame above.
 - **Cache mechanics,** such as Docker's health-check ping, GitHub's 304 refreshes, and per-step
   workflow writes. The event is the completed sync or the final state.
 - **Generic process and port lifecycle.** Declared run targets changing state is the exception.

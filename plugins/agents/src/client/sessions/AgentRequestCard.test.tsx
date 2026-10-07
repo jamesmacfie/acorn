@@ -2,6 +2,8 @@ import { render } from 'solid-js/web'
 import { createSignal } from 'solid-js'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AgentRequest } from '../../contract/wire.ts'
+import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/protocol/extensionPoints.ts'
+import { extensionPointRegistry, extensionRegistry, type ExtensionContribution } from '@acorn/plugin-api/testkit/client'
 
 // A question that takes more than one answer. The control is a column of checkboxes rather than the
 // dropdown a single-choice question gets, and what it posts has to stay an array all the way to the
@@ -15,6 +17,9 @@ vi.mock('./managedClient', () => ({
     },
   },
 }))
+
+// The slot reads the reader's arbitration preference through a query.
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: {} }) }))
 
 const { default: AgentRequestCard } = await import('./AgentRequestCard')
 
@@ -51,7 +56,7 @@ afterEach(() => {
 const drawRequest = (value: AgentRequest) => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <AgentRequestCard request={value} />, host)
+  const dispose = render(() => <AgentRequestCard request={value} taskId="task-1" />, host)
   hosts.push(() => { dispose(); host.remove() })
   return host
 }
@@ -63,6 +68,31 @@ const submit = async (host: HTMLElement) => {
   button?.click()
   await Promise.resolve()
 }
+
+describe('another plugin’s note on a request', () => {
+  it('draws under the card’s own buttons while the request waits, with the request’s identity', () => {
+    const seen: AgentRequestCardProps[] = []
+    const Note = (props: AgentRequestCardProps) => {
+      seen.push({ ...props })
+      return <p data-note>looks risky</p>
+    }
+    const point = extensionPointRegistry.register({ id: AGENT_REQUEST_CARD_POINT, ownerId: 'agents', label: 'Agent request card', kind: 'remote', mode: 'stack', max: 2 })
+    const note = extensionRegistry.register({
+      id: 'plugin:policy:warn', pluginId: 'policy', point: AGENT_REQUEST_CARD_POINT, label: 'Warnings', order: 500, carrier: 'component', component: Note,
+    } as ExtensionContribution)
+    hosts.push(() => { note.dispose(); point.dispose() })
+    const permission = { ...request(false), kind: 'permission' as const, title: 'git push', payload: { options: [{ id: 'allow', label: 'Allow' }, { id: 'deny', label: 'Deny', kind: 'reject_once' }] } }
+
+    const host = drawRequest(permission)
+    const drawn = host.querySelector('[data-note]')!
+    const buttons = [...host.querySelectorAll('button')]
+    expect(buttons.map((button) => button.textContent)).toEqual(['Allow', 'Deny'])
+    expect(buttons.at(-1)!.compareDocumentPosition(drawn) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(seen.at(-1)).toEqual({ taskId: 'task-1', sessionId: 'session-1', requestId: 'ask-1', kind: 'permission', title: 'git push' })
+
+    expect(drawRequest({ ...permission, status: 'resolving' }).querySelector('[data-note]')).toBeNull()
+  })
+})
 
 describe('answering a question that takes more than one answer', () => {
   it('posts every box that was ticked, as an array', async () => {
@@ -174,7 +204,7 @@ describe('revealing a request without stealing the caret', () => {
     const [tick, setTick] = createSignal(0)
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => <AgentRequestCard request={request(false)} focused={tick() >= 0} />, host)
+    const dispose = render(() => <AgentRequestCard request={request(false)} taskId="task-1" focused={tick() >= 0} />, host)
     hosts.push(() => { dispose(); host.remove() })
     await flush()
     const card = host.querySelector<HTMLElement>('.ui-card')!
@@ -193,7 +223,7 @@ describe('revealing a request without stealing the caret', () => {
     const [on, setOn] = createSignal(true)
     const host = document.createElement('div')
     document.body.append(host)
-    const dispose = render(() => <AgentRequestCard request={request(false)} focused={on()} />, host)
+    const dispose = render(() => <AgentRequestCard request={request(false)} taskId="task-1" focused={on()} />, host)
     hosts.push(() => { dispose(); host.remove() })
     await flush()
     const card = host.querySelector<HTMLElement>('.ui-card')!

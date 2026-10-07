@@ -10,7 +10,7 @@ import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import { catalogueSkills, readPackageSkill, registerSkill, skillDeliveries, skillStateStore } from '@acorn/plugin-api/testkit'
-import type { AgentAppApproval, AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import type { AgentAppApproval, AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
 import type {
   AgentDriver,
   AgentDriverSession,
@@ -20,6 +20,9 @@ import type {
 import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
+import { createSessionControl } from './sessionControl'
+import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
+import type { AgentSessionControl } from '../../contract/sessionExecute'
 import { writeAgentConcurrency } from '../concurrencyStore'
 import { readAgentSessionDefaults, writeAgentSessionDefaults } from '../sessionDefaultsStore'
 import { defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
@@ -2067,6 +2070,38 @@ describe('managed agent runtime conformance', () => {
       registry.registerNative('fake', driver)
       return registry
     })(),
+  })
+
+  it('lets a plugin pick an advertised option through the picker path, named in the transcript and not remembered', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const owner = 'owner-plugin-config'
+    runtime = defaultsRuntime(owner)
+    const session = await runtime.createSession({
+      taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: { configOptions: advertised() },
+    })
+    const rows: AgentSession[] = []
+    runtime.subscribe((frame) => { if (frame.channel === 'agent:session') rows.push(frame.session) })
+    // What the host hands a loaded plugin (node-core's scopeCapabilities).
+    const bound = (createSessionControl(runtime) as AgentSessionControl & { [BIND_CAPABILITY_CALLER]: (id: string) => AgentSessionControl })[BIND_CAPABILITY_CALLER]('acorn-session-meter')
+
+    await bound.setConfig(seed.taskId, session.id, 'reasoning', 'high')
+    const effort = (config: Record<string, unknown>) => (config.configOptions as Array<{ id: string; currentValue: string }>).find((option) => option.id === 'reasoning')?.currentValue
+    expect(effort((await runtime.store.requireSession(session.id)).config)).toBe('high')
+    // The row every client's picker reads.
+    expect(effort(rows.at(-1)!.config)).toBe('high')
+    const messages = (await runtime.store.snapshot(session.id, 0)).events.flatMap((record) => record.event.type === 'diagnostic' ? [record.event.message] : [])
+    expect(messages).toContain('Reasoning effort changed to High by acorn-session-meter')
+    expect((await readAgentSessionDefaults(core.prefs, owner)).last).toEqual({})
+
+    await expect(bound.setConfig(seed.taskId, session.id, 'temperature', 'hot')).rejects.toThrow("did not advertise option 'temperature'")
+    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'max')).rejects.toThrow("did not advertise value 'max'")
+    await expect(bound.setConfig('another-task', session.id, 'reasoning', 'medium')).rejects.toThrow('not found for this task')
+    await runtime.store.setController(session.id, 'terminal')
+    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'medium')).rejects.toThrow('controlled by terminal')
+    await runtime.store.setController(session.id, 'acorn')
+    await runtime.patchSession(session.id, { archived: true })
+    await expect(bound.setConfig(seed.taskId, session.id, 'reasoning', 'medium')).rejects.toThrow('Archived')
+    expect(effort((await runtime.store.requireSession(session.id)).config)).toBe('high')
   })
 
   it('starts a new session on the pinned defaults, and does not treat that as a change to carry forward', async () => {

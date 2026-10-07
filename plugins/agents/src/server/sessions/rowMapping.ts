@@ -11,7 +11,7 @@ import type {
   AgentUsage,
 } from '../../contract/wire.ts'
 
-const parseJson = <T>(value: string | null, fallback: T): T => {
+export const parseJson = <T>(value: string | null, fallback: T): T => {
   if (value == null) return fallback
   try {
     return JSON.parse(value) as T

@@ -1,8 +1,14 @@
 import { randomUUID } from 'node:crypto'
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { makeTestCoreServices, makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { AgentProviderDescriptor } from '../../contract/wire.ts'
-import { MAX_REVIEW_FINAL_TEXT_BYTES, MAX_REVIEW_USER_TEXT_BYTES, type AgentLifecycleFrame } from '../../contract/lifecycle'
+import type { AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import {
+  MAX_REVIEW_FINAL_TEXT_BYTES,
+  MAX_REVIEW_USER_TEXT_BYTES,
+  type AgentActivityEvent,
+  type AgentActivityState,
+  type AgentLifecycleFrame,
+} from '../../contract/lifecycle'
 import { AgentStore } from './store'
 
 const provider: AgentProviderDescriptor = {
@@ -370,6 +376,75 @@ describe('managed-agent lifecycle events and read models', () => {
     ])
     expect(requests[0]).not.toHaveProperty('resolution')
     expect(await store.lifecycleRequests({ taskId: otherTaskId })).toEqual([])
+  })
+
+  // What a consumer does with the frames: each one replaces its item and moves it to the end.
+  const applyActivity = (state: AgentActivityState, frame: AgentActivityEvent): AgentActivityState => {
+    if (frame.kind === 'usage') return { ...state, usage: frame.usage }
+    if (frame.kind === 'tool') {
+      return { ...state, tools: [...state.tools.filter((tool) => tool.toolCallId !== frame.tool.toolCallId), frame.tool] }
+    }
+    return { ...state, subagents: [...state.subagents.filter((item) => item.subagentId !== frame.subagent.subagentId), frame.subagent] }
+  }
+
+  it('publishes tool, subagent, and context edges that rebuild to the same state, with no command or output', async () => {
+    const session = await createSession()
+    const turn = (await store.enqueueTurn(session.id, { input: [{ type: 'text', text: 'go' }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID() })).turn
+    const first: AgentNormalizedEvent[] = [
+      { type: 'usage', usage: { contextUsed: 1_000, contextSize: 200_000, cost: { amount: 0.01, currency: 'USD' } } },
+      { type: 'tool', tool: { id: 'bash-1', title: 'rm -rf /tmp/secret-dir', kind: 'execute', status: 'pending', input: 'rm -rf /tmp/secret-dir' } },
+      { type: 'tool', tool: { id: 'bash-1', title: '', output: 'SECRET OUTPUT', outputAppend: true } },
+      { type: 'usage', usage: { contextUsed: 1_000, contextSize: 200_000 } },
+      { type: 'subagent', subagent: { id: 'agent-1', title: 'Explore the repo', status: 'running', role: 'Explore' } },
+    ]
+    const second: AgentNormalizedEvent[] = [
+      { type: 'tool', tool: { id: 'read-1', title: 'Read src/a.ts', kind: 'read', status: 'running', paths: ['/w/src/a.ts'], subagentId: 'agent-1' } },
+      { type: 'tool', tool: { id: 'read-1', title: '', status: 'completed', output: 'file body' } },
+      { type: 'tool', tool: { id: 'bash-1', title: '', status: 'completed', output: 'more SECRET OUTPUT' } },
+      { type: 'subagent', subagent: { id: 'agent-1', status: 'completed' } },
+      { type: 'usage', usage: { contextUsed: 5_000 } },
+      { type: 'assistant_message', text: 'private reply' },
+    ]
+    frames = []
+    const activityFrames = () => frames.flatMap((frame) => frame.channel === 'plugin:agents:activity' ? [frame] : [])
+    // Frames go out once the projection module has loaded, after the commit.
+    for (const event of first) await store.recordEvent(session.id, turn.id, event)
+    await vi.waitFor(() => expect(activityFrames()).toHaveLength(3))
+    const midway = await store.lifecycleActivity({ taskId, sessionId: session.id })
+    for (const event of second) await store.recordEvent(session.id, turn.id, event)
+    await vi.waitFor(() => expect(activityFrames()).toHaveLength(8))
+
+    const activity = activityFrames()
+    expect(activity.map((frame) => frame.kind === 'tool'
+      ? `tool ${frame.tool.toolCallId} ${frame.tool.status}`
+      : frame.kind === 'subagent' ? `subagent ${frame.subagent.subagentId} ${frame.subagent.status}` : `usage ${frame.usage.contextUsed}`)).toEqual([
+      'usage 1000', 'tool bash-1 pending', 'subagent agent-1 running',
+      'tool read-1 running', 'tool read-1 completed', 'tool bash-1 completed', 'subagent agent-1 completed', 'usage 5000',
+    ])
+    const sent = JSON.stringify(activity)
+    for (const secret of ['rm -rf', 'secret-dir', 'SECRET OUTPUT', 'file body', 'private reply']) expect(sent).not.toContain(secret)
+    expect(activity[1]).toMatchObject({ kind: 'tool', tool: { title: 'Command', kind: 'execute', turnId: turn.id } })
+    expect(activity.at(-1)).toMatchObject({ kind: 'usage', usage: { contextUsed: 5_000, contextSize: 200_000 } })
+
+    // A view opened midway reads the first half, then applies the frames sent after it.
+    const live = activity.slice(3).reduce(
+      (state, { channel: _channel, ...frame }) => applyActivity(state, frame),
+      midway!,
+    )
+    const rebuilt = await store.lifecycleActivity({ taskId, sessionId: session.id })
+    // The same items by id. Order is a display hint: an output chunk moves a call's stored row unannounced.
+    const keyed = (state: AgentActivityState) => ({ ...state, tools: state.tools.toSorted((a, b) => a.toolCallId.localeCompare(b.toolCallId)) })
+    expect(keyed(rebuilt!)).toEqual(keyed(live))
+    expect(rebuilt!.tools.map((tool) => [tool.toolCallId, tool.status, tool.subagentId])).toEqual([
+      ['read-1', 'completed', 'agent-1'],
+      ['bash-1', 'completed', null],
+    ])
+    expect(rebuilt!.subagents).toEqual([{ subagentId: 'agent-1', turnId: turn.id, title: 'Explore the repo', role: 'Explore', status: 'completed', background: false }])
+
+    // After a restart, the read comes from the ledger alone.
+    const restarted = new AgentStore(pluginDb.db, core, () => undefined)
+    expect(await restarted.lifecycleActivity({ taskId, sessionId: session.id })).toEqual(rebuilt)
+    expect(await store.lifecycleActivity({ taskId: otherTaskId, sessionId: session.id })).toBeNull()
   })
 
   it('announces roster creation, title and archive edges, and deletion after the row is gone', async () => {

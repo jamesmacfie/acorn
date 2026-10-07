@@ -41,6 +41,11 @@ real constants.
 A capability a manifest didn't grant reads as absent through `get`, the same as a disabled provider.
 `require` throws.
 
+A provider that has to know which plugin called sets a function under `BIND_CAPABILITY_CALLER` from
+`@acorn/protocol/plugin/ids.ts`. A loaded plugin's `get` then returns that function's result for the
+plugin's own id, so the caller never names itself. `agents.sessionControl` uses it to name the plugin
+that changed a session's model ([session control](../managed-agents/session-control.md#who-called)).
+
 `CapabilityCatalogue` in `acorn-plugin-types` lists every id the first-party plugins publish, with its
 signature. Most ids are declared in `plugins/*/src/contract/` modules a loaded plugin can't import, so
 the catalogue is how an outside author learns what exists.

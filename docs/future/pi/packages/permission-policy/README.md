@@ -1,8 +1,8 @@
 # Permission policy
 
-A loaded acorn plugin with two hard-coded rules on `agents:before-permission`
+A loaded acorn plugin with hard-coded rules on `agents:before-permission`
 ([permission policy](../../../../managed-agents/permission-policy.md)). It refuses a harness
-permission request when the command line is:
+permission request when the command line is one of two things, and warns about three others:
 
 - A force-push: `git push` with `--force`, `-f` or a short-flag bundle holding `f`,
   `--force-with-lease`, `--force-if-includes`, or a `+refspec`. Git's own options before `push`,
@@ -14,6 +14,21 @@ permission request when the command line is:
 The command is split into simple commands at `;`, `&&`, `||`, `|`, and newlines, honouring single
 and double quotes. A leading `sudo` and `NAME=value` assignments are skipped. Relative operands
 resolve against `root`, so a `cd` earlier in the same line isn't followed.
+
+## Warnings
+
+Three more rules only warn. The request goes to the person as usual, and the card waiting on them shows
+why it looks risky, through `agents:request-card`
+([remote points](../../../../plugins/remote-points.md)). The card's buttons stay the host's. A warning
+covers:
+
+- A push: `git push` in any form the force rule doesn't refuse.
+- A recursive deletion the deletion rule lets through, such as `rm -rf build` inside the root.
+- A download run by a shell: `curl` or `wget` piped into `sh`, `bash`, or `zsh`.
+
+The veto route keeps each warning in memory by session and request ID, up to the newest 200, and the
+card's tree (`client.js`) reads it from `GET /v1/p/acorn-permission-policy/warning`. A Node restart
+forgets them, which loses nothing, because it also ends the harness process that asked.
 
 These rules are examples, not containment. They see only the requests a harness asks about, only a
 command the harness sent as a string, and nothing a script does once it runs. A request with no

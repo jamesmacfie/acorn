@@ -1,10 +1,12 @@
 import type {
   AgentAttentionReason,
+  AgentConfigOption,
   AgentRequestBlocked,
   AgentRequestKind,
   AgentRequestStatus,
   AgentRuntimeState,
   AgentSessionKind,
+  AgentSubagentStatus,
   AgentTurnSource,
   AgentTurnStatus,
 } from './wire.ts'
@@ -39,10 +41,45 @@ export type AgentSessionsChangedEvent = {
   renameSource?: SessionRenameSource
 }
 
+/** One tool call's current state. `title` is what the transcript card shows, except a command's,
+ *  which is always `Command` so a command line never leaves. No input, output, or reasoning. */
+export type AgentActivityTool = {
+  toolCallId: string
+  turnId: string | null
+  kind: string | null
+  title: string
+  status: 'pending' | 'running' | 'completed' | 'failed'
+  paths: string[]
+  /** The subagent that ran the call, when the harness says. Its parent is that subagent, else the session. */
+  subagentId: string | null
+}
+
+/** One subagent's current state. Its parent is the session: harnesses report one level of subagents. */
+export type AgentActivitySubagent = {
+  subagentId: string
+  turnId: string | null
+  title: string
+  role: string | null
+  status: AgentSubagentStatus
+  background: boolean
+}
+
+/** The latest context fill the harness reported. Either may be absent until it reports one. */
+export type AgentActivityUsage = { contextUsed: number | null; contextSize: number | null }
+
+/** One item's whole current state, keyed by its id, so a later frame for the same item replaces it.
+ *  Sent when a tool call or subagent starts or finishes, and when the context fill changes. */
+export type AgentActivityEvent = { taskId: string; sessionId: string } & (
+  | { kind: 'tool'; tool: AgentActivityTool }
+  | { kind: 'subagent'; subagent: AgentActivitySubagent }
+  | { kind: 'usage'; usage: AgentActivityUsage }
+)
+
 export type AgentLifecycleFrame =
   | ({ channel: 'plugin:agents:turn-changed' } & AgentTurnChangedEvent)
   | ({ channel: 'plugin:agents:request-changed' } & AgentRequestChangedEvent)
   | ({ channel: 'plugin:agents:sessions-changed' } & AgentSessionsChangedEvent)
+  | ({ channel: 'plugin:agents:activity' } & AgentActivityEvent)
 
 export type AgentLifecyclePublisher = (frame: AgentLifecycleFrame) => void
 
@@ -75,6 +112,9 @@ export type AgentSessionRosterEntry = Omit<AgentSessionsChangedEvent, 'changes' 
   title: string
   runtimeState: AgentRuntimeState
   attention: AgentAttentionReason
+  /** The options the harness advertised and their current values: what `agents.sessionControl`
+   *  `setConfig` accepts. Empty until the harness reports them. */
+  configOptions: AgentConfigOption[]
   createdAt: number
   updatedAt: number
 }
@@ -133,6 +173,26 @@ export type AgentReviewInputCapability = {
   read(ref: { taskId: string; sessionId: string; turnId: string }): Promise<AgentReviewInputResult>
 }
 
+/** One session's activity, rebuilt from the ledger: the same items the frames carry, keyed by id, at
+ *  most `MAX_ACTIVITY_TOOLS` tools and `MAX_ACTIVITY_SUBAGENTS` subagents, the newest kept. Tools are in
+ *  order of their last stored update, which an output chunk can move without sending a frame. */
+export type AgentActivityState = {
+  taskId: string
+  sessionId: string
+  tools: AgentActivityTool[]
+  subagents: AgentActivitySubagent[]
+  usage: AgentActivityUsage
+}
+
+/** Rebuild one session's activity, so a view opened mid-session starts where the frames left off
+ *  (docs/managed-agents/session-events.md § Activity). `null` for a session outside the task. */
+export type AgentActivityCapability = {
+  read(ref: { taskId: string; sessionId: string }): Promise<AgentActivityState | null>
+}
+
+export const MAX_ACTIVITY_TOOLS = 50
+export const MAX_ACTIVITY_SUBAGENTS = 50
+
 export const MAX_REVIEW_USER_TEXT_BYTES = 16 * 1024
 export const MAX_REVIEW_FINAL_TEXT_BYTES = 32 * 1024
 
@@ -140,3 +200,4 @@ export const AGENTS_TURNS = capabilityId<AgentTurnsCapability>('agents.turns')
 export const AGENTS_REQUESTS = capabilityId<AgentRequestsCapability>('agents.requests')
 export const AGENTS_SESSIONS = capabilityId<AgentSessionsCapability>('agents.sessions')
 export const AGENTS_REVIEW_INPUT = capabilityId<AgentReviewInputCapability>('agents.reviewInput.v1')
+export const AGENTS_ACTIVITY = capabilityId<AgentActivityCapability>('agents.activity.v1')

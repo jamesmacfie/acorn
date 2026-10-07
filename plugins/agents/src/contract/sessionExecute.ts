@@ -43,9 +43,16 @@ export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promi
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')
 
-/** Task-checked cancellation for a managed session owned by another plugin's operation. */
+/** Task-checked control of a managed session another plugin didn't start
+ *  (docs/managed-agents/session-control.md). */
 export type AgentSessionControl = {
+  /** Stop the session's running turn. */
   cancel(taskId: string, sessionId: string): Promise<void>
+  /** Pick one of the values the harness advertised for one of its options, such as the model or the
+   *  reasoning effort, the same way the composer's picker does. Throws for an archived or
+   *  terminal-held session, an option or value the harness didn't advertise, or another task's session.
+   *  The transcript names the plugin that made the change. */
+  setConfig(taskId: string, sessionId: string, optionId: string, value: string): Promise<void>
 }
 
 export const AGENTS_SESSION_CONTROL = capabilityId<AgentSessionControl>('agents.sessionControl')

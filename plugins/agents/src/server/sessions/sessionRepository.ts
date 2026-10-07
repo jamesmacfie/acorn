@@ -100,6 +100,7 @@ export class AgentSessionRepository {
           configJson: schema.agentSessions.configJson,
           subagentsJson: schema.agentSessions.subagentsJson,
           kind: schema.agentSessions.kind,
+          taskId: schema.agentSessions.taskId,
         })
         .from(schema.agentSessions)
         .where(eq(schema.agentSessions.id, sessionId))
@@ -129,13 +130,11 @@ export class AgentSessionRepository {
       // backgrounded row honest: its own updates stop at the launch receipt, so without this the only
       // clock the roster has is one that stopped ticking minutes ago.
       const touchedId = event.type === 'subagent' ? undefined : eventSubagentId(event)
+      const roster = event.type === 'subagent'
+        ? foldSubagentRoster(parseSubagents(current.subagentsJson), event.subagent, turnId, timestamp)
+        : []
       const subagentsJson = event.type === 'subagent'
-        ? JSON.stringify(foldSubagentRoster(
-            parseSubagents(current.subagentsJson),
-            event.subagent,
-            turnId,
-            timestamp,
-          ))
+        ? JSON.stringify(roster)
         : touchedId
           ? jsonOrUndefined(touchSubagentRoster(parseSubagents(current.subagentsJson), touchedId, timestamp))
           : undefined
@@ -183,6 +182,9 @@ export class AgentSessionRepository {
         // frame stays the size of the change. The stored row folds to the same card (./ledgerFold.ts).
         row: { ...values, eventJson: JSON.stringify(event), turnId: values.turnId ?? null, searchText: values.searchText ?? null },
         fold,
+        stored,
+        roster,
+        taskId: current.taskId,
         streamClosed: stream.closed,
         ...changed,
       }
@@ -193,6 +195,7 @@ export class AgentSessionRepository {
     if (committed.requestChanged && (event.type === 'request' || event.type === 'request_resolved')) {
       await this.lifecycle.announceRequest(sessionId, event.requestId)
     }
+    this.lifecycle.announceActivity(committed.taskId, sessionId, turnId, event, committed.stored, committed.roster)
     return mapAgentEvent(committed.row)
   }
 
@@ -721,6 +724,10 @@ export class AgentSessionRepository {
 
   lifecycleReviewInput(ref: { taskId: string; sessionId: string; turnId: string }) {
     return this.lifecycle.reviewInput(ref)
+  }
+
+  lifecycleActivity(ref: { taskId: string; sessionId: string }) {
+    return this.lifecycle.activity(ref)
   }
 
 }

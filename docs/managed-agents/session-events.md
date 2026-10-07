@@ -26,7 +26,8 @@ HTTP wait forwards its request's abort signal without cancelling the session's w
 
 ## Cross-plugin lifecycle
 
-Three plugin events describe the durable model:
+Three plugin events describe the durable model, and a fourth describes what a session is doing
+([activity](#activity)):
 
 - `plugin:agents:turn-changed` carries the task, session, turn, source, status, and attempt after a
   turn is queued, dispatched, retried, settled, or repaired at restart.
@@ -35,12 +36,57 @@ Three plugin events describe the durable model:
 - `plugin:agents:sessions-changed` carries task and session IDs, presence and archive state, and a
   `changes` array of `created`, `renamed`, `archived`, `restored`, or `deleted`. A rename also
   carries `renameSource`, `generated` or `user`. Titles stay out of the payload.
+- `plugin:agents:activity` carries one tool call's, subagent's, or context count's current state.
 
 The store and repository send these after the commit, not each route on its own. Node consumers
 rebuild state through the task-scoped `agents.turns`, `agents.requests`, and `agents.sessions`
 capabilities. Turn reads leave out the prompt, the effective policy, errors, and transcript content,
-and request resolution stays private to the runtime. Core's `agent-session:changed` is the generic
+and request resolution stays private to the runtime. A roster entry also carries the session's
+advertised `configOptions`, which is what [session control](./session-control.md) accepts. Core's `agent-session:changed` is the generic
 completion and attention event, and `agent:*` is the transcript stream.
+
+## Activity
+
+`plugin:agents:activity` and `agents.activity.v1` let a plugin draw a live view of a session on any
+harness, from the ledger every driver already fills. The types are in
+`plugins/agents/src/contract/lifecycle.ts`, and `server/sessions/activity.ts` is the one projection
+the frames and the read share.
+
+A frame names its task and session and carries one item's whole current state, keyed by its id, so a
+later frame for the same item replaces it:
+
+- `tool`: `toolCallId`, `turnId`, `kind`, `title`, `status`, up to 8 `paths`, and the `subagentId` that
+  ran it. Sent when an update reports a status, so a call sends its start and its finish, and an output
+  chunk sends nothing.
+- `subagent`: `subagentId`, `turnId`, `title`, `role`, `status`, and `background`. Sent the same way.
+  Its parent is the session: harnesses report one level of subagents, and a tool's `subagentId` hangs
+  it under one.
+- `usage`: `contextUsed` and `contextSize`, merged with what was last sent. Sent only when either
+  changes, because harnesses report usage several times a turn.
+
+Tool input and output, message text, reasoning, and command lines stay out. The title is what the
+transcript card shows, except a command's: Codex and Claude title a command with its command line, so a
+call of kind `execute` is always titled `Command`. Titles are cut at 200 characters. Command lines stay
+with [the permission hook](./permission-policy.md), where the grant is explicit. No harness reports
+rate-limit percentages per session. Plan usage is account-wide, on the
+[providers](./providers.md) page.
+
+The repository publishes a frame after the event's transaction commits, beside the turn and request
+announcements. `read({ taskId, sessionId })` rebuilds the same items from the ledger: each tool call's
+newest stored row, which holds its whole folded state, the session row's subagent roster, and the
+newest context counts. It keeps the 50 newest tools and subagents, and answers `null` for a session
+outside the task. A consumer that reads once and then applies each frame, replacing the item by its
+id, holds the same items the read would return. That holds after a Node restart, because the read
+comes from the ledger alone. `lifecycle.test.ts` checks it. Order is a display hint, not part of the
+state: the read lists tools by their last stored update, and an output chunk moves that without a
+frame.
+
+| Harness | Tools | Subagents | Context |
+| --- | --- | --- | --- |
+| Claude Code | Every call, kind from ACP | `Agent` calls, attributed tool calls | `contextUsed`, `contextSize` |
+| Codex | Commands, file changes, MCP and dynamic tools, web searches | Child threads, attributed tool calls | Last request's tokens and the context window |
+| DeepSeek | Every call as kind `other`, titled by tool name | None | `contextUsed`, `contextSize` |
+| `omp` | Every call through ACP | None in ACP mode | What its `usage_update` carries |
 
 ## Review input
 

@@ -2,10 +2,11 @@
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "acorn-permission-policy",
   "name": "Permission policy",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "baseline": "acorn-1",
   "apiVersion": "3",
   "node": "./node.js",
+  "client": "./client.js",
   "migrations": "./migrations",
   "permissions": {
     "api": [],
@@ -25,6 +26,12 @@
         "id": "explanations",
         "point": "agents:session-messenger",
         "label": "explain a refused permission to the agent"
+      },
+      {
+        "id": "warnings",
+        "point": "agents:request-card",
+        "label": "request card",
+        "remote": "warning"
       }
     ],
     "commands": [

@@ -18,6 +18,7 @@ import { agentToolContributions } from '../agentTools/registry'
 import type { AppEnv } from '../middleware/auth'
 import { PLUGIN_NAMESPACE, pluginRouteContributions } from '../routes/registry'
 import { CapabilityRegistry, capabilityId } from '../pluginHost/capabilities'
+import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
 import { dispatchPluginFetch } from '../pluginHost/fetchRoute'
 import { clearRegistrations, initPlugins, type PluginReloadRequest } from '../pluginHost/host'
 import type { CompiledNodePluginContext, NodePlugin, PluginStorage } from '../pluginHost/types'
@@ -468,17 +469,25 @@ describe('a folder plugin’s granted model call through the loader and the host
     core.models = { ...models, forPlugin: (id) => pluginModelService(db.db, models, core.identity, id) }
     const review = { available: true, input: { userText: [{ text: 'é'.repeat(8_000), provenance: { kind: 'context', source: 'plugin:x', label: 'Issue' }, truncated: true }] } }
     const provided = options.capabilities.provide(capabilityId('agents.reviewInput.v1'), { read: async () => review })
+    // A caller-bound capability: the provider learns who called from the host, never from an argument.
+    const changes: string[] = []
+    const control = (caller: string) => ({ setConfig: async (_task: string, _session: string, option: string, value: string) => { changes.push(`${caller} ${option}=${value}`) } })
+    const controlled = options.capabilities.provide(capabilityId('agents.sessionControl'), {
+      ...control('unbound'),
+      [BIND_CAPABILITY_CALLER]: control,
+    })
     try {
       const source = join(root, 'source')
       mkdirSync(join(source, 'dist'), { recursive: true })
       writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
         id: 'models-fixture', name: 'Models fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
-        permissions: { node: { core: ['models', 'identity'], capabilities: ['agents.reviewInput.v1'], secrets: false, exec: false, net: [] } },
+        permissions: { node: { core: ['models', 'identity'], capabilities: ['agents.reviewInput.v1', 'agents.sessionControl'], secrets: false, exec: false, net: [] } },
       }))
       writeFileSync(join(source, 'dist', 'node.js'), `export default { name: "models-fixture", init(ctx) {
         ctx.routes.fetch(async (request) => {
           const body = await request.json()
           if (body.review) return Response.json(await ctx.capabilities.get("agents.reviewInput.v1").read({ taskId: "t", sessionId: "s", turnId: "u" }))
+          if (body.control) return Response.json(await ctx.capabilities.get("agents.sessionControl").setConfig("t", "s", "effort", "high") ?? null)
           const controller = new AbortController()
           if (body.abortAfterMs) setTimeout(() => controller.abort(), body.abortAfterMs)
           try {
@@ -515,9 +524,12 @@ describe('a folder plugin’s granted model call through the loader and the host
 
       // Bounds and provenance arrive as the provider shaped them.
       expect(await call({ review: true })).toEqual(review)
+      expect(await call({ control: true })).toBeNull()
+      expect(changes).toEqual(['models-fixture effort=high'])
       await host.dispose()
     } finally {
       provided.dispose()
+      controlled.dispose()
       clearRegistrations('models-fixture')
       db.cleanup()
       rmSync(root, { recursive: true, force: true })

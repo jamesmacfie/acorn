@@ -8,6 +8,7 @@ import { dataSourceFor } from '../core/data'
 import type { CapabilityId, CapabilityRegistry } from '../pluginHost/capabilities'
 import type { NodePermissions } from './manifest'
 import { MAX_PLUGIN_STATE_BYTES, pluginStateKey } from '@acorn/protocol/plugin/state.ts'
+import { BIND_CAPABILITY_CALLER } from '@acorn/protocol/plugin/ids.ts'
 import { connectionProviderRegistry } from '../integrations/connectionProviders/registry'
 import { SIMPLE_FACETS } from './coreFacets'
 export { NODE_CORE_FACETS } from './coreFacets'
@@ -139,6 +140,11 @@ export const HOST_OWNED_CAPABILITY_IDS: readonly string[] = ['agents.harnessRegi
 //
 // A throw, contained by the host like any other init failure, so the roster row says which id was
 // refused instead of the plugin half-starting.
+// A provider that has to know who called, such as `agents.sessionControl` naming the plugin that
+// changed a session's model, gets the caller's id from the host rather than from an argument.
+const boundToCaller = <T>(impl: T | undefined, pluginId: string): T | undefined =>
+  (impl as { [BIND_CAPABILITY_CALLER]?: (caller: string) => T } | undefined)?.[BIND_CAPABILITY_CALLER]?.(pluginId) ?? impl
+
 export function scopeCapabilities(
   registry: CapabilityRegistry,
   declared: readonly string[],
@@ -154,9 +160,9 @@ export function scopeCapabilities(
       }
       return registry.provide(id, impl)
     },
-    get: <T>(id: CapabilityId<T>) => (allowed.has(id) ? registry.get(id) : undefined),
+    get: <T>(id: CapabilityId<T>) => (allowed.has(id) ? boundToCaller(registry.get(id), pluginId) : undefined),
     require: <T>(id: CapabilityId<T>): T => {
-      const impl = allowed.has(id) ? registry.get(id) : undefined
+      const impl = allowed.has(id) ? boundToCaller(registry.get(id), pluginId) : undefined
       if (impl === undefined) throw new Error(`Required capability not provided: ${id}`)
       return impl
     },

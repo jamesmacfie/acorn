@@ -1,6 +1,8 @@
 import { createSignal, For, Show } from 'solid-js'
 import type { AgentRequest } from '../../contract/wire.ts'
+import { AGENT_REQUEST_CARD_POINT, type AgentRequestCardProps } from '@acorn/protocol/extensionPoints.ts'
 import { Alert, Button, Card, Checkbox, Field, Heading, Inline, Input, Select, Stack, Text } from '@acorn/plugin-api/ui'
+import { Slot } from '@acorn/plugin-api/ui/host'
 import { managedAgentApi } from './managedClient'
 import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
 
@@ -10,6 +12,7 @@ import { appApprovalOf, approvalScopeNote, approvalTarget } from './appApproval'
 // order. The task sidebar's "Needs you" list is how a reader reaches one in a session they are not on.
 export default function AgentRequestCard(props: {
   request: AgentRequest
+  taskId: string
   focused?: boolean
   onResolved?: () => void
 }) {
@@ -146,6 +149,21 @@ export default function AgentRequestCard(props: {
           </For>
         </Inline>
         <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
+        {/* Another plugin's note on this request, under the buttons. It gets the request's identity
+            and title, and no way to answer it. */}
+        <Show when={props.request.status === 'pending'}>
+          <Slot
+            point={AGENT_REQUEST_CARD_POINT}
+            taskId={props.taskId}
+            props={(): AgentRequestCardProps => ({
+              taskId: props.taskId,
+              sessionId: props.request.sessionId,
+              requestId: props.request.providerRequestId,
+              kind: props.request.kind,
+              title: props.request.title,
+            })}
+          />
+        </Show>
       </Stack>
     </Card>
   )

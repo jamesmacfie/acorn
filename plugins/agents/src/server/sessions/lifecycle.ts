@@ -1,8 +1,10 @@
 import { and, asc, eq, sql } from 'drizzle-orm'
-import type { PluginDatabase } from '@acorn/plugin-api/node'
+import { createLogger, describeError, type PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
-import type { AgentRequest, AgentRequestBlocked, AgentSession, AgentTurn } from '../../contract/wire.ts'
+import type { AgentConfigOption, AgentNormalizedEvent, AgentRequest, AgentRequestBlocked, AgentSession, AgentSubagent, AgentTurn } from '../../contract/wire.ts'
 import type {
+  AgentActivityState,
+  AgentActivityUsage,
   AgentLifecyclePublisher,
   AgentReviewInputResult,
   AgentRequestState,
@@ -13,12 +15,21 @@ import type {
 } from '../../contract/lifecycle'
 import { mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 
+const log = createLogger('agents:lifecycle', 'agents')
+
 /**
  * The one post-commit projection from managed-agent rows to the public lifecycle catalogue.
  * Persistence owners call the announce methods only after their transaction has committed; capability
  * readers use the same projections, so an event payload and a subsequent read cannot disagree.
  */
 export class AgentLifecycle {
+  // The context fill last sent per session, so a report that moves nothing sends nothing, and a report
+  // with one count keeps the other. Harnesses send usage several times a turn.
+  readonly #sentUsage = new Map<string, AgentActivityUsage>()
+  // Loaded on the first tool, subagent, or usage event, not at boot.
+  #activityLoad: Promise<typeof import('./activity')> | null = null
+  readonly #activityModule = () => this.#activityLoad ??= import('./activity')
+
   constructor(
     private readonly db: PluginDatabase,
     private readonly publish?: AgentLifecyclePublisher,
@@ -70,6 +81,38 @@ export class AgentLifecycle {
     })
   }
 
+  /** After the event's transaction commits. `stored` and `roster` are what it committed. */
+  announceActivity(
+    taskId: string,
+    sessionId: string,
+    turnId: string | null,
+    event: AgentNormalizedEvent,
+    stored: AgentNormalizedEvent,
+    roster: readonly AgentSubagent[],
+  ): void {
+    if (!this.publish || (event.type !== 'tool' && event.type !== 'subagent' && event.type !== 'usage')) return
+    const publish = this.publish
+    // One promise for every frame, so they go out in commit order.
+    this.#activityModule().then(({ activityItem }) => {
+      const item = activityItem(event, stored, roster, turnId)
+      if (!item) return
+      if (item.kind !== 'usage') return publish({ channel: 'plugin:agents:activity', taskId, sessionId, ...item })
+      const sent = this.#sentUsage.get(sessionId)
+      const usage = {
+        contextUsed: item.usage.contextUsed ?? sent?.contextUsed ?? null,
+        contextSize: item.usage.contextSize ?? sent?.contextSize ?? null,
+      }
+      if (sent?.contextUsed === usage.contextUsed && sent.contextSize === usage.contextSize) return
+      this.#sentUsage.set(sessionId, usage)
+      publish({ channel: 'plugin:agents:activity', taskId, sessionId, kind: 'usage', usage })
+    }).catch((error: unknown) => log.warn(`failed to announce activity: ${describeError(error).message}`))
+  }
+
+  /** The frames' items rebuilt from the ledger (./activity.ts). */
+  async activity(ref: { taskId: string; sessionId: string }): Promise<AgentActivityState | null> {
+    return (await this.#activityModule()).readActivity(this.db, ref)
+  }
+
   async turns(filter: { taskId: string; sessionId?: string }): Promise<AgentTurnState[]> {
     const rows = await this.db
       .select({ turn: schema.agentTurns })
@@ -115,6 +158,7 @@ export class AgentLifecycle {
         title: session.title,
         runtimeState: session.runtimeState,
         attention: session.attention,
+        configOptions: Array.isArray(session.config.configOptions) ? session.config.configOptions as AgentConfigOption[] : [],
         createdAt: session.createdAt,
         updatedAt: session.updatedAt,
       }

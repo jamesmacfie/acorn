@@ -546,7 +546,8 @@ export class ManagedAgentRuntime {
   async patchSession(
     sessionId: string,
     patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> },
-    options: { remember?: boolean } = {},
+    // `changedBy` names a plugin that changed an option, so the person can see who changed their model.
+    options: { remember?: boolean; changedBy?: string } = {},
   ): Promise<AgentSession> {
     const before = await this.store.requireSession(sessionId)
     let persistedPatch = patch
@@ -595,7 +596,7 @@ export class ManagedAgentRuntime {
           await this.engine.record(sessionId, null, {
             type: 'diagnostic',
             level: 'info',
-            message: `${option.label} changed to ${option.valueLabel}`,
+            message: `${option.label} changed to ${option.valueLabel}${options.changedBy ? ` by ${options.changedBy}` : ''}`,
           })
         }
         // Both user and automation changes pass here before updating saved defaults.

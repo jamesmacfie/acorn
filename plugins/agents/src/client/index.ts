@@ -65,7 +65,7 @@ export const agentsClientPlugin: ClientPlugin = {
       isStale,
       Card: InlineDiffCard,
     })
-    // The four places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative
+    // The places another plugin may come into this pane (docs/plugins/cooperative-extension-points.md § Cooperative
     // extension points). The tool card is keyed by the harness's own name for what a call did; the
     // attachment chip by the file's media type; the composer's action bar takes everyone who has
     // something to offer a draft, up to the owner's ceiling because it is the owner's bar.
@@ -86,6 +86,11 @@ export const agentsClientPlugin: ClientPlugin = {
     })
     ctx.extensionPoints.register({
       id: 'session-header', label: 'Agent session header', kind: 'remote', mode: 'stack', max: 2,
+    })
+    // A note on a request waiting for the person, such as a policy plugin's warning. Below the card's
+    // own buttons, which stay the owner's (./sessions/AgentRequestCard.tsx).
+    ctx.extensionPoints.register({
+      id: 'request-card', label: 'Agent request card', kind: 'remote', mode: 'stack', max: 2,
     })
     // The task row's agent state, in the rail's top-right corner (railMarkerContribution.ts). The host
     // owns the corner and the collision rules; this plugin only says what is true.

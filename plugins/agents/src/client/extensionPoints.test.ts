@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   AGENT_ATTACHMENT_POINT,
   AGENT_COMPOSER_ACTIONS_POINT,
+  AGENT_REQUEST_CARD_POINT,
   AGENT_TOOL_CARD_POINT,
 } from '@acorn/protocol/extensionPoints.ts'
 import { agentPaneContribution, AGENT_PANE_ID } from './paneContribution'
@@ -15,10 +16,11 @@ describe('the points the agents pane opens', () => {
     expect(AGENT_TOOL_CARD_POINT).toBe('agents:tool-card')
     expect(AGENT_ATTACHMENT_POINT).toBe('agents:attachment')
     expect(AGENT_COMPOSER_ACTIONS_POINT).toBe('agents:composer-actions')
+    expect(AGENT_REQUEST_CARD_POINT).toBe('agents:request-card')
   })
 
   it('names the pane the same way the collection and the notice handler do', () => {
-    for (const point of [AGENT_TOOL_CARD_POINT, AGENT_ATTACHMENT_POINT, AGENT_COMPOSER_ACTIONS_POINT]) {
+    for (const point of [AGENT_TOOL_CARD_POINT, AGENT_ATTACHMENT_POINT, AGENT_COMPOSER_ACTIONS_POINT, AGENT_REQUEST_CARD_POINT]) {
       expect(point.split(':')[0]).toBe(AGENT_PANE_ID)
     }
   })

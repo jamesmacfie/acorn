@@ -9,6 +9,11 @@ export type CapabilityId<T> = string & { readonly __signature?: (value: T) => vo
 
 export const capabilityId = <T>(id: string): CapabilityId<T> => id as CapabilityId<T>
 
+/** Set on a capability that has to know which plugin called it. The host hands each loaded plugin
+ *  `value[BIND_CAPABILITY_CALLER](pluginId)` instead of the value, so the caller never names itself.
+ *  A compiled plugin gets the value unbound. Registered with `Symbol.for`, so the key needs no import edge. */
+export const BIND_CAPABILITY_CALLER: unique symbol = Symbol.for('acorn.capability.bindCaller')
+
 // A point id that remembers what its entries are. Same phantom-brand trick as CapabilityId, for the
 // same reason: two packages agree on a type without an import edge between their implementations.
 export type ExtensionPointId<T> = string & { readonly __entry?: (value: T) => void }
