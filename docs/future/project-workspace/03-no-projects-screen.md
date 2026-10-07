@@ -12,19 +12,29 @@ Status: implemented on `phase-03-no-projects-screen`.
 - Settings Overview and the empty screen share folder, absolute-path, and importer controls. Both
   omit `workspaceId`, leaving off-mode pairing and grouped Default selection to the Node. Local
   folder picks are checked against the active Node. Remote Nodes use an absolute path on the Node;
-  picker-based importer actions are hidden there. Import completion uses reported
-  project IDs against the refreshed list and opens one actual result on the default source.
+  every importer stays listed, while GitHub refuses its picker action for a remote Node. Import
+  completion uses reported project IDs against the refreshed list and opens one actual result on
+  the default source. The app owns the navigation callback across an empty-to-nonempty query
+  transition. It discards late completions after a Node switch, unrelated navigation, Settings
+  opening, or app disposal.
 - Focused client-core tests for the gate, shared controls, and Settings passed (seven tests);
   onboarding tests passed (16), scoped TypeScript checks for client-core, desktop, and onboarding
   passed, changed-source oxlint passed, and architecture checks passed (87). The stock service build
   stayed within its size limit during desktop staging. The focused desktop plugin-disable suite
   still reports 11 contribution-list expectation failures; this phase did not establish their
-  baseline or change those lists.
+  baseline or change those lists. The follow-up passed six real-query add lifecycle tests, two gate
+  tests, two Settings consumer tests, TypeScript checks for client-core, desktop, plugin-api, and
+  GitHub, changed-source oxlint, and the 87 architecture checks. The full repository gate remains
+  for the coordinator after all phases.
 - Isolated `--vite` desktop sessions in both modes showed the prompt after deleting the seeded last
   project and closing onboarding. Screenshots were inspected and sessions stopped. A third launch
   with the onboarding contribution temporarily omitted showed the prompt directly; the temporary
-  roster edit was restored. The driver cannot operate a native folder dialog, so the folder write
-  and returned-project callback are covered by component tests rather than a desktop click-through.
+  roster edit was restored. In a further isolated `--vite` session, a temporary client capability
+  fixture exposed the absolute-path form on the local test Node. Submitting a disposable directory
+  through that form created a project and navigated to its returned project URL; the fixture was
+  restored. The driver cannot operate a native folder dialog. Real TanStack query tests exercise
+  folder and importer completion after refetch or event cache updates unmount the empty screen,
+  and late completions after Node switches or unrelated navigation.
 - Later phases should keep the visibility signal owned by core, use the shared add controls when
   offering project creation, and preserve the undefined loading state of `createWorkspacesMode`.
 

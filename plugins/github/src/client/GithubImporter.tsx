@@ -1,7 +1,7 @@
 import { createSignal, For, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  canPickFolder, clientEvents, integrationsOptions, pickFolder, type ProjectImporterProps,
+  activeNodeId, canAddProjectFromFolder, canPickFolder, clientEvents, integrationsOptions, pickFolder, type ProjectImporterProps,
   projectsKey, projectsOptions, workspacesKey, writeJson,
 } from '@acorn/plugin-api/client'
 import { Alert, Button, Card, EmptyState, Heading, Inline, SettingRow, Stack, Text } from '@acorn/plugin-api/ui'
@@ -44,10 +44,19 @@ export default function GithubImporter(props: ProjectImporterProps) {
   const importOne = async (repo: Repo, action: GithubImportAction) => {
     if (running()) return
     setError('')
+    if (!canAddProjectFromFolder()) {
+      setError('Choose the local Node to import with a folder picker.')
+      return
+    }
+    const nodeId = activeNodeId()
     // Ask for the folder before anything is written, so cancelling the dialog cancels the import
     // rather than leaving a half-made project behind.
     const path = await pickFolder()
     if (!path) return
+    if (activeNodeId() !== nodeId || !canAddProjectFromFolder()) {
+      setError('The active Node changed. Choose the folder again.')
+      return
+    }
     const item: GithubImportItem = action === 'map'
       ? { repoId: repo.id, action, path }
       : { repoId: repo.id, action, parentDir: path }
@@ -100,8 +109,8 @@ export default function GithubImporter(props: ProjectImporterProps) {
           {(login) => <Text emphasis="muted">Connected as @{login()}.</Text>}
         </Show>
         <Show
-          when={canPickFolder()}
-          fallback={<Text emphasis="muted">To choose a folder, use the desktop app.</Text>}
+          when={canAddProjectFromFolder()}
+          fallback={<Text emphasis="muted">{canPickFolder() ? 'Choose the local Node to import from GitHub.' : 'To choose a folder, use the desktop app.'}</Text>}
         >
           <Show when={!repos.isLoading} fallback={<EmptyState align="start" size="sm" busy>Loading GitHub repositories…</EmptyState>}>
             <Show

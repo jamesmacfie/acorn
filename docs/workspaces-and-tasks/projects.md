@@ -23,8 +23,12 @@ under the topbar. Settings remains available. This screen and Settings → Overv
 folder and importer controls. They omit `workspaceId` in both modes, so the Node applies its mode
 rule. After an add from the empty screen, the desktop opens the returned project ID. An importer
 reports its project IDs to the host; the host selects a reported ID present in the refreshed list.
+The desktop keeps the pending navigation alive if that refresh removes the empty screen, and drops
+it if the active Node or route changes before completion.
 For a remote Node, enter an absolute folder path on that Node. The native folder picker selects a
-path on the desktop machine and is unavailable for remote project creation.
+path on the desktop machine and is unavailable for remote project creation. Importer contributions
+remain listed; the GitHub importer refuses its picker action for a remote Node, because that action
+would send a desktop path to the Node.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an

@@ -9,7 +9,7 @@ import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsO
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createProjectAddNavigation, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -294,6 +294,12 @@ export default function App() {
     if (source) setSelectedSource(source)
     navigate(projectPath(id))
   }
+  const beginProjectAdd = createProjectAddNavigation({
+    nodeId: activeNodeId,
+    pathname: () => location.pathname,
+    settingsOpen: () => !!settingsRequest(),
+    openProject: openAddedProject,
+  })
   const railCollapsed = () => prefs.data?.[PrefKeys.leftCollapsed] === 'true'
   const toggleRail = () => void savePref(queryClient, PrefKeys.leftCollapsed, String(!railCollapsed()))
 
@@ -563,7 +569,7 @@ export default function App() {
     <div class="shell-body">
     <Show when={!showNoProjects()}><TabRail /></Show>
     <div class="app">
-      <Show when={showNoProjects()}><NoProjects onProjectAdded={openAddedProject} /></Show>
+      <Show when={showNoProjects()}><NoProjects beginAdd={beginProjectAdd} /></Show>
       <Show when={!showNoProjects()}>
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >

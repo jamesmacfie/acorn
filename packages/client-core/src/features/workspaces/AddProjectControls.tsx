@@ -2,7 +2,7 @@ import { createEffect, createSignal, For, onCleanup, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useQueryClient } from '@tanstack/solid-query'
 import { projectsKey, tasksKey, workspacesKey, type Project } from '../../infra/queries'
-import { canPickFolder, pickFolder } from '../../infra/platform'
+import { pickFolder } from '../../infra/platform'
 import { activeNodeId } from '../../infra/node/activeNode'
 import { canAddProjectFromFolder } from './addProject'
 import { createProject } from './workspaceMutations'
@@ -12,7 +12,7 @@ import Icon from '../../kit/components/content/Icon'
 import './projects.css'
 
 /** Both Settings Overview and the empty Node use the same creation and import lifecycle. */
-export default function AddProjectControls(props: { onProjectAdded?: (id: string) => void }) {
+export default function AddProjectControls(props: { beginAdd?: () => (id: string) => void }) {
   const qc = useQueryClient()
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -44,17 +44,16 @@ export default function AddProjectControls(props: { onProjectAdded?: (id: string
     qc.invalidateQueries({ queryKey: tasksKey }),
   ])
 
-  async function addFolder(folder: string) {
-    const nodeId = node()
+  async function addFolder(folder: string, nodeId: string | null, complete?: (id: string) => void) {
     setBusy(true)
     setError('')
     try {
       const { project } = await createProject({ path: folder })
-      if (!mounted || node() !== nodeId) return
+      if (node() !== nodeId) return
       await refresh()
-      if (!mounted || node() !== nodeId) return
-      setPath('')
-      props.onProjectAdded?.(project.id)
+      if (node() !== nodeId) return
+      if (mounted) setPath('')
+      complete?.(project.id)
     } catch (cause) {
       if (mounted && node() === nodeId) setError(cause instanceof Error ? cause.message : "Couldn't add the folder.")
     } finally {
@@ -64,24 +63,24 @@ export default function AddProjectControls(props: { onProjectAdded?: (id: string
 
   async function chooseFolder() {
     const nodeId = node()
+    const complete = props.beginAdd?.()
     const folder = await pickFolder()
     if (!folder || !mounted) return
     if (node() !== nodeId) return
-    await addFolder(folder)
+    await addFolder(folder, nodeId, complete)
   }
 
-  async function imported(run: number, ids: readonly string[] = []) {
-    const nodeId = node()
-    if (run !== importerRun) return
-    setError('')
+  async function imported(run: number, nodeId: string | null, complete: ((id: string) => void) | undefined, ids: readonly string[] = []) {
+    if (run !== importerRun || node() !== nodeId) return
+    if (mounted) setError('')
     try {
       await refresh()
-      if (!mounted || node() !== nodeId || run !== importerRun) return
-      if (!props.onProjectAdded) return
+      if (node() !== nodeId || run !== importerRun) return
+      if (!complete) return
       const projects = qc.getQueryData<Project[]>(projectsKey) ?? []
       const selected = ids.find((id) => projects.some((project) => project.id === id))
-      if (selected) props.onProjectAdded(selected)
-      else setError('The importer did not report a project on this Node.')
+      if (selected) complete(selected)
+      else if (mounted) setError('The importer did not report a project on this Node.')
     } catch (cause) {
       if (mounted && node() === nodeId && run === importerRun) setError(cause instanceof Error ? cause.message : "Couldn't refresh projects.")
     }
@@ -96,23 +95,26 @@ export default function AddProjectControls(props: { onProjectAdded?: (id: string
         {/* The native picker returns a path on this client. For a remote Node, enter a path that
             exists on the Node instead; no client path crosses the API boundary. */}
         <Show when={!canAddProjectFromFolder()}>
-          <form class="project-add-path" onSubmit={(event) => { event.preventDefault(); if (path().trim()) void addFolder(path().trim()) }}>
+          <form class="project-add-path" onSubmit={(event) => {
+            event.preventDefault()
+            if (path().trim()) void addFolder(path().trim(), node(), props.beginAdd?.())
+          }}>
             <Input label="Folder path on this Node" value={path()} onInput={setPath} placeholder="/absolute/path/on/node" />
             <Button submit disabled={busy() || !path().trim()}>Add project</Button>
           </form>
         </Show>
-        <Show when={canAddProjectFromFolder() || !canPickFolder()}>
-          <For each={projectImporterContributions()}>
-            {(entry) => <Button disabled={busy()} onPress={() => { importerRun++; setActiveImporter(entry.id) }}><Icon name={entry.glyph} /> {entry.label}</Button>}
-          </For>
-        </Show>
+        <For each={projectImporterContributions()}>
+          {(entry) => <Button disabled={busy()} onPress={() => { importerRun++; setActiveImporter(entry.id) }}><Icon name={entry.glyph} /> {entry.label}</Button>}
+        </For>
       </div>
       <Show when={error()}><Alert>{error()}</Alert></Show>
       <Show keyed when={importer()}>
         {(entry) => {
           const run = importerRun
+          const nodeId = node()
+          const complete = props.beginAdd?.()
           return <section class="project-importer" aria-label={entry.label}>
-            <Dynamic component={entry.component} onClose={() => { importerRun++; setActiveImporter(null) }} onImported={(ids?: readonly string[]) => void imported(run, ids)} />
+            <Dynamic component={entry.component} onClose={() => { importerRun++; setActiveImporter(null) }} onImported={(ids?: readonly string[]) => void imported(run, nodeId, complete, ids)} />
           </section>
         }}
       </Show>
