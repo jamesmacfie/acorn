@@ -1,5 +1,33 @@
 # Phase 03: no-projects screen
 
+## Completion note — October 7, 2026
+
+Status: implemented on `phase-03-no-projects-screen`.
+
+- The desktop now replaces its rail and source body with a core **Add a project** screen after a
+  successful empty projects read, while keeping the topbar, Settings, and overlay host mounted. A
+  pending or failed read does not trigger it. The onboarding plugin publishes only its visible state
+  through a core-owned seam, which clears on unmount and connection loss. Node changes reset its
+  wizard latch.
+- Settings Overview and the empty screen share folder, absolute-path, and importer controls. Both
+  omit `workspaceId`, leaving off-mode pairing and grouped Default selection to the Node. Local
+  folder picks are checked against the active Node. Remote Nodes use an absolute path on the Node;
+  picker-based importer actions are hidden there. Import completion uses reported
+  project IDs against the refreshed list and opens one actual result on the default source.
+- Focused client-core tests for the gate, shared controls, and Settings passed (seven tests);
+  onboarding tests passed (16), scoped TypeScript checks for client-core, desktop, and onboarding
+  passed, changed-source oxlint passed, and architecture checks passed (87). The stock service build
+  stayed within its size limit during desktop staging. The focused desktop plugin-disable suite
+  still reports 11 contribution-list expectation failures; this phase did not establish their
+  baseline or change those lists.
+- Isolated `--vite` desktop sessions in both modes showed the prompt after deleting the seeded last
+  project and closing onboarding. Screenshots were inspected and sessions stopped. A third launch
+  with the onboarding contribution temporarily omitted showed the prompt directly; the temporary
+  roster edit was restored. The driver cannot operate a native folder dialog, so the folder write
+  and returned-project callback are covered by component tests rather than a desktop click-through.
+- Later phases should keep the visibility signal owned by core, use the shared add controls when
+  offering project creation, and preserve the undefined loading state of `createWorkspacesMode`.
+
 Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 01](./01-node-switch.md).
 Read the [plan](./README.md) first, especially [decision](./README.md#decisions) 6.
 

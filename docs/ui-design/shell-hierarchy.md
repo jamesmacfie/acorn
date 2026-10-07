@@ -49,6 +49,12 @@ off, the first picker is labeled **Project**, lists visible projects across the 
 is hidden is absent from the picker. The label follows the active Node while other Nodes may use a
 different mode.
 
+When the active Node has no projects, the main area shows **Add a project** after the project read
+finishes, unless the first-run wizard is visible. The rail and source view give way to that prompt;
+the topbar stays mounted for Node switching and Settings. A failed or unfinished project read does
+not claim the Node is empty. The optional onboarding plugin publishes its visible state through a
+core seam, so disabling it leaves the prompt available.
+
 ### Geometry
 
 The top bar spans the window, and the rails and panes start under its bottom border, so that border

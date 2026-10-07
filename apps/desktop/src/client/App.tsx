@@ -9,7 +9,7 @@ import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsO
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createWorkspacesMode, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -65,6 +65,7 @@ import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
 const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
+const NoProjects = lazy(() => import('@acorn/client-core/features/workspaces/NoProjects.tsx'))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -283,6 +284,16 @@ export default function App() {
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const tasks = createQuery(() => tasksOptions(nodeReady()))
   const workspaces = createQuery(() => workspacesOptions(nodeReady()))
+  const showNoProjects = () => noProjectsScreenVisible({
+    projectCount: projects.data?.length,
+    projectsError: projects.isError,
+    wizardVisible: onboardingWizardVisible(),
+  })
+  const openAddedProject = (id: string) => {
+    const source = defaultSourceId()
+    if (source) setSelectedSource(source)
+    navigate(projectPath(id))
+  }
   const railCollapsed = () => prefs.data?.[PrefKeys.leftCollapsed] === 'true'
   const toggleRail = () => void savePref(queryClient, PrefKeys.leftCollapsed, String(!railCollapsed()))
 
@@ -467,7 +478,8 @@ export default function App() {
   const rightSlotRef = mintSlotRef()
   const topbarProps = (): TopbarProps => {
     const active = activeNodeId()
-    const project = scopedProjects().find((candidate) => candidate.id === contextProjectId())
+    const empty = showNoProjects()
+    const project = empty ? undefined : scopedProjects().find((candidate) => candidate.id === contextProjectId())
     const breadcrumb = topbarBreadcrumb({
       task: inTaskView() ? activeTask() ?? null : null,
       params: { projectId: params.projectId, number: params.number },
@@ -479,13 +491,13 @@ export default function App() {
     })
     return {
       workspacesMode: workspaceMode() ?? null,
-      workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
+      workspace: !empty && activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
         id: entry.workspace.id, label: entry.workspace.name, nodeId: entry.nodeId,
         nodeLabel: entry.node.label, projectCount: entry.workspace.projects.length,
       })),
       project: project ? { id: project.id, label: project.name } : null,
-      projects: scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
+      projects: empty ? [] : scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
       projectPickerVisible: workspaceMode() === 'on' && showProjectPicker(),
       projectPickerDisabled: false,
       breadcrumb,
@@ -549,8 +561,10 @@ export default function App() {
         nestedSlots={[{ ref: rightSlotRef, render: () => <SlotHost slot="topbar.right" context={slotContext()} /> }]} />
     </header>
     <div class="shell-body">
-    <TabRail />
+    <Show when={!showNoProjects()}><TabRail /></Show>
     <div class="app">
+      <Show when={showNoProjects()}><NoProjects onProjectAdded={openAddedProject} /></Show>
+      <Show when={!showNoProjects()}>
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
       >
         <Match when={drawnSource()}>
@@ -571,6 +585,7 @@ export default function App() {
           </Show>
         </Match>
       </Switch>
+      </Show>
       {/* Settings and the panel studio cover the task, so the task's own chords stand down while either
           is open: a pane chord would act on a surface nobody can see, and could move focus into a
           terminal under the layer. */}

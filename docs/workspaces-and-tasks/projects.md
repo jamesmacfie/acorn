@@ -18,6 +18,14 @@ is named. With workspaces off, the Node creates a workspace named after each pro
 transaction and publishes `workspace:changed` after commit. An explicit workspace returns 409
 `workspaces_off`.
 
+When a Node has no projects and the first-run wizard is closed, the desktop shows **Add a project**
+under the topbar. Settings remains available. This screen and Settings → Overview share the same
+folder and importer controls. They omit `workspaceId` in both modes, so the Node applies its mode
+rule. After an add from the empty screen, the desktop opens the returned project ID. An importer
+reports its project IDs to the host; the host selects a reported ID present in the refreshed list.
+For a remote Node, enter an absolute folder path on that Node. The native folder picker selects a
+path on the desktop machine and is unavailable for remote project creation.
+
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an
 optional `.git` suffix. HTTPS and SSH URLs require a single slash after the host.

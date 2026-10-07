@@ -1,13 +1,11 @@
-import { createEffect, createMemo, createSignal, For, Show } from 'solid-js'
-import { Dynamic } from 'solid-js/web'
+import { createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { projectsKey, projectsOptions, tasksKey, tasksOptions, workspacesKey, workspacesOptions } from '../../infra/queries'
-import { createProject, createWorkspace, patchProject } from './workspaceMutations'
-import { canPickFolder, pickFolder } from '../../infra/platform'
-import { projectImporterContributions } from '../../host/registries/sources/projectImporters'
+import { createWorkspace, patchProject } from './workspaceMutations'
+import { pickFolder } from '../../infra/platform'
 import { projectSettingsTarget, workspaceSettingsTarget } from '../../host/registries/shell/settings'
 import { Alert, Button, Input } from '../../kit/components/primitives'
-import Icon from '../../kit/components/content/Icon'
+import AddProjectControls from './AddProjectControls'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { ProjectTable, type ProjectGroup } from './ProjectTable'
@@ -31,16 +29,6 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   const [newWorkspace, setNewWorkspace] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
-  const [activeImporter, setActiveImporter] = createSignal<string | null>(null)
-  const importer = () => {
-    const id = activeImporter()
-    return id ? projectImporterContributions().find((entry) => entry.id === id) : undefined
-  }
-  createEffect(() => {
-    if (!activeImporter() || importer()) return
-    setActiveImporter(null)
-    setError('That importer was turned off or removed.')
-  })
 
   const refresh = () => Promise.all([
     qc.invalidateQueries({ queryKey: projectsKey }),
@@ -82,12 +70,6 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
     }
   }
 
-  async function addFolder() {
-    const path = await pickFolder()
-    if (!path) return
-    await guard(() => createProject({ path }), "Couldn't add the folder.")
-  }
-
   async function mapFolder(id: string) {
     const path = await pickFolder()
     if (!path) return
@@ -108,37 +90,14 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
       help={mode() === 'on' ? 'A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub.' : 'Add a folder, or import repositories from GitHub.'}
       actions={
         <>
-          <Show when={canPickFolder()}>
-            <Button onPress={() => void addFolder()}>Add folder…</Button>
-          </Show>
-          <For each={projectImporterContributions()}>
-            {/* Through Icon, not raw text: an importer's glyph is an icon name like every other
-                registry's, so a Lucide name or a `brand:` mark both resolve here. */}
-            {(entry) => (
-              <Button onPress={() => setActiveImporter(entry.id)}>
-                <Icon name={entry.glyph} /> {entry.label}
-              </Button>
-            )}
-          </For>
           <Show when={mode() === 'on'}><Button onPress={() => setNewWorkspace('')}>New workspace</Button></Show>
         </>
       }
     >
       <Stack>
+        <AddProjectControls />
         <Show when={error()}><Alert>{error()}</Alert></Show>
         <Show when={projects.isError}><Alert>Couldn't load projects.</Alert></Show>
-
-        <Show when={importer()}>
-          {(entry) => (
-            <section class="project-importer" aria-label={entry().label}>
-              <Dynamic
-                component={entry().component}
-                onClose={() => setActiveImporter(null)}
-                onImported={() => void refresh()}
-              />
-            </section>
-          )}
-        </Show>
 
         {/* Revealed on demand rather than a form sitting permanently above the table, where it read as
             the primary action on a page whose primary action is adding a project. */}
