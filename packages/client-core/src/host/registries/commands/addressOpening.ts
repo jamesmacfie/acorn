@@ -15,6 +15,7 @@ import { buildLink, parseLink, type Address, type LinkRefusal } from './addresse
 export type AddressHost = {
   nodeId: string | null
   navigate(path: string): void
+  openProject(path: string, source: string | null): void
   openTask(taskId: string, path: string): boolean
   hasProject(projectId: string): boolean
 }
@@ -106,12 +107,10 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
       const surfaceSource = surface && sourceRegistry.entries().find((entry) =>
         entry.projectSurfaceId === surface.id && entry.when?.() !== false)?.id
       if (address.rest.length && !source && !surfaceSource) {
-        setSelectedSource(defaultSourceId() ?? null)
-        shell.navigate(base)
+        shell.openProject(base, defaultSourceId() ?? null)
         return refused(shownLink, 'Project page is unavailable; opened the project')
       }
-      setSelectedSource(source ?? surfaceSource ?? defaultSourceId() ?? null)
-      shell.navigate(path)
+      shell.openProject(path, source ?? surfaceSource ?? defaultSourceId() ?? null)
       break
     }
     case 'settings': {

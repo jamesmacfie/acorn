@@ -6,6 +6,7 @@ import { projectIdFromPath } from '../../host/registries/commands/corePaths'
 export type WorkspaceView = { source: string; path?: string } | { taskId: string }
 
 export type WorkspaceViewTransition =
+  | { kind: 'keep-project' }
   | { kind: 'keep-task'; task: Task }
   | { kind: 'restore-task'; task: Task }
   | { kind: 'restore-source'; source: string; path?: string }
@@ -17,6 +18,7 @@ type WorkspaceViewTransitionInput = {
   tasks: readonly Task[]
   defaultSource: string
   rememberedView?: WorkspaceView
+  explicitProjectPath?: string
 }
 
 const ownsProject = (workspace: Workspace, projectId: string): boolean =>
@@ -31,8 +33,12 @@ export const workspaceOwnsPath = (workspace: Workspace, path: string): boolean =
 // Plan what to show on entering a workspace, without touching signals or navigation. Task selection
 // changes its signals before the router updates, so the active task may already belong to the
 // destination. That is an intentional cross-workspace task jump and must win over remembered view
-// restoration. Membership checks also make stale memories self-healing after repo reassignment.
+// restoration. A linked project path similarly wins over the remembered view. Membership checks
+// also make stale memories self-healing after repo reassignment.
 export function planWorkspaceViewTransition(input: WorkspaceViewTransitionInput): WorkspaceViewTransition {
+  if (input.explicitProjectPath && workspaceOwnsPath(input.workspace, input.explicitProjectPath)) {
+    return { kind: 'keep-project' }
+  }
   const activeTask = input.activeTaskId
     ? input.tasks.find((task) => task.id === input.activeTaskId)
     : undefined

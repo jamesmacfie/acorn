@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const state = vi.hoisted(() => ({
   active: 'node-a' as string | null,
   navigated: [] as string[],
+  projectPaths: [] as string[],
   selected: [] as (string | null)[],
   notices: [] as string[],
   noticeRows: [] as string[],
@@ -57,6 +58,11 @@ function mount(nodeId: string) {
   const host = {
     nodeId,
     navigate: (path: string) => state.navigated.push(path),
+    openProject: (path: string, source: string | null) => {
+      state.projectPaths.push(path)
+      state.selected.push(source)
+      state.navigated.push(path)
+    },
     openTask: (_id: string, path: string) => { state.navigated.push(path); state.selected.push(null); return true },
     hasProject: (id: string) => id === 'project' || id === 'project-b',
   }
@@ -67,6 +73,7 @@ beforeEach(() => {
   for (const unmount of mounted.splice(0)) unmount()
   state.active = 'node-a'
   state.navigated = []
+  state.projectPaths = []
   state.selected = []
   state.notices = []
   state.noticeRows = []
@@ -123,7 +130,20 @@ describe('opening an Acorn address', () => {
     expect(state.selected).toContain('plugin-source')
     expect(await openLink('acorn://node-a/p/project-b')).toEqual({ kind: 'opened' })
     expect(state.navigated).toEqual(['/p/project/x/plugin/item', '/p/project-b'])
+    expect(state.projectPaths).toEqual(['/p/project/x/plugin/item', '/p/project-b'])
     expect(state.notices).toEqual([])
+  })
+
+  it('marks core, compiled, and loaded project routes as explicit project navigation', async () => {
+    mount('node-a')
+    for (const link of [
+      'acorn://node-a/p/project',
+      'acorn://node-a/p/project/pulls/42',
+      'acorn://node-a/p/project/x/plugin/item',
+    ]) expect(await openLink(link)).toEqual({ kind: 'opened' })
+    expect(state.projectPaths).toEqual([
+      '/p/project', '/p/project/pulls/42', '/p/project/x/plugin/item',
+    ])
   })
 
   it('reports refused, unpaired, missing, unclaimed, and new-task links without navigation', async () => {

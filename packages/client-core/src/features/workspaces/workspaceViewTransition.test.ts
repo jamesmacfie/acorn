@@ -34,6 +34,24 @@ const selectedRunnTask = task('selected-runn-task', 'project-runn', 'runn')
 const tasks = [acornTask, oldRunnTask, selectedRunnTask]
 
 describe('workspace view transitions', () => {
+  it.each([
+    '/p/project-runn',
+    '/p/project-runn/pulls/42',
+    '/p/project-runn/x/plugin/item',
+  ])('keeps an explicit project path %s over a remembered task or source', (path) => {
+    for (const rememberedView of [{ taskId: oldRunnTask.id }, { source: 'github', path: '/p/project-runn/pulls/old' }]) {
+      expect(planWorkspaceViewTransition({
+        workspace: runn,
+        selectedSource: 'plugin-source',
+        activeTaskId: acornTask.id,
+        tasks,
+        defaultSource: 'home',
+        rememberedView,
+        explicitProjectPath: path,
+      })).toEqual({ kind: 'keep-project' })
+    }
+  })
+
   it('keeps an explicit cross-workspace task jump instead of restoring an older task', () => {
     const transition = planWorkspaceViewTransition({
       workspace: runn,

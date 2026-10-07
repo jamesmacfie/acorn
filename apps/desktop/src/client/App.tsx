@@ -301,25 +301,6 @@ export default function App() {
     workspaces: () => workspaces.data,
   })
 
-  // Addresses may arrive while a Node switch is remounting this router. Register only after the
-  // restore and plugin pass have settled, so the dispatcher never navigates an outgoing shell.
-  createEffect(() => {
-    if (!startup.restored() || !clientPluginsReady()) return
-    const unregister = registerAddressHost({
-      nodeId: mountedNodeId,
-      navigate: (path) => navigate(path),
-      openTask: (taskId, path) => {
-        const task = tasks.data?.find((candidate) => candidate.id === taskId)
-        if (!task) return false
-        activateTaskSignals(task)
-        navigate(path)
-        return true
-      },
-      hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
-    })
-    onCleanup(unregister)
-  })
-
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params
   // (tasks/taskDeepLink.ts). The address a plugin pane could not previously be given.
   createTaskDeepLink({
@@ -368,6 +349,8 @@ export default function App() {
     if (on) emitBootSpans()
   })
 
+  let explicitProjectPath: string | undefined
+
   // Whatever source was selected has to still be on offer. A workspace switch can take one away:
   // a browse source only appears where its provider is connected and the workspace links one of its
   // projects, and neither is a fact about the source alone.
@@ -375,6 +358,9 @@ export default function App() {
     const current = selectedSource()
     const connected = integrations.data?.integrations
     if (!current || !connected) return
+    // The linked source may belong to the workspace we are entering, not the one still on screen.
+    const workspace = activeWorkspace()
+    if (explicitProjectPath && (!workspace || !workspaceOwnsPath(workspace, explicitProjectPath))) return
     if (!availableSources(connected, sourceScope()).some((source) => source.id === current)) {
       setSelectedSource(defaultSourceId() ?? null)
     }
@@ -403,6 +389,7 @@ export default function App() {
       tasks: tasks.data ?? [],
       defaultSource: defaultSourceId() ?? '',
       rememberedView: workspaceView(ws.id),
+      explicitProjectPath: explicitProjectPath === location.pathname ? explicitProjectPath : undefined,
     })
     if (plan.kind === 'restore-task') {
       activateTaskSignals(plan.task)
@@ -433,6 +420,31 @@ export default function App() {
     setPlaceRestored(true)
   })
 
+  // A linked project chooses its own route and source. Keep that choice when the route enters a
+  // workspace whose remembered view points elsewhere; ordinary workspace-picker changes still
+  // restore their remembered view.
+  createEffect(() => {
+    if (!placeRestored() || !clientPluginsReady()) return
+    const unregister = registerAddressHost({
+      nodeId: mountedNodeId,
+      navigate: (path) => navigate(path),
+      openProject: (path, source) => {
+        explicitProjectPath = path
+        setSelectedSource(source)
+        navigate(path)
+      },
+      openTask: (taskId, path) => {
+        const task = tasks.data?.find((candidate) => candidate.id === taskId)
+        if (!task) return false
+        activateTaskSignals(task)
+        navigate(path)
+        return true
+      },
+      hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
+    })
+    onCleanup(unregister)
+  })
+
   // The route is the authority for what actually opened. Wait until the saved pair and the startup
   // destination have both landed, or a transient first route would displace the previous workspace.
   createEffect(() => {
@@ -451,6 +463,9 @@ export default function App() {
     ([ws, , , , ready]) => {
       if (!ws || !ready) return
       if (enteredWorkspaceId && enteredWorkspaceId !== ws.id) openWorkspaceView(ws)
+      if (explicitProjectPath === location.pathname && workspaceOwnsPath(ws, location.pathname)) {
+        explicitProjectPath = undefined
+      }
       enteredWorkspaceId = ws.id
       // Read again rather than taken from the arguments, because opening the workspace may have
       // just changed them.

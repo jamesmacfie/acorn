@@ -48,6 +48,19 @@ generated Tauri schemas in `docs/future/security/01-desktop-command-authorizatio
 `/private/tmp/acorn-phase01-followup-boundaries.log`. The coordinator owns the next full repository
 gate.
 
+Second follow-up: the desktop shell now marks project addresses as explicit navigation. Its
+workspace transition keeps the linked route and source over remembered tasks and sources, including
+core, compiled, and loaded plugin project paths. The address host registers after place restoration
+has completed, so a waiting dispatch cannot race the shell's startup destination effect. The earlier
+registration condition observed `startup.restored()` only; the `readyHost` promise continued in a
+microtask after synchronous effects in normal scheduling, but that ordering was implicit. The host
+sets the pending project path before selecting its source, so source validation waits for the
+destination workspace. Focused checks on Node 26.9: 10 workspace-transition tests and seven address
+dispatch tests passed; client-core and desktop scoped lint passed. The coordinator's unchanged-parent
+desktop client baseline already has 11 `test/client/clientPluginDisable.test.ts` failures involving
+the added `agents.find-resource` and `agents.loop-coverage` extension IDs and `railMarkers`; this
+phase does not change those assertions.
+
 Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md), especially [the address format](./README.md#the-address-format) and
 [the safety rules](./README.md#safety-rules).

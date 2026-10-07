@@ -115,3 +115,6 @@ selected Node's shell to finish remounting before it navigates. A project addres
 path to enter its workspace. Loaded plugin project surfaces also name their owning source; selecting
 that source is necessary because the route alone does not choose what the shell renders. If no source
 owns a project subpath, the dispatcher opens the project and reports the missing page.
+An explicit project address keeps its route and selected source when it enters another workspace;
+that workspace's remembered task or source does not replace the linked destination. Ordinary
+workspace-picker navigation continues to restore the remembered view.
