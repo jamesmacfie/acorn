@@ -35,22 +35,27 @@ entrypoint, and route each read to the same handler the matching tool uses.
 
 ## The design
 
-Map each read-only tool to one URI template under one scheme:
+Map each read-only tool to one URI template, in the bare style `omp` uses:
 
 | Template | Same handler as |
 | --- | --- |
-| `acorn://task` | `task_current` |
-| `acorn://task/context` | `task_context` |
-| `acorn://pr` | `pr_current` |
-| `acorn://pr/files` | `pr_changed_files` |
-| `acorn://pr/checks` | `pr_checks` |
-| `acorn://pr/comments` | `pr_review_comments` |
-| `acorn://issue/{provider}/{id}` | `issue_detail` |
-| `acorn://changes` | `local_changes` |
-| `acorn://changes/{path}` | `local_diff` |
-| `acorn://agent/{sessionId}` | `agent_read` |
-| `acorn://memory/{name}` | `memory_get` |
-| `acorn://notes/{kind}` | `notes_read` |
+| `task://` | `task_current` |
+| `task://context` | `task_context` |
+| `pr://` | `pr_current` |
+| `pr://files` | `pr_changed_files` |
+| `pr://checks` | `pr_checks` |
+| `pr://comments` | `pr_review_comments` |
+| `issue://{kind}/{id}` | `issue_detail` |
+| `changes://` | `local_changes` |
+| `changes://{path}` | `local_diff` |
+| `agent://{sessionId}` | `agent_read` |
+| `memory://{name}` | `memory_get` |
+| `notes://{kind}` | `notes_read` |
+
+The templates don't carry Acorn's name. MCP clients already label each resource with the server it
+came from, and `acorn://` is reserved for links that open the app. These addresses are relative to the
+session's task, are only valid inside the MCP server, and are never links. `{kind}` in `issue://` is the
+content-link kind that names the item everywhere else, such as `linear.issue`.
 
 Rules:
 
