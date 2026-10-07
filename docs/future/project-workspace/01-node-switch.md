@@ -1,5 +1,19 @@
 # Phase 01: Node switch
 
+## Combined gate follow-up — October 8, 2026
+
+The three Node 26 backup timeouts are resolved. In an isolated test, the third sequential
+`node:sqlite` online-backup promise settled only when Vitest's 20-second deadline woke the event
+loop. A live 50 ms timer made all three copies settle in milliseconds; disabling Vitest's
+`fsModuleCache` did not change the stall. The SQLite wrapper now keeps that timer only while an
+online backup is pending and clears it on success or failure. Archive scrubbing, private staging,
+atomic replacement, and cleanup are unchanged.
+
+On Node 26.8.1, the full backup file passed (12 tests), as did storage policy (9) and process
+broker (18) tests. `@acorn/node-core` and `@acorn/node` typechecks, changed-file oxlint, and the
+stock Node build passed. The service bundle is 3,149,652 bytes against a 3,150,000-byte limit.
+The full repository gate was not rerun.
+
 ## Completion note — October 7, 2026
 
 Status: implemented on `phase-01-node-switch`.
@@ -34,8 +48,8 @@ Status: implemented on `phase-01-node-switch`.
   workspace and project deletion leave behind. The desktop and terminal UI still use grouped-mode
   controls until their phases land.
 - Initial focused Node, CLI, protocol, and seed checks passed; the CLI and protocol package suites
-  passed. Three Node 26 storage backup tests timed out, including when run alone. Their cause remains
-  unresolved for the final combined gate. The architecture doc check reported three missing
+  passed. Three Node 26 storage backup tests timed out, including when run alone; the October 8
+  follow-up above resolved them. The architecture doc check reported three missing
   generated Tauri schema files cited by the security plan; that check is pending desktop staging.
 
 Date: October 7, 2026. Status: implemented. Dependencies: none.
