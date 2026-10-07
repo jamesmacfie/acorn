@@ -55,6 +55,9 @@ export type CapabilityCatalogue = {
   'agents.requests': HostOwned<'plugins/agents/contract/lifecycle.AgentRequestsCapability'>
   /** Rebuild one task's active and archived managed-session roster. */
   'agents.sessions': HostOwned<'plugins/agents/contract/lifecycle.AgentSessionsCapability'>
+  /** Read one completed turn of a task for review: its text and context with provenance, and the
+   *  agent's final message, bounded at 16 and 32 KiB. Never the ledger, tool output, or a path. */
+  'agents.reviewInput.v1': HostOwned<'plugins/agents/contract/lifecycle.AgentReviewInputCapability'>
   /** Read one unsent PNG or JPEG turn attachment, and store an altered copy of it. Never a path, never
    *  a sent attachment, and never the draft itself: the composer decides what is in the turn. */
   'agents.draftAttachments': DraftAttachmentsCapability

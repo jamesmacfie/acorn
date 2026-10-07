@@ -137,9 +137,9 @@ provider's `contract/` directory holds the matching read capability whenever a l
 than the event's safe state payload. Exact payloads and deliberate omissions are in
 [Events](./plugins/events.md#shipped-first-party-events).
 
-Events have no replay or delivery guarantee. Re-read stored state after startup or reconnect.
-Use `ctx.events.status()` to invalidate your descriptors and `worktreeStatus(taskId)` after a
-worktree change. Store durable work in your own database.
+Events have no replay or delivery guarantee. Re-read stored state after startup or reconnect. Use
+`ctx.events.status()` to invalidate your descriptors and `worktreeStatus(taskId)` after a worktree
+change. Store durable work in your own database.
 
 The client-local `clientEvents` emitter carries presentation and lifecycle events within one client.
 It doesn't notify other devices. Compiled clients can also register WebSocket handlers through
@@ -160,9 +160,8 @@ read its database, or use core internals to bypass a missing API. For working fr
 Use `ctx.events.notice` for a notification from a node plugin. By default, the host binds a loaded
 plugin's notification destination to that plugin and drops its supplied `target` and `kind` fields.
 A frame may declare a cooperative destination with a target kind and optional notice kind. The host
-keeps a matching target and strips every undeclared pair.
-Use attention contributions for persistent conditions that the user needs to resolve.
-For delivery and acknowledgment behavior, see [Notifications](./notifications.md).
+keeps a matching target and strips every undeclared pair. Use attention contributions for persistent
+conditions that the user needs to resolve. For delivery and acknowledgment, see [Notifications](./notifications.md).
 
 ## Attaching to the rail
 
@@ -185,6 +184,7 @@ For package layout and registration, see [Package shape](./plugins/package-shape
 Create the default scaffold, then have the node save its data and emit on its own plugin channel.
 The tree subscribes through the bridge and fetches the updated data from the plugin's route.
 For the event declarations and calls, see [Publish an event](./plugin-authoring/events-and-capabilities.md#publish-an-event-for-another-plugin).
+The advisor package reacts to agent turns and spends a [model grant](./integrations/model-providers.md#plugin-model-grants).
 
 ## Rules that bite
 

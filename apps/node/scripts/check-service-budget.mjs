@@ -44,7 +44,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // first contribution. The point's declaration and loader, the per-plugin count in the turn store, the
 // typed veto error, the manifest rule for a carrier-less declaration, and the host check that a loaded
 // plugin declared the point all load at boot. Add 5.5 KB.
-const limits = { ceiling: 3_123_500, floor: 1_000_000 }
+// 2026-10-07: 3,130,976 B with plugin model grants and `agents.reviewInput.v1`. The grant runtime
+// (about 8 KB) loads on a loaded plugin's first call or a settings read, and the reader's shaping on its
+// first read. The two tables and the boot charge for interrupted calls, the three settings routes, and
+// the reader's query load at boot. Add 8 KB.
+const limits = { ceiling: 3_131_500, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

@@ -17,6 +17,7 @@ import { drizzleOverSqlite, openSqlite } from './storage/sqlite'
 import { assertMigrationHistory } from './storage/migrationHistory'
 import { ensureSessionKey } from './sessionKey'
 import { ensureCert } from './transport/tls'
+import { chargeInterruptedModelCalls } from './modelProviders/grantSchema'
 
 // The runtime object the routes read via c.env (typed as the global Env in env.d.ts). Built once
 // at startup and handed to the Hono app at the single app.fetch() seam in server/transport/listener.ts.
@@ -242,6 +243,8 @@ export function makeBindings({ dbPath, blobsDir, nodeId, appVersion, serviceInst
   // boot, the identity was bound as a side effect of connecting GitHub, and every internal caller
   // (MCP, agents) failed closed until then.
   ensureBoundIdentity(db, activeIdentity)
+  // A plugin model call an earlier process admitted can no longer settle, and may have spent.
+  chargeInterruptedModelCalls(db)
   return {
     DB: db,
     DATA_DIR: dataDir,

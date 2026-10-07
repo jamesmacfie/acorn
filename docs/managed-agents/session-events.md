@@ -42,6 +42,29 @@ capabilities. Turn reads leave out the prompt, the effective policy, errors, and
 and request resolution stays private to the runtime. Core's `agent-session:changed` is the generic
 completion and attention event, and `agent:*` is the transcript stream.
 
+## Review input
+
+`agents.reviewInput.v1` reads one completed turn for a reviewer, such as the advisor package in
+`docs/future/pi/packages/advisor/`. The contract is in `plugins/agents/src/contract/lifecycle.ts`.
+`read({ taskId, sessionId, turnId })` checks that the turn belongs to that session and the session
+to that task. A turn outside them, or a missing one, answers `{ available: false, reason:
+'not-found' }`, so a reader learns nothing about turns it may not see. A turn that hasn't completed
+answers `not-completed`.
+
+A completed turn returns two things, and nothing else:
+
+- `userText`: the turn's text and context parts in order, at most 16 KiB of UTF-8 in all. Each part
+  has a `provenance`. Only text typed into an interactive turn is `person`. Text in another kind of
+  turn names the turn's source, such as `plugin` or `delegation_report`, and an attached context
+  snapshot carries its source ID and label. A part cut at the bound has `truncated: true`, the parts
+  after it are dropped, and `userTextTruncated` is true.
+- `finalText`: the turn's last top-level assistant message, folded from its streamed deltas, at most
+  32 KiB, with `finalTextTruncated`. A subagent's message isn't the agent's answer, so it's skipped.
+
+Files, attachments, images, paths, tool calls and their output, reasoning, and the event ledger stay
+out. The read selects assistant rows only, so tool output never leaves SQLite. Stop reasons come from
+`agents.turns`, not from this reader.
+
 The fallback title, a generated title, and a rename all go through the repository's one title write,
 which also publishes the `agent:session` frame clients use to update their cache.
 

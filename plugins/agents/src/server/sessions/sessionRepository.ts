@@ -719,4 +719,8 @@ export class AgentSessionRepository {
     return this.lifecycle.sessions(taskId)
   }
 
+  lifecycleReviewInput(ref: { taskId: string; sessionId: string; turnId: string }) {
+    return this.lifecycle.reviewInput(ref)
+  }
+
 }

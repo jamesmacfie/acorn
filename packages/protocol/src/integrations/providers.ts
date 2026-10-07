@@ -26,6 +26,10 @@ export const PROVIDER_ERROR_CODES = [
   'provider_resource_forbidden',
   'provider_bad_config',
   'provider_secret_unreadable',
+  // A plugin's call that names no backend, before the owner chose one for it, or past today's allowance
+  // (docs/integrations/model-providers.md § Plugin model grants).
+  'provider_not_configured',
+  'provider_budget_exhausted',
 ] as const
 
 export type ProviderErrorCode = (typeof PROVIDER_ERROR_CODES)[number]

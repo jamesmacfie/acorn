@@ -9,7 +9,7 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { z } from 'zod'
 import { memoryIdentityStore } from '../activeIdentity'
-import { createCoreServices, SecretService } from '../core'
+import { createCoreServices, SecretService, type GenerateTextRequest } from '../core'
 import type { NodePermissions } from './manifest'
 import { makeTestDb } from '../../testkit/db'
 import { testGate } from '../../testkit/auth'
@@ -393,6 +393,97 @@ describe('a folder plugin’s session messenger through the loader and the host'
     } finally {
       point.dispose()
       cleanup()
+    }
+  })
+})
+
+// The owner-bound models facet and a capability's bounded result, across a real loaded worker
+// (docs/integrations/model-providers.md § Plugin model grants). The worker names no plugin anywhere:
+// the host's binding files the call under the package, and a spoofed owner never spends.
+describe('a folder plugin’s granted model call through the loader and the host', () => {
+  it('spends its own grant, refuses a spoofed owner, carries cancellation, and reads a bounded review', async () => {
+    const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const { join } = await import('node:path')
+    const { installPlugin } = await import('./installer')
+    const { loadExternalPlugins, loadedPluginBinding } = await import('./loader')
+    const { PLUGIN_API_MAJOR } = await import('./manifest')
+    const { ProviderOperationError } = await import('../integrations/types')
+    const { dayUsage, localDay, pluginModelService, writeModelGrant } = await import('../modelProviders/grants')
+    const root = mkdtempSync(join(tmpdir(), 'acorn-models-folder-'))
+    const db = makeTestDb()
+    const identity = memoryIdentityStore()
+    identity.set('owner-1')
+    // The prompt says whether to wait for the caller's abort, which is the cancellation case.
+    const seen: { backendId: string; aborted: boolean }[] = []
+    const models = {
+      available: async () => [],
+      generateText: async (request: GenerateTextRequest) => {
+        const signal = request.input.signal
+        if (request.input.prompt === 'wait' && signal) await new Promise((resolve) => signal.addEventListener('abort', resolve, { once: true }))
+        seen.push({ backendId: request.backendId, aborted: !!signal?.aborted })
+        if (signal?.aborted) throw new ProviderOperationError('provider_unavailable', 502)
+        return { text: 'reviewed', providerId: 'fake', backendId: request.backendId, modelId: 'm', usage: { outputTokens: 7 } }
+      },
+    }
+    const options = hostOptions()
+    const core = createCoreServices({ secrets: new SecretService('b'.repeat(64)), db: db.db, activeIdentity: identity })
+    core.models = { ...models, forPlugin: (id) => pluginModelService(db.db, models, core.identity, id) }
+    const review = { available: true, input: { userText: [{ text: 'é'.repeat(8_000), provenance: { kind: 'context', source: 'plugin:x', label: 'Issue' }, truncated: true }] } }
+    const provided = options.capabilities.provide(capabilityId('agents.reviewInput.v1'), { read: async () => review })
+    try {
+      const source = join(root, 'source')
+      mkdirSync(join(source, 'dist'), { recursive: true })
+      writeFileSync(join(source, 'acorn-plugin.json'), JSON.stringify({
+        id: 'models-fixture', name: 'Models fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
+        permissions: { node: { core: ['models', 'identity'], capabilities: ['agents.reviewInput.v1'], secrets: false, exec: false, net: [] } },
+      }))
+      writeFileSync(join(source, 'dist', 'node.js'), `export default { name: "models-fixture", init(ctx) {
+        ctx.routes.fetch(async (request) => {
+          const body = await request.json()
+          if (body.review) return Response.json(await ctx.capabilities.get("agents.reviewInput.v1").read({ taskId: "t", sessionId: "s", turnId: "u" }))
+          const controller = new AbortController()
+          if (body.abortAfterMs) setTimeout(() => controller.abort(), body.abortAfterMs)
+          try {
+            const input = { system: "s", prompt: body.prompt ?? "p", maxOutputTokens: 100, signal: controller.signal }
+            return Response.json({ text: (await ctx.core.models.generateText({ userId: body.userId ?? ctx.core.identity.active(), input })).text })
+          } catch (error) { return Response.json({ code: error.code }) }
+        })
+      } }\n`)
+      await installPlugin(root, { path: source })
+      const { loaded } = await loadExternalPlugins(root, { builtins: [] })
+      const host = await initPlugins(loaded.map((entry) => entry.plugin), {
+        ...options, core, dataDir: root,
+        loaded: new Map(loaded.map((entry) => [entry.manifest.id, loadedPluginBinding(entry)])),
+      })
+      const call = async (body: Record<string, unknown>) => (await new Hono<AppEnv>()
+        .use('/v1/*', ...testGate({ kind: 'device', userId: 'owner-1', deviceId: 'device-1' }))
+        .all(`${PLUGIN_NAMESPACE}/:plugin/*`, dispatchPluginFetch)
+        .fetch(new Request('http://acorn.test/v1/p/models-fixture/call', { method: 'POST', body: JSON.stringify(body) }), {} as Env)).json()
+      const today = () => dayUsage(db.db, 'owner-1', 'models-fixture', localDay(Date.now()))
+
+      expect(await call({})).toEqual({ code: 'provider_not_configured' })
+      writeModelGrant(db.db, 'owner-1', 'models-fixture', { backendId: 'connection:key', modelId: '', dailyOutputTokens: 1_000 })
+      expect(await call({ userId: 'someone-else' })).toEqual({ code: 'provider_bad_config' })
+      expect(seen).toEqual([])
+
+      expect(await call({})).toEqual({ text: 'reviewed' })
+      expect(seen).toEqual([{ backendId: 'connection:key', aborted: false }])
+      expect(today()).toMatchObject({ spent: 7, calls: 1 })
+
+      // The worker's abort reaches the provider call, and the reservation stays charged.
+      expect(await call({ prompt: 'wait', abortAfterMs: 20 })).toEqual({ code: 'provider_unavailable' })
+      expect(seen.at(-1)).toEqual({ backendId: 'connection:key', aborted: true })
+      expect(today()).toMatchObject({ spent: 107, calls: 2 })
+
+      // Bounds and provenance arrive as the provider shaped them.
+      expect(await call({ review: true })).toEqual(review)
+      await host.dispose()
+    } finally {
+      provided.dispose()
+      clearRegistrations('models-fixture')
+      db.cleanup()
+      rmSync(root, { recursive: true, force: true })
     }
   })
 })

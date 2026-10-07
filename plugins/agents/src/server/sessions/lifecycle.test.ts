@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { makeTestCoreServices, makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
-import type { AgentLifecycleFrame } from '../../contract/lifecycle'
+import { MAX_REVIEW_FINAL_TEXT_BYTES, MAX_REVIEW_USER_TEXT_BYTES, type AgentLifecycleFrame } from '../../contract/lifecycle'
 import { AgentStore } from './store'
 
 const provider: AgentProviderDescriptor = {
@@ -250,6 +250,73 @@ describe('managed-agent lifecycle events and read models', () => {
       attempt: 2,
     }])
     expect(await store.lifecycleTurns({ taskId: otherTaskId })).toEqual([])
+  })
+
+  it('reads one completed turn for review, bounded, with provenance, and only within its task', async () => {
+    const session = await createSession()
+    const context = { type: 'context' as const, contextId: 'c1', label: 'Issue', content: 'Fix the parser.', source: 'plugin:github', capturedAt: 1 }
+    const { turn } = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: 'Please fix it.' }, { type: 'file', path: '/private/secret.txt' }, context],
+      source: 'interactive',
+      effectivePolicy: {},
+      idempotencyKey: 'review-one',
+    })
+    const ref = { taskId, sessionId: session.id, turnId: turn.id }
+    expect(await store.lifecycleReviewInput(ref)).toEqual({ available: false, reason: 'not-completed' })
+    await store.dispatchTurn(turn.id)
+    await store.startTurn(turn.id)
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Looking.', messageId: 'm1' })
+    await store.recordEvent(session.id, turn.id, { type: 'reasoning', text: 'hidden reasoning stays private', messageId: 'r1' })
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'Done', messageId: 'm2', append: true })
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: ': fixed.', messageId: 'm2', append: true })
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'a subagent aside', messageId: 's1', subagentId: 'sub' })
+    await store.recordEvent(session.id, turn.id, { type: 'turn_completed', stopReason: 'end_turn' })
+
+    const read = await store.lifecycleReviewInput(ref)
+    expect(read).toEqual({
+      available: true,
+      input: {
+        ...ref,
+        source: 'interactive',
+        completedAt: expect.any(Number),
+        userText: [
+          { text: 'Please fix it.', provenance: { kind: 'person' }, truncated: false },
+          { text: 'Fix the parser.', provenance: { kind: 'context', source: 'plugin:github', label: 'Issue' }, truncated: false },
+        ],
+        userTextTruncated: false,
+        finalText: 'Done: fixed.',
+        finalTextTruncated: false,
+      },
+    })
+    expect(JSON.stringify(read)).not.toMatch(/secret\.txt|hidden reasoning/)
+    // Another task, another session, or an unknown turn all read the same.
+    for (const other of [{ ...ref, taskId: otherTaskId }, { ...ref, sessionId: (await createSession(otherTaskId)).id }, { ...ref, turnId: 'nope' }]) {
+      expect(await store.lifecycleReviewInput(other)).toEqual({ available: false, reason: 'not-found' })
+    }
+  })
+
+  it('cuts review text at its byte bounds and says so', async () => {
+    const session = await createSession()
+    const big = 'é'.repeat(MAX_REVIEW_USER_TEXT_BYTES)
+    const { turn } = await store.enqueueTurn(session.id, {
+      input: [{ type: 'text', text: big }, { type: 'text', text: 'dropped' }],
+      source: 'plugin',
+      effectivePolicy: {},
+      idempotencyKey: 'review-big',
+    })
+    await store.dispatchTurn(turn.id)
+    await store.startTurn(turn.id)
+    await store.recordEvent(session.id, turn.id, { type: 'assistant_message', text: 'x'.repeat(MAX_REVIEW_FINAL_TEXT_BYTES + 10), messageId: 'm' })
+    await store.recordEvent(session.id, turn.id, { type: 'turn_completed', stopReason: 'end_turn' })
+    const read = await store.lifecycleReviewInput({ taskId, sessionId: session.id, turnId: turn.id })
+    if (!read.available) throw new Error('expected a completed turn')
+    expect(read.input.userText).toHaveLength(1)
+    expect(read.input.userText[0]).toMatchObject({ provenance: { kind: 'turn', source: 'plugin' }, truncated: true })
+    expect(Buffer.byteLength(read.input.userText[0]!.text)).toBeLessThanOrEqual(MAX_REVIEW_USER_TEXT_BYTES)
+    expect(read.input.userText[0]!.text).not.toContain('\uFFFD')
+    expect(read.input.userTextTruncated).toBe(true)
+    expect(read.input.finalTextTruncated).toBe(true)
+    expect(Buffer.byteLength(read.input.finalText)).toBeLessThanOrEqual(MAX_REVIEW_FINAL_TEXT_BYTES)
   })
 
   it('announces request creation, claims, acknowledgement and expiry without leaking resolution data', async () => {

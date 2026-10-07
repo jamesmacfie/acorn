@@ -202,6 +202,8 @@ export const corePluginDevelopmentRoute = (id: string) => `/v1/core/plugins/${en
 export const corePluginLogsRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/logs`
 // The person's approval of what a loaded plugin's derived sources read. Device-only by the same mount.
 export const corePluginInputGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/input-grant`
+// The owner's model choice and daily allowance for a plugin holding `models`. Device-only by the same mount.
+export const corePluginModelGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/model-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable
 // from a plugin frame: an approval a frame could post would turn the request/decision split back into
 // an install route the agent can reach (client-core/host/frames/scopes.ts).

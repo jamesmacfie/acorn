@@ -75,7 +75,8 @@ with no cached fallback, even when the connection needs authentication or is off
 
 <a id="model-providers"></a>
 
-- [Model providers](./integrations/model-providers.md): backends for Generate controls.
+- [Model providers](./integrations/model-providers.md): backends for Generate controls, and the
+  model grant and daily allowance a loaded plugin spends when it names no backend.
 
 <a id="provider-boundaries"></a>
 

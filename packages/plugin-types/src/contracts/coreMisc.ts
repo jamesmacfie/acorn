@@ -6,19 +6,25 @@ export type CoreContextService = {
   assemble(userLogin: string, taskId: string, include: Set<string>): Promise<HostOwned<'protocol/api.TaskContext'> | null>
 }
 
-/** Text generation through a stored model-provider connection. You own the prompt; core owns
- *  credential resolution and the provider adapters. */
+/** Text generation through a stored model-provider connection or an installed agent CLI. You own the
+ *  prompt; core owns credential resolution and the provider adapters. */
 export type CoreModelService = {
-  /** One turn of the backend the request names: a stored API key spent over HTTP, or one run of an
-   *  agent CLI installed on this machine with its tools off. The grant does not decide which; the
-   *  person who picked from the dropdown does, and your route passes their `backendId` through. */
+  /** One turn of a backend, as text.
+   *
+   *  Name a `backendId` and that backend runs: the person picked it from a dropdown and your route passes
+   *  it through. That path is unchanged and is only counted.
+   *
+   *  Leave `backendId` out and the host spends the model grant the owner set for your plugin in
+   *  Settings > Plugins: their backend, their model, and a daily output-token allowance. `userId` must be
+   *  `ctx.core.identity.active()`, and `input.modelId` must be absent. With no grant this throws
+   *  `provider_not_configured`; past today's allowance, `provider_budget_exhausted`. Neither spends.
+   *  The allowance covers this path only, not calls that name a backend. */
   generateText(
-    request: HostOwned<'node-core/server/core/models.GenerateTextRequest'>,
+    request: HostOwned<'node-core/server/core/models.PluginGenerateTextRequest'>,
   ): Promise<HostOwned<'node-core/server/modelProviders/types.GenerateTextResult'>>
   /** Which backends this owner could generate with — a stored API key, or an agent CLI installed on
    *  this machine — as ids and labels only. Connections come first, so a plugin that falls back to
-   *  `[0]` keeps spending the key the owner configured. The grant does not decide which backend runs;
-   *  the person picking from the dropdown does. */
+   *  `[0]` keeps spending the key the owner configured. Prefer leaving `backendId` out over `[0]`. */
   available(userId: string): Promise<Array<HostOwned<'protocol/modelProviders.ModelBackend'>>>
 }
 

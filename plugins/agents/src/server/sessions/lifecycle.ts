@@ -1,9 +1,10 @@
-import { and, asc, eq } from 'drizzle-orm'
+import { and, asc, eq, sql } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type { AgentRequest, AgentRequestBlocked, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type {
   AgentLifecyclePublisher,
+  AgentReviewInputResult,
   AgentRequestState,
   AgentSessionChange,
   AgentSessionRosterEntry,
@@ -118,6 +119,45 @@ export class AgentLifecycle {
         updatedAt: session.updatedAt,
       }
     })
+  }
+
+  /** One completed turn of one task, bounded for a reviewer. The task and session must both match. */
+  async reviewInput(ref: { taskId: string; sessionId: string; turnId: string }): Promise<AgentReviewInputResult> {
+    const [row] = await this.db
+      .select({ turn: schema.agentTurns })
+      .from(schema.agentTurns)
+      .innerJoin(schema.agentSessions, eq(schema.agentTurns.sessionId, schema.agentSessions.id))
+      .where(and(
+        eq(schema.agentSessions.taskId, ref.taskId),
+        eq(schema.agentSessions.id, ref.sessionId),
+        eq(schema.agentTurns.id, ref.turnId),
+      ))
+      .limit(1)
+    if (!row) return { available: false, reason: 'not-found' }
+    const turn = mapAgentTurn(row.turn)
+    if (turn.status !== 'completed' || turn.completedAt == null) return { available: false, reason: 'not-completed' }
+    // Assistant rows only, so a turn's tool output never leaves SQLite on its way to being skipped.
+    const events = await this.db
+      .select({ eventJson: schema.agentEvents.eventJson })
+      .from(schema.agentEvents)
+      .where(and(
+        eq(schema.agentEvents.sessionId, ref.sessionId),
+        eq(schema.agentEvents.turnId, ref.turnId),
+        sql`json_extract(${schema.agentEvents.eventJson}, '$.type') = 'assistant_message'`,
+      ))
+      .orderBy(asc(schema.agentEvents.seq))
+    // Loaded on the first review, not at boot.
+    const { finalAssistantText, reviewUserText } = await import('./reviewInput')
+    return {
+      available: true,
+      input: {
+        ...ref,
+        source: turn.source,
+        completedAt: turn.completedAt,
+        ...reviewUserText(turn),
+        ...finalAssistantText(events.map((event) => JSON.parse(event.eventJson) as Record<string, unknown>)),
+      },
+    }
   }
 
   private async turnRow(turnId: string): Promise<{ turn: AgentTurn; taskId: string } | null> {

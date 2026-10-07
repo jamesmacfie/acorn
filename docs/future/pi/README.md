@@ -65,9 +65,10 @@ A loaded acorn plugin runs in a permission-scoped worker and reaches the agent t
 - Agent tools, which reach every harness through acorn's MCP server.
 - `core:before-tool-call`, which guards acorn's own tools only.
 - Lifecycle events on `plugin:agents:turn-changed`, `request-changed`, and `sessions-changed`.
-- A bounded completed-turn reader is proposed in phase 04. The previous `agents.reviewInput.v1`
-  reader was removed with Findings; it is not a shipped seam.
-- `ctx.core.models.generateText` under the `models` grant, which spends a backend the caller names.
+- `agents.reviewInput.v1`, a bounded completed-turn reader, delivered in phase 04
+  ([review input](../../managed-agents/session-events.md#review-input)).
+- `ctx.core.models.generateText` under the `models` grant, which spends a backend the caller names,
+  or with no backend the owner's model grant for that plugin, delivered in phase 04.
 - UI points such as `agents:tool-card`, `agents:session-header`, and `agents:composer-actions`.
 - Custom agents, MCP servers, and harness contributions.
 

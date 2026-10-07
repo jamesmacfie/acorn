@@ -108,3 +108,33 @@ export type ModelBackendsResponse = {
    */
   missing: Array<{ id: string; label: string }>
 }
+
+/**
+ * What `GET /v1/core/plugins/:id/model-grant` returns: a loaded plugin's host-held model choice and
+ * today's use of it (docs/integrations/model-providers.md § Plugin model grants). Device-only.
+ *
+ * The allowance bounds calls that name no backend. A plugin holding `models` can still name one, and
+ * those calls are only counted, in `explicitCalls`.
+ */
+export type PluginModelGrantState = {
+  grant: { backendId: string; modelId: string; dailyOutputTokens: number } | null
+  /** Why a call that names no backend would fail now, or `ready`. */
+  status: 'unconfigured' | 'backend-missing' | 'exhausted' | 'ready'
+  /** The Node-local day the usage counts, `YYYY-MM-DD`. Resets at the Node's midnight. */
+  day: string
+  usage: {
+    /** Output tokens charged today, open reservations counted in full. */
+    spent: number
+    /** The part of `spent` still waiting on a call to finish. */
+    reserved: number
+    calls: number
+    /** What providers reported. For an agent CLI this can differ from the estimate it was charged. */
+    reportedOutputTokens: number
+    explicitCalls: number
+    explicitReportedOutputTokens: number
+  }
+  /** What this owner could pick: the same list a Generate control offers. */
+  backends: ModelBackend[]
+  /** What one agent CLI call is charged, whatever it reports. A CLI takes no output-token bound. */
+  harnessCallEstimate: number
+}

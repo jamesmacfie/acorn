@@ -73,8 +73,26 @@ is scoped to your own namespace.
 `models` is one token, and it doesn't choose what gets spent. The trust prompt reads "Generate text
 with your model providers and installed agent CLIs", because the list holds both a connected API key
 and any agent CLI that declares a one-shot mode ([model providers](../integrations/model-providers.md)).
-The person picking from the list decides which runs. You can't name a CLI the owner doesn't have, or
-make one run with tools or in a worktree.
+When your route passes a `backendId` the person picked, that backend runs. You can't name a CLI the
+owner doesn't have, or make one run with tools or in a worktree.
+
+Leave `backendId` out when no person is there to pick, such as in an event handler. The host then
+spends the model grant the owner set for your plugin on its page in **Settings > Plugins**: their
+backend, their model, and a daily allowance of output tokens. Pass `ctx.core.identity.active()` as
+`userId`, so add `identity` to `core`, and leave `input.modelId` out.
+
+```js
+const result = await ctx.core.models.generateText({
+  userId: ctx.core.identity.active(),
+  input: { system, prompt, maxOutputTokens: 800, signal },
+})
+```
+
+With no grant this throws `provider_not_configured`, and past today's allowance
+`provider_budget_exhausted`. Neither spends anything, so record the reason and let the owner act. A
+cancelled or timed-out call stays counted. The allowance covers this path only. A call that names a
+backend isn't limited by it, and the settings page tells the owner that
+([plugin model grants](../integrations/model-providers.md#plugin-model-grants)).
 
 `data:query` supplies `ctx.core.data`: connect or disconnect a task's configured PostgreSQL source,
 inspect its catalog or schema description, and run a bounded read. Core resolves the URL, applies the

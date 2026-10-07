@@ -2,6 +2,7 @@ import { sql } from 'drizzle-orm'
 import { blob, index, integer, primaryKey, real, sqliteTable, text, uniqueIndex } from 'drizzle-orm/sqlite-core'
 export { queryDrafts, queryRevisions, queryConsumers, queryPublicationHolds } from '../queries/schema'
 export { dashboardDrafts, dashboardRevisions } from '../dashboards/schema'
+export { pluginModelGrants, pluginModelCalls } from '../modelProviders/grantSchema'
 export { datasets, datasetVersions, datasetRows, datasetCorrections, datasetCaptures, datasetCoverage } from '../datasets/schema'
 
 export const syncState = sqliteTable(

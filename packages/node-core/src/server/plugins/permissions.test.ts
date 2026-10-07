@@ -20,7 +20,8 @@ const CORE = {
   secrets: marker('secrets'),
   tasks: marker('tasks'),
   context: marker('context'),
-  models: marker('models'),
+  // The compiled facet hands each loaded plugin its own bound service.
+  models: { forPlugin: (pluginId: string) => ({ boundTo: pluginId }) },
   data: marker('data'),
   prefs: marker('prefs'),
   identity: marker('identity'),
@@ -67,6 +68,10 @@ describe('scopeCore', () => {
   it('covers every simple facet name', () => {
     const all = ['fs', 'git', 'tasks', 'context', 'models', 'data:query', 'prefs', 'identity', 'telemetry', 'agent-tool-provenance']
     expect(keys(scoped({ core: all }))).toEqual(['agentToolProvenance', 'context', 'data', 'fs', 'git', 'identity', 'models', 'prefs', 'tasks', 'telemetry'])
+  })
+
+  it('binds the models facet to the plugin holding the context, never the shared service', () => {
+    expect(scoped({ core: ['models'] }).models).toEqual({ boundTo: 'demo' })
   })
 
   it('keeps writes behind data:write while data:query stays read-only', async () => {

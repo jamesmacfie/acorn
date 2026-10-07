@@ -140,3 +140,17 @@ acceptance pass.
     turn, and that switching Nodes and back keeps the label. In the terminal client, the note reads
     **From acorn-permission-policy** too. A workflow step's refusal stands with no note
     ([session messages](../managed-agents/session-messages.md)).
+
+158. The advisor and its model grant. Install `docs/future/pi/packages/advisor/` and restart the Node.
+    The trust prompt lists generating text and sending notes to your agent sessions. On the plugin's
+    page in **Settings > Plugins**, **Model** says it isn't set up. Choose a backend, a model, and a
+    daily allowance, and **Save**. A backend the Node doesn't have, or a model outside its catalog,
+    is refused with a reason. In **Settings > Agents > Advisor**, set **Review sessions** to
+    **Interactive sessions**. In a throwaway repository, break a function in the task's working tree,
+    then ask a Claude Code session for an unrelated edit. After the turn, the transcript shows a turn
+    labelled **From acorn-advisor** with a blocker, and the agent answers it. **Recent notes** lists
+    the blocker as **Sent to the agent**, and the plugin page's **Today** row shows the charge: 4,000
+    output tokens for a CLI call. Remove the grant and send another turn: no call is charged, and the
+    advisor shows `provider_not_configured`. Turn reviews off and send a turn: no review runs. Restart
+    the Node during a review: it isn't retried, and its charge stays
+    ([plugin model grants](../integrations/model-providers.md#plugin-model-grants)).

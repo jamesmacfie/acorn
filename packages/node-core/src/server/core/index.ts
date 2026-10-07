@@ -6,7 +6,7 @@ import { createDataSourceService, type DataSourceService } from './data'
 import * as fs from './fs'
 import * as git from './git'
 import { createIdentityService, type IdentityService } from './identity'
-import { createModelService, type ModelService } from './models'
+import { createModelService, type ModelService, type PluginGenerateTextRequest } from './models'
 import { createPrefService, type PrefService } from './prefs'
 import * as proc from './proc'
 import { SecretService } from './secrets'
@@ -85,10 +85,12 @@ export type CoreServices = {
 }
 
 /** First-party orchestration seams that never cross the loaded-plugin boundary. */
-export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects'> & {
+export type CompiledCoreServices = Omit<CoreServices, 'tasks' | 'projects' | 'models'> & {
   taskScripts: TaskScriptEvidenceService
   tasks: CompiledTaskService
   projects: CompiledProjectService
+  // `forPlugin` is the owner-bound facet scopeCore hands a loaded plugin (../modelProviders/grants.ts).
+  models: ModelService & { forPlugin(pluginId: string): { generateText(request: PluginGenerateTextRequest): ReturnType<ModelService['generateText']>; available: ModelService['available'] } }
 }
 
 export function createCoreServices(options: {
@@ -100,6 +102,8 @@ export function createCoreServices(options: {
 }): CompiledCoreServices {
   const tasks = createTaskService(options.db)
   const projects = createProjectService(options.db)
+  const identity = createIdentityService(options.activeIdentity)
+  const models = createModelService(options.db, options.secrets)
   return {
     agentToolProvenance: { verify: verifyAgentToolProvenance },
     // `satisfies`, not a bare reference: it is what makes the named facets above a projection of the
@@ -111,10 +115,18 @@ export function createCoreServices(options: {
     tasks,
     taskScripts: taskScriptEvidence(options.db),
     context: createContextService(options.db),
-    models: createModelService(options.db, options.secrets),
+    models: {
+      ...models,
+      // The grant runtime loads on a loaded plugin's first call, not at boot.
+      forPlugin: (pluginId) => ({
+        generateText: async (request) =>
+          (await import('../modelProviders/grants')).pluginModelService(options.db, models, identity, pluginId).generateText(request),
+        available: (userId) => models.available(userId),
+      }),
+    },
     data: createDataSourceService({ tasks, projects, fs, proc }),
     prefs: createPrefService(options.db),
-    identity: createIdentityService(options.activeIdentity),
+    identity,
     projects,
     telemetry: createTelemetryService(),
   }
@@ -133,7 +145,7 @@ export type { TaskRef } from '../worktrees/taskWorktree'
 export type { ContextService } from './context'
 export type { PrefService } from './prefs'
 export type { TelemetryService, TelemetrySink } from './telemetry'
-export type { GenerateTextRequest, ModelService } from './models'
+export type { GenerateTextRequest, ModelService, PluginGenerateTextRequest } from './models'
 export type {
   DataCell,
   DataColumn,

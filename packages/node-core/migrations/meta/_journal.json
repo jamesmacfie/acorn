@@ -29,6 +29,13 @@
       "when": 1791084406719,
       "tag": "0003_modern_talkback",
       "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1791330825809,
+      "tag": "0004_plugin_model_grants",
+      "breakpoints": true
     }
   ]
 }

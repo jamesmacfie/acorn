@@ -1,0 +1,45 @@
+{
+  "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
+  "id": "acorn-advisor",
+  "name": "Advisor",
+  "version": "0.1.0",
+  "baseline": "acorn-1",
+  "apiVersion": "3",
+  "node": "./node.js",
+  "client": "./client.js",
+  "migrations": "./migrations",
+  "requires": { "plugins": [{ "id": "agents" }] },
+  "permissions": {
+    "api": [],
+    "events": ["plugin:agents:turn-changed", "plugin:agents:sessions-changed"],
+    "node": {
+      "core": ["models", "tasks", "git", "identity"],
+      "capabilities": ["agents.reviewInput.v1", "agents.turns", "agents.sessions"],
+      "secrets": false,
+      "exec": false,
+      "net": []
+    }
+  },
+  "contributions": {
+    "extensions": [
+      {
+        "id": "notes",
+        "point": "agents:session-messenger",
+        "label": "send the agent a review note"
+      }
+    ],
+    "frames": [
+      {
+        "target": "settings",
+        "id": "advisor-settings",
+        "label": "Advisor",
+        "category": "agents",
+        "glyph": "message-square-warning",
+        "keywords": ["review", "second opinion"],
+        "sections": [{ "id": "reviews", "label": "Reviews" }, { "id": "notes", "label": "Recent notes" }],
+        "layout": "single",
+        "regions": { "body": { "kind": "remote", "entry": "settings" } }
+      }
+    ]
+  }
+}

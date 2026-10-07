@@ -32,6 +32,7 @@ import { useSettingsDetail } from '../settingsDetail'
 import { createSettingSave } from '../settingSave'
 import { pluginName, pluginRow, statusOf, type InstalledPlugin } from './installed'
 import { removeDevicePlugin, setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
+import { ModelGrantSection } from './ModelGrantSection'
 import './plugins.css'
 
 // One plugin's page under Settings > Plugins > Installed (docs/plugins/activation.md § What the owner
@@ -114,6 +115,8 @@ export function PluginPage(props: PluginPageProps) {
   // Overview and Settings read what the plugin registered in this window, which runs on the active node.
   // With the header on another node they say so, rather than passing that node's plugin off as this one.
   const elsewhere = () => props.plugin.kind === 'node' && props.nodeId !== activeNodeId()
+  // A loaded plugin asking for `models` gets the host's model section. Read on the active Node only.
+  const holdsModels = () => !!(nodeRow()?.active ?? nodeRow()?.installed)?.permissions.node.core.includes('models')
 
   return (
     <>
@@ -141,6 +144,7 @@ export function PluginPage(props: PluginPageProps) {
               </Alert>
             </Show>
           </SettingsSection>
+          <Show when={holdsModels() && !elsewhere()}><ModelGrantSection pluginId={props.plugin.id} /></Show>
           <Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} />
         </Stack>
       </TabPanel>

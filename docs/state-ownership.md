@@ -36,6 +36,12 @@ open, but **Save draft** writes a disabled core cadence and its workflow-owned b
 an immediate device-only mutation, and a disconnected renderer reports the failure rather than keeping
 an intent to replay.
 
+A loaded plugin's model grant is Node state in core's tables: the backend, model, and daily allowance
+the owner chose, and the calls charged against it. Only the device-only settings routes write it, so a
+plugin can't change its own grant through its namespace preferences or its routes. The settings page
+reads it through the selected Node's query cache, and refreshes every 15 seconds while it's open
+([plugin model grants](./integrations/model-providers.md#plugin-model-grants)).
+
 Whether the Node collects telemetry is one Node preference, `telemetry.enabled`
 ([the switch](./telemetry/model.md#the-switch)). It belongs to the Node because the collector runs
 whether or not a client is attached, and turning it off in one window stops every client paired with

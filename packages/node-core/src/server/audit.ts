@@ -52,6 +52,8 @@ export type CoreAuditAction =
   | 'plugins.review.decided'
   // The person approved or revoked the list of sources a loaded plugin's derived sources read.
   | 'plugins.inputs.granted'
+  | 'plugins.models.granted'
+  | 'plugins.models.revoked'
   | 'plugins.inputs.revoked'
   // Development mode for a folder plugin came on or went off. The reloads it runs on each save aren't
   // audited one by one: turning it on is the decision.

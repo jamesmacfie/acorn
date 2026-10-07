@@ -17,6 +17,11 @@ export type GenerateTextRequest = {
   timeoutMs?: number
 }
 
+/** What a loaded plugin passes. With no `backendId`, the host spends the grant the owner set for that
+ *  plugin and refuses when there is none or today's allowance is gone (../modelProviders/grants.ts).
+ *  Core's own callers keep `GenerateTextRequest`, which must name a backend. */
+export type PluginGenerateTextRequest = Omit<GenerateTextRequest, 'backendId'> & { backendId?: string }
+
 export type ModelService = {
   // Throws ProviderOperationError with the status the caller should surface: 404 not connected, 401
   // needs auth, 400 bad config, 502 unavailable.

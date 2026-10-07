@@ -82,6 +82,12 @@ export function scopeCore(
       granted.tasks = tasks as CoreServices['tasks']
       continue
     }
+    if (token === 'models') {
+      // Bound to this plugin, so a call that names no backend spends the grant the owner set for it
+      // (../modelProviders/grants.ts). A call that names one is unchanged and only recorded.
+      granted.models = (core.models as CompiledCoreServices['models']).forPlugin(pluginId)
+      continue
+    }
     if (token === 'data:query' || token === 'data:write') {
       // Write implies read, while the projection itself ensures a caller holding only data:query
       // cannot opt out of the read-only transaction with an options object.

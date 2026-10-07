@@ -15,7 +15,7 @@ import { AGENTS_SESSION_MESSENGER } from '../contract/sessionMessages.ts'
 import type { SessionMessages } from '../server/sessions/sessionMessages'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
-import { AGENTS_REQUESTS, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
+import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
 import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { createSessionControl } from '../server/sessions/sessionControl'
@@ -274,6 +274,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         }),
         ctx.capabilities.provide(AGENTS_SESSIONS, {
           list: (taskId) => runtime!.store.lifecycleSessions(taskId),
+        }),
+        ctx.capabilities.provide(AGENTS_REVIEW_INPUT, {
+          read: (ref) => runtime!.store.lifecycleReviewInput(ref),
         }),
       ]
       // Local provider usage plus the pricing overrides it costs against. The probe directory sits

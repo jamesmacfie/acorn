@@ -11,7 +11,6 @@ export const SIMPLE_FACETS = {
   fs: 'fs',
   git: 'git',
   context: 'context',
-  models: 'models',
   identity: 'identity',
   'agent-tool-provenance': 'agentToolProvenance',
   // A sink can read every owner's records. Writing a plugin's own telemetry needs no grant.
@@ -22,6 +21,7 @@ export const SIMPLE_FACETS = {
 // pluginAuthoring.test.ts checks that each token still grants something.
 export const NODE_CORE_FACETS = [
   ...Object.keys(SIMPLE_FACETS),
+  'models',
   'tasks',
   'data:query',
   'data:write',

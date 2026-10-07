@@ -74,6 +74,8 @@ These pages cover harnesses and the work agents do:
 
 - [Session messages](./managed-agents/session-messages.md): `agents:session-messenger`, a plugin's
   attributed note on an interactive session, with its limits and idempotency.
+- [Review input](./managed-agents/session-events.md#review-input): `agents.reviewInput.v1`, one
+  completed turn's text and final answer for a reviewer, bounded and checked against its task.
 
 <a id="provider-native-subagents"></a>
 

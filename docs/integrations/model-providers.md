@@ -81,6 +81,59 @@ message isn't a session. Managed-session naming is an internal consumer with no 
 spends `harness:<session.profileId>` only, and a profile without `aiArgv`, such as Aider, keeps the
 fallback title.
 
+## Plugin model grants
+
+A loaded plugin holding `models` can generate without a person picking a backend. The owner chooses a
+backend, a model, and a daily allowance of output tokens for that plugin on its page in **Settings >
+Plugins**. Core keeps the choice in `plugin_model_grants`, keyed by the Node's owner ID and the plugin
+ID. The page reads and writes it through `GET`, `PUT`, and `DELETE /v1/core/plugins/:id/model-grant`,
+which are device-only and unreachable from a plugin frame. The Node refuses a backend that isn't in
+`models.available()` and a model that isn't in that backend's catalog. A plugin can't reach either
+table, so it can't rewrite its own grant.
+
+`scopeCore` hands a loaded plugin a models facet bound to its ID (`modelProviders/grants.ts`). A call
+that leaves out `backendId` spends the grant:
+
+- `userId` must equal `ctx.core.identity.active()`. Any other value fails with
+  `provider_bad_config`, and so does an `input.modelId` that differs from the grant's model.
+- With no grant, the call fails with `provider_not_configured`. Past the allowance, it fails with
+  `provider_budget_exhausted` and status 429. Neither reaches a provider, and neither falls back to
+  `available()[0]`.
+- A call that names a `backendId` runs as it always has. It's recorded in `plugin_model_calls` with
+  path `explicit`, and the allowance doesn't count it. So the allowance caps the omitted-backend path
+  only, not everything the broad `models` permission lets a plugin spend. The settings page says so,
+  and counts the explicit calls.
+
+Core's own callers and built-in plugins keep `GenerateTextRequest`, which must name a backend.
+
+### Accounting
+
+Admission is one synchronous SQLite transaction. It sums the day's charges with open reservations
+counted in full, refuses the call if this reservation would pass the allowance, and writes the
+reservation. The provider call runs after the transaction commits. Concurrent calls can't admit more
+than the allowance, because the Node is the only writer and the transaction doesn't yield.
+
+- A connection call reserves its `maxOutputTokens`. On success it's charged the output tokens the
+  provider reported, or the whole reservation when the provider reported none.
+- An agent CLI call is charged a fixed estimate of 4,000 output tokens, whatever it reports, because a
+  CLI ignores `maxOutputTokens`. The reported usage is kept beside the charge. The estimate is a
+  call-count approximation, not a token ceiling, and the settings page says that.
+- A refusal that happens before anything is generated releases the reservation:
+  `provider_not_connected`, `provider_needs_auth`, `provider_bad_config`, and
+  `provider_secret_unreadable`. A removed backend is one of these.
+- Every other failure stays charged in full, because the provider may have spent: a timeout, an
+  unavailable provider, and a caller's cancellation. The caller's `AbortSignal` crosses the loaded
+  worker and reaches the provider call.
+- A call keeps the Node-local calendar day it was admitted on, across midnight. The allowance resets
+  at the Node's midnight.
+- A changed grant applies to the next call. A call already admitted keeps its backend and its
+  reservation.
+- At boot, `chargeInterruptedModelCalls` charges every reservation an earlier process left open, in
+  full, and drops rows older than 30 days.
+
+The accounting counts output tokens, not money. Acorn doesn't know every connection's price, and a CLI
+has none. No prompt, response, or credential is stored or sent to telemetry.
+
 ## Consumers
 
 Three routes use the seam, each with its own prompt:
@@ -97,6 +150,10 @@ generate spends your key or your CLI login. Each offers `models.available(userId
 its own. Workflows asks twice: when the first definition fails the checker, the messages go back once,
 which is why its route has a longer timeout
 ([generating and editing with AI](../workflows/authoring.md#generating-and-editing-with-ai)).
+
+The loaded advisor package in `docs/future/pi/packages/advisor/` is the one consumer of the grant
+path. It reviews completed interactive turns
+([review input](../managed-agents/session-events.md#review-input)).
 
 A `ProviderOperationError` reaches the client with the status you act on, 401 to reconnect and 429 to
 wait. Anything else is flattened to `provider_unavailable`

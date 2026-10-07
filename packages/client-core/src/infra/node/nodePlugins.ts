@@ -4,6 +4,7 @@ import {
   corePluginInputGrantRoute,
   corePluginInstallRoute,
   corePluginLogsRoute,
+  corePluginModelGrantRoute,
   corePluginReloadRoute,
   corePluginRequestRoute,
   corePluginReviewRoute,
@@ -20,6 +21,7 @@ import {
   type PluginUninstallResult,
   type PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
+import type { PluginModelGrantState } from '@acorn/protocol/modelProviders.ts'
 import { readJson, writeJson } from './apiClient'
 import { activeNodeId } from './activeNode'
 import { onScopeEvicted } from '../../host/registries/shell/scopeEviction'
@@ -143,6 +145,18 @@ export const grantPluginInputs = async (id: string, sources: PluginInputGrant['s
 
 export const revokePluginInputs = async (id: string, nodeId?: string): Promise<void> => {
   await mutate(corePluginInputGrantRoute(id), 'DELETE', {}, nodeId)
+}
+
+// The model a plugin spends when it names none, and its daily allowance
+// (docs/integrations/model-providers.md § Plugin model grants). Read and written on the active Node.
+export const readPluginModelGrant = async (id: string, signal?: AbortSignal): Promise<PluginModelGrantState> =>
+  await readJson<PluginModelGrantState>(corePluginModelGrantRoute(id), signal ? { signal } : {})
+
+export const savePluginModelGrant = async (id: string, grant: NonNullable<PluginModelGrantState['grant']>): Promise<PluginModelGrantState> =>
+  await mutate<PluginModelGrantState>(corePluginModelGrantRoute(id), 'PUT', grant)
+
+export const removePluginModelGrant = async (id: string): Promise<void> => {
+  await mutate(corePluginModelGrantRoute(id), 'DELETE', {})
 }
 
 // The owner's answer to one agent-raised approval request (docs/plugins/agent-install.md § Approval-mediated

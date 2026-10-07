@@ -22,11 +22,17 @@ schemas.
 | Dashboard measure history | `dashboard_measure_samples` |
 | Dashboard authoring | `dashboard_drafts`, `dashboard_revisions` |
 | Saved queries | `query_drafts`, `query_revisions`, `query_consumers`, `query_publication_holds` |
+| Plugin model grants | `plugin_model_grants`, `plugin_model_calls` |
 
 - `devices` stores only token hashes.
 - `integrations` stores encrypted provider credentials and non-secret provider metadata.
 - `task_pulls` stores the pull request relations acorn created for a task, including managed-agent
   provenance. The GitHub mirror stays plugin-owned and disposable.
+- `plugin_model_grants` stores the backend, model, and daily allowance the owner chose for a loaded
+  plugin, keyed by owner ID and plugin ID. `plugin_model_calls` stores one row per call that plugin
+  made through its models facet: its day, reservation, charge, and reported usage, never a prompt or a
+  response. Boot charges any reservation left open and drops rows older than 30 days
+  ([plugin model grants](../integrations/model-providers.md#plugin-model-grants)).
 - `config_acks` stores the exact hash and snapshot of trusted executable repository configuration.
 - The schedule tables split state from definition by owner. A schedule core or a plugin declares keeps
   its definition in the registry and only its overrides and run state in `schedule_state`. A

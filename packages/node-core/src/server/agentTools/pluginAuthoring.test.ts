@@ -135,7 +135,7 @@ describe('the permission facets are the ones scopeCore honours', () => {
   // debugs. `scopeCore` gates by omission, so "this token grants something" is exactly "the returned
   // object is not empty", which is also why an unknown token has to come back empty.
   const core = {
-    fs: {}, git: {}, tasks: {}, context: {}, models: {}, data: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
+    fs: {}, git: {}, tasks: {}, context: {}, models: { forPlugin: () => ({}) }, data: {}, identity: {}, prefs: { read: () => {}, write: () => {} },
     projects: { byId: 1, byGithub: 1, checkouts: 1, externalProjects: 1, config: 1, assertConfigTrusted: 1, setup: 1, create: 1, update: 1 },
     secrets: {}, proc: {}, telemetry: { onBatch: () => ({ dispose: () => {} }) },
   } as unknown as CoreServices

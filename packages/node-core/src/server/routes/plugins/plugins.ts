@@ -15,6 +15,9 @@ import { eq } from 'drizzle-orm'
 import type { PluginInputGrant, PluginInputGrantState, PluginLogs } from '@acorn/protocol/api.ts'
 import { declaredInputs, sameInputs } from '../../plugins/inputGrants'
 import { pluginInputUsage } from '../../dashboards/inputUsage'
+import { MAX_DAILY_OUTPUT_TOKENS } from '../../modelProviders/grantSchema'
+import { createModelService } from '../../core/models'
+import { ownerId } from '../../middleware/requireUser'
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
@@ -40,6 +43,13 @@ const requestDecisionBody = z.strictObject({
   message: z.string().min(1).max(400).optional(),
 })
 const bundleHash = /^[0-9a-f]{64}$/
+const modelGrantBody = z.strictObject({
+  backendId: z.string().min(1).max(200),
+  modelId: z.string().max(200),
+  dailyOutputTokens: z.number().int().min(1).max(MAX_DAILY_OUTPUT_TOKENS),
+})
+// Loaded when the settings page asks, so boot doesn't carry it.
+const modelGrants = () => import('../../modelProviders/grants')
 // The exact input list the person saw, keyed as a grant keys it (server/plugins/inputGrants.ts).
 const inputGrantBody = z.strictObject({
   sources: z.record(z.string().min(1).max(200), z.record(z.string().min(1).max(32),
@@ -68,6 +78,15 @@ const boundedCommandOutput = async (response: Response): Promise<string | null> 
     text += decoder.decode(part.value, { stream: true })
   }
   return text + decoder.decode()
+}
+
+// A loaded plugin whose installed or running manifest asks for `models`. Anything else has no grant.
+const holdsModels = (bridge: Parameters<typeof pluginState>[0], id: string): string => {
+  const row = pluginState(bridge).plugins.find((entry) => entry.name === id)
+  if (!(row?.active ?? row?.installed)?.permissions.node.core.includes('models')) {
+    throw new BridgeError(404, 'not_found', `${id} doesn't generate text.`)
+  }
+  return id
 }
 
 // The installer's refusals are all operator-fixable: a bad manifest, an unreachable release, a
@@ -343,6 +362,36 @@ export const plugins = new Hono<AppEnv>()
     bridge.inputGrants().delete(id)
     auditRequest(c, { action: 'plugins.inputs.revoked', subject: id })
     broadcastPluginsChanged()
+    return { ok: true }
+  }))
+  // The owner's model choice and daily allowance for a plugin holding `models`
+  // (docs/integrations/model-providers.md § Plugin model grants). Here, behind the device-only mount,
+  // because a plugin must not be able to rewrite its own grant. It's read on every call, so a change
+  // applies to the next call without a restart.
+  .get('/:id/model-grant', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => {
+    const id = holdsModels(bridge, c.req.param('id'))
+    const backends = await createModelService(getDb(c.env), c.env.SECRETS).available(ownerId(c))
+    return (await modelGrants()).modelGrantState(getDb(c.env), ownerId(c), id, backends)
+  }))
+  .put('/:id/model-grant', async (c) => {
+    const parsed = modelGrantBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const id = holdsModels(bridge, c.req.param('id'))
+      const backends = await createModelService(getDb(c.env), c.env.SECRETS).available(ownerId(c))
+      const grants = await modelGrants()
+      const problem = grants.modelGrantProblem(parsed.data, backends)
+      if (problem) throw new BridgeError(400, 'bad_request', problem)
+      grants.writeModelGrant(getDb(c.env), ownerId(c), id, parsed.data)
+      auditRequest(c, { action: 'plugins.models.granted', subject: id, details: { backendId: parsed.data.backendId } })
+      return grants.modelGrantState(getDb(c.env), ownerId(c), id, backends)
+    })
+  })
+  .delete('/:id/model-grant', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => {
+    const id = holdsModels(bridge, c.req.param('id'))
+    const grants = await modelGrants()
+    grants.deleteModelGrant(getDb(c.env), ownerId(c), id)
+    auditRequest(c, { action: 'plugins.models.revoked', subject: id })
     return { ok: true }
   }))
   // The one exception to "nothing here starts a plugin" (docs/plugins/dev-loop.md § The dev loop § Reloading
