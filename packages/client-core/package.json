@@ -106,6 +106,7 @@
     "./host/plugins/distribution.ts": "./src/host/plugins/distribution.ts",
     "./host/plugins/reload.ts": "./src/host/plugins/reload.ts",
     "./host/registries/commands": "./src/host/registries/commands/public.ts",
+    "./host/registries/commands/addresses": "./src/host/registries/commands/addresses.ts",
     "./host/registries/extensionPoints": "./src/host/registries/extensionPoints/public.ts",
     "./host/registries/extensionPoints/extensionPoints.ts": "./src/host/registries/extensionPoints/extensionPoints.ts",
     "./host/registries/extensionPoints/slots.ts": "./src/host/registries/extensionPoints/slots.ts",

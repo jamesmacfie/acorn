@@ -108,3 +108,10 @@ pull request's URL, and `pathForTask` falls back to `/t/:taskId`. Two more claim
 
 Task panes use query parameters: `/t/:taskId?pane=…&item=…` becomes a `PaneIntent` once and is then
 stripped ([addressing a pane](../panes.md#addressing-a-pane)).
+
+The `acorn://` address parser and builder live in `client-core` beside `corePaths.ts`. Parsing is pure,
+so the terminal client can read a link before it connects. The address dispatcher waits for the
+selected Node's shell to finish remounting before it navigates. A project address uses the project
+path to enter its workspace. Loaded plugin project surfaces also name their owning source; selecting
+that source is necessary because the route alone does not choose what the shell renders. If no source
+owns a project subpath, the dispatcher opens the project and reports the missing page.

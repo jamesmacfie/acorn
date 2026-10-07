@@ -46,6 +46,7 @@ import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
 import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands'
+import { registerAddressHost } from '@acorn/client-core/host/registries/commands'
 import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -70,6 +71,7 @@ const SettingsView = lazy(() => import('@acorn/client-core/features/settings/Set
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
 export default function App() {
   const queryClient = useQueryClient()
+  const mountedNodeId = activeNodeId()
   const params = useParams()
   const location = useLocation()
   const navigate = useNavigate()
@@ -297,6 +299,25 @@ export default function App() {
     projects: () => projects.data,
     tasks: () => tasks.data,
     workspaces: () => workspaces.data,
+  })
+
+  // Addresses may arrive while a Node switch is remounting this router. Register only after the
+  // restore and plugin pass have settled, so the dispatcher never navigates an outgoing shell.
+  createEffect(() => {
+    if (!startup.restored() || !clientPluginsReady()) return
+    const unregister = registerAddressHost({
+      nodeId: mountedNodeId,
+      navigate: (path) => navigate(path),
+      openTask: (taskId, path) => {
+        const task = tasks.data?.find((candidate) => candidate.id === taskId)
+        if (!task) return false
+        activateTaskSignals(task)
+        navigate(path)
+        return true
+      },
+      hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
+    })
+    onCleanup(unregister)
   })
 
   // `/t/:taskId?pane=…&item=…`: open a pane on a selected item, once, then strip the params

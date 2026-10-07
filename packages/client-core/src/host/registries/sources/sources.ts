@@ -31,6 +31,9 @@ export type SourceRouteContribution = {
 
 export type SourceContribution<Item = unknown> = {
   id: string
+  // A loaded source's host-minted project surface. Used when an outside address selects the page
+  // directly: the router path alone does not select the rail source that renders its detail.
+  projectSurfaceId?: string
   // The rail's position. Required rather than derived from plugin activation order. See
   // docs/frontend/registries.md § Registries and plugins.
   order: number

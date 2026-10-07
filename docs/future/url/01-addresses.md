@@ -1,6 +1,30 @@
 # Phase 01: addresses
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: none.
+## Completion note, October 7, 2026
+
+Implemented the six-form address parser, navigation-link builder, and in-app dispatcher. The parser
+has a pure leaf export for the terminal client. The dispatcher selects a paired Node, waits for that
+Node's mounted shell, opens the routed place, and reports refusals in the notice ring and a toast.
+It opens a project when a plugin page or task pane is missing. `new-task` still refuses links.
+
+The parser and dispatcher are separate modules rather than one module because importing the parser
+before the terminal connects must not load renderer state. Loaded project surfaces now record their
+owning source so a pasted path selects the surface that renders it. The desktop registers its router
+only after plugin registration and startup restore, using the Node captured when that shell mounts.
+Node IDs are lowercase UUIDs in the Node data root; `local` resolves at dispatch time. Project paths
+already drive workspace selection in the desktop shell.
+
+Verification: 21 parser tests and six dispatcher tests pass. Client-core and desktop scoped lint pass,
+as do all 56 architecture boundary tests. The final `pnpm test` run on Node 26.8 passed 31 of 36
+package tasks. Failures outside this phase remain in generated Tauri schema doc paths, a Node route
+golden list, desktop plugin registration snapshots, the client-core CSS token and route-scope checks,
+and three Node backup tests that timed out under the full run.
+
+Later phases should call `openLink` after the desktop receives a scheme event, use `buildLink` with the
+active Node ID for Copy link, and replace the `new-task` refusal when the promotion flow is ready.
+The terminal can import the pure `addresses` entry before it connects.
+
+Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md), especially [the address format](./README.md#the-address-format) and
 [the safety rules](./README.md#safety-rules).
 

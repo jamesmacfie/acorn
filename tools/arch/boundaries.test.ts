@@ -619,7 +619,8 @@ describe('architecture boundaries', () => {
       // remote tree can write a `tipKey` without the renderer-only barrel. One more the same day for
       // `features/editor/documentCustody.ts`, merged in from perf. One more on 2026-10-06 for
       // `kit/lib/ansi`, so the terminal kit's CodeBlock strips escape codes without that barrel.
-      '@acorn/client-core': 169, // Includes the host-owned Datasets settings page and the panel studio's open flag.
+      // The address parser is a pure leaf for the terminal before its renderer host connects.
+      '@acorn/client-core': 170,
       '@acorn/node-core': 65,
       '@acorn/custody': 10,
       '@acorn/dashboards-core': 16, // Shared SQL/in-memory summary and time-bucket semantics, the plan's labels, and its outline.
