@@ -14,6 +14,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [url/](./url/README.md) | `acorn://` links that open the desktop app on a task, project page, plugin page, settings page, or rail source, plus **Copy link**, a confirmed new-task action, and `acorn --link` for the terminal client. Six sequential phases. | Planned, October 7, 2026; implementation not started. |
 | [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
