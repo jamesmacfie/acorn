@@ -22,8 +22,8 @@ The agreed behavior is:
 
 - Support Acorn's normal icons on a solid background colour or a gradient, and uploaded images.
 - Use initials when a workspace has no configured icon.
-- Show the icon beside the selected workspace name and beside each dropdown entry, independent
-  of whether the workspace rail is enabled.
+- Show the icon beside the selected workspace name and beside each dropdown entry when the workspace
+  rail is hidden. Showing the rail hides the top-bar workspace dropdown.
 - Offer **Show workspace rail** in **Settings > Appearance**, off by default.
 - Edit a workspace's icon on its workspace settings page. Store it on the owning Node.
 - Store rail visibility as a device preference.
@@ -123,7 +123,8 @@ reachable and reveal it when selection changes through another navigation contro
 rail keyboard and focus conventions, with names and selected state exposed to assistive technology.
 
 Turning the setting on or off changes layout without resetting the workspace, task, panes, or
-terminal. The dropdown remains available with the rail enabled. This feature adds no drag ordering,
+terminal. Hide the dropdown while the rail is enabled and restore it when the rail is hidden.
+This feature adds no drag ordering,
 workspace badges, creation button, or replacement plugin slot.
 
 ### Layout and terminal client
@@ -234,7 +235,8 @@ The implementation is complete when these observable behaviors pass:
 - A workspace can save an icon with a solid background, an icon with a gradient, or an uploaded
   image. Replacement, reset, crop cancellation, and failed-save recovery work.
 - The selected switcher label and each dropdown entry show the same workspace appearance with the
-  rail off and on. Names, filtering, active indication, and Node identification remain usable.
+  rail off. Enabling the rail hides the dropdown. Names, filtering, active indication, and Node
+  identification remain usable.
 - The rail is off by default, follows the device after relaunch, and does not follow Node switches.
   Enabling or disabling it preserves the active task and mounted pane state.
 - Both left rails use the same width across style packs. Tiles remain distinguishable in light and

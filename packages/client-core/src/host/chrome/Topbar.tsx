@@ -21,7 +21,7 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <Show when={props().workspacesMode && props().workspaces.length}>
+        <Show when={props().workspacesMode && props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
             size="sm"
             label={<span class="workspace-identity-label"><Show when={props().workspace}>{(workspace) => <WorkspaceIdentity name={workspace().label} appearance={workspace().appearance} nodeId={props().node?.id} />}</Show>{props().workspace?.label ?? (props().workspacesMode === 'off' ? 'Select a project' : 'Select a workspace')}</span>}

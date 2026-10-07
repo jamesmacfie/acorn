@@ -43,6 +43,8 @@ export type TopbarData = {
   workspacesMode: WorkspacesMode | null
   workspace: { id: string; label: string; appearance?: WorkspaceAppearance | null } | null
   workspaces: readonly { id: string; label: string; nodeId: string; nodeLabel: string; projectCount: number; appearance?: WorkspaceAppearance | null }[]
+  /** False when the desktop workspace rail supplies switching. Omission keeps the picker visible. */
+  workspacePickerVisible?: boolean
   project: { id: string; label: string } | null
   projects: readonly { id: string; label: string }[]
   projectPickerVisible: boolean

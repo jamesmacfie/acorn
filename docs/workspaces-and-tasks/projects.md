@@ -58,6 +58,10 @@ With workspaces off, the Node refuses workspace create, rename, and delete, and 
 another workspace with 409 `workspaces_off`. Renaming a project renames its workspace. Bootstrap
 lists workspaces without creating `Default`.
 
+Appearance-only updates to a paired workspace remain available in separate mode. They preserve its
+name and project membership. Deleting the project also removes image bytes that no other workspace
+references.
+
 Drag a project's grip in Settings → Overview or a workspace's Projects table to reorder it within
 that workspace. The insertion line shows where it will land. You can also open the grip's menu and
 choose **Move up** or **Move down**, or focus the grip and press Alt+Up or Alt+Down. Escape cancels a

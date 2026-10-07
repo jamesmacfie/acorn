@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web'
+import { createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SlotRef, TopbarProps } from '@acorn/protocol/chrome.ts'
 import Topbar from './Topbar'
@@ -14,6 +15,7 @@ describe('core topbar', () => {
   it('draws its shell chrome from the shared contract and places status items', () => {
     const right = 'minted-right' as SlotRef
     const navigate = vi.fn()
+    const [workspacePickerVisible, setWorkspacePickerVisible] = createSignal<boolean>()
     const props: TopbarProps = {
       workspacesMode: 'on',
       workspace: { id: 'w1', label: 'Work' },
@@ -31,13 +33,19 @@ describe('core topbar', () => {
     document.body.append(host)
     dispose = render(() => (
       <WithNestedChromeSlots slots={[{ ref: right, render: () => <span data-status>Ready</span> }]}>
-        <Topbar value={props} />
+        <Topbar value={{ ...props, workspacePickerVisible: workspacePickerVisible() }} />
       </WithNestedChromeSlots>
     ), host!)
     expect(host.querySelector('.topbar')).not.toBeNull()
     expect(host.querySelector('[data-node="n1"]')).not.toBeNull()
     expect(host.querySelector('[data-status]')?.textContent).toBe('Ready')
     expect(host.textContent).toContain('#4')
+    expect(host.querySelector('[aria-label="Workspace"]')).not.toBeNull()
+    setWorkspacePickerVisible(false)
+    expect(host.querySelector('[aria-label="Workspace"]')).toBeNull()
+    expect(host.querySelector('[aria-label="Project"]')).not.toBeNull()
+    setWorkspacePickerVisible(true)
+    expect(host.querySelector('[aria-label="Workspace"]')).not.toBeNull()
     host.querySelector<HTMLButtonElement>('.breadcrumb button')?.click()
     expect(navigate).toHaveBeenCalledWith('/p/p1')
   })

@@ -85,6 +85,7 @@ decision.
 - `--dash-cell` and `--dash-pitch` are a dashboard grid's measured cell size and pitch, from
   `PanelGrid`'s `ResizeObserver`.
 - `--term-drawer-h` is the terminal drawer's height, and `--left` is a reserved override hook.
+- `--left-rails-w` is the combined left rail width, published by the desktop shell for body portals.
 - `--l` and `--r` are Shiki's per-token syntax colors. An `ansi` `CodeBlock` sets them on each colored
   run of terminal output, with `--lb` and `--rb` for a background.
 - `--state-color`, `--label-color`, and `--chip-color` are live provider colors from an external API

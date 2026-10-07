@@ -44,10 +44,10 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
 }
 
 export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: OwnerActions } {
-  const { workspacesMode, workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
+  const { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
     breadcrumb, node, nodes, account, canAddProject, slots } = value
   return {
-    data: { workspacesMode, workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
+    data: { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
       breadcrumb, node, nodes, account, canAddProject, slots },
     actions: {
       pickWorkspace: (selection) => {

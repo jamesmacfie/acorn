@@ -1,7 +1,8 @@
 # Workspace icons
 
 Workspace appearance belongs to the owning Node. The desktop shows it beside the selected workspace
-name, in switcher rows, and in the optional workspace rail. Configure it under a workspace's
+name and in switcher rows when the workspace rail is hidden, or in the optional workspace rail
+when it is shown. Configure it under a workspace's
 **General > Icon** setting, including for Default. Resetting an icon restores initials derived from
 the workspace name. Missing metadata, unsupported versions, and unavailable images also show initials.
 
@@ -26,6 +27,9 @@ The version 1 `WorkspaceAppearance` contract in
 `Workspace.appearance` and the public top-bar workspace data carry optional metadata only. Absence
 means initials. The Node validates catalogue membership during an icon write. The icon census
 generates its name list from the renderer's Lucide dependency.
+
+Switcher tiles are 18 pixels square and centered within the caption. Rail tiles follow the pane
+header size, capped at 28 pixels. Settings previews use these same sizes.
 
 ## Images and limits
 
@@ -73,6 +77,14 @@ releases its object URL. Failed reads leave the stored appearance intact and sho
 **Settings > Appearance > Show workspace rail** is off by default. The device preference
 `workspace_rail` projects to the desktop's `acorn.json` field `workspaceRail`. It follows the device
 across Node changes. The terminal client offers no icon controls or rail option and fetches no images.
+
+In separate mode, the control says **Show project rail**, and the rail uses the paired project
+workspaces. The empty-project screen hides both left rails while keeping Settings and Node switching
+available.
+
+Showing the rail hides the workspace dropdown in the top bar; hiding the rail restores it. The
+public top-bar field `workspacePickerVisible` carries this choice to replacement providers. Hosts
+that omit the field retain the dropdown.
 
 The rail sits before the source/task rail below the top bar. It uses `--tabrail-w` and `RailTab`
 geometry, with a selection marker outside the artwork. It shares the switcher's roster, ordering,

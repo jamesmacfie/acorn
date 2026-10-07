@@ -4,7 +4,7 @@ This plan makes a fresh install project-first. Each project gets its own workspa
 a project, and the Default workspace is never created. Read this page before you build a phase. It
 holds the research and the decisions the phase files depend on.
 
-Date: October 8, 2026. Status: all six phases implemented and integrated; ready for merge review.
+Date: October 8, 2026. Status: all six phases implemented and integrated with main; validation complete.
 
 The phase completion notes record the implementation and review decisions. Shipped behavior is
 documented in [projects](../../workspaces-and-tasks/projects.md),
@@ -12,6 +12,8 @@ documented in [projects](../../workspaces-and-tasks/projects.md),
 The research below describes the code as it stood when the plan was written on October 7, 2026.
 
 ## Combined validation
+
+### Before main integration
 
 October 8, 2026: full lint passed all 37 tasks. The full test gate completed with 28 of 36 tasks
 passing. Focused reruns resolved the missed wording consumers, the architecture scan's test rename,
@@ -36,6 +38,27 @@ Affected typechecks and lint passed after the fixes. Final builds passed the sto
 3,149,652 of 3,150,000 bytes for the Node service, and 718,210 of 720,000 bytes for terminal startup.
 The full gate ran once; the checks that failed were rerun after their fixes. No failures remain
 open. Phase notes record the isolated desktop and terminal checks and the native-dialog driver limit.
+
+### Main integration
+
+October 8, 2026: integrated main's workspace icons, optional rail, and subsequent sizing and picker
+refinement. Conflict resolutions preserve project-mode labels, empty-screen behavior, appearance
+metadata, remote chrome data, and the single keybinding dispatcher. Shared workspace removal prunes
+unreferenced image bytes inside the deletion transaction. Appearance-only writes remain available
+for paired workspaces; direct renames remain refused in separate mode.
+
+Full lint passed all 37 tasks. The full test run passed 27 of 36 tasks before the merge fixes.
+Sequential reruns passed every failed check without changing deadlines. These include all 87
+architecture checks, 20 workspace route tests, 695 terminal tests, and the desktop package gate:
+189 client tests, 11 packaged boot tests, and 65 Rust tests. The packaged icon fixture explicitly
+selects grouped mode before requesting Default. Final chrome and token checks passed 44 tests.
+
+Build budgets from main remain unchanged: the Node service uses 3,152,094 of 3,153,000 bytes, and
+terminal startup uses 719,593 of 720,000 bytes. Git reports no unresolved merge entries.
+
+An isolated desktop session in separate mode showed the Project picker and Show project rail
+control. Enabling the rail showed Projects navigation and hid the duplicate picker. Its screenshot
+was inspected, and the session was stopped.
 
 ## Goal
 

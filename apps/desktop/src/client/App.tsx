@@ -509,6 +509,7 @@ export default function App() {
     })
     return {
       workspacesMode: workspaceMode() ?? null,
+      workspacePickerVisible: !workspaceRailShown(prefs.data),
       workspace: !empty && activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name, appearance: activeWorkspace()!.appearance } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
         id: entry.workspace.id, label: entry.workspace.name, appearance: entry.workspace.appearance, nodeId: entry.nodeId,
