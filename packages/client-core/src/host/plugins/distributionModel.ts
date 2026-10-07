@@ -88,6 +88,14 @@ export const decisionKey = (pluginId: string, hash: string): string => JSON.stri
 export const awaitingInputApproval = (row: NodePluginRow): boolean =>
   !row.disabled && !row.pendingReview && !!row.inputs?.inputs.some((input) => !input.approved)
 
+/** The running version supplies a skill the owner hasn't approved at its current digest
+ *  (docs/managed-agents/skills.md § Skills). */
+export const awaitingSkillApproval = (row: NodePluginRow): boolean =>
+  !row.disabled && !row.pendingReview && !!row.skills?.skills.some((skill) => !skill.approved)
+
+/** Anything the node holds back until the owner answers in the trust prompt. */
+export const awaitingNodeApproval = (row: NodePluginRow): boolean => awaitingInputApproval(row) || awaitingSkillApproval(row)
+
 // One acknowledgement covers one exact pair. If nodes attach different grants to the same bytes,
 // no selection or prompt may turn that single decision into authority for both declarations.
 const enforcedDeclaration = (candidate: OfferedPluginCandidate): string => clientDeclaration(candidate.declaration)
@@ -218,13 +226,13 @@ export function derivePluginDistribution(
       ...(previous ? { previous } : {}),
     })
   }
-  // What a plugin's derived sources read is approved on its node, not per bundle, so a node-only plugin
-  // asks too. A plugin whose bundle already waits above asks once: that request's row carries `inputs`,
-  // and the dialog records both answers. An agent-staged package asks in its own review instead.
+  // What a plugin's derived sources read, and the skills it supplies, are approved on its node, not per
+  // bundle, so a node-only plugin asks too. A plugin whose bundle already waits above asks once: that
+  // request's row carries `inputs` and `skills`, and the dialog records every answer. An agent-staged package asks in its own review instead.
   for (const observation of byNode.values()) {
     if (!observation.reachable || observation.stale) continue
     for (const row of observation.rows) {
-      if (!awaitingInputApproval(row) || selectedDevice.has(row.name)) continue
+      if (!awaitingNodeApproval(row) || selectedDevice.has(row.name)) continue
       if (pendingTrust.some((request) => request.row.name === row.name && request.nodeId === observation.nodeId)) continue
       pendingTrust.push({
         row, hash: '', nodeId: observation.nodeId, sourceNodeIds: [observation.nodeId],

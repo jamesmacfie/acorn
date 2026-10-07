@@ -13,3 +13,9 @@ export { runDashboard } from '../server/dashboards/run.ts'
 
 // Seed authenticated legacy proposal records in migration fixtures.
 export { issueAgentToolProvenance } from '../server/agentTools/provenance'
+
+// The skill catalogue as the host fills it from a loaded package (docs/managed-agents/skills.md § Skills).
+// Here rather than on the plugins barrel, which the Node imports at boot and the reader must stay out of.
+export { readPackageSkill } from '../server/plugins/skills.ts'
+export { skillStateStore } from '../server/plugins/skillState.ts'
+export { catalogueSkills, registerSkill, skillDeliveries } from '../server/pluginHost/skills.ts'

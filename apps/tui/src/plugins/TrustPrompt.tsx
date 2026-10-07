@@ -1,8 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createMemo, createSignal, For, Show } from 'solid-js'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
-import { pendingBundleTrust, resolvePendingTrust } from '@acorn/client-core/host/plugins/distribution.ts'
-import { recordTrustDecision, TIER_LABEL, trustTiers } from '@acorn/client-core/host/trust/trustModel.ts'
+import { pendingTerminalTrust, resolvePendingTrust, terminalAnswersSkills } from '@acorn/client-core/host/plugins/distribution.ts'
+import { recordNodeDecision, recordTrustDecision, TIER_LABEL, trustTiers } from '@acorn/client-core/host/trust/trustModel.ts'
 import { Modal, ModalBody, SectionHeader } from '../kit/grouping'
 import { Alert, Row, Rows } from '../kit/showing'
 import { Line } from '../kit/cells'
@@ -31,7 +31,7 @@ export function TrustPrompt() {
   const [saving, setSaving] = createSignal(false)
   const [error, setError] = createSignal('')
 
-  const request = () => pendingBundleTrust()[0]
+  const request = () => pendingTerminalTrust()[0]
   const nodeLabel = (nodeId: string) => nodes().find((node) => node.nodeId === nodeId)?.label ?? nodeId
   const tiers = createMemo(() => trustTiers(request()))
   // What an update is actually about. Leading with it is the reason an update re-prompts at all.
@@ -52,7 +52,9 @@ export function TrustPrompt() {
     if (!current || saving()) return
     setSaving(true)
     setError('')
-    void recordTrustDecision(current, key === 'accepted' ? 'accepted' : 'rejected')
+    const decision = key === 'accepted' ? 'accepted' : 'rejected'
+    void (terminalAnswersSkills(current.row) ? recordNodeDecision(current, decision) : Promise.resolve())
+      .then(() => current.hash ? recordTrustDecision(current, decision) : undefined)
       .catch((problem: unknown) => setError(problem instanceof Error ? problem.message : 'Could not record the decision.'))
       .finally(() => setSaving(false))
   }

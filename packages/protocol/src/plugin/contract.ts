@@ -21,7 +21,7 @@ import {
 import { extensionDescriptor, extensionPointDescriptor } from './manifest/extensionDescriptors.ts'
 import { brandMark, entry, ID_RE, nodePermissions } from './manifest/manifestFields.ts'
 import { pluginAgentToolDescriptorSchema, pluginContextSectionDescriptorSchema } from './runtimeContributions.ts'
-import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, taskCheckDescriptor } from './manifest/runtimeDescriptors.ts'
+import { auditActionDescriptor, harnessDescriptor, scheduleDescriptor, skillDescriptor, taskCheckDescriptor } from './manifest/runtimeDescriptors.ts'
 import { documentCompletions, documentRegion, frameSurface, navigationDestination } from './manifest/surfaces.ts'
 
 // A saved start for a managed session: a harness, the provider options it starts on, text for its
@@ -86,6 +86,9 @@ const contributionsShape = z.looseObject({
   // Custom agents. The ctx twin is the `agents.customAgentRegistry` capability. See
   // docs/managed-agents/custom-agents.md § Custom agents.
   customAgents: z.array(customAgentDescriptor).max(8).default([]),
+  // Procedures agents load by name. The host reads each folder, and agents delivers them on every
+  // session start (docs/managed-agents/skills.md § Skills).
+  skills: z.array(skillDescriptor).max(16).default([]),
   // Node-runtime carriers. The host adapts these into the same registries compiled contributions use.
   agentTools: z.array(pluginAgentToolDescriptorSchema).max(16).default([]),
   contextSections: z.array(pluginContextSectionDescriptorSchema).max(8).default([]),
@@ -353,6 +356,7 @@ export type PluginScheduleDescriptor = z.infer<typeof scheduleDescriptor>
 export type PluginTaskCheckDescriptor = z.infer<typeof taskCheckDescriptor>
 export type PluginAuditActionDescriptor = z.infer<typeof auditActionDescriptor>
 export type PluginHarnessDescriptor = z.infer<typeof harnessDescriptor>
+export type PluginSkillDescriptor = z.infer<typeof skillDescriptor>
 export type PluginCustomAgentDescriptor = z.infer<typeof customAgentDescriptor>
 export type { PluginAgentToolDescriptor, PluginContextSectionDescriptor } from './runtimeContributions.ts'
 export type { PluginCliCommandDescriptor } from './cliCommands.ts'
@@ -384,6 +388,7 @@ export type PluginContributions = {
   auditActions?: PluginAuditActionDescriptor[]
   harnesses?: PluginHarnessDescriptor[]
   customAgents?: PluginCustomAgentDescriptor[]
+  skills?: PluginSkillDescriptor[]
   agentTools?: import('./runtimeContributions.ts').PluginAgentToolDescriptor[]
   contextSections?: import('./runtimeContributions.ts').PluginContextSectionDescriptor[]
   cliCommands?: import('./cliCommands.ts').PluginCliCommandDescriptor[]

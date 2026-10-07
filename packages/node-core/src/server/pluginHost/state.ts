@@ -6,6 +6,8 @@ import type { InstalledPluginInfo, PluginLoadFailure } from '../plugins/loader'
 import type { ActivePluginSnapshot } from '../plugins/loader'
 import type { PendingPluginReview } from '../plugins/pendingReview'
 import { pluginInputs, type InputGrantsStore } from '../plugins/inputGrants'
+import type { SkillStateStore } from '../plugins/skillState'
+import { pluginSkills } from './skills'
 import type { PluginDevelopment } from '../plugins/development'
 import { registeredDataSource } from '../dataSources/registry'
 import { parseDataSourceInputRef } from '@acorn/protocol/dataSources.ts'
@@ -81,6 +83,9 @@ export type PluginsBridge = {
   // The person's approvals of what loaded plugins' derived sources read (server/plugins/inputGrants.ts).
   // A fresh read per call, as the input handles do, so a grant written elsewhere shows at once.
   inputGrants(): InputGrantsStore
+  // The owner's approvals and switches for loaded plugins' skills (server/plugins/skillState.ts), read
+  // fresh per call like the input grants above.
+  skillState(): SkillStateStore
   // Development mode for folder-installed node plugins: the watch, the reload, the log lines, and the
   // development grant (server/plugins/development.ts).
   development: PluginDevelopment
@@ -176,6 +181,7 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
   // step with the first by hand, the exact habit the one-declaration contract exists to end. What keeps
   // the spread honest is the exactness assertion at the top of this file.
   const grants = bridge.inputGrants()
+  const skillState = bridge.skillState().get()
   const roster = new Map(bridge.roster().map((entry) => [entry.name, entry]))
   // An input names its source by the plugin that owns it. A compiled owner's label is acorn's own words;
   // a loaded owner wrote its label itself, so the id stands in, as it does in the trust prompt.
@@ -188,14 +194,17 @@ export const pluginState = (bridge: PluginsBridge): { plugins: NodePluginRow[]; 
       ...(!registered || registered.providerId ? { provider: owner } : {}),
     }
   }
-  const declared = (name: string): Pick<NodePluginRow, 'installed' | 'inputs' | 'development'> => {
+  const declared = (name: string): Pick<NodePluginRow, 'installed' | 'inputs' | 'skills' | 'development'> => {
     const entry = installed.get(name)
     if (!entry) return {}
     const { id: _id, label: _label, hasNode: _hasNode, ...row } = entry satisfies InstalledPluginInfo
     const inputs = pluginInputs(entry.contributions.dataSources, grants.get(name), describeInput)
+    // From the catalogue, which holds what the running version loaded, never the disk candidate: a
+    // skill is approved as the bytes an agent will be pointed at.
+    const skills = pluginSkills(name, skillState)
     const development = entry.hasNode ? bridge.development.state(name) : undefined
     return {
-      installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}),
+      installed: row satisfies DeclaredRow, ...(inputs ? { inputs } : {}), ...(skills ? { skills } : {}),
       ...(development ? { development: { on: development.on, ...(development.reloadedAt ? { reloadedAt: development.reloadedAt } : {}) } } : {}),
     }
   }

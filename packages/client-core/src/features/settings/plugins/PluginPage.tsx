@@ -33,6 +33,7 @@ import { createSettingSave } from '../settingSave'
 import { pluginName, pluginRow, statusOf, type InstalledPlugin } from './installed'
 import { removeDevicePlugin, setDevicePluginEnabled, setNodePluginEnabled } from './pluginActions'
 import { ModelGrantSection } from './ModelGrantSection'
+import { SkillsSection } from './SkillsSection'
 import './plugins.css'
 
 // One plugin's page under Settings > Plugins > Installed (docs/plugins/activation.md § What the owner
@@ -145,6 +146,7 @@ export function PluginPage(props: PluginPageProps) {
             </Show>
           </SettingsSection>
           <Show when={holdsModels() && !elsewhere()}><ModelGrantSection pluginId={props.plugin.id} /></Show>
+          <Show when={nodeRow()?.skills && !elsewhere()}><SkillsSection pluginId={props.plugin.id} /></Show>
           <Overview plugin={props.plugin} navigate={props.navigate} elsewhere={elsewhere()} />
         </Stack>
       </TabPanel>
@@ -194,6 +196,8 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
   const emits = () => pluginRow(props.plugin).emits ?? []
   // Declared rather than registered: data sources live on the node, so this device has no registry to read.
   const dataSources = () => contributions()?.dataSources ?? []
+  // What the running version supplies, from the node's roster row. The Skills section above holds the switches.
+  const skills = () => pluginRow(props.plugin).skills?.skills ?? []
   const pages = () => settingsRegistry.entries().filter((page) => settingsRegistry.ownerOf(page.id) === props.plugin.id)
   const surfaces = () => CORE_EXCLUSIVE_SLOTS.flatMap((slot) => exclusiveSlotOffers(slot).filter((offer) => offer.pluginId === props.plugin.id))
   const plural = (count: number, word: string) => `${count} ${word}${count === 1 ? '' : 's'}`
@@ -248,6 +252,9 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
       <Show when={dataSources().length}>
         <SettingRow label="Data sources" description={`${dataSources().map((source) => source.name).join(', ')}. You can use them in panels, workflows, and datasets.`} />
       </Show>
+      <Show when={skills().length}>
+        <SettingRow label="Skills" description={`${plural(skills().length, 'procedure')} your agents can load. Switch each one in Skills above.`} />
+      </Show>
       <Show when={emits().length}>
         <SettingRow label="Events it announces" help="Other plugins can react to these." layout="stacked">
           <ul class="plugin-emits">
@@ -255,7 +262,7 @@ function Overview(props: { plugin: InstalledPlugin; navigate: SettingsNavigate; 
           </ul>
         </SettingRow>
       </Show>
-      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length && !dataSources().length}>
+      <Show when={!sources().length && !pages().length && !surfaces().length && !commands().length && !shortcuts().length && !tools() && !emits().length && !dataSources().length && !skills().length}>
         <Text emphasis="muted" wrap>It isn't adding anything right now. A plugin that's off or waiting for approval adds nothing.</Text>
       </Show>
     </SettingsSection>

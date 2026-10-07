@@ -19,6 +19,7 @@ import { openPluginDb } from './storage'
 import { readBundledPluginState } from './bundledState'
 import { disposeUnstartedPlugin, isolateNodePlugin } from './isolation'
 import { hasPendingPluginReview } from './pendingReview'
+import type { PackageSkill } from './skills'
 import type { NodePlugin, PluginStorage } from '../pluginHost/types'
 import type { LoadedPluginBinding } from '../pluginHost/context'
 import { createLogger } from '../telemetry/logger'
@@ -41,6 +42,9 @@ export type LoadedPlugin = {
   shadowsBuiltin: boolean
   migrationsFolder: string | null
   storage: PluginStorage
+  // Read and checked here, once per load, so the host registers bytes it has already seen
+  // (./skills.ts). Absent means none.
+  skills?: PackageSkill[]
 }
 
 /** What the plugin host binds a loaded plugin's context to: its permissions, storage, and the manifest
@@ -59,6 +63,7 @@ export const loadedPluginBinding = (entry: LoadedPlugin): LoadedPluginBinding =>
   auditActions: entry.manifest.contributions.auditActions,
   harnesses: entry.manifest.contributions.harnesses,
   customAgents: entry.manifest.contributions.customAgents,
+  skills: entry.skills,
   agentTools: entry.manifest.contributions.agentTools,
   contextSections: entry.manifest.contributions.contextSections,
   // Hook points this package opens and the route-backed handlers it adds to other plugins' hooks
@@ -410,6 +415,18 @@ type EntryOutcome = { loaded?: LoadedPlugin; installed?: InstalledPlugin; failur
 // siblings from loading.
 async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: ReadonlySet<string>): Promise<EntryOutcome> {
   const { manifest, dir } = entry
+  // Before anything runs: a skill that fails its checks fails the package, with the reason, rather
+  // than quietly leaving the agent without a procedure the owner installed for it.
+  const skills: PackageSkill[] = []
+  if (manifest.contributions.skills.length) {
+    // Loaded only for a package that declares skills, so the reader stays out of the Node's boot.
+    const { readPackageSkill } = await import('./skills')
+    for (const descriptor of manifest.contributions.skills) {
+      const read = readPackageSkill(dir, descriptor)
+      if (!read.ok) return { failure: { id: manifest.id, dir, reason: read.reason } }
+      skills.push(read.skill)
+    }
+  }
   // No node bundle. Its client bundle still has to reach every paired device, which is the whole
   // reason `installed` exists alongside `loaded`.
   if (!manifest.node) {
@@ -438,6 +455,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
         dir,
         shadowsBuiltin: false,
         migrationsFolder: null,
+        skills,
         storage: {
           open: () => {
             throw new PluginMigrationsError(`Plugin '${manifest.id}' opened storage but ships no node half.`)
@@ -498,7 +516,7 @@ async function loadEntry(entry: InstalledPlugin, dataRoot: string, builtins: Rea
   // broken, not client-only, and distributing the UI of a plugin whose routes will never exist would
   // put a row on every paired device claiming a plugin that is not running anywhere.
   return {
-    loaded: { manifest, plugin, dir, shadowsBuiltin: builtins.has(manifest.id), migrationsFolder, storage },
+    loaded: { manifest, plugin, dir, shadowsBuiltin: builtins.has(manifest.id), migrationsFolder, storage, skills },
     installed: entry,
   }
 }

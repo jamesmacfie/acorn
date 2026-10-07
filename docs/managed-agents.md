@@ -93,6 +93,8 @@ These pages cover harnesses and the work agents do:
 <a id="from-a-plugin"></a>
 
 - [Custom agents](./managed-agents/custom-agents.md): saved starts for a session.
+- [Skills](./managed-agents/skills.md): a plugin's named procedures, approved on the Node and indexed
+  at every start and resume.
 
 <a id="web-activity"></a>
 <a id="file-changes"></a>

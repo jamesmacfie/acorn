@@ -86,6 +86,7 @@ The Node runs these, with or without a client attached.
 | Hooks | Both | `ctx.hooks` / `contributions.extensionPoints` (`kind: 'hook'`) and `contributions.extensions` (a `route` plus a `mode`) | A turn in one plugin's decision before it happens ([hooks](./plugins/hooks.md)) |
 | Harnesses | Both | Host seam / `contributions.harnesses` | Managed agent sessions ([harnesses](./managed-agents/harnesses.md)) |
 | Custom agents | Both | Host seam / `contributions.customAgents` | Saved agents under **New** ([custom agents](./managed-agents/custom-agents.md)) |
+| Skills | Loaded | `contributions.skills` | Named procedures every managed session can load, qualified `<pluginId>:<id>` ([skills](./managed-agents/skills.md)). **Direction: stays loaded-only**, because a skill is a folder in a package and a compiled plugin's text ships with acorn |
 | Node actions | Both | Host seam / a `commands` entry whose verb is `runNodeAction` | Work a plugin does when a user schedule asks |
 | Agent tools | Both | `ctx.tools` / `contributions.agentTools` | The MCP, harness HTTP, and renderer projections. The host qualifies a loaded tool as `<pluginId>_<localId>` and applies authority, permissions, risk, and limits before dispatch |
 | Context sections | Both | `ctx.contextSections` / `contributions.contextSections` | The assembled task-context prompt |

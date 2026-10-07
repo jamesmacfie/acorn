@@ -42,6 +42,12 @@ export type PluginContextSectionDescriptor = {
   maxTokens: number
 }
 
+/** A folder in this package holding a standard `SKILL.md`. The host names it `<pluginId>:<id>`. */
+export type PluginSkillDescriptor = {
+  id: string
+  path: string
+}
+
 /** A manifest-declared headless command served by this plugin's Node worker. */
 export type PluginCliCommandDescriptor = {
   name: string

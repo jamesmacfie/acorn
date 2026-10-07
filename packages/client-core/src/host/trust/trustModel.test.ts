@@ -20,7 +20,7 @@ vi.mock('../plugins/syncContributions', () => ({ syncPluginContributions: () => 
 vi.mock('../../infra/node/apiClient', () => ({ readJson: vi.fn(), sendRaw: vi.fn(), writeJson: vi.fn() }))
 
 const { bundleAccepted, pendingTrust, onPluginDistributionCommit, _resetPluginDistribution, _seedPluginDistribution, _seedPendingTrust } = await import('../plugins/distribution')
-const { recordInputDecision, recordTrustDecision, trustTiers } = await import('./trustModel')
+const { recordNodeDecision, recordTrustDecision, trustTiers } = await import('./trustModel')
 const { writeJson } = await import('../../infra/node/apiClient')
 
 // What the trust prompt says, and what answering it does (PluginTrustDialog.tsx draws it).
@@ -274,17 +274,50 @@ describe('what a plugin reads', () => {
   it('accepts by posting the exact list shown, and rejects by turning the plugin off on its node', async () => {
     const asked = reading({ granted: false, inputs: [input('pulls'), input('checks', { optional: true })] })
     vi.mocked(writeJson).mockResolvedValue({ plugins: [], restartRequired: false })
-    await recordInputDecision(asked, 'accepted')
+    await recordNodeDecision(asked, 'accepted')
     const [url, init] = vi.mocked(writeJson).mock.calls[0]!
     expect(url).toBe('/v1/core/plugins/board/input-grant')
     expect(init).toMatchObject({ method: 'POST', nodeId: 'node-a' })
     expect(JSON.parse(String(init!.body))).toEqual({ sources: { board: { pulls: { source: 'github:pulls', optional: false }, checks: { source: 'github:checks', optional: true } } } })
 
     vi.mocked(writeJson).mockClear()
-    await recordInputDecision(asked, 'rejected')
+    await recordNodeDecision(asked, 'rejected')
     const [putUrl, putInit] = vi.mocked(writeJson).mock.calls[0]!
     expect(putUrl).toBe('/v1/core/plugins')
     expect(JSON.parse(String(putInit!.body))).toEqual({ disabled: ['board'] })
+  })
+})
+
+describe('the skills a plugin supplies', () => {
+  const skill = (name: string, over: Partial<NonNullable<NodePluginRow['skills']>['skills'][number]> = {}) => ({
+    name: `board:${name}`, title: name, description: `Do ${name}.`, digest: name[0]!.repeat(64), approved: false, enabled: true, ...over,
+  })
+  const supplying = (skills: NonNullable<NodePluginRow['skills']>) => {
+    const base = request()
+    return { ...base, nodeId: 'node-a', row: { ...base.row, skills } }
+  }
+
+  it('discloses them as one ordinary declared line with every name', () => {
+    const lines = trustTiers(supplying({ granted: false, skills: [skill('review'), skill('migrate')] })).flatMap((tier) => tier.lines)
+    const line = lines.find((entry) => entry.key.startsWith('skills:'))!
+    expect([line.tier, line.high, line.text]).toEqual(['declared', false, 'Adds 2 procedures your agents can load: migrate, review'])
+  })
+
+  it('marks the line new when one body changed since the owner approved it', () => {
+    const changed = supplying({ granted: true, skills: [skill('review', { approved: true }), skill('migrate', { digest: 'z'.repeat(64) })] })
+    expect(trustTiers(changed).flatMap((tier) => tier.lines).filter((line) => line.added).map((line) => line.key.slice(0, 7))).toEqual(['skills:'])
+    const unchanged = supplying({ granted: true, skills: [skill('review', { approved: true })] })
+    expect(trustTiers(unchanged).flatMap((tier) => tier.lines).some((line) => line.added)).toBe(false)
+  })
+
+  it('accepts by posting the digests shown to the plugin’s node', async () => {
+    vi.mocked(writeJson).mockClear()
+    vi.mocked(writeJson).mockResolvedValue({ plugins: [], restartRequired: false })
+    await recordNodeDecision(supplying({ granted: false, skills: [skill('review')] }), 'accepted')
+    const [url, init] = vi.mocked(writeJson).mock.calls[0]!
+    expect(url).toBe('/v1/core/plugins/board/skill-grant')
+    expect(init).toMatchObject({ method: 'POST', nodeId: 'node-a' })
+    expect(JSON.parse(String(init!.body))).toEqual({ digests: { 'board:review': 'r'.repeat(64) } })
   })
 })
 

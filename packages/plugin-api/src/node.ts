@@ -53,6 +53,11 @@ export { AGENTS_HARNESS_REGISTRY } from '@acorn/node-core/server/pluginHost'
 export type { HarnessProbe, HarnessRegistry, ManifestHarness, ManifestHarnessSpawn } from '@acorn/node-core/server/pluginHost'
 export { AGENTS_CUSTOM_AGENT_REGISTRY } from '@acorn/node-core/server/pluginHost'
 export type { CustomAgentRegistry, ManifestCustomAgent } from '@acorn/node-core/server/pluginHost'
+// The skill catalogue (docs/managed-agents/skills.md § Skills). Core owns the list and the owner's
+// answers; the agents plugin asks what a starting provider may receive and says what it sent. Compiled
+// only: a loaded bundle inlining this would get its own empty catalogue.
+export { deliverableSkills, recordSkillDelivery } from '@acorn/node-core/server/pluginHost'
+export type { DeliverableSkill } from '@acorn/node-core/server/pluginHost'
 
 // ── Route toolkit ─────────────────────────────────────────────────────────────────────────────
 export type { AppEnv, Principal } from '@acorn/node-core/server/middleware/auth.ts'

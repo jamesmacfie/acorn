@@ -282,8 +282,9 @@ export const managedAgents = new Hono<AppEnv>()
     // can make. Without it a task-scoped agent starts sessions in any task.
     if (!mayActOnTask(c, parsed.data.taskId)) return respondError(c, 404, 'not_found')
     // A custom agent's snapshot is the node's to write, from `customAgentId`. One a client put in
-    // `config` itself would reach the agent's system prompt unread, so it is dropped here.
-    const { customAgent: _unread, standingContext: _standingContext, ...config } = parsed.data.config
+    // `config` itself would reach the agent's system prompt unread, so it is dropped here, with the other
+    // keys only the node writes.
+    const { customAgent: _unread, standingContext: _standingContext, skillIndex: _skillIndex, ...config } = parsed.data.config
     return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.createSession({ ...parsed.data, config }, key))
   })
   .post('/transcript-imports', async (c) => {

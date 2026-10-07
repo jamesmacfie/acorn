@@ -48,6 +48,11 @@ export type NodePluginRow = {
    * only for a loaded plugin whose installed version declares inputs. Separate from `state`, because a
    * plugin waiting for this approval still runs (docs/data-sources/derived-sources.md). */
   inputs?: PluginInputs
+  /** The skills this plugin's running version supplies, and whether the owner approved each at its
+   * current digest. Present only when the running version declares skills. Like `inputs`, separate from
+   * `state`: the plugin runs either way, and an unapproved skill is just not delivered
+   * (docs/managed-agents/skills.md § Skills). */
+  skills?: PluginSkills
   /** Present only for a node plugin installed from a local folder, the one kind development mode is
    * for (docs/plugins/dev-loop.md § Development mode for a folder plugin). `on` while the node watches its
    * files, and `reloadedAt` is the last reload that worked since then, in epoch millis. */
@@ -82,6 +87,37 @@ export type PluginInputLine = {
   /** Whose account the read uses, such as "GitHub". Absent for a source that needs no account. */
   provider?: string
   approved: boolean
+}
+
+export type PluginSkills = {
+  /** Some skill of this plugin was approved before, so an unapproved one is new or changed. */
+  granted: boolean
+  skills: PluginSkillLine[]
+}
+
+export type PluginSkillLine = {
+  /** `<pluginId>:<id>`, minted by the host. */
+  name: string
+  /** The `SKILL.md` frontmatter `name`, and its `description`. Untrusted display text. */
+  title: string
+  description: string
+  /** sha256 over the skill's folder. Approval is of this value. */
+  digest: string
+  approved: boolean
+  enabled: boolean
+}
+
+/** Why a skill is or isn't offered at the next session start, in the order the Node checks. `changed`
+ * means its folder no longer holds the bytes the plugin started with. */
+export type PluginSkillStatus = 'ready' | 'disabled' | 'unapproved' | 'changed'
+
+/** What `GET /v1/core/plugins/:id/skills` returns: each skill, its status, and the last start of each
+ * harness that received it since the Node started. */
+export type PluginSkillState = {
+  skills: Array<PluginSkillLine & {
+    status: PluginSkillStatus
+    deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted' }>
+  }>
 }
 
 export type PluginInputGrant = {
@@ -202,6 +238,10 @@ export const corePluginDevelopmentRoute = (id: string) => `/v1/core/plugins/${en
 export const corePluginLogsRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/logs`
 // The person's approval of what a loaded plugin's derived sources read. Device-only by the same mount.
 export const corePluginInputGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/input-grant`
+// The owner's answers about a plugin's skills: the switches (`/skills`) and the approval of the digests
+// the trust prompt showed (`/skill-grant`). Device-only by the same mount.
+export const corePluginSkillsRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/skills`
+export const corePluginSkillGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/skill-grant`
 // The owner's model choice and daily allowance for a plugin holding `models`. Device-only by the same mount.
 export const corePluginModelGrantRoute = (id: string) => `/v1/core/plugins/${encodeURIComponent(id)}/model-grant`
 // The owner's answer to one agent-raised approval request. Device-only, and permanently unmappable

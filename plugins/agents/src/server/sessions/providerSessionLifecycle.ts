@@ -5,6 +5,8 @@ import type { AgentDriver, AgentDriverEvent, AgentDriverMcpServer, AgentDriverSe
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
+import type { SkillIndex } from '../drivers/skillIndex'
+import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
 
 export type ProviderGeneration = Readonly<{ sessionId: string; number: number }>
 
@@ -42,6 +44,9 @@ type LiveSession = {
   reconnectAttempt: number
   acceptedResponse: boolean
   driver: AgentDriver
+  // This start's skills index, and the part still owed ahead of a turn (../drivers/skillIndex.ts).
+  skills: SkillIndex | null
+  skillsOwed: AgentContextSnapshot | null
 }
 
 export type ProviderLifecyclePorts = {
@@ -55,6 +60,9 @@ export type ProviderLifecyclePorts = {
     unavailable: string[]
   }>
   mcpUnavailable(sessionId: string, names: string[]): Promise<void>
+  /** The skills index a start of this session receives, and the report once a turn carried it. */
+  skills(session: AgentSession): Promise<SkillIndex>
+  skillsDelivered(sessionId: string, index: SkillIndex): Promise<void>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -205,6 +213,7 @@ export class ProviderSessionLifecycle {
       workspaceId: admission?.workspaceId ?? '', providerId: session.providerId,
       stopping: false, closing: false, lastActivityAt: Date.now(),
       reconnectAttempt: existing?.reconnectAttempt ?? 0, acceptedResponse: false, driver,
+      skills: null, skillsOwed: null,
     }
     // Install before any task, ledger, environment, or driver await.
     this.live.set(session.id, live)
@@ -240,8 +249,14 @@ export class ProviderSessionLifecycle {
       // A warning write is durable work. Join it even if stop aborts the following driver start.
       if (mcp.unavailable.length) await this.ports.mcpUnavailable(session.id, mcp.unavailable)
       signal.throwIfAborted()
+      // Read at every start and resume, like the MCP servers above, so a skill switched off or approved
+      // since the last one applies now. A process that keeps running keeps what it was given.
+      const skills = await read(() => this.ports.skills(session))
+      signal.throwIfAborted()
+      live.skills = skills
+      live.skillsOwed = (await import('../drivers/skillIndex')).owedSkillPart(skills, session.config.skillIndex)
       const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
-        cwd, env, mcpServers: mcp.servers, noProviderExecutionHistory, signal, session,
+        cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, noProviderExecutionHistory, signal, session,
         measureStartup,
         onEvent: (event) => this.callback(live, () => this.ports.event(session.id, live.generation, event)),
         onClosed: (error) => this.callback(live, () => this.closed(session.id, live, error)),
@@ -296,9 +311,20 @@ export class ProviderSessionLifecycle {
   ): void {
     const live = this.require(generation)
     if (!this.owns(generation) || !live.handle) throw new Error('Provider session is not connected.')
-    void live.handle.sendTurn(request)
-      .then((result) => this.callback(live, () => onSuccess(result)))
-      .catch((error) => this.callback(live, () => onError(error)))
+    // The skills index rides ahead of the first turn after a start (../drivers/skillIndex.ts). It counts
+    // as delivered once that turn has run, and is owed again if the turn failed.
+    const owed = live.skillsOwed
+    live.skillsOwed = null
+    void live.handle.sendTurn(owed ? { ...request, input: [owed, ...request.input] } : request)
+      .then(async (result) => {
+        // A failed report must not turn a finished turn into a failed one.
+        if (owed && live.skills) await this.callback(live, () => this.ports.skillsDelivered(generation.sessionId, live.skills!)).catch(() => undefined)
+        await this.callback(live, () => onSuccess(result))
+      })
+      .catch((error) => {
+        if (owed) live.skillsOwed ??= owed
+        return this.callback(live, () => onError(error))
+      })
   }
   async handleIfPresent<T>(sessionId: string, operation: (handle: AgentDriverSession) => Promise<T>): Promise<T | null> {
     const live = this.live.get(sessionId)

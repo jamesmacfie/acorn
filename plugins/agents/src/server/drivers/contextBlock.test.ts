@@ -15,8 +15,8 @@ describe('contextBlock', () => {
 })
 
 describe('claudeHarness session metadata', () => {
-  const meta = (kind: AgentSession['kind'], config: Record<string, unknown> = {}) =>
-    claudeHarness.acpSessionMeta!({ kind, config } as AgentSession)
+  const meta = (kind: AgentSession['kind'], config: Record<string, unknown> = {}, skillFolders: string[] = []) =>
+    claudeHarness.acpSessionMeta!({ kind, config } as AgentSession, skillFolders)
 
   it('tells an unattended session how its turns should end, and leaves a chat alone', () => {
     expect(meta('workflow').systemPrompt).toEqual({ append: UNATTENDED_TURN_ENDINGS })
@@ -32,5 +32,16 @@ describe('claudeHarness session metadata', () => {
       .toEqual({ append: `Review for correctness only.\n\n${UNATTENDED_TURN_ENDINGS}\n\nStored memory.` })
     // An agent with no instructions adds nothing.
     expect(meta('interactive', { customAgent: { id: 'a1', name: 'Bug reviewer' } }).systemPrompt).toBeUndefined()
+  })
+
+  // The index itself goes ahead of a turn, because Claude Code keeps the appended prompt a session was
+  // created with.
+  it('grants read access to each skill folder only, and keeps the index out of the system prompt', () => {
+    const sent = meta('interactive', { standingContext: 'Stored memory.' }, ['/data/plugins/acme/skills/review'])
+    expect(sent.systemPrompt).toEqual({ append: 'Stored memory.' })
+    expect(sent.claudeCode).toEqual({ options: { settings: {
+      autoContinueAtUsageLimit: false,
+      permissions: { allow: ['Read(//data/plugins/acme/skills/review/**)'] },
+    } } })
   })
 })

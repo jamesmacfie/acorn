@@ -384,6 +384,7 @@ node: DataSourceService
 node: DataTable
 node: DataType
 node: DataValue
+node: DeliverableSkill
 node: Disposable
 node: Extension
 node: ExtensionPointId
@@ -510,6 +511,7 @@ node: dataFieldSchema
 node: dataFieldsSchema
 node: dataPointerSchema
 node: defaultBudgets
+node: deliverableSkills
 node: describeError
 node: diffDocumentBlobKey
 node: encodeCached
@@ -558,6 +560,7 @@ node: queryContentSchema
 node: queryReferenceSchema
 node: queryScopeSchema
 node: readDataPointer
+node: recordSkillDelivery
 node: registerAcornMcp
 node: rendererBaseCheckout
 node: requireDevice
@@ -627,6 +630,7 @@ testkit: SecretService
 testkit: TestDb
 testkit: TestNodeContext
 testkit: TestPluginDb
+testkit: catalogueSkills
 testkit: confineExistingFile
 testkit: connectProvider
 testkit: connectionProviderRegistry
@@ -645,6 +649,8 @@ testkit: makeTestRequestContext
 testkit: memoryIdentityStore
 testkit: onServerError
 testkit: patchBlobKey
+testkit: readPackageSkill
+testkit: registerSkill
 testkit: rendererBaseCheckout
 testkit: requireUser
 testkit: resolveInRoot
@@ -654,6 +660,8 @@ testkit: seedProviderConnection
 testkit: setRouteTestCapability
 testkit: setRunBridge
 testkit: settleBackground
+testkit: skillDeliveries
+testkit: skillStateStore
 testkit: testAgentToolDescriptor
 testkit: testCliCommandDescriptor
 testkit: testConnection

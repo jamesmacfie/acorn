@@ -115,6 +115,21 @@ describe('loading a plugin', () => {
     expect(installed.map((entry) => entry.manifest.id)).toEqual(['widget'])
   })
 
+  it('runs a skills-only package as a plugin, with its skills read, and fails a broken skill by name', async () => {
+    const dir = install('procedures', manifest('procedures', { node: undefined, contributions: { skills: [{ id: 'review', path: 'skills/review' }] } }))
+    mkdirSync(join(dir, 'skills/review'), { recursive: true })
+    writeFileSync(join(dir, 'skills/review/SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nBody\n')
+    const ok = await loadExternalPlugins(root, { builtins: [] })
+    expect(ok.failures).toEqual([])
+    expect(ok.loaded.map((entry) => [entry.manifest.id, entry.skills?.map((skill) => [skill.id, skill.name])])).toEqual([['procedures', [['review', 'review']]]])
+    expect((await snapshotActivePlugin(ok.installed[0]!)).identity.activation).toBe('node')
+
+    writeFileSync(join(dir, 'skills/review/SKILL.md'), '---\nname: review\n---\nBody\n')
+    const broken = await loadExternalPlugins(root, { builtins: [] })
+    expect(broken.loaded).toEqual([])
+    expect(broken.failures.map((failure) => failure.reason)).toEqual(["skill 'review': frontmatter has no description"])
+  })
+
   it('marks a plugin that deliberately replaces a built-in', async () => {
     install('rollbar', manifest('rollbar'), BUNDLE('rollbar'))
     const { loaded } = await loadExternalPlugins(root, { builtins: ['rollbar', 'github'] })
@@ -544,7 +559,7 @@ describe('declared frame contributions', () => {
     // Present-and-empty rather than absent, so no adapter on the device has to distinguish "declared
     // none" from "did not know about this kind".
     expect(installedPluginInfo(installed[0]).contributions)
-      .toEqual({ frames: [], sources: [], slots: [], commands: [], cliCommands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [] })
+      .toEqual({ frames: [], sources: [], slots: [], commands: [], cliCommands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [] })
   })
 
   it('keeps keys it does not understand, so a manifest written for a newer acorn still loads', async () => {

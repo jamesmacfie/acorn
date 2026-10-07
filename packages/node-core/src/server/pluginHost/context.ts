@@ -20,6 +20,8 @@ import { registerNodeProvider } from '../nodeProviders/registry'
 import { registerRunSource } from '../runs/registry'
 import { AGENTS_HARNESS_REGISTRY, qualifiedHarnessId } from './harnesses'
 import { AGENTS_CUSTOM_AGENT_REGISTRY } from './customAgents'
+import { registerSkill } from './skills'
+import type { PackageSkill } from '../plugins/skills'
 import { registerTaskCheck } from './taskChecks'
 import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
@@ -90,6 +92,8 @@ export type LoadedPluginBinding = {
   harnesses?: readonly PluginHarnessDescriptor[]
   // And its custom agents, by the same route (./customAgents.ts).
   customAgents?: readonly PluginCustomAgentDescriptor[]
+  // Its skills, already read out of the package and checked by the loader (../plugins/skills.ts).
+  skills?: readonly PackageSkill[]
   agentTools?: readonly PluginAgentToolDescriptor[]
   contextSections?: readonly PluginContextSectionDescriptor[]
   destinations?: readonly NonNullable<PluginFrameSurface['destinations']>[number][]
@@ -308,6 +312,11 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         const handle = registry.register({ ...agent, id: qualifiedHarnessId(plugin, agent.id), pluginId: plugin })
         recordUndo(() => handle.dispose())
       },
+    },
+    // Owner-bound like the two above: the catalogue mints `<pluginId>:<id>` from `plugin`. Core owns
+    // the catalogue, so unlike them this lands whether or not agents is running.
+    skills: {
+      register: (skill) => recordUndo(registerSkill(plugin, skill).dispose),
     },
     // Owner-bound on both halves: `open` refuses a point outside this plugin's namespace, and a
     // contributed entry's id is minted from the plugin rather than taken from the entry. Both
@@ -549,7 +558,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
   // every member below, and a logger that throws after a reload breaks the one rule telemetry has:
   // it never fails the thing it describes (docs/telemetry/runtimes.md § Never fail what you measure). A
   // leaked handle writing a few more lines under a plugin's own name is the cheaper failure.
-  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'customAgents', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
+  for (const group of ['routes', 'tools', 'schedules', 'dataSources', 'nodeActions', 'runs', 'taskChecks', 'search', 'harnesses', 'customAgents', 'skills', 'contextSections', 'audit', 'extensionPoints', 'hooks', 'providers', 'events', 'storage'] as const) {
     // Absent for the members a tier does not get (`undefined as never`), which is why this is a typeof
     // check per member rather than a list of names.
     const members = ctx[group] as Record<string, unknown> | undefined

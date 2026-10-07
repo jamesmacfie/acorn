@@ -788,6 +788,8 @@ acorn-plugin-types: member PluginSchedule.run
 acorn-plugin-types: member PluginSchedule.scheduleId
 acorn-plugin-types: member PluginSchedule.timeout
 acorn-plugin-types: member PluginScheduleRegistry.register
+acorn-plugin-types: member PluginSkillDescriptor.id
+acorn-plugin-types: member PluginSkillDescriptor.path
 acorn-plugin-types: member PluginStorage.open
 acorn-plugin-types: member PluginTaskCheck.apply
 acorn-plugin-types: member PluginTaskCheck.check
@@ -1080,6 +1082,7 @@ acorn-plugin-types: type PluginRouteRegistry
 acorn-plugin-types: type PluginRunRegistry
 acorn-plugin-types: type PluginSchedule
 acorn-plugin-types: type PluginScheduleRegistry
+acorn-plugin-types: type PluginSkillDescriptor
 acorn-plugin-types: type PluginStorage
 acorn-plugin-types: type PluginTaskCheck
 acorn-plugin-types: type PluginTaskCheckRegistry

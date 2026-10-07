@@ -1,6 +1,6 @@
 import { distribution, refreshPluginTrust, syncPluginDistribution, type PluginTrustRequest } from '../plugins/distribution'
-import { awaitingInputApproval } from '../plugins/distributionModel'
-import { grantPluginInputs, saveDisabledNodePlugins } from '../../infra/node/nodePlugins'
+import { awaitingInputApproval, awaitingNodeApproval, awaitingSkillApproval } from '../plugins/distributionModel'
+import { grantPluginInputs, grantPluginSkills, saveDisabledNodePlugins } from '../../infra/node/nodePlugins'
 import { nextDisabledList } from '../../features/settings/plugins/pluginToggle'
 import {
   agentToolGrants,
@@ -20,6 +20,7 @@ import {
   nodePermissionLines,
   type PermissionLine,
   scheduleGrants,
+  skillPermissionLines,
   schedulePermissionLines,
   taskCheckGrants,
   taskCheckPermissionLines,
@@ -73,6 +74,7 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
   // What its derived sources read is approved on the node, input by input, so its "what is new" comes
   // from the node's grant rather than from this device's last answer about a bundle.
   const inputs = request.row.inputs
+  const skills = request.row.skills
   const groups: { key: TierKey; now: readonly PermissionLine[]; was: readonly PermissionLine[] | null }[] = [
     {
       key: 'reads',
@@ -113,6 +115,8 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
     },
     {
       key: 'declared',
+      // Skills are approved on the node, digest by digest, like inputs, so what is new about them comes
+      // from that approval rather than from this device's last answer about a bundle.
       // Schedules sit here rather than under `Enforced` for the reason the legend gives: the host does
       // hold the cadence and the route confinement, but what runs is the plugin's own node code, and a
       // claim about that can never be stronger than the group it is in.
@@ -124,13 +128,15 @@ export function trustTiers(request: PluginTrustRequest | undefined): TrustTier[]
         ...contextSectionPermissionLines(contextSectionGrants(installed.contributions)),
         // Beside the context sections: both are words the plugin puts in front of an agent.
         ...customAgentPermissionLines(customAgentGrants(installed.contributions)),
+        ...skillPermissionLines(skills?.skills ?? []),
       ],
-      was: previous
+      was: previous || skills?.granted
         ? [
-          ...schedulePermissionLines(previous.schedules ?? []),
-          ...taskCheckPermissionLines(previous.taskChecks ?? []),
-          ...contextSectionPermissionLines(previous.contextSections ?? []),
-          ...customAgentPermissionLines(previous.customAgents ?? []),
+          ...schedulePermissionLines(previous?.schedules ?? []),
+          ...taskCheckPermissionLines(previous?.taskChecks ?? []),
+          ...contextSectionPermissionLines(previous?.contextSections ?? []),
+          ...customAgentPermissionLines(previous?.customAgents ?? []),
+          ...(skills?.granted ? skillPermissionLines(skills.skills.filter((skill) => skill.approved)) : []),
         ]
         : null,
     },
@@ -208,15 +214,22 @@ export const shownInputs = (row: NodePluginRow): PluginInputGrant['sources'] => 
 }
 
 /**
- * Answer what a plugin reads, on its node. Accepting writes a grant for the list shown. Rejecting turns
- * the plugin off on that node, as rejecting a bundle turns its interface off here. Not now goes through
- * `resolvePendingTrust` and records nothing. Run it before `recordTrustDecision` when a request carries
- * both, so the re-read roster no longer asks once the bundle answer lands.
+ * Answer what the node holds for the owner: what a plugin reads, and the skills it supplies. Accepting
+ * writes a grant for exactly what was shown, inputs and skill digests both, and the node refuses it if
+ * the plugin moved on since. Rejecting turns the plugin off on that node, as rejecting a bundle turns its
+ * interface off here. Not now goes through `resolvePendingTrust` and records nothing. Run it before
+ * `recordTrustDecision` when a request carries both, so the re-read roster no longer asks once the
+ * bundle answer lands.
  */
-export async function recordInputDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
-  if (!awaitingInputApproval(request.row)) return
+export async function recordNodeDecision(request: PluginTrustRequest, decision: 'accepted' | 'rejected'): Promise<void> {
+  if (!awaitingNodeApproval(request.row)) return
   const nodeId = request.nodeId
-  if (decision === 'accepted') await grantPluginInputs(request.row.name, shownInputs(request.row), nodeId)
-  else await saveDisabledNodePlugins(nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true), nodeId)
+  if (decision === 'accepted') {
+    if (awaitingInputApproval(request.row)) await grantPluginInputs(request.row.name, shownInputs(request.row), nodeId)
+    if (awaitingSkillApproval(request.row)) {
+      const digests = Object.fromEntries((request.row.skills?.skills ?? []).map((skill) => [skill.name, skill.digest]))
+      await grantPluginSkills(request.row.name, digests, nodeId)
+    }
+  } else await saveDisabledNodePlugins(nextDisabledList(distribution().byNode.get(nodeId)?.rows ?? [request.row], request.row.name, true), nodeId)
   await syncPluginDistribution({ nodeIds: [nodeId] })
 }

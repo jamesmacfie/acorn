@@ -38,12 +38,12 @@ export type {
 export type { PluginCliCommandDescriptor } from '@acorn/protocol/plugin/cliCommands.ts'
 
 /**
- * Whether a manifest gives the node something to hold with no node bundle behind it. Harnesses and
- * custom agents are both data another plugin consumes, so a package made of only those still runs on
+ * Whether a manifest gives the node something to hold with no node bundle behind it. Harnesses, custom
+ * agents and skills are all data another plugin consumes, so a package made of only those still runs on
  * the node as a plugin with an empty `init` (./loader.ts), and its row reads as node-activated.
  */
-export const contributesNodeData = (contributions: { harnesses: readonly unknown[]; customAgents?: readonly unknown[] }): boolean =>
-  contributions.harnesses.length > 0 || (contributions.customAgents?.length ?? 0) > 0
+export const contributesNodeData = (contributions: { harnesses: readonly unknown[]; customAgents?: readonly unknown[]; skills?: readonly unknown[] }): boolean =>
+  contributions.harnesses.length > 0 || (contributions.customAgents?.length ?? 0) > 0 || (contributions.skills?.length ?? 0) > 0
 
 // Cross-field checks run after protocol field parsing, in the order reported to plugin authors.
 export const pluginManifestSchema = pluginManifestShape.superRefine((manifest, ctx) => {

@@ -52,7 +52,12 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // the first workflow step, which paid for the point's declaration and disclosure, the two follow-up turn
 // queries, and the startup cancel. The operation registry loads on first use. Lower the ceiling to keep
 // the cut.
-const limits = { ceiling: 3_127_500, floor: 1_000_000 }
+// 2026-10-07: 3,143,980 B with plugin skills. The branch head already measured 3,129,438 B after the
+// last merge from main. The SKILL.md reader (about 6.4 KB) loads on the first package that declares a
+// skill, the first settings read, or the first session start, and the skills index on the first start.
+// The manifest kind, the catalogue and its registration, the roster's projection, the owner's state
+// file, three device routes, and the per-turn delivery report load at boot. Add 16.5 KB.
+const limits = { ceiling: 3_144_500, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

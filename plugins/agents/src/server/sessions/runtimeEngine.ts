@@ -1,6 +1,6 @@
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { agentProfileRegistry, createLogger, describeError } from '@acorn/plugin-api/node'
+import { agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentConfigOption,
@@ -11,6 +11,7 @@ import type {
   AgentWsFrame,
 } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
+import type { SkillIndex } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
 import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
@@ -264,6 +265,9 @@ export class ManagedAgentEngine {
       hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
       scopedEnvironment: (session) => this.scopedProviderEnvironment(session),
       mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
+      // Loaded on the first start rather than at boot, like the rest of a start's preparation.
+      skills: async () => (await import('../drivers/skillIndex')).skillIndex(await deliverableSkills(options.dataDir)),
+      skillsDelivered: (sessionId, index) => this.skillsDelivered(sessionId, index),
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
         message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
@@ -551,6 +555,28 @@ export class ManagedAgentEngine {
     }
     for (const secret of secretEnvironmentValues(env)) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
     return env
+  }
+
+  // A turn that carried the skills index ran (../drivers/skillIndex.ts). The catalogue hears which
+  // harness got which skills, the session row keeps the index's digest so a later start knows whether a
+  // withdrawal is owed, and the transcript gets one line a reader on either host can see.
+  private async skillsDelivered(sessionId: string, index: SkillIndex): Promise<void> {
+    const session = await this.store.requireSession(sessionId)
+    if (index.delivered.length || index.omitted.length) {
+      recordSkillDelivery(agentProfileRegistry.get(session.profileId)?.label ?? session.providerId, index)
+    }
+    const digest = (await import('../drivers/skillIndex')).skillIndexDigest(index)
+    if ((session.config.skillIndex ?? '') !== digest) {
+      await this.store.patchSession(sessionId, { config: { ...session.config, skillIndex: digest } })
+    }
+    const left = index.omitted.length ? ` ${index.omitted.length} more didn't fit: ${index.omitted.join(', ')}.` : ''
+    await this.record(sessionId, null, {
+      type: 'diagnostic',
+      level: 'info',
+      message: index.delivered.length
+        ? `Skills the agent can load: ${index.delivered.join(', ')}.${left}`
+        : index.omitted.length ? `No skills fit in the list.${left}` : 'The agent was told no skills are available now.',
+    })
   }
 
   private async providerMcpServers(

@@ -42,6 +42,12 @@ plugin can't change its own grant through its namespace preferences or its route
 reads it through the selected Node's query cache, and refreshes every 15 seconds while it's open
 ([plugin model grants](./integrations/model-providers.md#plugin-model-grants)).
 
+A loaded plugin's skills are Node state in two parts. The catalogue is the running process's: what each
+active plugin loaded, and which harnesses each skill reached since the process started. The owner's
+answers about it, the approved digest per skill and the switches, are `skill-state.json` in the data
+root, written only by device-only routes. A session start reads both on its own Node, so no client path
+or cached delivery status reaches another Node ([skills](./managed-agents/skills.md#the-catalogue)).
+
 Whether the Node collects telemetry is one Node preference, `telemetry.enabled`
 ([the switch](./telemetry/model.md#the-switch)). It belongs to the Node because the collector runs
 whether or not a client is attached, and turning it off in one window stops every client paired with

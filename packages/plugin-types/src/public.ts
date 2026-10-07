@@ -12,6 +12,7 @@ export type {
   PluginAgentToolDescriptor,
   PluginContextSectionDescriptor,
   PluginCliCommandDescriptor,
+  PluginSkillDescriptor,
 } from './contracts/manifest.js'
 export type { NodePlugin, NodePluginContext } from './contracts/context.js'
 export type {

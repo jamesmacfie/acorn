@@ -37,6 +37,10 @@ export type { AppDatabase } from '@acorn/node-core/server/db/index.ts'
 export { validatePluginConfig } from '@acorn/node-core/testkit'
 export { testAgentToolDescriptor, testContextSectionDescriptor, testCliCommandDescriptor } from '@acorn/node-core/testkit'
 
+// The skill catalogue as the host fills it from a loaded package, and the owner's answers about it
+// (docs/managed-agents/skills.md § Skills), so the agents plugin can test a start against real skills.
+export { catalogueSkills, readPackageSkill, registerSkill, skillDeliveries, skillStateStore } from '@acorn/node-core/testkit'
+
 // Host services used to exercise plugin routes without constructing a full Node.
 export { memoryIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 export { settleBackground } from '@acorn/node-core/server/background.ts'

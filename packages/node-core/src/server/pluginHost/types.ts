@@ -15,6 +15,7 @@ import type { Extension, ExtensionPointId } from './extensionPoints'
 import type { PluginContextSection } from '../agentTools/contextSections'
 import type { PluginHarnessRegistry } from './harnesses'
 import type { PluginCustomAgentRegistry } from './customAgents'
+import type { PluginSkillRegistry } from './skills'
 import type { TaskCheck } from './taskChecks'
 import type { SearchProvider } from './search'
 import type { AppEnv, Principal } from '../middleware/auth'
@@ -491,6 +492,7 @@ export type HostPluginContext = CompiledNodePluginContext & {
   nodeActions: PluginNodeActionRegistry
   harnesses: PluginHarnessRegistry
   customAgents: PluginCustomAgentRegistry
+  skills: PluginSkillRegistry
 }
 
 export type NodePlugin = {

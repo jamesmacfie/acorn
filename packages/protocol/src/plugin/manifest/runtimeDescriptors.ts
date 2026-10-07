@@ -163,3 +163,15 @@ export const harnessDescriptor = z.object({
   // One contained text turn. Independent of `terminal`: a harness may offer both, either, or neither.
   oneShot: harnessOneShot.optional(),
 })
+
+// ── Skills (docs/managed-agents/skills.md § Skills) ───────────────────────────────────────────────
+//
+// A named procedure an agent loads when a task calls for it: a folder holding a `SKILL.md`, the shape
+// Claude Code reads, with nothing added. The host reads and checks the file when it loads the package,
+// because the rules are about bytes a parser of this file never sees.
+export const skillDescriptor = z.object({
+  // Namespaced by the host into `<pluginId>:<id>`, the name the agent and the settings page see.
+  id: z.string().min(1).max(64).regex(/^[a-z0-9][a-z0-9-]*$/, 'skill id must be lower-case letters, digits and dashes'),
+  // The skill's folder, inside the package. Its `SKILL.md` and supporting files stay under it.
+  path: entry,
+})

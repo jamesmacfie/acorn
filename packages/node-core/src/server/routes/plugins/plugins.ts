@@ -18,6 +18,8 @@ import { pluginInputUsage } from '../../dashboards/inputUsage'
 import { MAX_DAILY_OUTPUT_TOKENS } from '../../modelProviders/grantSchema'
 import { createModelService } from '../../core/models'
 import { ownerId } from '../../middleware/requireUser'
+import { catalogueSkills, pluginSkills, skillDeliveries, skillStatus } from '../../pluginHost/skills'
+import type { PluginSkillState } from '@acorn/protocol/api.ts'
 
 const body = z.strictObject({ disabled: z.array(z.string().min(1)).max(200) })
 
@@ -43,6 +45,9 @@ const requestDecisionBody = z.strictObject({
   message: z.string().min(1).max(400).optional(),
 })
 const bundleHash = /^[0-9a-f]{64}$/
+const skillSwitchBody = z.strictObject({ name: z.string().min(1).max(200), enabled: z.boolean() })
+// The digests the trust prompt showed, by runtime name. All of the plugin's skills, or none.
+const skillGrantBody = z.strictObject({ digests: z.record(z.string().min(1).max(200), z.string().regex(/^[a-f0-9]{64}$/)) })
 const modelGrantBody = z.strictObject({
   backendId: z.string().min(1).max(200),
   modelId: z.string().max(200),
@@ -87,6 +92,16 @@ const holdsModels = (bridge: Parameters<typeof pluginState>[0], id: string): str
     throw new BridgeError(404, 'not_found', `${id} doesn't generate text.`)
   }
   return id
+}
+
+const skillState = async (bridge: Parameters<typeof pluginState>[0], id: string): Promise<PluginSkillState> => {
+  const state = bridge.skillState().get()
+  const lines = pluginSkills(id, state)
+  if (!lines) throw new BridgeError(404, 'not_found', `${id} supplies no skills.`)
+  const own = catalogueSkills(id)
+  return {
+    skills: await Promise.all(lines.skills.map(async (line, at) => ({ ...line, status: await skillStatus(state, own[at]!), deliveries: skillDeliveries(own[at]!) }))),
+  }
 }
 
 // The installer's refusals are all operator-fixable: a bad manifest, an unreachable release, a
@@ -394,6 +409,41 @@ export const plugins = new Hono<AppEnv>()
     auditRequest(c, { action: 'plugins.models.revoked', subject: id })
     return { ok: true }
   }))
+  // The owner's answers about a loaded plugin's skills (docs/managed-agents/skills.md § Skills). The
+  // status re-hashes every folder, so it's read when the settings page asks, not on each roster poll.
+  .get('/:id/skills', (c) => viaBridge(c, PLUGIN_STATE, async (bridge) => await skillState(bridge, c.req.param('id'))))
+  // A switch applies at each session's next start or resume. A running agent keeps what it was given.
+  .put('/:id/skills', async (c) => {
+    const parsed = skillSwitchBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const id = c.req.param('id')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      if (!catalogueSkills(id).some((skill) => skill.name === parsed.data.name)) throw new BridgeError(404, 'not_found', `${id} has no skill ${parsed.data.name}.`)
+      bridge.skillState().setDisabled(parsed.data.name, !parsed.data.enabled)
+      auditRequest(c, { action: 'plugins.skills.switched', subject: id, details: { skill: parsed.data.name, enabled: parsed.data.enabled } })
+      broadcastPluginsChanged()
+      return await skillState(bridge, id)
+    })
+  })
+  // The trust prompt's answer. Refused when what it showed is no longer what the plugin runs, so an
+  // approval never covers bytes nobody saw.
+  .post('/:id/skill-grant', async (c) => {
+    const parsed = skillGrantBody.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    const id = c.req.param('id')
+    return viaBridge(c, PLUGIN_STATE, async (bridge) => {
+      const own = catalogueSkills(id)
+      if (!own.length) throw new BridgeError(404, 'not_found', `${id} supplies no skills.`)
+      const shown = parsed.data.digests
+      if (Object.keys(shown).length !== own.length || own.some((skill) => shown[skill.name] !== skill.digest)) {
+        throw new BridgeError(409, 'bad_request', 'This plugin\'s skills changed. Refresh the plugin list.')
+      }
+      bridge.skillState().approve(shown)
+      auditRequest(c, { action: 'plugins.skills.granted', subject: id, details: { skills: own.map((skill) => skill.name).join(', ') } })
+      broadcastPluginsChanged()
+      return { ok: true }
+    })
+  })
   // The one exception to "nothing here starts a plugin" (docs/plugins/dev-loop.md § The dev loop § Reloading
   // one plugin without a restart). Loaded plugins only. A built-in is refused with the installer's own
   // 400 shape.

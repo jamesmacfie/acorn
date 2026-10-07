@@ -1,7 +1,160 @@
 # Phase 06: portable plugin skills
 
-Status: proposed, 2026-10-03. Entry: phase 05 accepted. Next:
-[phase 07](./07-native-skills.md).
+Status: done with recorded limitations, 2026-10-07. Proposed 2026-10-03. Entry: phase 05 accepted.
+Next: [phase 07](./07-native-skills.md).
+
+## Completion note, 2026-10-07
+
+**What landed.** On branch `phase-06-portable-skills`, at the commit titled "Phase 06: Portable
+plugin skills". [Skills](../../managed-agents/skills.md) is the owning contract.
+
+- **Manifest.** `contributions.skills`, up to 16 entries of `{ id, path }`, in
+  `packages/protocol/src/plugin/manifest/runtimeDescriptors.ts` and `contract.ts`. It's in the
+  published schema (`packages/plugin-types/acorn-plugin.schema.json`) and the authoring type
+  `PluginSkillDescriptor`. Skill IDs are their own namespace, and two that repeat fail the manifest.
+  A skills-only package counts as node data (`contributesNodeData`), so it runs as a plugin with an
+  empty `init` and no bundle.
+- **Checks.** `packages/node-core/src/server/plugins/skills.ts` reads one skill. The folder must
+  resolve inside the package and may hold no symlinks, at most 64 entries, 4 levels, and 1 MiB.
+  `SKILL.md` must be UTF-8 with frontmatter. `name` follows Anthropic's published rule (up to 64
+  lower-case letters, digits, and dashes). `description` is up to 1,024 characters with no XML tags
+  and no control or bidirectional characters. The body is at most 64 KiB. The installer and the
+  loader both run it, and a failure refuses the package with a named reason. The reader loads only
+  when a package declares skills.
+- **Digest and approval.** Each skill's digest is a sha256 over every file in its folder. The roster
+  row carries `skills`: name, title, description, digest, approved, and enabled. An unapproved skill
+  puts a request in the trust prompt on both hosts. Its one line, under **Declared** and not high,
+  reads "Adds 1 procedure your agents can load: release-note", and its key holds every digest.
+  `POST /v1/core/plugins/:id/skill-grant` records the digests shown, and answers 409 when they
+  aren't the running plugin's. The answers live in `skill-state.json` in the data root
+  (`server/plugins/skillState.ts`): `approved` by name, and `disabled` separately. Uninstall
+  forgets both.
+- **Catalogue.** `server/pluginHost/skills.ts` holds what each active plugin loaded, through a
+  host-only `ctx.skills.register` that reload stages and teardown undoes. It also holds which harness
+  last received each skill. The contract agents consumes is `deliverableSkills(dataDir)` and
+  `recordSkillDelivery(harness, report)` on the compiled-only `@acorn/plugin-api/node`.
+- **Delivery.** `plugins/agents/src/server/drivers/skillIndex.ts` builds the index: acorn's fixed
+  sentence, then name, one-line description, and absolute `SKILL.md` path per skill, capped at 16 KiB
+  with whole skills left out and counted. `ProviderSessionLifecycle` reads it at every start and
+  resume and sends it as a `context.skills` part ahead of the first turn after the start, on every
+  harness. A session that last received an index and now has none gets a withdrawal sentence. The
+  session row keeps the last index's digest in `config.skillIndex`, a Node-only key. A delivery
+  counts once that turn has run, and the transcript gets one info line naming what was sent.
+- **Read access.** Claude gets a read-only allow rule per indexed folder, `Read(//<folder>/**)`, in
+  the SDK flag settings. Codex and the ACP harnesses get no grant (see the matrix below).
+- **Settings.** A **Skills** section on **Settings > Plugins > {plugin} > Overview**, with a switch per
+  skill, its status (ready, off, waiting for approval, changed on disk), and the harnesses it reached.
+  `GET` and `PUT /v1/core/plugins/:id/skills`, device-only and unmappable from a frame. **What it
+  adds** counts skills. The terminal client answers a skills-only trust request itself.
+- **Package.** [`packages/skills/`](./packages/skills/README.md), `pi-skills` 0.1.0: one skill,
+  `release-note`, and a supporting `format.md` whose fixed last line shows the agent read it.
+
+No migration. The wire changes are additive: `NodePluginRow.skills`, two routes, and two audit verbs,
+`plugins.skills.granted` and `plugins.skills.switched`.
+
+**Decisions and deviations.**
+
+- **The design's trust claim was wrong.** It said a skill's bytes were "already covered by the bundle
+  hash the device checks". The device hash covers only a client bundle, and a manifest-only package
+  never reaches the bundle prompt. Skills are approved on the Node by digest instead, following the
+  derived-source input grants.
+- **No system prompt for the index.** The first build appended it to Claude's system prompt. On the
+  real host a switched-off skill was still listed after a resume. Claude Code 2.1.292 keeps the
+  appended prompt a session was created with and ignores a new one on `--resume`. Two direct CLI
+  runs showed it: a resumed session kept `PINEAPPLE` and ignored a new `MANGO`. So the index goes
+  ahead of a turn, the same way on every harness, and Codex's `developerInstructions` aren't used
+  for it either. The cost is the index's tokens once per process start, and a compaction can drop
+  it until the next start.
+- **No staging copy.** The agent reads the installed package's folder. The digest check at every
+  start guards it: a folder edited under a running Node reads as `changed` and isn't offered.
+- **No symlinks in a skill folder at all,** rather than only escaping ones, so every file an agent
+  opens was hashed.
+- **Reserved words aren't refused.** Anthropic's API rejects `anthropic` and `claude` in a name, and
+  Claude Code's local skills don't. The host follows Claude Code.
+- **Medium is an ordinary line.** The trust line has two weights, high and not. A skill line isn't
+  high.
+- **The service boot budget rose to 3,144,500 B.** The branch head measured 3,129,438 B before this
+  phase, already over the 3,127,500 B ceiling after the last merge from main. This phase measures
+  3,143,980 B. The reader and the index builder load on first use. The rest is the manifest kind,
+  the catalogue, the roster projection, the state file, three routes, and the delivery report.
+
+**Harness matrix.**
+
+| Harness | Index | Body read | Evidence |
+| --- | --- | --- | --- |
+| Claude Code 2.1.292 | Context part before the first turn after each start | Read-only allow rule per folder | Real host, below |
+| Codex 0.159.2 | Same part, rendered by the Codex driver's context block | Built-in profiles read the whole disk; a custom profile that limits reads makes Codex ask | App-server schema only. Its account is at its usage limit until 2026-10-10 |
+| DeepSeek, `omp` | Same part, as an `<acorn-context>` block | The harness's own tools. `omp`'s native `read` asks no permission (phase 01) | Neither is installed on this machine |
+
+**Verification.**
+
+- `pnpm lint` passes. `@acorn/arch-tests`: 86 passed, with the surface pin regenerated for
+  `PluginSkillDescriptor`. `apps/node` `pnpm build` passes the budget.
+- `skills.test.ts` (node-core), 9 cases: the standard shape with other keys ignored, a supporting
+  file changing the digest, quoted and block descriptions, traversal and a symlinked folder, a
+  symlink inside the folder, seven malformed frontmatter forms, the 1,024-character and 64 KiB
+  bounds, duplicate IDs, deliverable only when approved, on, and unchanged, and a delivery recorded
+  against the copy delivered. `loader.test.ts` loads a skills-only package as a node plugin and fails
+  a broken skill by name. `plugins.test.ts` covers the roster row, a stale or partial grant
+  refused with 409, the switch, and 404 for a plugin with none.
+- `runtime.test.ts`: the index rides ahead of the first turn and not the second, Claude's folders are
+  passed, the delivery is recorded, and after a switch-off and restart the next start sends the
+  withdrawal. `skillIndex.test.ts` covers the bound and the omission count. `contextBlock.test.ts`
+  covers Claude's grant with the index kept out of the system prompt.
+- `trustModel.test.ts` and `distributionModel.test.ts`: one declared line, the line marked new when
+  a digest changed, the grant posting the digests shown, and a node-only request for skills alone.
+- Suites: `@acorn/plugin-agents` 1,151 passed. `@acorn/node-core` under Node 26.8.1: 1,624 passed,
+  and the 3 failures are `storage/backup.test.ts`, whose 12 tests pass on Node 24.11.
+  `@acorn/client-core`: 2,459 passed, with the known `scopes.test.ts` (`workspaceProjectOrderRoute`)
+  and `cssHygiene` box-shadow failures. Both new routes are classified. `@acorn/protocol` 294,
+  `acorn-plugin-types` 5, `@acorn/tui` 676, `@acorn/plugin-api` 14 after the facade snapshot update.
+  `@acorn/node`: 272 passed, and `routeRegistry.test.ts` fails on a terminal plugin route,
+  `POST /v1/p/terminal/tasks/:taskId/setup`, that this phase didn't add. The full `pnpm test` wasn't
+  run.
+
+Real host, `pnpm dev:agent -- --session pi-phase-06`, Claude Code 2.1.292 through ACP, Opus 5.5:
+
+- The package installed through `POST /v1/core/plugins/install` and was `active` after a Node restart,
+  with no bundle. The desktop trust prompt read "Approve this plugin's skills" and "Adds 1 procedure
+  your agents can load: release-note" (`screenshot-1791338870828.png`). Accepting wrote the digest to
+  `skill-state.json`.
+- In a throwaway repository, a fresh session asked for "a release note for the uncommitted change"
+  without naming the skill. The transcript says "Skills the agent can load:
+  pi-skills:release-note.", the agent read `SKILL.md` and `format.md`, and its note ends with the
+  fixed line from `format.md`. The repository's status showed only the seeded change.
+- The settings page showed the switch and "Reached Claude Code at 03:08 PM"
+  (`screenshot-1791338996035.png`). After the switch was turned off in the UI and the Node
+  restarted, the resumed session answered that no procedures were available and earlier lists no
+  longer applied. The transcript says "The agent was told no skills are available now."
+  (`screenshot-1791340183075.png`).
+- Editing `format.md` turned the status to `changed`, and restoring it turned it back to `ready`.
+- In **Don't Ask** mode, `Read` on `SKILL.md`, outside the working directory, succeeded, and `Read` on
+  `/etc/hosts` was denied, so the grant covers the skill folder only.
+- Terminal client, `pnpm dev:tui:agent -- --session pi-phase-06-tui` with the package placed in its
+  data root: the prompt "Run pi-skills?" showed the same line under **Declared** at 80 by 24, and
+  **Run it** wrote the approval to that Node's `skill-state.json`. The client was resized to 120 by
+  40 afterwards.
+- Screenshots are in the session's ignored `.acorn/agent-dev/pi-phase-06/screenshots/`.
+
+**Limitations.**
+
+- **Codex, DeepSeek, and `omp` weren't run.** Codex is at its usage limit until 2026-10-10, and
+  `dsh` and `omp` aren't installed. Their delivery is the shared context part, which the runtime
+  test covers at the driver boundary.
+- **Node switching wasn't exercised.** The session had one Node. Delivery reads only the Node's own
+  catalogue and state, and the settings section is hidden for another Node.
+- **The terminal client has no skills settings.** Its plugin pages open in the desktop app.
+- **A first-turn read in the default `auto` mode went through Bash `cat`,** which Claude Code treats
+  as read-only. The allow rule was proven separately in **Don't Ask** mode.
+- **A Claude session created before this change** keeps any index it got in its system prompt, but
+  no released build ever sent one.
+
+**For phase 07.** Consume `deliverableSkills` and the catalogue rather than a second registry. Native
+Claude delivery has to account for the same finding: the appended prompt and probably other session
+options are fixed at creation, so check what a resumed session actually loads before claiming native
+skills refresh. Keep `skillIndex.ts`'s portable part for any skill a harness didn't take natively,
+and use the session's `config.skillIndex` digest to decide when a withdrawal is owed. Native names
+map back to `<pluginId>:<id>`.
 
 ## Outcome
 

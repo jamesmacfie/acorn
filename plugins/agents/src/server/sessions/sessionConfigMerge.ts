@@ -6,6 +6,8 @@ const owns = (value: Record<string, unknown>, key: string): boolean =>
 // Written by admission or a dedicated authority operation, not generic provider configuration.
 const serverOwnedKeys = [
   'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent', 'standingContext',
+  // The digest of the last skills index a turn carried (../drivers/skillIndex.ts).
+  'skillIndex',
 ] as const
 
 export function retainSessionAuthority(

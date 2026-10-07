@@ -14,7 +14,7 @@ const NO_CONTRIBUTIONS = {
   frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [],
   attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [],
   contextMenus: [], extensionPoints: [], extensions: [],
-  schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [], cliCommands: [],
+  schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], cliCommands: [],
 }
 const installed = (id: string, over: Partial<InstalledPluginInfo> = {}): InstalledPluginInfo => ({
   id,
@@ -70,6 +70,7 @@ const bridge = (situation: Situation): PluginsBridge => {
     uninstall: () => ({ restartRequired: true, dataPurged: false }),
     reload: async () => ({ id: '', version: '', state: 'reloaded' }),
     inputGrants: () => ({ get: (id) => situation.grants?.find((grant) => grant.pluginId === id), set: () => {}, delete: () => {} }),
+    skillState: () => ({ get: () => ({ approved: {}, disabled: [] }), approve: () => {}, setDisabled: () => {}, forget: () => {} }),
     development: { state: (id) => situation.development?.[id], set: () => {}, logs: () => null, reload: () => Promise.reject(new Error('not under test')), dispose: () => {} },
   }
 }

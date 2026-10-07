@@ -13,7 +13,7 @@ import { cachePluginBundle, pluginHostAvailable, readPluginHostState } from './h
 import { createLogger } from '../../infra/telemetry/logger'
 import { runtimeIdentityForRow, legacyRuntimeIdentityWithheld } from './runtimeIdentity'
 import {
-  decisionKey, derivePluginDistribution,
+  awaitingInputApproval, awaitingSkillApproval, decisionKey, derivePluginDistribution,
   type DevicePluginEntry, type NodePluginObservation, type PluginDistributionSnapshot, type PluginTrustRequest,
 } from './distributionModel'
 import { contributionAvailability, nodePluginRuntime, nodePluginServiceAvailable } from './availabilityModel'
@@ -44,9 +44,14 @@ export const pendingTrust = (): readonly PluginTrustRequest[] => {
     .sort((a, b) => Number(b.row.name === first) - Number(a.row.name === first))
 }
 
-/** Only the requests about a client bundle. The terminal client draws no dashboards, so it can't
- *  approve what a plugin reads and leaves those to the desktop app. */
-export const pendingBundleTrust = (): readonly PluginTrustRequest[] => pendingTrust().filter((request) => request.hash)
+/** The skills the terminal client approves on a node: those of a plugin waiting on nothing else there.
+ *  The node's grant is one answer, and what a plugin reads is left to the desktop app. */
+export const terminalAnswersSkills = (row: NodePluginRow): boolean => awaitingSkillApproval(row) && !awaitingInputApproval(row)
+
+/** The requests the terminal client answers: a client bundle, or skills alone. It draws no dashboards,
+ *  so it can't approve what a plugin reads and leaves those to the desktop app. */
+export const pendingTerminalTrust = (): readonly PluginTrustRequest[] =>
+  pendingTrust().filter((request) => request.hash || terminalAnswersSkills(request.row))
 
 /** Bring a plugin's waiting request back to the front, even after "Not now", for a row's Manage. */
 export function reviewPendingTrust(pluginId: string): void {

@@ -9,6 +9,8 @@ rules that check one field against another. Read it while you write a manifest. 
 - [Settings pages](./settings-pages.md), [UI contributions](./ui-contributions.md), and
   [extensions](./extensions.md).
 - [Harnesses](./harnesses.md) and [custom agents](./custom-agents.md).
+- [Skills](../managed-agents/skills.md): folders holding a standard `SKILL.md`, and the checks the
+  host runs on them.
 
 ## The manifest
 
@@ -112,4 +114,8 @@ These rules catch a manifest that parses and then does nothing:
   beside an `entry`, and needs a `node` half if it declares `probes`.
 - A `dataSources` entry with `inputs` can't also declare `providerId`. It names at most eight
   inputs, each a `<pluginId>:<sourceId>` ([derived sources](../data-sources/derived-sources.md)).
-- No id may repeat across contributions.
+- No id may repeat across contributions. Skills are their own namespace, so a skill id must differ
+  only from the other skills.
+- A `skills` entry's `path` must be a folder inside the package holding a valid `SKILL.md`. The host
+  reads it at install and at every load, and refuses the package with the reason
+  ([skills](../managed-agents/skills.md#the-checks)).

@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { SecretService } from '@acorn/plugin-api/testkit'
-import { mkdtemp, rm } from 'node:fs/promises'
+import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
@@ -9,7 +9,8 @@ import { agentProfileRegistry } from '@acorn/plugin-api/node'
 import { memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import { createCoreServices, type CoreServices } from '@acorn/plugin-api/testkit'
 import { makeTestDb, makeTestPluginDb, schema, type TestDb, type TestPluginDb } from '@acorn/plugin-api/testkit'
-import type { AgentAppApproval, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
+import { catalogueSkills, readPackageSkill, registerSkill, skillDeliveries, skillStateStore } from '@acorn/plugin-api/testkit'
+import type { AgentAppApproval, AgentInputPart, AgentNormalizedEvent, AgentProviderDescriptor } from '../../contract/wire.ts'
 import type {
   AgentDriver,
   AgentDriverSession,
@@ -2277,6 +2278,62 @@ describe('managed agent runtime conformance', () => {
   })
 
   // docs/mcp.md § Your own servers. Which programs a session starts is the owner's setting: it comes from
+  // The skills index is read at every start, like the MCP servers, and rides ahead of the first turn
+  // after it. It counts as delivered once that turn ran (docs/managed-agents/skills.md § Delivery).
+  it('sends each start the approved, switched-on skills ahead of its first turn, and withdraws them', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const folder = join(dataDir, 'package', 'skills', 'review')
+    await mkdir(folder, { recursive: true })
+    await writeFile(join(folder, 'SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nRead the diff.\n')
+    const read = readPackageSkill(join(dataDir, 'package'), { id: 'review', path: 'skills/review' })
+    if (!read.ok) throw new Error(read.reason)
+    const registration = registerSkill('acme', read.skill)
+    try {
+      skillStateStore(dataDir).approve({ 'acme:review': read.skill.digest })
+      const registry = new AgentDriverRegistry()
+      const starts: AgentDriverStartOptions[] = []
+      const sent: AgentInputPart[][] = []
+      class CaptureDriver extends FakeAgentDriver {
+        override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+          starts.push(options)
+          const handle = await super.start(options)
+          const send = handle.sendTurn.bind(handle)
+          handle.sendTurn = (turn) => { sent.push(turn.input); return send(turn) }
+          return handle
+        }
+      }
+      registry.registerNative('fake', () => new CaptureDriver())
+      const boot = () => new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry })
+      runtime = boot()
+      const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      const turn = async (text: string) => {
+        await runtime!.enqueueTurn(session.id, { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: { providerDefault: true }, idempotencyKey: randomUUID() })
+      }
+      const skillPart = (input: AgentInputPart[]) => input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
+      await turn('Review this.')
+      await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+      expect(starts.at(-1)!.skillFolders).toEqual([read.skill.dir])
+      expect(skillPart(sent.at(-1)!)).toContain(read.skill.file)
+      await vi.waitFor(() => expect(skillDeliveries(catalogueSkills('acme')[0]!).map((entry) => entry.outcome)).toEqual(['delivered']))
+      // Once per start: the next turn on the same process carries no index.
+      await turn('And this.')
+      await runtime.wait(session.id, 0, 'turn_completed', 2_000)
+      await vi.waitFor(() => expect(sent).toHaveLength(2))
+      expect(skillPart(sent[1]!)).toBeNull()
+
+      // Switched off: the running process keeps what it has, and the next start is told the list is gone.
+      skillStateStore(dataDir).setDisabled('acme:review', true)
+      await runtime.stop()
+      runtime = boot()
+      await turn('Again.')
+      await vi.waitFor(() => expect(sent).toHaveLength(3))
+      expect(starts.at(-1)!.skillFolders).toEqual([])
+      expect(skillPart(sent[2]!)).toMatch(/^No procedures are available to load now/)
+    } finally {
+      registration.dispose()
+    }
+  })
+
   // Settings at creation, only the MCP route changes it, and every start hands the harness the list.
   it('starts a session with the servers switched on in Settings and restarts it when they change', async () => {
     const seed = await seedTask(testDb, dataDir)

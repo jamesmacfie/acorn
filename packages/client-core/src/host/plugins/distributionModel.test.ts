@@ -280,6 +280,14 @@ describe('input approval requests', () => {
     expect(pending([nodeOnly({ pendingReview: { reviewId: 'r', fingerprint: 'f', stagedAt: 1 } })])).toEqual([])
   })
 
+  // A skills-only package has no bundle at all, so the node's approval is the only prompt it gets.
+  it('asks about a node-only plugin whose skills are not approved at their current digest', () => {
+    const review = { name: 'readiness:review', title: 'review', description: 'Check a diff.', digest: 'd'.repeat(64), approved: false, enabled: true }
+    const skillsOnly = (approved: boolean) => nodeOnly({ inputs: undefined, skills: { granted: approved, skills: [{ ...review, approved }] } })
+    expect(pending([skillsOnly(false)]).map((request) => [request.row.name, request.hash])).toEqual([['readiness', '']])
+    expect(pending([skillsOnly(true)])).toEqual([])
+  })
+
   it('asks once when the same plugin also has a bundle waiting', () => {
     const runtime = identity('1.0.0', 'bundle-hash')
     const both = { ...row('readiness', runtime, installed(runtime)), inputs: { granted: false, inputs: [pulls] } }

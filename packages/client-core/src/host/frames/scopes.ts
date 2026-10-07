@@ -202,6 +202,8 @@ const RULES: readonly RouteRule[] = [
   { path: shape(`/v1/core/plugins/${SEG}/review`), scopes: {}, note: 'Clears a durable gate before Node code can run.' },
   { path: shape(`/v1/core/plugins/${SEG}/input-grant`), scopes: {}, note: 'Approves which of the owner’s data a plugin may read.' },
   { path: shape(`/v1/core/plugins/${SEG}/model-grant`), scopes: {}, note: 'Sets which model a plugin spends and how much, which the plugin must not choose for itself.' },
+  { path: shape(`/v1/core/plugins/${SEG}/skills`), scopes: {}, note: 'Switches the procedures a plugin gives agents.' },
+  { path: shape(`/v1/core/plugins/${SEG}/skill-grant`), scopes: {}, note: 'Approves text a plugin puts in front of every agent.' },
   // Development mode reloads a plugin on every save and approves what it reads, so a frame that could
   // turn it on would get both without a prompt.
   { path: shape(`/v1/core/plugins/${SEG}/development`), scopes: {}, note: 'Reloads a plugin on save and approves what it reads.' },

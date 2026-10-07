@@ -1,7 +1,10 @@
 import { createHash } from 'node:crypto'
+import { mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { Hono } from 'hono'
 import { afterEach, describe, expect, it } from 'vitest'
-import type { NodePluginState, PluginInputGrantState } from '@acorn/protocol/api.ts'
+import type { NodePluginState, PluginInputGrantState, PluginSkillState } from '@acorn/protocol/api.ts'
 import type { ActivePluginSnapshot, InstalledPluginInfo, PluginLoadFailure } from '../../plugins/loader'
 import type { AppEnv } from '../../middleware/auth'
 import { requireDevice } from '../../middleware/requireUser'
@@ -18,6 +21,9 @@ import { makeTestDb, testEnv } from '../../../testkit/db'
 import { schema } from '../../db'
 import { registerRoute, removePluginRoutes } from '../registry'
 import type { InputGrant, InputGrantsStore } from '../../plugins/inputGrants'
+import { skillStateStore, type SkillStateStore } from '../../plugins/skillState'
+import { skillFolderDigest, type PackageSkill } from '../../plugins/skills'
+import { registerSkill } from '../../pluginHost/skills'
 
 const ROSTER: PluginRosterEntry[] = [
   { name: 'github', required: false, disabled: false, state: 'active' },
@@ -34,7 +40,7 @@ const installedEntry = (id: string, over: Partial<InstalledPluginInfo> = {}): In
   apiVersion: '1',
   permissions: NO_PERMISSIONS,
   emits: [],
-  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [], cliCommands: [] },
+  contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], cliCommands: [] },
   client: { hash: 'a'.repeat(64), bytes: 12 },
   hasNode: true,
   ...over,
@@ -59,6 +65,7 @@ type WireOptions = {
   loadFailures?: Omit<PluginLoadFailure, 'at'>[]
   pendingReview?: { reviewId: string; requestId: string; fingerprint: string; stagedAt: number }
   grants?: InputGrantsStore
+  skillState?: SkillStateStore
   /** Plugins installed from a folder, the ones development mode is for. */
   folders?: string[]
 }
@@ -75,6 +82,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
   let saved = [...initial]
   const installed = options.installed ?? []
   const grants = options.grants ?? memoryGrants()
+  const skillState = options.skillState ?? skillStateStore(mkdtempSync(join(tmpdir(), 'acorn-skill-state-')))
   const developing = new Set<string>()
   const calls: { install: unknown[]; update: unknown[]; uninstall: unknown[]; reload: unknown[]; approve: unknown[] } = { install: [], update: [], uninstall: [], reload: [], approve: [] }
   setRouteTestCapability(PLUGIN_STATE, {
@@ -112,6 +120,7 @@ const wire = (initial: readonly string[], options: WireOptions = {}) => {
       return { restartRequired: true, dataPurged: opts.purgeData === true }
     },
     inputGrants: () => grants,
+    skillState: () => skillState,
     development: {
       state: (id) => (options.folders?.includes(id) ? { on: developing.has(id) } : undefined),
       set: (id, on) => {
@@ -397,7 +406,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
       emits: [],
       // Passed through untouched for the device to register surfaces from (docs/plugins.md). The node
       // neither reads nor renders it.
-      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [], cliCommands: [] },
+      contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [], cliCommands: [] },
       client: { hash: 'a'.repeat(64), bytes: 12 },
     })
     // The client's "is this third-party?" answer, so a built-in must not carry the block at all.
@@ -425,7 +434,7 @@ describe('installed packages in the roster (docs/plugins.md)', () => {
         apiVersion: '1',
         permissions: NO_PERMISSIONS,
         emits: [],
-        contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], agentTools: [], contextSections: [] },
+        contributions: { frames: [], remote: [], sources: [], slots: [], commands: [], keybindings: [], attention: [], nodeStats: [], contentLinks: [], agentContexts: [], refResolvers: [], routes: [], themes: [], styles: [], contextMenus: [], extensionPoints: [], extensions: [], schedules: [], taskChecks: [], auditActions: [], harnesses: [], customAgents: [], skills: [], agentTools: [], contextSections: [] },
         client: { hash: 'a'.repeat(64), bytes: 12 },
       },
     })
@@ -934,5 +943,55 @@ describe('the input grant routes', () => {
     hono.use('/v1/core/plugins/*', requireDevice)
     hono.route('/v1/core/plugins', plugins)
     expect((await hono.request(at('/readiness/input-grant', 'POST', { sources: shown }))).status).toBe(403)
+  })
+})
+
+describe('a loaded plugin’s skills', () => {
+  const roster = [{ name: 'procedures', required: false, disabled: false, state: 'active' as const }]
+  let undo: (() => void) | null = null
+  afterEach(() => { undo?.(); undo = null })
+  // One skill in the catalogue, as the host registers it from a loaded package.
+  const loadSkill = (): PackageSkill => {
+    const dir = mkdtempSync(join(tmpdir(), 'acorn-skill-route-'))
+    writeFileSync(join(dir, 'SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nBody\n')
+    const folder = skillFolderDigest(dir)
+    if (!folder.ok) throw new Error(folder.reason)
+    const skill = { id: 'review', dir, file: join(dir, 'SKILL.md'), name: 'review', description: 'Check a diff.', digest: folder.digest }
+    undo = registerSkill('procedures', skill).dispose
+    return skill
+  }
+
+  it('puts the running version’s skills on the roster and approves exactly the digests shown', async () => {
+    const skill = loadSkill()
+    const skillState = skillStateStore(mkdtempSync(join(tmpdir(), 'acorn-skill-state-')))
+    wire([], { roster, installed: [installedEntry('procedures')], skillState })
+    const node = asDevice()
+    const row = async () => ((await (await node.request(request('GET'))).json()) as NodePluginState).plugins.find((entry) => entry.name === 'procedures')
+    expect((await row())?.skills).toEqual({
+      granted: false,
+      skills: [{ name: 'procedures:review', title: 'review', description: 'Check a diff.', digest: skill.digest, approved: false, enabled: true }],
+    })
+
+    // What the prompt showed is no longer what runs: refused, and nothing is approved.
+    expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': 'f'.repeat(64) } }))).status).toBe(409)
+    expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: {} }))).status).toBe(409)
+    expect(skillState.get().approved).toEqual({})
+
+    expect((await node.request(at('/procedures/skill-grant', 'POST', { digests: { 'procedures:review': skill.digest } }))).status).toBe(200)
+    expect((await row())?.skills?.skills[0]?.approved).toBe(true)
+    const state = await (await node.request(at('/procedures/skills', 'GET'))).json() as PluginSkillState
+    expect(state.skills.map((entry) => [entry.name, entry.status, entry.deliveries])).toEqual([['procedures:review', 'ready', []]])
+  })
+
+  it('switches one skill off for the next start, and answers 404 for a plugin with none', async () => {
+    loadSkill()
+    const skillState = skillStateStore(mkdtempSync(join(tmpdir(), 'acorn-skill-state-')))
+    wire([], { roster, installed: [installedEntry('procedures')], skillState })
+    const node = asDevice()
+    const off = await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:review', enabled: false }))
+    expect(((await off.json()) as PluginSkillState).skills.map((entry) => [entry.enabled, entry.status])).toEqual([[false, 'disabled']])
+    expect(skillState.get().disabled).toEqual(['procedures:review'])
+    expect((await node.request(at('/procedures/skills', 'PUT', { name: 'procedures:other', enabled: false }))).status).toBe(404)
+    expect((await node.request(at('/github/skills', 'GET'))).status).toBe(404)
   })
 })

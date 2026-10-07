@@ -188,6 +188,18 @@ const digestOf = (root: string, relPath: string | undefined, maxBytes = MAX_PLUG
   }
 }
 
+// The loader reads skills again at every boot. Reading them here too refuses a broken one at install,
+// with its reason, rather than installing a package that will fail to start. Loaded only for a package
+// that declares skills, so the reader stays out of the Node's boot.
+async function validateSkills(root: string, manifest: PluginManifest): Promise<void> {
+  if (!manifest.contributions.skills.length) return
+  const { readPackageSkill } = await import('./skills')
+  for (const skill of manifest.contributions.skills) {
+    const read = readPackageSkill(root, skill)
+    if (!read.ok) fail(`That package's ${read.reason}.`)
+  }
+}
+
 function validate(root: string, expectId: string | null): PluginManifest {
   try { assertPluginPackageTree(root) }
   catch (error) { fail(error instanceof Error ? error.message : 'The package could not be validated.') }
@@ -330,7 +342,7 @@ export async function updatePlugin(dataRoot: string, id: string, options: Instal
 }
 
 async function place(dataRoot: string, source: PluginInstallSource, expectId: string | null, options: InstallOptions): Promise<PluginInstallResult> {
-  if ('path' in source) return linkLocal(dataRoot, source, expectId, options)
+  if ('path' in source) return await linkLocal(dataRoot, source, expectId, options)
   const root = pluginInstallRoot(dataRoot)
   mkdirSync(root, { recursive: true, mode: 0o700 })
   sweepDebris(dataRoot)
@@ -345,6 +357,7 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
     await unpack(archive, unpacked)
     const pkg = packageRoot(unpacked)
     const manifest = validate(pkg, expectId)
+    await validateSkills(pkg, manifest)
     if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
 
     const existing = readLockfile(dataRoot, manifest.id)
@@ -374,9 +387,10 @@ async function place(dataRoot: string, source: PluginInstallSource, expectId: st
 // A folder install (docs/security/plugin-install.md § Installing from a folder). The directory is symlinked rather
 // than copied, so whatever is in that tree at the node's next start is what runs, and the lockfile
 // below records no archive hash and no entrypoint digests because there is nothing to pin.
-function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): PluginInstallResult {
+async function linkLocal(dataRoot: string, source: { path: string }, expectId: string | null, options: InstallOptions): Promise<PluginInstallResult> {
   if (!isAbsolute(source.path)) fail('A local plugin path must be absolute.')
   const manifest = validate(source.path, expectId)
+  await validateSkills(source.path, manifest)
   if (hasPendingPluginReview(dataRoot, manifest.id)) fail(`'${manifest.id}' has an unreviewed package. Review or remove it first.`)
   guardDowngrade(readLockfile(dataRoot, manifest.id), manifest.version, options)
 

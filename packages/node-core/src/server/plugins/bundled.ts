@@ -67,6 +67,7 @@ const packageManifest = (dir: string, expectedId: string): PluginManifest => {
     manifest.client,
     manifest.migrations,
     ...manifest.contributions.harnesses.map((harness) => harness.spawn.entry),
+    ...manifest.contributions.skills.map((skill) => skill.path),
   ]
   for (const declared of declaredPaths) {
     if (!declared) continue

@@ -1,4 +1,4 @@
-import type { NodePluginPermissions, PluginInputLine, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
+import type { NodePluginPermissions, PluginInputLine, PluginSkillLine, PluginAgentToolGrant, PluginContextSectionGrant, PluginContributions, PluginCustomAgentGrant, PluginExtensionGrant, PluginHarnessGrant, PluginKeyClaimGrant, PluginNavigationDestinationGrant, PluginScheduleGrant, PluginTaskCheckGrant, PluginWebviewGrant } from '@acorn/protocol/api.ts'
 import { DISCLOSED_NODE_POINTS, isExtensionPointKind, isHookMode, type CoreExclusiveSlot, type ExtensionPointKind, type HookMode } from '@acorn/protocol/extensionPoints.ts'
 import { pluginAgentToolGrants, pluginContextSectionGrants, pluginCustomAgentGrants, pluginExtensionGrants, pluginHarnessGrants, pluginKeyClaimGrants, pluginNavigationDestinationGrants, pluginScheduleGrants, pluginTaskCheckGrants, pluginWebviewGrants } from '@acorn/protocol/plugin/grants.ts'
 import { describeCadence } from '@acorn/protocol/schedules.ts'
@@ -413,6 +413,22 @@ export const inputPermissionLines = (inputs: readonly Pick<PluginInputLine, 'sou
       high: false,
     }
   })
+
+// `Declared`, beside the custom agents: the host delivers them, but the words are the plugin's own, and an
+// agent follows them when a task matches. One line naming every skill, keyed by each folder's digest, so
+// a version that changes one byte of a body asks again (docs/managed-agents/skills.md § Skills). Not
+// high: an agent reads a skill only when it chooses to, and a skill carries no access of its own.
+export const skillPermissionLines = (skills: readonly Pick<PluginSkillLine, 'name' | 'title' | 'digest'>[]): PermissionLine[] => {
+  if (!skills.length) return []
+  const sorted = [...skills].sort((a, b) => a.name.localeCompare(b.name))
+  return [{
+    key: `skills:${sorted.map((skill) => `${skill.name}@${skill.digest}`).join(',')}`,
+    text: `Adds ${sorted.length} ${sorted.length === 1 ? 'procedure' : 'procedures'} your agents can load: ${sorted.map((skill) => skill.title).join(', ')}`,
+    detail: 'An agent reads one when a task matches its description. The plugin wrote the instructions in each.',
+    icon: 'scroll-text',
+    high: false,
+  }]
+}
 
 /** Each data source the plugin registers. Its name is the plugin's own, which is what a person picks it by. */
 export const providedSourceLines = (contributions: PluginContributions): PermissionLine[] =>

@@ -6,7 +6,7 @@ import { restartLocalNode } from '../../../infra/node/fleetActions'
 import { installNodePlugin, refreshNodePlugins } from '../../../infra/node/nodePlugins'
 import { installPluginOnDevice, readPluginHostState } from '../../../host/plugins/host'
 import { devicePlugins, distribution, reviewPendingTrust, syncPluginDistribution } from '../../../host/plugins/distribution'
-import { awaitingInputApproval } from '../../../host/plugins/distributionModel'
+import { awaitingNodeApproval } from '../../../host/plugins/distributionModel'
 import { reconcileDevicePluginChange } from '../../../host/plugins/reload'
 import type { SettingsPageContext } from '../../../host/registries/shell/settings'
 import { Alert, Badge, Button, SegmentedControl } from '../../../kit/components/primitives'
@@ -129,10 +129,11 @@ export default function PluginsSettings(props: { context: SettingsPageContext })
     return plugins().find((plugin) => plugin.id === current.id && (!current.pluginKind || plugin.kind === current.pluginKind))
   })
 
-  // A plugin waiting to have what it reads approved opens that dialog, which is the one decision left.
+  // A plugin waiting to have what it reads or its skills approved opens that dialog, which is the one
+  // decision left.
   // A folder install opens its page instead, because development mode there is the other answer.
   const manage = (plugin: InstalledPlugin) => {
-    if (plugin.kind === 'node' && awaitingInputApproval(plugin.row) && !plugin.row.development) reviewPendingTrust(plugin.id)
+    if (plugin.kind === 'node' && awaitingNodeApproval(plugin.row) && !plugin.row.development) reviewPendingTrust(plugin.id)
     else setOpen({ kind: 'plugin', id: plugin.id, pluginKind: plugin.kind })
   }
 

@@ -1,6 +1,6 @@
 import { PLUGIN_API_MAJOR, type NodePluginRow } from '@acorn/protocol/api.ts'
 import { contributionAvailability } from './availabilityModel'
-import { awaitingInputApproval, decisionKey, type DevicePluginEntry, type PluginDistributionSnapshot } from './distributionModel'
+import { awaitingInputApproval, awaitingSkillApproval, decisionKey, type DevicePluginEntry, type PluginDistributionSnapshot } from './distributionModel'
 
 // One plugin's state in a few words, for the three places that say it: a row under Settings > Plugins >
 // Installed, the status line of the plugin strip above the plugin's own settings page, and the rows the
@@ -39,6 +39,7 @@ export function nodePluginStatus(snapshot: PluginDistributionSnapshot, nodeId: s
     // It runs either way. Until the person answers, its derived sources read only what an earlier
     // grant covers, so this is something only they can settle.
     if (result.available && awaitingInputApproval(row)) return status('warn', 'Waiting for you to approve what it reads.', true, 'waiting')
+    if (result.available && awaitingSkillApproval(row)) return status('warn', 'Waiting for you to approve its skills. Agents don’t get them until you do.', true, 'waiting')
     if (result.available && row.development?.on) return status('accent', 'In development. Reloads when its files change.')
     if (result.available) return devMode ? status('accent', 'In development. Bundle changes are trusted without asking.') : status('ok', 'Active')
     switch (result.selection.kind) {

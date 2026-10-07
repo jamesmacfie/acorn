@@ -4,7 +4,8 @@ import { nodes } from '../../infra/node/fleet'
 import Icon from '../../kit/components/content/Icon'
 import { createDismissable } from '../../kit/lib/controls/dismissable'
 import { distribution, pendingTrust, resolvePendingTrust, type PluginTrustRequest } from '../plugins/distribution'
-import { recordInputDecision, recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
+import { awaitingInputApproval } from '../plugins/distributionModel'
+import { recordNodeDecision, recordTrustDecision, TIER_LABEL, trustTiers, type TierKey } from './trustModel'
 import './plugin-trust.css'
 import { Alert, Badge, Button, ToolbarSpacer } from '../../kit/components/primitives'
 import { HelpMark } from '../../kit/components/content/HelpMark'
@@ -46,6 +47,9 @@ export default function PluginTrustDialog() {
   // A node-only plugin, or one whose bundle is already approved, asks only about what it reads.
   const inputsOnly = () => !request()?.hash
   const readsMore = () => inputsOnly() && !!request()?.row.inputs?.granted
+  // Node-only and about skills alone: what it reads is already settled.
+  const skillsOnly = () => inputsOnly() && !!request() && !awaitingInputApproval(request()!.row)
+  const skillsChanged = () => skillsOnly() && !!request()?.row.skills?.granted
   const sameBundleReview = () => request()?.previous?.hash === request()?.hash
   const changedDeclaration = () => sameBundleReview() && !!request()?.previous?.declaration
   const previousStillActive = () => {
@@ -58,6 +62,7 @@ export default function PluginTrustDialog() {
   const fallbackCopy = () => {
     const current = request()
     if (!current) return ''
+    if (skillsOnly()) return 'Until you decide, its other features keep working, and agents don’t get these skills.'
     if (inputsOnly()) return 'Until you decide, its other features keep working, and its data sources read only what you approved before.'
     if (current.source?.kind === 'device') return 'This device plugin stays unavailable until you accept this version.'
     if (previousStillActive()) return 'The current version keeps working until the node activates this update.'
@@ -73,7 +78,7 @@ export default function PluginTrustDialog() {
     try {
       // Inputs first: their answer re-reads the node's roster, so the bundle's answer lands on a queue
       // that no longer asks about them.
-      await recordInputDecision(current, decision)
+      await recordNodeDecision(current, decision)
       if (current.hash) await recordTrustDecision(current, decision)
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Could not record the decision.')
@@ -118,14 +123,14 @@ export default function PluginTrustDialog() {
             onClick={dismiss.onContainerClick}
             onKeyDown={dismiss.onKeyDown}
           >
-            <div class="overlay-title">{inputsOnly() ? readsMore() ? 'Plugin reads more' : 'Approve what this plugin reads' : sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
+            <div class="overlay-title">{skillsOnly() ? skillsChanged() ? 'Plugin skills changed' : 'Approve this plugin’s skills' : inputsOnly() ? readsMore() ? 'Plugin reads more' : 'Approve what this plugin reads' : sameBundleReview() ? changedDeclaration() ? 'Plugin changed what it asks for' : 'Review plugin again' : previousVersion() ? 'Plugin update' : 'New plugin'}</div>
             <div class="overlay-body plugin-trust-body">
               <header class="plugin-trust-identity">
                 <span class="plugin-trust-glyph" aria-hidden="true">{current().row.name.slice(0, 1).toUpperCase()}</span>
                 <div>
                   <h2 id="plugin-trust-title">
                     <code>{current().row.name}</code>
-                    {inputsOnly() ? readsMore() ? ' wants to read more of your data' : ' wants to read your data' : sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
+                    {skillsOnly() ? skillsChanged() ? ' changed the procedures it gives your agents' : ' wants to give your agents procedures' : inputsOnly() ? readsMore() ? ' wants to read more of your data' : ' wants to read your data' : sameBundleReview() ? changedDeclaration() ? ' changed what it asks for' : ' needs another review' : previousVersion() ? (addedLines().length ? ' was updated — it asks for more' : ' was updated') : ' wants to run in acorn'}
                   </h2>
                   <p class="plugin-trust-meta">
                     <Badge size="xs">{inputsOnly() ? current().row.installed?.version : sameBundleReview() ? current().row.installed?.version : previousVersion() ? `${previousVersion()} → ${current().row.installed?.version}` : current().row.installed?.version}</Badge>
@@ -146,7 +151,9 @@ export default function PluginTrustDialog() {
                 <p class="muted plugin-trust-intro">A plugin from a folder isn't pinned to a version.</p>
               </Show>
               <p class="muted plugin-trust-intro">
-                <Show when={!inputsOnly()} fallback={readsMore()
+                <Show when={!inputsOnly()} fallback={skillsOnly()
+                  ? 'Agents see each one by name and description, and read it when a task matches. They get it at their next start.'
+                  : readsMore()
                   ? `This version reads ${addedLines().length === 1 ? 'one source' : `${addedLines().length} sources`} you haven't approved. It reads only with accounts you choose for each panel.`
                   : 'It reads only with accounts you choose for each panel.'}>
                 <Show

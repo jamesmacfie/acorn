@@ -92,6 +92,12 @@ summary table. Its topic pages cover [client bundle trust](./security/plugin-bun
 agent sessions spends turns on the person's provider, so it holds a disclosed, high grant of its own,
 separate from any veto it holds ([client bundle trust](./security/plugin-bundles.md)).
 
+A plugin's skills are text an agent follows, so they're a prompt-injection path by design. The device
+trust hash doesn't cover them, because it covers only a client bundle. The Node approves each skill at
+the digest of its whole folder, a changed byte asks again, and the folder may hold no symlinks. A harness
+gets read access to each delivered skill folder and nothing else: no data root, no write access, and
+nothing in the worktree ([skills](./managed-agents/skills.md#approval)).
+
 <a id="the-renderers-policy-and-its-dangerous-sinks"></a>
 <a id="untrusted-provider-data"></a>
 

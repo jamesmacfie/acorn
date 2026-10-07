@@ -55,6 +55,10 @@ export type CoreAuditAction =
   | 'plugins.models.granted'
   | 'plugins.models.revoked'
   | 'plugins.inputs.revoked'
+  // The person approved a loaded plugin's skills at the digests the trust prompt showed, or switched one
+  // on or off (docs/managed-agents/skills.md § Skills).
+  | 'plugins.skills.granted'
+  | 'plugins.skills.switched'
   // Development mode for a folder plugin came on or went off. The reloads it runs on each save aren't
   // audited one by one: turning it on is the decision.
   | 'plugins.development.started'

@@ -69,6 +69,10 @@ export type AgentDriverStartOptions = {
    *  § Configuration), followed by the user's servers this session has switched on (docs/mcp.md § Your
    *  own servers). Empty is a real answer, never a forgotten one. */
   mcpServers: readonly AgentDriverMcpServer[]
+  /** The folder of each skill this start indexes (./skillIndex.ts). A driver whose harness needs a grant
+   *  to read outside the worktree gives one for these and nothing else. The index itself goes ahead of
+   *  the first turn, from the lifecycle. Absent means none. */
+  skillFolders?: readonly string[]
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>

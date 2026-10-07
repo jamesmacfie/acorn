@@ -91,4 +91,11 @@ export function validateContributionIds(refs: ManifestReferences): void {
     if (seen.has(entry.id)) issues.addIssue({ code: 'custom', path: ['contributions'], message: `duplicate contribution id '${entry.id}'` })
     seen.add(entry.id)
   }
+  // Skills have their own namespace, `<pluginId>:<id>`, and never reach a client registry, so they only
+  // have to differ from each other.
+  const skills = new Set<string>()
+  for (const skill of manifest.contributions.skills) {
+    if (skills.has(skill.id)) issues.addIssue({ code: 'custom', path: ['contributions', 'skills'], message: `duplicate skill id '${skill.id}'` })
+    skills.add(skill.id)
+  }
 }

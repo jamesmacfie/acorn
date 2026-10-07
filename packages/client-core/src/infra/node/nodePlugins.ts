@@ -9,6 +9,8 @@ import {
   corePluginRequestRoute,
   corePluginReviewRoute,
   corePluginRoute,
+  corePluginSkillGrantRoute,
+  corePluginSkillsRoute,
   corePluginsRoute,
   corePluginUpdateRoute,
   type NodePluginState,
@@ -18,6 +20,7 @@ import {
   type PluginInstallSource,
   type PluginLogs,
   type PluginReloadResult,
+  type PluginSkillState,
   type PluginUninstallResult,
   type PluginUpdateResult,
 } from '@acorn/protocol/api.ts'
@@ -142,6 +145,18 @@ export const readPluginInputGrant = async (id: string, nodeId?: string): Promise
 export const grantPluginInputs = async (id: string, sources: PluginInputGrant['sources'], nodeId?: string): Promise<void> => {
   await mutate(corePluginInputGrantRoute(id), 'POST', { sources }, nodeId)
 }
+
+// The owner's approval of a plugin's skills at the digests the trust prompt showed, and the switch for
+// one (docs/managed-agents/skills.md § Skills). Read and written on the plugin's own Node.
+export const grantPluginSkills = async (id: string, digests: Record<string, string>, nodeId?: string): Promise<void> => {
+  await mutate(corePluginSkillGrantRoute(id), 'POST', { digests }, nodeId)
+}
+
+export const readPluginSkills = async (id: string, signal?: AbortSignal): Promise<PluginSkillState> =>
+  await readJson<PluginSkillState>(corePluginSkillsRoute(id), signal ? { signal } : {})
+
+export const setPluginSkillEnabled = async (id: string, name: string, enabled: boolean): Promise<PluginSkillState> =>
+  await mutate<PluginSkillState>(corePluginSkillsRoute(id), 'PUT', { name, enabled })
 
 export const revokePluginInputs = async (id: string, nodeId?: string): Promise<void> => {
   await mutate(corePluginInputGrantRoute(id), 'DELETE', {}, nodeId)

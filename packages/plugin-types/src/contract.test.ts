@@ -141,7 +141,8 @@ const _loadedCliCommand = {
   inputSchema: { type: 'object', properties: { nodeId: { type: 'string' }, projectId: { type: 'string' } }, required: ['nodeId', 'projectId'] },
   outputSchema: { type: 'object', properties: { status: { type: 'string' } }, required: ['status'] },
 } satisfies Published.PluginCliCommandDescriptor
-void [_loadedTool, _loadedContext, _loadedCliCommand]
+const _loadedSkill = { id: 'review-checklist', path: 'skills/review-checklist' } satisfies Published.PluginSkillDescriptor
+void [_loadedTool, _loadedContext, _loadedCliCommand, _loadedSkill]
 
 it('leaves most of the surface compared, not substituted', () => {
   // What the assertions above cannot catch: the hole lists growing until the comparison is vacuous.

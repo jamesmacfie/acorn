@@ -44,14 +44,20 @@ export const claudeHarness: HarnessLaunchSpec = {
   // system prompt, after any custom agent's own instructions. It is appended at creation and again,
   // unchanged, on every resume, because a system prompt that changes partway through a session
   // invalidates the model's earlier thinking.
-  acpSessionMeta: (session) => {
+  // Claude Code 2.1.292 keeps the appended prompt a session was created with and ignores a new one on
+  // resume, so nothing that can change between starts goes here. The skills index goes ahead of a turn
+  // instead (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
+  // (`//` anchors at the filesystem root), so the agent reads a body without a prompt and gains no write
+  // access anywhere new. Flag settings are per process, so the rule follows the current index.
+  acpSessionMeta: (session, skillFolders) => {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
       UNATTENDED_KINDS.has(session.kind) ? UNATTENDED_TURN_ENDINGS : undefined,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
     ].filter(Boolean).join('\n\n')
+    const permissions = skillFolders.length ? { permissions: { allow: skillFolders.map((dir) => `Read(/${dir}/**)`) } } : {}
     return {
-      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false } } },
+      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions } } },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },

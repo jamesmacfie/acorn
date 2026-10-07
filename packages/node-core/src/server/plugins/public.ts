@@ -4,6 +4,7 @@ export {
 } from './bundledState.ts'
 export { disabledPluginsStore } from './disabled.ts'
 export { inputGrantsStore } from './inputGrants.ts'
+export { skillStateStore } from './skillState.ts'
 export { installPlugin, pluginDir, pluginInstallRoot, uninstallPlugin, updatePlugin, withPluginPackage } from './installer.ts'
 export {
   installedPluginInfo, loadedPluginBinding, loadExternalPlugins, pluginInstallDir, readClientBundle, snapshotActivePlugin,

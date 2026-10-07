@@ -255,6 +255,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
         registerManifestNodeActions(ctx, loaded)
         registerManifestAuditActions(ctx, loaded)
         registerManifestRuntimeContributions(ctx, plugin.name, loaded, requireEnv)
+        for (const skill of loaded?.skills ?? []) ctx.skills.register(skill)
       } catch (error) {
         if (!loaded) throw error
         await contain(plugin, ctx, 'init', error)
@@ -472,6 +473,7 @@ export async function initPlugins(plugins: readonly NodePlugin[], options: Plugi
       registerManifestNodeActions(candidateCtx, next.binding)
       registerManifestAuditActions(candidateCtx, next.binding)
       registerManifestRuntimeContributions(candidateCtx, name, next.binding, requireEnv)
+      for (const skill of next.binding.skills ?? []) candidateCtx.skills.register(skill)
       await next.plugin.init(candidateCtx)
       // Ready belongs to the candidate window too. If it throws after the old instance is disposed,
       // the host can no longer truthfully report that the old runtime is still active.

@@ -7,7 +7,7 @@ import type { PluginsBridge } from '@acorn/node-core/server/pluginHost'
 import type { PluginHostResult, PluginRosterEntry } from '@acorn/node-core/server/pluginHost/host.ts'
 import type { PluginLoadFailure } from '@acorn/node-core/server/plugins'
 import { nodePluginNames } from './composition'
-import { approvePluginReview, hasPendingPluginReview, inputGrantsStore, pendingPluginReviewIds, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
+import { approvePluginReview, hasPendingPluginReview, inputGrantsStore, pendingPluginReviewIds, skillStateStore, pluginReviewFingerprint, readPendingPluginReview } from '@acorn/node-core/server/plugins'
 
 // The PLUGIN_STATE bridge, built once for both composition roots (docs/node-distribution.md §
 // Plugins). Building it once here is what stops the two roots drifting on which build allows
@@ -103,19 +103,21 @@ export async function buildPluginStateBridge(input: PluginStateInput): Promise<P
     // owned there. Disk first because a failure after it still leaves the plugin gone, where the reverse
     // leaves a running plugin whose state has been deleted underneath it.
     //
-    // The input grant goes before both, whether or not the data stays. It's keyed by plugin id alone,
-    // so a package installed later under the same id would otherwise read without asking. Dropping it
+    // The input grant and skill approvals go before both, whether or not the data stays. They're keyed
+    // by plugin id, so a package installed later under the same id would otherwise read without asking. Dropping it
     // first means a failed uninstall leaves a plugin that asks again, never one that kept a grant.
     // Development mode ends first of all, so its watch doesn't outlive the package.
     uninstall: async (id, options) => {
       development.set(id, false)
       inputGrantsStore(dataDir).delete(id)
+      skillStateStore(dataDir).forget(id)
       const result = uninstallPlugin(dataDir, id, options)
       if (options.purgeData) await cascadeDeletePluginData(input.db, id)
       return result
     },
     reload: (id) => development.reload(id),
     inputGrants: () => inputGrantsStore(dataDir),
+    skillState: () => skillStateStore(dataDir),
     development,
     dispose: development.dispose,
   }
