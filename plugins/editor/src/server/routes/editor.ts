@@ -34,7 +34,7 @@ export const setEditorBridge = (bridge: EditorBridge | null): void => setRouteTe
 
 // Write touches the filesystem, so the body is validated (the privileged-boundary contract).
 const writeBody = z.object({ path: z.string().min(1), content: z.string(), expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).nullable() })
-const targetBody = z.object({ path: z.string(), kind: z.enum(['file', 'folder', 'link']), identity: z.string().min(1), root: z.string().min(1) })
+const targetBody = z.object({ path: z.string(), kind: z.enum(['file', 'folder', 'link']), identity: z.string().min(1), entryId: z.string().min(1), root: z.string().min(1) })
 const createBody = z.object({ parent: targetBody, name: z.string(), kind: z.enum(['file', 'folder']) })
 const renameBody = z.object({ source: targetBody, name: z.string() })
 const trashBody = z.object({ source: targetBody })

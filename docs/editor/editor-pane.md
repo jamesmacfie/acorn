@@ -90,9 +90,15 @@ operations leave Git staging and imports alone.
 **Move to trash…** names the task and entry and warns when a folder's descendants are affected. The
 menu disables it when the owning Node lacks a supported trash command. An unsaved descendant needs
 **Save and move to trash**; a failed or conflicted save stops the action. Opening the menu suspends
-ordinary writes before focus changes. Cancel and failures release that hold. A confirmed rename
-updates open tabs, document custody, recovery, view state, and expanded paths. Confirmed trash
-removes affected tabs. Quick-open reads a fresh file list each time; the Node invalidates Git status
+ordinary writes before focus changes, including closed drafts kept in device recovery. A confirmed
+operation keeps its hold until the Node reply and local tab and recovery changes finish. Cancel is
+disabled while the operation is running; a partial result blocks old writers and explains where to
+resolve the draft. Node entry IDs detect a replaced file even after an explicit save changes ctime.
+A confirmed rename updates open tabs, document custody, recovery, view state, and expanded paths;
+confirmed trash retires affected tabs and local recovery. Rename uses the Node host's atomic
+exclusive rename primitive on macOS or Linux and reports unavailable when the host has no C compiler
+or the volume does not support that primitive. Quick-open reads a fresh file list each time; the Node
+invalidates Git status
 and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
 system Trash. The editor has no permanent-delete action or in-app trash browser.
 

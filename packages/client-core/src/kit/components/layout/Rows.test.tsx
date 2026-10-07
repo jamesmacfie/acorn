@@ -201,9 +201,25 @@ it('admits a bounded first frame and replays an early reveal when geometry arriv
   await vi.waitFor(() => expect(rows().some((row) => row.textContent === '1999')).toBe(true))
   expect(rows().length).toBeLessThan(40)
   expect(host.querySelector('[role="listbox"]')?.getAttribute('aria-activedescendant')).toBe('rows-early-reveal-item-1999')
+  const scroller = host.querySelector<HTMLElement>('.ui-rows-scroll')!
+  scroller.scrollTop = 5000
+  scroller.dispatchEvent(new Event('scroll'))
+  await frame()
+  expect(rows().some((row) => Number(row.textContent) >= 130 && Number(row.textContent) <= 180)).toBe(true)
+  expect(rows().length).toBeLessThan(40)
+  expect(host.querySelector('[role="listbox"]')?.getAttribute('aria-activedescendant')).toBe('rows-early-reveal-item-1999')
 })
 
 describe('Row slots', () => {
+  it('arms a secondary press before its context menu event', () => {
+    const order: string[] = []
+    mount(() => <Row onBeforeMenu={() => order.push('arm')} onMenu={() => order.push('menu')}>File</Row>)
+    const row = rows()[0]!
+    row.dispatchEvent(new MouseEvent('pointerdown', { button: 2, bubbles: true }))
+    row.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true }))
+    expect(order).toEqual(['arm', 'menu'])
+  })
+
   it('draws no leading slot when every mark inside it is hidden', () => {
     const [shown, setShown] = createSignal(false)
     mount(() => (

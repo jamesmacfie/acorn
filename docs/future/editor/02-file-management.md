@@ -1,44 +1,40 @@
 # Phase 02: manage files from the tree
 
-> **Completion note — October 7, 2026.** Landed task-addressed create, rename, and move-to-trash
-> routes; Node-side checkout and entry revalidation; exclusive creation; protected-root and Git
-> metadata checks; symlink-entry handling; and Node-owned trash detection. macOS uses the system
-> `/usr/bin/trash` command and Linux uses `gio trash`; Windows reports trash unavailable. The Node
-> serializes file actions with Editor writes across checkout aliases, tracks active external editor
-> PTYs, and broadcasts worktree changes to every task alias. The client captures the target when
-> opening a menu, suspends affected document custodies before focus moves, explicitly saves dirty
-> drafts only after the trash choice, and rebinds or retires open, recovered, and persisted paths
-> after a confirmed mutation. The shared desktop and terminal menus expose focused file and folder
-> actions; F2 starts inline rename. The Editor pane delegates these rules to the file-action model.
+> **Completion note — October 8, 2026.** Task-addressed create, rename, and move-to-trash routes
+> now rederive roots and entry identities on the owning Node. File and folder operations suspend
+> captured open and persisted descendant drafts before a menu can change focus, join admitted saves,
+> reserve destination custody before mutation, and keep their suspension through local reconciliation
+> even if the dialog closes or the pane retires. Rename moves recovery, text, view state, and tabs;
+> trash requires deliberate saves of every dirty descendant and retires their old callbacks. Same
+> kind external replacement is refused using a stable entry ID separate from ctime-sensitive
+> freshness. The Node serializes Editor writes and file actions across checkout aliases, checks
+> external editor PTYs, protects Git metadata and the root, and handles leaf symlink entries.
 >
-> **Decisions and limits.** The owning Node's trash is the only delete mechanism; there is no
-> permanent-delete fallback or Acorn recovery database. A successful adapter exit is checked
-> against the source entry, and a failed adapter that removed the source reports a partial result.
-> macOS file and folder trash were exercised through the real route with disposable entries; direct
-> `/usr/bin/trash` output named a destination under that Node's `~/.Trash`. This sandbox cannot
-> list that protected Trash directory, so recovery was verified by the system command's destination
-> report and source disappearance rather than by restoring an entry. Linux GIO and other remote
-> hosts were unavailable for a live adapter check. Native Node rename has no atomic no-overwrite
-> primitive, so an unrelated external process can still race destination preflight; Acorn writers
-> and known PTYs are serialized. A case-only rename uses a temporary sibling with rollback.
+> **Decisions and limits.** macOS uses `/usr/bin/trash`, Linux uses `gio trash`, and Windows reports
+> trash unavailable; there is no permanent-delete fallback. Node has no exclusive `fs.rename`, so
+> a small host-built helper calls macOS `RENAME_EXCL` or Linux `RENAME_NOREPLACE`. A Node host needs a
+> C compiler for rename; an unavailable compiler or unsupported volume fails closed with an error.
+> Case-only rename uses a temporary sibling and reports its actual path if rollback fails. A
+> successful trash adapter exit is checked against source disappearance. macOS file and folder trash
+> were exercised through the route; the protected `~/.Trash` could not be listed in this sandbox.
+> Linux GIO and remote hosts were unavailable for a live adapter check.
 >
-> **Verification.** Lint and architecture tests passed. Editor passed 130 tests (1 skipped),
-> Node core 1,633, plugin API 14, and terminal 676 (2 skipped). Client core passed 2,465 with the
-> two unchanged parent-baseline route-classification and CSS-token failures; desktop passed 171
-> with the 11 unchanged parent-baseline activation snapshot failures. The isolated desktop driver
-> created a file as a kept tab, reached it after scrolling the virtual tree, and opened its action
-> and inline-rename controls. It cannot send Enter/F2 or reach native dialogs, so the desktop
-> rename/trash completion paths were checked by component and route tests. The isolated terminal
-> driver rendered the Editor tree after a browser-event compatibility fix; focused row action
-> navigation was not confirmed by that driver. No unfiltered repository suite was run.
+> **Verification.** Focused custody, file-action model, Node route, no-clobber race, UI, and virtual
+> row tests passed. The isolated desktop driver created a file, canceled inline rename with Escape,
+> renamed it with Enter, and moved it to Trash; screenshots showed the tree and tab reconciliation.
+> The terminal driver built the current host and showed the tree at 120×40; at 80×24 the responsive
+> layout shows only the detail. Pane list focus registration made the tree reachable from the tab
+> strip, and Enter expanded folders. F2 and the context-menu key did not expose a row action in the
+> live snapshot, so terminal create, rename, and trash remain unverified in a live session. The filtered
+> package and architecture results are recorded in the handoff. No unfiltered repository suite ran.
 >
-> **For later phases.** Use the file-action model's captured target and counted suspension for
-> mutations that move paths. Keep destination custody preflight before the Node write and release
-> each holder once. Reconcile remote-device drafts through phase 01; do not transfer their custody
-> or assume local trash represents a remote Node. Plugin resource-action registration and preview
-> renderers remain outside this phase.
+> **For later phases.** Keep counted custody holds and destination reservations until the Node
+> result and local reconciliation finish. A partial Node or local result leaves drafts write-blocked
+> with an actual-path recovery message. Remote device drafts remain a phase 01 reconciliation matter;
+> local Trash is never assumed to represent a remote Node. Plugin resource-action registration and
+> preview renderers remain outside this phase.
 
-Date: October 7, 2026. Status: implemented.
+Date: October 7, 2026. Status: incomplete (terminal keyboard file actions).
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 01](./01-document-lifecycle.md).
 

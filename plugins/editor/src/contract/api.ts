@@ -9,9 +9,9 @@ export const searchRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/sea
 
 // Editor pane: read, write, and list worktree files. relPath rides a query param so a nested path
 // never collides with the route segments.
-export type EditorEntry = { name: string; dir: boolean; kind?: 'file' | 'folder' | 'link'; identity?: string; root?: string }
+export type EditorEntry = { name: string; dir: boolean; kind?: 'file' | 'folder' | 'link'; identity?: string; entryId?: string; root?: string }
 export type FileEntryKind = 'file' | 'folder' | 'link'
-export type FileTarget = { path: string; kind: FileEntryKind; identity: string; root: string }
+export type FileTarget = { path: string; kind: FileEntryKind; identity: string; entryId: string; root: string }
 export type FileActionResult = { ok: true; path: string } | { ok: false; reason: string; partial?: boolean }
 export type TrashAvailability = { available: boolean; reason?: string }
 export type EditorReadResult = { text: string; revision: string }

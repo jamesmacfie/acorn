@@ -126,14 +126,25 @@ export default function FileTree(props: {
   const targetOf = (item: TreeItem): FileTarget | null => {
     const entry = listings().get(item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : '')
       ?.find((candidate) => candidate.name === item.label)
-    return entry?.identity && entry.kind && entry.root
-      ? { path: item.key, kind: entry.kind, identity: entry.identity, root: entry.root }
+    return entry?.identity && entry.entryId && entry.kind && entry.root
+      ? { path: item.key, kind: entry.kind, identity: entry.identity, entryId: entry.entryId, root: entry.root }
       : null
   }
   const release = () => { armed()?.release(); setArmed(null); setMenuPath(null) }
+  const restoreFocus = (path: string) => queueMicrotask(() => {
+    const rows = items()
+    const surviving = rows.some((item) => item.key === path) ? path : rows[0]?.key
+    if (surviving && !disposed) revealCollectionItem(TREE, surviving)
+  })
   const dismissMenu = () => {
     const closing = armed()
-    queueMicrotask(() => { if (!dialog() && armed() === closing) release() })
+    queueMicrotask(() => {
+      if (!busy() && !dialog() && armed() === closing) {
+        const path = closing?.target.path
+        release()
+        if (path) restoreFocus(path)
+      }
+    })
   }
   const prepareMenu = (target: FileTarget) => {
     if (armed()?.target.path === target.path) return
@@ -152,31 +163,41 @@ export default function FileTree(props: {
     setInlinePath(next !== 'trash' && target.path && items().some((item) => item.key === target.path) ? target.path : null)
     setMenuPath(null)
   }
-  const finish = () => { setDialog(null); setInlinePath(null); release() }
+  const closeAction = (focusPath?: string) => {
+    if (busy()) return
+    setDialog(null); setInlinePath(null); release()
+    if (focusPath) restoreFocus(focusPath)
+  }
+  const finish = () => closeAction(armed()?.target.path)
   const act = async (saveDrafts = false, suppliedName?: string) => {
     const current = armed()
     const operation = dialog()
     if (!current || !operation || busy()) return
+    const operationTask = taskId
+    const actions = props.actions
+    const endOperation = current.hold()
     setBusy(true)
     setActionError('')
     try {
       let reveal: string | null = null
       if (operation === 'create-file' || operation === 'create-folder') {
         const parent = !current.target.path && destinationFolder()
-          ? await api.entry(taskId, destinationFolder()) : current.target
-        reveal = await props.actions.create(parent, suppliedName ?? name(), operation === 'create-file' ? 'file' : 'folder')
-      } else if (operation === 'rename') reveal = await props.actions.rename(current, suppliedName ?? name())
-      else await props.actions.trash(current, saveDrafts)
+          ? await api.entry(operationTask, destinationFolder()) : current.target
+        reveal = await actions.create(parent, suppliedName ?? name(), operation === 'create-file' ? 'file' : 'folder')
+      } else if (operation === 'rename') reveal = await actions.rename(current, suppliedName ?? name())
+      else await actions.trash(current, saveDrafts)
+      if (disposed || taskId !== operationTask || activeNodeId() !== nodeId) return
       await refresh()
       if (reveal) {
         const segments = reveal.split('/').slice(0, -1)
         let parent = ''
-        for (const segment of segments) { parent = parent ? `${parent}/${segment}` : segment; setEditorTreeDirectoryOpen(taskId, parent, true); await load(parent) }
+        for (const segment of segments) { parent = parent ? `${parent}/${segment}` : segment; setEditorTreeDirectoryOpen(operationTask, parent, true); await load(parent) }
         revealCollectionItem(TREE, reveal)
       }
-      finish()
+      setBusy(false)
+      closeAction(reveal ?? current.target.path)
     } catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setBusy(false) }
+    finally { endOperation(); setBusy(false) }
   }
   const copyPath = (absolute: boolean) => {
     const target = armed()?.target
@@ -210,16 +231,23 @@ export default function FileTree(props: {
   // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop: the recursive
   // component this replaced had a `<ul>` per directory and no keyboard at all.
   type TreeItem = { key: string; label: string; depth: number; dir: boolean }
+  let previousItems = new Map<string, TreeItem>()
   const items = createMemo<TreeItem[]>(() => {
     const rows: TreeItem[] = []
+    const nextItems = new Map<string, TreeItem>()
     const walk = (dir: string, depth: number): void => {
       for (const entry of listings().get(dir) ?? []) {
         const path = dir ? `${dir}/${entry.name}` : entry.name
-        rows.push({ key: path, label: entry.name, depth, dir: entry.dir })
+        const previous = previousItems.get(path)
+        const item = previous?.label === entry.name && previous.depth === depth && previous.dir === entry.dir
+          ? previous : { key: path, label: entry.name, depth, dir: entry.dir }
+        rows.push(item)
+        nextItems.set(path, item)
         if (entry.dir && isOpen(path)) walk(path, depth + 1)
       }
     }
     walk('', 0)
+    previousItems = nextItems
     return rows
   })
 
@@ -312,6 +340,7 @@ export default function FileTree(props: {
           onPress={() => (item.dir ? setOpen(item.key, !isOpen(item.key)) : props.onOpen(item.key, true))}
           onDoublePress={!item.dir ? () => props.onOpen(item.key, false) : undefined}
           onMenu={() => { const target = targetOf(item); if (target) openMenu(target) }}
+          onBeforeMenu={() => { const target = targetOf(item); if (target) prepareMenu(target) }}
           onRename={() => { const target = targetOf(item); if (target) { openMenu(target); begin('rename') } }}
           trailing={<RowActions ariaLabel={`Actions for ${item.key}`} open={() => menuPath() === item.key}
             onBeforeOpen={() => { const target = targetOf(item); if (target) prepareMenu(target) }}
@@ -351,7 +380,7 @@ export default function FileTree(props: {
         {actionError() && <Alert tone="danger">{actionError()}</Alert>}
       </Modal.Body>
       <Modal.Actions>
-        <Button onPress={finish}>Cancel</Button>
+        <Button disabled={busy()} onPress={finish}>Cancel</Button>
         {dialog() === 'trash' ? <>
           {!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act()}>Move to trash</Button>}
           {!!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act(true)}>Save and move to trash</Button>}

@@ -17,7 +17,7 @@ const listing = vi.fn(async (_taskId: string, path: string): Promise<EditorEntry
 
 vi.mock('./editorClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./editorClient')>()),
-  editorApi: () => ({ list: listing, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root' }),
+  editorApi: () => ({ list: listing, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root', entryId: path || 'root' }),
     trashAvailability: async () => ({ available: false, reason: 'Unsupported in this test.' }) }),
 }))
 
@@ -40,9 +40,9 @@ afterEach(() => {
 })
 
 it('renames the focused tree target with F2 without opening its file', async () => {
-  listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', root: '/work' }])
+  listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'seen', root: '/work' }])
   const release = vi.fn()
-  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, dirty: () => [], custodies: new Map() }))
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
   vi.mocked(actions.rename).mockResolvedValue('renamed.txt')
   const onOpen = mount()
   const row = await vi.waitFor(() => {
@@ -61,15 +61,48 @@ it('renames the focused tree target with F2 without opening its file', async () 
   input.dispatchEvent(new Event('input', { bubbles: true }))
   input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
   await vi.waitFor(() => expect(actions.rename).toHaveBeenCalledWith(expect.objectContaining({ target: {
-    root: '/work', path: 'draft.txt', kind: 'file', identity: 'seen',
+    root: '/work', path: 'draft.txt', kind: 'file', identity: 'seen', entryId: 'seen',
   } }), 'renamed.txt'))
   expect(onOpen).not.toHaveBeenCalled()
   await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1))
 })
 
+it('keeps the armed action through Enter, Escape, and a delayed Node response', async () => {
+  listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'inode', root: '/work' }])
+  const release = vi.fn()
+  const end = vi.fn()
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => end, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
+  let complete!: (path: string) => void
+  vi.mocked(actions.rename).mockImplementation(() => new Promise((resolve) => { complete = resolve }))
+  mount()
+  const row = await vi.waitFor(() => {
+    const element = host.querySelector<HTMLElement>('[title="draft.txt"]')
+    if (!element) throw new Error('row not loaded')
+    return element
+  })
+  row.focus()
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))
+  const input = await vi.waitFor(() => {
+    const element = row.querySelector<HTMLInputElement>('input')
+    if (!element) throw new Error('inline rename not open')
+    return element
+  })
+  input.value = 'renamed.txt'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  await vi.waitFor(() => expect(actions.rename).toHaveBeenCalledOnce())
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  expect(row.querySelector('input')).toBe(input)
+  expect(release).not.toHaveBeenCalled()
+  expect(end).not.toHaveBeenCalled()
+  complete('renamed.txt')
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
+  expect(end).toHaveBeenCalledOnce()
+})
+
 it('keeps the captured root target and uses an explicit destination folder', async () => {
   const release = vi.fn()
-  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, dirty: () => [], custodies: new Map() }))
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
   vi.mocked(actions.create).mockResolvedValue('src/new.txt')
   mount()
   const trigger = await vi.waitFor(() => {
@@ -97,7 +130,7 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   }
   const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent === 'Confirm')!
   confirm.click()
-  await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src' }, 'new.txt', 'file'))
+  await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
 
 const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void }) => {

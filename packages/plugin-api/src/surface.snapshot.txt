@@ -730,10 +730,12 @@ ui/editor: applyViewState
 ui/editor: captureViewState
 ui/editor: documentCustody
 ui/editor: editorTheme
+ui/editor: fileDocumentCustodies
 ui/editor: languageForPath
 ui/editor: mountEmbeddedEditor
 ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
+ui/editor: reserveDocumentDestinations
 ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn

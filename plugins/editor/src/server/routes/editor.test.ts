@@ -125,6 +125,45 @@ describe('editor routes over a real worktree', () => {
     expect(existsSync(join(work, 'renamed'))).toBe(false)
   })
 
+  it('keeps stable entry identity across a write and rejects a same-kind replacement', async () => {
+    const app = authed()
+    const before = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=hello.txt'), {} as Env)).json() as { entryId: string; identity: string }
+    writeFileSync(join(work, 'hello.txt'), 'acknowledged update')
+    const written = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=hello.txt'), {} as Env)).json() as { entryId: string; identity: string }
+    expect(written.entryId).toBe(before.entryId)
+    expect(written.identity).not.toBe(before.identity)
+    rmSync(join(work, 'hello.txt'))
+    writeFileSync(join(work, 'hello.txt'), 'external replacement')
+    const replacement = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=hello.txt'), {} as Env)).json() as { entryId: string }
+    expect(replacement.entryId).not.toBe(before.entryId)
+    const stale = await (await app.fetch(req('/api/tasks/task1/editor/rename', 'POST', { source: written, name: 'moved.txt' }), {} as Env)).json()
+    expect(stale).toMatchObject({ ok: false })
+    expect(readFileSync(join(work, 'hello.txt'), 'utf8')).toBe('external replacement')
+    writeFileSync(join(work, 'hello.txt'), 'hi there')
+  })
+
+  it('does not overwrite a destination created after route preflight', async () => {
+    const from = join(work, 'race-source.txt')
+    const to = join(work, 'race-destination.txt')
+    writeFileSync(from, 'source content')
+    const racedProc: EditorCoreServices['proc'] = {
+      ...testProc,
+      runProcess: async (spec) => {
+        if (spec.file.includes('acorn-exclusive-rename-') && spec.args?.[0] === from) writeFileSync(to, 'external winner')
+        return testProc.runProcess(spec)
+      },
+    }
+    setEditorBridge(editorBridge({ tasks: createTaskService(t.db), fs: coreFs, proc: racedProc }))
+    const app = authed()
+    const source = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=race-source.txt'), {} as Env)).json()
+    const result = await (await app.fetch(req('/api/tasks/task1/editor/rename', 'POST', { source, name: 'race-destination.txt' }), {} as Env)).json()
+    expect(result).toMatchObject({ ok: false })
+    expect(readFileSync(from, 'utf8')).toBe('source content')
+    expect(readFileSync(to, 'utf8')).toBe('external winner')
+    rmSync(from)
+    rmSync(to)
+  })
+
   it('renames a link entry without touching its outside target and refuses protected paths', async () => {
     const app = authed()
     symlinkSync(outside, join(work, 'escape-action'))

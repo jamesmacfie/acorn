@@ -3,6 +3,8 @@ import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import { Line } from '../cells'
 import { ScrollViewport } from '../scrolling'
+import { regionFocus } from '../../keys/regions'
+import { paneIdForFocus } from '../paneContext'
 
 // The narrow ceiling for the two-column nodes. The same number the `list-detail` layout uses, and for
 // the same reason: below it there is no room for a list and a document side by side. A node asks its
@@ -28,6 +30,7 @@ export function ListDetail(props: {
   collapseContent?: 'rows' | 'empty'
   children: JSX.Element
 }) {
+  const paneId = paneIdForFocus()
   let box: Renderable | undefined
   const [width, setWidth] = createSignal(NARROW_AT)
   const narrow = () => width() < NARROW_AT
@@ -49,10 +52,12 @@ export function ListDetail(props: {
         <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>{props.children}</box>
       }>
         <Show when={!narrow()}>
-          <box flexDirection="column" width={LIST_CELLS}>{props.list}</box>
+          <box flexDirection="column" width={LIST_CELLS}
+            ref={paneId ? regionFocus({ paneId, regionId: 'list' }, 0) : undefined}>{props.list}</box>
           <box width={1}><Line>│</Line></box>
         </Show>
-        <box flexDirection="column" flexGrow={1}>{props.children}</box>
+        <box flexDirection="column" flexGrow={1}
+          ref={paneId ? regionFocus({ paneId, regionId: 'detail' }, 1) : undefined}>{props.children}</box>
       </Show>
     </box>
   )

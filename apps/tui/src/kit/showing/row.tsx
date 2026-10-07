@@ -155,6 +155,8 @@ export function TreeRow(props: {
   selected?: boolean
   onPress?: () => void
   onMenu?: () => void
+  /** Desktop-only pointer preparation; terminal menus are armed by the key action. */
+  onBeforeMenu?: () => void
   onRename?: () => void
   /** Accepted for kit parity. A terminal has no double-click activation gesture. */
   onDoublePress?: () => void

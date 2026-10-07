@@ -12,7 +12,7 @@ import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
 import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
-import { createFileActions, entryIdentity, entryKind } from './fileActions'
+import { createFileActions, entryIdentity, entryKind, stableEntryId } from './fileActions'
 import { editorWorktreeChanged } from './worktreeInvalidation'
 
 const revisionOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
@@ -67,7 +67,7 @@ export const editorBridge = (
       .map(async (e): Promise<EditorEntry | null> => {
         try {
           const info = await lstat(join(abs, e.name))
-          return { name: e.name, dir: info.isDirectory(), kind: entryKind(info), identity: entryIdentity(info), root }
+          return { name: e.name, dir: info.isDirectory(), kind: entryKind(info), identity: entryIdentity(info), entryId: stableEntryId(info), root }
         } catch { return null } // a disappearing row is absent, not a stale target
       }))
     return entries.filter((entry): entry is EditorEntry => entry !== null)

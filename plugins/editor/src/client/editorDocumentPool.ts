@@ -25,6 +25,7 @@ export type EditorPool = {
 }
 
 export function flushEditorDocument(custody: DocumentCustody, api: EditorApi, taskId: string, path: string, fileAction = false): Promise<void> {
+  if (!custody.ownsFile(taskId, path)) return Promise.resolve()
   const write = async (text: string) => {
     const expected = custody.acknowledgedRevision
     if (!expected) throw new Error('The saved disk version is unknown. Reload or compare before saving.')
@@ -86,6 +87,7 @@ export function rebindEditorFile(pool: EditorPool, oldPath: string, newPath: str
 export function retireEditorFile(pool: EditorPool, path: string): void {
   const entry = pool.files.get(path)
   if (!entry) return
+  entry.custody.retireFile()
   pool.files.delete(path)
   pool.saved.delete(path)
   pool.reading.delete(path)

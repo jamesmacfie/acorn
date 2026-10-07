@@ -20,6 +20,7 @@ export function TreeRow(props: {
   onPress?: () => void
   onDoublePress?: () => void
   onMenu?: (event?: MouseEvent) => void
+  onBeforeMenu?: () => void
   onRename?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
@@ -55,6 +56,7 @@ export function TreeRow(props: {
       onPress={props.onPress}
       onDoublePress={props.onDoublePress}
       onMenu={props.onMenu}
+      onBeforeMenu={props.onBeforeMenu}
       onRename={props.onRename}
       leading={
         <>

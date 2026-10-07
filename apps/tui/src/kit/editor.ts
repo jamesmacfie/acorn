@@ -15,7 +15,7 @@
 //
 // Graphical engine imports and state construction belong to the DOM Rectangle's mount.
 // The terminal host retains the shared text custody API without importing grammars or views.
-export { documentCustody, recoverDocumentCustody, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
+export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, type DocumentCustody } from '@acorn/client-core/features/editor/documentCustody.ts'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import type { Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'

@@ -137,7 +137,7 @@ describe('document custody', () => {
     const admitted = document.flush(writer)
     const suspended = document.suspendWrites()
     document.editText('later')
-    await expect(document.flush(writer)).rejects.toThrow('suspended')
+    await expect(document.flush(writer)).resolves.toBeUndefined()
     finish({ text: 'first', revision: 'disk-first' })
     await admitted
     const resume = await suspended
@@ -162,7 +162,7 @@ describe('document custody', () => {
     const releaseSecond = await secondHolder
     releaseFirst()
     releaseFirst() // a holder cannot release another holder by resuming twice
-    await expect(document.flush(writer)).rejects.toThrow('suspended')
+    await expect(document.flush(writer)).resolves.toBeUndefined()
     expect(writer).toHaveBeenCalledTimes(1)
     releaseSecond()
     await document.flush(async (text) => ({ text, revision: 'disk-follow-up' }))
@@ -177,7 +177,7 @@ describe('document custody', () => {
     expect(document.dirty).toBe(false)
     expect(document.acknowledgedRevision).toBe('saved-before-trash')
     document.editText('later edit')
-    await expect(document.flush(async () => ({}))).rejects.toThrow('suspended')
+    await expect(document.flush(async () => ({}))).resolves.toBeUndefined()
     release()
     await document.flush(async (text) => ({ text, revision: 'later' }))
     expect(document.acknowledgedRevision).toBe('later')

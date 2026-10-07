@@ -77,6 +77,8 @@ export function Row(props: {
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
   onMenu?: (event?: MouseEvent) => void
+  /** Capture a secondary press before it blurs an editor and schedules a save. */
+  onBeforeMenu?: () => void
   onRename?: () => void
   /** A mouse double-click, for rows where the second press has a distinct conventional meaning. */
   onDoublePress?: () => void
@@ -168,6 +170,7 @@ export function Row(props: {
         style={placement(props)}
         onFocus={() => { props.item?.onFocus(); props.onHover?.(true) }}
         onBlur={() => props.onHover?.(false)}
+        onPointerDown={props.onBeforeMenu ? (event) => { if (event.button === 2) props.onBeforeMenu?.() } : undefined}
         onMouseEnter={() => props.onHover?.(true)}
         onMouseLeave={() => props.onHover?.(false)}
         onClick={(event) => {
@@ -218,6 +221,7 @@ export function Row(props: {
       tabindex={props.item ? props.item.tabindex : props.onPress || props.onMenu ? 0 : undefined}
       onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
       onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.(event) } : undefined}
+      onPointerDown={props.onBeforeMenu ? (event) => { if (event.button === 2) props.onBeforeMenu?.() } : undefined}
       onDblClick={props.onDoublePress ? (event) => { if (!fromNestedControl(event)) props.onDoublePress?.() } : undefined}
       onKeyDown={(props.onRename || (props.onPress || props.onMenu) && !props.item)
         ? (event) => {
