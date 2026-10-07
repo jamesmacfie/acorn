@@ -489,7 +489,6 @@ export default function App() {
       node: active ? { id: active, label: nodes().find((entry) => entry.nodeId === active)?.label ?? active, state: nodeState(active) } : null,
       nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
       account: null,
-      railCollapsed: railCollapsed(),
       canAddProject: canAddProjectFromFolder(),
       slots: { right: rightSlotRef },
       pickWorkspace: (id, nodeId) => {
@@ -506,7 +505,6 @@ export default function App() {
       },
       pickNode: (id) => { if (nodes().some((candidate) => candidate.nodeId === id)) setActiveNode(id) },
       openSettings: () => openSettings(),
-      collapseRail: toggleRail,
       navigate: (route) => {
         if (!breadcrumb.some((item) => item.route === route)) return
         // From a task, the project crumb leaves the task for the project's default source, as picking

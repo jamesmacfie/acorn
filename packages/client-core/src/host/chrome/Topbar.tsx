@@ -2,7 +2,6 @@ import { For, Show } from 'solid-js'
 import type { TopbarProps } from '@acorn/protocol/chrome.ts'
 import Picker from '../../kit/components/inputs/Picker'
 import { Button, Select } from '../../kit/components/primitives'
-import { IconButton } from '../../kit/components/inputs/IconButton'
 import NodeChip from '../../features/fleet/NodeChip'
 import OverflowMenu from '../../features/settings/OverflowMenu'
 import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
@@ -21,8 +20,6 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <IconButton icon="panel-left" label={props().railCollapsed ? 'Show tasks' : 'Hide tasks'}
-          onPress={props().collapseRail} />
         <Show when={props().workspaces.length}>
           <Picker
             size="sm"

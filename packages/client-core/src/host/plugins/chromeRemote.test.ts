@@ -38,9 +38,9 @@ describe('chrome action boundary', () => {
       breadcrumb: [{ label: 'Project', route: '/p/one' }],
       node: { id: 'n1', label: 'Local', state: 'online' },
       nodes: [{ id: 'n1', label: 'Local', state: 'online' }],
-      account: null, railCollapsed: false, canAddProject: false, slots: { right: slot },
+      account: null, canAddProject: false, slots: { right: slot },
       pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode, openSettings: vi.fn(),
-      collapseRail: vi.fn(), navigate, clearCache: vi.fn(), addProject,
+      navigate, clearCache: vi.fn(), addProject,
     }
     const remote = topbarRemote(props)
     expect(() => structuredClone(remote.data)).not.toThrow()
