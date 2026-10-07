@@ -1,0 +1,23 @@
+{
+  "tools": {
+    "task_current": { "id": "task-fixture-1", "title": "Fix the login redirect loop", "branch": "fix/login-redirect", "repo": "example/webapp" },
+    "task_context": { "task": { "title": "Fix the login redirect loop" }, "linkedIssues": [{ "kind": "linear.issue", "identifier": "WEB-412", "title": "Login redirects forever after session expiry" }], "pull": { "number": 1428, "state": "open" } },
+    "pr_current": { "number": 1428, "title": "Stop the login redirect loop", "state": "open", "headRef": "fix/login-redirect", "baseRef": "main" },
+    "pr_changed_files": { "files": [{ "path": "src/auth/redirect.ts", "additions": 12, "deletions": 3 }, { "path": "src/auth/redirect.test.ts", "additions": 40, "deletions": 0 }] },
+    "pr_checks": { "checks": [{ "name": "unit", "status": "completed", "conclusion": "failure", "summary": "redirect.test.ts: expected /dashboard, got /login" }, { "name": "lint", "status": "completed", "conclusion": "success" }] },
+    "pr_review_comments": { "comments": [{ "author": "reviewer", "path": "src/auth/redirect.ts", "line": 18, "body": "This drops the original query string. Keep `next` when you rebuild the URL." }] },
+    "local_changes": { "files": [{ "path": "src/auth/redirect.ts", "status": "modified" }] }
+  },
+  "issues": {
+    "linear.issue/WEB-412": { "identifier": "WEB-412", "title": "Login redirects forever after session expiry", "description": "After the session cookie expires, /dashboard sends the person to /login?next=/dashboard, and /login sends them straight back because it reads a stale cookie.", "comments": [] }
+  },
+  "diffs": {
+    "src/auth/redirect.ts": "@@ -15,6 +15,9 @@\n-  return new URL('/login', base)\n+  const url = new URL('/login', base)\n+  if (expired(session)) clearCookie(res)\n+  return url\n"
+  },
+  "memories": {
+    "auth-cookie-name": "The session cookie is `wa_session`; tests stub it through `testCookies()`."
+  },
+  "notes": {
+    "task": "Repro: expire the cookie in devtools, then load /dashboard."
+  }
+}

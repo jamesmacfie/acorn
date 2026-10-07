@@ -1,7 +1,99 @@
 # Phase 08: resource-read experiment
 
-Status: proposed, 2026-10-03. Entry: phase 07 accepted. Next:
+Status: done, result **remove**, 2026-10-07. Proposed 2026-10-03. Entry: phase 07 accepted. Next:
 [phase 09](./09-session-reach.md).
+
+## Completion note, 2026-10-07
+
+**Result.** The experiment fails the stop rule on both harnesses, so acorn gets no resource
+aliases and no experiment mode. Claude Code and Codex both keep MCP tool schemas out of the first
+turn. Hiding the 11 aliased readers saves 111 tokens of 23,641 on Claude (0.5%) and nothing on
+Codex. In a paired probe, both clients finished the task with tools and failed it with resources
+only, because neither model ever read a resource.
+
+**What landed.** On branch `phase-08-resource-read-experiment`, at the commit titled "Phase 08:
+Resource-read experiment". No product code changed, so nothing needed removing. The benchmark is in
+[`packages/resource-read-benchmark/`](./packages/resource-read-benchmark/README.md): the live tool
+list from 2026-10-07, a fixture task, a dependency-free MCP server that serves the three modes, and
+`measure.sh`, which reruns the context measurement. `docs/mcp.md` and `docs/agent-tools.md` are
+unchanged, because nothing was retained.
+
+**Eligibility.** A development node advertised 38 tools to this task on 2026-10-07, 26 of them at
+the `read` tier. The design's table has 12 aliases, and 11 are eligible. `agent_read` is registered
+as `execute`, so `agent://` was dropped. The 11 aliased readers are 4.4 KB of the 21.7 KB tool list.
+
+**First-turn context.** Each run sent "Reply with the single word OK." from an empty Git folder.
+Claude is the first assistant message's input plus cache-creation plus cache-read tokens. Codex is
+`turn.completed` `input_tokens`. The first turn differs between modes only in the server's tools and
+resources, because each task's prompt is the same in every mode. So a task's saving is the same
+fixed number, whatever the task.
+
+| Client | No acorn server | `tools` | `tools-and-resources` | `resources-and-write-tools` | Saving against `tools` |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Claude Code, run 1 | 23,107 | 23,641 | 23,679 | 23,530 | 111 (0.47%) |
+| Claude Code, run 2 | 23,329 | 23,863 | 23,901 | 23,752 | 111 (0.47%) |
+| Claude Code, tool search off | 38,381 | 47,805 | | 47,089 | 716 (1.50%) |
+| Codex, run 1 | 20,615 | 20,615 | 20,615 | 20,615 | 0 |
+| Codex, run 2 | 20,677 | 20,677 | 20,677 | 20,677 | 0 |
+
+The bar is 15%. Claude Code 2.1.292 defers every MCP tool to its `ToolSearch` tool and lists only
+the names, so all 38 acorn tools cost 534 tokens. Resources add 38 tokens for
+`ListMcpResourcesTool`, `ReadMcpResourceTool`, and `ReadMcpResourceDirTool`. The row with
+`ENABLE_TOOL_SEARCH=false` isn't how acorn runs Claude, and it still fails. Acorn's tools cost 9,424
+tokens there, and the aliased readers 716 of them. Codex 0.159.2 gives the model one `exec` tool and
+no MCP schemas. The model finds a tool from JavaScript through `ALL_TOOLS` and calls
+`tools.mcp__acorn__task_current({})`, as the session rollout recorded. The
+`tool_search_always_defer_mcp_tools` feature is graduated and on. Acorn's Codex driver sets no
+feature or tool-search override, and its Claude driver sets no `ENABLE_TOOL_SEARCH`, so managed
+sessions behave like these runs. This session's own acorn tools were deferred as well.
+
+**Discovery probe.** The doc's first step asks whether a model reads resources on its own. The
+prompt was "Which task am I working on, and which CI check on its pull request is failing and why?
+Answer in two short lines." It names no URI. `FIXTURE_LOG` recorded the server side.
+
+| Client | `tools` | `resources-and-write-tools` |
+| --- | --- | --- |
+| Claude Code, Opus 5.5 | Finished. `task_current`, `pr_current`, `pr_checks`. | Failed. Claude Code fetched `resources/list` itself, but the model never called a resource tool. It called `repo_info`, `linked_issues`, and `notes_list`, then asked for the link. |
+| Codex, `codex exec` default model | Finished. `task_current`, `task_context`, `pr_checks`. | Failed. No `resources/list` or `resources/read` reached the server. Same three tools, then it asked for the link. |
+
+The fixture doesn't fill `repo_info`, `linked_issues`, or `notes_list`, so they answered
+`not-found`. A real node would have answered them, but the resource surface would still have gone
+unread.
+
+**Decisions and deviations.**
+
+- **Measured before building.** The design's order was build, then 60 runs. The context criterion
+  depends only on what `tools/list` and the resource capability put in the first turn, and a fixture
+  serving the same bytes measures that exactly. Both clients defer MCP schemas, so no implementation
+  could reach 15%. Building the aliases and the Node mode only to delete them would have changed no
+  number in the tables.
+- **No 60-run pass.** The saving is a fixed number per harness, 111 tokens and zero, so 10 tasks
+  can't move the aggregate. The completion criterion failed on the first paired probe as well. The
+  rule asks both criteria to pass on both harnesses, and three of the four fail. The 10 task
+  definitions weren't frozen and the runs weren't spent.
+- **Hidden readers are the aliased ones.** `resources-and-write-tools` hides the 11 readers that have
+  an alias and keeps `memory_search`, `git_log`, the listers, and the data-source readers. Hiding a
+  reader with no alias would lose the capability, which tests something else. Hiding all 26 readers
+  still couldn't pass, because acorn's whole tool list costs 534 tokens on Claude and none on Codex.
+- **The fixture stands in for the node.** It speaks newline-delimited JSON-RPC with no SDK, so it
+  runs from the docs folder and touches no task, provider, or outbound write.
+- **`omp` and DeepSeek weren't checked.** The design counts them only after Claude and Codex pass.
+
+**Verification.** `pnpm test:focus @acorn/node-core src/mcp/server.test.ts`: 5 passed, covering
+`tools/list` from the manifest, the bearer and session headers on `tools/call`, one call id across
+a retry, no task, and acorn-not-running. Ordinary tool discovery and calls are unchanged, because no
+product file changed. `pnpm lint` and `@acorn/arch-tests` (86) passed. The full `pnpm test` wasn't
+run, because the change is docs and a fixture outside every package. Raw transcripts were kept out
+of the repository, because they carry the person's settings and paths. `measure.sh` regenerates the
+context numbers.
+
+**For later phases.**
+
+- Phase 11 gets the benchmark folder at this commit and needs no removal revision.
+- Acorn's MCP tool count doesn't cost first-turn context on either managed harness. A later proposal
+  to merge or trim agent tools for context reasons should measure first, starting from `measure.sh`.
+- Neither model reaches for MCP resources unprompted. A feature that delivers content as a resource
+  needs a prompt or a tool to point at it.
 
 ## Outcome
 

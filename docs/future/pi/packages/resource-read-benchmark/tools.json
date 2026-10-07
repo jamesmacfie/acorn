@@ -1,0 +1,1055 @@
+[
+  {
+    "name": "agent_spawn",
+    "description": "Start another agent that you own, send it `prompt` as its first message, and return its ids at once. With isolation 'worktree' this also creates a new task with its own checkout and branch; that is how you hand a change to a separate task. When a child you started from a managed chat finishes a turn, its final message comes back to you as a new message, so you do not need to poll. From a terminal, use agent_wait and agent_read. A child can start one more level of agents; a third level is refused, and one root allows 12 live agents. A child that stops for a permission or a question waits for a person to answer in its own pane.",
+    "risk": "execute",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 500,
+          "description": "Shown in the session list. With worktree isolation, it names the child task and derives its branch, adding a numeric suffix if taken."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000000,
+          "description": "The child's first message. The child sees none of your conversation, so write a complete brief."
+        },
+        "profileId": {
+          "description": "The harness to run, such as 'claude-code' or 'codex'. Overrides the saved spawned-agent harness. When omitted, uses the saved explicit harness or inherits yours, according to Settings. Choose model and effort through configOptions.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "agent": {
+          "description": "A custom agent the user saved, by its name or id, such as \"Bug reviewer\". It sets the agent to run, its settings, and its instructions, so leave profileId out. configOptions and toolCeiling still apply on top.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "isolation": {
+          "default": "shared",
+          "description": "'shared' runs the child in this task's checkout, so its edits land beside yours. 'worktree' creates a new task with its own checkout and branch. Without baseBranch, the branch starts from the project folder's HEAD. Use 'worktree' for a separate change.",
+          "type": "string",
+          "enum": [
+            "shared",
+            "worktree"
+          ]
+        },
+        "baseBranch": {
+          "description": "An existing local branch to start the child from. Only valid with worktree isolation. Takes its last commit; uncommitted changes do not carry over. Leave it out to start from the project folder's HEAD.",
+          "type": "string",
+          "minLength": 1
+        },
+        "resultSchema": {
+          "description": "A JSON Schema for the child's final answer. An answer that matches comes back as structured output in the report and in agent_read.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "configOptions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "description": "Overrides for this child by provider option id. For Codex, use { \"model\": \"<model id>\", \"reasoning\": \"high\" } to choose model and effort. These override saved spawn defaults and custom-agent settings. Unsupported values are skipped with a warning in the child's transcript."
+        },
+        "toolCeiling": {
+          "description": "Narrows the tools the child may use. It never widens past your own. Leave it out, or keep maxRisk at 'execute', if the child has to start its own agent.",
+          "type": "object",
+          "properties": {
+            "allow": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            },
+            "maxRisk": {
+              "type": "string",
+              "enum": [
+                "read",
+                "write",
+                "execute"
+              ]
+            }
+          }
+        }
+      },
+      "required": [
+        "title",
+        "prompt"
+      ]
+    }
+  },
+  {
+    "name": "agent_prompt",
+    "description": "Send another message to an agent you started. It waits behind any turn the agent is running, and its answer reports back like the first one.",
+    "risk": "execute",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The sessionId that agent_spawn returned for the child."
+        },
+        "prompt": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000000,
+          "description": "The next message for the child. It waits behind any turn the child is running."
+        },
+        "resultSchema": {
+          "description": "A JSON Schema for the child's answer to this message.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "configOptions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "type": "string",
+            "maxLength": 2000
+          },
+          "description": "Overrides for this child by provider option id. For Codex, use { \"model\": \"<model id>\", \"reasoning\": \"high\" } to choose model and effort. These override saved spawn defaults and custom-agent settings. Unsupported values are skipped with a warning in the child's transcript."
+        }
+      },
+      "required": [
+        "sessionId",
+        "prompt"
+      ]
+    }
+  },
+  {
+    "name": "agent_wait",
+    "description": "Wait up to 30 seconds for an agent you started to reach a condition. Call it again if it times out.",
+    "risk": "execute",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The sessionId that agent_spawn returned for the child."
+        },
+        "afterSeq": {
+          "default": 0,
+          "description": "Only look at events after this cursor. Pass the cursor, lastSeq, or nextCursor from your last call.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "until": {
+          "default": "turn_completed",
+          "description": "'turn_completed' matches when a turn after the cursor ends or fails. 'attention' matches when the child is waiting on a person, for example for a permission. 'ready' matches when the child is idle. 'stopped' matches when it has stopped, failed, or been archived.",
+          "type": "string",
+          "enum": [
+            "ready",
+            "attention",
+            "turn_completed",
+            "stopped"
+          ]
+        },
+        "timeoutMs": {
+          "default": 30000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    }
+  },
+  {
+    "name": "agent_read",
+    "description": "Read a page of messages, tool calls, and results from an agent you started. Pass nextCursor back as afterSeq to read the next page.",
+    "risk": "execute",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The sessionId that agent_spawn returned for the child."
+        },
+        "afterSeq": {
+          "default": 0,
+          "description": "Only look at events after this cursor. Pass the cursor, lastSeq, or nextCursor from your last call.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    }
+  },
+  {
+    "name": "agent_cancel",
+    "description": "Cancel the running or named turn of an agent you started. Its history stays.",
+    "risk": "execute",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "sessionId": {
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$",
+          "description": "The sessionId that agent_spawn returned for the child."
+        },
+        "turnId": {
+          "description": "The turn to cancel. Leave it out to cancel the turn that is running.",
+          "type": "string",
+          "format": "uuid",
+          "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+        }
+      },
+      "required": [
+        "sessionId"
+      ]
+    }
+  },
+  {
+    "name": "local_changes",
+    "description": "Uncommitted changes in the task worktree (git status): staged, unstaged, untracked, and conflicted files.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "local_diff",
+    "description": "The unified diff of one uncommitted file in the task worktree.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "repo-relative file path"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "unstaged",
+            "staged"
+          ]
+        }
+      },
+      "required": [
+        "path"
+      ]
+    }
+  },
+  {
+    "name": "git_log",
+    "description": "Recent commits on the task's branch.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "n": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      }
+    }
+  },
+  {
+    "name": "memory_list",
+    "description": "List memory names, descriptions, types and update dates. Use when the standing index is truncated or stale.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "private"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "memory_search",
+    "description": "Search names, descriptions and bodies in project and private memory. Returns up to ten matches with excerpts.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "private"
+          ]
+        }
+      },
+      "required": [
+        "query"
+      ]
+    }
+  },
+  {
+    "name": "memory_get",
+    "description": "Read a memory and its hash. Read before updating or deleting.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "private"
+          ]
+        },
+        "name": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "name"
+      ]
+    }
+  },
+  {
+    "name": "memory_write",
+    "description": "Save durable memory directly. Use project scope for codebase facts, private for the person. Updating an existing name requires its current hash from memory_get.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "private"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string",
+          "enum": [
+            "user",
+            "feedback",
+            "project",
+            "reference"
+          ]
+        },
+        "body": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "scope",
+        "name",
+        "description",
+        "type",
+        "body"
+      ]
+    }
+  },
+  {
+    "name": "memory_delete",
+    "description": "Delete a memory using its current hash from memory_get. The owner can undo it.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "project",
+            "private"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "hash": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "scope",
+        "name",
+        "hash"
+      ]
+    }
+  },
+  {
+    "name": "notes_list",
+    "description": "Workspace notes for the current task (slug, title, kind, author).",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "scope": {
+          "type": "string",
+          "enum": [
+            "task",
+            "workspace",
+            "global"
+          ]
+        }
+      }
+    }
+  },
+  {
+    "name": "notes_read",
+    "description": "Read one workspace note.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "task",
+            "workspace",
+            "global"
+          ]
+        }
+      },
+      "required": [
+        "slug"
+      ]
+    }
+  },
+  {
+    "name": "notes_write",
+    "description": "Replace a note body (creates the note if missing, attributed to this agent).",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "body": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "task",
+            "workspace",
+            "global"
+          ]
+        }
+      },
+      "required": [
+        "slug",
+        "body"
+      ]
+    }
+  },
+  {
+    "name": "notes_append",
+    "description": "Append to a note (findings, plans, handoffs) — creates it if missing, attributed to this agent.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "slug": {
+          "type": "string"
+        },
+        "text": {
+          "type": "string"
+        },
+        "scope": {
+          "type": "string",
+          "enum": [
+            "task",
+            "workspace",
+            "global"
+          ]
+        }
+      },
+      "required": [
+        "slug",
+        "text"
+      ]
+    }
+  },
+  {
+    "name": "github_pull_create",
+    "description": "Create a GitHub pull request for this task's branch and attach it to the task. The first attached PR becomes primary; later PRs become related.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Pull request title"
+        },
+        "body": {
+          "description": "Pull request description",
+          "type": "string"
+        },
+        "base": {
+          "type": "string",
+          "minLength": 1,
+          "description": "Base branch, for example main"
+        },
+        "draft": {
+          "description": "Create as a draft pull request",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "title",
+        "base"
+      ]
+    }
+  },
+  {
+    "name": "pr_review_comments",
+    "description": "What reviewers said about the current task's pull request: submitted reviews, inline comment threads, and conversation comments, from acorn's local mirror. Open threads only unless you ask for resolved ones.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "includeResolved": {
+          "description": "include threads a reviewer has marked resolved (default: false)",
+          "type": "boolean"
+        }
+      }
+    }
+  },
+  {
+    "name": "pr_checks",
+    "description": "The CI checks on the current task's pull request from acorn's local mirror, with the failing ones called out. A check with no status has not run yet.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "task_scripts_status",
+    "description": "Read durable setup and teardown status for this task. Reads never start scripts. Setup running means installation may be incomplete.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "task_scripts_wait",
+    "description": "Wait up to 30 seconds for one setup or teardown attempt to settle. Reads never start scripts. Timeout returns matched:false and does not cancel the script; bind retries with attemptId.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "setup",
+            "teardown"
+          ]
+        },
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "timeoutMs": {
+          "default": 30000,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 30000
+        }
+      },
+      "required": [
+        "phase"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_scripts_logs",
+    "description": "Read a bounded diagnostic tail for this task script phase or attempt. Reads never start scripts. Check available and truncated.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "phase": {
+          "type": "string",
+          "enum": [
+            "setup",
+            "teardown"
+          ]
+        },
+        "attemptId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "tailLines": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "maxBytes": {
+          "default": 32768,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 32768
+        }
+      },
+      "required": [
+        "phase"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "task_current",
+    "description": "The current acorn task: repo, branch, worktree path, PR number and linked issues.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "task_context",
+    "description": "The assembled context for the current task: PR detail, linked issues and notes. Compact by design.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "include": {
+          "description": "comma list of context section ids (default: registry defaults)",
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "pr_current",
+    "description": "The current task's pull request (title, body, changed-file count) from acorn's local mirror.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "pr_changed_files",
+    "description": "The changed file paths of the current task's pull request.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "linked_issues",
+    "description": "Issues/errors linked to the current task (Linear tickets, Rollbar items), resolved from the local cache.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "provider": {
+          "description": "filter by provider, e.g. 'linear' or 'rollbar'",
+          "type": "string"
+        }
+      }
+    }
+  },
+  {
+    "name": "repo_info",
+    "description": "The current task's repo: owner, name, default branch, task branch and worktree path.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "plugin_authoring",
+    "description": "How to write an acorn plugin against THIS node, with the current manifest vocabulary, action verbs, permission facets and frame-bridge messages read from the node itself. Call this before writing or changing a plugin, and before answering any question about the plugin contract — never answer one from memory. Installing is a separate tool (plugin_request); this one only tells you how.",
+    "risk": "read",
+    "inputSchema": {
+      "type": "object",
+      "properties": {}
+    }
+  },
+  {
+    "name": "issue_detail",
+    "description": "One issue or error in full, from the tracker it lives in: a Linear ticket's description and comments, or a Rollbar item with its newest occurrence. Reads acorn's provider mirror and refreshes it when the cached copy has expired. Use this when linked_issues or the task context names something you have to act on.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the item's own id, such as 'ENG-42' for Linear or '142' for Rollbar"
+        },
+        "provider": {
+          "description": "which provider to ask, such as 'linear' or 'rollbar'. Default: every connected one that can answer",
+          "type": "string"
+        },
+        "refresh": {
+          "description": "read from the provider instead of serving the cached copy",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "identifier"
+      ]
+    }
+  },
+  {
+    "name": "issue_comment",
+    "description": "Post a comment on an issue linked to this task, such as a Linear ticket. It is posted as the person who connected the tracker, so say that it comes from an agent when that matters. Use it to report progress or to ask the ticket's author a question.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the linked item's own id, such as 'ENG-42' for Linear"
+        },
+        "body": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20000,
+          "description": "the comment, in Markdown"
+        },
+        "provider": {
+          "description": "which provider, such as 'linear'. Only needed when two linked items share an id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "identifier",
+        "body"
+      ]
+    }
+  },
+  {
+    "name": "issue_image",
+    "description": "View an image from an issue linked to this task, such as a screenshot in a Linear ticket's description or comments. Use it when the ticket's text relies on what an image shows.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "identifier": {
+          "type": "string",
+          "minLength": 1,
+          "description": "the linked item's own id, such as 'ENG-42' for Linear"
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "an image URL exactly as issue_detail returned it"
+        },
+        "provider": {
+          "description": "which provider, such as 'linear'. Only needed when two linked items share an id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "identifier",
+        "url"
+      ]
+    }
+  },
+  {
+    "name": "dataset_write",
+    "description": "Write evidence-backed rows to an agent-fed dataset in this task project. The dataset schema and scope are fixed by its owner; corrections remain separate.",
+    "risk": "write",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "datasetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "version": {
+          "type": "integer",
+          "exclusiveMinimum": 0,
+          "maximum": 9007199254740991
+        },
+        "rows": {
+          "minItems": 1,
+          "maxItems": 5000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "data": {},
+              "evidence": {},
+              "reason": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 2048
+              }
+            },
+            "required": [
+              "data"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "datasetId",
+        "version",
+        "rows"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "data_sources_list",
+    "description": "List typed data sources available to the current task project. Read-only; returns descriptors, never credentials.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "connectionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "data_source_describe",
+    "description": "Describe fields, parameters, operators, and capabilities for one available typed data source.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "connectionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "pluginId",
+        "sourceId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "data_sources_discover",
+    "description": "Read one bounded page from an installed dynamic source discovery. This registers only the returned source descriptors and never returns credentials.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "discoveryId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "pageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "connectionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "pluginId",
+        "discoveryId"
+      ],
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "data_source_options",
+    "description": "Resolve a bounded page of real option ids and labels for a typed data source field or parameter.",
+    "risk": "read",
+    "inputSchema": {
+      "$schema": "http://json-schema.org/draft-07/schema#",
+      "type": "object",
+      "properties": {
+        "pluginId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "sourceId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "target": {
+          "type": "string",
+          "enum": [
+            "field",
+            "parameter"
+          ]
+        },
+        "pointer": {
+          "type": "string",
+          "pattern": "^\\/.*"
+        },
+        "search": {
+          "type": "string",
+          "maxLength": 256
+        },
+        "cursor": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4096
+        },
+        "pageSize": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "connectionId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "parameters": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "pluginId",
+        "sourceId",
+        "target",
+        "pointer"
+      ],
+      "additionalProperties": false
+    }
+  }
+]
