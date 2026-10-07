@@ -163,6 +163,9 @@ function viewportBox(props: ViewportProps): JSX.Element {
     setOffset(next)
     stuck = next >= Math.max(0, total() - fits())
   }
+  // Geometry changes must not reinterpret a previously bottom-following reader as having
+  // scrolled away: a growing transcript still follows, while a shrinking menu clamps its offset.
+  const clampCurrent = (): void => { setOffset(clamp(offset())) }
   const move = (rows: number): void => { place(offset() + rows) }
 
   const scrollBy = (delta: number, unit?: 'viewport'): void => {
@@ -224,6 +227,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
       minWidth={0}
       minHeight={0}
       visible={props.visible ?? true}
+      onSizeChange={clampCurrent}
       ref={(element: Renderable) => {
         box = element as unknown as Node
         // Descriptors rather than a spread, or the three getters above would be copied as whatever
@@ -242,6 +246,7 @@ function viewportBox(props: ViewportProps): JSX.Element {
         flexShrink={0}
         minWidth="100%"
         maxWidth="100%"
+        onSizeChange={clampCurrent}
         ref={(element: Renderable) => { content = element as unknown as Node }}
       >
         {props.children}

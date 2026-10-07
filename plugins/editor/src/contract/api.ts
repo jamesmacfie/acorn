@@ -28,6 +28,7 @@ export const editorWriteRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId
 export const editorEntryRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/entry?path=${encodeURIComponent(relPath)}`
 export const editorCreateRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/create`
 export const editorRenameRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/rename`
+export const editorRenameAvailabilityRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/rename-availability`
 export const editorTrashRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash`
 export const editorTrashAvailabilityRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash-availability`
 

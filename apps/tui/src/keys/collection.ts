@@ -18,7 +18,7 @@
 
 import { onCleanup } from 'solid-js'
 import type { Renderable } from '../tree/compat'
-import { _resetCollectionState } from '@acorn/client-core/kit/keys'
+import { _resetCollectionState, registerCollectionReveal } from '@acorn/client-core/kit/keys'
 import {
   COLLECTION_INTENTS, createCollectionIntents, type CollectionIntentOptions, type CollectionItem,
 } from '@acorn/client-core/kit/keys'
@@ -116,6 +116,9 @@ export function createCellCollection(options: CellCollectionOptions): CellCollec
       return focusRenderable(box)
     },
     attach: (box) => {
+      onCleanup(registerCollectionReveal(options.id(), (key) => {
+        if (options.items().some((item) => item.key === key && !item.disabled)) keys.goTo(key)
+      }))
       // The collection tier, focus-within on the collection, exactly as on the desktop (client-core
       // host/keys/install.ts § the four tiers). Priority decides, not locality. The number comes from
       // `registerIntentLayer`'s own default, which both hosts read, so it is the one tier this

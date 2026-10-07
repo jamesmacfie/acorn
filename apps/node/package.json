@@ -10,7 +10,7 @@
   "scripts": {
     "lint": "tsc --noEmit",
     "test": "vitest run",
-    "build": "vite build && node scripts/check-service-budget.mjs",
+    "build": "vite build && node scripts/build-exclusive-rename.mjs && node scripts/check-service-budget.mjs",
     "build:plugin": "node scripts/build-plugin.mjs",
     "measure:editor-bundle": "node scripts/measure-editor-bundle.mjs",
     "measure:service-graph": "node scripts/measure-service-graph.mjs",

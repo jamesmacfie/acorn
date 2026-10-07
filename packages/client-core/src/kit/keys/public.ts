@@ -1,4 +1,4 @@
-export { revealCollectionItem } from './collection.ts'
+export { registerCollectionReveal, revealCollectionItem } from './collection.ts'
 export { COLLECTION_INTENTS, createCollectionIntents } from './collectionIntents.ts'
 export type { CollectionIntentOptions, CollectionItem } from './collectionIntents.ts'
 export { _resetCollectionState } from './collectionState.ts'

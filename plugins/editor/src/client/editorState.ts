@@ -64,18 +64,25 @@ export const editorSetDirty = (taskId: string, path: string, dirty: boolean): vo
 export const editorActivate = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, active: path }))
 
 /** One synchronous state change keeps tab order, preview, dirtiness, and active identity together. */
+export const movePathsInEditorState = (state: TaskEditorState, from: string, to: string): TaskEditorState => ({
+  files: state.files.map((file) => ({ ...file, path: movedPath(file.path, from, to) })),
+  active: state.active ? movedPath(state.active, from, to) : null,
+})
 export const editorMovePaths = (taskId: string, from: string, to: string): void =>
-  update(taskId, (s) => ({
-    files: s.files.map((file) => ({ ...file, path: movedPath(file.path, from, to) })),
-    active: s.active ? movedPath(s.active, from, to) : null,
-  }))
+  update(taskId, (s) => movePathsInEditorState(s, from, to))
 
+export const removePathsInEditorState = (state: TaskEditorState, path: string): TaskEditorState => {
+  const removed = state.files.filter((file) => pathContains(path, file.path))
+  const files = state.files.filter((file) => !pathContains(path, file.path))
+  return { files, active: state.active && removed.some((file) => file.path === state.active) ? files[0]?.path ?? null : state.active }
+}
 export const editorRemovePaths = (taskId: string, path: string): void =>
-  update(taskId, (s) => {
-    const removed = s.files.filter((file) => pathContains(path, file.path))
-    const files = s.files.filter((file) => !pathContains(path, file.path))
-    return { files, active: s.active && removed.some((file) => file.path === s.active) ? files[0]?.path ?? null : s.active }
-  })
+  update(taskId, (s) => removePathsInEditorState(s, path))
+
+export const captureTaskEditorState = (taskId: string): TaskEditorState => {
+  const state = stateFor(taskId)
+  return { files: state.files.map((file) => ({ ...file })), active: state.active }
+}
 
 export const pathContains = (parent: string, child: string): boolean => !parent || child === parent || child.startsWith(`${parent}/`)
 export const movedPath = (path: string, from: string, to: string): string =>

@@ -57,6 +57,7 @@ export function Row(props: {
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
   onRename?: () => void
+  onCreate?: () => void
   /** Accepted for kit parity. A terminal has no double-click activation gesture. */
   onDoublePress?: () => void
   href?: string
@@ -103,11 +104,14 @@ export function Row(props: {
         if (!props.item) return
         element.focusable = true
         props.item.ref(element)
-        if (props.onRename) bindKeys(element, [{ key: 'f2', cmd: () => {
-          if (focusedRenderable() !== element) return false
-          props.onRename?.()
-          return true
-        } }], PANE)
+        const actionKeys = [
+          ...(props.onRename ? [{ key: 'f2', cmd: () => { props.onRename?.(); return true } }] : []),
+          ...(props.onCreate ? [{ key: 'ctrl+n', cmd: () => { props.onCreate?.(); return true } }] : []),
+        ]
+        if (actionKeys.length) bindKeys(element, actionKeys.map((binding) => ({
+          key: binding.key,
+          cmd: () => focusedRenderable() === element && binding.cmd(),
+        })), PANE)
       }}
     >
       <box flexShrink={0}><Line tone="accent">{isActive() ? '›' : ' '}</Line></box>
@@ -158,6 +162,7 @@ export function TreeRow(props: {
   /** Desktop-only pointer preparation; terminal menus are armed by the key action. */
   onBeforeMenu?: () => void
   onRename?: () => void
+  onCreate?: () => void
   /** Accepted for kit parity. A terminal has no double-click activation gesture. */
   onDoublePress?: () => void
   leading?: JSX.Element
@@ -181,6 +186,7 @@ export function TreeRow(props: {
       keepTrailing={props.keepTrailing}
       onPress={props.onPress}
       onRename={props.onRename}
+      onCreate={props.onCreate}
       leading={<box flexDirection="row" gap={1}><Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>{slot(props.leading)}</box>}
     >
       {props.children}

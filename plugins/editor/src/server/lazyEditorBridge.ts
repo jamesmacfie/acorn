@@ -23,6 +23,7 @@ export function lazyEditorBridge(
     write: (...args) => bridge().then((owner) => owner.write(...args)),
     entry: (...args) => bridge().then((owner) => owner.entry(...args)),
     trashAvailability: (...args) => bridge().then((owner) => owner.trashAvailability(...args)),
+    renameAvailability: (...args) => bridge().then((owner) => owner.renameAvailability(...args)),
     create: (...args) => bridge().then((owner) => owner.create(...args)),
     rename: (...args) => bridge().then((owner) => owner.rename(...args)),
     trash: (...args) => bridge().then((owner) => owner.trash(...args)),

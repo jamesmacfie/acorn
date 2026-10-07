@@ -37,8 +37,9 @@ export function Menu(props: {
     opens: true,
   })
   return (
-    // An open menu takes a full row so its list does not inherit the trigger's narrow width.
-    <box flexDirection="column" {...(open() ? { flexBasis: '100%' as const } : {})}>
+    // The column stretches this box to the list width. A 100% flex basis here consumes the
+    // list's height after dismissal and pushes the surviving rows below the viewport.
+    <box flexDirection="column">
       {/* The trigger's characters are the caller's; the box around them is the stop. */}
       <box flexDirection="row" flexShrink={0} ref={control.ref}>
         {props.trigger({ open, toggle: () => set(!open()), focused: control.focused })}

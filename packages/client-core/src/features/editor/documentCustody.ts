@@ -6,6 +6,7 @@ export type DocumentAcknowledgement = { text?: string; revision?: string }
 export type DocumentWriter = (text: string) => Promise<DocumentAcknowledgement>
 const documents = new Map<string, DocumentCustody>()
 const reservations = new Map<string, DocumentCustody | null>()
+const sourceHolds = new Set<{ nodeId: string | null; taskId: string; prefix: string; held: Map<DocumentCustody, { path: string; release: () => void }> }>()
 const textOf = (text: string): Text => Text.of(text.split('\n'))
 const validViewState = (value: EditorViewState | undefined): value is EditorViewState => !!value
   && Number.isSafeInteger(value.anchor) && value.anchor >= 0
@@ -192,9 +193,15 @@ export class DocumentCustody {
 
   /** Stop new and queued writes, then join an admitted write before a file mutation. */
   async suspendWrites(): Promise<() => void> {
+    const release = this.holdWrites()
+    await this.pending?.catch(() => {})
+    return release
+  }
+
+  /** Count a hold before an asynchronously loaded document can queue a save. */
+  holdWrites(): () => void {
     this.suspensionCount++
     this.requested = false
-    await this.pending?.catch(() => {})
     let resumed = false
     return () => {
       if (resumed) return
@@ -241,13 +248,14 @@ const recoveryKey = (address: readonly (string | null)[]): string => `acorn.docu
 export function recoverDocumentCustody(address: readonly (string | null)[]): DocumentCustody | undefined {
   const key = recoveryKey(address)
   const held = documents.get(key)
-  if (held) return held
+  if (held) { holdSourceCustody(address, held); return held }
   if (reservations.has(key)) return undefined
   try {
     const recovery = JSON.parse(readLocal(key) ?? 'null') as { text?: unknown } | null
     if (typeof recovery?.text === 'string') {
       const custody = new DocumentCustody(key, '')
       documents.set(key, custody)
+      holdSourceCustody(address, custody)
       return custody
     }
   } catch { /* Invalid device recovery is not a document. */ }
@@ -256,8 +264,33 @@ export function recoverDocumentCustody(address: readonly (string | null)[]): Doc
 
 export function documentCustody(address: readonly (string | null)[], loaded: string, diskRevision?: string): DocumentCustody {
   const key = recoveryKey(address)
-  if (reservations.has(key)) throw new Error('This document is reserved by a file action. Try again after it finishes.')
-  return documents.get(key) ?? new DocumentCustody(key, loaded, diskRevision)
+  if (reservations.has(key)) throw new Error('A file action is moving into this path. Wait for it to finish, then reopen the document or resolve its recovery.')
+  const custody = documents.get(key) ?? new DocumentCustody(key, loaded, diskRevision)
+  holdSourceCustody(address, custody)
+  return custody
+}
+
+function holdSourceCustody(address: readonly (string | null)[], custody: DocumentCustody): void {
+  if (address.length !== 4 || address[1] !== 'file' || typeof address[2] !== 'string' || typeof address[3] !== 'string') return
+  for (const hold of sourceHolds) {
+    if (hold.nodeId !== address[0] || hold.taskId !== address[2] || hold.prefix !== '' && address[3] !== hold.prefix && !address[3].startsWith(`${hold.prefix}/`)) continue
+    if (!hold.held.has(custody)) hold.held.set(custody, { path: address[3], release: custody.holdWrites() })
+  }
+}
+
+/** Hold descendants acquired by a pending read or a new pane after the menu was armed. */
+export function reserveFileSourceCustodies(nodeId: string | null, taskId: string, prefix: string): { release: () => void; custodies: () => Map<string, DocumentCustody> } {
+  const hold = { nodeId, taskId, prefix, held: new Map<DocumentCustody, { path: string; release: () => void }>() }
+  sourceHolds.add(hold)
+  fileDocumentCustodies(nodeId, taskId, prefix)
+  let released = false
+  const release = () => {
+    if (released) return
+    released = true
+    sourceHolds.delete(hold)
+    for (const entry of hold.held.values()) entry.release()
+  }
+  return { release, custodies: () => new Map([...hold.held].map(([custody, entry]) => [entry.path, custody])) }
 }
 
 /** The custody owner enumerates in-memory and persisted drafts without leaking storage keys to a pane. */

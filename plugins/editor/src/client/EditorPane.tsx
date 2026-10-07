@@ -13,6 +13,7 @@ import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, edi
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { createFileActionModel } from './fileActionModel'
+import { persistCapturedEditorOpenFiles } from './openFilesSlice'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import SearchPanel from './search/SearchPanel'
@@ -222,7 +223,7 @@ export default function EditorPane(props: { task: Task }) {
     scheduleSave.cancel()
     saveViewState()
     if (view && currentPath) remember(currentPath, view.state)
-  })
+  }, (state) => persistCapturedEditorOpenFiles(queryClient, nodeId, taskId, state))
 
   // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
   // explicit-flush chord. Built per path, because the language is the file's and the update listener

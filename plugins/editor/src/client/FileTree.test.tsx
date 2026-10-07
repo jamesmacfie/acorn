@@ -18,7 +18,7 @@ const listing = vi.fn(async (_taskId: string, path: string): Promise<EditorEntry
 vi.mock('./editorClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./editorClient')>()),
   editorApi: () => ({ list: listing, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root', entryId: path || 'root' }),
-    trashAvailability: async () => ({ available: false, reason: 'Unsupported in this test.' }) }),
+    trashAvailability: async () => ({ available: false, reason: 'Unsupported in this test.' }), renameAvailability: async () => ({ available: true }) }),
 }))
 
 const { default: FileTree } = await import('./FileTree')
@@ -42,7 +42,7 @@ afterEach(() => {
 it('renames the focused tree target with F2 without opening its file', async () => {
   listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'seen', root: '/work' }])
   const release = vi.fn()
-  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
   vi.mocked(actions.rename).mockResolvedValue('renamed.txt')
   const onOpen = mount()
   const row = await vi.waitFor(() => {
@@ -71,7 +71,7 @@ it('keeps the armed action through Enter, Escape, and a delayed Node response', 
   listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'inode', root: '/work' }])
   const release = vi.fn()
   const end = vi.fn()
-  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => end, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => end, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
   let complete!: (path: string) => void
   vi.mocked(actions.rename).mockImplementation(() => new Promise((resolve) => { complete = resolve }))
   mount()
@@ -102,7 +102,7 @@ it('keeps the armed action through Enter, Escape, and a delayed Node response', 
 
 it('keeps the captured root target and uses an explicit destination folder', async () => {
   const release = vi.fn()
-  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), savedRevisions: new Map() }))
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
   vi.mocked(actions.create).mockResolvedValue('src/new.txt')
   mount()
   const trigger = await vi.waitFor(() => {

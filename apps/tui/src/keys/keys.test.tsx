@@ -2,13 +2,14 @@
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import type { PluginTrustRequest } from '@acorn/client-core/host/plugins/distribution.ts'
+import { revealCollectionItem } from '@acorn/client-core/kit/keys'
 import { renderFixture } from '../harness'
 import { activeHints } from '../chrome/bindings'
 import { renderCells } from '../kit/render'
-import { Modal, ModalBody, TabPanel, Tabs } from '../kit/grouping'
+import { ListDetail, Modal, ModalBody, TabPanel, Tabs } from '../kit/grouping'
 import { Rectangle } from '../kit/pixels'
 import { enteredRectangle, type CellTerminal } from '../kit/rectangle'
-import { Row, Rows } from '../kit/showing'
+import { Row, Rows, TreeRow } from '../kit/showing'
 import { Text } from '../kit/showing'
 import { Button, Input } from '../kit/asking'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
@@ -66,6 +67,36 @@ const TRUST: PluginTrustRequest = {
 }
 
 describe('keys and focus in cells', () => {
+  it('keeps a narrow file row alive through F2 and restores focus for the context key', async () => {
+    const [editing, setEditing] = createSignal(false)
+    const [menu, setMenu] = createSignal('')
+    const [create, setCreate] = createSignal(false)
+    const ActionList = () => <Show when={editing()} fallback={
+      <Rows id="files" items={[{ key: 'one', label: 'one' }, { key: 'two', label: 'two' }]} onMenu={setMenu}>
+        {(item, props) => <TreeRow item={props} onRename={() => setEditing(true)} onCreate={() => setCreate(true)}>{item.label}</TreeRow>}
+      </Rows>
+    }>
+      <Modal title="Rename entry" onDismiss={() => setEditing(false)}>
+        <ModalBody><Input label="Name" value="one" onInput={() => {}} /></ModalBody>
+      </Modal>
+    </Show>
+    const frame = await renderCells(() => (
+      <HeaderBodyFooter stateKey="file-actions" label="Editor" regions={{ body: () =>
+        <ListDetail list={<ActionList />}><Text>Document detail</Text></ListDetail>
+      }} />
+    ), { width: 70, height: 24 })
+    try {
+      expect((await frame.press('F2')).text).toContain('Rename entry')
+      const cancelled = await frame.press('ESCAPE')
+      expect(cancelled.text).toContain('one')
+      revealCollectionItem('files', 'two')
+      await frame.press('F10', { shift: true })
+      expect(menu()).toBe('two')
+      await frame.press('n', { ctrl: true })
+      expect(create()).toBe(true)
+    } finally { frame.done() }
+  }, 30_000)
+
   it('lands the keys on the list when a pane opens, and moves them with next and prev', async () => {
     const frame = await renderCells(() => (
       <HeaderBodyFooter stateKey="pane" label="Test" regions={{ body: () => <List /> }} />

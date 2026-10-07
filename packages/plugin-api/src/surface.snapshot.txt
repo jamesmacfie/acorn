@@ -291,6 +291,7 @@ client: setSelectedSource
 client: setTerminalOpen
 client: sourceRegistry
 client: splitRefTokens
+client: storageKeyFor
 client: summarizeFileStats
 client: taskBridge
 client: taskStatus
@@ -736,6 +737,7 @@ ui/editor: mountEmbeddedEditor
 ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
 ui/editor: reserveDocumentDestinations
+ui/editor: reserveFileSourceCustodies
 ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn
@@ -1004,6 +1006,7 @@ ui: ToolbarSpacer
 ui: TreeRow
 ui: UserAvatar
 ui: attachPty
+ui: copyText
 ui: createArmedConfirm
 ui: createSplitDrag
 ui: createTimelineWindow

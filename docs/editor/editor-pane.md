@@ -81,9 +81,12 @@ directory refreshes, including collapsed ones, and unopened directories stay unl
 refresh keeps the last listing and shows **Retry**.
 
 The tree's ellipsis, right-click, and focused-row menu show file actions without opening a preview or
-saving a draft. F2 renames the focused row. Name entry stays in the row when it is visible; the root
-creation command uses a dialog with an optional relative destination folder, so it can create beside
-an open file. Names are single basenames, including dotfiles. Create uses an
+saving a draft. F2 renames the focused row. On the terminal, Shift+F10 opens its menu and Ctrl+N
+opens the worktree root's New menu from a focused row. The terminal stacks a 12-line file list above
+the document at narrow widths and uses a name dialog; the desktop keeps name entry in an available
+row. Root creation has an optional relative destination folder, so it can create beside an open
+file. A terminal without OSC 52 clipboard support shows a selected path for manual copy. Names are
+single basenames, including dotfiles. Create uses an
 exclusive Node operation and opens a file as a kept tab. Rename stays in the same folder. Both
 operations leave Git staging and imports alone.
 
@@ -95,9 +98,11 @@ operation keeps its hold until the Node reply and local tab and recovery changes
 disabled while the operation is running; a partial result blocks old writers and explains where to
 resolve the draft. Node entry IDs detect a replaced file even after an explicit save changes ctime.
 A confirmed rename updates open tabs, document custody, recovery, view state, and expanded paths;
-confirmed trash retires affected tabs and local recovery. Rename uses the Node host's atomic
-exclusive rename primitive on macOS or Linux and reports unavailable when the host has no C compiler
-or the volume does not support that primitive. Quick-open reads a fresh file list each time; the Node
+confirmed trash retires affected tabs and local recovery. Rename uses a Node build artifact that
+calls the host's atomic exclusive rename primitive on macOS or Linux. An ordinary Node host does not
+compile code when a person renames a file. The action is disabled when this Node build has no helper
+for its platform or architecture and fails closed when the volume lacks the primitive. Quick-open
+reads a fresh file list each time; the Node
 invalidates Git status
 and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
 system Trash. The editor has no permanent-delete action or in-app trash browser.

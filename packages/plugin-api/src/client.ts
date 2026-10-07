@@ -218,7 +218,7 @@ export type { HostCapabilityRequirement, HostRequirement } from '@acorn/client-c
 export { clientCapability, clientCapabilityId, requireClientCapability } from '@acorn/client-core/infra/node'
 export { parseJson } from '@acorn/client-core/infra/persistence'
 export type { PersistedStateSlice } from '@acorn/client-core/infra/persistence'
-export { PersistedSliceKeys, PrefKeys } from '@acorn/client-core/infra/persistence'
+export { PersistedSliceKeys, PrefKeys, storageKeyFor } from '@acorn/client-core/infra/persistence'
 export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/savePref.ts'
 // The one shared "Generate with" default. Here rather than on ./ui because none of it is a component:
 // a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes

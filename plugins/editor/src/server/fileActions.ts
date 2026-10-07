@@ -10,7 +10,7 @@ import type { EditorCoreServices, EditorChanged } from './editor'
 import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
 import { activeEditorUnder } from './editorPtyOwners'
 import { editorWorktreeChanged } from './worktreeInvalidation'
-import { exclusiveRename } from './exclusiveRename'
+import { exclusiveRename, exclusiveRenameAvailability } from './exclusiveRename'
 
 const validName = (name: string): boolean => !!name && name !== '.' && name !== '..' && !/[\\/\0]/.test(name) && name.toLowerCase() !== '.git'
 const gitMetadata = (path: string): boolean => path.split(/[\\/]/).some((part) => part.toLowerCase() === '.git')
@@ -96,6 +96,7 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
       }
     },
     trashAvailability,
+    renameAvailability: exclusiveRenameAvailability,
     create: async (taskId: string, parent: FileTarget, name: string, kind: 'file' | 'folder'): Promise<FileActionResult> => {
       if (!validName(name)) return failure('Enter one valid file name.')
       try {
@@ -116,6 +117,8 @@ export function createFileActions(core: EditorCoreServices, changed: EditorChang
     },
     rename: async (taskId: string, source: FileTarget, name: string): Promise<FileActionResult> => {
       if (!validName(name)) return failure('Enter one valid file name.')
+      const support = await exclusiveRenameAvailability()
+      if (!support.available) return failure(support.reason ?? 'Exclusive rename is unavailable.')
       try {
         const root = await rootFor(core, taskId, source.root)
         return await withFileWriteLock(await canonicalCheckoutKey(root), async () => {

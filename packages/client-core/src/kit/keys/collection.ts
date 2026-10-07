@@ -67,6 +67,12 @@ export function revealCollectionItem(id: string, key: string): void {
   live.get(id)?.(key)
 }
 
+/** The same named reveal door for a host that draws cells instead of DOM rows. */
+export function registerCollectionReveal(id: string, reveal: (key: string) => void): () => void {
+  live.set(id, reveal)
+  return () => { if (live.get(id) === reveal) live.delete(id) }
+}
+
 /** The DOM's own role vocabulary, so a node cannot invent one. */
 type AriaRole = NonNullable<JSX.HTMLAttributes<HTMLElement>['role']>
 
@@ -146,8 +152,7 @@ export function createCollection(options: CollectionOptions): Collection {
   // the old view those props answer with the new task. The old entry then stayed in `live`, and its
   // `reveal` held the whole detached view, until that task was opened again.
   const id = options.id()
-  live.set(id, reveal)
-  onCleanup(() => { if (live.get(id) === reveal) live.delete(id) })
+  onCleanup(registerCollectionReveal(id, reveal))
 
   return {
     active,

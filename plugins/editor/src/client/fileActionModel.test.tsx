@@ -6,7 +6,9 @@ import type { EditorApi } from './editorClient'
 import type { FileTarget } from '../contract/api'
 import { createFileActionModel } from './fileActionModel'
 import { flushEditorDocument, type EditorPool } from './editorDocumentPool'
-import { activeFile, editorOpen, editorSetDirty, evictEditorState, openFiles } from './editorState'
+import { activeFile, editorOpen, editorSetDirty, evictEditorState, openFiles, type TaskEditorState } from './editorState'
+import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
+import { editorViewState, rememberEditorViewState } from './editorViewState'
 
 let serial = 0
 const task = () => `file-actions-${++serial}`
@@ -17,7 +19,7 @@ const api = (overrides: Partial<EditorApi> = {}): EditorApi => ({
   root: async () => '/work', list: async () => [], files: async () => [], read: async () => ({ text: '', revision: 'rev0' }),
   readImage: async () => ({ bytes: new Uint8Array(), type: 'image/png' }), lineMarkers: async () => null,
   write: async (_task, _path, text) => ({ ok: true, text, revision: 'rev1' }), entry: async (_task, path) => target(path),
-  trashAvailability: async () => ({ available: true }), create: async () => ({ ok: true, path: 'new.ts' }),
+  trashAvailability: async () => ({ available: true }), renameAvailability: async () => ({ available: true }), create: async () => ({ ok: true, path: 'new.ts' }),
   rename: async () => ({ ok: true, path: 'renamed' }), trash: async () => ({ ok: true, path: 'gone' }),
   ...overrides,
 })
@@ -44,13 +46,15 @@ it('holds old writers through a delayed folder rename, menu dismissal, and pane 
   const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
   const write = vi.fn(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
   const service = api({ rename, write })
-  const model = createFileActionModel(service, owner, taskId, null, () => {})
+  const model = createFileActionModel(service, owner, taskId, null, () => {}, async (state) => {
+    expect(state.files.map((file) => file.path)).toEqual(['moved/a.ts', 'moved/preview.ts'])
+  })
   const armed = model.arm(target('dir', 'folder'))
   const end = armed.hold()
   const pending = model.rename(armed, 'moved')
   armed.release() // closing the menu does not release the operation's suspension
   await vi.waitFor(() => expect(rename).toHaveBeenCalledOnce())
-  expect(() => documentCustody([null, 'file', taskId, 'moved/a.ts'], 'external')).toThrow('reserved')
+  expect(() => documentCustody([null, 'file', taskId, 'moved/a.ts'], 'external')).toThrow('Wait for it to finish')
   custody.editText('later typing')
   await flushEditorDocument(custody, service, taskId, 'dir/a.ts')
   expect(write).not.toHaveBeenCalled()
@@ -92,6 +96,34 @@ it('enumerates closed persisted drafts and moves their recovery without touching
   expect(localStorage.getItem(recoveryKey(taskId, 'dir/other.ts', 'other-node'))).toContain('closed draft')
 })
 
+it('holds a document acquired after the menu arm until its folder move is reconciled', async () => {
+  const taskId = task()
+  let finish!: (result: { ok: true; path: string }) => void
+  const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
+  const write = vi.fn(async (_task: string, _path: string, text: string) => ({ ok: true as const, text, revision: 'rev1' }))
+  const service = api({ rename, write })
+  const model = createFileActionModel(service, pool(), taskId, null, () => {})
+  const armed = model.arm(target('dir', 'folder'))
+  // A read that began before the menu opened can still hand its document to the pane afterward.
+  const late = documentCustody([null, 'file', taskId, 'dir/late.ts'], 'disk', 'rev0')
+  const release = late.retain()
+  late.editText('typed after arm')
+  await flushEditorDocument(late, service, taskId, 'dir/late.ts')
+  expect(write).not.toHaveBeenCalled()
+  const end = armed.hold()
+  const pending = model.rename(armed, 'moved')
+  armed.release()
+  await vi.waitFor(() => expect(rename).toHaveBeenCalledOnce())
+  finish({ ok: true, path: 'moved' })
+  await pending
+  end()
+  expect(late.ownsFile(taskId, 'moved/late.ts')).toBe(true)
+  await flushEditorDocument(late, service, taskId, 'dir/late.ts')
+  expect(write).not.toHaveBeenCalled()
+  expect(localStorage.getItem(recoveryKey(taskId, 'moved/late.ts'))).toContain('typed after arm')
+  release()
+})
+
 it('moves captured custody after a Node switch without writing to the former path', async () => {
   const taskId = task()
   const custody = documentCustody([null, 'file', taskId, 'before.ts'], 'disk', 'rev0')
@@ -101,21 +133,61 @@ it('moves captured custody after a Node switch without writing to the former pat
   const rename = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
   const write = vi.fn(async () => ({ ok: true as const, text: 'should not write', revision: 'rev1' }))
   const service = api({ rename, write })
-  const model = createFileActionModel(service, pool(), taskId, null, () => {})
+  editorOpen(taskId, 'before.ts', false)
+  setEditorTreeDirectoryOpen(taskId, 'before.ts', true, null)
+  rememberEditorViewState(taskId, 'before.ts', { anchor: 1, head: 1, scrollTop: 7 }, null)
+  let firstNodeTabs: TaskEditorState | undefined
+  const model = createFileActionModel(service, pool(), taskId, null, () => {}, async (state) => { firstNodeTabs = state })
   const armed = model.arm(target('before.ts'))
   const end = armed.hold()
   const pending = model.rename(armed, 'after.ts')
   await vi.waitFor(() => expect(rename).toHaveBeenCalledOnce())
   setActiveNode('other-node')
+  evictEditorState(taskId)
+  editorOpen(taskId, 'other-node.ts', false)
+  setEditorTreeDirectoryOpen(taskId, 'before.ts', true, 'other-node')
+  rememberEditorViewState(taskId, 'before.ts', { anchor: 8, head: 8, scrollTop: 0 }, 'other-node')
   armed.release()
   finish({ ok: true, path: 'after.ts' })
   await pending
   end()
   expect(custody.ownsFile(taskId, 'after.ts')).toBe(true)
+  expect(firstNodeTabs?.files.map((file) => file.path)).toEqual(['after.ts'])
+  expect(firstNodeTabs?.active).toBe('after.ts')
+  expect(openFiles(taskId).map((file) => file.path)).toEqual(['other-node.ts'])
+  expect(editorTreeDirectoryOpen(taskId, 'after.ts', null)).toBe(true)
+  expect(editorTreeDirectoryOpen(taskId, 'before.ts', 'other-node')).toBe(true)
+  expect(editorViewState(taskId, 'after.ts', null)?.scrollTop).toBe(7)
+  expect(editorViewState(taskId, 'before.ts', 'other-node')?.anchor).toBe(8)
   expect(localStorage.getItem(recoveryKey(taskId, 'before.ts'))).toBeNull()
   expect(localStorage.getItem(recoveryKey(taskId, 'after.ts'))).toContain('unsaved')
   await flushEditorDocument(custody, service, taskId, 'before.ts')
   expect(write).not.toHaveBeenCalled()
+})
+
+it('retires captured tabs after trash succeeds on the previous Node with the same task ID', async () => {
+  const taskId = task()
+  const custody = documentCustody([null, 'file', taskId, 'doomed.ts'], 'disk', 'rev0')
+  const releaseCustody = custody.retain()
+  editorOpen(taskId, 'doomed.ts', false)
+  let finish!: (result: { ok: true; path: string }) => void
+  const trash = vi.fn(() => new Promise<{ ok: true; path: string }>((resolve) => { finish = resolve }))
+  let firstNodeTabs: TaskEditorState | undefined
+  const model = createFileActionModel(api({ trash }), pool(), taskId, null, () => {}, async (state) => { firstNodeTabs = state })
+  const armed = model.arm(target('doomed.ts'))
+  const end = armed.hold()
+  const pending = model.trash(armed, false)
+  await vi.waitFor(() => expect(trash).toHaveBeenCalledOnce())
+  setActiveNode('other-node')
+  evictEditorState(taskId)
+  editorOpen(taskId, 'safe.ts', false)
+  finish({ ok: true, path: 'doomed.ts' })
+  await pending
+  armed.release(); end()
+  expect(firstNodeTabs).toEqual({ files: [], active: null })
+  expect(openFiles(taskId).map((file) => file.path)).toEqual(['safe.ts'])
+  expect(custody.ownsFile(taskId, 'doomed.ts')).toBe(false)
+  releaseCustody()
 })
 
 it('refuses a destination draft before Node mutation', async () => {

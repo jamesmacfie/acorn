@@ -10,7 +10,7 @@ import {
   editorReadRoute,
   editorRootRoute,
   editorWriteRoute,
-  editorEntryRoute, editorCreateRoute, editorRenameRoute, editorTrashRoute, editorTrashAvailabilityRoute,
+  editorEntryRoute, editorCreateRoute, editorRenameRoute, editorRenameAvailabilityRoute, editorTrashRoute, editorTrashAvailabilityRoute,
   type FileTarget, type FileActionResult, type TrashAvailability,
   type EditorEntry,
   type EditorReadResult,
@@ -33,6 +33,7 @@ export type EditorApi = {
   write(taskId: string, relPath: string, content: string, expectedRevision: string | null): Promise<EditorWriteResult>
   entry(taskId: string, path: string): Promise<FileTarget>
   trashAvailability(taskId: string): Promise<TrashAvailability>
+  renameAvailability(taskId: string): Promise<TrashAvailability>
   create(taskId: string, parent: FileTarget, name: string, kind: 'file' | 'folder'): Promise<FileActionResult>
   rename(taskId: string, source: FileTarget, name: string): Promise<FileActionResult>
   trash(taskId: string, source: FileTarget): Promise<FileActionResult>
@@ -57,6 +58,7 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
   },
   entry: (taskId, path) => readJson<FileTarget>(editorEntryRoute(taskId, path), { nodeId }),
   trashAvailability: (taskId) => readJson<TrashAvailability>(editorTrashAvailabilityRoute(taskId), { nodeId }),
+  renameAvailability: (taskId) => readJson<TrashAvailability>(editorRenameAvailabilityRoute(taskId), { nodeId }),
   create: (taskId, parent, name, kind) => writeJson<FileActionResult>(editorCreateRoute(taskId), {
     method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parent, name, kind }),
   }),

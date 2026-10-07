@@ -23,6 +23,7 @@ export type EditorBridge = {
   write(taskId: string, relPath: string, content: string, expectedRevision: string | null): Promise<EditorWriteResult>
   entry(taskId: string, path: string): Promise<FileTarget>
   trashAvailability(taskId: string): Promise<TrashAvailability>
+  renameAvailability(): Promise<TrashAvailability>
   create(taskId: string, parent: FileTarget, name: string, kind: 'file' | 'folder'): Promise<FileActionResult>
   rename(taskId: string, source: FileTarget, name: string): Promise<FileActionResult>
   trash(taskId: string, source: FileTarget): Promise<FileActionResult>
@@ -84,6 +85,7 @@ export const editor = new Hono<AppEnv>()
   })
   .get('/:id/editor/entry', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.entry(c.req.param('id'), c.req.query('path') ?? '')))
   .get('/:id/editor/trash-availability', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.trashAvailability(c.req.param('id'))))
+  .get('/:id/editor/rename-availability', requireDevice, (c) => viaBridge(c, EDITOR, (b) => b.renameAvailability()))
   .post('/:id/editor/create', requireDevice, async (c) => {
     const parsed = createBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')

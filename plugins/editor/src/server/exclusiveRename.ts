@@ -1,60 +1,39 @@
-import { mkdtemp, writeFile } from 'node:fs/promises'
-import { rmSync } from 'node:fs'
-import { tmpdir, platform } from 'node:os'
-import { join } from 'node:path'
+import { access, readFile } from 'node:fs/promises'
+import { constants } from 'node:fs'
+import { arch, platform } from 'node:os'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import type { CoreServices } from '@acorn/plugin-api/node'
+import type { TrashAvailability } from '../contract/api'
 
 type ProcessRunner = Pick<CoreServices['proc'], 'runProcess'>
+type HelperManifest = { platform: string; arch: string; available: boolean; reason?: string }
 
-// Node's fs.rename has no exclusive mode. The two supported kernels expose an atomic primitive,
-// invoked by this tiny helper on the owning Node. A host without a C compiler fails closed.
-const source = `
-#ifdef __linux__
-#define _GNU_SOURCE
-#endif
-#include <errno.h>
-#include <stdio.h>
-#include <string.h>
-#ifdef __APPLE__
-#elif __linux__
-#include <fcntl.h>
-#endif
-int main(int argc, char **argv) {
-  if (argc != 3) return 2;
-#ifdef __APPLE__
-  if (renamex_np(argv[1], argv[2], RENAME_EXCL) == 0) return 0;
-#elif __linux__
-  if (renameat2(AT_FDCWD, argv[1], AT_FDCWD, argv[2], RENAME_NOREPLACE) == 0) return 0;
-#else
-  errno = ENOTSUP;
-#endif
-  if (errno == EEXIST || errno == ENOTEMPTY) return 17;
-  if (errno == ENOSYS || errno == ENOTSUP || errno == EINVAL) return 18;
-  fprintf(stderr, "%s", strerror(errno));
-  return 1;
-}
-`
+// Vite places the plugin in dist/chunks; desktop staging and the standalone tarball copy the
+// entire apps/node/dist directory. Tests can point at their own build artifact explicitly.
+const artifactDirectory = (): string => process.env.ACORN_EXCLUSIVE_RENAME_DIR
+  || join(dirname(fileURLToPath(import.meta.url)), '..')
 
-let helper: Promise<string> | undefined
-async function executable(proc: ProcessRunner): Promise<string> {
-  if (platform() !== 'darwin' && platform() !== 'linux') throw new Error('Exclusive rename is unavailable on this Node host.')
-  helper ??= (async () => {
-    const directory = await mkdtemp(join(tmpdir(), 'acorn-exclusive-rename-'))
-    process.once('exit', () => { try { rmSync(directory, { recursive: true, force: true }) } catch { /* best effort */ } })
-    const input = join(directory, 'rename.c')
-    const output = join(directory, 'rename')
-    await writeFile(input, source)
-    const compiled = await proc.runProcess({ file: 'cc', args: ['-o', output, input], cwd: directory, timeoutMs: 15_000, maxOutputBytes: 4_096 })
-    if (compiled.code !== 0) throw new Error(`Exclusive rename is unavailable on this Node host: ${compiled.spawnError ?? compiled.stderr}`)
-    return output
-  })()
-  return helper
+export async function exclusiveRenameAvailability(): Promise<TrashAvailability> {
+  if (platform() !== 'darwin' && platform() !== 'linux') return { available: false, reason: 'Exclusive rename is unavailable on this Node host.' }
+  const directory = artifactDirectory()
+  try {
+    const manifest = JSON.parse(await readFile(join(directory, 'exclusive-rename.json'), 'utf8')) as HelperManifest
+    if (!manifest.available) return { available: false, reason: manifest.reason || 'This Node build has no exclusive rename helper.' }
+    if (manifest.platform !== platform() || manifest.arch !== arch()) return { available: false, reason: 'This Node build has no exclusive rename helper for this host.' }
+    await access(join(directory, 'exclusive-rename'), constants.X_OK)
+    return { available: true }
+  } catch {
+    return { available: false, reason: 'This Node build has no exclusive rename helper. Rebuild or update the Node.' }
+  }
 }
 
 /** The kernel either moves the entry to an absent name or leaves both entries alone. */
 export async function exclusiveRename(proc: ProcessRunner, from: string, to: string): Promise<void> {
-  const binary = await executable(proc)
-  const result = await proc.runProcess({ file: binary, args: [from, to], cwd: tmpdir(), timeoutMs: 30_000, maxOutputBytes: 4_096 })
+  const support = await exclusiveRenameAvailability()
+  if (!support.available) throw new Error(support.reason)
+  const binary = join(artifactDirectory(), 'exclusive-rename')
+  const result = await proc.runProcess({ file: binary, args: [from, to], cwd: dirname(from), timeoutMs: 30_000, maxOutputBytes: 4_096 })
   if (result.code === 0) return
   if (result.code === 17) throw new Error('A file or folder already has that name.')
   if (result.code === 18) throw new Error('This Node volume does not support exclusive rename.')

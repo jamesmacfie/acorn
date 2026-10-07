@@ -23,6 +23,22 @@ const lit = (screen: { runs: () => { text: string; fg: { r: number; g: number; b
   screen.runs().filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1).map((run) => run.text)
 
 describe('scrolling detail viewports', () => {
+  it('clamps a scrolled viewport when an action menu disappears above surviving rows', async () => {
+    const [menuOpen, setMenuOpen] = createSignal(true)
+    const screen = await renderCells(() => (
+      <HeaderBodyFooter stateKey="shrinking-menu" label="Files" regions={{ body: () => <>
+        <Button onPress={() => setMenuOpen(false)}>Dismiss menu</Button>
+        <Show when={menuOpen()}>{items(24).map((row) => <Text>{row.label}</Text>)}</Show>
+        <Text>Surviving file row</Text>
+      </> }} />
+    ), { width: 44, height: 10 })
+    try {
+      await screen.press('END')
+      const dismissed = await screen.press('RETURN')
+      expect(dismissed.text).toContain('Surviving file row')
+    } finally { screen.done() }
+  }, 30_000)
+
   it('enters a selected tab with Down, reveals keyboard rows, and returns with Escape', async () => {
     const rows = items(18)
     const screen = await renderCells(() => (

@@ -41,8 +41,15 @@ describe('editor routes over a real worktree', () => {
   let t: TestDb
   let work: string
   let outside: string
+  let helperDir: string
+  let previousHelperDir: string | undefined
 
   beforeAll(() => {
+    helperDir = mkdtempSync(join(tmpdir(), 'acorn-editor-native-test-'))
+    previousHelperDir = process.env.ACORN_EXCLUSIVE_RENAME_DIR
+    execFileSync('cc', ['-o', join(helperDir, 'exclusive-rename'), join(import.meta.dirname, '../../../native/exclusive-rename.c')])
+    writeFileSync(join(helperDir, 'exclusive-rename.json'), JSON.stringify({ available: true, platform: process.platform, arch: process.arch }))
+    process.env.ACORN_EXCLUSIVE_RENAME_DIR = helperDir
     work = mkdtempSync(join(tmpdir(), 'acorn-editor-work-'))
     outside = mkdtempSync(join(tmpdir(), 'acorn-editor-outside-'))
     execFileSync('git', ['init', '-q'], { cwd: work })
@@ -58,6 +65,9 @@ describe('editor routes over a real worktree', () => {
   afterAll(() => {
     rmSync(work, { recursive: true, force: true })
     rmSync(outside, { recursive: true, force: true })
+    rmSync(helperDir, { recursive: true, force: true })
+    if (previousHelperDir === undefined) delete process.env.ACORN_EXCLUSIVE_RENAME_DIR
+    else process.env.ACORN_EXCLUSIVE_RENAME_DIR = previousHelperDir
   })
 
   beforeEach(async () => {
@@ -125,6 +135,21 @@ describe('editor routes over a real worktree', () => {
     expect(existsSync(join(work, 'renamed'))).toBe(false)
   })
 
+  it('announces missing native rename support before offering a mutation', async () => {
+    const app = authed()
+    const available = await (await app.fetch(req('/api/tasks/task1/editor/rename-availability'), {} as Env)).json()
+    expect(available).toEqual({ available: true })
+    process.env.ACORN_EXCLUSIVE_RENAME_DIR = outside
+    try {
+      const missing = await (await app.fetch(req('/api/tasks/task1/editor/rename-availability'), {} as Env)).json()
+      expect(missing).toMatchObject({ available: false })
+      const source = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=hello.txt'), {} as Env)).json()
+      const result = await (await app.fetch(req('/api/tasks/task1/editor/rename', 'POST', { source, name: 'not-moved.txt' }), {} as Env)).json()
+      expect(result).toMatchObject({ ok: false, reason: expect.stringContaining('helper') })
+      expect(existsSync(join(work, 'hello.txt'))).toBe(true)
+    } finally { process.env.ACORN_EXCLUSIVE_RENAME_DIR = helperDir }
+  })
+
   it('keeps stable entry identity across a write and rejects a same-kind replacement', async () => {
     const app = authed()
     const before = await (await app.fetch(req('/api/tasks/task1/editor/entry?path=hello.txt'), {} as Env)).json() as { entryId: string; identity: string }
@@ -149,7 +174,7 @@ describe('editor routes over a real worktree', () => {
     const racedProc: EditorCoreServices['proc'] = {
       ...testProc,
       runProcess: async (spec) => {
-        if (spec.file.includes('acorn-exclusive-rename-') && spec.args?.[0] === from) writeFileSync(to, 'external winner')
+        if (spec.file === join(helperDir, 'exclusive-rename') && spec.args?.[0] === from) writeFileSync(to, 'external winner')
         return testProc.runProcess(spec)
       },
     }

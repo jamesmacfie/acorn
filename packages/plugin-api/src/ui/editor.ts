@@ -18,4 +18,4 @@ export { applyViewState, captureViewState, type EditorViewState } from '@acorn/c
 export { mountEmbeddedEditor } from '@acorn/client-core/features/editor'
 export type { EmbeddedEditor } from '@acorn/client-core/features/editor'
 
-export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, type DocumentCustody } from '@acorn/client-core/features/editor'
+export { documentCustody, recoverDocumentCustody, fileDocumentCustodies, reserveDocumentDestinations, reserveFileSourceCustodies, type DocumentCustody } from '@acorn/client-core/features/editor'
