@@ -27,6 +27,8 @@ import { activeNodeId, nodeGateHolds, nodeReady, setActiveNode } from '@acorn/cl
 import { nodes, nodeState } from '@acorn/client-core/infra/node/fleet.ts'
 import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPluginsReady } from './activate'
+import { preparePluginContributionsForNode } from '@acorn/client-core/host/plugins/reload.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { clearCache } from './clearCache'
 import { topbarBreadcrumb } from './breadcrumb'
 import TaskView from './TaskView'
@@ -70,6 +72,7 @@ const SettingsView = lazy(() => import('@acorn/client-core/features/settings/Set
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
 export default function App() {
+  const linkLog = createLogger('links')
   const queryClient = useQueryClient()
   const mountedNodeId = activeNodeId()
   const params = useParams()
@@ -424,25 +427,32 @@ export default function App() {
   // workspace whose remembered view points elsewhere; ordinary workspace-picker changes still
   // restore their remembered view.
   createEffect(() => {
-    if (!placeRestored() || !clientPluginsReady()) return
-    const unregister = registerAddressHost({
-      nodeId: mountedNodeId,
-      navigate: (path) => navigate(path),
-      openProject: (path, source) => {
-        explicitProjectPath = path
-        setSelectedSource(source)
-        navigate(path)
-      },
-      openTask: (taskId, path) => {
-        const task = tasks.data?.find((candidate) => candidate.id === taskId)
-        if (!task) return false
-        activateTaskSignals(task)
-        navigate(path)
-        return true
-      },
-      hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
+    if (!mountedNodeId || !placeRestored() || !clientPluginsReady()) return
+    let disposed = false
+    let unregister = () => {}
+    void preparePluginContributionsForNode(mountedNodeId).catch((error: unknown) => {
+      linkLog.warn('Could not prepare loaded plugin routes for an Acorn link', error)
+    }).then(() => {
+      if (disposed) return
+      unregister = registerAddressHost({
+        nodeId: mountedNodeId,
+        navigate: (path) => navigate(path),
+        openProject: (path, source) => {
+          explicitProjectPath = path
+          setSelectedSource(source)
+          navigate(path)
+        },
+        openTask: (taskId, path) => {
+          const task = tasks.data?.find((candidate) => candidate.id === taskId)
+          if (!task) return false
+          activateTaskSignals(task)
+          navigate(path)
+          return true
+        },
+        hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
+      })
     })
-    onCleanup(unregister)
+    onCleanup(() => { disposed = true; unregister() })
   })
 
   // The route is the authority for what actually opened. Wait until the saved pair and the startup

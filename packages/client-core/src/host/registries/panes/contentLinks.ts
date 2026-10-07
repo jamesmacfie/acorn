@@ -1,5 +1,5 @@
 import { Registry } from '../../../kit/lib/state/registry'
-import { openPane } from '../commands/clientEvents'
+import { clientEvents, openPane } from '../commands/clientEvents'
 import { paneAvailable, paneContribution } from './panes'
 import { openRefPanel, refPanelFor } from './refPanels'
 import { sourceIdForPath } from '../sources/sources'
@@ -418,6 +418,11 @@ export function handlePluginContentLinkClick(event: MouseEvent, presentation: Co
   }
   const href = anchor.getAttribute('href')
   if (!href) return false
+  if (/^acorn:/i.test(href)) {
+    event.preventDefault()
+    clientEvents.emit('presentation:open-link', { href })
+    return true
+  }
   // The full ladder, routes included, which is what let plugins/github delete its own copy of the route
   // rung: it used to call this first and then re-parse the href to resolve owner and name to a project
   // itself, purely because this stopped at two destinations.

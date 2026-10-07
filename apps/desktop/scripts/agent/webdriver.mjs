@@ -219,6 +219,13 @@ export class WebDriverClient {
     return this.request('POST', this.sessionPath('/execute/sync'), { script, args })
   }
 
+  link(href) {
+    return this.request('POST', this.sessionPath('/execute/async'), {
+      script: 'const done = arguments[arguments.length - 1]; window.dispatchEvent(new CustomEvent("acorn:agent-link", { detail: { href: arguments[0], done } }))',
+      args: [href],
+    })
+  }
+
   snapshot(target) {
     return this.execute(`return (${snapshotDocument.toString()})(arguments[0])`, [target ?? null])
   }

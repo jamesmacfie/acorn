@@ -39,12 +39,15 @@ pnpm dev:agent:ui -- --session my-change click e2
 pnpm dev:agent:ui -- --session my-change fill e4 "new value"
 pnpm dev:agent:ui -- --session my-change scroll -400
 pnpm dev:agent:ui -- --session my-change screenshot after-change.png
+pnpm dev:agent:ui -- --session my-change link acorn://local/settings/connections
 pnpm dev:agent:ui -- --session my-change stop
 ```
 
 Take a `snapshot` before an element action and again after the UI changes. Its element references
 belong to that snapshot. Leave out `--session` when exactly one session is running. For a disposable
 check of the launcher and the first-run UI, run `pnpm dev:agent:smoke`.
+The `link` verb sends a URL to the renderer's normal link handler and waits for dispatch, without
+asking macOS to open a registered app.
 
 `scroll` moves the largest scrolling region and reports where the reader is: the offset, and the turn
 at the top of the viewport where the content publishes one. With no delta it only reports. To check a

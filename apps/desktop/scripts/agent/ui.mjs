@@ -14,7 +14,7 @@ function parseArgs(argv) {
     else rest.push(argv[index])
   }
   const [command, ...args] = rest
-  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|flow|status|target|stop')
+  if (!command) throw new Error('Usage: pnpm dev:agent:ui -- [--session NAME] snapshot|click|fill|scroll|screenshot|link|flow|status|target|stop')
   return { session, command, args }
 }
 
@@ -61,6 +61,12 @@ async function main() {
     if (args.length !== 1) throw new Error('Usage: click REF')
     await client.click(await client.resolveElement(await refFor(manifest, args[0])))
     console.log(`Clicked ${args[0]}.`)
+    return
+  }
+  if (command === 'link') {
+    if (args.length !== 1) throw new Error('Usage: link acorn://<node>/<place>')
+    const result = await client.link(args[0])
+    console.log(result?.kind === 'opened' ? `Opened ${args[0]}.` : `Refused ${args[0]}: ${result?.reason ?? 'unknown reason'}`)
     return
   }
   if (command === 'fill') {

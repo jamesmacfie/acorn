@@ -36,8 +36,9 @@ vi.mock('./distribution', () => ({
 }))
 vi.mock('./syncContributions', () => ({ syncPluginContributions: vi.fn() }))
 
-const { watchPluginChanges, reconcileDevicePluginChange } = await import('./reload')
+const { watchPluginChanges, reconcileDevicePluginChange, preparePluginContributionsForNode } = await import('./reload')
 const { syncPluginDistribution } = await import('./distribution')
+const { syncPluginContributions } = await import('./syncContributions')
 const passes = () => vi.mocked(syncPluginDistribution).mock.calls.length
 
 const node = (nodeId: string): NodeRecord => ({ nodeId, label: nodeId, local: true }) as NodeRecord
@@ -78,4 +79,16 @@ describe('the first pass', () => {
 it('reconciles device changes without requesting node rosters', async () => {
   await reconcileDevicePluginChange()
   expect(syncPluginDistribution).toHaveBeenLastCalledWith({ deviceOnly: true })
+})
+
+it('waits for the selected node roster before registering loaded contributions', async () => {
+  let finish!: () => void
+  vi.mocked(syncPluginDistribution).mockImplementationOnce(() => new Promise<void>((resolve) => { finish = resolve }))
+  vi.mocked(syncPluginContributions).mockClear()
+  const ready = preparePluginContributionsForNode('linked-node')
+  expect(syncPluginDistribution).toHaveBeenLastCalledWith({ nodeIds: ['linked-node'] })
+  expect(syncPluginContributions).not.toHaveBeenCalled()
+  finish()
+  await ready
+  expect(syncPluginContributions).toHaveBeenCalledTimes(1)
 })

@@ -224,7 +224,8 @@ export const CORE_SETTINGS_PAGES = [
 
   // Connections. Services keeps the id `integrations`, which plugins and notices deep-link to. A model
   // key is a connection too, but it is listed on AI models, beside the agent CLIs it competes with.
-  { id: 'integrations', ...services, label: 'Services', category: 'connections', scope: 'node', icon: 'plug', order: 10 },
+  { id: 'integrations', ...services, label: 'Services', category: 'connections', scope: 'node', icon: 'plug', order: 10,
+    aliases: ['connections'] },
   { id: 'ai-models', ...aiModels, label: 'AI models', category: 'connections', scope: 'node', icon: 'sparkles', order: 20 },
 
   // Automation. A schedule is a promise one machine makes (docs/schedules.md), and a run happens on one

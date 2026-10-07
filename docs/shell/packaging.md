@@ -46,6 +46,11 @@ CLI, and the renderer can't choose a path or command.
 ([startup budget](../frontend/startup-budget.md)) and the bundles' syntax.
 `pnpm --filter @acorn/desktop dist` adds the bundler pass and the inventory check. The package builds
 the renderer, not `beforeBuildCommand`, so the budget checks the bytes that ship.
+The dist command includes `apps/desktop/src-tauri/tauri.release.json`, which registers the `acorn`
+URL scheme in installed bundles. The base and dev configurations omit the scheme, and agent sessions
+run a debug binary without a registered handler. The shell's deep-link plugin queues cold-start and
+running-app URLs until the renderer subscribes; the renderer drains that queue and opens them through
+the client address dispatcher. macOS registration needs an installed app bundle in `/Applications`.
 
 The bundled-plugin build stages plugin packages under `dist/bundled-plugins`, which the bundler copies
 to app resources, and the helper passes that read-only directory to the service. Bundled client

@@ -1,6 +1,45 @@
 # Phase 02: desktop registration
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: phase 01.
+## Completion note, October 7, 2026
+
+Implemented installed-bundle `acorn` scheme registration through `apps/desktop/src-tauri/tauri.release.json`, included only
+by `apps/desktop/scripts/dist.mjs`. Tauri's deep-link plugin receives cold and running-app URLs. Rust stores each
+URL until the renderer subscribes, emits a wake event carrying the URL, and leaves parsing and routing
+to phase 01's `openLink`. The single-instance plugin's deep-link feature handles second launches on
+Windows and Linux. Dev and agent binaries have no scheme declaration; the agent driver sends links to
+the same renderer handler with its `link` verb.
+
+The renderer registers an address host after place restore, compiled plugin readiness, and a selected-
+Node distribution pass that commits loaded contributions. The same wait runs when a link switches to
+another paired Node. Content anchor clicks emit a link request into that handler. The external URL
+command and agent web activity cards keep their `acorn:` refusals. The `connections` settings target
+now aliases the live `integrations` page, so the phase's example lands on Services → Connections.
+
+The [Tauri deep-link guide](https://v2.tauri.app/plugin/deep-linking/) and
+[plugin source](https://github.com/tauri-apps/plugins-workspace/blob/v2/plugins/deep-link/src/lib.rs)
+establish the cold `get_current` read, the running `on_open_url` event, the single-instance feature,
+and installed-bundle registration on macOS. No installed app was replaced or launched for this phase,
+so OS delivery when running, minimised, and closed remains an installed-build acceptance check. Verify
+those three states with a disposable installed bundle in `/Applications`, then verify a cold loaded
+plugin path and a paired-Node switch with test data on that bundle. The agent session exercises the
+renderer path, not macOS Launch Services.
+
+Scoped checks: client-core lint, desktop lint, agents lint, architecture tests, four focused
+plugin/content tests, and 65 Rust tests passed. The client-core suite passed 2,512 tests and retained
+its two baseline failures in `scopes.test.ts` and `cssHygiene.test.ts` (log:
+`/private/tmp/acorn-phase02-client-core.log`). The desktop suite passed 171 tests and retained its
+11 baseline `clientPluginDisable.test.ts` failures (log: `/private/tmp/acorn-phase02-desktop.log`).
+The agents suite passed 1,174 tests and had one sandbox process-table failure in `footprint.test.ts`;
+its focused rerun outside the sandbox passed (log: `/private/tmp/acorn-phase02-agents.log`). The
+architecture suite passed after staging generated the schema files (log:
+`/private/tmp/acorn-phase02-arch.log`). In `dev:agent`, `link acorn://local/settings/connections`
+opened Services → Connections; a screenshot is in the isolated session's `screenshots` directory.
+An unpaired Node link returned the refusal and appeared in the notification ring.
+
+Later phases should send every inbound link through this handler. Phase 04 can replace the dispatcher
+refusal for `new-task` without changing OS delivery, content click routing, or the agent driver.
+
+Date: October 7, 2026. Status: implemented. Dependencies: phase 01.
 Read the [plan](./README.md), especially [the decisions](./README.md#decisions) about dev builds and
 Node selection.
 
