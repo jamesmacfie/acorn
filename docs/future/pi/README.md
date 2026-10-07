@@ -9,7 +9,7 @@ changes that contract.
 For implementation, start with the [sequential phase plan](./phases/README.md). Give a developer one
 phase at a time and require its acceptance record before continuing. The seven numbered files below
 are design topics; their numbers are not the execution order. The phase plan incorporates the
-permission design from [mods.md](../mods.md) and resolves consumer, review-reader, and unattended
+permission design from [Mods design in Git history](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md) and resolves consumer, review-reader, and unattended
 operation prerequisites.
 
 ## What this is
@@ -80,7 +80,7 @@ everything inside the loop.
 | File | What it covers |
 | --- | --- |
 | [01-omp-harness.md](./01-omp-harness.md) | Run `omp` as a contributed ACP harness. One manifest, no acorn change, and the test of whether acorn needs its own loop. |
-| [02-before-permission.md](./02-before-permission.md) | Build the `agents:before-permission` hook already designed in [mods.md](../mods.md), and what `omp` adds to that design. |
+| [02-before-permission.md](./02-before-permission.md) | Build the `agents:before-permission` hook already designed in [Mods design in Git history](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md), and what `omp` adds to that design. |
 | [03-session-messages.md](./03-session-messages.md) | A host-bound extension point that lets a plugin queue an attributed turn on a live session. |
 | [04-unattended-model-calls.md](./04-unattended-model-calls.md) | A host-held backend choice and spending cap per plugin, so a plugin can call a model from an event without a picker. |
 | [05-advisor.md](./05-advisor.md) | A loaded advisor plugin: a second model that reviews each finished turn and sends a note back. The consumer for 03 and 04. |
@@ -112,7 +112,7 @@ boundary.
 
 ## Relation to other programmes
 
-- [mods.md](../mods.md) owns the base permission design. Topic 02 adds explanations; implementation
+- [Mods design in Git history](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md) owns the base permission design. Topic 02 adds explanations; implementation
   phases 02 and 03 deliver the hook and explanation consumer in order.
 - The shipped [memory contract](../../notes-and-memory.md#memory) replaces Findings, which consumed
   `agents.reviewInput.v1` and supplied the precedent 04 generalizes. The Findings removal also

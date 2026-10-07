@@ -1,6 +1,7 @@
 # 02. Build `agents:before-permission`
 
-Status: proposed, 2026-10-02. Not started. The design is [mods.md](../mods.md) and stays there. This
+Status: proposed, 2026-10-02. Not started. The base design remains in
+[Git history](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md). This
 file records why the `omp` comparison moves it up the order, and the two additions the comparison
 suggests.
 
@@ -15,8 +16,8 @@ it. An acorn plugin has no equivalent for the harness's tools: `core:before-tool
 acorn's own tools, on the agent tools route, and withholds their arguments on purpose.
 
 The permission request is the one place every harness stops and asks acorn before running a risky
-tool. [mods.md § The gap](../mods.md#the-gap-harness-permission-requests) traces it through both
-drivers, and [mods.md § The design](../mods.md#the-design-agentsbefore-permission) puts a veto-only
+tool. [mods.md § The gap](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-gap-harness-permission-requests) traces it through both
+drivers, and [mods.md § The design](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-design-agentsbefore-permission) puts a veto-only
 hook there. That is the closest acorn can get to `tool_call` from outside the loop, and it works the
 same for Claude, Codex, DeepSeek, and `omp` from [01](./01-omp-harness.md).
 
@@ -65,5 +66,5 @@ an agent whose loop takes extensions.
 
 ## Verify before building
 
-Everything in [mods.md § Verify before building](../mods.md#verify-before-building), plus whether
+Everything in [mods.md § Verify before building](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#verify-before-building), plus whether
 [03](./03-session-messages.md) has shipped, which decides whether the explanation path is in scope.

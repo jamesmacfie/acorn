@@ -153,4 +153,6 @@ provider processes, whose limit is an agents setting
 ([operations and failure](./managed-agents/operations.md)). Startup repairs that converge to
 zero stay boot-time calls, such as `pruneOrphanedGithubMirror` and the agents ledger compaction.
 
-Unattended backup and an `agent-run` target aren't built ([proposals](./future/schedules.md)).
+Unattended backup and an `agent-run` target aren't built. Their
+[proposal](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/schedules.md)
+was deleted on October 7, 2026, and remains in Git history.

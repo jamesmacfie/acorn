@@ -5,7 +5,7 @@ No phase is implemented by this plan. Execute these handoffs in
 order, using one phase as the developer's assignment. The numbered files in the parent folder are
 topic proposals, not execution phases.
 
-Read the [programme overview](../README.md), [Mods comparison and permission design](../../mods.md),
+Read the [programme overview](../README.md), [Mods comparison and permission design](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md),
 and [refusals](../refused.md) first. This plan resolves sequencing and delivery details. The topic
 proposals explain intent; this folder owns implementation order and acceptance. Shipped reference
 documents remain authoritative about implemented behavior.

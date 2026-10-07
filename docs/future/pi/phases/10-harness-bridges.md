@@ -64,8 +64,9 @@ Apply [shared verification](./README.md#verification-for-every-phase). Prove:
 Update [node extension points](../../../plugins/node-side-extension-points.md), the hook table in
 [hooks](../../../plugins/hooks.md#hooks), [managed agents](../../../managed-agents.md),
 [MCP](../../../mcp.md), and [security](../../../security.md). Record the Claude and Codex versions
-tested and the measured per-call latency. Mark [mods.md](../../mods.md)'s "shipping a mod into
-Claude sessions" item as delivered or replaced.
+tested and the measured per-call latency. Record here whether the archived
+[Mods design's "shipping a mod into Claude sessions" item](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#later-each-with-its-trigger)
+is delivered or replaced.
 
 ## Verify before building
 

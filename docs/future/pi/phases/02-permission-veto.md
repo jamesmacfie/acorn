@@ -8,7 +8,7 @@ Status: proposed, 2026-10-03. Entry: phase 01 disposition recorded. Next:
 A loaded policy plugin refuses a harness permission request before Acorn shows it as pending.
 Both clients show a resolved request naming the blocking plugin and reason. The plugin tightens
 approval without acquiring the power to approve. Source design:
-[Mods permission hook](../../mods.md#the-design-agentsbefore-permission), with
+[Mods permission hook](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-design-agentsbefore-permission), with
 [Pi additions](../02-before-permission.md).
 
 ## Ownership and data flow
