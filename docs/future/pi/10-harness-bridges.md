@@ -47,7 +47,7 @@ point. The manifest schema and the published surface pin were regenerated. Docs 
 [hooks](../../plugins/hooks.md), [node extension points](../../plugins/node-side-extension-points.md),
 [managed agents](../../managed-agents.md), [permission policy](../../managed-agents/permission-policy.md),
 [MCP](../../mcp.md), [security](../../security.md), [remote points](../../plugins/remote-points.md),
-[extensions](../../plugin-authoring/extensions.md), [mods.md](../mods.md) (the "shipping a mod" item
+[extensions](../../plugin-authoring/extensions.md), [mods.md](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md) (the "shipping a mod" item
 is replaced), manual check 164 in [agents and providers](../../testing/agents-and-providers.md), and
 the docs index.
 
@@ -408,7 +408,7 @@ Apply [shared verification](./README.md#verification-for-every-phase). Prove:
 Update [node extension points](../../plugins/node-side-extension-points.md), the hook table in
 [hooks](../../plugins/hooks.md#hooks), [managed agents](../../managed-agents.md),
 [MCP](../../mcp.md), and [security](../../security.md). Record the Claude and Codex versions
-tested and the measured per-call latency. Mark [mods.md](../mods.md)'s "shipping a mod into
+tested and the measured per-call latency. Mark [mods.md](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md)'s "shipping a mod into
 Claude sessions" item as delivered or replaced.
 
 ## Verify before building

@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { CodeRow, DiffDocumentTopology, DiffSource } from '@acorn/plugin-api/ui/diff'
-import { pullDiffKey, pullKey, type PullDiffResponse } from '../shared/api'
+import { pullDiffKey, pullKey, type PullDiffResponse, type Thread } from '../shared/api'
 import { DiffForPull } from './DiffForPull'
 
 const { openPane } = vi.hoisted(() => ({ openPane: vi.fn() }))
@@ -109,6 +109,52 @@ describe('task pull diff', () => {
       expect(fetchMock).toHaveBeenCalledWith('/v1/p/github/repos/acorn/web/diff/search', expect.objectContaining({ method: 'POST' }))
       // No whole patch is read for the diff: not the files route, not a patches batch.
       expect(fetchMock.mock.calls.some(([url]) => url.includes('/files'))).toBe(false)
+    } finally {
+      dispose()
+      queryClient.clear()
+    }
+  })
+
+  it('withholds outdated, legacy, unlocated and incompatible threads, and updates an open pane', async () => {
+    const queryClient = new QueryClient({ defaultOptions: { queries: { retry: false, staleTime: Infinity } } })
+    const thread = (threadId: string, overrides: Partial<Thread> = {}): Thread => ({
+      threadId, path: file.path, line: 1, originalLine: 275, side: 'RIGHT', outdated: false, resolved: false,
+      comments: [], ...overrides,
+    })
+    const current = thread('moved')
+    const deleted = thread('deleted', { side: 'LEFT', resolved: true })
+    const threads = [current, deleted,
+      thread('outdated-null', { outdated: true, line: null }),
+      thread('outdated-numeric', { outdated: true }),
+      thread('unlocated', { line: null }), thread('unknown', { outdated: null }),
+      thread('older-response', { outdated: undefined }), thread('bad-side', { side: 'OTHER' }),
+      thread('missing-path', { path: null }), thread('missing-file', { path: 'missing.ts' }),
+      thread('binary', { path: 'logo.png' }),
+    ]
+    const detail = { revision: 'base:head', pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads }
+    queryClient.setQueryData(pullDiffKey('acorn', 'web', '42'), { ...diff(), revision: 'base:head' })
+    queryClient.setQueryData(pullKey('acorn', 'web', '42'), detail)
+    const host = document.createElement('div')
+    const dispose = render(() => (
+      <QueryClientProvider client={queryClient}>
+        <DiffForPull route={{ owner: 'acorn', repo: 'web', number: '42', key: 'acorn/web#42' }} router={false} />
+      </QueryClientProvider>
+    ), host)
+    const flush = () => new Promise((resolve) => setTimeout(resolve, 0))
+    try {
+      expect(source?.threads?.()).toEqual([current, deleted])
+      queryClient.setQueryData(pullKey('acorn', 'web', '42'), { ...detail, threads: threads.map((t) => ({ ...t, outdated: true })) })
+      await flush()
+      expect(source?.threads?.()).toEqual([])
+      queryClient.setQueryData(pullKey('acorn', 'web', '42'), { ...detail, revision: 'base:force-pushed' })
+      await flush()
+      expect(source?.threads?.()).toEqual([])
+      queryClient.setQueryData(pullDiffKey('acorn', 'web', '42'), { ...diff(), revision: 'base:force-pushed' })
+      await flush()
+      expect(source?.threads?.()).toEqual([current, deleted])
+      queryClient.setQueryData(pullDiffKey('acorn', 'web', '42'), diff())
+      await flush()
+      expect(source?.threads?.()).toEqual([])
     } finally {
       dispose()
       queryClient.clear()

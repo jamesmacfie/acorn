@@ -144,8 +144,8 @@ describe('a transcript row finding its turn', () => {
 
 // Rows are keyed by the projection's stable id, not by their place in the list. A row that survives a
 // filter keeps its own DOM node, so the focus and local state riding on it stay with the right item
-// instead of transferring to whatever the array position now holds (docs/future/scoll_fix.md § Positional
-// rows retain the wrong identity).
+// instead of transferring to whatever the array position now holds
+// (docs/ui-design/kit-internals.md § Behavior a pane keeps redoing becomes a node's prop).
 describe('a surviving transcript row keeping its identity', () => {
   const item = (host: HTMLElement, key: string) =>
     host.querySelector<HTMLElement>(`[data-item="${key}"]`)

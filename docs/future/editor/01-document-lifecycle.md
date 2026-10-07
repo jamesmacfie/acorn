@@ -1,0 +1,139 @@
+# Phase 01: protect documents from external changes
+
+Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`. Dependency: none.
+
+This PRD defines disk freshness, save conflicts, and document write suspension for worktree files.
+Implement it before file rename and deletion. It applies to file documents, not every plugin's write API.
+
+## Problem and outcome
+
+Agents and people edit the same checkout. `plugins/editor/src/client/EditorPane.tsx` reloads a clean
+active document on window focus. Dirty documents skip that read. `plugins/editor/src/server/editor.ts`
+writes without comparing the file with the version originally read.
+
+A person must see external changes without leaving and returning to Acorn. A save that detects
+different disk content must retain the draft and request a deliberate resolution. A missing file
+must remain recoverable without an autosave recreating it.
+
+## Starting points and owners
+
+Inspect these files and their tests:
+
+- `plugins/editor/src/contract/api.ts`, `plugins/editor/src/client/editorClient.ts`, and
+  `plugins/editor/src/server/routes/editor.ts` own the file wire contract and transport.
+- `plugins/editor/src/client/editorDocumentPool.ts` binds file saves to document custody.
+- `plugins/editor/src/client/EditorPane.tsx` owns display, save scheduling, reload, and close guards.
+- `packages/client-core/src/features/editor/documentCustody.ts` owns serialized writes, acknowledged
+  text, formatter updates, and dirty recovery. Preserve host-document callers when extending it.
+- `packages/node-core/src/server/core/fs.ts` owns path confinement. The shared diff renderer is
+  described in [diff rendering](../../diff-rendering.md).
+
+Read [saving and recovery](../../editor/save-and-recovery.md),
+[the editor pane](../../editor/editor-pane.md), and [path confinement](../../security/process-and-paths.md).
+
+## Required behavior
+
+### Refresh documents
+
+Revalidate the active text document on worktree invalidation, reconnect, explicit **Reload from disk**,
+and window focus. Mark inactive cached files stale and revalidate before showing them. Coalesce bursts;
+do not read every open file on every event or install a watcher per tab.
+
+A successful read of unchanged text changes no selection, undo history, dirty state, or autosave.
+Changed text replaces a clean buffer and clamps its cursor/scroll to the replacement. A dirty or saving
+buffer retains its contents; detect disk divergence and show the conflict state after the save settles.
+Discard reads that belong to a retired document, changed Node/task, or older request generation.
+
+An unavailable Node shows a read failure while retaining useful text. Distinguish this from a missing
+file. A missing file shows **Deleted on disk** and pauses ordinary writes. Offer **Save as…** into the
+task root or **Recreate file…** with confirmation. Recreating requires that the path is still absent.
+
+### Guard saves
+
+Read a file as text plus an opaque disk revision. The revision covers the original UTF-8 bytes,
+including a byte order mark and line endings. Send the expected disk revision on file saves.
+Return the exact post-hook text and its revision on success, as the acknowledgement already does.
+
+The Node compares the expected revision after before-save hooks and immediately before replacing
+the file. Reject detected changes or deletion with a typed conflict result. A conflict must not enter
+the ordinary autosave retry loop, including blur, pane retirement, and tab close. Keep recovery intact.
+
+Serialize Editor-owned saves and path mutations against the canonical checkout/path, including
+aliases of the same checkout. Define lock ordering for folder operations so nested files cannot deadlock.
+External CLI writers do not participate in this coordination. Document the remaining filesystem race;
+do not describe a hash check plus replacement as an atomic compare-and-swap against arbitrary writers.
+
+Graphical clients must not downgrade to unguarded saving when a Node lacks revision support. Show an
+actionable Node-update state and preserve recovered text. Define the mixed-version route behavior
+explicitly in the API docs; do not change unrelated document routes or silently accept a missing
+precondition. Keep the existing file-list contract used by agent mentions intact.
+
+### Resolve conflicts
+
+Show **Changed on disk** with **Compare**, **Reload from disk**, and **Overwrite disk…**. Compare the
+live draft with a named disk snapshot through shared diff rendering. Opening comparison does not
+save, modify, or discard either side. Refresh the comparison if its snapshot becomes stale.
+
+Reloading a dirty draft requires confirmation. Overwrite confirms the file and uses the disk revision
+shown by that decision; if disk changes again, refuse and refresh. Neither action stages a file.
+Resolve ordinary save failure separately with **Retry save**. Editing remains available during a
+conflict, but automatic writes remain paused until the person resolves it.
+
+Recovered dirty text opens without an automatic write. Reconcile its acknowledged baseline with
+disk on the first available read. Older recovery records remain readable; an unknown baseline requires
+a deliberate resolution rather than an inferred acknowledgement.
+
+### Prepare file operations
+
+Provide narrow owner operations to suspend a file's save scheduling, await an admitted write, and
+rebind or retire a document. Rename and deletion in phase 02 use them. Suspension must also cover
+pane retirement and queued follow-up writes. Failure resumes the original usable document.
+
+In `$EDITOR` mode, report external-editor ownership to file actions. Do not rename or trash a file
+while its PTY is active. Graphical conflict handling does not claim to intercept writes made by that editor.
+
+## Boundaries and delivery sequence
+
+Exclude three-way Git resolution, local file history, a general filesystem watcher, and automatic merges.
+Do not widen loaded-plugin filesystem access. Add shared custody behavior only for demonstrated callers.
+
+Implement the Node revision contract and observable conflict tests first, then custody suspension and
+recovery, then refresh and resolution UI. Preserve ordinary saves and formatter acknowledgements
+throughout. Update the API reference, saving/recovery doc, and editor-pane doc when behavior ships.
+
+## Acceptance and verification
+
+Prove these behaviors with controlled writes and disposable files:
+
+- Change disk after read, during a formatter hook, and before an explicit overwrite. Each detected
+  change preserves both the draft and newer disk text, with a useful conflict result.
+- Delete a dirty open file externally. Blur, close, and pane retirement do not recreate it. Explicit
+  recreation refuses a path another writer created meanwhile.
+- A failed read preserves text; an unchanged read preserves undo and selection; a changed clean read
+  refreshes without triggering autosave. Cached tab returns and reconnects do not show stale text.
+- A recovered draft opens offline, survives conflict resolution failure, and writes only after
+  deliberate resolution. Test records written before revision metadata existed.
+- Two Editor writes through aliased task roots serialize. Suspension joins an admitted save and
+  prevents follow-up writes. Failure releases coordination and leaves the document editable.
+- Formatter output remains the acknowledged body, and typing during a save stays dirty. UTF-8,
+  byte order marks, and CRLF/LF round trips retain supported text behavior.
+- Late reads, a Node switch, and a task eviction cannot update or write through a replacement owner.
+  The database document surface and embedded editor keep their saving behavior.
+
+Run `pnpm lint`, `pnpm test --filter=@acorn/plugin-editor`,
+`pnpm test --filter=@acorn/client-core`, `pnpm test --filter=@acorn/node-core`,
+`pnpm test --filter=@acorn/tui`, and `pnpm --filter @acorn/arch-tests test`.
+Run full suites for other touched contracts and consumers, including database/workflow callers if
+shared custody or editor entrypoints change.
+
+Use the [isolated drivers](../../local-development/agent-drivers.md) to verify clean reload, conflict,
+compare, failed save, recovery, and deleted-file states in a desktop session. Check terminal import and
+PTY ownership in a terminal session. Record screenshots, commands, and the external-writer race limit.
+
+## Verify before building
+
+- Trace save, follow-up save, retirement, recovery, and formatter lifetimes in the implementation checkout.
+- Check read envelopes, HTTP error handling, path aliases, and mixed-version transport behavior.
+- Reuse shared diff ownership and keep [Git resolution](../git-client/08-conflict-resolution.md) separate.
+- Confirm worktree invalidation sources; describe which external changes are detected on focus or refresh.

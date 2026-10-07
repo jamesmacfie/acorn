@@ -5,7 +5,7 @@ import type { PullDiffResponse, PullFilesResponse } from '../../../shared/api'
 import { filesResource } from '../../resourceKeys'
 import { type AppEnv, type Cached, ownerId, type PluginDatabase, respondError, serveThenRevalidate } from '@acorn/plugin-api/node'
 import { PULLS_STALE_AFTER_MS } from '../../syncPolicy'
-import { filesCompleteness, readFiles } from '../mirror/prMirror'
+import { readFiles } from '../mirror/prMirror'
 import { topologyOf } from '../mirror/prDocument'
 import { refreshPullFiles } from './pullRefresh'
 import { resolveRepoForUser } from '../mirror/repoMirror'
@@ -60,7 +60,7 @@ const serveFiles = async <T,>(db: PluginDatabase, c: Context<AppEnv>, emit: Gith
     ttlMs: PULLS_STALE_AFTER_MS,
     force: c.req.query('force') === 'true',
     read: cached,
-    refresh: () => refreshPullFiles(token, db, c.env.BLOBS, { userId, repoId, owner, repo, number }),
+    refresh: () => refreshPullFiles(token, db, c.env.BLOBS, { userId, repoId, owner, repo, number }, emit),
   })
   if (!result.ok) return respondError(c, result.failure.status, result.failure.error, result.failure.detail)
   return result.value
@@ -78,7 +78,7 @@ const handleFilesRead = async (
   // read blocks on a refresh that rewrites it rather than serving the file as if it had no diff.
   const served = await serveFiles<PullFilesResponse>(db, c, emit, async (sync, key) => {
     const files = await readFiles(c.env.BLOBS, db, key, { includePatches, paths })
-    return files.ok ? { files: orderedByRequest(files.files, paths), completeness: filesCompleteness(sync) } : null
+    return files.ok ? { files: orderedByRequest(files.files, paths), completeness: files.completeness, revision: files.revision } : null
   })
   return served instanceof Response ? served : c.json(served)
 }
@@ -104,7 +104,7 @@ export const pullFiles = (db: PluginDatabase, emit: GithubEmit = NO_EMIT) => new
     const files = await readFiles(c.env.BLOBS, db, key, { includePatches: false })
     if (!files.ok) return null
     const topology = await topologyOf(c.env.BLOBS, files.files)
-    return topology.ok ? { document: topology.document, completeness: filesCompleteness(sync) } : null
+    return topology.ok ? { document: topology.document, completeness: files.completeness, revision: files.revision } : null
   })
   return served instanceof Response ? served : c.json(served)
 })

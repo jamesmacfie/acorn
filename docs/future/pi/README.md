@@ -10,7 +10,7 @@ owning reference document wins until the implementation changes that contract.
 
 Give a developer one phase at a time and require its acceptance record before continuing. Each
 phase file holds the design behind it, the implementation steps, and the acceptance gate. The phase
-plan incorporates the permission design from [mods.md](../mods.md) and resolves consumer,
+plan incorporates the permission design from [mods.md](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md) and resolves consumer,
 review-reader, and unattended operation prerequisites.
 
 ## What this is
@@ -219,7 +219,7 @@ reference docs. Never report a phase complete with an unresolved acceptance gate
 
 ## Relation to other programmes
 
-- [mods.md](../mods.md) owns the base permission design. Phase 02 delivers the hook and phase 03 the
+- [mods.md](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md) owns the base permission design. Phase 02 delivers the hook and phase 03 the
   explanation consumer.
 - The shipped [memory contract](../../notes-and-memory.md#memory) replaces Findings, which consumed
   `agents.reviewInput.v1` and supplied the precedent phase 04 generalizes. The Findings removal also

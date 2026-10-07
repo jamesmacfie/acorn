@@ -6,7 +6,7 @@ import { prFiles, reviewThreads, syncState } from '../../../node/schema'
 import { refreshPullDetail, refreshPullFiles } from '../pulls/pullRefresh'
 import { fakeGithub, makeFakePull } from './fakeGithub.helper'
 import { filesCompleteness, mirrorFiles, patchDigest, readComposite, readFiles, type PatchBlobStore } from './prMirror'
-import { COMPLETE } from './prFetch'
+import { completePullTopology as COMPLETE } from '../../../shared/api'
 
 // The mirror's swap, against the real migrated github.sqlite: a refresh either swaps in a
 // complete, ordered resource with its sync row, or changes nothing at all.
@@ -160,6 +160,26 @@ describe('detail mirror', () => {
     expect(detail.threads.map((t) => t.threadId).slice(0, 3)).toEqual(['thread-0', 'thread-1', 'thread-2'])
     expect(detail.threads[0]!.comments.map((c) => c.id)).toEqual(Array.from({ length: 120 }, (_, c) => `thread-0-comment-${c}`))
     expect(detail.commits.map((c) => c.sha)).toEqual(Array.from({ length: 150 }, (_, i) => `commit-${i}`))
+  })
+
+  it('keeps historical metadata and replies through the mirror and refreshes the other revision', async () => {
+    const pull = makeFakePull({ threads: 151, commentsPerThread: (t) => t === 150 ? 120 : 1, files: 1 })
+    Object.assign(pull.threads[150]!, { isOutdated: true, line: null, originalLine: 275 })
+    vi.stubGlobal('fetch', fakeGithub(pull).fetch)
+    await refreshPullFiles('token', plugin.db, store, refreshKey)
+    await refreshPullDetail('token', plugin.db, refreshKey)
+    const detail = await readComposite(plugin.db, key)
+    expect(detail.revision).toBe('base-sha:head-sha')
+    expect(detail.threads[150]).toMatchObject({ outdated: true, line: null, originalLine: 275, resolved: false })
+    expect(detail.threads[150]?.comments).toHaveLength(120)
+    expect((await filesSync())?.revision).toBe(detail.revision)
+    pull.headRefOid = 'pushed-head'
+    await refreshPullDetail('token', plugin.db, refreshKey)
+    expect((await filesSync())?.fetchedAt).toBe(0)
+    const emit = vi.fn()
+    await refreshPullFiles('token', plugin.db, store, refreshKey, emit)
+    expect((await filesSync())?.revision).toBe('base-sha:pushed-head')
+    expect(emit).toHaveBeenCalledWith('pr-synced', expect.objectContaining({ pullNumber: 7 }))
   })
 
   it('keeps the previous detail and its sync time when a continuation fails', async () => {

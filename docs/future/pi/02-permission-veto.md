@@ -114,7 +114,7 @@ own setting.
 A loaded policy plugin refuses a harness permission request before Acorn shows it as pending.
 Both clients show a resolved request naming the blocking plugin and reason. The plugin tightens
 approval without acquiring the power to approve. The base design is the
-[Mods permission hook](../mods.md#the-design-delivered); the Pi additions are below.
+[Mods permission hook](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-design-agentsbefore-permission); the Pi additions are below.
 
 ## Design
 
@@ -128,8 +128,8 @@ it. An acorn plugin has no equivalent for the harness's tools: `core:before-tool
 acorn's own tools, on the agent tools route, and withholds their arguments on purpose.
 
 The permission request is the one place every harness stops and asks acorn before running a risky
-tool. [mods.md § The gap](../mods.md#the-gap-harness-permission-requests) traces it through both
-drivers, and [mods.md § The design](../mods.md#the-design-delivered) puts a veto-only
+tool. [mods.md § The gap](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-gap-harness-permission-requests) traces it through both
+drivers, and [mods.md § The design](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#the-design-agentsbefore-permission) puts a veto-only
 hook there. That is the closest acorn can get to `tool_call` from outside the loop, and it works the
 same for Claude, Codex, DeepSeek, and `omp` from [phase 01](./01-omp-harness.md).
 
@@ -256,5 +256,5 @@ metadata before adding the subject so the change preserves all shipped approval 
 
 From the design:
 
-Everything in [mods.md § Verify before building](../mods.md#verify-before-building), plus whether
+Everything in [mods.md § Verify before building](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#verify-before-building), plus whether
 [phase 03](./03-session-messages.md) has shipped, which decides whether the explanation path is in scope.

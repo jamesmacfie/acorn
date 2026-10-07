@@ -42,6 +42,7 @@ class McpClient {
   private buffer = ''
   private pending = new Map<number, (msg: unknown) => void>()
   private nextId = 1
+  readonly notifications: string[] = []
 
   constructor(env: Record<string, string | undefined>) {
     // Start from an environment with acorn's own variables stripped, then apply the test's. A
@@ -60,8 +61,9 @@ class McpClient {
         this.buffer = this.buffer.slice(i + 1)
         if (!line) continue
         try {
-          const msg = JSON.parse(line) as { id?: number }
+          const msg = JSON.parse(line) as { id?: number; method?: string }
           if (msg.id != null) this.pending.get(msg.id)?.(msg)
+          else if (msg.method) this.notifications.push(msg.method)
         } catch {
           // non-JSON stdout noise, ignore
         }
@@ -121,6 +123,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
     callId: string
     server: 'primary' | 'retry'
   }[] = []
+  let manifest = MANIFEST
 
   beforeAll(async () => {
     dataDir = mkdtempSync(join(tmpdir(), 'acorn-mcp-root-'))
@@ -161,7 +164,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
         })
         return
       }
-      if (url.startsWith('/v1/core/tasks/t1/tools')) return json(MANIFEST)
+      if (url.startsWith('/v1/core/tasks/t1/tools')) return json(manifest)
       res.statusCode = 404
       res.end('{}')
     }
@@ -178,6 +181,7 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
 
   beforeEach(() => {
     posts.length = 0
+    manifest = MANIFEST
     writeFileSync(join(dataDir, 'node.json'), JSON.stringify({ nodeId: 'n', createdAt: Date.now(), protocolVersion: 1, port }))
   })
 
@@ -205,7 +209,8 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
 
       const list = await client.send('tools/list')
       const tools = (list.result as { tools: { name: string; inputSchema: unknown }[] }).tools
-      expect(tools.map((t) => t.name).sort()).toEqual(['notes_append', 'retry_tool', 'task_current'])
+      // Sorted by name whatever order the registry lists them in, so a harness prompt stays stable.
+      expect(tools.map((t) => t.name)).toEqual(['notes_append', 'retry_tool', 'task_current'])
       // The registry's JSON schema rides through unchanged.
       expect(tools.find((t) => t.name === 'notes_append')?.inputSchema).toMatchObject({ properties: { slug: { type: 'string' } } })
 
@@ -220,6 +225,19 @@ describe('acorn MCP server projects the agent-tool registry over stdio (docs/age
       expect(post?.session).toBe('sess-42')
       expect(post?.ceiling).toBe('encoded-scope')
       expect(post?.callId).toMatch(/^[0-9a-f-]{36}$/)
+    } finally {
+      client.kill()
+    }
+  }, 30_000)
+
+  it('announces a changed description even when the tool names stay the same', async () => {
+    const client = new McpClient({ ACORN_TASK_ID: 't1', ACORN_DATA_DIR: dataDir, NODE_EXTRA_CA_CERTS: caPath, ACORN_API_TOKEN: 'internal-token' })
+    try {
+      await client.init()
+      await client.send('tools/list') // the server has taken its first manifest snapshot by now
+      manifest = { tools: MANIFEST.tools.map((t) => (t.name === 'task_current' ? { ...t, description: 'the current task' } : t)) }
+      // The server polls every 10 s.
+      await expect.poll(() => client.notifications, { timeout: 15_000, interval: 250 }).toContain('notifications/tools/list_changed')
     } finally {
       client.kill()
     }

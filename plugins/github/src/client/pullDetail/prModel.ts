@@ -7,7 +7,7 @@ import {
 import {
   fileSummariesOptions, mentionsOptions, pullConflictsOptions, pullDetailOptions, repoLabelsOptions,
 } from '../queries'
-import { pullKey, pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
+import { pullKey, pullDiffKey, fileSummariesKey, pullPrefixKey, pullsPrefixKey, type Label } from '../../shared/api'
 import {
   addComment, addLabel, closePr, disableAutoMerge, enableAutoMerge, mergePr, removeLabel,
   removeReviewer, reopenPr, requestReviewer, rerunFailed, setDraft, setViewed, submitReview,
@@ -91,6 +91,8 @@ function build(scope: PrScope) {
     if (event.pullNumber !== Number(number)) return
     if (event.repoOwner.toLowerCase() !== owner.toLowerCase() || event.repoName.toLowerCase() !== repo.toLowerCase()) return
     void queryClient.invalidateQueries({ queryKey: pullKey(owner, repo, number) })
+    void queryClient.invalidateQueries({ queryKey: fileSummariesKey(owner, repo, number) })
+    void queryClient.invalidateQueries({ queryKey: pullDiffKey(owner, repo, number) })
   })
   onCleanup(offPrSynced)
 

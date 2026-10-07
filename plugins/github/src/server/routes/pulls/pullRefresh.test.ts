@@ -224,6 +224,7 @@ describe('shared pull refresh operations', () => {
       if (url.includes('/pulls/5/files')) {
         return json([{ filename: 'src/app.ts', status: 'modified', additions: 2, deletions: 1, sha: 'file-sha', patch: '@@ patch' }])
       }
+      if (url.endsWith('/pulls/5')) return json({ base: { sha: 'base-sha' }, head: { sha: gqlPull.headRefOid }, updated_at: gqlPull.updatedAt })
       throw new Error(`Unexpected URL ${url}`)
     }))
     const store = {

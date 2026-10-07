@@ -302,12 +302,12 @@ Each feature landing page above has topic pages in a folder of the same name:
   [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
   [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
   [what it refused](./future/deerflow/refused.md).
-- [Prompt caching analysis](./future/cache.md): Codex and Claude caching behavior, Acorn's protections,
-  proposed MCP and usage improvements, and verification before implementation.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's
   code on first use, to keep heavy, rarely used routes out of the node's boot graph.
+- [Find in file](./future/find-in-file.md): product requirements for shared inline find and replace
+  controls built from Acorn components across the graphical editors.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
@@ -316,6 +316,22 @@ Each feature landing page above has topic pages in a folder of the same name:
 Keep one owning page for each contract, and add every new page to this index in the same commit.
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
+
+## Future editor improvements
+
+These product requirements keep everyday file management and editing small. Implement the six phases
+in order; plugin file viewers, inline find controls, and Git merge resolution keep their separate owners.
+
+| Document | What it holds |
+| --- | --- |
+| [Editor programme](./future/editor/README.md) | Product goal, phase order, ownership, related plans, research, and verification. |
+| [Scope boundaries](./future/editor/refused.md) | Deferred functionality and its reasons. |
+| [Phase 01](./future/editor/01-document-lifecycle.md) | Disk revisions, external-change freshness, save conflicts, recovery, and writer suspension. |
+| [Phase 02](./future/editor/02-file-management.md) | Create, rename, and move to trash through file/folder menus, with document reconciliation. |
+| [Phase 03](./future/editor/03-git-status.md) | Optional Git status provider, file/tab marks, folder summaries, and batched refresh. |
+| [Phase 04](./future/editor/04-tabs-and-navigation.md) | Tab menus, guarded bulk close, reopen, recent quick open, position input, and back/forward. |
+| [Phase 05](./future/editor/05-editing-controls.md) | File status, word wrap, indentation controls, and engine command discovery. |
+| [Phase 06](./future/editor/06-search-and-acceptance.md) | Folder search, include/exclude patterns, ignored-file visibility, tree controls, and release acceptance. |
 
 ## Future UI extension handoffs
 
@@ -341,6 +357,21 @@ These planned handoffs follow Editor file viewers. They do not describe shipped 
 | [Phase 12](./future/ui-extension/12-rail-status.md) | Consenting source and task-pane status annotations. |
 | [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
 | [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
+
+## Future Acorn links
+
+These pages describe planned work, not shipped behavior.
+
+| Document | What it holds |
+| --- | --- |
+| [Acorn links plan](./future/url/README.md) | The `acorn://` address format, decisions, safety rules, and how existing addresses map in. |
+| [Refused alternatives](./future/url/refused.md) | What the plan decided not to do, and deferred work. |
+| [Phase 01](./future/url/01-addresses.md) | A pure link parser and builder, and a dispatcher that opens an address in the app. |
+| [Phase 02](./future/url/02-desktop-registration.md) | macOS scheme registration, cold-start delivery, and the dev session `link` verb. |
+| [Phase 03](./future/url/03-copy-link.md) | **Copy link** on tasks, project pages, plugin pages, settings pages, and rail sources. |
+| [Phase 04](./future/url/04-new-task-action.md) | `new-task?url=` through the promote dialog. |
+| [Phase 05](./future/url/05-terminal-link.md) | `acorn --link` for the terminal client. |
+| [Phase 06](./future/url/06-documentation.md) | The reference page and index updates. |
 
 ## Future Git client handoff
 

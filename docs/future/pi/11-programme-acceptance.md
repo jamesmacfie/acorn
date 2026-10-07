@@ -32,8 +32,8 @@ Docs updated: the [programme overview](./README.md) (status, reach list, and an 
 the loop hooks), [skills](../../managed-agents/skills.md) (native delivery is Claude Code and Codex
 only), [permissions](../../plugin-authoring/permissions.md), phase 03's tense about the review
 reader, and manual check 165 in [agents and providers](../../testing/agents-and-providers.md), which
-reproduces the combined flow. The [future index](../README.md) row records the result. [mods.md](../mods.md)
-keeps the comparison and links the shipped contracts. No migration and no wire change.
+reproduces the combined flow. The [future index](../README.md) row records the result. The [Mods design](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md),
+now removed from main, stays in Git history. No migration and no wire change.
 
 **Disposition of every phase.**
 

@@ -95,8 +95,8 @@ describe('the pull-request read tools', () => {
 
   it('groups inline comments into their threads and leaves resolved ones out by default', async () => {
     await testDb.db.insert(reviewThreads).values([
-      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c1', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'reviewer', body: 'rename this', createdAt: 2, position: 0 },
-      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c2', path: 'src/a.ts', line: 10, side: 'RIGHT', resolved: false, author: 'author', body: 'done', createdAt: 3, position: 1 },
+      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c1', path: 'src/a.ts', line: null, originalLine: 10, outdated: true, side: 'RIGHT', resolved: false, author: 'reviewer', body: 'rename this', createdAt: 2, position: 0 },
+      { userId: USER, repoId: 1, number: 7, threadId: 't1', id: 'c2', path: 'src/a.ts', line: null, originalLine: 10, outdated: true, side: 'RIGHT', resolved: false, author: 'author', body: 'done', createdAt: 3, position: 1 },
       { userId: USER, repoId: 1, number: 7, threadId: 't2', id: 'c3', path: 'src/b.ts', line: 4, side: 'RIGHT', resolved: true, author: 'reviewer', body: 'settled', createdAt: 1, position: 2 },
     ])
     await testDb.db.insert(reviews).values({ userId: USER, repoId: 1, number: 7, id: 'r1', author: 'reviewer', state: 'CHANGES_REQUESTED', body: 'one thing', submittedAt: 4, position: 0 })
@@ -112,7 +112,7 @@ describe('the pull-request read tools', () => {
     expect(open.number).toBe(7)
     expect(open.reviews).toEqual([{ author: 'reviewer', state: 'CHANGES_REQUESTED', body: 'one thing', submittedAt: 4 }])
     expect(open.threads).toHaveLength(1)
-    expect(open.threads[0]!.threadId).toBe('t1')
+    expect(open.threads[0]).toMatchObject({ threadId: 't1', line: null, originalLine: 10, outdated: true, resolved: false })
     expect(open.threads[0]!.comments.map((comment) => comment.body)).toEqual(['rename this', 'done'])
     expect(open.comments.map((comment) => comment.body)).toEqual(['deployed'])
     expect(open.omitted).toBe(0)

@@ -53,8 +53,13 @@ const makePullFilesDb = (selectRows: unknown[][]) => {
     from: vi.fn(() => ({
       // Awaitable as it is, or after `.orderBy`, the way the mirror reads use it.
       where: vi.fn(() => {
-        const rows = Promise.resolve(queue.shift() ?? [])
-        return Object.assign(rows, { orderBy: () => rows })
+        const query = {
+          then: (resolve: (rows: unknown[]) => unknown) => Promise.resolve(queue.shift() ?? []).then(resolve),
+          all: () => queue.shift() ?? [],
+          get: () => undefined,
+          orderBy: () => query,
+        }
+        return query
       }),
     })),
   }))
@@ -131,6 +136,7 @@ describe('resolveRepoForUser', () => {
 describe('pull files stale-while-revalidate', () => {
   beforeEach(async () => {
     vi.clearAllMocks()
+    vi.mocked(gh).mockReset()
     core = makeTestDb()
     await seedGithubIntegration(core.db, 'james', 'token', ENC_KEY)
   })
@@ -163,7 +169,7 @@ describe('pull files stale-while-revalidate', () => {
     const ghPromise = new Promise<Response>((resolve) => {
       resolveGh = resolve
     })
-    vi.mocked(gh).mockReturnValue(ghPromise)
+    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ? ghPromise : responseJson({}))
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -201,9 +207,10 @@ describe('pull files stale-while-revalidate', () => {
         },
       ],
       completeness: { kind: 'complete' },
+      revision: null,
     })
     expect(blobGet).not.toHaveBeenCalled()
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
+    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
 
     resolveGh(responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]))
     await settleBackground()
@@ -233,9 +240,8 @@ describe('pull files stale-while-revalidate', () => {
       [fileRow],
       [],
     ])
-    vi.mocked(gh).mockResolvedValueOnce(
-      responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]),
-    )
+    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ?
+      responseJson([{ filename: 'src/app.ts', status: 'modified', additions: 3, deletions: 1, sha: 'abc123', patch: '@@' }]) : responseJson({}))
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -249,7 +255,7 @@ describe('pull files stale-while-revalidate', () => {
     )
 
     expect(response.status).toBe(200)
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
+    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
   })
 
   it('serves a stale diff document at once and refreshes in the background', async () => {
@@ -292,7 +298,7 @@ describe('pull files stale-while-revalidate', () => {
     const ghPromise = new Promise<Response>((resolve) => {
       resolveGh = resolve
     })
-    vi.mocked(gh).mockReturnValue(ghPromise)
+    vi.mocked(gh).mockImplementation(async (_token, path) => path.includes('/files?') ? ghPromise : responseJson({}))
 
     const app = new Hono<AppEnv>()
     app.use('/api/*', async (c, next) => {
@@ -323,7 +329,7 @@ describe('pull files stale-while-revalidate', () => {
     ])
     expect(JSON.stringify(body)).not.toContain('+a')
     expect(blobPut).toHaveBeenCalledWith(`diffdoc:v${DIFF_DOCUMENT_VERSION}:sha256:a`, expect.any(String))
-    expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1')
+    await vi.waitFor(() => expect(gh).toHaveBeenCalledWith('token', '/repos/Runn-Fast/runn/pulls/12/files?per_page=100&page=1'))
 
     resolveGh(
       responseJson([

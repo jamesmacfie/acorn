@@ -20,7 +20,7 @@ Revisit: never for loaded plugins. A person who wants `omp`'s model runs `omp` a
 
 `omp` extensions can intercept any event, replace any built-in tool, and register under any name.
 Acorn refused this model when it compared itself with Claude Code's function hooks
-([mods.md § Refused](../mods.md#refused)). The `omp` comparison adds no new argument for it.
+([mods.md § Refused](https://github.com/jamesmacfie/acorn/blob/b76dcd46b3f0cfbd2e0bd4620a1ef4e1f99590fd/docs/future/mods.md#refused)). The `omp` comparison adds no new argument for it.
 
 Revisit: when a real need cannot be expressed as an owner-declared point, widen the point's
 vocabulary instead.

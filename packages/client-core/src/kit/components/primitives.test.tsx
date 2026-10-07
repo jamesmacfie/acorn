@@ -6,7 +6,7 @@ import { Card } from './primitives'
 // Card's `focus` is a navigation command, spent on the rising edge and not replayed. A pane derives it
 // from a row it rebuilds on every streamed event, so the prop is re-notified while its value stays true.
 // Re-running the reveal then would yank the reader back to the card and take the caret out of whatever
-// they were typing (docs/future/scoll_fix.md § Repeated focus commands).
+// they were typing (docs/ui-design/kit-internals.md § Behavior a pane keeps redoing becomes a node's prop).
 
 let dispose: (() => void) | undefined
 let host: HTMLElement

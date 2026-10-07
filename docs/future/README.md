@@ -14,6 +14,9 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | Folder | What it is | Status |
 | --- | --- | --- |
+| [security/](./security/README.md) | Five product requirement documents from a hardening pass: desktop command authorization, plugin realm policy tampering, the bundled-runtime network and filesystem backstop, internal-token confinement when advertised, and the automation-driver release fence. | Proposed, October 7, 2026; implementation not started. |
+| [editor/](./editor/README.md) | Six product requirement phases for document conflicts, file management, Git status, tabs/navigation, editing controls, and scoped search, with combined acceptance and scope boundaries. | Proposed, October 7, 2026; implementation not started. |
+| [url/](./url/README.md) | `acorn://` links that open the desktop app on a task, project page, plugin page, settings page, or rail source, plus **Copy link**, a confirmed new-task action, and `acorn --link` for the terminal client. Six sequential phases. | Planned, October 7, 2026; implementation not started. |
 | [git-client/](./git-client/README.md) | Built-in Git repository source and task pane: worktrees, commit history, stashes, AI explanations, task/workflow launches, refs/remotes/settings, operations, and conflict resolution. Eight sequential phases with retained screenshot references. | Planned, October 7, 2026; implementation not started. |
 | [cloud/](./cloud/README.md) | Hosted cloud tasks: account service, team Nodes, relay, task workers, archive, isolation, plugin policy, team memory, billing, and eleven deployable phases. | Proposed, 2026-09-29; nothing built. |
 | [ecosystem/](./ecosystem/README.md) | The umbrella over third-party plugins: containment, signing, discovery, the fat-core stance. | Front door and rung-2 containment shipped; signing and discovery remain. |
@@ -33,21 +36,15 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | File | What it is | Status |
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
-| [cache.md](./cache.md) | Codex and Claude prompt caching: harness ownership, deterministic MCP definitions, usage diagnostics, and measured follow-up experiments. | Analysis and proposal, October 6, 2026. Implementation not started. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
+| [find-in-file.md](./find-in-file.md) | Shared inline find and replace controls built from Acorn components, with CodeMirror search ownership, keyboard behavior, lifecycle rules, and acceptance criteria. | Product requirements, October 7, 2026. Implementation not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [lazy-plugin-code.md](./lazy-plugin-code.md) | An opt-in `lazyFetch` helper that loads a plugin route's code on its first request, so heavy, rarely used routes stay out of the node's boot graph. | Proposal, October 6, 2026. Not started. |
-| [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
-| [mods.md](./mods.md) | What acorn takes from Claude Code's function hooks: the comparison, and a veto-only `agents:before-permission` hook over every harness's permission requests. | Proposal, 2026-09-29. Not started. |
 | [multi-account.md](./multi-account.md) | Running more than one Claude Code or Codex subscription: how other tools do it, the terms risk, and a per-account config folder pinned to each session. | Research and proposal, October 6, 2026. Not started. |
-| [outdated-review-comments.md](./outdated-review-comments.md) | Hide outdated GitHub review threads from the code pane while preserving conversation history, location metadata, and refresh correctness. | Product requirements, 2026-10-01. Not implemented. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
-| [rail-context-menus.md](./rail-context-menus.md) | Desktop source and pane icon menus, plugin ownership, replacement providers, and verification gates. | Implementation on isolated branch, 2026-10-03; integration acceptance open. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
-| [scoll_fix.md](./scoll_fix.md) | Agent transcript scroll and focus repair: retained view state, stable row identity, consumable navigation intent, and cross-session regression coverage. | Implementation proposal, 2026-09-14. Reading position, row identity and reveal intent shipped; filter and disclosure state not built. |
-| [schedules.md](./schedules.md) | Unattended backup and an `agent-run` schedule target. | Proposals moved from schedules.md, 2026-10-03. Not started. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
@@ -66,6 +63,11 @@ beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containmen
 `blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`outdated-review-comments.md` was implemented and deleted on October 7, 2026.
+[Review locations](../github-integration/mirror.md#review-locations) owns provider status, historical
+locations, legacy handling, and revision compatibility. [Conversation](../github-integration/surfaces.md#conversation)
+owns historical presentation. The proposal remains in Git history.
 
 `sandbox/` was deleted on 2026-10-03. The local task-isolation proposal did not establish how to
 preserve normal Git and host development workflows. The API gates, project configuration trust,

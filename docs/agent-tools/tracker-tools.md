@@ -11,7 +11,8 @@ project and a branch. It creates the pull request from that branch, records the 
 task pull request relation, and returns whether the pull request became primary or related.
 
 `pr_review_comments` and `pr_checks` are read-tier. Both read the mirror the GitHub plugin keeps fresh,
-so neither spends a credential or touches the network. `pr_review_comments` groups the mirror's
+so neither spends a credential or touches the network. `pr_review_comments` includes outdated unresolved
+threads with separate current line, original line, and nullable outdated status. It groups the mirror's
 `review_threads` rows into threads and leaves resolved ones out unless asked. `pr_checks` returns every
 check with its raw status and the failing names, by the rule the ci-loop step uses (`checkFailed` in
 `plugins/github/src/server/mirrorQueries.ts`). Both say in a `status` field whether the pull request
