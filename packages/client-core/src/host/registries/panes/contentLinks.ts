@@ -78,7 +78,7 @@ export function resolveNamedContentTarget(kind: string, item: string): { target:
 //
 // Both the target and who claimed it, because the contribution carries the route resolver too and a URL
 // must not be able to resolve to one provider's target and another's path.
-function claimFor(href: string): { target: InAppTarget; contribution: ContentLinkContribution } | null {
+export function claimFor(href: string): { target: InAppTarget; contribution: ContentLinkContribution } | null {
   for (const contribution of contentLinkRegistry.entries()) {
     const claim = contribution.parse(href)
     if (!claim) continue

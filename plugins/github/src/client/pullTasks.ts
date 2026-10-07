@@ -1,4 +1,4 @@
-import type { QueryClient } from '@tanstack/solid-query'
+import { QueryClient } from '@tanstack/solid-query'
 import { tasksRoute } from '@acorn/protocol/api.ts'
 import {
   createTask,
@@ -13,7 +13,7 @@ import {
   type Task,
 } from '@acorn/plugin-api/client'
 import type { Integration } from '@acorn/protocol/api.ts'
-import type { Pull } from '../shared/api'
+import { pullRoute, type Pull, type PullDetail } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
@@ -73,25 +73,7 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
   const existing = activeTaskForPull(tasks, target.projectId, pullNumber)
   if (existing) return existing
 
-  // Seed task links from the same warmed detail body regardless of which UI started the promotion.
-  // A task link needs an unambiguous connection, which `linearConnectionForProject` settles.
-  const detail = await queryClient
-    .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
-    .catch(() => undefined)
-  const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
-  const linears = (integrations?.integrations ?? [])
-    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
-  const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
-  const links = linearId
-    ? scanContentRefs([detail?.pull?.body])
-        .filter((ref) => ref.providerId === 'linear')
-        .map((ref) => ({
-          connectionId: linearId,
-          identifier: ref.item,
-          ref: { displayId: ref.item, url: ref.url },
-        }))
-    : []
-
+  const links = await linksForPull(queryClient, target)
   const task = await createTask({
     origin: 'github-pr',
     projectId: target.projectId,
@@ -103,27 +85,57 @@ export async function promotePullToTask(queryClient: QueryClient, target: PullTa
   return task
 }
 
+// A task link needs an unambiguous connection. Both the direct PR action and the confirmation
+// dialog derive links here, so they record the same references from the PR body.
+async function linksForPull(queryClient: QueryClient, target: PullRef & { projectId: string }) {
+  const detail = await queryClient
+    .ensureQueryData(pullDetailOptions(target.owner, target.repo, target.number, true))
+    .catch(() => undefined)
+  const integrations = await queryClient.ensureQueryData(integrationsOptions(true)).catch(() => null)
+  const linears = (integrations?.integrations ?? [])
+    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
+  const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
+  return linearId
+    ? scanContentRefs([detail?.pull?.body])
+        .filter((ref) => ref.providerId === 'linear')
+        .map((ref) => ({
+          connectionId: linearId,
+          identifier: ref.item,
+          ref: { displayId: ref.item, url: ref.url },
+        }))
+    : []
+}
+
 /**
- * The source's promotion contract, for the one caller that is not this plugin: the shared
- * promote-to-task modal, which the workflows plugin opens from a pull request's row menu
- * (docs/workflows/starting-runs.md § Starting a run). Without it the modal has no way to turn a pull into a task
- * and refuses to draw.
+ * The source's promotion contract for the shared promote-to-task modal. Workflows opens it from
+ * a pull request row (docs/workflows/starting-runs.md § Starting a run); Acorn links open it after
+ * the content recogniser resolves a PR URL.
  *
- * Deliberately thinner than `promotePullToTask` above. It keeps the half that matters — a pull that
- * already has an active task gets that task rather than a second one, which is what "attach to the
- * PR's task" means here — and drops the Linear link seeding, which needs the warmed detail cache and
- * therefore a QueryClient this contract has no way to hand over. The list's own **Create task** row
- * still runs the full path. There is no `attachToCurrentTask`: a pull request is recorded on the task
+ * There is no `attachToCurrentTask`: a pull request is recorded on the task
  * row as `pullNumber`, not as a link, so attaching one to somebody else's task is not a thing.
  */
 export const githubPullPromotion: NonNullable<SourceContribution<Pull>['promotion']> = {
+  fromContentLink: async (target) => {
+    if (target.kind !== 'pr' || typeof target.owner !== 'string' || typeof target.repo !== 'string' || typeof target.number !== 'string') return null
+    const detail = await readJson<PullDetail>(pullRoute(target.owner, target.repo, target.number))
+    return detail.pull
+  },
+  existingTask: async (target, projectId) => {
+    const number = Number(target.number)
+    if (target.kind !== 'pr' || !Number.isSafeInteger(number) || number <= 0) return undefined
+    const tasks = await readJson<Task[]>(tasksRoute)
+    return activeTaskForPull(tasks, projectId, number)
+  },
   canPromote: (pull, context) => !!context.projectId && !!pull.headRef,
-  prepare: (pull, context) => ({
+  prepare: async (pull, context) => ({
     origin: 'github-pr',
     projectId: context.projectId,
     title: pull.title,
     branch: pull.headRef ?? context.branch,
     pullNumber: pull.number,
+    links: context.owner && context.repo
+      ? await linksForPull(new QueryClient(), { owner: context.owner, repo: context.repo, number: String(pull.number), projectId: context.projectId })
+      : [],
   }),
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])

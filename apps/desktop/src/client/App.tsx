@@ -29,6 +29,7 @@ import { warnOnceAboutDisk } from '@acorn/client-core/infra/node'
 import { applyNodePlugins, clientPluginsReady } from './activate'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { registerAddressHostWhenReady } from './addressHostRegistration'
+import { PromoteToTaskModal } from '@acorn/client-core/features/integrations/PromoteToTaskModal.tsx'
 import { clearCache } from './clearCache'
 import { topbarBreadcrumb } from './breadcrumb'
 import TaskView from './TaskView'
@@ -84,6 +85,7 @@ export default function App() {
   // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
   const [settingsLink, setSettingsLink] = createSignal<{ nodeId: string; place: Extract<Place, { kind: 'settings' }> } | null>(null)
+  const [linkPromotion, setLinkPromotion] = createSignal<{ projectId: string; sourceId: string; item: unknown; itemTitle: string } | null>(null)
   const openSettings = (target?: string): void => { setSettingsRequest(target ? { target } : {}) }
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
@@ -452,18 +454,26 @@ export default function App() {
       nodeId: mountedNodeId,
       navigate: (path) => navigate(path),
       openProject: (path, source) => {
+        setLinkPromotion(null)
         explicitProjectPath = path
         setSelectedSource(source)
         navigate(path)
       },
-      openTask: (taskId, path) => {
-        const task = tasks.data?.find((candidate) => candidate.id === taskId)
+      openTask: (taskId, path, linkedTask) => {
+        setLinkPromotion(null)
+        const task = linkedTask ?? tasks.data?.find((candidate) => candidate.id === taskId)
         if (!task) return false
+        if (linkedTask) queryClient.setQueryData<Task[]>(tasksKey, (current = []) =>
+          current.some((candidate) => candidate.id === linkedTask.id)
+            ? current.map((candidate) => candidate.id === linkedTask.id ? linkedTask : candidate)
+            : [...current, linkedTask])
         activateTaskSignals(task)
         navigate(path)
         return true
       },
-      hasProject: (projectId) => !!projects.data?.some((project) => project.id === projectId),
+      hasProject: (projectId) => !!queryClient.getQueryData<Project[]>(projectsKey)?.some((project) => project.id === projectId),
+      loadProjects: async () => { await queryClient.ensureQueryData(projectsOptions(true)) },
+      showPromotion: setLinkPromotion,
     }, (error) => linkLog.warn('Could not prepare loaded plugin routes for an Acorn link', error))
     onCleanup(unregister)
   })
@@ -640,6 +650,29 @@ export default function App() {
           (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
+      <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId && projects.data?.some((project) => project.id === linkPromotion()!.projectId) ? linkPromotion() : null}>
+        {(promotion) => {
+          const projectTasks = (tasks.data ?? []).filter((task) => task.projectId === promotion.projectId)
+          const workspaceProjects = new Set(workspaceForProject(workspaces.data, promotion.projectId)?.projects.map((project) => project.id) ?? [])
+          const ready = (task: Task) => {
+            setLinkPromotion(null)
+            void queryClient.invalidateQueries({ queryKey: tasksKey })
+            activateTaskSignals(task)
+            navigate(pathForTask(task))
+          }
+          return <PromoteToTaskModal
+            providerId={promotion.sourceId}
+            item={promotion.item}
+            itemTitle={promotion.itemTitle}
+            headerLabel="Create task"
+            attachTasks={(tasks.data ?? []).filter((task) => task.status === 'active' && workspaceProjects.has(task.projectId))}
+            existingBranches={projectTasks.flatMap((task) => task.branch ? [task.branch] : [])}
+            onClose={() => setLinkPromotion(null)}
+            onCreated={ready}
+            onAttached={ready}
+          />
+        }}
+      </Show>
       <Show when={settingsRequest()}>
         {(request) => <Portal><SettingsView request={request()} onClose={() => { setSettingsRequest(null); setSettingsLink(null) }}
           onLinkPlace={setSettingsLink} onCopyLink={copyVisibleLink} /></Portal>}

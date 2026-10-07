@@ -2,6 +2,7 @@ import type { Component } from 'solid-js'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
 import type { ProviderCapabilityName } from '@acorn/protocol/integrations.ts'
 import type { HostCapabilityRequirement } from '../../../infra/node/hostCapabilities'
+import type { InAppTarget } from '../panes/contentLinks'
 import { Registry } from '../../../kit/lib/state/registry'
 
 export type SourcePromotionContext = {
@@ -13,6 +14,10 @@ export type SourcePromotionContext = {
 }
 
 export type SourcePromotion<Item> = {
+  /** Resolve a content-link claim to a promotable item. Absent for sources with no external URL. */
+  fromContentLink?: (target: InAppTarget, projectId: string) => Promise<Item | null>
+  /** Return an active task for a claimed link before loading an item or opening confirmation. */
+  existingTask?: (target: InAppTarget, projectId: string) => Promise<Task | undefined>
   canPromote(item: Item, context: SourcePromotionContext): boolean
   prepare(item: Item, context: SourcePromotionContext): TaskSeed | Promise<TaskSeed>
   create(seed: TaskSeed): Promise<Task>

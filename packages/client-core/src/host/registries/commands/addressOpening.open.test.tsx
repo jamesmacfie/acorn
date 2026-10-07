@@ -56,6 +56,8 @@ it('keeps a recognised GitHub pull route and its source across a workspace trans
     },
     openTask: () => false,
     hasProject: () => true,
+    loadProjects: async () => {},
+    showPromotion: () => {},
   }))
 
   const link = 'acorn://node-a/open?url=https%3A%2F%2Fgithub.com%2Facme%2Frepo%2Fpull%2F42'

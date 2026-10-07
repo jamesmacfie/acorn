@@ -1,6 +1,43 @@
 # Phase 04: new task action
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: phase 02.
+## Completion note, October 8, 2026
+
+`new-task?url=` uses the content-link registry's claim and project path, then finds a source by its
+provider ID. It waits for the selected Node's projects before resolving that path. A source's
+`existingTask` checks the claim before loading PR details; an active task opens directly and enters
+the client cache if the task list has not loaded. Otherwise
+the source's `fromContentLink` loads the item, the desktop opens the project through its explicit
+route and source path, and `PromoteToTaskModal` mounts only after the target project is in router
+params. Source IDs, which the modal uses to retrieve a promotion, remain distinct from provider IDs.
+An unrecognised URL, an untracked repository, and a source without link promotion have separate
+refusals. **Add project** opens the Projects section of the Workspaces settings page.
+
+GitHub fetches a pull's title and head branch through its promotion. The modal and the PR list
+share Linear reference seeding from the pull body; the modal reads those details during preparation
+and writes only after confirmation. GitHub still cannot attach a pull to another task because its
+identity lives in the task's `pullNumber`, rather than in a task link. The optional link methods add
+no requirement for other sources, and this phase adds no terminal dispatch behavior.
+
+Verification: focused address dispatch (10 tests), promotion modal (10), GitHub promotion (9),
+desktop address-host readiness (2), and GitHub's full package suite (272) passed. Client-core,
+desktop, and GitHub scoped TypeScript lint and targeted oxlint passed. The architecture suite passed
+all 87 checks after desktop staging generated Tauri schemas. The client-core package suite passed
+2,522 tests and retained the known route-scope and CSS-shadow failures; an additional icon-census
+timeout under concurrent native compilation passed on a focused rerun. The desktop package suite
+passed 155 tests and retained 11 known stale plugin-disable snapshots. Its other 19 failures were
+sandbox loopback or process-inspection errors; the four affected files passed all 22 tests on a
+narrow host-permission rerun.
+
+An isolated desktop session refused an unrecognised URL and showed the untracked GitHub PR notice
+with **Add project** in its rendered snapshot. Its screenshot missed the transient toast, and the
+WebDriver click expired before reaching that action; the focused dispatcher test verifies the action
+target. The session had no connected GitHub repository, so the PR dialog and active-task paths were
+verified in focused tests rather than a live PR. The session was stopped. Installed release-bundle
+delivery remains with the coordinator after phase 02's host Rust build failures. Phase 06 should
+document the `workspaces#projects` destination and the source promotion link methods; phase 05 can
+continue to refuse action links in the terminal.
+
+Date: October 8, 2026. Status: implemented. Dependencies: phase 02.
 Read the [plan](./README.md), especially [the safety rules](./README.md#safety-rules).
 
 ## Deliverable

@@ -7,17 +7,20 @@ import { setSelectedSource } from '../../../features/tasks/tasks'
 import { defaultSourceId, matchRoute, sourceIdForPath, sourceRegistry } from '../sources/sources'
 import { projectSurfaceRoutes } from '../panes/projectSurfaces'
 import { paneContribution } from '../panes/panes'
-import { openInAppUrl } from '../panes/contentLinks'
+import { claimFor, openInAppUrl } from '../panes/contentLinks'
+import type { Task } from '@acorn/protocol/api.ts'
 import { clientEvents } from './clientEvents'
-import { isProjectPath, projectPath, taskPath } from './corePaths'
+import { isProjectPath, projectIdFromPath, projectPath, taskPath } from './corePaths'
 import { buildLink, parseLink, type Address, type LinkRefusal } from './addresses'
 
 export type AddressHost = {
   nodeId: string | null
   navigate(path: string): void
   openProject(path: string, source: string | null): void
-  openTask(taskId: string, path: string): boolean
+  openTask(taskId: string, path: string, task?: Task): boolean
   hasProject(projectId: string): boolean
+  loadProjects(): Promise<void>
+  showPromotion(details: { projectId: string; sourceId: string; item: unknown; itemTitle: string }): void
 }
 
 let host: AddressHost | null = null
@@ -58,10 +61,11 @@ function waitForInitialFleet(): Promise<void> {
   })
 }
 
-export function reportLinkFailure(link: string, reason: string): LinkRefusal {
+export function reportLinkFailure(link: string, reason: string, addProject = false): LinkRefusal {
   const detail = `${reason}: ${link.length > 500 ? `${link.slice(0, 500)}…` : link}`
-  pushNotice({ taskId: '', kind: 'error', title: 'Could not open Acorn link', detail, at: Date.now() })
-  toast(detail, { tone: 'danger' })
+  pushNotice({ taskId: '', kind: 'error', title: 'Could not open Acorn link', detail, at: Date.now(),
+    ...(addProject ? { target: { kind: 'settings', resourceId: 'workspaces#projects' } } : {}) })
+  toast(detail, { tone: 'danger', ...(addProject ? { action: { label: 'Add project', onPress: () => clientEvents.emit('presentation:open-settings', { tab: 'settings/workspaces#projects' }) } } : {}) })
   return { kind: 'refused', reason, link }
 }
 
@@ -79,7 +83,6 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
   if (!nodes().length) await waitForInitialFleet()
   const nodeId = address.nodeId === 'local' ? homeNodeId() : address.nodeId
   if (!nodeId || !nodes().some((node) => node.nodeId === nodeId)) return reportLinkFailure(shownLink, 'Node is not paired on this device')
-  if (address.kind === 'new-task') return reportLinkFailure(shownLink, 'Creating a task from a link is not available yet')
   if (activeNodeId() !== nodeId) setActiveNode(nodeId)
   const shell = await readyHost(nodeId)
   if (!shell || activeNodeId() !== nodeId) return reportLinkFailure(shownLink, 'Node did not become ready to open the link')
@@ -135,6 +138,48 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
         return reportLinkFailure(shownLink, 'No Acorn destination claims this URL')
       }
       break
+    case 'new-task': {
+      let claim: ReturnType<typeof claimFor>
+      try { claim = claimFor(address.url) } catch {
+        return reportLinkFailure(shownLink, 'Could not recognise this URL')
+      }
+      if (!claim) return reportLinkFailure(shownLink, 'No Acorn recogniser claims this URL')
+      try { await shell.loadProjects() } catch {
+        return reportLinkFailure(shownLink, 'Could not load projects for this Node')
+      }
+      if (!claim.contribution.path) return reportLinkFailure(shownLink, 'Provider has no task promotion')
+      let projectId: string | null
+      try {
+        const path = claim.contribution.path(claim.target)
+        projectId = path ? projectIdFromPath(path) : null
+      } catch {
+        return reportLinkFailure(shownLink, 'Could not resolve the item project')
+      }
+      if (!projectId || !shell.hasProject(projectId)) {
+        return reportLinkFailure(shownLink, 'Repository is not a project in Acorn', true)
+      }
+      const source = sourceRegistry.entries().find((entry) =>
+        entry.providerId === claim.contribution.providerId && entry.promotion?.fromContentLink && entry.when?.() !== false)
+      if (!source?.promotion?.fromContentLink) return reportLinkFailure(shownLink, 'Provider has no task promotion')
+      try {
+        const task: Task | undefined = await source.promotion.existingTask?.(claim.target, projectId)
+        if (task) {
+          if (!shell.openTask(task.id, taskPath(task.id), task)) return reportLinkFailure(shownLink, 'Task was not found')
+          break
+        }
+        const item = await source.promotion.fromContentLink(claim.target, projectId)
+        const owner = typeof claim.target.owner === 'string' ? claim.target.owner : ''
+        const repo = typeof claim.target.repo === 'string' ? claim.target.repo : ''
+        if (!item || !source.promotion.canPromote(item, { projectId, owner, repo })) {
+          return reportLinkFailure(shownLink, 'Provider cannot promote this item')
+        }
+        shell.openProject(projectPath(projectId), source.id)
+        shell.showPromotion({ projectId, sourceId: source.id, item, itemTitle: typeof item.title === 'string' ? item.title : address.url })
+      } catch (error) {
+        return reportLinkFailure(shownLink, error instanceof Error ? error.message : 'Could not load the item')
+      }
+      break
+    }
   }
   return { kind: 'opened' }
 }

@@ -59,6 +59,16 @@ afterEach(() => {
 })
 
 describe('the optional task action', () => {
+  it('does not create or attach when the confirmation is cancelled', async () => {
+    mount(undefined, [TASK])
+    await settle()
+    expect(inputs()[0].value).toBe('TypeError')
+    const cancel = [...document.querySelectorAll('button')].find((button) => button.textContent === 'Cancel')
+    cancel?.click()
+    await settle()
+    expect(created).not.toHaveBeenCalled()
+    expect(attached).not.toHaveBeenCalled()
+  })
   it('leaves ordinary promotion unchanged', async () => {
     mount()
     await settle()

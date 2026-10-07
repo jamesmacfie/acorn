@@ -6,10 +6,17 @@ const state = vi.hoisted(() => ({
   projectPaths: [] as string[],
   selected: [] as (string | null)[],
   notices: [] as string[],
+  toastActions: [] as Array<{ label: string; onPress: () => void }>,
   noticeRows: [] as string[],
   settings: [] as string[],
   opened: [] as string[],
+  openedTask: null as unknown,
   claimed: true,
+  claim: null as null | { target: Record<string, unknown>; contribution: { providerId?: string; path?: () => string | null } },
+  promotions: [] as unknown[],
+  created: 0,
+  loadedItems: 0,
+  existing: false,
 }))
 
 vi.mock('../../../infra/node/activeNode', () => ({
@@ -21,7 +28,10 @@ vi.mock('../../../infra/node/fleet', () => ({
   nodes: () => [{ nodeId: 'node-a' }, { nodeId: 'node-b' }],
 }))
 vi.mock('../../../features/notifications/toast', () => ({
-  toast: (message: string) => state.notices.push(message),
+  toast: (message: string, options?: { action?: { label: string; onPress: () => void } }) => {
+    state.notices.push(message)
+    if (options?.action) state.toastActions.push(options.action)
+  },
 }))
 vi.mock('../../../features/notifications/notifications', () => ({
   pushNotice: (notice: { detail: string }) => state.noticeRows.push(notice.detail),
@@ -35,7 +45,14 @@ vi.mock('../sources/sources', () => ({
   sourceIdForPath: (path: string) => path.includes('/pulls') ? 'pulls' : undefined,
   sourceRegistry: {
     get: (id: string) => id === 'pulls' ? { id } : undefined,
-    entries: () => [{ id: 'plugin-source', projectSurfaceId: 'plugin-surface' }],
+    entries: () => [{ id: 'plugin-source', projectSurfaceId: 'plugin-surface' }, {
+      id: 'source-github', providerId: 'github', promotion: {
+        fromContentLink: async () => { state.loadedItems++; return { number: 42, title: 'Review changes', headRef: 'feature/pr' } },
+        canPromote: () => true,
+        existingTask: async () => state.existing ? { id: 'tracked-task' } : undefined,
+        create: async () => { state.created++; return { id: 'created-task' } },
+      },
+    }],
   },
 }))
 vi.mock('../panes/projectSurfaces', () => ({
@@ -46,6 +63,7 @@ vi.mock('../panes/panes', () => ({
 }))
 vi.mock('../panes/contentLinks', () => ({
   openInAppUrl: (url: string) => { state.opened.push(url); return state.claimed },
+  claimFor: () => state.claim,
 }))
 vi.mock('./clientEvents', () => ({
   clientEvents: { emit: (_event: string, value: { tab: string }) => state.settings.push(value.tab) },
@@ -63,8 +81,10 @@ function mount(nodeId: string) {
       state.selected.push(source)
       state.navigated.push(path)
     },
-    openTask: (_id: string, path: string) => { state.navigated.push(path); state.selected.push(null); return true },
+    openTask: (_id: string, path: string, task?: unknown) => { state.navigated.push(path); state.selected.push(null); state.openedTask = task; return true },
     hasProject: (id: string) => id === 'project' || id === 'project-b',
+    loadProjects: async () => {},
+    showPromotion: (details: unknown) => state.promotions.push(details),
   }
   mounted.push(registerAddressHost(host))
 }
@@ -76,10 +96,17 @@ beforeEach(() => {
   state.projectPaths = []
   state.selected = []
   state.notices = []
+  state.toastActions = []
   state.noticeRows = []
   state.settings = []
   state.opened = []
+  state.openedTask = null
   state.claimed = true
+  state.claim = null
+  state.promotions = []
+  state.created = 0
+  state.loadedItems = 0
+  state.existing = false
 })
 
 describe('opening an Acorn address', () => {
@@ -160,5 +187,43 @@ describe('opening an Acorn address', () => {
     expect(state.navigated).toEqual([])
     expect(state.notices).toHaveLength(6)
     expect(state.noticeRows).toHaveLength(6)
+  })
+
+  it('prepares a recognised item without writing until the dialog confirms', async () => {
+    mount('node-a')
+    state.claim = { target: { kind: 'pr', item: 'acme/repo#42' }, contribution: { providerId: 'github', path: () => '/p/project/pulls/42' } }
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toEqual({ kind: 'opened' })
+    expect(state.projectPaths).toEqual(['/p/project'])
+    expect(state.promotions).toEqual([{ projectId: 'project', sourceId: 'source-github', item: { number: 42, title: 'Review changes', headRef: 'feature/pr' }, itemTitle: 'Review changes' }])
+    expect(state.created).toBe(0)
+    // Dismissing the request does not call the promotion's create method.
+    state.promotions = []
+    expect(state.created).toBe(0)
+  })
+
+  it('opens an active task without a dialog', async () => {
+    mount('node-a')
+    state.claim = { target: { kind: 'pr' }, contribution: { providerId: 'github', path: () => '/p/project/pulls/42' } }
+    state.existing = true
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toEqual({ kind: 'opened' })
+    expect(state.navigated).toEqual(['/t/tracked-task'])
+    expect(state.openedTask).toEqual({ id: 'tracked-task' })
+    expect(state.promotions).toEqual([])
+    expect(state.created).toBe(0)
+    expect(state.loadedItems).toBe(0)
+  })
+
+  it('distinguishes an untracked project and a claimed URL with no promotion', async () => {
+    mount('node-a')
+    state.claim = { target: { kind: 'pr' }, contribution: { providerId: 'github', path: () => null } }
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Repository is not a project in Acorn' })
+    expect(state.toastActions[0].label).toBe('Add project')
+    state.toastActions[0].onPress()
+    expect(state.settings).toEqual(['settings/workspaces#projects'])
+    state.claim = { target: { kind: 'repo' }, contribution: { path: () => '/p/project' } }
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Provider has no task promotion' })
+    state.claim = { target: { kind: 'linear.issue', item: 'ENG-42' }, contribution: { providerId: 'linear' } }
+    expect(await openLink('acorn://node-a/new-task?url=https%3A%2F%2Fexample.com')).toMatchObject({ reason: 'Provider has no task promotion' })
+    expect(state.promotions).toEqual([])
   })
 })

@@ -35,6 +35,8 @@ it('holds a cold loaded-plugin link until its contribution and Node host registe
     openProject: (path, source) => { navigated.push(path); sources.push(source) },
     openTask: () => false,
     hasProject: () => true,
+    loadProjects: async () => {},
+    showPromotion: () => {},
   }, (error) => { throw error })
   const link = 'acorn://node-a/p/project/x/loaded/item/42'
   const opening = openLink(link)
@@ -69,6 +71,8 @@ it('does not let an old Node contribution pass replace the remounted host', asyn
     openProject: (path: string) => opened.push(`${nodeId}:${path}`),
     openTask: () => false,
     hasProject: () => true,
+    loadProjects: async () => {},
+    showPromotion: () => {},
   })
   const stopOld = registerAddressHostWhenReady(host('node-a'), (error) => { throw error })
   stopOld()
