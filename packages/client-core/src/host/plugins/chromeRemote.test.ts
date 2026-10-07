@@ -34,6 +34,7 @@ describe('chrome action boundary', () => {
     const navigate = vi.fn()
     const props: TopbarProps = {
       workspace: null, workspaces: [], project: null, projects: [],
+      workspacePickerVisible: false,
       projectPickerVisible: false, projectPickerDisabled: false,
       breadcrumb: [{ label: 'Project', route: '/p/one' }],
       node: { id: 'n1', label: 'Local', state: 'online' },
@@ -43,6 +44,7 @@ describe('chrome action boundary', () => {
       navigate, clearCache: vi.fn(), addProject,
     }
     const remote = topbarRemote(props)
+    expect(remote.data.workspacePickerVisible).toBe(false)
     expect(() => structuredClone(remote.data)).not.toThrow()
     remote.actions.pickNode?.('n1')
     expect(pickNode).toHaveBeenCalledWith('n1')

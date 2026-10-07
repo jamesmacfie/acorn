@@ -482,6 +482,7 @@ export default function App() {
       projectRoute: projectPath,
     })
     return {
+      workspacePickerVisible: !workspaceRailShown(prefs.data),
       workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name, appearance: activeWorkspace()!.appearance } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
         id: entry.workspace.id, label: entry.workspace.name, appearance: entry.workspace.appearance, nodeId: entry.nodeId,

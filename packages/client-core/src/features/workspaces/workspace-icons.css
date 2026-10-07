@@ -1,24 +1,25 @@
 .workspace-icon {
+  --workspace-icon-radius: min(var(--radius-sm), 25%);
   position: relative;
   display: inline-flex;
   flex: none;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 18px;
+  height: 18px;
   overflow: hidden;
-  border-radius: var(--radius-sm);
+  border-radius: var(--workspace-icon-radius);
   background: var(--bg-subtle);
   color: var(--text);
   font-size: var(--fs-2xs);
   font-weight: 600;
 }
-.workspace-icon[data-size='rail'] { width: clamp(22px, calc(var(--pane-head-h) - 12px), 36px); height: clamp(22px, calc(var(--pane-head-h) - 12px), 36px); font-size: var(--fs-sm); }
+.workspace-icon[data-size='rail'] { width: clamp(22px, calc(var(--pane-head-h) - 20px), 28px); height: clamp(22px, calc(var(--pane-head-h) - 20px), 28px); font-size: var(--fs-xs); }
 .workspace-icon img { width: 100%; height: 100%; object-fit: cover; }
 /* A dark backing keeps a white glyph readable over every solid colour and gradient stop. */
-.workspace-icon-glyph { display: flex; align-items: center; justify-content: center; padding: var(--space-1); border-radius: var(--radius-xs); color: white; background: rgb(0 0 0 / 72%); font-size: var(--fs); }
-.workspace-icon[data-size='rail'] .workspace-icon-glyph { font-size: var(--fs-lg); }
-.workspace-identity-label { display: inline-flex; align-items: center; gap: var(--gap-row); }
+.workspace-icon-glyph { display: flex; align-items: center; justify-content: center; padding: var(--space-1); border-radius: var(--radius-xs); color: white; background: rgb(0 0 0 / 72%); font-size: var(--fs-xs); }
+.workspace-icon[data-size='rail'] .workspace-icon-glyph { font-size: var(--fs); }
+.workspace-identity-label { display: flex; align-items: center; gap: var(--gap-row); }
 .workspace-rail { width: var(--tabrail-w); flex: 0 0 var(--tabrail-w); min-height: 0; overflow-y: auto; background: var(--bg-subtle); border-right: var(--chrome-divider); }
 .workspace-rail .tabrail-tab { position: relative; }
 .workspace-rail .tabrail-tab.active::before { content: ''; position: absolute; left: 1px; top: 25%; bottom: 25%; width: 3px; background: var(--accent); border-radius: var(--radius-marker); }

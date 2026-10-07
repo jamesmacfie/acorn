@@ -21,7 +21,7 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <Show when={props().workspaces.length}>
+        <Show when={props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
             size="sm"
             ariaLabel="Workspace"
