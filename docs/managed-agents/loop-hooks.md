@@ -164,6 +164,6 @@ stays the fallback for a refusal on the permission hook.
 - **It isn't containment.** A refused command can come back as a script the hook sees only as
   `bash script.sh`. [Security](../security.md) owns the boundaries that exist.
 
-The policy package in `docs/future/pi/packages/permission-policy/` is the sample consumer. It
+The `acorn-permission-policy` plugin, kept in its own repository, is the sample consumer. It
 refuses on `agents:before-tool` with its permission rules, asks with its warning rules, and adds a
 test-first note on `agents:after-tool`.

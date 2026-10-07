@@ -21,7 +21,7 @@ model asks for, and feeds the results back. Most of its features are middleware 
 such as context compaction, tool-call repair, loop detection, and progressive skill loading.
 
 Acorn drives loops other people wrote: Claude Code over ACP, Codex over its app-server, and any
-contributed ACP harness. The [oh-my-pi review](../pi/README.md) reached the same conclusion. So the
+contributed ACP harness. The [oh-my-pi review](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/README.md) reached the same conclusion. So the
 five ideas taken here all work from outside the loop. Each one reads acorn's own durable record of a
 session, or queues a turn through acorn's own turn queue, or checks something on disk.
 

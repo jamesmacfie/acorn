@@ -53,7 +53,7 @@ The first five forms only go somewhere. `new-task` is the one action, and it alw
 - **Dev builds don't register the scheme.** Only the installed app does, so links never open a dev
   build by surprise. Agent-driven sessions feed links to the handler directly.
 - **`acorn://` means only this.** The dropped MCP resource experiment proposed bare names such as `pr://` and
-  `task://context` instead ([resource reads](../pi/08-resource-read-experiment.md)).
+  `task://context` instead ([resource reads](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/08-resource-read-experiment.md)).
 
 ## Safety rules
 

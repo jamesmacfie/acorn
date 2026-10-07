@@ -122,6 +122,6 @@ The explanation itself is a note through `agents:session-messenger`, a separate 
   reply to a refusal has no room for a reason. The model reads a plain rejection.
 - **It isn't a policy engine.** Rules live in the handler plugin's code. Acorn adds no rule language.
 
-A sample consumer with two rules, no force-push and no deletion outside the task root, is kept in
-`docs/future/pi/packages/permission-policy/`. It can also explain each refusal to the agent, off by
+A sample consumer with two rules, no force-push and no deletion outside the task root, is the
+`acorn-permission-policy` plugin, kept in its own repository. It can also explain each refusal to the agent, off by
 default.

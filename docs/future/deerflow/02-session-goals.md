@@ -120,7 +120,7 @@ the same row and command.
 - The judge sees a bounded transcript, so it can miss work done early in a long session. The
   `missing_evidence` blocker makes that visible instead of guessing.
 - A judge on the same harness as the worker may share its blind spots. A per-device model pick isn't
-  readable on the Node. The [model grant design](../pi/04-model-grants-and-advisor.md) would allow a
+  readable on the Node. The [model grant design](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/04-model-grants-and-advisor.md) would allow a
   different backend later.
 
 ## Verification

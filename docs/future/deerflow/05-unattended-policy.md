@@ -44,7 +44,7 @@ Out of scope:
 - Approving anything automatically. Acorn never answers a permission request with an allow. The
   harness's permission mode decides what prompts at all.
 - Plugin follow-up turns in unattended operations. The
-  [oh-my-pi unattended follow-ups](../pi/05-unattended-follow-ups.md) phase owns that.
+  [oh-my-pi unattended follow-ups](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/05-unattended-follow-ups.md) phase owns that.
 - A setting for deadlines on supervised requests. Supervised turns keep waiting, as they do today.
 
 ## Design

@@ -104,8 +104,12 @@ acceptance pass.
     **Generate** in the workflow editor: both offer DeepSeek, and it answers. Its terminal profile menu
     entry should be absent throughout, because `dsh` alone has no interactive mode.
 
-155. The contributed `omp` harness, which needs `omp` on the Node's `PATH` and the package in
-    `docs/future/pi/packages/omp-harness/` installed from its folder. Sign in once by opening a task
+Checks 155 to 165 install plugins that live in their own repositories beside an acorn checkout:
+`acorn-omp-harness`, `acorn-permission-policy`, `acorn-advisor`, `acorn-skills`, and
+`acorn-session-meter`. Each README says how to install it.
+
+155. The contributed `omp` harness, which needs `omp` on the Node's `PATH` and the
+    `acorn-omp-harness` plugin installed from its folder. Sign in once by opening a task
     terminal on **oh-my-pi** and finishing `omp`'s own setup. Start an oh-my-pi session: the pane
     shows `omp`'s **Mode**, **Model**, and **Thinking** options. Ask for a file write, which runs
     without a card, then a shell command, which raises a permission card. Reject it once and allow it
@@ -115,9 +119,9 @@ acceptance pass.
     `session/resume`. Run a one-step workflow on `omp:omp` and have a Claude Code session delegate to
     it with `agent_spawn`. Both run as managed `omp` sessions. Last, read the turn after a provider
     error, such as an over-long prompt: `omp` sends it as an ordinary answer ending in `end_turn`, so
-    a workflow step reads it as success ([the omp harness phase](../future/pi/01-omp-harness.md)).
+    a workflow step reads it as success ([the omp harness phase](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/01-omp-harness.md)).
 
-156. A loaded permission policy. Install `docs/future/pi/packages/permission-policy/` from its folder,
+156. A loaded permission policy. Install the `acorn-permission-policy` plugin from its folder,
     restart the Node, and read the trust prompt: it says the plugin can stop the agents plugin from
     running a tool the agent asks permission for, marked high. Then, in a Claude Code session in a
     permission mode that asks before Bash, ask the agent to run `git push --force`. No card asks you
@@ -141,7 +145,7 @@ acceptance pass.
     **From acorn-permission-policy** too. A workflow step's refusal stands with no note
     ([session messages](../managed-agents/session-messages.md)).
 
-158. The advisor and its model grant. Install `docs/future/pi/packages/advisor/` and restart the Node.
+158. The advisor and its model grant. Install the `acorn-advisor` plugin and restart the Node.
     The trust prompt lists generating text and sending notes to your agent sessions. On the plugin's
     page in **Settings > Plugins**, **Model** says it isn't set up. Choose a backend, a model, and a
     daily allowance, and **Save**. A backend the Node doesn't have, or a model outside its catalog,
@@ -155,7 +159,7 @@ acceptance pass.
     the Node during a review: it isn't retried, and its charge stays
     ([plugin model grants](../integrations/model-providers.md#plugin-model-grants)).
 
-163. Native skills. Install `docs/future/pi/packages/skills/`, restart the Node, and approve the skill.
+163. Native skills. Install the `acorn-skills` plugin, restart the Node, and approve the skill.
     In a throwaway repository with one uncommitted change, start a Claude Code session and type
     `/acorn`: the composer offers `/acorn-pi-skills:release-note` beside your own commands. Send it
     with "for the uncommitted change". The transcript shows **Launching skill:
@@ -168,7 +172,7 @@ acceptance pass.
     status shows only the seeded change, and neither harness's config file names the skill folder
     ([native delivery](../managed-agents/native-skills.md)).
 
-164. Harness bridges. Install `docs/future/pi/packages/permission-policy/` 0.5.0 and restart the Node.
+164. Harness bridges. Install the `acorn-permission-policy` plugin 0.5.0 and restart the Node.
     Its **Permissions** tab lists "Make a tool wait for you before agents can “run any tool”", and
     **Agents it reaches** reads **Every tool call, and every tool result.** for Claude Code and **Only
     the tool calls it asks you about.** for Codex. In a throwaway repository, start a Claude Code
@@ -180,8 +184,8 @@ acceptance pass.
     the missing remote. Ask for one edit to a source file: the agent quotes the "Test first: …" note.
     `~/.claude/settings.json` is unchanged ([harness bridges](../managed-agents/loop-hooks.md)).
 
-165. The combined plugin flow. Install the four packages in `docs/future/pi/packages/` (permission
-    policy, advisor, skills, and session meter), restart the Node, and accept each prompt. Give the
+165. The combined plugin flow. Install the four plugins `acorn-permission-policy`,
+    `acorn-advisor`, `acorn-skills`, and `acorn-session-meter`, restart the Node, and accept each prompt. Give the
     advisor a Claude Code grant and set its reviews to **Every session**. In a throwaway repository,
     ask a Claude Code session for a small change and a release note with the skill: the note ends with
     the line from `format.md`, and the transcript says "(native)". Ask it to run `rm -rf` on a folder
@@ -190,4 +194,4 @@ acceptance pass.
     labelled **From acorn-advisor** follows, the agent answers it, and the advisor reviews no plugin
     turn. Run a one-step workflow on the same tree: its review window closes before the run reports,
     and the step's result is the reply to the note. Restart the Node: no note or review repeats
-    ([phase 11](../future/pi/11-programme-acceptance.md)).
+    ([phase 11](https://github.com/jamesmacfie/acorn/blob/e67db6f50/docs/future/pi/11-programme-acceptance.md)).

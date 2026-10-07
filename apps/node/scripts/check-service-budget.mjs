@@ -40,7 +40,7 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,118,217 B with setup run by hand: the rule core checks before admitting it, the
 // terminal route and bridge verb that spawn it, and the status flag the palette reads. All three are
 // registered at boot, so the ceiling moves by 3 KB.
-// 2026-10-07: 3,148,767 B with the pi programme (docs/future/pi): the permission veto, session
+// 2026-10-07: 3,148,767 B with the pi programme: the permission veto, session
 // messages, plugin model grants, unattended follow-ups, plugin skills, the activity feed and session
 // control, and harness bridges. Each feature's runtime loads on first use, and `agents.sessionExecute`
 // moved to the first workflow step. What stays at boot is the hook and extension point declarations,

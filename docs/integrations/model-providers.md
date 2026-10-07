@@ -153,8 +153,7 @@ its own. Workflows asks twice: when the first definition fails the checker, the 
 which is why its route has a longer timeout
 ([generating and editing with AI](../workflows/authoring.md#generating-and-editing-with-ai)).
 
-The loaded advisor package in `docs/future/pi/packages/advisor/` is the one consumer of the grant
-path. It reviews completed interactive turns
+The `acorn-advisor` plugin, kept in its own repository, is the one consumer of the grant path. It reviews completed interactive turns
 ([review input](../managed-agents/session-events.md#review-input)).
 
 A `ProviderOperationError` reaches the client with the status you act on, 401 to reconnect and 429 to
