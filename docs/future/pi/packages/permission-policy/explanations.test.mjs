@@ -16,14 +16,15 @@ const database = () => {
 // One session with one request, whose row the test edits, and a sender that records what it's asked.
 const setup = ({ on = true } = {}) => {
   const db = database()
-  const row = { requestId: 'r1', status: 'resolved', title: 'Bash: git push --force', blocked: { by: PLUGIN_ID, reason: 'No force-push.' } }
+  const row = { requestId: 'r1', turnId: 'turn-1', status: 'resolved', title: 'Bash: git push --force', blocked: { by: PLUGIN_ID, reason: 'No force-push.' } }
   const sent = []
   const sender = { queue: async (message) => { sent.push(message); return { ok: true, turnId: 't1' } } }
   const requests = { list: async ({ sessionId }) => (sessionId === 's1' && row ? [row] : []) }
-  const explanations = createExplanations({ db, requests: () => requests })
+  const logged = []
+  const explanations = createExplanations({ db, requests: () => requests, log: (line) => logged.push(line) })
   explanations.setEnabled(on)
   const pending = () => db.prepare('SELECT count(*) AS n FROM explanations').get().n
-  return { db, row, sent, sender, explanations, pending }
+  return { db, row, sent, sender, explanations, pending, logged }
 }
 const payload = { sessionId: 's1', taskId: 'task', requestId: 'r1' }
 const resolved = { sessionId: 's1', taskId: 'task', requestId: 'r1', status: 'resolved' }
@@ -86,9 +87,17 @@ test('keeps the work when the send fails, and a failed send leaves the veto alon
   assert.equal(pending(), 0)
 })
 
-test('treats a host refusal such as an unattended session as final', async () => {
-  const { explanations, pending } = setup()
+test('names the refused turn, so a workflow or delegated note joins its operation', async () => {
+  const { sent, sender, explanations } = setup()
   explanations.refused(payload)
-  await explanations.connect({ queue: async () => ({ ok: false, reason: 'unattended-not-supported' }) })
+  await explanations.connect(sender)
+  assert.equal(sent[0].originTurnId, 'turn-1')
+})
+
+test('records a host refusal, such as a finished operation, as final', async () => {
+  const { explanations, pending, logged } = setup()
+  explanations.refused(payload)
+  await explanations.connect({ queue: async () => ({ ok: false, reason: 'operation-closed' }) })
   assert.equal(pending(), 0)
+  assert.deepEqual(logged, ['the refusal of request r1 was not explained: the host answered operation-closed'])
 })

@@ -85,6 +85,17 @@ The child task ID lands in the step's `inputs_json`, so
 cancelling the run reaches it. The default, `shared`, runs the step on the run's own task beside its
 siblings. Two investigators reading the same checkout can share a task; child workflows use separate tasks.
 
+### Plugin notes
+
+A managed agent step owns an operation while it runs. A plugin's note about the step's turn joins it
+and queues behind the turn, and a reviewer contributed to `agents:turn-follow-up` gets up to 30
+seconds, within the step's timeout, to look at the finished turn. The step waits for every note's turn
+before it returns, so its result and structured output come from the last reply, and its usage
+covers all of its turns, with Codex's cumulative totals taken from the last. Cancelling the step
+cancels its notes too. After a restart the step reruns as a new turn, and its old queued notes are
+cancelled. For the rules, see
+[unattended follow-ups](../managed-agents/unattended-follow-ups.md).
+
 ### Retry
 
 `POST /v1/p/workflows/workflows/runs/:runId/retry` takes a `stepId` and an optional `prompt`. The run

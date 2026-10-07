@@ -827,6 +827,35 @@ export class AgentStore extends AgentSessionRepository {
     return Number(row?.count ?? 0)
   }
 
+  /** The plugin notes that joined one unattended operation, in queue order (./turnFollowUps.ts). */
+  async followUpTurns(sessionId: string, originTurnId: string): Promise<AgentTurn[]> {
+    const rows = await this.db
+      .select()
+      .from(schema.agentTurns)
+      .where(and(
+        eq(schema.agentTurns.sessionId, sessionId),
+        eq(schema.agentTurns.source, 'plugin'),
+        sql`json_extract(${schema.agentTurns.effectivePolicyJson}, '$.followUpOf') = ${originTurnId}`,
+      ))
+      .orderBy(asc(schema.agentTurns.ordinal))
+    return rows.map(mapAgentTurn)
+  }
+
+  /** A workflow step's operation ends with the process, so a note still queued for it would run with
+   *  nobody waiting. The step reruns as a new turn after a restart. Startup-only. */
+  async cancelWorkflowFollowUps(): Promise<void> {
+    const rows = await this.db
+      .select({ id: schema.agentTurns.id })
+      .from(schema.agentTurns)
+      .innerJoin(schema.agentSessions, eq(schema.agentSessions.id, schema.agentTurns.sessionId))
+      .where(and(
+        eq(schema.agentSessions.kind, 'workflow'),
+        eq(schema.agentTurns.source, 'plugin'),
+        eq(schema.agentTurns.status, 'queued'),
+      ))
+    for (const row of rows) await this.cancelTurn(row.id)
+  }
+
   /** Settled turns an owner queued and asked to hear back about. The LIKE is a narrow cut on a JSON
    *  column; the caller still reads `reportTo` from the parsed policy. Startup-only. */
   async settledReportingTurns(): Promise<AgentTurn[]> {

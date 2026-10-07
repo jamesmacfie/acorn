@@ -177,3 +177,48 @@ test('after a restart, an interrupted review is never retried and a queued one r
   assert.equal(second.job('u3').status, 'done')
   assert.equal(second.world.generated.length, 1)
 })
+
+// A workflow step's window: the owner waits for `reviewWindow`, and aborts its signal at the deadline.
+const unattended = (advisor, { turnId = 'u1', signal = new AbortController().signal } = {}) =>
+  advisor.reviewWindow({ taskId: 't1', sessionId: 's1', turnId, owner: 'workflow', deadline: Date.now() + 30_000, signal })
+
+test('reviews an unattended turn inside the owner’s window, once, and names the turn the note is about', async () => {
+  const { world, advisor, notes } = setup({ mode: 'unattended', answer: '{"severity":"concern","note":"The test is skipped."}' })
+  world.session.kind = 'workflow'
+  await unattended(advisor)
+  // The window has returned, so the owner can wait for the note's turn before it reports.
+  assert.equal(world.sent.length, 1)
+  assert.equal(world.sent[0].originTurnId, 'u1')
+  // A finished answer's concern is sent here, because the owner is about to report it.
+  assert.deepEqual(notes(), [{ severity: 'concern', outcome: 'delivered', reason: null }])
+  // A recovered owner opens the window again, and nothing more is spent.
+  await unattended(advisor)
+  assert.equal(world.generated.length, 1)
+})
+
+test('keeps the two kinds of session apart by mode', async () => {
+  const { world, advisor, completed } = setup({ mode: 'unattended' })
+  completed()
+  await settle()
+  assert.deepEqual(world.generated, [])
+  advisor.setMode('interactive')
+  world.session.kind = 'workflow'
+  await unattended(advisor, { turnId: 'u2' })
+  assert.deepEqual(world.generated, [])
+  advisor.setMode('all')
+  await unattended(advisor, { turnId: 'u3' })
+  assert.equal(world.generated.length, 1)
+})
+
+test('stops at the window’s deadline and sends nothing late', async () => {
+  const { world, advisor, job } = setup({ mode: 'unattended' })
+  world.session.kind = 'delegated'
+  const deadline = new AbortController()
+  world.hold = (request) => new Promise((resolve) => {
+    request.input.signal.addEventListener('abort', resolve)
+    deadline.abort()
+  })
+  await unattended(advisor, { signal: deadline.signal })
+  assert.equal(job().status, 'cancelled')
+  assert.deepEqual(world.sent, [])
+})

@@ -143,6 +143,7 @@ export function parseExtensionPointRef(value: string): { owner: string; point: s
  */
 export const DISCLOSED_NODE_POINTS: Readonly<Record<string, string>> = {
   'agents:session-messenger': 'Send notes to your agent sessions, which starts a turn on your agent provider',
+  'agents:turn-follow-up': 'Review your workflow and delegated agents’ finished turns before they report, which can hold their results and add turns on your agent provider',
 }
 
 /**

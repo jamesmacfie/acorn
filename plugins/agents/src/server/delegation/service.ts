@@ -15,6 +15,7 @@ import type {
   AgentWaitInput,
 } from '../../shared/delegationSchemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import type { TurnFollowUps } from '../sessions/turnFollowUps'
 import { findCustomAgent, type CustomAgent } from '../../shared/customAgents'
 import { assistantResult, parseStructuredResult } from '../sessions/resultContract'
 import {
@@ -121,9 +122,10 @@ export class AgentDelegationService {
     private readonly terminalSessions: () => Promise<TerminalSession[]>,
     tasks?: WorktreeTaskService,
     private readonly reconciled: Promise<void> = Promise.resolve(),
+    followUps?: () => Promise<TurnFollowUps>,
   ) {
     this.worktrees = new WorktreeProvisioning(runtime, store, tasks)
-    this.reports = new DelegationReports(runtime, store)
+    this.reports = new DelegationReports(runtime, store, followUps)
   }
 
   async canSpawn(context: ToolContext): Promise<boolean> {
@@ -475,17 +477,22 @@ export class AgentDelegationService {
       throw new ToolError('conflict', `The child turn is already ${target.status}.`)
     }
     await this.runtime.cancelTurn(session.id, target.id)
+    // A plugin's note belongs to the delegated turn it follows, so cancelling it stops that whole turn's
+    // operation: its other notes, its review, and its report.
+    const followUpOf = target.effectivePolicy.followUpOf
+    const origin = typeof followUpOf === 'string' ? await this.runtime.store.turn(followUpOf) ?? target : target
+    await this.reports.cancelFollowUps(origin)
     const resultingSession = await this.runtime.store.requireSession(session.id)
     const result: AgentCancelResult = {
       sessionId: session.id,
       cancelledTurnId: target.id,
       state: resultingSession.runtimeState,
     }
-    await this.runtime.store.saveOperation(key, 'delegation.cancel', result, target.id)
+    await this.runtime.store.saveOperation(key, 'delegation.cancel', result, origin.id)
     // The owner stopped this turn, so it does not need telling. The saved operation stops a report that
     // has not been queued yet, and this removes one that already has.
-    const reportTo = target.effectivePolicy.reportTo
-    if (typeof reportTo === 'string') await this.reports.withdraw(reportTo, target.id)
+    const reportTo = origin.effectivePolicy.reportTo
+    if (typeof reportTo === 'string') await this.reports.withdraw(reportTo, origin.id)
     return result
   }
 

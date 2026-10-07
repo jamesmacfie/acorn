@@ -1,16 +1,26 @@
 # Advisor
 
-A loaded acorn plugin that reads each completed turn of an interactive agent session, asks a second
-model whether something is wrong, and sends the agent a note when it finds a real problem. It's the
+A loaded acorn plugin that reads each completed turn of an agent session, asks a second model whether
+something is wrong, and sends the agent a note when it finds a real problem. It's the
 consumer for [plugin model grants](../../../../integrations/model-providers.md#plugin-model-grants),
 the [review input](../../../../managed-agents/session-events.md#review-input) reader, and
 [session messages](../../../../managed-agents/session-messages.md).
 
 ## What it does
 
-Reviews are off by default. Turn them on in **Settings > Agents > Advisor**, and choose the model and
-the daily allowance on the plugin's page in **Settings > Plugins**. Workflow and delegated sessions
-are never reviewed in this version.
+Reviews are off by default. In **Settings > Agents > Advisor**, choose **Unattended sessions** for
+workflow steps and delegated agents, or **Every session**. Choose the model and the daily allowance on
+the plugin's page in **Settings > Plugins**. A 0.1.0 install that chose **Interactive sessions** keeps
+that choice until it's changed.
+
+Interactive turns arrive as events, in the steps below. An unattended turn arrives through
+`agents:turn-follow-up` instead ([unattended follow-ups](../../../../managed-agents/unattended-follow-ups.md)):
+the workflow step or the parent agent holds its result for up to 30 seconds while the review runs, so
+a blocker's correction comes before the result. The review is the same, with three differences. It
+runs at once rather than waiting in the table, it stops when the window's signal aborts, and a
+concern is sent even after a finished answer, because the owner is about to report it. The note names
+the turn as `originTurnId`, and its key is the interactive one, so a recovered owner's second window
+spends nothing.
 
 1. On `plugin:agents:turn-changed` with status `completed` and source `interactive`, it records one
    job keyed by session and turn. A repeated event finds the job and does nothing. A plugin's note

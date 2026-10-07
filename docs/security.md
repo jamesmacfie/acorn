@@ -34,6 +34,11 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   untrusted input to a connecting client.
 - **A Node child** is a task-scoped internal caller. It gets an allowlisted environment and a scoped
   token, and the Node checks its routes and task identity.
+- **A loaded reviewer** on `agents:turn-follow-up` sees a workflow step's or a delegated turn's
+  address, never its transcript, and reads the turn through `agents.reviewInput.v1` like any reader.
+  Its notes join only the operation of a turn in the same session, inherit that turn's model and the
+  session's tool ceiling, and are refused once the window or the operation closes
+  ([unattended follow-ups](./managed-agents/unattended-follow-ups.md)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

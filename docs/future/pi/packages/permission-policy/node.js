@@ -9,6 +9,7 @@ export default {
     const explanations = createExplanations({
       db: ctx.storage.open().$client,
       requests: () => ctx.capabilities.get('agents.requests'),
+      log: (line) => ctx.log.info(line),
     })
     const failed = (error) => ctx.log.warn(`explaining a refusal failed: ${error?.message ?? error}`)
 

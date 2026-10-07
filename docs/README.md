@@ -240,7 +240,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   messages](./managed-agents/session-messages.md), [Sessions](./managed-agents/sessions.md),
   [Subagents](./managed-agents/subagents.md), [Transcript
   search](./managed-agents/transcript-search.md), [The transcript
-  store](./managed-agents/transcript-store.md), [The transcript](./managed-agents/transcript.md).
+  store](./managed-agents/transcript-store.md), [The transcript](./managed-agents/transcript.md),
+  [Unattended follow-ups](./managed-agents/unattended-follow-ups.md).
 - [terminal.md](./terminal.md): [Activity and delivery](./terminal/activity.md), [The terminal
   drawer](./terminal/client.md), [Run targets](./terminal/run-targets.md), [Terminal
   sessions](./terminal/sessions.md).

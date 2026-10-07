@@ -48,7 +48,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // (about 8 KB) loads on a loaded plugin's first call or a settings read, and the reader's shaping on its
 // first read. The two tables and the boot charge for interrupted calls, the three settings routes, and
 // the reader's query load at boot. Add 8 KB.
-const limits = { ceiling: 3_131_500, floor: 1_000_000 }
+// 2026-10-07: 3,126,635 B with `agents:turn-follow-up`. `agents.sessionExecute` (about 14 KB) moved to
+// the first workflow step, which paid for the point's declaration and disclosure, the two follow-up turn
+// queries, and the startup cancel. The operation registry loads on first use. Lower the ceiling to keep
+// the cut.
+const limits = { ceiling: 3_127_500, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

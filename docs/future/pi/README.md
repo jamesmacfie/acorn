@@ -66,6 +66,9 @@ A loaded acorn plugin runs in a permission-scoped worker and reaches the agent t
 - Lifecycle events on `plugin:agents:turn-changed`, `request-changed`, and `sessions-changed`.
 - `agents.reviewInput.v1`, a bounded completed-turn reader, delivered in phase 04
   ([review input](../../managed-agents/session-events.md#review-input)).
+- `agents:turn-follow-up`, a bounded review window a workflow step or a delegated turn opens before
+  its owner reports, and notes that join that owner's operation, delivered in phase 05
+  ([unattended follow-ups](../../managed-agents/unattended-follow-ups.md)).
 - `ctx.core.models.generateText` under the `models` grant, which spends a backend the caller names,
   or with no backend the owner's model grant for that plugin, delivered in phase 04.
 - UI points such as `agents:tool-card`, `agents:session-header`, and `agents:composer-actions`.

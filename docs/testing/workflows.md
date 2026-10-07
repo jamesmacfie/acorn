@@ -121,7 +121,25 @@ cover the corresponding state and rendering contracts.
     workflow and one static inline workflow reference to confirm both behave as
     documented.
 
-## Provider-backed schedules and queries
+## Unattended follow-ups
+
+These need the advisor from check 158, set to **Unattended sessions**, with a model grant, and
+optionally the policy from check 156 with explanations on. The rules are in
+[unattended follow-ups](../managed-agents/unattended-follow-ups.md).
+
+159. In a throwaway repository, change `add` to return `a - b` in the task's working tree. Run a
+     one-step workflow on Claude that asks for `add` tests with a structured result. Confirm the
+     transcript shows the step's turn, then a turn labelled **From acorn-advisor**, then the agent's
+     reply, and that the run reports success only after that reply. The step's structured output is
+     the reply's, and its usage covers both turns.
+160. Ask a managed agent to delegate the same task. Confirm the parent gets one report, after the
+     child's reply to the advisor's note, and that the report says a plugin sent notes. Read
+     `turn-follow-up:<turn id>` in the agents operations table: it says `reviewed`.
+161. Start another workflow run, and cancel it while the advisor is generating. No note arrives,
+     every turn of the step is settled, and the review row says `cancelled`.
+162. Repeat check 159 with every client closed, then reconnect. The run, its correction turn, its
+     usage, and the parent report from check 160 are all there.
+
 
 The next six are workflow v2's release checks ([workflows.md](../workflows.md) § Typed data and
 conditions, § Record processing history, § Scheduled roots). Controlled provider fixtures cover them

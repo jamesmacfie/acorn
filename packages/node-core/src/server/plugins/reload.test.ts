@@ -321,11 +321,30 @@ describe('a folder plugin’s hook handler through the loader and the host', () 
   })
 })
 
+// The worker keeps the sender past `connect`, then uses it twice: once to send, once to echo the
+// answer it got back. It also names another plugin in the message, which nothing reads.
+const MESSENGER_FIXTURE = `export default { name: "messenger-fixture", init(ctx) {
+  ctx.extensionPoints.handle("agents:session-messenger", { id: "notes", value: { connect(sender) {
+    setTimeout(async () => {
+      const answer = await sender.queue({ taskId: "t", sessionId: "s", subject: "hi", text: "first", idempotencyKey: "k", pluginId: "agents" })
+      await sender.queue({ taskId: "t", sessionId: "s", subject: "echo", text: JSON.stringify(answer), idempotencyKey: "k2" })
+    }, 0)
+  } } })
+} }\n`
+
+// A reviewer that hands back the window it was given, then holds until the owner aborts it.
+const REVIEWER_FIXTURE = `export default { name: "messenger-fixture", init(ctx) {
+  ctx.extensionPoints.handle("agents:turn-follow-up", { id: "review", value: { review(window) {
+    return new Promise((resolve) => window.signal.addEventListener("abort", () => resolve(), { once: true }))
+      .then(() => window.report({ turnId: window.turnId, owner: window.owner, aborted: window.signal.aborted }))
+  } } })
+} }\n`
+
 // A host-bound sender handed to a loaded worker: the agents session messenger's carrier
 // (plugins/agents/src/server/sessions/sessionMessages.ts). The owner here stands in for agents, so this
 // proves the transport and the manifest gate, not the admission rules agents' own tests cover.
 describe('a folder plugin’s session messenger through the loader and the host', () => {
-  const install = async (manifestExtensions: unknown[]) => {
+  const install = async (manifestExtensions: unknown[], nodeSource = MESSENGER_FIXTURE) => {
     const { mkdirSync, mkdtempSync, rmSync, writeFileSync } = await import('node:fs')
     const { tmpdir } = await import('node:os')
     const { join } = await import('node:path')
@@ -339,16 +358,7 @@ describe('a folder plugin’s session messenger through the loader and the host'
       id: 'messenger-fixture', name: 'Messenger fixture', version: '1.0.0', baseline: 'acorn-1', apiVersion: PLUGIN_API_MAJOR, node: './dist/node.js',
       contributions: { extensions: manifestExtensions },
     }))
-    // The worker keeps the sender past `connect`, then uses it twice: once to send, once to echo
-    // the answer it got back. It also names another plugin in the message, which nothing reads.
-    writeFileSync(join(source, 'dist', 'node.js'), `export default { name: "messenger-fixture", init(ctx) {
-      ctx.extensionPoints.handle("agents:session-messenger", { id: "notes", value: { connect(sender) {
-        setTimeout(async () => {
-          const answer = await sender.queue({ taskId: "t", sessionId: "s", subject: "hi", text: "first", idempotencyKey: "k", pluginId: "agents" })
-          await sender.queue({ taskId: "t", sessionId: "s", subject: "echo", text: JSON.stringify(answer), idempotencyKey: "k2" })
-        }, 0)
-      } } })
-    } }\n`)
+    writeFileSync(join(source, 'dist', 'node.js'), nodeSource)
     await installPlugin(root, { path: source })
     const { loaded } = await loadExternalPlugins(root, { builtins: [] })
     const host = await initPlugins(loaded.map((entry) => entry.plugin), {
@@ -375,6 +385,33 @@ describe('a folder plugin’s session messenger through the loader and the host'
       await vi.waitFor(() => expect(calls).toHaveLength(2))
       expect(calls.map((call) => call.pluginId)).toEqual(['messenger-fixture', 'messenger-fixture'])
       expect(calls[1]!.message.text).toBe('{"ok":true,"turnId":"turn-1"}')
+      await host.dispose()
+    } finally {
+      point.dispose()
+      cleanup()
+    }
+  })
+
+  // The owner's window crosses the worker: its fields, a host function, and an abort the host raises later.
+  it('gives a loaded reviewer the window and reaches it with the owner’s abort', async () => {
+    const { extensionsFor, openExtensionPoint } = await import('../pluginHost/extensionPoints')
+    const point = openExtensionPoint('agents', 'agents:turn-follow-up' as never, 'Turn reviewers')
+    const { host, cleanup } = await install([{ id: 'review', point: 'agents:turn-follow-up', label: 'review a turn' }], REVIEWER_FIXTURE)
+    try {
+      const [entry] = extensionsFor<{ review(window: unknown): Promise<void> }>('agents:turn-follow-up' as never)
+      expect(entry).toMatchObject({ pluginId: 'messenger-fixture' })
+      const controller = new AbortController()
+      const reports: unknown[] = []
+      let settled = false
+      const review = entry!.value.review({
+        taskId: 't', sessionId: 's', turnId: 'turn-1', owner: 'workflow', deadline: Date.now() + 30_000, signal: controller.signal,
+        report: (seen: unknown) => { reports.push(seen) },
+      }).then(() => { settled = true })
+      await new Promise((resolve) => setTimeout(resolve, 50))
+      expect(settled).toBe(false)
+      controller.abort()
+      await review
+      expect(reports).toEqual([{ turnId: 'turn-1', owner: 'workflow', aborted: true }])
       await host.dispose()
     } finally {
       point.dispose()

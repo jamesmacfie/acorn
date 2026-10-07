@@ -11,8 +11,11 @@ export const PLUGIN_ID = 'acorn-permission-policy'
 // once it's this old. Younger ones may still be on their way to the database.
 const FORGET_MISSING_AFTER_MS = 60_000
 
-/** `db` is a SQLite client with `prepare`. `requests` is the `agents.requests` capability, or null. */
-export function createExplanations({ db, requests, now = Date.now }) {
+/**
+ * `db` is a SQLite client with `prepare`. `requests` is the `agents.requests` capability, or null.
+ * `log` records a note the host refused.
+ */
+export function createExplanations({ db, requests, log = () => {}, now = Date.now }) {
   let sender = null
 
   const enabled = () => db.prepare('SELECT value FROM settings WHERE key = ?').get('explain')?.value === 'on'
@@ -44,10 +47,13 @@ export function createExplanations({ db, requests, now = Date.now }) {
     // Somebody else's veto, a late verdict the host ignored, or the person's own answer.
     if (request.blocked?.by !== PLUGIN_ID) return forget(row)
     // A thrown error leaves the row for the next pass. Any answer, including a refusal, is final, and
-    // the host's idempotency key makes a repeated send return the first note.
-    await sender.queue({
+    // the host's idempotency key makes a repeated send return the first note. On a workflow or
+    // delegated session, `originTurnId` joins the note to the operation running that turn, so its owner
+    // waits for it. Once that operation has finished, the host answers `operation-closed`.
+    const result = await sender.queue({
       taskId: row.task_id,
       sessionId: row.session_id,
+      ...(request.turnId ? { originTurnId: request.turnId } : {}),
       subject: 'permission refused',
       idempotencyKey: `${row.session_id}:${row.request_id}`,
       text: [
@@ -55,6 +61,7 @@ export function createExplanations({ db, requests, now = Date.now }) {
         'The command did not run. Do not retry it in another form to get around the rule. If the work needs it, ask the person to run it or to change the policy.',
       ].join('\n\n'),
     })
+    if (!result.ok) log(`the refusal of request ${row.request_id} was not explained: the host answered ${result.reason}`)
     forget(row)
   }
 

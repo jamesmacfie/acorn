@@ -7,6 +7,7 @@ import { AgentDriverRegistry } from '../drivers/registry'
 import { FakeAgentDriver } from '../drivers/fake'
 import { ManagedAgentRuntime } from './runtime'
 import { SessionMessages } from './sessionMessages'
+import { TurnFollowUps } from './turnFollowUps'
 
 describe('agents:session-messenger', () => {
   let ctx: TestNodeContext
@@ -18,7 +19,12 @@ describe('agents:session-messenger', () => {
   let sends: string[]
   let onEvent: ((event: never) => Promise<void>) | null
 
-  const build = () => new SessionMessages({ runtime, entries: () => entries, notice: (notice) => notices.push(notice) })
+  const build = () => new SessionMessages({
+    runtime,
+    entries: () => entries,
+    notice: (notice) => notices.push(notice),
+    followUps: async () => new TurnFollowUps({ runtime, entries: () => [], delegationLive: async () => false }),
+  })
 
   // Files an entry the way the host does: the id and plugin id are the host's, the value the plugin's.
   const contribute = async (messages: SessionMessages, pluginId: string): Promise<SessionMessenger> => {
@@ -100,8 +106,9 @@ describe('agents:session-messenger', () => {
     const target = await session()
     expect(await sender.queue(note(target, { taskId: randomUUID() }))).toEqual({ ok: false, reason: 'unknown-session' })
     expect(await sender.queue(note({ id: randomUUID(), taskId: target.taskId }))).toEqual({ ok: false, reason: 'unknown-session' })
-    expect(await sender.queue(note(await session('workflow')))).toEqual({ ok: false, reason: 'unattended-not-supported' })
-    expect(await sender.queue(note(await session('delegated')))).toEqual({ ok: false, reason: 'unattended-not-supported' })
+    // An unattended session takes a note only inside a live operation (turnFollowUps.test.ts).
+    expect(await sender.queue(note(await session('workflow')))).toEqual({ ok: false, reason: 'operation-closed' })
+    expect(await sender.queue(note(await session('delegated')))).toEqual({ ok: false, reason: 'operation-closed' })
     const held = await session()
     await runtime.store.setController(held.id, 'terminal')
     expect(await sender.queue(note(held))).toEqual({ ok: false, reason: 'not-controlled' })

@@ -2,7 +2,9 @@
 
 A plugin can queue a note on an agent session. The note is a turn with the plugin's name on it, and
 the agent reads it as advice, not as the person's request. This page covers the
-`agents:session-messenger` point, what a note looks like, its limits, and what it can't do.
+`agents:session-messenger` point, what a note looks like, its limits, and what it can't do. A note on
+a workflow or delegated session joins its owner's operation, which
+[unattended follow-ups](./unattended-follow-ups.md) covers.
 `plugins/agents/src/contract/sessionMessages.ts` declares the point and its types, and
 `plugins/agents/src/server/sessions/sessionMessages.ts` runs it.
 
@@ -72,8 +74,8 @@ A malformed message throws. Every other refusal is a result:
 | --- | --- |
 | `unknown-session` | No session with that id in that task. It's coarse on purpose, so a plugin learns nothing about another task's session. |
 | `archived` | The session is archived. |
-| `unattended-not-supported` | A workflow or delegated session. Nobody is watching it, and unattended notes wait for [phase 05](../future/pi/05-unattended-follow-ups.md). |
-| `not-controlled` | A terminal holds the session's input, or it isn't an interactive session. |
+| `operation-closed` | A workflow or delegated session with no open operation for the note's `originTurnId`. See [unattended follow-ups](./unattended-follow-ups.md). |
+| `not-controlled` | A terminal holds the session's input, or it's an imported session. |
 | `cap` | The plugin already has 20 accepted notes on this session. |
 | `vetoed` | An `agents:before-send` handler refused the turn. Nothing is kept, and the note doesn't count. |
 
@@ -99,8 +101,8 @@ these tables, which is why an in-memory chain is enough.
 - **It can't steer a running turn.** Neither ACP nor the Codex app-server takes input mid-turn, and
   acorn doesn't cancel and restart a turn to fake it. A note waits.
 - **It can't hold a note for the person's next message.** A note always starts a turn of its own.
-- **It doesn't reach unattended sessions yet.** Workflow and delegated sessions refuse notes until
-  their operations account for the extra turns.
+- **It doesn't outlive the work it's about.** On a workflow or delegated session, a note joins an
+  operation that its owner holds open, and is refused once the owner has finished.
 - **A veto doesn't send one.** `agents:before-permission` and `agents:before-send` stay verdicts. A
   plugin that wants to explain its refusal sends a separate note through its own messenger grant.
 
@@ -118,5 +120,7 @@ explain refusals to the agent** turned on in the palette, it sends one note per 
    or a restart doesn't lose an explanation. A failed send keeps the record for that pass.
 
 The key is the session id and the provider request id, so one refusal is one note. A failed note
-never changes the refusal. In an unattended session the refusal stands, and the note comes back
-`unattended-not-supported`.
+never changes the refusal. The note names the request's turn as `originTurnId`. In a workflow or
+delegated session, that joins it to the running operation, so the step or the parent agent waits for
+the agent's reply. A refusal after the operation finished comes back `operation-closed`, and the policy
+logs it and keeps no record.

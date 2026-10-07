@@ -134,11 +134,17 @@ function mount(slot, bridgePort) {
       el('SettingsSection', { id: 'reviews', label: 'Reviews', description: 'A second model reads each finished turn and the task\'s changes, and sends the agent a note when it sees a real problem.' }, [
         ...(error ? [el('Alert', { tone: 'danger' }, [text(error)])] : []),
         ...(state?.problem ? [el('Alert', { tone: 'warn' }, [text(`The last review failed: ${state.problem}`)])] : []),
-        el('SettingRow', { label: 'Review sessions', description: 'Off by default. Workflow and delegated sessions are never reviewed in this version. Choose the model and daily allowance in Settings › Plugins › Advisor.' }, [
+        el('SettingRow', { label: 'Review sessions', description: 'Off by default. An unattended session is a workflow step or a delegated agent: its owner waits up to 30 seconds for the review before it reports, and a note adds a turn. Choose the model and daily allowance in Settings › Plugins › Advisor.' }, [
           el('Select', {
             label: 'Review sessions',
             value: state?.mode ?? 'off',
-            options: [{ value: 'off', label: 'Off' }, { value: 'interactive', label: 'Interactive sessions' }],
+            options: [
+              { value: 'off', label: 'Off' },
+              { value: 'unattended', label: 'Unattended sessions' },
+              { value: 'all', label: 'Every session' },
+              // 0.1.0's only choice, shown while it's still the saved one.
+              ...(state?.mode === 'interactive' ? [{ value: 'interactive', label: 'Interactive sessions' }] : []),
+            ],
             onChange: on((mode) => void bridge.put(ROUTE, { mode }).then((next) => draw(next)).catch((failure) => draw(state, String(failure.message ?? failure)))),
           }),
         ]),

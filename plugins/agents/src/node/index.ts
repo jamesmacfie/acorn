@@ -13,11 +13,12 @@ import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { BEFORE_PERMISSION_HOOK } from '../contract/permissionHook.ts'
 import { AGENTS_SESSION_MESSENGER } from '../contract/sessionMessages.ts'
 import type { SessionMessages } from '../server/sessions/sessionMessages'
+import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
+import type { TurnFollowUps } from '../server/sessions/turnFollowUps'
 import { AGENTS_RUNTIME } from '../contract/runtime'
 import { AGENTS_DRAFT_ATTACHMENTS } from '../contract/draftAttachments'
 import { AGENTS_REQUESTS, AGENTS_REVIEW_INPUT, AGENTS_SESSIONS, AGENTS_TURNS } from '../contract/lifecycle'
 import { createDraftAttachments } from '../server/sessions/draftAttachments'
-import { createSessionExecute } from '../server/sessions/sessionExecute'
 import { createSessionControl } from '../server/sessions/sessionControl'
 import { agentUsageCollectors } from '../server/usage/collectors'
 import { readAgentConcurrency, writeAgentConcurrency } from '../server/concurrencyStore'
@@ -102,6 +103,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let runtime: ManagedAgentRuntime | null = null
   let delegation: AgentDelegationService | null = null
   let messages: Promise<SessionMessages> | null = null
+  let followUps: Promise<TurnFollowUps> | null = null
   let reconcileMessages: (() => Promise<void>) | null = null
   let pluginsChanged: { dispose(): void } | null = null
   let managedRoute: { dispose(): void } | null = null
@@ -245,12 +247,24 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // Loaded on the first contribution, to stay inside the service boot budget
       // (apps/node/scripts/check-service-budget.mjs).
       ctx.extensionPoints.declare(AGENTS_SESSION_MESSENGER, 'Session messengers')
+      // The reviewers a workflow step or a delegated turn offers its finished turn to, and the
+      // operations their notes join (../server/sessions/turnFollowUps.ts). Loaded on first use.
+      ctx.extensionPoints.declare(AGENTS_TURN_FOLLOW_UP, 'Turn reviewers')
       const entries = () => ctx.extensionPoints.handlers(AGENTS_SESSION_MESSENGER)
       const messagesRuntime = runtime
+      const followUpRegistry = () => followUps ??= import('../server/sessions/turnFollowUps').then(({ TurnFollowUps }) => new TurnFollowUps({
+        runtime: messagesRuntime,
+        entries: () => ctx.extensionPoints.handlers(AGENTS_TURN_FOLLOW_UP),
+        delegationLive: async (turn) => await delegation?.reports.operationLive(turn) ?? false,
+      }))
       reconcileMessages = async () => {
         if (!messages && !entries().length) return
-        messages ??= import('../server/sessions/sessionMessages').then(({ SessionMessages }) =>
-          new SessionMessages({ runtime: messagesRuntime, entries, notice: (notice) => ctx.events.notice(notice) }))
+        messages ??= import('../server/sessions/sessionMessages').then(({ SessionMessages }) => new SessionMessages({
+          runtime: messagesRuntime,
+          entries,
+          notice: (notice) => ctx.events.notice(notice),
+          followUps: followUpRegistry,
+        }))
         await (await messages).reconcile()
       }
       pluginsChanged = ctx.events.on('plugins:changed', () => void reconcileMessages?.().catch(() => undefined))
@@ -261,6 +275,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         async () => await ctx.capabilities.get(TERMINAL_SESSIONS)?.list() ?? [],
         core.tasks,
         deps.reconciled,
+        followUpRegistry,
       )
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
 
@@ -384,7 +399,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // agents.sessionExecute (contract/sessionExecute.ts). The workflow runner resolves this at call
       // time and falls back to its own headless runner, so a node without this plugin still runs
       // non-managed workflow steps.
-      ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, createSessionExecute(runtime))
+      // Loaded on the first step, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
+      const executeRuntime = runtime
+      ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
+        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry)(request))
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).
@@ -410,6 +428,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       reconcileMessages = null
       void messages?.then((loaded) => loaded.dispose())
       messages = null
+      followUps = null
       pluginsChanged?.dispose()
       pluginsChanged = null
       await runtime?.stop()

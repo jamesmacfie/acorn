@@ -435,6 +435,7 @@ export class ManagedAgentEngine {
         await this.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
       }
     }
+    await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
     await this.webhooks.reconcile()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,

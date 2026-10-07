@@ -66,9 +66,10 @@ const normalized = (note) => note.toLowerCase().replace(/\s+/g, ' ').trim()
  *
  * `history` is this session's earlier notes, `{ severity, note, outcome, ordinal }`. `turn` is the
  * reviewed turn's `{ ordinal, stopReason }`. `latest` is the session's newest turn, read after
- * generating, and `session` its roster entry, also read after.
+ * generating, and `session` its roster entry, also read after. `unattended` is a workflow or delegated
+ * turn, whose owner is about to report it: a concern there is worth a turn even after a finished answer.
  */
-export function decide({ verdict, history, turn, latest, session }) {
+export function decide({ verdict, history, turn, latest, session, unattended = false }) {
   if (verdict.severity === 'none') return { outcome: 'none' }
   if (!session || session.archived) return { outcome: 'recorded', reason: 'session-gone' }
   // The person stopped the session, or its newest turn. A late note must not start it again.
@@ -80,7 +81,7 @@ export function decide({ verdict, history, turn, latest, session }) {
   if (repeat) return { outcome: 'suppressed', reason: 'repeat' }
   if (verdict.severity === 'nit') return { outcome: 'recorded', reason: 'nit' }
   if (verdict.severity === 'concern') {
-    if (!MID_WORK.has(turn.stopReason)) return { outcome: 'recorded', reason: 'finished' }
+    if (!unattended && !MID_WORK.has(turn.stopReason)) return { outcome: 'recorded', reason: 'finished' }
     const cooling = history.some((earlier) => earlier.outcome === 'delivered' && turn.ordinal - earlier.ordinal <= COOLDOWN_TURNS)
     if (cooling) return { outcome: 'recorded', reason: 'cooldown' }
   }

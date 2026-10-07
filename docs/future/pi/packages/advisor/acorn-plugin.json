@@ -2,7 +2,7 @@
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "acorn-advisor",
   "name": "Advisor",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "baseline": "acorn-1",
   "apiVersion": "3",
   "node": "./node.js",
@@ -26,6 +26,11 @@
         "id": "notes",
         "point": "agents:session-messenger",
         "label": "send the agent a review note"
+      },
+      {
+        "id": "review",
+        "point": "agents:turn-follow-up",
+        "label": "review a finished turn before it reports"
       }
     ],
     "frames": [

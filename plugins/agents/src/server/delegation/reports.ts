@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, pastedContent } from '@acorn/plugin-api/node'
 import type { AgentInputPart, AgentTurn } from '../../contract/wire.ts'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import type { TurnFollowUps } from '../sessions/turnFollowUps'
+import { TURN_FOLLOW_UP_DEADLINE_MS } from '../../contract/turnFollowUp.ts'
 import type { AgentDelegationStore } from './store'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from '../sessions/resultContract'
 
@@ -79,9 +81,15 @@ export function delegatedTurn(
 
 /** Queues one turn on the owner when a turn it gave a child settles (docs/managed-agents/delegation.md § Managed delegation). */
 export class DelegationReports {
+  // One delivery per child turn at a time: the broadcast and the startup pass can both ask for it.
+  private readonly delivering = new Map<string, Promise<void>>()
+
   constructor(
     private readonly runtime: ManagedAgentRuntime,
     private readonly delegations: AgentDelegationStore,
+    // The unattended operations a plugin's note joins (../sessions/turnFollowUps.ts). Absent, a turn
+    // reports as soon as it settles.
+    private readonly followUps?: () => Promise<TurnFollowUps>,
   ) {}
 
   /** A pending request is a pause, not a settled turn. The request row is read after commit. */
@@ -90,7 +98,10 @@ export class DelegationReports {
     const request = await store.request(sessionId, providerRequestId)
     if (!request || request.status !== 'pending' || !request.turnId
       || !['permission', 'question', 'elicitation'].includes(request.kind)) return
-    const turn = await store.turn(request.turnId)
+    const asked = await store.turn(request.turnId)
+    // A plugin's note reports through the delegated turn it follows.
+    const followUpOf = asked?.effectivePolicy.followUpOf
+    const turn = typeof followUpOf === 'string' ? await store.turn(followUpOf) : asked
     const ownerId = turn?.effectivePolicy.reportTo
     if (!turn || turn.sessionId !== sessionId || turn.source !== 'delegation' || typeof ownerId !== 'string') return
     const [owner, child] = await Promise.all([store.getSession(ownerId), store.getSession(sessionId)])
@@ -122,30 +133,63 @@ export class DelegationReports {
       log.warn(`report for request ${providerRequestId} failed: ${describeError(error).message}`))
   }
 
-  async deliver(childTurnId: string): Promise<void> {
+  /**
+   * Whether the owner of a delegated turn still waits for its report. That is the operation a plugin's
+   * note about the turn joins: once the report is queued, the owner cancelled the turn, or the owner
+   * is gone, notes are refused.
+   */
+  async operationLive(turn: AgentTurn): Promise<boolean> {
+    const store = this.runtime.store
+    const ownerId = turn.effectivePolicy.reportTo
+    if (turn.source !== 'delegation' || typeof ownerId !== 'string') return false
+    // The idempotency key is the exactly-once rule, so an existing report ends this before the hooks
+    // and file checks enqueueTurn runs, which matters for the startup pass over every settled turn.
+    if (await store.turnForIdempotency(ownerId, reportKey(turn.id))) return false
+    if (await store.hasOperationFor('delegation.cancel', turn.id)) return false
+    const owner = await store.getSession(ownerId)
+    return !!owner && !owner.archivedAt && owner.runtimeState !== 'failed'
+  }
+
+  /** The owner stopped the turn: its notes stop too. */
+  async cancelFollowUps(turn: AgentTurn): Promise<void> {
+    await (await this.followUps?.())?.cancel(turn)
+  }
+
+  deliver(childTurnId: string): Promise<void> {
+    let running = this.delivering.get(childTurnId)
+    if (!running) {
+      running = this.deliverOnce(childTurnId).finally(() => this.delivering.delete(childTurnId))
+      this.delivering.set(childTurnId, running)
+    }
+    return running
+  }
+
+  private async deliverOnce(childTurnId: string): Promise<void> {
     const store = this.runtime.store
     const turn = await store.turn(childTurnId)
     const ownerId = turn?.effectivePolicy.reportTo
     if (!turn || typeof ownerId !== 'string' || !SETTLED.has(turn.status)) return
-    // The idempotency key is the exactly-once rule, so an existing report ends this before the hooks
-    // and file checks enqueueTurn runs, which matters for the startup pass over every settled turn.
-    if (await store.turnForIdempotency(ownerId, reportKey(turn.id))) return
-    if (turn.status === 'cancelled' && await store.hasOperationFor('delegation.cancel', turn.id)) return
-    const [owner, child] = await Promise.all([store.getSession(ownerId), store.getSession(turn.sessionId)])
-    if (!owner || !child || owner.archivedAt || owner.runtimeState === 'failed') return
+    if (!await this.operationLive(turn)) return this.cancelFollowUps(turn)
+    // The report waits for the plugin notes that joined this turn, and says what the last one ended on.
+    const last = await this.settleFollowUps(turn)
+    if (!await this.operationLive(turn)) return
+    const child = await store.getSession(turn.sessionId)
+    if (!child) return
     if (await store.countTurns(ownerId, 'delegation_report') >= MAX_REPORTS_PER_OWNER) {
       log.warn(`not reporting turn ${turn.id}: session ${ownerId} already holds ${MAX_REPORTS_PER_OWNER} reports`)
       return
     }
-    const text = assistantResult(await store.eventsForTurn(turn.id))
+    const text = assistantResult(await store.eventsForTurn(last.id))
     const schema = turnResultSchema(turn)
     const structured = schema && text ? parseStructuredResult(text, schema) : null
+    const notes = last.id === turn.id ? [] : [`A plugin sent it notes about that turn. The outcome and message below are from its reply to the last one, turn ${last.id}.`]
     // The child's message is marked as text the owner did not write. A child that read a hostile page
     // can repeat what it read, and unmarked, that would reach the owner as its own user's request.
     const body = [
       `${child.title} finished the turn you gave it. Answer it with agent_prompt on session ${child.id}, or read its full output with agent_read.`,
-      `Outcome: ${turn.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : turn.status}`,
-      ...(turn.error ? [`Error: ${turn.error.message}`] : []),
+      ...notes,
+      `Outcome: ${last.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : last.status}`,
+      ...(last.error ? [`Error: ${last.error.message}`] : []),
       ...(text ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)] : ['The turn ended with no message.']),
       ...(structured != null ? ['Structured result:', '```json', JSON.stringify(structured, null, 2), '```'] : []),
     ].join('\n\n')
@@ -168,6 +212,35 @@ export class DelegationReports {
     })
   }
 
+  /**
+   * Offers a finished turn to its reviewers, then waits for every note that joined the operation, and
+   * closes it. Returns the operation's last turn. Waiting on turns never holds the provider queue: this
+   * runs from a broadcast, after the write that settled the turn.
+   */
+  private async settleFollowUps(turn: AgentTurn): Promise<AgentTurn> {
+    const registry = await this.followUps?.()
+    if (!registry) return turn
+    const store = this.runtime.store
+    const operation = registry.open(turn, 'delegation')
+    try {
+      if (turn.status === 'completed') await registry.review(operation, turn.id, TURN_FOLLOW_UP_DEADLINE_MS)
+      for (;;) {
+        const seq = (await store.requireSession(turn.sessionId)).lastEventSeq
+        const notes = await store.followUpTurns(turn.sessionId, turn.id)
+        if (notes.some((note) => !SETTLED.has(note.status))) {
+          await this.runtime.wait(turn.sessionId, seq, 'turn_completed', 1_000)
+          continue
+        }
+        // Closed only once its notes have settled, so a note can still join while one runs. Then once
+        // more round, for a note that was being admitted as it closed.
+        if (!operation.open) return notes.at(-1) ?? turn
+        await registry.close(operation)
+      }
+    } finally {
+      registry.release(operation)
+    }
+  }
+
   /** Delivers from the lifecycle broadcast, which is not durable; `reconcile` covers a lost one. */
   deliverSafely(childTurnId: string): void {
     void this.deliver(childTurnId).catch((error: unknown) =>
@@ -184,9 +257,11 @@ export class DelegationReports {
     if (report?.status === 'queued') await this.runtime.cancelTurn(ownerSessionId, report.id)
   }
 
+  /** Boot waits for this, so a report that waits on a plugin's note carries on after it returns. */
   async reconcile(): Promise<void> {
     for (const turn of await this.runtime.store.settledReportingTurns()) {
-      await this.deliver(turn.id).catch((error: unknown) =>
+      if (!await this.operationLive(turn)) continue
+      void this.deliver(turn.id).catch((error: unknown) =>
         log.warn(`report for turn ${turn.id} failed at startup: ${describeError(error).message}`))
     }
   }

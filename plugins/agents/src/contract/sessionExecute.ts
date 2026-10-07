@@ -36,7 +36,9 @@ export type AgentSessionExecuteRequest = {
   signal?: AbortSignal
 }
 
-// Resolves to null when the profile has no managed driver; the caller then owns the fallback.
+// Resolves to null when the profile has no managed driver; the caller then owns the fallback. The
+// result covers every turn the step owns, including plugin notes that joined it: the last turn's output,
+// and usage across them all (docs/managed-agents/unattended-follow-ups.md).
 export type AgentSessionExecute = (request: AgentSessionExecuteRequest) => Promise<HeadlessResult | null>
 
 export const AGENTS_SESSION_EXECUTE = capabilityId<AgentSessionExecute>('agents.sessionExecute')

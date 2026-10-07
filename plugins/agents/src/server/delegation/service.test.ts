@@ -1055,7 +1055,8 @@ describe('agent delegation service', () => {
 
       await reconcileAfterRestart()
 
-      expect(await reports(parent.id)).toHaveLength(1)
+      // Boot doesn't wait for it, because a report can wait on a plugin's note (reports.ts).
+      await vi.waitFor(async () => expect(await reports(parent.id)).toHaveLength(1))
     })
   })
 })

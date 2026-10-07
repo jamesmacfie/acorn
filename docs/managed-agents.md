@@ -73,7 +73,10 @@ These pages cover harnesses and the work agents do:
 <a id="session-messages"></a>
 
 - [Session messages](./managed-agents/session-messages.md): `agents:session-messenger`, a plugin's
-  attributed note on an interactive session, with its limits and idempotency.
+  attributed note on a session, with its limits and idempotency.
+- [Unattended follow-ups](./managed-agents/unattended-follow-ups.md): the operation a note on a
+  workflow or delegated session joins, and `agents:turn-follow-up`, the review window its owner opens
+  before it reports.
 - [Review input](./managed-agents/session-events.md#review-input): `agents.reviewInput.v1`, one
   completed turn's text and final answer for a reviewer, bounded and checked against its task.
 

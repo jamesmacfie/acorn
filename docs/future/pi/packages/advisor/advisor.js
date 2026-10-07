@@ -1,6 +1,10 @@
 // The advisor's durable review jobs. One job per completed turn, keyed by session and turn. An event
 // is a nudge to look, never the record itself: each job reads the turn's state again before it
 // spends, and again after, before it sends anything.
+//
+// Interactive turns arrive as `turn-changed` events and wait in the table. A workflow step's or a
+// delegated agent's turn arrives as an `agents:turn-follow-up` window, which the owner holds open while
+// the review runs, so a note lands before the result is reported.
 
 import { buildPrompt, decide, MAX_DIFF_BYTES, noteText, parseVerdict, SYSTEM } from './review.js'
 
@@ -25,7 +29,11 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
   const setSetting = (name, value) => db.prepare(
     'INSERT INTO settings (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
   ).run(name, value)
-  const enabled = () => setting('mode') === 'interactive'
+  // `off`, `unattended` (workflow and delegated), or `all`. `interactive` is 0.1.0's only choice, kept
+  // as it was so an upgrade starts no unattended spending.
+  const mode = () => setting('mode') ?? 'off'
+  const reviews = (unattended) => mode() === 'all' || mode() === (unattended ? 'unattended' : 'interactive')
+  const enabled = () => reviews(false)
   const setJob = (job, status, reason = null) => db.prepare(
     'UPDATE jobs SET status = ?, reason = ?, updated_at = ? WHERE session_id = ? AND turn_id = ?',
   ).run(status, reason, now(), job.session_id, job.turn_id)
@@ -49,9 +57,9 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
     }
   }
 
-  async function run(job, signal) {
+  async function run(job, signal, unattended = false) {
     try {
-      const reason = await review(job, signal)
+      const reason = await review(job, signal, unattended)
       setJob(job, signal.aborted ? 'cancelled' : 'done', reason ?? null)
       if (!signal.aborted) setSetting('problem', '')
     } catch (error) {
@@ -64,14 +72,14 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
   }
 
   /** One review. Returns why it sent nothing, or null once a note is delivered or recorded. */
-  async function review(job, signal) {
+  async function review(job, signal, unattended) {
     const reader = reviewInput(), turnList = turns(), roster = sessions()
     if (!reader || !turnList || !roster) return 'the agents plugin is off, or its review reader is missing'
     const ref = { taskId: job.task_id, sessionId: job.session_id, turnId: job.turn_id }
 
     const session = (await roster.list(job.task_id)).find((entry) => entry.sessionId === job.session_id)
     if (!session || session.archived) return 'session gone'
-    if (session.kind !== 'interactive') return 'not an interactive session'
+    if ((session.kind === 'interactive') === unattended) return 'not the kind of session this review was for'
     const read = await reader.read(ref)
     if (!read.available) return `turn ${read.reason}`
 
@@ -92,7 +100,7 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
     const latest = list.at(-1)
     const after = (await roster.list(job.task_id)).find((entry) => entry.sessionId === job.session_id)
     const history = db.prepare('SELECT severity, note, outcome, ordinal FROM notes WHERE session_id = ? ORDER BY created_at').all(job.session_id)
-    const decision = decide({ verdict, history, turn: { ...turn, turnId: job.turn_id }, latest, session: after })
+    const decision = decide({ verdict, history, turn: { ...turn, turnId: job.turn_id }, latest, session: after, unattended })
     if (decision.outcome === 'none') return 'nothing to say'
 
     let outcome = decision.outcome === 'deliver' ? 'delivered' : decision.outcome
@@ -102,8 +110,10 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
         outcome = 'recorded'
         reason = 'no messenger connected'
       } else {
+        // `originTurnId` joins an unattended note to the operation its owner holds open. An interactive
+        // session ignores it.
         const sent = await sender.queue({
-          ...ref, subject: `advisor ${verdict.severity}`, text: noteText(verdict), idempotencyKey: `${job.session_id}:${job.turn_id}`,
+          ...ref, originTurnId: job.turn_id, subject: `advisor ${verdict.severity}`, text: noteText(verdict), idempotencyKey: `${job.session_id}:${job.turn_id}`,
         })
         if (!sent.ok) {
           outcome = 'recorded'
@@ -144,6 +154,29 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
         VALUES (?, ?, ?, 'queued', ?, ?)`).run(frame.sessionId, frame.turnId, frame.taskId, now(), now())
       pump()
     },
+    /**
+     * `agents:turn-follow-up`. The owner waits for this, up to its deadline, then aborts `window.signal`
+     * and refuses a later note. The job key is the interactive one, so a recovered owner's second window
+     * finds the job and spends nothing.
+     */
+    async reviewWindow(window) {
+      if (stopped || !reviews(true)) return
+      const job = { session_id: window.sessionId, turn_id: window.turnId, task_id: window.taskId }
+      const inserted = db.prepare(`INSERT OR IGNORE INTO jobs (session_id, turn_id, task_id, status, created_at, updated_at)
+        VALUES (?, ?, ?, 'running', ?, ?)`).run(job.session_id, job.turn_id, job.task_id, now(), now())
+      if (!inserted.changes) return
+      const controller = new AbortController()
+      const stop = () => controller.abort()
+      if (window.signal.aborted) stop()
+      window.signal.addEventListener('abort', stop, { once: true })
+      running.set(key(job), controller)
+      try {
+        await run(job, controller.signal, true)
+      } finally {
+        running.delete(key(job))
+        window.signal.removeEventListener('abort', stop)
+      }
+    },
     /** `plugin:agents:sessions-changed`. An archived or deleted session's reviews stop. */
     sessionsChanged(frame) {
       if (!frame.archived && frame.present) return
@@ -154,7 +187,7 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
       sender = given
       pump()
     },
-    mode: () => (enabled() ? 'interactive' : 'off'),
+    mode,
     setMode(mode) {
       setSetting('mode', mode)
       if (mode === 'off') {
@@ -163,7 +196,7 @@ export function createAdvisor({ db, reviewInput, turns, sessions, tasks, git, mo
       } else pump()
     },
     status: () => ({
-      mode: enabled() ? 'interactive' : 'off',
+      mode: mode(),
       problem: setting('problem') || null,
       reviewsToday: db.prepare("SELECT count(*) AS n FROM jobs WHERE status = 'done' AND updated_at >= ?").get(startOfDay(now())).n,
       notes: db.prepare('SELECT task_id AS taskId, severity, note, outcome, reason, created_at AS createdAt FROM notes ORDER BY created_at DESC LIMIT 20').all(),

@@ -43,8 +43,10 @@ Off by default. Run **Permission policy: explain refusals to the agent** from th
 - Each time agents connects the sender, it reads every recorded refusal again, so a missed event or a
   restart doesn't lose one. A send that throws keeps its record for that pass.
 - The idempotency key is `<sessionId>:<requestId>`, so one refusal is one note. A failed note never
-  undoes the refusal. Workflow and delegated sessions answer `unattended-not-supported`, and the
-  refusal stands with no note.
+  undoes the refusal.
+- The note names the request's turn as `originTurnId`. In a workflow or delegated session, that
+  joins it to the running step or delegated turn, which waits for the agent's reply before it
+  reports. Once that's finished, the host answers `operation-closed`, and the plugin logs it.
 
 The manifest asks for `plugin:agents:request-changed`, the `agents.requests` capability, and a
 declared `agents:session-messenger` extension, which the trust prompt shows as a high grant.

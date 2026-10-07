@@ -2,7 +2,7 @@
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "acorn-permission-policy",
   "name": "Permission policy",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "baseline": "acorn-1",
   "apiVersion": "3",
   "node": "./node.js",

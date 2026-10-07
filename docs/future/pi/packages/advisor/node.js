@@ -24,6 +24,12 @@ export default {
       id: 'notes',
       value: { connect: (sender) => advisor.connect(sender) },
     })
+    // A workflow step's or a delegated agent's finished turn, offered before its owner reports it. The
+    // owner waits for this, so a blocker's correction comes before the result.
+    ctx.extensionPoints.handle('agents:turn-follow-up', {
+      id: 'review',
+      value: { review: (window) => advisor.reviewWindow(window) },
+    })
     ctx.events.on('plugin:agents:turn-changed', (frame) => { try { advisor.turnChanged(frame) } catch (error) { failed(error) } })
     ctx.events.on('plugin:agents:sessions-changed', (frame) => { try { advisor.sessionsChanged(frame) } catch (error) { failed(error) } })
 
@@ -33,7 +39,7 @@ export default {
       if (pathname !== '/settings') return new Response('not found', { status: 404 })
       if (request.method === 'PUT') {
         const { mode } = await request.json()
-        if (mode !== 'off' && mode !== 'interactive') return Response.json({ error: 'mode is off or interactive' }, { status: 400 })
+        if (!['off', 'unattended', 'all', 'interactive'].includes(mode)) return Response.json({ error: 'mode is off, unattended, or all' }, { status: 400 })
         advisor.setMode(mode)
       }
       return Response.json(advisor.status())

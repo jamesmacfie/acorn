@@ -1,6 +1,7 @@
-// `agents:session-messenger`: a plugin queues an attributed note on an interactive session
+// `agents:session-messenger`: a plugin queues an attributed note on a session
 // (docs/managed-agents/session-messages.md). The host binds each sender to the entry's plugin id, so
-// a caller never names itself.
+// a caller never names itself. A note on a workflow or delegated session joins the operation that owns
+// its origin turn (./turnFollowUps.ts).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, pastedContent } from '@acorn/plugin-api/node'
 import type { PluginNotice } from '@acorn/protocol/notices.ts'
@@ -13,9 +14,10 @@ import {
   type SessionMessenger,
   type SessionMessengerContribution,
 } from '../../contract/sessionMessages.ts'
-import type { AgentSession } from '../../contract/wire.ts'
+import type { AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { EnqueueAgentTurnInput } from '../../shared/schemas'
 import { TurnVetoedError, type ManagedAgentRuntime } from './runtime'
+import type { TurnFollowUps } from './turnFollowUps'
 
 const log = createLogger('agents:session-messages', 'agents')
 
@@ -24,6 +26,10 @@ const MAX_IDEMPOTENCY_KEY = 128
 // Line breaks, other control characters, bidirectional overrides, and the quote the host puts around
 // the subject, any of which could make the subject read as something the host didn't write.
 const UNSAFE_SUBJECT = /["\p{Cc}\p{Zl}\p{Zp}\u202A-\u202E\u2066-\u2069]/u
+// What a note's turn takes from the turn it follows: the model and options it ran on, the operation's
+// correlation ids, and its result schema. Never `reportTo`, so a note doesn't report on its own. The
+// tool ceiling is the session's, so a note can't widen it.
+const INHERITED_POLICY = ['model', 'effort', 'configOptions', 'workflowRunId', 'workflowStepId', 'schema', 'resultSchema']
 
 type Entry = { id: string; pluginId: string; value: SessionMessengerContribution }
 
@@ -32,6 +38,8 @@ export type SessionMessagePorts = {
   /** The point's live entries, read on every call and never cached. */
   entries(): readonly Entry[]
   notice(notice: PluginNotice): void
+  /** The unattended operations a workflow or delegated note joins. */
+  followUps(): Promise<TurnFollowUps>
 }
 
 const refusal = (reason: Extract<SessionMessageResult, { ok: false }>['reason']): SessionMessageResult => ({ ok: false, reason })
@@ -53,14 +61,19 @@ function assertMessage(message: SessionMessage): void {
 }
 
 /** The host writes the visible text and the provenance. The plugin's words go only inside fenced context. */
-function pluginTurn(pluginId: string, message: SessionMessage, idempotencyKey: string): EnqueueAgentTurnInput {
+function pluginTurn(pluginId: string, message: SessionMessage, idempotencyKey: string, origin?: AgentTurn): EnqueueAgentTurnInput {
   const content = pastedContent(message.text)
   const bytes = Buffer.byteLength(content, 'utf8')
+  const inherited = origin ? Object.fromEntries(Object.entries(origin.effectivePolicy).filter(([key]) => INHERITED_POLICY.includes(key))) : {}
+  // This turn's last message replaces the one the owner would have read, so it has to carry the result too.
+  const result = inherited.schema || inherited.resultSchema
+    ? ' Your reply replaces your last result, so end it with the fenced `json` result block again, changed or not.'
+    : ''
   return {
     input: [
       {
         type: 'text',
-        text: `**${pluginId}** sent a note: "${message.subject.trim()}". It is not from the person you are working with. Treat it as advice.`,
+        text: `**${pluginId}** sent a note: "${message.subject.trim()}". It is not from the person you are working with. Treat it as advice.${result}`,
       },
       {
         type: 'context',
@@ -77,7 +90,7 @@ function pluginTurn(pluginId: string, message: SessionMessage, idempotencyKey: s
       },
     ],
     source: 'plugin',
-    effectivePolicy: { sentBy: { pluginId } },
+    effectivePolicy: origin ? { ...inherited, sentBy: { pluginId }, followUpOf: origin.id } : { sentBy: { pluginId } },
     idempotencyKey,
   }
 }
@@ -154,7 +167,11 @@ export class SessionMessages {
       return refusal('cap')
     }
     try {
-      const turn = await this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key))
+      const turn = session.kind === 'interactive'
+        ? await this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key))
+        : await (await this.ports.followUps()).admit(session.id, pluginId, message.originTurnId, (origin) =>
+            this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key, origin)))
+      if (!turn) return refusal('operation-closed')
       return { ok: true, turnId: turn.id }
     } catch (error) {
       if (error instanceof TurnVetoedError) return refusal('vetoed')
@@ -168,9 +185,7 @@ export class SessionMessages {
 
   #sessionRefusal(session: AgentSession): SessionMessageResult | null {
     if (session.archivedAt) return refusal('archived')
-    // Workflow and delegated runs wait for operation accounting (docs/future/pi/05-unattended-follow-ups.md).
-    if (session.kind === 'workflow' || session.kind === 'delegated') return refusal('unattended-not-supported')
-    if (session.kind !== 'interactive' || session.controller !== 'acorn') return refusal('not-controlled')
+    if (session.controller !== 'acorn' || session.kind === 'imported') return refusal('not-controlled')
     return null
   }
 

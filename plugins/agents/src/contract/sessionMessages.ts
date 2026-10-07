@@ -12,17 +12,24 @@ export type SessionMessage = {
   subject: string
   /** Scoped by the host to the calling plugin, so two plugins can't collide or suppress each other. */
   idempotencyKey: string
+  /**
+   * Required on a workflow or delegated session: the turn the note is about. The host joins the note
+   * to that turn's operation, so the owner waits for it before it reports. Ignored on an interactive one.
+   */
+  originTurnId?: string
 }
 
 /**
  * The refusals are coarse on purpose. `unknown-session` covers a missing session and one that isn't in
- * the named task, so a plugin learns nothing about a row it may not see.
+ * the named task, so a plugin learns nothing about a row it may not see. `operation-closed` covers an
+ * unattended note with no live owner: a missing or foreign origin turn, a finished or cancelled
+ * operation, and a reviewer whose window has closed.
  */
 export type SessionMessageResult =
   | { ok: true; turnId: string }
   | {
       ok: false
-      reason: 'unknown-session' | 'archived' | 'not-controlled' | 'unattended-not-supported' | 'cap' | 'vetoed'
+      reason: 'unknown-session' | 'archived' | 'not-controlled' | 'operation-closed' | 'cap' | 'vetoed'
     }
 
 /** What the host hands a contributor, bound to its plugin id. It stops working when the entry goes. */
