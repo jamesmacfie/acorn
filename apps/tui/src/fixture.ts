@@ -511,9 +511,13 @@ const json = (value: unknown) => ({
           : []),
       ])
       if (path === '/v1/core/workspaces/ws-1/external-projects') return json({
-        projects: process.env.ACORN_FIXTURE_LINK_SCOPES ? [{ integrationId: 'github', externalId: 'runn-fast/acorn' }] : [],
+        projects: process.env.ACORN_FIXTURE_LINK_SCOPES && !process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+          ? [{ integrationId: 'github', externalId: 'runn-fast/acorn' }] : [],
       })
-      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({ projects: [] })
+      if (path === '/v1/core/workspaces/ws-2/external-projects') return json({
+        projects: process.env.ACORN_FIXTURE_LINK_DESTINATION_PROVIDER
+          ? [{ integrationId: 'github', externalId: 'runn-fast/second' }] : [],
+      })
       if (path === '/v1/core/tasks') return json([TASK, ...(process.env.ACORN_FIXTURE_LINK_SCOPES ? [SECOND_TASK] : [])])
       // A descriptor source's items, for the one test that drives a `SourcePanel` list rather than a
       // first-party source's own regions (./sourceFilter.test.tsx). Three titles, two of which share a

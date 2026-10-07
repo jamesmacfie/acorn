@@ -1,6 +1,6 @@
 export {
   REF_LINK_CLASS, contentLinkRegistry, handlePluginContentLinkClick, learnRefPrefixes,
-  inAppPathFor, linkifyRefs, openInAppUrl, parseInAppTarget, scanContentRefs,
+  claimFor, inAppPathFor, linkifyRefs, openInAppUrl, parseInAppTarget, scanContentRefs,
   splitRefTokens,
 } from './contentLinks.ts'
 export type { ContentLinkContribution, InAppTarget } from './contentLinks.ts'

@@ -1,5 +1,25 @@
 # Phase 05: terminal client
 
+## Second follow-up completion note, October 8, 2026
+
+The terminal resolves an `open?url=` claim once after selected-Node contributions register. The
+resolved task or project destination then uses the same workspace and source-readiness handoff as a
+direct link. A route whose provider is available only in the destination workspace opens there; the
+same route falls back to its project with a notice when that workspace hides the provider. The
+focused fixture verifies both outcomes and that its recogniser parses the URL once. Task links focus
+their task row after a workspace switch, so a pending Menu focus settle cannot restore the old
+source over the linked task.
+
+Named Settings-page links now wait for the bounded contribution pass. The Settings root remains
+fast. A delayed page-registration test opens the contributed page after readiness. The deferred
+resolver and Node-identity guard remain after the first frame; its measured closure is 722,967 bytes
+across 164 chunks under the unchanged 723,000-byte guard.
+
+The TUI build, TUI and client-core scoped TypeScript checks, targeted oxlint, five cross-workspace
+link tests, six link tests, and focused source-switch and deferred-request tests passed. Architecture
+passed 86 of 87 checks, retaining only the three missing generated Tauri schema paths in the
+unrelated desktop security design. No full repository gate or release build ran.
+
 ## Follow-up completion note, October 8, 2026
 
 Pane-bearing task links now wait for the selected Node's loaded contribution preparation, under

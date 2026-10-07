@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { createSignal } from 'solid-js'
 import { contentLinkRegistry, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
+import { settingsRegistry } from '@acorn/client-core/host/registries/shell'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { TASK } from '../fixture'
 import { renderFixture } from '../harness'
@@ -48,6 +49,25 @@ describe('terminal startup links', () => {
     const frame = await screen.until('The pane fixture.missing is not available')
     expect(frame).not.toContain('Task: fix-login')
     screen.done()
+  }, 30_000)
+
+  it('waits for a named loaded Settings page before resolving its link', async () => {
+    const [ready, setReady] = createSignal(false)
+    const screen = await renderFixture({
+      link: { nodeId: 'node-1', kind: 'settings', pageId: 'fixture.settings' },
+      linkReady: ready,
+    })
+    const page = settingsRegistry.register({
+      id: 'fixture.settings', label: 'Loaded settings', order: 50,
+      component: () => <Line>Loaded settings page</Line>,
+    })
+    try {
+      setReady(true)
+      expect(await screen.until('Loaded settings page')).toContain('Loaded settings')
+      screen.done()
+    } finally {
+      page.dispose()
+    }
   }, 30_000)
 
   it('routes an external URL through its registered recogniser and terminal source', async () => {

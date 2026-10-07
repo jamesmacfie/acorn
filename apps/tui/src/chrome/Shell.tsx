@@ -59,6 +59,7 @@ import { activeConfirmation } from './confirmStore'
 import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { placeRestored } from './state'
 import { startLinkRequest } from './linkRequest'
+import type { ResolvedTerminalLink } from './link'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -138,17 +139,35 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // memory of what was open in it (./restore.ts).
   installRestore(model, () => prefs.data)
   const [settingsReady, setSettingsReady] = createSignal(false)
+  const reportLinkError = (error: unknown): void => log.warn('could not open terminal link', error)
+  const [resolvedLink, setResolvedLink] = createSignal<{
+    place: ResolvedTerminalLink
+    open: (place: ResolvedTerminalLink, model: ShellModel) => void
+  } | null>(null)
+  let loadingLink = false
   let linked = false
   let cancelLinkRequest: (() => void) | undefined
   onCleanup(() => cancelLinkRequest?.())
   createEffect(() => {
     const link = props.link
-    if (!link || linked || !props.linkReady?.() || !placeRestored() || !model.ready() || !settingsReady()) return
+    if (!link || loadingLink || !props.linkReady?.() || !placeRestored() || !model.ready() || !settingsReady()) return
+    loadingLink = true
+    cancelLinkRequest = startLinkRequest({
+      load: () => import('./link'),
+      apply: ({ resolveTerminalLink, openTerminalLink }) => setResolvedLink({
+        place: resolveTerminalLink(link, model), open: openTerminalLink,
+      }),
+      currentNodeId: activeNodeId,
+      nodeId: props.nodeId,
+      onError: reportLinkError,
+    })
+  })
+  createEffect(() => {
+    const resolved = resolvedLink()
+    if (!resolved || linked || activeNodeId() !== props.nodeId) return
     // A project source is visible only after the destination workspace's provider scope answers.
     // Switch first, then let this effect run again with that workspace's source list.
-    const projectId = link.kind === 'project' ? link.projectId
-      : link.kind === 'task' ? model.allTasks().find((task) => task.id === link.taskId)?.projectId
-        : undefined
+    const projectId = resolved.place.projectId
     const owner = projectId && model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === projectId))
     if (owner && model.workspace()?.id !== owner.id) {
       model.chooseWorkspace(owner.id)
@@ -156,13 +175,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     }
     if (!model.sourcesReady()) return
     linked = true
-    cancelLinkRequest = startLinkRequest({
-      load: () => import('./link'),
-      apply: ({ openTerminalLink }) => openTerminalLink(link, model),
-      currentNodeId: activeNodeId,
-      nodeId: props.nodeId,
-      onError: (error) => log.warn('could not open terminal link', error),
-    })
+    try { resolved.open(resolved.place, model) }
+    catch (error) { reportLinkError(error) }
   })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody

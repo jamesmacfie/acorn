@@ -4,7 +4,7 @@ import type { Address } from '@acorn/client-core/host/registries/commands/addres
 import { openPane, projectPath, TASK_ROUTE } from '@acorn/client-core/host/registries/commands'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
 import { setActiveTaskId, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
-import { inAppPathFor, parseInAppTarget, projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
+import { claimFor, projectSurfaceRoutes } from '@acorn/client-core/host/registries/panes'
 import { paneAvailable, paneContribution } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { matchRoute, sourceIdForPath } from '@acorn/client-core/host/registries/sources'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -17,8 +17,34 @@ import { focusRenderable } from '../keys/regions'
 import { openSettings, placeFor } from './settingsStore'
 import type { ShellModel } from './model'
 
-/** Resolve a startup address against the roster this terminal can actually draw. */
-export function openTerminalLink(address: Address, model: ShellModel): void {
+type Destination = Exclude<Address, { kind: 'open' }> |
+  { kind: 'project-route'; projectId: string; path: string } |
+  { kind: 'refused'; reason: string }
+
+export type ResolvedTerminalLink = { destination: Destination; projectId?: string }
+
+/** Claim an outside URL once, after this Node's contributions have registered. */
+export function resolveTerminalLink(address: Address, model: ShellModel): ResolvedTerminalLink {
+  if (address.kind === 'task') return {
+    destination: address,
+    projectId: model.allTasks().find((task) => task.id === address.taskId)?.projectId,
+  }
+  if (address.kind === 'project') return { destination: address, projectId: address.projectId }
+  if (address.kind !== 'open') return { destination: address }
+  const claim = claimFor(address.url)
+  if (!claim) return { destination: { kind: 'refused', reason: `No content-link recogniser accepts ${address.url}.` } }
+  const path = claim.contribution.path?.(claim.target)
+  if (!path) return { destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' } }
+  const task = matchRoute(TASK_ROUTE, path)
+  if (task?.taskId) return resolveTerminalLink({ nodeId: address.nodeId, kind: 'task', taskId: task.taskId }, model)
+  const projectId = path.startsWith('/p/') ? decodeURIComponent(path.split('/')[2] ?? '') : ''
+  if (!projectId) return { destination: { kind: 'refused', reason: 'This content link has no terminal view. Open it in the desktop app.' } }
+  return { destination: { kind: 'project-route', projectId, path }, projectId }
+}
+
+/** Open the resolved place against the roster this terminal can actually draw. */
+export function openTerminalLink(resolved: ResolvedTerminalLink, model: ShellModel): void {
+  const address = resolved.destination
   const navigate = useNavigate()
   const refuse = (reason: string): void => toast(reason, { tone: 'danger' })
   const selectLinkedSource = (sourceId: string, workspaceId: string): void => {
@@ -52,6 +78,8 @@ export function openTerminalLink(address: Address, model: ShellModel): void {
   }
 
   switch (address.kind) {
+    case 'refused':
+      return refuse(address.reason)
     case 'task': {
       const task = model.allTasks().find((entry) => entry.id === address.taskId)
       if (!task) return refuse(`No task ${address.taskId} on this node.`)
@@ -68,10 +96,15 @@ export function openTerminalLink(address: Address, model: ShellModel): void {
           if (address.item) openPane(task.id, pane.id, { kind: 'plugin:select', item: address.item })
         }
       })
+      // A pending workspace settle can otherwise return focus to the old Menu source.
+      setActiveItem('chrome.rail.tasks', task.id)
+      focusRenderable(itemByIdentity(`chrome.rail.tasks\u0000${task.id}`))
       return
     }
     case 'project':
       return openProjectPath(`${projectPath(address.projectId)}${address.rest.map((part) => `/${encodeURIComponent(part)}`).join('')}`, address.projectId)
+    case 'project-route':
+      return openProjectPath(address.path, address.projectId)
     case 'settings': {
       const target = address.pageId ? `settings/${address.pageId}${address.sectionId ? `#${address.sectionId}` : ''}` : undefined
       if (target && !placeFor(target)) return refuse(`The settings page ${address.pageId} is not available in this terminal.`)
@@ -85,16 +118,6 @@ export function openTerminalLink(address: Address, model: ShellModel): void {
       }
       selectLinkedSource(address.sourceId, model.workspace()?.id ?? 'loading')
       return
-    case 'open': {
-      if (!parseInAppTarget(address.url)) return refuse(`No content-link recogniser accepts ${address.url}.`)
-      const path = inAppPathFor(address.url)
-      if (!path) return refuse('This content link has no terminal view. Open it in the desktop app.')
-      const task = matchRoute(TASK_ROUTE, path)
-      if (task?.taskId) return openTerminalLink({ nodeId: address.nodeId, kind: 'task', taskId: task.taskId }, model)
-      const projectId = path.startsWith('/p/') ? decodeURIComponent(path.split('/')[2] ?? '') : ''
-      if (!projectId) return refuse('This content link has no terminal view. Open it in the desktop app.')
-      return openProjectPath(path, projectId)
-    }
     case 'new-task':
       // The CLI refuses this before opening a Node; keep the type exhaustive here.
       return

@@ -267,7 +267,7 @@ async function fillIn(): Promise<void> {
     // sources need the selected Node's loaded contributions too. A stalled roster read must not
     // keep the terminal on its remembered place forever; after the deadline, the resolver gives a
     // specific unavailable-view refusal if the contribution still has not arrived.
-    if ((link.kind === 'task' && !link.pane) || link.kind === 'settings' || (link.kind === 'project' && !link.rest.length)) {
+    if ((link.kind === 'task' && !link.pane) || (link.kind === 'settings' && !link.pageId) || (link.kind === 'project' && !link.rest.length)) {
       setLinkReady(true)
     } else {
       const { preparePluginContributionsForNode } = await import('@acorn/client-core/host/plugins/reload.ts')
