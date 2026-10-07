@@ -25,10 +25,11 @@ Review follow-up, October 8, 2026:
   database restoration (1), notes storage (11), and Linear provider (14). Client-core, desktop,
   Node-core, agents, workflows, notes, Linear, and plugin-api scoped type checks passed; all 87
   architecture checks passed. The stock Node build measured 3,149,554 B against the 3,150,000 B
-  ceiling. The database
-  package type check reports `src/server/routes/database.test.ts:73` calling `createProjectService`
-  with one argument where its signature requires two. That test and signature were untouched by
-  this follow-up, but no independent baseline run was made. The database restoration test passed.
+  ceiling. The database restoration test passed.
+- Coordinator integration, October 8, 2026: the database route fixture was the remaining consumer
+  missing the identity argument introduced in phase 01. It uses the testkit's memory identity store
+  bound to the fixture caller. The database typecheck and 47 route tests passed. Merged Settings,
+  palette, and command-session checks passed (94 tests), as did the queued-turn checks (four).
 
 - `client-core` exports `workspaceWords(mode)` and the reactive `createWorkspaceWords()` through
   `plugin-api`. Desktop components and first-party plugins read the active Node's mode when they
