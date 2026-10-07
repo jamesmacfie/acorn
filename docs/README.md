@@ -308,6 +308,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   code on first use, to keep heavy, rarely used routes out of the node's boot graph.
 - [Find in file](./future/find-in-file.md): product requirements for shared inline find and replace
   controls built from Acorn components across the graphical editors.
+- [Workspace icons](./future/workspace-icons.md): product requirements for workspace icons and images,
+  icons in the desktop switcher, and an optional workspace rail. The TUI keeps its workspace switcher.
 - `schemas/`: generated, versioned JSON Schemas that a test pins and that never change once
   published. The one schema is `docs/schemas/enrollment-v1.json`.
 
