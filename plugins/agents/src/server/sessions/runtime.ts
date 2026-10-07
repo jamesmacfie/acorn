@@ -213,7 +213,7 @@ export class ManagedAgentRuntime {
       if (existing) return { session: await this.engine.readWhileRunning(() => this.store.requireSession(existing.id)), created: false }
     }
     const provider = await this.engine.readWhileRunning(() => this.usableProvider((candidate) => candidate.id === input.providerId))
-    if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
+    if (!provider) throw new Error(`Unknown agent provider: ${input.providerId}`)
     if (!provider.installed) throw new Error(provider.diagnostics[0] ?? `${provider.label} is unavailable.`)
     if (provider.authenticated === false) {
       throw new Error(`${provider.label} is installed but its CLI account is not authenticated.`)

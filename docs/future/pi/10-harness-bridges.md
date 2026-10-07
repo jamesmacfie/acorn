@@ -165,11 +165,12 @@ Opus 5.5:
 - **The terminal client wasn't driven.** The ask card is the shared request card, which both hosts
   draw, and the coverage section is desktop-only: the terminal client has no plugin page.
 - **The transform trust line reads "Change what agents does when it “read a tool result”s".** The
-  shared sentence appends an "s" to the label, as it does for `before-send`'s "send a prompt". Not
-  changed here.
+  shared sentence appends an "s" to the label, as it does for `before-send`'s "send a prompt". Fixed
+  after phase 11: every transform line now reads "Change how agents will “read a tool result”".
 - **`~/.codex/config.toml` was rewritten at Node boot** by the terminal plugin's existing
   `acorn-dev` MCP re-registration ([MCP § Configuration](../../mcp.md#configuration)), which now
-  points at this worktree. That's pre-existing behavior, not the bridge.
+  points at this worktree. That's pre-existing behavior, not the bridge. Fixed after phase 11: the
+  `dev:agent` and `dev:tui:agent` launchers set `ACORN_SKIP_MCP_REGISTRATION=1`.
 
 **For phase 11.** Run manual check 164 with a signed-in Claude Code. Codex, DeepSeek, and `omp` reach
 policy only through `agents:before-permission`. A plugin's tool hooks reach a running session after

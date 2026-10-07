@@ -16,6 +16,8 @@ import type { ManagedAgentsBridge } from './managed'
 // shape. An unmatched error rethrows and becomes a 500, which is the honest answer for a bug.
 function bridgeFailure(error: unknown): never {
   const message = error instanceof Error ? error.message : 'Managed agent operation failed.'
+  // A request naming a provider this Node never registered, as opposed to one that is unavailable now.
+  if (/^Unknown agent provider/.test(message)) throw new BridgeError(400, 'bad_request', message)
   if (/not found/i.test(message)) throw new BridgeError(404, 'agent_not_found', message)
   if (/not available|unavailable|no mapped checkout/i.test(message)) {
     throw new BridgeError(422, 'agent_provider_unavailable', message)

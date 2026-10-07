@@ -400,7 +400,7 @@ describe('the cross-plugin grants', () => {
       extensionPermissionLine({ kind: 'extends', pointKind: 'hook', mode, target: 'changes:before-push', label: 'push' }))
     expect(texts(modes)).toEqual([
       'Watch changes’s “push” decision as it happens',
-      'Change what changes does when it “push”s',
+      'Change how changes will “push”',
       'Stop changes from doing “push”',
       'Make a tool wait for you before changes can “push”',
     ])

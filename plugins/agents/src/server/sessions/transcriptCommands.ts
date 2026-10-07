@@ -29,7 +29,7 @@ export class TranscriptCommands {
     content: string
   }): Promise<AgentSession> {
     const provider = (await this.deps.providers()).find((candidate) => candidate.id === input.providerId)
-    if (!provider) throw new Error(`Managed provider is not registered: ${input.providerId}`)
+    if (!provider) throw new Error(`Unknown agent provider: ${input.providerId}`)
     if (provider.profileId !== input.profileId) {
       throw new Error(`Provider '${provider.id}' requires profile '${provider.profileId}'.`)
     }

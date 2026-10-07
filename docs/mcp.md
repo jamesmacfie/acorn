@@ -105,7 +105,9 @@ A standalone Node offers no server through either path. It gets no service hands
 the staging directory its `mcp.js` is in (`configureAcornMcp` in
 `packages/node-core/src/server/mcpRegister.ts`). Registration also refreshes once at boot for every
 installed agent CLI, because the registered launcher is the Node's own binary path, which in a
-development build goes stale after a reinstall, and a restored tmux session never spawns again.
+development build goes stale after a reinstall, and a restored tmux session never spawns again. An
+isolated `dev:agent` or `dev:tui:agent` session sets `ACORN_SKIP_MCP_REGISTRATION=1` and skips both, so
+a throwaway checkout never takes over the person's `acorn-dev` entry.
 
 **Settings → MCP config files** lists the servers each CLI loads from its own config files, with secret
 values masked, and never starts one. It reads one project, picked on the page, starting on the open

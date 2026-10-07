@@ -329,7 +329,7 @@ const EXTENDS_COPY: Record<ExtensionPointKind, string> = {
 // sentence above rather than qualifying it.
 const HOOK_MODE_COPY: Record<HookMode, string> = {
   observe: 'Watch %s’s “%l” decision as it happens',
-  transform: 'Change what %s does when it “%l”s',
+  transform: 'Change how %s will “%l”',
   veto: 'Stop %s from doing “%l”',
   // Named apart from veto: it can only hold a tool for the person, never refuse it by itself.
   ask: 'Make a tool wait for you before %s can “%l”',

@@ -6,6 +6,9 @@ import { sessionDirectory } from '../apps/tui/scripts/agent/state.mjs'
 
 const repoRoot = resolve(import.meta.dirname, '..')
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
+// An isolated session leaves the person's own `acorn-dev` MCP registration alone
+// (plugins/terminal/src/server/terminal.ts).
+process.env.ACORN_SKIP_MCP_REGISTRATION = '1'
 
 async function exists(path) {
   try { await stat(path); return true } catch { return false }

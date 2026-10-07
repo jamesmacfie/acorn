@@ -57,7 +57,7 @@ export const BEFORE_TOOL_HOOK = {
 /** After a bridged harness ran a tool. A transform's `note` reaches the model inside the turn. */
 export const AFTER_TOOL_HOOK = {
   id: 'after-tool',
-  // Quoted by the trust prompt: "Change what agents does when it “read a tool result”s".
+  // Quoted by the trust prompt: "Change how agents will “read a tool result”".
   label: 'read a tool result',
   payload: { ...SUBJECT, succeeded: 'boolean', note: 'string' },
   allows: ['observe', 'transform'],

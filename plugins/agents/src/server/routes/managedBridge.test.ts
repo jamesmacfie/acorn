@@ -180,3 +180,10 @@ describe('the snapshot a client reads', () => {
     }])
   })
 })
+
+it('answers a session for an unknown provider as a bad request', async () => {
+  const runtime = {
+    acceptSession: async () => { throw new Error('Unknown agent provider: nope') },
+  } as unknown as ManagedAgentRuntime
+  await expect(managedAgentsBridge(runtime).createSession({ providerId: 'nope' } as never)).rejects.toMatchObject({ status: 400, code: 'bad_request' })
+})

@@ -222,6 +222,8 @@ async function main() {
         ...process.env,
         ACORN_DATA_DIR: dataDir,
         ACORN_DEV_SERVER: viteUrl ?? '',
+        // Leave the person's own `acorn-dev` MCP registration alone (plugins/terminal/src/server/terminal.ts).
+        ACORN_SKIP_MCP_REGISTRATION: '1',
         TAURI_WEBDRIVER_PORT: String(webdriverPort),
       },
     })

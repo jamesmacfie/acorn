@@ -554,7 +554,7 @@ async function spawnOne(
     exitCode: null,
   }
 
-  if (profile.mcpRegistration && !mcpRegistered.has(profile.id)) {
+  if (profile.mcpRegistration && mcpRegistrationAllowed() && !mcpRegistered.has(profile.id)) {
     void profile.mcpRegistration(mcpName(), mcpLauncher()).then((res) => { if (res?.ok) mcpRegistered.add(profile.id) }).catch(() => undefined)
   }
 
@@ -632,11 +632,16 @@ const mcpRegistered = new Set<string>()
 // composition root sets the real one through configureAcornMcp before any session spawns.
 const mcpName = () => acornMcp()?.name ?? serverName(true)
 const mcpLauncher = () => acornMcp()?.launcher ?? launcherSpec(process.execPath, resolveMcpEntry(dirname(fileURLToPath(import.meta.url))), mcpName())
+// The registration lives in the person's own Claude and Codex config, which every checkout shares. An
+// isolated `dev:agent` session sets this so its throwaway build doesn't take the `acorn-dev` entry
+// over and leave it pointing at a worktree that is later removed.
+const mcpRegistrationAllowed = () => !process.env.ACORN_SKIP_MCP_REGISTRATION
 
 // Boot-time MCP re-registration (docs/mcp.md § Configuration). Session spawn already re-registers;
 // this covers restored and tmux-reattached sessions, which never respawn. Idempotent (remove then
 // add), failures swallowed.
 export async function refreshAcornMcpRegistrations(): Promise<void> {
+  if (!mcpRegistrationAllowed()) return
   const name = mcpName()
   const launcher = mcpLauncher()
   await Promise.all(
