@@ -23,11 +23,16 @@ type ManifestTool = { name: string; description: string; inputSchema: Record<str
 
 // Fetch the currently-available tools from the registry projection. No task / acorn down / API error
 // → empty list (a plain terminal shows no acorn tools; they appear once a task session connects).
+// Sorted by name because the registry lists tools in registration order, and reloading a plugin moves
+// its tools without changing them. A harness that renders the list into its prompt would then miss
+// the provider's prompt cache.
 async function fetchManifest(): Promise<ManifestTool[]> {
   if (!TASK_ID) return []
   const res = await apiGet(`/v1/core/tasks/${TASK_ID}/tools`)
   if (!res.ok) return []
-  return ((res.data as { tools?: ManifestTool[] }).tools ?? []).map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
+  return ((res.data as { tools?: ManifestTool[] }).tools ?? [])
+    .map((t) => ({ name: t.name, description: t.description, inputSchema: t.inputSchema }))
+    .sort((a, b) => (a.name < b.name ? -1 : a.name > b.name ? 1 : 0))
 }
 
 export function buildServer(): Server {
@@ -64,9 +69,12 @@ export async function main(): Promise<void> {
   await server.connect(new StdioServerTransport())
 
   if (TASK_ID) {
-    let seen = (await fetchManifest().catch(() => [])).map((t) => t.name).sort().join(',')
+    // Compare whole definitions, not just names: a changed description or schema is a change the
+    // harness must re-list to see.
+    const manifestKey = async () => JSON.stringify(await fetchManifest().catch(() => []))
+    let seen = await manifestKey()
     const timer = setInterval(async () => {
-      const now = (await fetchManifest().catch(() => [])).map((t) => t.name).sort().join(',')
+      const now = await manifestKey()
       if (now !== seen) {
         seen = now
         await server.sendToolListChanged().catch(() => {})

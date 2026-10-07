@@ -297,8 +297,6 @@ Each feature landing page above has topic pages in a folder of the same name:
   [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
   [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
   [what it refused](./future/deerflow/refused.md).
-- [Prompt caching analysis](./future/cache.md): Codex and Claude caching behavior, Acorn's protections,
-  proposed MCP and usage improvements, and verification before implementation.
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's

@@ -64,7 +64,8 @@ preferences. The cost badge in the session header comes from the bundled `agent-
 Codex's token counters are cumulative for each thread. Input includes cache reads and cache writes;
 output includes reasoning tokens. The estimate subtracts consecutive turn snapshots, then prices
 ordinary input, cache reads, cache writes, and output separately. Repeated snapshots add no cost.
-The one-shot `codex exec --json` capture preserves the same cache-write count.
+The one-shot `codex exec --json` capture preserves the same cache-write count. The cost badge's tip
+shows the share of input tokens read from the prompt cache and the tokens written to it.
 
 The catalog uses standard short-context API rates. GPT-5.6 and later charge cache writes at 1.25
 times the input rate; GPT-5.5 uses the input rate. See [OpenAI's prompt caching

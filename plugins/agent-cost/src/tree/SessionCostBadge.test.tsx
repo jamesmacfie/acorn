@@ -57,6 +57,8 @@ describe('session cost remote tree', () => {
       size: 'xs',
       tip: expect.stringContaining('Estimated from the tokens used'),
     })
+    expect(nodes.find((node) => node.type === 'Badge')?.props.tip)
+      .toContain('40% of 100K input tokens came from the prompt cache, 10K written to it.')
     expect(nodes.find((node) => node.type === '#text')?.props.value).toBe('≈$0.25')
   })
 

@@ -63,6 +63,10 @@ The same registry is projected three ways:
 2. `/v1/core/tasks/:id/tools` and `/v1/core/tasks/:id/tools/:name`, for the renderer.
 3. The stdio MCP server, for a spawned agent.
 
+The MCP server lists tools sorted by name, so reloading a plugin doesn't reorder a harness's tool list
+and spoil its prompt cache. Every 10 seconds it compares the full definitions, including descriptions
+and schemas, and sends `notifications/tools/list_changed` when any of them changes.
+
 Renderer calls need a device principal. MCP calls need an internal principal whose token is bound to
 the task. The Node applies the caller's scope, the task identity, and your per-tool permission before
 it runs a tool.

@@ -13,8 +13,10 @@ those facts:
 - otherwise calculate an API-equivalent estimate from input, output, cache-read, and cache-write
   tokens;
 - turn cumulative counters into deltas;
-- show nothing when a model price is unknown or counters regress; and
-- format the result as a compact `≈$…` badge when it is estimated.
+- show nothing when a model price is unknown or counters regress;
+- format the result as a compact `≈$…` badge when it is estimated; and
+- add the session's prompt-cache share and cache writes to the badge's tip when the provider reports
+  cache counters. Codex does. Claude over ACP reports no token counts, so its tip has no cache line.
 
 The manifest requests no node, API, event, secret, process, or network permissions. Production code
 imports only the published `acorn-plugin-sdk` and Solid. The point payload has a local structural type,

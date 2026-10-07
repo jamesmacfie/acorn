@@ -34,7 +34,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | File | What it is | Status |
 | --- | --- | --- |
 | [bundle.md](./bundle.md) | Packaging a downloadable node: native deps, the CI matrix, the snags. | DX and CLI/TUI tarball staging shipped; platform binaries, installer, container image, and desktop embedding remain. |
-| [cache.md](./cache.md) | Codex and Claude prompt caching: harness ownership, deterministic MCP definitions, usage diagnostics, and measured follow-up experiments. | Analysis and proposal, October 6, 2026. Implementation not started. |
 | [compiled-tier.md](./compiled-tier.md) | Which compiled plugin moves to the loaded tier next and what blocks it. | Standing map. Three of its four couplings dissolved when the remote component tree shipped. |
 | [editor-files.md](./editor-files.md) | Letting plugins render files in the editor pane: one `replace` point keyed by file, a read-only file capability, and a catalogue of renderers for third-party plugins. | Design proposal, 2026-09-29. Not started. |
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |

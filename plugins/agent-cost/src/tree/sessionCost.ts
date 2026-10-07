@@ -54,3 +54,41 @@ export function estimateSessionCost(props: SessionHeaderProps): SessionCostEstim
   }
   return counted ? { amountUsd, source: estimated ? 'estimated' : 'provider' } : null
 }
+
+export type SessionCacheUsage = {
+  inputTokens: number
+  readTokens: number
+  /** Null when the provider reports no cache-write counter. */
+  writeTokens: number | null
+}
+
+/** Session totals for the cache readout. Input includes cache reads and writes, as in the estimate
+ *  above. Null when the provider reports no cache counters at all (Claude over ACP reports none) or
+ *  the counters regress, so the readout never claims a cache rate it cannot know. */
+export function sessionCacheUsage(props: SessionHeaderProps): SessionCacheUsage | null {
+  let previous: SessionHeaderUsage = {}
+  const total = { inputTokens: 0, readTokens: 0, writeTokens: 0 }
+  let readsReported = false
+  let writesReported = false
+  for (const turn of props.turns) {
+    const before = props.tokenAccounting === 'cumulative' ? previous : {}
+    const input = finiteCount(turn.usage.inputTokens)
+    const read = finiteCount(turn.usage.cachedInputTokens)
+    const write = finiteCount(turn.usage.cacheWriteInputTokens)
+    if (input === null) return null
+    readsReported ||= read !== null
+    writesReported ||= write !== null
+    const deltas = [
+      input - (finiteCount(before.inputTokens) ?? 0),
+      (read ?? 0) - (finiteCount(before.cachedInputTokens) ?? 0),
+      (write ?? 0) - (finiteCount(before.cacheWriteInputTokens) ?? 0),
+    ]
+    if (deltas.some((count) => count < 0)) return null
+    total.inputTokens += deltas[0]
+    total.readTokens += deltas[1]
+    total.writeTokens += deltas[2]
+    previous = turn.usage
+  }
+  if (!readsReported || total.inputTokens === 0) return null
+  return { ...total, writeTokens: writesReported ? total.writeTokens : null }
+}

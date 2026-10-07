@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { estimateSessionCost } from './sessionCost'
+import { estimateSessionCost, sessionCacheUsage } from './sessionCost'
 import type { SessionHeaderProps, SessionHeaderTurn } from './sessionHeaderContract'
 
 const price = { input: 2, output: 12, cacheWrite: 2.5, cacheRead: 0.2 }
@@ -62,6 +62,30 @@ describe('session cost estimate', () => {
     expect(estimateSessionCost(context([
       turn('turn-1', { inputTokens: 10 }),
       turn('turn-2', { inputTokens: 9 }),
+    ]))).toBeNull()
+  })
+})
+
+describe('session cache usage', () => {
+  it('sums cumulative counters as deltas', () => {
+    expect(sessionCacheUsage(context([
+      turn('turn-1', { inputTokens: 100_000, cachedInputTokens: 40_000, cacheWriteInputTokens: 10_000 }),
+      turn('turn-2', { inputTokens: 160_000, cachedInputTokens: 90_000, cacheWriteInputTokens: 15_000 }),
+    ]))).toEqual({ inputTokens: 160_000, readTokens: 90_000, writeTokens: 15_000 })
+  })
+
+  it('adds per-turn counters', () => {
+    expect(sessionCacheUsage(context([
+      turn('turn-1', { inputTokens: 100_000, cachedInputTokens: 40_000 }),
+      turn('turn-2', { inputTokens: 60_000, cachedInputTokens: 50_000 }),
+    ], { tokenAccounting: 'per-turn' }))).toEqual({ inputTokens: 160_000, readTokens: 90_000, writeTokens: null })
+  })
+
+  it('reports nothing without cache counters or when counters regress', () => {
+    expect(sessionCacheUsage(context([turn('turn-1', { inputTokens: 100_000 })]))).toBeNull()
+    expect(sessionCacheUsage(context([
+      turn('turn-1', { inputTokens: 100_000, cachedInputTokens: 40_000 }),
+      turn('turn-2', { inputTokens: 90_000, cachedInputTokens: 50_000 }),
     ]))).toBeNull()
   })
 })
