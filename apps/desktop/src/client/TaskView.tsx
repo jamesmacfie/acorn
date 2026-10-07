@@ -81,14 +81,15 @@ export default function TaskView(props: {
   const [closeError, setCloseError] = createSignal('')
   const [teardownFailed, setTeardownFailed] = createSignal(false)
 
-  function nextTask(): Task | null {
+  function nextTask(excludedIds: readonly string[] = []): Task | null {
     const currentWorkspace = workspace()
     const all = tasksQuery.data ?? []
     const projectSet = currentWorkspace ? new Set(currentWorkspace.projects.map((project) => project.id)) : null
     const list = projectSet ? all.filter((task) => projectSet.has(task.projectId)) : all
     const index = list.findIndex((task) => task.id === props.task.id)
-    if (index < 0) return list[0] ?? null
-    return list[index + 1] ?? list[index - 1] ?? null
+    const available = (task: Task) => !excludedIds.includes(task.id)
+    if (index < 0) return list.find(available) ?? null
+    return list.slice(index + 1).find(available) ?? list.slice(0, index).reverse().find(available) ?? null
   }
 
   async function openClose() {
@@ -204,6 +205,7 @@ export default function TaskView(props: {
     const archivedProjectId = props.task.projectId
     // Held to the end, not just around the request: the spinner runs until the row leaves the rail.
     await withArchiving(archivedTaskId, async () => {
+      let archivedTaskIds = [archivedTaskId]
       // The guarded teardown (stop sessions → teardown script → remove worktree) is served through the
       // node's TASK_SESSIONS bridge, which the terminal plugin fills; without it the route 503s, so a node
       // that does not run terminals gets the plain status flip instead.
@@ -212,23 +214,34 @@ export default function TaskView(props: {
           deleteWorktree: true, force: true, skipTeardown, applyChecks: pendingChecks(),
         })
         if (!result.ok) {
+          if (result.archivedTaskIds?.length) {
+            finishArchive(result.archivedTaskIds)
+            await queryClient.invalidateQueries({ queryKey: tasksKey })
+          }
           setTeardownFailed(!!result.teardownFailed)
           setCloseError(result.output ? `${result.reason}\n${result.output}` : result.reason)
           return
         }
         // Archived either way (`ok` is true), but the owner ticked something that did not happen.
         if (result.cleanupFailed?.length) log.warn(`cleanup failed for: ${result.cleanupFailed.join(', ')}`)
+        archivedTaskIds = result.archivedTaskIds ?? [archivedTaskId]
         setPendingChecks([])
       } else {
-        await archiveTask(archivedTaskId)
+        const result = await archiveTask(archivedTaskId)
+        archivedTaskIds = result.archivedTaskIds ?? [archivedTaskId]
       }
+      finishArchive(archivedTaskIds)
+      await queryClient.invalidateQueries({ queryKey: tasksKey })
+    })
+
+    function finishArchive(archivedTaskIds: string[]) {
       completeTaskArchive(archivedTaskId, () => {
         // Only when the archived task is still the one being looked at. A guarded teardown takes
         // seconds, and the owner is free to move to another task while it runs; moving them again
         // when it finishes takes them off whatever they went to, which they chose and this did not.
-        if (activeTaskId() !== archivedTaskId) return
+        if (!archivedTaskIds.includes(activeTaskId() ?? '')) return
         // Read now rather than before the request, so the task moved to is one that still exists.
-        const next = nextTask()
+        const next = nextTask(archivedTaskIds)
         if (next) {
           activateTaskSignals(next)
           navigate(pathForTask(next))
@@ -238,9 +251,8 @@ export default function TaskView(props: {
           setActiveTaskId(null)
           navigate(projectPath(archivedProjectId))
         }
-      })
-      await queryClient.invalidateQueries({ queryKey: tasksKey })
-    })
+      }, archivedTaskIds)
+    }
   }
 
   const extraButtons = () => (

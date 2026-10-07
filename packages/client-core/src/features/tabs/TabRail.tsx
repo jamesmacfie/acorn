@@ -297,27 +297,38 @@ export default function TabRail() {
   }
 
   async function archiveInner(w: Task, applyChecks: string[]) {
+    let archivedTaskIds = [w.id]
     if (hasHostCapability({ plugin: 'terminal' })) {
       // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
       // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
       // danger row.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
-      if (!res.ok) return toast(res.output ? `${res.reason}\n${res.output}` : res.reason, { tone: 'danger' })
+      archivedTaskIds = res.archivedTaskIds ?? (res.ok ? [w.id] : [])
+      if (!res.ok) {
+        finishArchive(w, archivedTaskIds)
+        await invalidate()
+        return toast(res.output ? `${res.reason}\n${res.output}` : res.reason, { tone: 'danger' })
+      }
       const warnings: string[] = []
       if (res.cleanupFailed?.length) warnings.push(`cleanup failed for: ${res.cleanupFailed.join(', ')}`)
       if (warnings.length) toast(`Archived, but ${warnings.join('; ')}.`, { tone: 'danger' })
     } else {
-      await archiveTask(w.id)
+      const res = await archiveTask(w.id)
+      archivedTaskIds = res.archivedTaskIds ?? [w.id]
     }
+    finishArchive(w, archivedTaskIds)
+    await invalidate()
+  }
+
+  function finishArchive(w: Task, archivedTaskIds: string[]) {
     completeTaskArchive(w.id, () => {
-      if (activeTaskId() === w.id) {
+      if (archivedTaskIds.includes(activeTaskId() ?? '')) {
         setActiveTaskId(null)
         const source = defaultSourceId()
         if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
         navigate(projectPath(w.projectId))
       }
-    })
-    await invalidate()
+    }, archivedTaskIds)
   }
 
   const CoreTaskList = () => (

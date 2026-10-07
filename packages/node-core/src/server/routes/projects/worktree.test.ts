@@ -136,6 +136,23 @@ describe('worktree routes', () => {
     expect((await gated.fetch(req('/core/task-statuses'), env())).status).toBe(401)
   })
 
+  it('refuses a cascading worktree archive by a caller confined to the parent task', async () => {
+    const now = Date.now()
+    await testDb.db.insert(schema.tasks).values({
+      id: 'child', parentId: 'task1', projectId: 'project-widget', title: 'Child', origin: 'local', status: 'active', createdAt: now, updatedAt: now,
+    })
+    setTaskSessionsBridge(sessions())
+    const confined = new Hono<AppEnv>()
+      .use('/core/*', async (c, next) => {
+        c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task1' })
+        await next()
+      })
+      .route('/core', worktree)
+    const response = await confined.fetch(req('/core/tasks/task1/archive', 'POST', { force: true }), env())
+    expect(response.status).toBe(404)
+    expect((await testDb.db.select().from(schema.tasks)).every((row) => row.status === 'active')).toBe(true)
+  })
+
   // Filtered rather than gated: a task-scoped caller may ask about its own task, and each row carries
   // another task's id, absolute worktree path and dirty count. The plugin-frame caller is covered by
   // the same filter, since `core.tasks:read` grants this path.

@@ -7,6 +7,7 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } 
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import { taskScripts } from '../taskScripts/service'
+import { createTaskService } from '../core/tasks'
 import { worktreeBranchDirName } from '../worktrees/pathGuards'
 import { archiveTask, restoreTask, runTeardownProcess, type ArchiveDeps } from './archive'
 import { computeTaskStatuses, setWorktreesRoot, taskRoot } from '../worktrees/taskWorktree'
@@ -97,6 +98,87 @@ describe('archiveTask teardown ordering', () => {
   })
 
   const setTeardown = (script: string | null) => t.db.update(schema.projects).set({ teardownScript: script })
+
+  const addSubtasks = async () => {
+    const childWorktree = join(dir, 'child-wt')
+    git(checkout, 'worktree', 'add', '-q', '-b', 'feat/child', childWorktree)
+    const now = Date.now()
+    await t.db.insert(schema.tasks).values([
+      { id: 'child', title: 'Child task', origin: 'local', projectId: 'project-widget', parentId: 'task1', branch: 'feat/child', worktreePath: childWorktree, status: 'active', createdAt: now, updatedAt: now },
+      { id: 'archived-child', title: 'Archived intermediate task', origin: 'local', projectId: 'project-widget', parentId: 'child', status: 'archived', archivedAt: now, createdAt: now, updatedAt: now },
+      { id: 'grandchild', title: 'Nested task', origin: 'workflows:child', projectId: 'project-widget', parentId: 'archived-child', status: 'active', createdAt: now, updatedAt: now },
+      { id: 'unrelated', title: 'Another task', origin: 'local', projectId: 'project-widget', status: 'active', createdAt: now, updatedAt: now },
+    ])
+    return childWorktree
+  }
+
+  it('archives every descendant with its own lifecycle and leaves unrelated tasks active', async () => {
+    const childWorktree = await addSubtasks()
+    await setTeardown('true')
+    const stopped: string[] = []
+    const dropped: string[] = []
+    const teardown: string[] = []
+    const cleanups: string[] = []
+    const result = await archiveTask(t.db, 'task1', { force: true, applyChecks: ['docker:containers:c'] }, {
+      ...deps(),
+      runningCount: () => 1,
+      killRunning: (id) => { stopped.push(id) },
+      taskArchiving: async (id) => { expect(stopped).toContain(id) },
+      dropTaskSessions: async (id) => { dropped.push(id) },
+      runTeardown: async (script, cwd, env, id) => {
+        expect(isDir(cwd)).toBe(true)
+        expect(env.ACORN_TASK_ID).toBe(id)
+        teardown.push(id)
+        return runTeardownProcess(script, cwd, env)
+      },
+      applyTaskChecks: async (task) => { cleanups.push(task.id); return [] },
+    })
+    expect(result).toEqual({ ok: true, archivedTaskIds: ['grandchild', 'child', 'task1'] })
+    expect(stopped).toEqual(['grandchild', 'child', 'task1'])
+    expect(dropped).toEqual(stopped)
+    expect(teardown).toEqual(['child', 'task1'])
+    expect(cleanups).toEqual(['task1'])
+    expect(existsSync(worktree)).toBe(false)
+    expect(existsSync(childWorktree)).toBe(false)
+    const rows = await t.db.select().from(schema.tasks)
+    expect(rows.filter((row) => row.status === 'active').map((row) => row.id)).toEqual(['unrelated'])
+    for (const row of rows.filter((row) => row.id !== 'unrelated')) {
+      expect(row.archivedAt).toEqual(expect.any(Number))
+      expect(row.worktreePath).toBeNull()
+    }
+  })
+
+  it('keeps the parent active on a subtask failure and skips completed subtasks on retry', async () => {
+    const childWorktree = await addSubtasks()
+    await setTeardown('exit 3')
+    const dropped: string[] = []
+    const d = { ...deps(), dropTaskSessions: async (id: string) => { dropped.push(id) } }
+    expect(await archiveTask(t.db, 'task1', {}, d)).toMatchObject({
+      ok: false, teardownFailed: true, reason: 'Could not archive subtask "Child task": Teardown script failed (exit 3).', archivedTaskIds: ['grandchild'],
+    })
+    expect(isDir(worktree)).toBe(true)
+    expect(isDir(childWorktree)).toBe(true)
+    expect((await t.db.select().from(schema.tasks).where(eq(schema.tasks.id, 'task1')))[0]?.status).toBe('active')
+    expect(await archiveTask(t.db, 'task1', { skipTeardown: true }, d)).toEqual({ ok: true, archivedTaskIds: ['child', 'task1'] })
+    expect(dropped).toEqual(['grandchild', 'child', 'task1'])
+    expect(isDir(worktree)).toBe(false)
+    expect(isDir(childWorktree)).toBe(false)
+  })
+
+  it('claims the whole tree and refuses new children while a descendant is being archived', async () => {
+    await addSubtasks()
+    const result = await archiveTask(t.db, 'task1', {}, {
+      ...deps(),
+      dropTaskSessions: async (id) => {
+        if (id !== 'grandchild') return
+        expect(await archiveTask(t.db, 'child', {}, deps())).toEqual({ ok: false, reason: 'Task archive is already in progress.' })
+        expect(await taskRoot(t.db, 'task1')).toBeNull()
+        await expect(createTaskService(t.db).createChild('task1', { title: 'Late child', branch: 'late' })).rejects.toThrow('being archived')
+      },
+    })
+    expect(result.ok).toBe(true)
+    expect((await t.db.select().from(schema.tasks)).map((row) => row.title)).not.toContain('Late child')
+  })
 
   it('runs teardown in the live worktree (ACORN_* env) before removal', async () => {
     const marker = join(dir, 'marker')

@@ -26,6 +26,7 @@ describe('confirmTaskArchive', () => {
     const decision = confirmTaskArchive({ id: 'task-1', title: 'Add task search', branch: 'feature', worktreePath: '/tmp/worktrees/feature' })
 
     await expect.poll(() => dialog()?.textContent).toContain('deletes its worktree')
+    expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
     expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Add task search')
     expect(footer().map((button) => button.textContent)).toEqual(['Cancel', 'Archive task'])
 
@@ -37,6 +38,7 @@ describe('confirmTaskArchive', () => {
     const decision = confirmTaskArchive({ id: 'task-2', title: 'Review release notes', branch: null, worktreePath: '/tmp/project' })
 
     await expect.poll(() => dialog()?.textContent).toContain('leaves the project folder as it is')
+    expect(dialog()?.textContent).toContain('All subtasks, including nested subtasks, will also be archived.')
     expect(dialog()?.querySelector('.overlay-body')?.firstElementChild?.textContent).toBe('Review release notes')
     expect(dialog()?.textContent).not.toContain('worktree')
 

@@ -3,14 +3,14 @@ import { Hono } from 'hono'
 import { z } from 'zod'
 import type { TeardownResult } from '../../storage/archive'
 import type { ArchiveOpts, ArchiveResult } from '@acorn/protocol/task.ts'
-import { archiveTask, restoreTask, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
+import { archiveTask, restoreTask, taskArchiveTree, TEARDOWN_TIMEOUT_MS } from '../../storage/archive'
 import { runProcess } from '../../core/proc'
 import { broadcastWorktreeStatusChanged } from '../../notify'
 import { buildSessionEnv } from '../../taskEnv'
 import { computeTaskStatuses, isDir, loadTask, projectForTask, projectSetup, resolveTaskCwd, taskRoot, toTaskRef } from '../../worktrees/taskWorktree'
 import { applyTaskChecks, collectTaskConcerns } from '../../pluginHost/taskChecks'
 import { runHook } from '../../pluginHost/hooks'
-import { routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
+import { BridgeError, routeCapability, routeCapabilityFor, setRouteTestCapability, viaBridge } from '../../bridge'
 import { getDb } from '../../db'
 import type { AppEnv } from '../../middleware/auth'
 import { isTaskConfined, mayActOnTask } from '../../middleware/requireUser'
@@ -89,7 +89,6 @@ async function capturePreviewUrl(
 // live-session half comes from the slot.
 async function archive(db: ReturnType<typeof getDb>, taskId: string, opts: ArchiveOpts, sessions: TaskSessionsBridge): Promise<ArchiveResult> {
   if (!taskId) return { ok: false, reason: 'Invalid task.' }
-  await sessions.ready()
   return archiveTask(db, taskId, opts, {
     isDir,
     runningCount: sessions.runningCount,
@@ -160,7 +159,11 @@ export const worktree = new Hono<AppEnv>()
   .post('/tasks/:id/archive', async (c) => {
     const parsed = archiveBody.safeParse(await c.req.json().catch(() => ({})))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
-    return viaBridge(c, TASK_SESSIONS, (sessions) => archive(getDb(c.env), c.req.param('id'), parsed.data, sessions))
+    return viaBridge(c, TASK_SESSIONS, async (sessions) => {
+      await sessions.ready()
+      if (taskArchiveTree(getDb(c.env), c.req.param('id')).some((task) => !mayActOnTask(c, task.id))) throw new BridgeError(404, 'not_found')
+      return archive(getDb(c.env), c.req.param('id'), parsed.data, sessions)
+    })
   })
   .post('/tasks/:id/restore', async (c) => {
     const parsed = restoreBody.safeParse(await c.req.json().catch(() => ({})))
