@@ -60,4 +60,6 @@ export type TopbarProps = TopbarData & {
   navigate(route: string): void
   clearCache(): void | Promise<void>
   addProject(): void
+  /** The routed project page, including a plugin path, when one is visible. */
+  copyLink?: () => void
 }

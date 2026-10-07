@@ -7,12 +7,15 @@ import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
-import { selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { isTerminalOpen, setTerminalOpen } from '@acorn/client-core/features/tasks/tasks.ts'
-import { clientEvents, registerCommands } from '@acorn/client-core/host/registries/commands'
+import { buildLink, clientEvents, registerCommands, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
 import { registerKeybindings } from '@acorn/client-core/host/registries/commands'
 import { registerNoticeTargetHandler } from '@acorn/client-core/features/notifications'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
+import { sourceIsProjectScoped } from '@acorn/client-core/host/registries/sources'
+import { currentPath } from '../kit/router'
+import { copyToTerminal } from '../kit/copy'
 import { pendingTerminalTrust } from '@acorn/client-core/host/plugins/distribution.ts'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { Dynamic } from '../tree/renderer'
@@ -26,7 +29,7 @@ import { startSpinner } from '../kit/tick'
 import { createShellModel, type ShellModel } from './model'
 import { installRestore } from './restore'
 import { chooseProject, installRouting, routedProjectId } from './routing'
-import { closeOverlay, openOverlay, topOverlay } from './state'
+import { closeOverlay, isOverlayOpen, openOverlay, topOverlay } from './state'
 import { cyclePane } from './panes'
 import { Rail, railCells } from './Rail'
 import { PANES, SOURCE, topology } from './topology'
@@ -48,7 +51,7 @@ import { SessionsHost } from './SessionsHost'
 import { FileDialog } from './FileDialog'
 import { activeFilePrompt } from './filePrompt'
 import { SettingsHost } from './SettingsHost'
-import { closeSettings, openSettings } from './settingsStore'
+import { closeSettings, openSettings, settingsPlace } from './settingsStore'
 import { Confirmation } from './Confirmation'
 import { activeConfirmation } from './confirmStore'
 
@@ -198,6 +201,16 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // The shell's own commands. Registered rather than written into a key handler, so each one is also
   // a palette row and each chord is one the reader can rebind, which is what every other command in
   // the app already is (docs/command-palette-and-shortcuts.md).
+  const linkPlace = (): Extract<Place, { kind: 'task' | 'project' | 'settings' | 'source' }> | null => {
+    if (isOverlayOpen('settings')) return { kind: 'settings', ...(settingsPlace().pageId ? { pageId: settingsPlace().pageId } : {}) }
+    const source = selectedSource()
+    if (!source) {
+      const task = model.task()
+      if (!task) return null
+      return taskPlace(task, focusedPane(task.id))
+    }
+    return sourcePlaceFromPath(currentPath(), source, sourceIsProjectScoped(source))
+  }
   onMount(() => {
     const quit = () => {
       // A node this TUI started dies with it, and a reader who typed `q` by accident should not
@@ -207,6 +220,13 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       else props.onQuit()
     }
     const commands = registerCommands([
+      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
+        when: () => !!linkPlace(), run: () => {
+          const place = linkPlace()
+          if (!place) return
+          const href = buildLink(props.nodeId, place)
+          return copyToTerminal(href) ? { effect: 'close' as const } : { effect: 'stay' as const, status: href }
+        } },
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
       { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },

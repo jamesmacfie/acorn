@@ -1,6 +1,46 @@
 # Phase 03: copy link
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: phase 01.
+## Completion note, October 8, 2026
+
+Implemented one core **Copy link** command in the desktop and terminal palettes. The desktop uses
+the Settings layer's page and Node while it is open. Otherwise it copies the visible task, a project
+route owned by the visible source, or the rail source. Project routes retain their encoded plugin
+path. The task row and rail source menus use their clicked targets, so an inactive task row never
+copies the active task. The project action is in the topbar menu, and Settings has a header button.
+Loaded plugin project pages receive the action from the host without plugin code.
+
+Task links include the focused pane. A pane can report a linkable selected item through
+`selectedItem(task)` on its contribution; no pane reports one in this phase, so current task links
+stop at the pane. The copy helper uses `buildLink` with a concrete Node ID, waits for the clipboard
+write, and shows success or failure in the transient toast stack. The terminal uses its OSC 52
+clipboard path and shows the link in the palette when that path is unavailable. This phase adds no
+terminal startup or link-dispatch behavior.
+
+The loaded HTTP source does not declare `projectScoped`, though its page is routed below
+`/p/:projectId/x/http/`. Copy link checks ownership of the routed surface, not that flag alone. It
+also ignores a stale project path when another source is on screen. The settings header copies the
+Node shown by a page's Node switcher, which can differ from the Node behind the overlay.
+
+Focused tests cover encoded plugin path parsing, clipboard refusal, task pane and item selection,
+source ownership, and a right click on a nonactive task row. The desktop agent session copied
+`acorn://ae6734dc-ea23-4221-8e99-226825a28fff/p/71f1b100-6d87-450b-8346-fea47353ebee/x/http/requests/sample%20id`
+from the loaded HTTP page; the driver reopened that link at the same route. The Settings button
+copied `acorn://ae6734dc-ea23-4221-8e99-226825a28fff/settings/integrations` while Settings
+covered Home. Screenshots are in the isolated `phase03-copy-link` agent session. An unpaired Node
+link returned the refusal. Client-core, desktop, TUI, and protocol scoped lint and all 87
+architecture tests passed.
+
+The desktop package suite passed 174 tests and retained 11 baseline plugin-disable snapshot
+failures when run with loopback access (`/private/tmp/acorn-phase03-desktop-escalated.log`). The
+client-core suite passed 2,519 tests and retained its two baseline scope and CSS assertions; one
+pane timing failure in an earlier loaded run passed on a focused rerun
+(`/private/tmp/acorn-phase03-client-core-final.log`). The TUI
+suite passed 676 tests with host access and has one `sourceSwitch.test.tsx` failure that
+also fails when run alone (`/private/tmp/acorn-phase03-tui-escalated.log`). The coordinator owns the
+final gate and the phase 02 installed-bundle check. Phase 05 can use the same address builder without
+changing this copy action.
+
+Date: October 8, 2026. Status: implemented. Dependencies: phase 01.
 Read the [plan](./README.md), especially the decision that
 [Copy link produces the exact path](./README.md#decisions).
 

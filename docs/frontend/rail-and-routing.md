@@ -118,3 +118,8 @@ owns a project subpath, the dispatcher opens the project and reports the missing
 An explicit project address keeps its route and selected source when it enters another workspace;
 that workspace's remembered task or source does not replace the linked destination. Ordinary
 workspace-picker navigation continues to restore the remembered view.
+**Copy link** uses the exact encoded project route when the visible source owns it, including loaded
+plugin paths whose source does not declare `projectScoped`. Selecting another source leaves a stale
+route behind, so that route alone is not enough to decide what the reader sees.
+The task row and rail source menus use their clicked target, even when a different task or source is
+active. The project page action lives in the topbar menu.

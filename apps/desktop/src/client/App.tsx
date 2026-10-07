@@ -47,7 +47,7 @@ import { createAppStartupRestore } from '@acorn/client-core/infra/persistence'
 import { createTaskDeepLink } from '@acorn/client-core/features/tasks'
 import { defaultSourceId, sourceIsProjectScoped, sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { SourceSurface } from '@acorn/client-core/host/registries/sources/SourceSurface.tsx'
-import { CREATE_TASK_ROUTE, projectPath } from '@acorn/client-core/host/registries/commands'
+import { CREATE_TASK_ROUTE, copyLink, projectPath, sourcePlaceFromPath, taskPlace, type Place } from '@acorn/client-core/host/registries/commands'
 import { availableSources } from '@acorn/client-core/features/tabs'
 import { createSourceScope } from '@acorn/client-core/features/tabs'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -83,6 +83,7 @@ export default function App() {
   // call, so a deep link that arrives while settings is open still navigates. With no target it opens on
   // the last page used; a target is `settings/<pageId>#<sectionId>` or a bare page id.
   const [settingsRequest, setSettingsRequest] = createSignal<SettingsRequest | null>(null)
+  const [settingsLink, setSettingsLink] = createSignal<{ nodeId: string; place: Extract<Place, { kind: 'settings' }> } | null>(null)
   const openSettings = (target?: string): void => { setSettingsRequest(target ? { target } : {}) }
   // Panes deep-link here rather than receiving an `openSettings` prop: the layer is the shell's, and
   // threading a callback through every pane that might ever want one is worse than one event.
@@ -91,6 +92,24 @@ export default function App() {
   // browse like Pull requests has no terminal) and its open/closed state is tracked per task, so
   // switching tabs swaps it. `termOpen` reflects the active task's state within the Task view.
   const inTaskView = () => !selectedSource() && !!activeTask()
+  const visibleLinkPlace = (): Extract<Place, { kind: 'task' | 'project' | 'source' }> | null => {
+    if (inTaskView()) {
+      const task = activeTask()!
+      return taskPlace(task, focusedPane(task.id))
+    }
+    const source = selectedSource()
+    if (!source) return null
+    return isNew() ? null : sourcePlaceFromPath(location.pathname, source, sourceIsProjectScoped(source))
+  }
+  const copyVisibleLink = () => {
+    if (settingsRequest()) {
+      const settings = settingsLink()
+      if (settings) void copyLink(settings.nodeId, settings.place)
+      return
+    }
+    const place = visibleLinkPlace()
+    if (place) void copyLink(activeNodeId(), place)
+  }
   const termOpen = () => inTaskView() && isTerminalOpen(activeTaskId())
   const toggleTerm = () => {
     const id = activeTaskId()
@@ -118,6 +137,8 @@ export default function App() {
   // keydown listener. Maximize is focus-directed and never enters persisted TaskLayout state.
   onMount(() => {
     const commands = registerCommands([
+      { id: 'core.copy-link', title: 'Copy link', category: 'action', palette: true,
+        when: () => settingsRequest() ? !!settingsLink() : !!visibleLinkPlace(), run: copyVisibleLink },
       { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
       {
         id: 'core.project.add', title: 'Add project', hint: 'from a folder, into this workspace', category: 'workspace', palette: true,
@@ -555,6 +576,7 @@ export default function App() {
       },
       clearCache: () => clearCache(queryClient),
       addProject: () => void addProjectFromFolder(queryClient, activeWorkspace()?.id),
+      copyLink: visibleLinkPlace()?.kind === 'project' ? copyVisibleLink : undefined,
     }
   }
   const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)
@@ -619,7 +641,8 @@ export default function App() {
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
       <Show when={settingsRequest()}>
-        {(request) => <Portal><SettingsView request={request()} onClose={() => setSettingsRequest(null)} /></Portal>}
+        {(request) => <Portal><SettingsView request={request()} onClose={() => { setSettingsRequest(null); setSettingsLink(null) }}
+          onLinkPlace={setSettingsLink} onCopyLink={copyVisibleLink} /></Portal>}
       </Show>
       {/* After settings, so a confirmation a settings page asks for paints above the layer that asked. */}
       <WillConfirmationHost />

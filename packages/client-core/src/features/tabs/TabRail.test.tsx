@@ -8,9 +8,10 @@ import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
-const { archiveTaskMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
-  archiveTaskMock: vi.fn(), createTaskMock: vi.fn(), navigateMock: vi.fn(), readJsonMock: vi.fn(),
+const { archiveTaskMock, copyLinkMock, createTaskMock, navigateMock, readJsonMock } = vi.hoisted(() => ({
+  archiveTaskMock: vi.fn(), copyLinkMock: vi.fn(), createTaskMock: vi.fn(), navigateMock: vi.fn(), readJsonMock: vi.fn(),
 }))
+vi.mock('../../host/registries/commands/copyLink', () => ({ copyLink: copyLinkMock }))
 vi.mock('../../infra/node/apiClient', () => ({ readJson: readJsonMock }))
 vi.mock('../tasks/taskMutations', () => ({
   archiveTask: archiveTaskMock,
@@ -72,6 +73,7 @@ const registered: Disposable[] = []
 beforeEach(() => {
   vi.useFakeTimers()
   archiveTaskMock.mockReset()
+  copyLinkMock.mockReset()
   navigateMock.mockReset()
   createTaskMock.mockReset()
   readJsonMock.mockReset()
@@ -202,6 +204,17 @@ describe('hovering a task row', () => {
 })
 
 describe('dragging a task row', () => {
+  it('copies the right-clicked task even when another task is active', () => {
+    setActiveTaskId('t1')
+    const rows = mount()
+    rows[1]!.dispatchEvent(new MouseEvent('contextmenu', { button: 2, bubbles: true, cancelable: true }))
+    const copy = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
+      .find((item) => item.textContent?.includes('Copy link'))!
+    copy.click()
+    expect(copyLinkMock).toHaveBeenCalledWith(null, { kind: 'task', taskId: 't2' })
+    expect(activeTaskId()).toBe('t1')
+  })
+
   it('opens row actions on right-click without selecting or dragging that task', () => {
     setActiveTaskId('t1')
     const rows = mount()

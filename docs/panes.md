@@ -98,6 +98,8 @@ item in it.
 because the layout restores itself from its own persisted state. A lingering `?pane=` would keep
 asserting a view you'd left. An unknown pane ID is rejected instead of dispatched, so a bad link
 can't push a placeholder into the durable layout. Every pane gets this without contributing a route.
+For **Copy link**, a pane may expose `selectedItem(task)` on its contribution when it can name the
+current item using the `?item=` intent. Without that report, the link names the focused pane alone.
 
 ## Pane scope
 

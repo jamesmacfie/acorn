@@ -37,6 +37,7 @@ import { registerContextMenuItems, type TaskRowTarget, type RailSourceTarget } f
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import { menuPoint } from '../../host/registries/panes/menuPoint'
 import { activeNodeId } from '../../infra/node/activeNode'
+import { copyLink } from '../../host/registries/commands/copyLink'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
@@ -159,10 +160,16 @@ export default function TabRail() {
     openedSource = sourceRegistry.get(id)
     setSourceMenu({ at, target })
   }
-  const sourceAction = registerContextMenuItems< 'rail.source'>([{
-    id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
-    run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
-  }])
+  const sourceAction = registerContextMenuItems<'rail.source'>([
+    {
+      id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
+      run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
+    },
+    {
+      id: 'core:rail-source-copy-link', location: 'rail.source', label: 'Copy link', icon: 'copy', order: 110,
+      run: (target) => { if (target.nodeId === activeNodeId()) void copyLink(target.nodeId, { kind: 'source', sourceId: target.id }) },
+    },
+  ])
   onCleanup(() => sourceAction.dispose())
   createEffect(() => {
     const opened = sourceMenu()?.target
@@ -205,6 +212,10 @@ export default function TabRail() {
     // Core's own row actions, registered rather than written inline (docs/plugins/menus-and-markers.md § Context
     // menus).
     const rowActions = registerContextMenuItems([
+      {
+        id: 'task.copy-link', location: 'task.row', label: 'Copy link', icon: 'copy', order: 5,
+        run: (target) => void copyLink(activeNodeId(), { kind: 'task', taskId: target.id }),
+      },
       {
         id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
         when: (target) => !target.pinned,

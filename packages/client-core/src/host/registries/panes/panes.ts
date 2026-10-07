@@ -27,6 +27,8 @@ type PaneCommon = {
   defaultChord?: string
   requires?: HostCapabilityRequirement
   when?: (task: Task) => boolean
+  /** A linkable item currently selected in this pane, when the pane can report one. */
+  selectedItem?: (task: Task) => string | undefined
   /**
    * Warm this pane's first read for a task the reader is pointing at but has not opened
    * (docs/panes/contributions.md § Contributions).
