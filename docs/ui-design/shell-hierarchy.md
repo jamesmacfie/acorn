@@ -42,6 +42,13 @@ rail provider places the host's task-list slot, and the top bar provider places 
 status slot. Settings warns when a provider says it leaves out either. The terminal hosts only
 `rail.taskList`.
 
+The desktop topbar follows the active Node's `core.workspaces` mode. With workspaces on, its first
+picker selects a workspace and a second picker appears for project-scoped sources. With workspaces
+off, the first picker is labeled **Project**, lists visible projects across the fleet, and offers
+**Add project…** on a local Node. The second picker is hidden. A paired workspace whose only project
+is hidden is absent from the picker. The label follows the active Node while other Nodes may use a
+different mode.
+
 ### Geometry
 
 The top bar spans the window, and the rails and panes start under its bottom border, so that border

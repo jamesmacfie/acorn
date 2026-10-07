@@ -20,14 +20,16 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <Show when={props().workspaces.length}>
+        <Show when={props().workspacesMode && props().workspaces.length}>
           <Picker
             size="sm"
-            label={props().workspace?.label ?? 'Select a workspace'}
-            placeholder="Filter workspaces…" emptyText="No workspaces."
+            label={props().workspace?.label ?? (props().workspacesMode === 'off' ? 'Select a project' : 'Select a workspace')}
+            ariaLabel={props().workspacesMode === 'off' ? 'Project' : 'Workspace'}
+            placeholder={props().workspacesMode === 'off' ? 'Filter projects…' : 'Filter workspaces…'}
+            emptyText={props().workspacesMode === 'off' ? 'No projects.' : 'No workspaces.'}
             results={workspaceResults}
             rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}`}
-            rowDescription={(entry) => entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
+            rowDescription={(entry) => props().workspacesMode === 'off' ? undefined : entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
             isActive={(entry) => entry.id === props().workspace?.id && entry.nodeId === props().node?.id}
             onSelect={(entry) => props().pickWorkspace(entry.id, entry.nodeId)}
             footer={props().canAddProject
@@ -37,7 +39,7 @@ export default function Topbar(own: { value?: unknown }) {
               : undefined}
           />
         </Show>
-        <Show when={props().projectPickerVisible}>
+        <Show when={props().workspacesMode === 'on' && props().projectPickerVisible}>
           <Picker
             size="sm"
             label={props().project?.label ?? 'Select a project'}

@@ -9,7 +9,7 @@ import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsO
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createWorkspacesMode, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -116,8 +116,9 @@ export default function App() {
     const commands = registerCommands([
       { id: 'core.settings.open', title: 'Open settings', hint: 'on the page you used last', category: 'navigation', palette: true, run: () => openSettings() },
       {
-        id: 'core.project.add', title: 'Add project', hint: 'from a folder, into this workspace', category: 'workspace', palette: true,
-        when: canAddProjectFromFolder, run: () => void addProjectFromFolder(queryClient, activeWorkspace()?.id),
+        id: 'core.project.add', title: 'Add project', hint: 'from a folder', category: 'workspace', palette: true,
+        when: () => canAddProjectFromFolder() && !!workspaceMode(),
+        run: () => { const mode = workspaceMode(); if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined) },
       },
       { id: 'core.rail.toggle', title: 'Toggle rail', category: 'navigation', run: () => toggleRail() },
       {
@@ -276,6 +277,7 @@ export default function App() {
   // Always refetched on mount, because the startup restore waits for the node's answer and a cached
   // value inside its stale time would otherwise never be asked for again.
   const prefs = createQuery(() => ({ ...prefsOptions(nodeReady()), refetchOnMount: 'always' as const }))
+  const workspaceMode = createWorkspacesMode()
   const mountedAt = Date.now()
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
   const projects = createQuery(() => projectsOptions(nodeReady()))
@@ -476,6 +478,7 @@ export default function App() {
       projectRoute: projectPath,
     })
     return {
+      workspacesMode: workspaceMode() ?? null,
       workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
         id: entry.workspace.id, label: entry.workspace.name, nodeId: entry.nodeId,
@@ -483,13 +486,13 @@ export default function App() {
       })),
       project: project ? { id: project.id, label: project.name } : null,
       projects: scopedProjects().map((entry) => ({ id: entry.id, label: entry.name })),
-      projectPickerVisible: showProjectPicker(),
+      projectPickerVisible: workspaceMode() === 'on' && showProjectPicker(),
       projectPickerDisabled: false,
       breadcrumb,
       node: active ? { id: active, label: nodes().find((entry) => entry.nodeId === active)?.label ?? active, state: nodeState(active) } : null,
       nodes: nodes().map((entry) => ({ id: entry.nodeId, label: entry.label, state: nodeState(entry.nodeId) })),
       account: null,
-      canAddProject: canAddProjectFromFolder(),
+      canAddProject: !!workspaceMode() && canAddProjectFromFolder(),
       slots: { right: rightSlotRef },
       pickWorkspace: (id, nodeId) => {
         const entry = fleetWorkspaces().entries.find((candidate) => candidate.workspace.id === id && candidate.nodeId === nodeId)
@@ -516,7 +519,7 @@ export default function App() {
         navigate(route)
       },
       clearCache: () => clearCache(queryClient),
-      addProject: () => void addProjectFromFolder(queryClient, activeWorkspace()?.id),
+      addProject: () => { const mode = workspaceMode(); if (mode) void addProjectFromFolder(queryClient, mode, mode === 'on' ? activeWorkspace()?.id : undefined) },
     }
   }
   const coreTopbar = registerCoreExclusiveSlot('topbar', Topbar)

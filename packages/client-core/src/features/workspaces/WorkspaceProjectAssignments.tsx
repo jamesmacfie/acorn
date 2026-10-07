@@ -11,6 +11,7 @@ import Icon from '../../kit/components/content/Icon'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { Stack } from '../../kit/components/layout/Stack'
 import { ProjectTable, type ProjectGroup } from './ProjectTable'
+import { createWorkspacesMode } from './workspacesMode'
 import './projects.css'
 
 // Settings → Overview: every project on the node in one table, grouped under the workspace it belongs
@@ -26,6 +27,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
   const projects = createQuery(() => projectsOptions(true))
   const workspaces = createQuery(() => workspacesOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
+  const mode = createWorkspacesMode()
   const [newWorkspace, setNewWorkspace] = createSignal<string | null>(null)
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
@@ -48,6 +50,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
 
   const groups = createMemo((): ProjectGroup[] => {
     const all = projects.data ?? []
+    if (mode() === 'off') return [{ id: 'projects', label: 'Projects', projects: all }]
     const known = new Set((workspaces.data ?? []).map((workspace) => workspace.id))
     // A project whose workspace is missing from the list would otherwise vanish with no way to rescue it.
     const orphans = all.filter((project) => !known.has(project.workspaceId))
@@ -102,7 +105,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
     <SettingsSection
       id="projects"
       label="Projects"
-      help="A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub."
+      help={mode() === 'on' ? 'A project is a folder on this computer, and workspaces group them. Add a folder, or import repositories from GitHub.' : 'Add a folder, or import repositories from GitHub.'}
       actions={
         <>
           <Show when={canPickFolder()}>
@@ -117,7 +120,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
               </Button>
             )}
           </For>
-          <Button onPress={() => setNewWorkspace('')}>New workspace</Button>
+          <Show when={mode() === 'on'}><Button onPress={() => setNewWorkspace('')}>New workspace</Button></Show>
         </>
       }
     >
@@ -139,7 +142,7 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
 
         {/* Revealed on demand rather than a form sitting permanently above the table, where it read as
             the primary action on a page whose primary action is adding a project. */}
-        <Show when={newWorkspace() !== null}>
+        <Show when={mode() === 'on' && newWorkspace() !== null}>
           <form class="ws-add-form" onSubmit={addWorkspace}>
             <Input
               label="Workspace name"
@@ -154,16 +157,17 @@ export default function WorkspaceProjectAssignments(props: { navigate: (target: 
           </form>
         </Show>
 
-        <ProjectTable
+        <Show when={mode()}><ProjectTable
           groups={groups()}
           workspaces={workspaces.data ?? []}
           taskCount={taskCount}
-          groupHeads
+          groupHeads={mode() === 'on'}
+          allowMove={mode() === 'on'}
           openProject={(id) => props.navigate(projectSettingsTarget(id))}
           openWorkspace={(id) => props.navigate(workspaceSettingsTarget(id))}
           mapFolder={(id) => void mapFolder(id)}
           refresh={refresh}
-        />
+        /></Show>
       </Stack>
     </SettingsSection>
   )

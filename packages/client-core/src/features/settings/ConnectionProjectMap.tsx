@@ -7,6 +7,7 @@ import { setIntegrationMappings } from '../workspaces/workspaceMutations'
 import { Alert, Button, EmptyState, Select, Table, TableCell, TableHead, TableRow } from '../../kit/components/primitives'
 import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { createSettingSave } from './settingSave'
+import { createWorkspacesMode } from '../workspaces/workspacesMode'
 
 // Settings > Services, on one connection's page: where that connection's external projects show up
 // (docs/integrations/project-sources.md § Project sources). One connection often serves every workspace on the
@@ -42,6 +43,7 @@ export default function ConnectionProjectMap(props: {
   const projects = createQuery(() => integrationProjectsOptions(props.connection.id, true))
   const mappings = createQuery(() => integrationMappingsOptions(props.connection.id, true))
   const workspaces = createQuery(() => workspacesOptions(true))
+  const mode = createWorkspacesMode()
 
   const [externalId, setExternalId] = createSignal('')
   const [target, setTarget] = createSignal('')
@@ -53,7 +55,7 @@ export default function ConnectionProjectMap(props: {
   const all = (): IntegrationMapping[] => mappings.data ?? []
   // A write replaces the connection's whole list, so it waits for the stored one. Written over a list
   // still loading, or one that failed to read, it would drop every link that list held.
-  const locked = () => busy() || !mappings.isSuccess
+  const locked = () => busy() || !mappings.isSuccess || !mode()
   const reaches = (row: IntegrationMapping, project: Project) =>
     row.workspaceId === project.workspaceId && (!row.projectId || row.projectId === project.id)
   const rows = (): IntegrationMapping[] => {
@@ -73,7 +75,10 @@ export default function ConnectionProjectMap(props: {
   // draws its own list and has no notion of an option group; carrying the workspace because that is
   // what makes the list's filter box answer "everything under Runn". One list, so a stored row and
   // the picker always name a target the same way.
-  const targets = createMemo(() => spaces().filter((workspace) => !props.workspace || workspace.id === props.workspace.id).flatMap((workspace) => [
+  const targets = createMemo(() => !mode() ? [] : mode() === 'off'
+    ? spaces().filter((workspace) => !props.workspace || workspace.id === props.workspace.id)
+      .flatMap((workspace) => workspace.projects.map((project) => ({ value: workspace.id, label: project.name })))
+    : spaces().filter((workspace) => !props.workspace || workspace.id === props.workspace.id).flatMap((workspace) => [
     { value: workspace.id, label: `${workspace.name} · All projects` },
     ...workspace.projects.map((project) => ({
       value: encodeTarget(workspace.id, project.id),
@@ -109,7 +114,10 @@ export default function ConnectionProjectMap(props: {
   }
 
   const add = (): void => {
-    const chosen = props.project ? { workspaceId: props.project.workspaceId, projectId: props.project.id } : decodeTarget(target())
+    if (!mode()) return
+    const chosen = props.project
+      ? mode() === 'off' ? { workspaceId: props.project.workspaceId } : { workspaceId: props.project.workspaceId, projectId: props.project.id }
+      : decodeTarget(target())
     const mapping: IntegrationMapping = { workspaceId: chosen.workspaceId, externalId: externalId(), ...(chosen.projectId ? { projectId: chosen.projectId } : {}) }
     if (all().some((row) => sameMapping(row, mapping))) return
     setExternalId('')
@@ -124,9 +132,9 @@ export default function ConnectionProjectMap(props: {
         description={props.project
           ? undefined
           : props.workspace
-            ? 'Pick All projects to show it across this workspace, or one project to show it only there.'
-            : 'Follow a project in a whole workspace, or in one project only.'}
-        help={props.project ? "Projects followed by the whole workspace show here too. Change those on the workspace's page." : undefined}
+            ? mode() === 'off' ? undefined : 'Pick All projects to show it across this workspace, or one project to show it only there.'
+            : mode() === 'off' ? 'Choose the project where this service shows up.' : 'Follow a project in a whole workspace, or in one project only.'}
+        help={props.project && mode() === 'on' ? "Projects followed by the whole workspace show here too. Change those on the workspace's page." : undefined}
         layout="stacked"
         savedAt={save.savedAt()}
         error={save.error()}
@@ -167,7 +175,7 @@ export default function ConnectionProjectMap(props: {
                   <TableCell header>{labels().get(row.externalId) ?? row.externalId}</TableCell>
                   <TableCell>{names().get(encodeTarget(row.workspaceId, row.projectId)) ?? row.workspaceId}</TableCell>
                   <TableCell align="end">
-                    <Show when={!props.project || row.projectId}>
+                    <Show when={mode() === 'off' || !props.project || row.projectId}>
                       <Button
                         variant="ghost"
                         tone="danger"

@@ -12,6 +12,16 @@ page. Selecting rows opens a bar under the table: **Move to workspace**, whose l
 workspace, **Hide** or **Show**, and **Set colour**. The bar calls the one-project `PATCH` route for each
 row and names each project that failed. A workspace's page draws the same table for its projects.
 
+With workspaces off, Overview shows one flat project table. Its selection bar offers **Hide** or
+**Show** and **Set colour**. Workspace creation and move controls are absent. Settings lists project
+pages directly under Overview and omits workspace pages. A project's General tab omits the workspace
+field. Deleting a project removes its workspace, links, and datasets. Its Home boards, notes, saved
+queries, and workflow definitions remain stored under that removed workspace, so they become
+inaccessible. The folder and task worktrees remain on disk.
+
+On a connection's Services page, workspaces off offers a project target. The connection map writes
+the project's workspace ID without a project ID. Workspaces on retains both target types.
+
 A workspace's page (`features/settings/WorkspaceSettings.tsx`) holds its name, its projects, the
 services it follows (`features/settings/ProjectConnections.tsx`), and a danger zone that deletes it. A
 project's page (`features/settings/ProjectSettings.tsx`) has five tabs:

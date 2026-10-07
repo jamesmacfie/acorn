@@ -1,5 +1,6 @@
 import { createMemo } from 'solid-js'
-import { workspacesKey, workspacesRoute, type Workspace } from '@acorn/protocol/api.ts'
+import { prefsKey, prefsRoute, projectsKey, projectsRoute, workspacesKey, workspacesRoute, type Project, type ProjectsResponse, type Workspace } from '@acorn/protocol/api.ts'
+import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import { readJson } from '../../infra/node/apiClient'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
@@ -22,22 +23,45 @@ export type FleetWorkspaceList = {
   grouped: boolean
 }
 
+/** Hide dead picker rows; off mode also excludes projects hidden on that specific Node. */
+export function pickerWorkspaces(workspaces: readonly Workspace[], projects: readonly Project[], preference: string | undefined): Workspace[] {
+  if (workspacesMode(preference, projects.length) === 'on') return workspaces.filter((workspace) => workspace.projects.length > 0)
+  const visible = new Set(projects.filter((project) => !project.hidden).map((project) => project.id))
+  return workspaces.flatMap((workspace) => {
+    const members = workspace.projects.filter((project) => visible.has(project.id))
+    return members.length ? [{ ...workspace, projects: members }] : []
+  })
+}
+
 export function createFleetWorkspaces(): () => FleetWorkspaceList {
   const [result] = createFleetQuery(
     () => workspacesKey,
     (nodeId, _dep, signal) => readJson<Workspace[]>(workspacesRoute, { nodeId, signal }),
   )
+  const [prefs] = createFleetQuery(
+    () => prefsKey,
+    (nodeId, _dep, signal) => readJson<Record<string, string>>(prefsRoute, { nodeId, signal }),
+  )
+  const [projects] = createFleetQuery(
+    () => projectsKey,
+    // Shares the active Node's projects query key, so the cache value must be the same array shape.
+    async (nodeId, _dep, signal) => (await readJson<ProjectsResponse>(projectsRoute, { nodeId, signal })).projects,
+  )
   return createMemo<FleetWorkspaceList>(() => {
     const current = result()
+    const preferences = new Map(prefs().rows.map((row) => [row.nodeId, row.data]))
+    const projectRows = new Map(projects().rows.map((row) => [row.nodeId, row.data]))
     return {
       // Node order (main's list) then the node's own workspace order, so the picker does not reshuffle
       // because one node answered faster. A workspace with no projects is left out: it has nowhere to
       // navigate to (see selectFleetWorkspace below), so it would only ever be a dead row.
-      entries: current.rows.flatMap((row) =>
-        row.data
-          .filter((workspace) => workspace.projects.length > 0)
-          .map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node })),
-      ),
+      entries: current.rows.flatMap((row) => {
+        const allProjects = projectRows.get(row.nodeId)
+        const nodePrefs = preferences.get(row.nodeId)
+        if (!allProjects || !nodePrefs) return []
+        return pickerWorkspaces(row.data, allProjects, nodePrefs[WORKSPACES_PREF_KEY])
+          .map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node }))
+      }),
       unavailable: current.unavailable,
       grouped: nodes().length > 1,
     }

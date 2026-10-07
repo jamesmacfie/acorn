@@ -63,7 +63,7 @@ describe('adding a project from a folder', () => {
   })
 
   it('adds to the selected workspace on the local Node and refreshes membership', async () => {
-    await addProjectFromFolder(queryClient, 'work')
+    await addProjectFromFolder(queryClient, 'on', 'work')
     expect(fetch).toHaveBeenCalledOnce()
     const [nodeId, request] = fetch.mock.calls[0]
     expect(nodeId).toBe(local.nodeId)
@@ -78,16 +78,30 @@ describe('adding a project from a folder', () => {
 
   it('names the owning workspace when the API reuses a project in another workspace', async () => {
     returnedProject = { ...project, workspaceId: 'other' }
-    await addProjectFromFolder(queryClient, 'work')
+    await addProjectFromFolder(queryClient, 'on', 'work')
     expect(activeToasts()).toMatchObject([{
       message: 'Repo is already in Personal. Move it in Settings → Overview.', tone: 'neutral',
     }])
     expect(fetch).toHaveBeenCalledOnce()
   })
 
+  it('omits membership while off and describes a re-added folder without a move', async () => {
+    queryClient.setQueryData(projectsKey, [project])
+    await addProjectFromFolder(queryClient, 'off', 'work')
+    const request = fetch.mock.calls[0]?.[1]
+    if (request?.body?.kind !== 'bytes') throw new Error('Expected a JSON body')
+    expect(JSON.parse(new TextDecoder().decode(request.body.bytes))).toEqual({ path: '/src/repo' })
+    expect(activeToasts()).toMatchObject([{ message: 'Repo is already added.' }])
+  })
+
+  it('reports a newly added off-mode folder', async () => {
+    await addProjectFromFolder(queryClient, 'off')
+    expect(activeToasts()).toMatchObject([{ message: 'Added Repo.', tone: 'success' }])
+  })
+
   it('does not pick or send a desktop folder when a remote Node is active', async () => {
     setActiveNode(remote.nodeId)
-    await addProjectFromFolder(queryClient, 'work')
+    await addProjectFromFolder(queryClient, 'on', 'work')
     expect(pick).not.toHaveBeenCalled()
     expect(fetch).not.toHaveBeenCalled()
   })
@@ -95,7 +109,7 @@ describe('adding a project from a folder', () => {
   it('cancels when the active Node changes while the folder picker is open', async () => {
     let choose!: (path: string) => void
     pick.mockImplementation(() => new Promise((resolve) => { choose = resolve }))
-    const adding = addProjectFromFolder(queryClient, 'work')
+    const adding = addProjectFromFolder(queryClient, 'on', 'work')
     setActiveNode(remote.nodeId)
     choose('/src/repo')
     await adding

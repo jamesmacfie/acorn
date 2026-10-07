@@ -21,6 +21,7 @@ import { TabPanel, Tabs } from '../../kit/components/layout/Tabs'
 import { BranchPrefixRow, createProjectConfig, DatabaseTab, PreviewTab, SetupTab, type ProjectConfigStore } from './ProjectConfigTabs'
 import { ProjectConnections } from './ProjectConnections'
 import { createSettingSave, createTextSetting } from './settingSave'
+import { createWorkspacesMode } from '../workspaces/workspacesMode'
 
 // Settings → a project's own page (docs/frontend/settings.md § Settings). One folder project's identity and its
 // project-level config, split over tabs because together they are two dozen rows. A settings page a
@@ -102,6 +103,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   const qc = useQueryClient()
   const workspaces = createQuery(() => workspacesOptions(true))
   const tasks = createQuery(() => tasksOptions(true))
+  const mode = createWorkspacesMode()
   const taskCount = () => (tasks.data ?? []).filter((task) => task.projectId === props.project.id).length
   // The page's project comes from the projects query, so awaiting its refetch is what lets a field show
   // the stored value again.
@@ -135,13 +137,18 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
   }
 
   const remove = async () => {
+    const currentMode = mode()
+    if (!currentMode) return
     const count = taskCount()
+    const taskLoss = count
+      ? `${props.project.name} and its ${count} task${count === 1 ? '' : 's'} are removed from acorn.`
+      : `${props.project.name} is removed from acorn.`
     const confirmed = await confirmAction({
       title: 'Delete project',
       actionLabel: count ? `Delete project and ${count} task${count === 1 ? '' : 's'}` : 'Delete project',
-      goes: count
-        ? `${props.project.name} is removed from acorn, with its ${count} task${count === 1 ? '' : 's'} and their history.`
-        : `${props.project.name} is removed from acorn.`,
+      goes: currentMode === 'off'
+        ? `${taskLoss} Its workspace, links, and datasets are removed. You will lose access to its Home boards, notes, saved queries, and workflow definitions; those records remain stored.`
+        : count ? `${props.project.name} is removed from acorn, with its ${count} task${count === 1 ? '' : 's'} and their history.` : taskLoss,
       stays: `Nothing on disk is removed. The folder${count ? ' and any task worktrees remain where they are' : ' remains where it is'}.`,
       danger: true,
     })
@@ -151,7 +158,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
       if (!(await removal.run(() => deleteProject(props.project.id)))) return
       // Off the page before the lists refetch, so the view does not fall back to its first page and
       // say this one is no longer available.
-      props.context.navigate(workspaceSettingsTarget(props.project.workspaceId))
+      props.context.navigate(currentMode === 'off' ? 'workspaces' : workspaceSettingsTarget(props.project.workspaceId))
       await Promise.all([refresh(), qc.invalidateQueries({ queryKey: tasksKey })])
     } finally {
       setBusy(false)
@@ -184,14 +191,14 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
             onChange={(color) => colour.run(() => patch({ color }))}
           />
         </SettingRow>
-        <SettingRow label="Workspace" error={workspace.error()}>
+        <Show when={mode() === 'on'}><SettingRow label="Workspace" error={workspace.error()}>
           <Select
             label="Workspace"
             value={props.project.workspaceId}
             options={(workspaces.data ?? []).map((entry) => ({ value: entry.id, label: entry.name }))}
             onChange={(workspaceId) => void workspace.run(() => patch({ workspaceId }))}
           />
-        </SettingRow>
+        </SettingRow></Show>
         <SettingRow
           label="Hidden"
           description="Its tasks don't show in the rail, and new tasks can't use it."
@@ -209,7 +216,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
 
       <SettingsSection id="danger" label="Danger zone" tone="danger">
         <SettingRow label="Delete project" description="Its tasks go with it. Nothing on disk is removed." error={removal.error()}>
-          <Button tone="danger" disabled={busy()} onPress={() => void remove()}>Delete project</Button>
+          <Button tone="danger" disabled={busy() || !mode()} onPress={() => void remove()}>Delete project</Button>
         </SettingRow>
       </SettingsSection>
     </>

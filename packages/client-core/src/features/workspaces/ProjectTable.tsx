@@ -33,6 +33,8 @@ export function ProjectTable(props: {
   taskCount: (projectId: string) => number
   /** Draw each group's head row. Off on a workspace's own page, which is the group. */
   groupHeads: boolean
+  /** Membership is fixed when every project owns its workspace. */
+  allowMove?: boolean
   openProject: (projectId: string) => void
   openWorkspace?: (workspaceId: string) => void
   /** Give a path-less project a folder from its row. Without it the row only says it has none. */
@@ -182,6 +184,7 @@ export function ProjectTable(props: {
         <BulkBar
           projects={chosen()}
           workspaces={props.workspaces}
+          allowMove={props.allowMove !== false}
           refresh={props.refresh}
           report={setResult}
           onClear={() => { setSelected(new Set<string>()); setResult(undefined) }}
@@ -201,6 +204,7 @@ type BulkResult = { tone: 'ok' | 'danger'; text: string }
 function BulkBar(props: {
   projects: readonly Project[]
   workspaces: readonly Workspace[]
+  allowMove: boolean
   refresh: () => Promise<unknown>
   report: (result: BulkResult | undefined) => void
   onClear: () => void
@@ -261,35 +265,26 @@ function BulkBar(props: {
       <Toolbar variant="bar" ariaLabel="Change the selected projects">
         <Text emphasis="strong">{count()} selected</Text>
         <Show
-          when={naming() === null}
-          fallback={
-            <form class="ws-add-form" onSubmit={(event) => void moveToNew(event)}>
-              <Input
-                label="New workspace name"
-                placeholder="Workspace name"
-                value={naming() ?? ''}
-                ref={(el: HTMLInputElement) => queueMicrotask(() => el.focus())}
-                onInput={setNaming}
-                onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNaming(null) } }}
-              />
-              <Button submit disabled={busy() || !naming()?.trim()}>Create and move</Button>
-              <Button variant="ghost" onPress={() => setNaming(null)}>Cancel</Button>
-            </form>
-          }
+          when={props.allowMove && naming() !== null}
+          fallback={null}
         >
+          <form class="ws-add-form" onSubmit={(event) => void moveToNew(event)}>
+            <Input label="New workspace name" placeholder="Workspace name" value={naming() ?? ''}
+              onInput={setNaming} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNaming(null) } }} />
+            <Button submit disabled={busy() || !naming()?.trim()}>Create and move</Button>
+            <Button variant="ghost" onPress={() => setNaming(null)}>Cancel</Button>
+          </form>
+        </Show>
+        <Show when={props.allowMove && naming() === null}>
           <Select
-            size="sm"
-            width="auto"
-            label="Move to workspace"
-            value=""
-            disabled={busy()}
-            options={[
-              { value: '', label: 'Move to workspace…', disabled: true },
+            size="sm" width="auto" label="Move to workspace" value="" disabled={busy()}
+            options={[{ value: '', label: 'Move to workspace…', disabled: true },
               ...props.workspaces.map((workspace) => ({ value: workspace.id, label: workspace.name })),
-              { value: NEW_WORKSPACE, label: 'New workspace…' },
-            ]}
+              { value: NEW_WORKSPACE, label: 'New workspace…' }]}
             onChange={moveTo}
           />
+        </Show>
+        <Show when={naming() === null || !props.allowMove}>
           <Button
             size="sm"
             disabled={busy()}
