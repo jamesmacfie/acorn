@@ -650,7 +650,11 @@ export default function App() {
           (client-core/host/registries/panes/refPanels.ts). Mounted at the shell because the state is the shell's.
           Before this, the only place in the app that could open one was github's PR conversation. */}
       <RefPanelHost />
-      <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId && projects.data?.some((project) => project.id === linkPromotion()!.projectId) ? linkPromotion() : null}>
+      {/* The modal snapshots eligible tasks and used branches when it mounts. Wait for both lists
+          before mounting so a cold Node does not offer an empty attachment/branch context. */}
+      <Show keyed when={linkPromotion() && params.projectId === linkPromotion()!.projectId
+        && projects.data?.some((project) => project.id === linkPromotion()!.projectId)
+        && tasks.data && workspaces.data ? linkPromotion() : null}>
         {(promotion) => {
           const projectTasks = (tasks.data ?? []).filter((task) => task.projectId === promotion.projectId)
           const workspaceProjects = new Set(workspaceForProject(workspaces.data, promotion.projectId)?.projects.map((project) => project.id) ?? [])

@@ -1,5 +1,32 @@
 # Phase 04: new task action
 
+## Follow-up completion note, October 8, 2026
+
+The new-task dispatcher now checks both the selected Node and the exact registered desktop host
+after each awaited project, existing-task, and item read. A request abandoned by a Node switch or
+host remount returns a refusal without navigating, opening a dialog, or reporting into the newly
+selected Node. Serial native delivery and navigation addresses are unchanged. A deferred-read test
+covers all three boundaries, including a replacement host registered for the same Node.
+
+GitHub promotion prepares from the full PR detail returned by `fromContentLink`, including its body.
+It no longer creates a query client or fetches that PR again on modal mount and submit. The direct
+PR action still uses its owning query client; both paths use the same Linear connection selection
+and reference-link construction. The modal path reads integration and project mapping metadata
+without a cache, so it may read that metadata again on confirmation. Those reads are read-only;
+task creation remains behind the button. The desktop waits for both task and workspace queries
+before mounting the keyed dialog, so initial branch and attachment choices include cold-query data.
+
+Verification: focused address dispatch (11 tests), promotion modal (11, including async title and
+branch prefill and the retained cancel/no-write test), actual GitHub promotion (11, including the
+existing-task short circuit and seeded Linear reference), and desktop address-host readiness (2)
+passed. Client-core, GitHub, and desktop scoped TypeScript lint, targeted oxlint, all 87 architecture
+checks, and `git diff --check` passed. No full package or repository gates or release bundle were
+run in this follow-up. The prior isolated desktop check and its live-PR limitation remain as noted
+below; this follow-up did not repeat that UI session. If task or workspace queries fail without
+cached data, the promotion dialog waits for those lists instead of guessing attachment/branch
+choices; the existing query error handling remains responsible for recovery. Later phases need no
+new contract beyond the link methods and settings destination noted below.
+
 ## Completion note, October 8, 2026
 
 `new-task?url=` uses the content-link registry's claim and project path, then finds a source by its

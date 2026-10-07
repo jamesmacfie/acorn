@@ -21,13 +21,14 @@ const registered: Disposable[] = []
 const created = vi.fn(async () => TASK)
 const attached = vi.fn(async () => {})
 let seedBranch = 'james/typeerror'
+let prepareOverride: (() => Promise<{ origin: string; projectId: string; title: string; branch: string }>) | null = null
 
 const mount = (action?: PromoteTaskAction, attachTasks: Task[] = []) => {
   registered.push(sourceRegistry.register({
     id: 'rollbar', order: 1, glyph: 'bug', label: 'Rollbar',
     promotion: {
       canPromote: () => true,
-      prepare: () => ({ origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: seedBranch }),
+      prepare: () => prepareOverride?.() ?? { origin: 'rollbar', projectId: 'p1', title: 'TypeError', branch: seedBranch },
       create: created,
       attachToCurrentTask: attached,
     },
@@ -51,6 +52,7 @@ const settle = async () => { for (let tick = 0; tick < 4; tick += 1) await Promi
 
 afterEach(() => {
   seedBranch = 'james/typeerror'
+  prepareOverride = null
   created.mockClear()
   attached.mockClear()
   dispose?.()
@@ -118,6 +120,17 @@ describe('the optional task action', () => {
 })
 
 describe('the branch field', () => {
+  it('fills the title and branch when preparation resolves after the modal mounts', async () => {
+    let release!: (seed: { origin: string; projectId: string; title: string; branch: string }) => void
+    prepareOverride = () => new Promise((resolve) => { release = resolve })
+    mount()
+    expect(inputs()[0].value).toBe('')
+    release({ origin: 'github-pr', projectId: 'p1', title: 'Fix deploy', branch: 'feature/deploy' })
+    await settle()
+    expect(inputs().map((input) => input.value)).toEqual(['Fix deploy', 'feature/deploy'])
+    expect(created).not.toHaveBeenCalled()
+  })
+
   it('derives the branch from the title when the source does not seed one', async () => {
     seedBranch = ''
     mount()

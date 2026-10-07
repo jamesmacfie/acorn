@@ -81,7 +81,7 @@ export function PromoteToTaskModal(props: {
   }
 
   // Prefill title/branch from the provider's own seed derivation (branch omitted so it derives a
-  // default). Both current providers are synchronous; resolve defensively in case one isn't.
+  // default). A source may need read-only metadata before it can return that seed.
   onMount(() => {
     const projectId = params.projectId
     if (!projectId) return

@@ -139,14 +139,19 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
       }
       break
     case 'new-task': {
+      const ownsRequest = () => host === shell && activeNodeId() === nodeId
+      const staleRequest = (): LinkRefusal => ({ kind: 'refused', reason: 'Node changed while opening the link', link: shownLink })
+      if (!ownsRequest()) return staleRequest()
       let claim: ReturnType<typeof claimFor>
       try { claim = claimFor(address.url) } catch {
         return reportLinkFailure(shownLink, 'Could not recognise this URL')
       }
       if (!claim) return reportLinkFailure(shownLink, 'No Acorn recogniser claims this URL')
       try { await shell.loadProjects() } catch {
+        if (!ownsRequest()) return staleRequest()
         return reportLinkFailure(shownLink, 'Could not load projects for this Node')
       }
+      if (!ownsRequest()) return staleRequest()
       if (!claim.contribution.path) return reportLinkFailure(shownLink, 'Provider has no task promotion')
       let projectId: string | null
       try {
@@ -163,11 +168,13 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
       if (!source?.promotion?.fromContentLink) return reportLinkFailure(shownLink, 'Provider has no task promotion')
       try {
         const task: Task | undefined = await source.promotion.existingTask?.(claim.target, projectId)
+        if (!ownsRequest()) return staleRequest()
         if (task) {
           if (!shell.openTask(task.id, taskPath(task.id), task)) return reportLinkFailure(shownLink, 'Task was not found')
           break
         }
         const item = await source.promotion.fromContentLink(claim.target, projectId)
+        if (!ownsRequest()) return staleRequest()
         const owner = typeof claim.target.owner === 'string' ? claim.target.owner : ''
         const repo = typeof claim.target.repo === 'string' ? claim.target.repo : ''
         if (!item || !source.promotion.canPromote(item, { projectId, owner, repo })) {
@@ -176,6 +183,7 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
         shell.openProject(projectPath(projectId), source.id)
         shell.showPromotion({ projectId, sourceId: source.id, item, itemTitle: typeof item.title === 'string' ? item.title : address.url })
       } catch (error) {
+        if (!ownsRequest()) return staleRequest()
         return reportLinkFailure(shownLink, error instanceof Error ? error.message : 'Could not load the item')
       }
       break

@@ -16,7 +16,12 @@ const state = vi.hoisted(() => ({
   promotions: [] as unknown[],
   created: 0,
   loadedItems: 0,
+  existingReads: 0,
+  projectReads: 0,
   existing: false,
+  projectsGate: null as Promise<void> | null,
+  existingGate: null as Promise<void> | null,
+  itemGate: null as Promise<void> | null,
 }))
 
 vi.mock('../../../infra/node/activeNode', () => ({
@@ -47,9 +52,9 @@ vi.mock('../sources/sources', () => ({
     get: (id: string) => id === 'pulls' ? { id } : undefined,
     entries: () => [{ id: 'plugin-source', projectSurfaceId: 'plugin-surface' }, {
       id: 'source-github', providerId: 'github', promotion: {
-        fromContentLink: async () => { state.loadedItems++; return { number: 42, title: 'Review changes', headRef: 'feature/pr' } },
+        fromContentLink: async () => { state.loadedItems++; await state.itemGate; return { number: 42, title: 'Review changes', headRef: 'feature/pr' } },
         canPromote: () => true,
-        existingTask: async () => state.existing ? { id: 'tracked-task' } : undefined,
+        existingTask: async () => { state.existingReads++; await state.existingGate; return state.existing ? { id: 'tracked-task' } : undefined },
         create: async () => { state.created++; return { id: 'created-task' } },
       },
     }],
@@ -83,7 +88,7 @@ function mount(nodeId: string) {
     },
     openTask: (_id: string, path: string, task?: unknown) => { state.navigated.push(path); state.selected.push(null); state.openedTask = task; return true },
     hasProject: (id: string) => id === 'project' || id === 'project-b',
-    loadProjects: async () => {},
+    loadProjects: async () => { state.projectReads++; await state.projectsGate },
     showPromotion: (details: unknown) => state.promotions.push(details),
   }
   mounted.push(registerAddressHost(host))
@@ -106,8 +111,23 @@ beforeEach(() => {
   state.promotions = []
   state.created = 0
   state.loadedItems = 0
+  state.existingReads = 0
+  state.projectReads = 0
   state.existing = false
+  state.projectsGate = null
+  state.existingGate = null
+  state.itemGate = null
 })
+
+function deferred() {
+  let release!: () => void
+  const promise = new Promise<void>((resolve) => { release = resolve })
+  return { promise, release }
+}
+
+const claimPull = () => {
+  state.claim = { target: { kind: 'pr', item: 'acme/repo#42' }, contribution: { providerId: 'github', path: () => '/p/project/pulls/42' } }
+}
 
 describe('opening an Acorn address', () => {
   it('routes tasks, project paths, settings, sources, and claimed outside URLs', async () => {
@@ -211,6 +231,47 @@ describe('opening an Acorn address', () => {
     expect(state.promotions).toEqual([])
     expect(state.created).toBe(0)
     expect(state.loadedItems).toBe(0)
+  })
+
+  it('abandons pending new-task reads when the selected Node or registered host changes', async () => {
+    const link = 'acorn://node-a/new-task?url=https%3A%2F%2Fexample.com'
+    claimPull()
+    mount('node-a')
+    const projects = deferred()
+    state.projectsGate = projects.promise
+    const loadingProjects = openLink(link)
+    await vi.waitFor(() => expect(state.projectReads).toBe(1))
+    state.active = 'node-b'
+    projects.release()
+    await expect(loadingProjects).resolves.toMatchObject({ kind: 'refused' })
+    expect(state.existingReads).toBe(0)
+
+    state.active = 'node-a'
+    state.projectsGate = null
+    const existing = deferred()
+    state.existingGate = existing.promise
+    const loadingTask = openLink(link)
+    await vi.waitFor(() => expect(state.existingReads).toBe(1))
+    mounted.pop()?.()
+    mount('node-a') // Same Node, new host: the old request must not navigate it.
+    state.existing = true
+    existing.release()
+    await expect(loadingTask).resolves.toMatchObject({ kind: 'refused' })
+    expect(state.loadedItems).toBe(0)
+
+    state.existing = false
+    state.existingGate = null
+    const item = deferred()
+    state.itemGate = item.promise
+    const loadingItem = openLink(link)
+    await vi.waitFor(() => expect(state.loadedItems).toBe(1))
+    state.active = 'node-b'
+    item.release()
+    await expect(loadingItem).resolves.toMatchObject({ kind: 'refused' })
+    expect(state.projectPaths).toEqual([])
+    expect(state.navigated).toEqual([])
+    expect(state.promotions).toEqual([])
+    expect(state.notices).toEqual([])
   })
 
   it('distinguishes an untracked project and a claimed URL with no promotion', async () => {

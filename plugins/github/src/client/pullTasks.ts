@@ -1,5 +1,7 @@
-import { QueryClient } from '@tanstack/solid-query'
-import { tasksRoute } from '@acorn/protocol/api.ts'
+import type { QueryClient } from '@tanstack/solid-query'
+import { integrationsRoute, projectsRoute, tasksRoute, workspaceExternalProjectsRoute,
+  type IntegrationsResponse, type Project, type ProjectsResponse, type WorkspaceExternalProjectsResponse,
+} from '@acorn/protocol/api.ts'
 import {
   createTask,
   integrationsOptions,
@@ -13,7 +15,7 @@ import {
   type Task,
 } from '@acorn/plugin-api/client'
 import type { Integration } from '@acorn/protocol/api.ts'
-import { pullRoute, type Pull, type PullDetail } from '../shared/api'
+import { pullRoute, type PullDetail } from '../shared/api'
 import type { PullRef } from '../shared/pullRef'
 import { pullDetailOptions } from './queries'
 
@@ -46,13 +48,22 @@ export async function linearConnectionForProject(
   projectId: string,
   linears: readonly Integration[],
 ): Promise<string | null> {
+  return connectionForProject(projectId, linears,
+    () => queryClient.ensureQueryData(projectsOptions(true)),
+    (workspaceId) => queryClient.ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true)))
+}
+
+async function connectionForProject(
+  projectId: string,
+  linears: readonly Integration[],
+  loadProjects: () => Promise<Project[]>,
+  loadMappings: (workspaceId: string) => Promise<WorkspaceExternalProjectsResponse>,
+): Promise<string | null> {
   if (linears.length <= 1) return linears[0]?.id ?? null
-  const projects = await queryClient.ensureQueryData(projectsOptions(true)).catch(() => [])
+  const projects = await loadProjects().catch(() => [] as Project[])
   const workspaceId = projects.find((project) => project.id === projectId)?.workspaceId
   if (!workspaceId) return null
-  const mapped = await queryClient
-    .ensureQueryData(workspaceExternalProjectsOptions(workspaceId, true))
-    .catch(() => ({ projects: [] }))
+  const mapped = await loadMappings(workspaceId).catch(() => ({ projects: [] }))
   const connected = new Set(linears.map((connection) => connection.id))
   const candidates = new Set(
     mapped.projects
@@ -95,8 +106,12 @@ async function linksForPull(queryClient: QueryClient, target: PullRef & { projec
   const linears = (integrations?.integrations ?? [])
     .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
   const linearId = await linearConnectionForProject(queryClient, target.projectId, linears)
+  return linksFromBody(detail?.pull?.body, linearId)
+}
+
+function linksFromBody(body: string | null | undefined, linearId: string | null) {
   return linearId
-    ? scanContentRefs([detail?.pull?.body])
+    ? scanContentRefs([body])
         .filter((ref) => ref.providerId === 'linear')
         .map((ref) => ({
           connectionId: linearId,
@@ -104,6 +119,18 @@ async function linksForPull(queryClient: QueryClient, target: PullRef & { projec
           ref: { displayId: ref.item, url: ref.url },
         }))
     : []
+}
+
+// The URL resolver already fetched the full detail. Prepare from that item and read only the
+// connection metadata needed for its references; no second PR read or detached query cache.
+async function linksForResolvedPull(pull: NonNullable<PullDetail['pull']>, projectId: string) {
+  const integrations = await readJson<IntegrationsResponse>(integrationsRoute).catch(() => null)
+  const linears = (integrations?.integrations ?? [])
+    .filter((connection) => connection.providerId === 'linear' && connection.status === 'connected')
+  const linearId = await connectionForProject(projectId, linears,
+    async () => (await readJson<ProjectsResponse>(projectsRoute)).projects,
+    (workspaceId) => readJson<WorkspaceExternalProjectsResponse>(workspaceExternalProjectsRoute(workspaceId)))
+  return linksFromBody(pull.body, linearId)
 }
 
 /**
@@ -114,7 +141,7 @@ async function linksForPull(queryClient: QueryClient, target: PullRef & { projec
  * There is no `attachToCurrentTask`: a pull request is recorded on the task
  * row as `pullNumber`, not as a link, so attaching one to somebody else's task is not a thing.
  */
-export const githubPullPromotion: NonNullable<SourceContribution<Pull>['promotion']> = {
+export const githubPullPromotion: NonNullable<SourceContribution<NonNullable<PullDetail['pull']>>['promotion']> = {
   fromContentLink: async (target) => {
     if (target.kind !== 'pr' || typeof target.owner !== 'string' || typeof target.repo !== 'string' || typeof target.number !== 'string') return null
     const detail = await readJson<PullDetail>(pullRoute(target.owner, target.repo, target.number))
@@ -133,9 +160,7 @@ export const githubPullPromotion: NonNullable<SourceContribution<Pull>['promotio
     title: pull.title,
     branch: pull.headRef ?? context.branch,
     pullNumber: pull.number,
-    links: context.owner && context.repo
-      ? await linksForPull(new QueryClient(), { owner: context.owner, repo: context.repo, number: String(pull.number), projectId: context.projectId })
-      : [],
+    links: await linksForResolvedPull(pull, context.projectId),
   }),
   create: async (seed) => {
     const tasks = await readJson<Task[]>(tasksRoute).catch(() => [] as Task[])
