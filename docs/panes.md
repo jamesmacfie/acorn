@@ -91,7 +91,8 @@ markers, and find in files.
 
 A task's URL is `/t/:taskId`. The layout row holds focus and maximize state, and a URL that tried to
 own it would go stale the moment you moved a pane. What a URL can address is what `PaneIntent`
-models: `/t/:taskId?pane=<paneId>&item=<id>` opens that pane on that item.
+models: `/t/:taskId?pane=<paneId>` opens and focuses a pane, and an optional `&item=<id>` selects an
+item in it.
 
 `packages/client-core/src/features/tasks/taskDeepLink.ts` reads the parameters once and strips them,
 because the layout restores itself from its own persisted state. A lingering `?pane=` would keep

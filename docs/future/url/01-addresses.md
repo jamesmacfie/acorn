@@ -2,7 +2,9 @@
 
 ## Completion note, October 7, 2026
 
-Implemented the six-form address parser, navigation-link builder, and in-app dispatcher. The parser
+Implemented the six-form address parser, navigation-link builder, and in-app dispatcher. Task links
+can name a pane without an item; an item requires a pane. Raw path and query components are checked
+before URL normalization, and the builder refuses a link above the parser's length cap. The parser
 has a pure leaf export for the terminal client. The dispatcher selects a paired Node, waits for that
 Node's mounted shell, opens the routed place, and reports refusals in the notice ring and a toast.
 It opens a project when a plugin page or task pane is missing. `new-task` still refuses links.
@@ -10,12 +12,13 @@ It opens a project when a plugin page or task pane is missing. `new-task` still 
 The parser and dispatcher are separate modules rather than one module because importing the parser
 before the terminal connects must not load renderer state. Loaded project surfaces now record their
 owning source so a pasted path selects the surface that renders it. The desktop registers its router
-only after plugin registration and startup restore, using the Node captured when that shell mounts.
+after compiled plugin registration and startup restore, using the Node captured when that shell mounts.
 Node IDs are lowercase UUIDs in the Node data root; `local` resolves at dispatch time. Project paths
 already drive workspace selection in the desktop shell.
 
-Verification: 21 parser tests and six dispatcher tests pass. Client-core and desktop scoped lint pass,
-as do all 56 architecture boundary tests. The final `pnpm test` run on Node 26.8 passed 31 of 36
+Verification at the first commit: 21 parser tests and six dispatcher tests passed. Client-core and
+desktop scoped lint passed, as did all 56 architecture boundary tests. The `pnpm test` run on Node
+26.8 passed 31 of 36
 package tasks. Failures outside this phase remain in generated Tauri schema doc paths, a Node route
 golden list, desktop plugin registration snapshots, the client-core CSS token and route-scope checks,
 and three Node backup tests that timed out under the full run.
@@ -23,6 +26,27 @@ and three Node backup tests that timed out under the full run.
 Later phases should call `openLink` after the desktop receives a scheme event, use `buildLink` with the
 active Node ID for Copy link, and replace the `new-task` refusal when the promotion flow is ready.
 The terminal can import the pure `addresses` entry before it connects.
+
+Phase 02 must also wait for loaded plugin route registration before treating a cold-start path as
+missing. `clientPluginsReady()` covers the compiled roster only. `watchPluginChanges()` starts the
+active Node's `syncPluginDistribution()` asynchronously; its distribution commit calls
+`syncPluginContributions()`, which installs loaded project surfaces and sources. Expose or await that
+initial active-Node reconciliation and contribution commit before dispatching a queued link. An
+unreachable Node still needs a bounded fallback rather than an indefinite wait.
+
+Follow-up verification on Node 26.9: 37 address parser tests, six dispatcher tests, four pure task
+deep-link tests, and two mounted deep-link tests pass. Client-core and desktop scoped lint pass.
+The isolated architecture boundary suite passes all 56 tests. The scoped client-core suite has two
+failures outside this phase: `src/host/frames/scopes.test.ts:38` expects no unclassified routes but
+receives `workspaceProjectOrderRoute /v1/core/workspaces/x/project-order`, and
+`src/infra/styles/cssHygiene.test.ts:81` expects zero literal box shadows but receives two. The
+architecture doc-path check at `tools/arch/docPaths.test.ts:89` finds three references to missing
+generated Tauri schemas in `docs/future/security/01-desktop-command-authorization.md` at lines 22,
+55, and 56. The detailed scoped logs are
+`/private/tmp/acorn-phase01-followup-client-tests.log`,
+`/private/tmp/acorn-phase01-followup-arch.log`, and
+`/private/tmp/acorn-phase01-followup-boundaries.log`. The coordinator owns the next full repository
+gate.
 
 Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md), especially [the address format](./README.md#the-address-format) and

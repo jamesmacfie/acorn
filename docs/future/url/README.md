@@ -4,7 +4,7 @@ This plan adds an `acorn://` link scheme that opens the desktop app on a task, a
 plugin page, a settings page, or a rail source. Read it before you build a phase. It holds the
 decisions the phase files depend on.
 
-Date: October 7, 2026. Status: planned; implementation not started. A browser extension that builds
+Date: October 7, 2026. Status: phase 01 implemented; later phases planned. A browser extension that builds
 these links is out of scope and has its own plan.
 
 ## Goal
@@ -18,7 +18,7 @@ app already routes on, so a plugin page can be linked to without the plugin doin
 Every link has a Node, then a place:
 
 ```text
-acorn://<node>/t/<taskId>[?pane=<paneId>&item=<itemId>]
+acorn://<node>/t/<taskId>[?pane=<paneId>[&item=<itemId>]]
 acorn://<node>/p/<projectId>[/<rest of a project path>]
 acorn://<node>/settings[/<pageId>][#<sectionId>]
 acorn://<node>/source/<sourceId>

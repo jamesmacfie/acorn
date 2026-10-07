@@ -80,6 +80,8 @@ describe('opening an Acorn address', () => {
     mount('node-a')
     expect(await openLink('acorn://local/t/task?pane=linear&item=ENG-1')).toEqual({ kind: 'opened' })
     expect(state.navigated).toContain('/t/task?pane=linear&item=ENG-1')
+    expect(await openLink('acorn://local/t/task?pane=linear')).toEqual({ kind: 'opened' })
+    expect(state.navigated).toContain('/t/task?pane=linear')
     expect(await openLink('acorn://node-a/p/project/pulls/42')).toEqual({ kind: 'opened' })
     expect(state.selected).toContain('pulls')
     expect(await openLink('acorn://node-a/settings/agents#general')).toEqual({ kind: 'opened' })

@@ -90,7 +90,9 @@ export async function openAddress(address: Address, link = ''): Promise<LinkRefu
         if (!shell.openTask(address.taskId, path)) return refused(shownLink, 'Task was not found')
         return refused(shownLink, 'Pane is unavailable; opened the task')
       }
-      const query = address.pane && address.item ? `?${new URLSearchParams({ pane: address.pane, item: address.item })}` : ''
+      const query = address.pane
+        ? `?${new URLSearchParams({ pane: address.pane, ...(address.item ? { item: address.item } : {}) })}`
+        : ''
       if (!shell.openTask(address.taskId, `${path}${query}`)) return refused(shownLink, 'Task was not found')
       break
     }
