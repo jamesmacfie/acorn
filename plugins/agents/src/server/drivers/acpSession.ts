@@ -311,7 +311,7 @@ export async function startAcpSession(
       message: `${label} does not take HTTP MCP servers, so this session runs without ${declared.unsupported.join(', ')}.`,
     })
   }
-  const sessionMeta = spec.acpSessionMeta?.(options.session, { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] })
+  const sessionMeta = spec.acpSessionMeta?.(options.session, { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] }, options.loopHooks)
   // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
   // provider session this driver creates, and never to one it picks back up, which already has them.
   const customAgent = sessionCustomAgent(options.session.config)

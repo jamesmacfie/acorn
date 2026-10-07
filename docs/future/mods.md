@@ -140,10 +140,11 @@ check 156 in [agents and providers](../testing/agents-and-providers.md) drives i
 - **Handlers a person can't turn off.** This would need an administrator policy and a separate
   proposal. Nothing here builds it. [Cloud team policy](./cloud/isolation.md#team-policy) applies
   to hosted workers and does not require named handlers.
-- **Shipping a mod into the Claude sessions acorn starts.** Superseded on 2026-10-07 by
-  [harness bridges](./pi/10-harness-bridges.md). Codex shipped command hooks shaped like Claude's, so
-  acorn installs one bridge per harness through command hooks first and keeps a Claude mod as the
-  fallback if per-call process cost is too high. Output redaction remains Claude-only and deferred.
+- **Shipping a mod into the Claude sessions acorn starts.** Replaced on 2026-10-07 by
+  [harness bridges](../managed-agents/loop-hooks.md), delivered in [phase 10](./pi/10-harness-bridges.md).
+  Acorn installs a command hook in the Claude sessions it starts. A Claude mod stays the fallback if
+  the per-call process cost is too high. Codex has no bridge, because a host can't install a trusted
+  hook there. Output redaction remains Claude-only and deferred.
 
 ## Refused
 

@@ -1,7 +1,8 @@
 import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
+import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION, type AgentLoopHookReply, type AgentLoopHookRequest } from '../../contract/loopHook.ts'
 import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
-import { agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
+import { acornLoopHook, agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
 import type {
   AgentEventRecord,
   AgentConfigOption,
@@ -143,7 +144,7 @@ export type AgentRuntimeOptions = {
   // The owner's half of this plugin's hooks (docs/plugins/hooks.md § Hooks). Optional so a test can build an
   // engine with no host around it, and absent means nobody objects, which is also what an empty chain
   // means.
-  hooks?: Pick<PluginHookRegistry, 'run'>
+  hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   /** `ctx.telemetry`, so a provider start and an agent turn are spans owned by this plugin
    *  (docs/managed-agents/session-events.md § What a session reports). Optional so a test can build an engine with
    *  no host around it. */
@@ -207,7 +208,7 @@ export class ManagedAgentEngine {
   protected readonly publish?: (frame: PublishedFrame) => void
   protected readonly startTerminalHandoff?: (session: AgentSession) => Promise<string>
   protected readonly terminalHandoffRunning?: (sessionId: string) => Promise<boolean>
-  protected readonly hooks?: Pick<PluginHookRegistry, 'run'>
+  protected readonly hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   protected readonly telemetry?: PluginTelemetry
   protected readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
   protected readonly usageContinuationGraceMs: number
@@ -234,6 +235,8 @@ export class ManagedAgentEngine {
   protected readonly sentRows = new Map<string, string>()
   protected readonly providerEvents: DurableAgentEventBuffer
   protected readonly eventMaterializer: ProviderEventMaterializer
+  // Bridge asks waiting on the person, by request id (./loopHooks.ts § holdAsk).
+  private readonly loopAsks = new Map<string, (resolution: unknown) => void>()
   // The last probe answer, when that probe started, and which drivers it asked. See providers().
   protected providerCache: { probedAt: number; generation: number; descriptors: AgentProviderDescriptor[] } | null = null
   // The probe running now, which every caller that needs one joins.
@@ -276,6 +279,14 @@ export class ManagedAgentEngine {
         lastTold: session.config.skillIndex,
       }),
       skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
+      // Only the points somebody handles, read at every start and resume like the skills.
+      loopHooks: async () => {
+        const bridge = acornLoopHook()
+        if (!bridge || !this.hooks) return null
+        const [before, after] = await Promise.all([BEFORE_TOOL_HOOK.id, AFTER_TOOL_HOOK.id].map((id) => this.hooks!.handlers(id)))
+        if (!before!.length && !after!.length) return null
+        return { command: bridge.command, args: [...bridge.args, LOOP_HOOK_ROUTE, LOOP_HOOK_VERSION], beforeTool: before!.length > 0, afterTool: after!.length > 0 }
+      },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
         message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
@@ -540,6 +551,29 @@ export class ManagedAgentEngine {
   get shutdownSignal(): AbortSignal { return this.shutdown.signal }
   get isStopped(): boolean { return this.stopped }
   currentSession(sessionId: string) { return this.processes.current(sessionId) }
+
+  /** One bridge call, for the session and task the caller's token names (./loopHooks.ts). */
+  async loopHook(caller: { taskId: string; sessionId: string }, request: AgentLoopHookRequest): Promise<AgentLoopHookReply> {
+    const { answerLoopHook } = await import('./loopHooks')
+    return answerLoopHook({
+      hooks: this.hooks,
+      session: (sessionId) => this.store.getSession(sessionId),
+      taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+      live: (sessionId) => this.processes.current(sessionId),
+      materialize: (sessionId, turnId, event) => this.eventMaterializer.map(sessionId, turnId, event),
+      accept: (pending) => this.providerEvents.accept(pending),
+      expire: (sessionId, requestId) => this.store.expirePendingRequests(sessionId, requestId),
+      asks: this.loopAsks,
+    }, caller, request)
+  }
+
+  /** The person's answer to a bridge ask, reaching the call that waits on it. False for any other
+   *  request, which the harness itself is waiting on. */
+  answerLoopAsk(requestId: string, resolution: unknown): boolean {
+    const answer = this.loopAsks.get(requestId)
+    answer?.(resolution)
+    return !!answer
+  }
   sessionSignal(generation: ProviderGeneration): AbortSignal { return this.processes.signal(generation) }
   hasLiveSession(sessionId: string): boolean { return this.processes.has(sessionId) }
   liveSessionIds(): string[] { return this.processes.ids() }

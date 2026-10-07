@@ -98,3 +98,11 @@ back as an asynchronous function, so the contributor can call it after the first
   entry's `review` with a window over its finished turn, and waits up to 30 seconds before it reports.
   The window's `signal` is an `AbortSignal` the owner aborts at close, and it crosses the loaded worker
   ([unattended follow-ups](../managed-agents/unattended-follow-ups.md)).
+
+## Hooks inside a harness's loop
+
+Two of agents' hooks reach inside a harness's own loop rather than an edge acorn owns.
+`agents:before-tool` and `agents:after-tool` run on every tool call a bridged harness makes, through a
+command hook acorn installs in that harness. Only Claude Code has a bridge. A handler registered while
+a session runs reaches it after the session's next resume, because the bridge is installed at start
+and resume, and only for a point with a handler ([harness bridges](../managed-agents/loop-hooks.md)).

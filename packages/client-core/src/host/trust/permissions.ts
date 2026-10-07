@@ -329,6 +329,8 @@ const HOOK_MODE_COPY: Record<HookMode, string> = {
   observe: 'Watch %s’s “%l” decision as it happens',
   transform: 'Change what %s does when it “%l”s',
   veto: 'Stop %s from doing “%l”',
+  // Named apart from veto: it can only hold a tool for the person, never refuse it by itself.
+  ask: 'Make a tool wait for you before %s can “%l”',
 }
 
 // A grant this build has no sentence for. It still gets a line, and the line still carries the target
@@ -369,7 +371,7 @@ export function extensionPermissionLine(grant: PluginExtensionGrant): Permission
     icon: EXTENSION_KIND_ICON[grant.kind],
     // Stopping or rewriting somebody else's decision is the one cross-plugin grant that changes what
     // another package does rather than what it shows.
-    high: mode === 'veto' || mode === 'transform',
+    high: mode === 'veto' || mode === 'transform' || mode === 'ask',
   })
 }
 

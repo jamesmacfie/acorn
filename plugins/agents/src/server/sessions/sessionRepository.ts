@@ -409,22 +409,22 @@ export class AgentSessionRepository {
     await this.lifecycle.announceRequest(sessionId, providerRequestId)
   }
 
-  async expirePendingRequests(sessionId: string): Promise<void> {
+  /** Every open request on the session, or only `providerRequestId` when it's given. */
+  async expirePendingRequests(sessionId: string, providerRequestId?: string): Promise<void> {
+    const open = and(
+      eq(schema.agentRequests.sessionId, sessionId),
+      inArray(schema.agentRequests.status, ['pending', 'resolving']),
+      providerRequestId ? eq(schema.agentRequests.providerRequestId, providerRequestId) : undefined,
+    )
     const requests = await this.db
       .select({ providerRequestId: schema.agentRequests.providerRequestId })
       .from(schema.agentRequests)
-      .where(and(
-        eq(schema.agentRequests.sessionId, sessionId),
-        inArray(schema.agentRequests.status, ['pending', 'resolving']),
-      ))
+      .where(open)
     if (!requests.length) return
     await this.db
       .update(schema.agentRequests)
       .set({ status: 'expired', resolvedAt: now() })
-      .where(and(
-        eq(schema.agentRequests.sessionId, sessionId),
-        inArray(schema.agentRequests.status, ['pending', 'resolving']),
-      ))
+      .where(open)
     for (const request of requests) await this.lifecycle.announceRequest(sessionId, request.providerRequestId)
   }
 

@@ -7,7 +7,7 @@
 // beside the harness (plugins/agents/src/server/profiles/). What core owns is the shape of the
 // exchange: remove, then add, through a login shell, with the failure turned into a sentence.
 import { execFile } from 'node:child_process'
-import { join } from 'node:path'
+import { dirname, join } from 'node:path'
 import { promisify } from 'node:util'
 
 export const serverName = (isPackaged: boolean): string => (isPackaged ? 'acorn' : 'acorn-dev')
@@ -40,6 +40,13 @@ export const configureAcornMcp = (name: string, launcher: Launcher): void => {
 }
 
 export const acornMcp = (): { name: string; launcher: Launcher } | null => configuredMcp
+
+// The harness bridge program (docs/managed-agents/loop-hooks.md). The build emits it as loop-hook.js
+// beside mcp.js, and the same Node runs it, so it is wherever the MCP entry is.
+export const acornLoopHook = (): { command: string; args: string[] } | null => {
+  const entry = configuredMcp?.launcher.args[0]
+  return configuredMcp && entry ? { command: configuredMcp.launcher.command, args: [join(dirname(entry), 'loop-hook.js')] } : null
+}
 
 export type Argv = { file: string; args: string[] }
 

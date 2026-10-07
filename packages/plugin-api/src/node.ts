@@ -184,7 +184,7 @@ export {
   tmuxAvailable,
 } from '@acorn/node-core/server/profiles.ts'
 export type { ProfileDef } from '@acorn/node-core/server/profiles.ts'
-export { acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
+export { acornLoopHook, acornMcp, configureAcornMcp, envFlags, launcherSpec, registerAcornMcp, resolveMcpEntry, serverName } from '@acorn/node-core/server/mcpRegister.ts'
 export type { Argv, Launcher, McpCommands } from '@acorn/node-core/server/mcpRegister.ts'
 
 // ── Agent tools ───────────────────────────────────────────────────────────────────────────────

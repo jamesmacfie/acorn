@@ -11,6 +11,7 @@ import { createHarnessRegistry } from '../server/harnessRegistry'
 import { readAgentPricingPreferences, writeAgentPricingPreferences } from '../server/pricingStore'
 import { ManagedAgentRuntime } from '../server/sessions/runtime'
 import { BEFORE_PERMISSION_HOOK } from '../contract/permissionHook.ts'
+import { AFTER_TOOL_HOOK, BEFORE_TOOL_HOOK } from '../contract/loopHook.ts'
 import { AGENTS_SESSION_MESSENGER } from '../contract/sessionMessages.ts'
 import type { SessionMessages } from '../server/sessions/sessionMessages'
 import { AGENTS_TURN_FOLLOW_UP } from '../contract/turnFollowUp.ts'
@@ -31,6 +32,7 @@ import { managedAgents, MANAGED_AGENTS } from '../server/routes/managed'
 import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
+import { agentLoopHooks, AGENT_LOOP_HOOKS } from '../server/routes/loopHook'
 import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
 import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
@@ -109,6 +111,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let mcpServersRoute: { dispose(): void } | null = null
+  let loopHooksRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
@@ -155,6 +158,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // The second: a harness permission request, before anyone sees it. Observe and veto only
       // (../server/sessions/permissionPolicy.ts).
       ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
+      // The third and fourth: every tool call a bridged harness makes, before it runs and after
+      // (docs/managed-agents/loop-hooks.md). Only `before-tool` allows `ask`.
+      ctx.hooks.declare(BEFORE_TOOL_HOOK)
+      ctx.hooks.declare(AFTER_TOOL_HOOK)
 
       runtime = new ManagedAgentRuntime({
         db: store,
@@ -366,6 +373,14 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       })
       ctx.routes.register(agentMcpServers, { prefix: '', note: '/mcp-servers — the MCP servers acorn declares to agent sessions' })
 
+      // Harness bridges (docs/managed-agents/loop-hooks.md): a bridged harness's tool calls, and which
+      // harnesses a plugin's tool hooks reach. Coverage is loaded on first use, like each bridge call.
+      loopHooksRoute = ctx.capabilities.provide(AGENT_LOOP_HOOKS, {
+        answer: (caller, request) => runtime!.loopHook(caller, request),
+        coverage: async (pluginId) => (await import('../server/sessions/loopHooks')).loopCoverage(ctx.hooks, await runtime!.providers(), pluginId),
+      })
+      ctx.routes.register(agentLoopHooks, { prefix: '', note: '/loop-hook, /loop-coverage — harness bridge calls and what they reach' })
+
       // Unattended usage collection, off by default (docs/schedules.md § What is registered today).
       ctx.schedules.register({
         scheduleId: 'usage-refresh',
@@ -442,6 +457,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
       mcpServersRoute?.dispose()
+      loopHooksRoute?.dispose()
       harnessRoute?.dispose()
       customAgentRoute?.dispose()
       for (const capability of lifecycleCapabilities) capability.dispose()

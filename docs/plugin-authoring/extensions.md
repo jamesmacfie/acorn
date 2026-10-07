@@ -27,7 +27,13 @@ naming the owner is the disclosure. Exactly one carrier says what you bring:
 - `items` is a route on your own namespace, read with GET for rows and POST for annotations.
 - `remote` is a key of the object your bundle passed to `mountTree`, for a tree.
 - `frame` is an `inline` surface of yours, for a rectangle.
-- `route` is a POST on your own namespace, for a hook handler.
+- `route` is a POST on your own namespace, for a hook handler. A handler's `mode` is `observe`,
+  `transform`, `veto`, or `ask`, and the owner's `allows` says which it takes
+  ([hooks](../plugins/hooks.md#register-a-handler)).
+
+A handler on `agents:before-tool` or `agents:after-tool` reaches a running agent session only after
+the session's next start or resume. Acorn installs a harness's bridge then, and only for a point that
+has a handler ([harness bridges](../managed-agents/loop-hooks.md#installation)).
 
 A disclosed node point, such as `agents:session-messenger`, is the exception. Its entry names no
 carrier, because your node half files the value through `ctx.extensionPoints.handle`. The manifest

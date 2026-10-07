@@ -1,4 +1,4 @@
-import { decide, warn } from './policy.js'
+import { createTestFirst, decide, warn } from './policy.js'
 import { createExplanations } from './explanations.js'
 
 // Relative imports and `node:` builtins only. This folder has no node_modules.
@@ -15,6 +15,7 @@ export default {
     // Warnings for requests the rules let through, by `<sessionId>:<requestId>`, for the request card to
     // read. In memory: a Node restart ends the harness process, and with it every pending request.
     const warnings = new Map()
+    const testFirst = createTestFirst()
 
     // The sender agents binds to this plugin. Kept past `connect`, and replaced when agents reconnects.
     ctx.extensionPoints.handle('agents:session-messenger', {
@@ -39,6 +40,21 @@ export default {
           if (warnings.size > 200) warnings.delete(warnings.keys().next().value)
         }
         return Response.json(verdict)
+      }
+      // A bridged harness's tool call (docs/managed-agents/loop-hooks.md). The same rules on the same
+      // subject: a refusal reaches the model inside the turn, so there's nothing to explain later.
+      if (request.method === 'POST' && pathname === '/before-tool') {
+        return Response.json(decide(await request.json()))
+      }
+      // What only warns on a permission card holds a bridged call for the person instead.
+      if (request.method === 'POST' && pathname === '/before-tool-ask') {
+        const reason = warn(await request.json())
+        return Response.json(reason ? { ask: true, reason } : { ask: false })
+      }
+      if (request.method === 'POST' && pathname === '/after-tool') {
+        const payload = await request.json()
+        const note = testFirst(payload)
+        return Response.json({ payload: note ? { ...payload, note } : payload })
       }
       // The request card's note (client.js).
       if (pathname === '/warning' && request.method === 'GET') {

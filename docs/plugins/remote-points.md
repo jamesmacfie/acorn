@@ -51,6 +51,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
 | `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
 | `core:storage` | `stack`, up to four | `{ nodeId }` |
+| `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
 branch bar, and its props are the five scalars the bar draws. The Changes plugin can't say "pull

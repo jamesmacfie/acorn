@@ -18,7 +18,9 @@ import { activeNodeId } from '../../../infra/node/activeNode'
 import { commandRegistry } from '../../../host/registries/commands/commands'
 import { keybindingRegistry } from '../../../host/registries/commands/keybindings'
 import { exclusiveSlotOffers } from '../../../host/registries/extensionPoints/exclusiveSlots'
-import { CORE_EXCLUSIVE_SLOTS } from '@acorn/protocol/extensionPoints.ts'
+import { CORE_EXCLUSIVE_SLOTS, CORE_PLUGIN_PAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { extensionPointRegistry } from '../../../host/registries/extensionPoints/extensionPoints'
+import { Slot } from '../../../host/tree/Slot'
 import { Alert, Badge, Button, Checkbox, CodeBlock } from '../../../kit/components/primitives'
 import { Facts } from '../../../kit/components/content/Facts'
 import { Text } from '../../../kit/components/content/Text'
@@ -41,6 +43,16 @@ import './plugins.css'
 // what it adds (its settings pages among them), what it may do and what this device decided about it,
 // and which version runs.
 // Uninstalling sits in the danger zone under them, where the shell's one confirmation names what goes.
+
+// Registered with the page, like `core:storage` is with its page: the point exists where it is drawn.
+extensionPointRegistry.register({
+  id: CORE_PLUGIN_PAGE_POINT,
+  ownerId: 'core',
+  label: 'Plugin page',
+  kind: 'remote',
+  mode: 'stack',
+  max: 4,
+})
 
 const TABS = [
   { id: 'overview', label: 'Overview' },
@@ -353,6 +365,8 @@ function Permissions(props: PluginPageProps & Actions & { devGrant: PluginHostSt
           {(line) => <SettingRow label={line.text}><Show when={line.high}><Badge tone="warn">Broad access</Badge></Show></SettingRow>}
         </For>
       </SettingsSection>
+      {/* What another plugin says this one's grants reach, such as the agent harnesses its tool hooks cover. */}
+      <Slot point={CORE_PLUGIN_PAGE_POINT} props={() => ({ pluginId: row().name, nodeId: props.nodeId ?? null })} />
       <SettingsSection id="approvals" label="Approvals on this computer" help="You approve each version of a plugin before this computer runs it.">
         <For each={decisions()} fallback={<Text emphasis="muted">{row().installed?.bundled || (props.plugin.kind === 'node' && !row().installed) ? "Built in, so there's nothing to approve." : 'No approvals.'}</Text>}>
           {(ack) => (

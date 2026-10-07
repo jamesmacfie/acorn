@@ -2,7 +2,7 @@
   "$schema": "https://acorn.sh/schemas/acorn-plugin.schema.json",
   "id": "acorn-permission-policy",
   "name": "Permission policy",
-  "version": "0.4.0",
+  "version": "0.5.0",
   "baseline": "acorn-1",
   "apiVersion": "3",
   "node": "./node.js",
@@ -21,6 +21,27 @@
         "label": "run a tool the agent asks permission for",
         "route": "/v1/p/acorn-permission-policy/before-permission",
         "mode": "veto"
+      },
+      {
+        "id": "tool-rules",
+        "point": "agents:before-tool",
+        "label": "run any tool",
+        "route": "/v1/p/acorn-permission-policy/before-tool",
+        "mode": "veto"
+      },
+      {
+        "id": "tool-questions",
+        "point": "agents:before-tool",
+        "label": "run any tool",
+        "route": "/v1/p/acorn-permission-policy/before-tool-ask",
+        "mode": "ask"
+      },
+      {
+        "id": "test-first",
+        "point": "agents:after-tool",
+        "label": "read a tool result",
+        "route": "/v1/p/acorn-permission-policy/after-tool",
+        "mode": "transform"
       },
       {
         "id": "explanations",

@@ -167,3 +167,15 @@ acceptance pass.
     empty after the restart. Repeat with Codex, using `$acorn-pi-skills:release-note`. The repository's
     status shows only the seeded change, and neither harness's config file names the skill folder
     ([native delivery](../managed-agents/native-skills.md)).
+
+164. Harness bridges. Install `docs/future/pi/packages/permission-policy/` 0.5.0 and restart the Node.
+    Its **Permissions** tab lists "Make a tool wait for you before agents can “run any tool”", and
+    **Agents it reaches** reads **Every tool call, and every tool result.** for Claude Code and **Only
+    the tool calls it asks you about.** for Codex. In a throwaway repository, start a Claude Code
+    session, switch Mode to **Bypass Permissions**, and ask it to run `git push --force nowhere-remote
+    HEAD`. The call fails, and the agent quotes "Blocked by acorn-permission-policy: Force-pushing
+    rewrites shared history…" in the same turn. Ask for `git push nowhere-remote HEAD`: a permission
+    card says "acorn-permission-policy wants you to decide: This pushes commits to a remote…". **Reject**
+    fails the call with "The person refused this…". Repeat and press **Allow**: git runs and fails on
+    the missing remote. Ask for one edit to a source file: the agent quotes the "Test first: …" note.
+    `~/.claude/settings.json` is unchanged ([harness bridges](../managed-agents/loop-hooks.md)).

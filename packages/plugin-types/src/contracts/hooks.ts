@@ -23,6 +23,9 @@ export type PluginHookRegistry = {
    *  out or answers with the wrong shape is recorded and skipped, because every hook sits in front of
    *  something you were about to do anyway. */
   run<T extends HookPayload>(id: string, payload: T): Promise<HookVerdict<T>>
+  /** The plugins with a handler that would run at one of your points, so you can skip work nobody
+   *  would see. `id` is the bare point id. */
+  handlers(id: string): Promise<string[]>
 }
 
 export type PluginHookPoint = {
@@ -34,7 +37,7 @@ export type PluginHookPoint = {
    *  A transform's answer is checked against it, so a handler cannot turn your payload into something
    *  you never declared. */
   payload: HookPayloadShape
-  /** The subset of observe | transform | veto you permit. */
+  /** The subset of observe | transform | veto | ask you permit. */
   allows: readonly HookMode[]
   /** Per handler. Five seconds unless you say otherwise. */
   timeoutMs?: number
@@ -52,12 +55,12 @@ export type PluginHookHandler = {
   id: string
   mode: HookMode
   priority?: number
-  /** `{ payload }` for a transform, `{ ok, reason? }` for a veto, anything at all for an observer,
-   *  whose answer is dropped unread. */
+  /** `{ payload }` for a transform, `{ ok, reason? }` for a veto, `{ ask: true, reason }` to hold the
+   *  decision for the person, anything at all for an observer, whose answer is dropped unread. */
   run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 
-export type HookMode = 'observe' | 'transform' | 'veto'
+export type HookMode = 'observe' | 'transform' | 'veto' | 'ask'
 export type HookPayloadType = 'string' | 'number' | 'boolean' | 'string[]' | 'number[]' | 'boolean[]'
 export type HookPayloadShape = Record<string, HookPayloadType>
 export type HookPayload = Record<string, unknown>
@@ -72,4 +75,6 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
   by?: string
   /** Every reason, when you declared `collect`. */
   reasons?: { reason: string; by: string }[]
+  /** The first `ask` handler that wants the person to decide, when nothing vetoed. */
+  ask?: { reason: string; by: string }
 }

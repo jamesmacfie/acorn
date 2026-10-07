@@ -225,8 +225,9 @@ export const annotationKeyOf = (fields: readonly string[], key: PluginAnnotation
 // the owner a verdict.
 
 /** What a handler asks to do. The owner's `allows` is the subset it permits; a handler asking for a
- *  mode the owner did not list is never called. */
-export const HOOK_MODES = ['observe', 'transform', 'veto'] as const
+ *  mode the owner did not list is never called. `ask` holds the decision for the person instead of
+ *  refusing it outright, so only a point whose owner can put a question to somebody allows it. */
+export const HOOK_MODES = ['observe', 'transform', 'veto', 'ask'] as const
 
 export type HookMode = (typeof HOOK_MODES)[number]
 
@@ -284,6 +285,9 @@ export type HookVerdict<T extends HookPayload = HookPayload> = {
   by?: string
   /** Every reason, when the owner declared `collect`. `reason` and `by` are the first of these. */
   reasons?: { reason: string; by: string }[]
+  /** The first `ask` handler that wants the person to decide, when nothing vetoed. The owner holds its
+   *  decision until the person answers. */
+  ask?: { reason: string; by: string }
 }
 
 /**
@@ -356,6 +360,12 @@ export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
  *  core's and the numbers are the plugin's, which is why it is a point rather than a page of either.
  *  A contributor gets `nodeId`, the node the page is showing. */
 export const CORE_STORAGE_POINT = 'core:storage'
+
+/** A section on one plugin's page in Settings > Plugins, a core-owned `remote` point in `stack` mode, so
+ *  a plugin that another plugin's contributions reach into can say what they reach. Agents uses it to show
+ *  which harnesses a plugin's tool hooks cover. A contributor gets `pluginId`, the plugin the page shows,
+ *  and `nodeId`, the node it is shown for. */
+export const CORE_PLUGIN_PAGE_POINT = 'core:plugin-page'
 
 /** What a contributor to `agents:tool-card` is handed. JSON, because the same props reach a compiled
  *  component in this realm and a worker's tree over a port, and the two must be handed the same thing.

@@ -109,7 +109,9 @@ The explanation itself is a note through `agents:session-messenger`, a separate 
 ## What it doesn't do
 
 - **It sees only what the harness asks about.** A session in a bypass mode, a tool the harness's own
-  settings already allow, or an earlier "allow for session" never reaches acorn.
+  settings already allow, or an earlier "allow for session" never reaches acorn. On a harness with a
+  bridge, `agents:before-tool` sees every call and takes the same subject
+  ([harness bridges](./loop-hooks.md)).
 - **It isn't containment.** A refused `rm -rf` can come back as a script the harness doesn't ask
   about. [Security](../security.md) owns the boundaries that exist.
 - **It can't change the command or the model's view.** The harness runs its own command, and its

@@ -34,11 +34,30 @@ These rules are examples, not containment. They see only the requests a harness 
 command the harness sent as a string, and nothing a script does once it runs. A request with no
 `root` passes the deletion rule, because the rule can't tell inside from outside.
 
+## Every tool call
+
+Version 0.5.0 also runs on every tool call a bridged harness makes
+([harness bridges](../../../../managed-agents/loop-hooks.md)), which is Claude Code only:
+
+- On `agents:before-tool`, the two refusing rules deny the call, and the model reads the reason in the
+  same turn. A session in a bypass mode, or a command the person's own hook approves, still reaches
+  them.
+- On `agents:before-tool`, the three warning rules ask instead of warn. The call waits on a card that
+  names the plugin and the reason. **Reject** denies it, and **Allow** hands it back to the harness's
+  own permission checks.
+- On `agents:after-tool`, a test-first guard adds a note after a successful edit to a source file
+  (`.js`, `.ts`, `.py`, `.go`, `.rs`, `.rb`, and their variants) when the session hasn't edited a test
+  yet. It notes each file once per session. A test file is one under `test/`, `tests/`, or
+  `__tests__/`, or one named `*.test.*`, `*.spec.*`, `*_test.go`, `*_test.py`, or `test_*.py`. The
+  guard keeps its memory in the Node process, so a restart starts each session over.
+
+A refusal on `agents:before-tool` is never explained afterward, because the model already read why.
+
 ## Coverage by harness
 
 | Harness | What reaches the rules |
 | --- | --- |
-| Claude Code | Bash's `command`. |
+| Claude Code | Bash's `command`, on every call through the bridge, and on permission requests. Edit, Write, and Read paths reach the test-first guard. |
 | Codex | The approval's `command`. Its working directory arrives in `paths`, and these rules don't read it. |
 | DeepSeek | `bash`'s `command`, merged from the tool call announced before the request. |
 | `omp` | Whatever its ACP permission request carries. Not checked: `omp` source and a working `omp` model were unavailable when this package was written. |

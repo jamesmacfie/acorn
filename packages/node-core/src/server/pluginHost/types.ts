@@ -197,6 +197,9 @@ export type PluginHookRegistry = {
   /** Run one of this plugin's own points. `id` is the bare point id; the host qualifies it. Never
    *  rejects: every failure inside the chain resolves to a verdict (./hooks.ts). */
   run<T extends HookPayload>(id: string, payload: T): Promise<HookVerdict<T>>
+  /** The plugins with a handler that would run at one of this plugin's points, so an owner can skip
+   *  work nobody would see. `id` is the bare point id. */
+  handlers(id: string): Promise<string[]>
 }
 
 export type PluginHookPoint = {
@@ -223,7 +226,8 @@ export type PluginHookHandler = {
   mode: HookMode
   priority?: number
   /** The answer the mode asks for: `{ payload }` for a transform, `{ ok, reason? }` for a veto,
-   *  anything at all for an observer, whose answer is dropped unread. */
+   *  `{ ask: true, reason }` to hold the decision for the person, anything at all for an observer,
+   *  whose answer is dropped unread. */
   run(payload: HookPayload, signal: AbortSignal): Promise<unknown>
 }
 

@@ -45,6 +45,13 @@ Deleting a workspace removes its datasets. Row and byte caps plus retention boun
   change from an id the host binds ([session control](./managed-agents/session-control.md)). Its
   activity feed carries no tool output, message text, reasoning, or command line, and a note it draws
   on a request card can't answer the request.
+- **A loaded plugin on `agents:before-tool` or `agents:after-tool`** sees every tool call a bridged
+  harness makes, with its command line and paths, and can refuse one, hold it for the person, or add
+  a note the model reads. It can't approve a call: every bridge reply is a deny, a note, or no
+  decision, and a broken bridge leaves the harness's own checks in charge. The bridge program posts
+  with the session's own task token, and the route answers only for the session that token names.
+  Acorn adds the bridge to the flag settings of the session it starts and writes nothing to the
+  person's harness settings files ([harness bridges](./managed-agents/loop-hooks.md)).
 - **The terminal client** collapses the shell and helper into one process. UI code and the broker share
   a realm, so what the desktop holds as a process boundary this holds as a module boundary. The device
   token lives in the broker's module, the plugin cache and acknowledgements in one custody module, and

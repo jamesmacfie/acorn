@@ -65,7 +65,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // read, and the option change, load on first use. The per-event check that starts a frame, the usage
 // dedupe, the roster's advertised options, the host's caller binding for capabilities, and the request
 // card point's constant load at boot. Add 3.5 KB.
-const limits = { ceiling: 3_149_000, floor: 1_000_000 }
+// 2026-10-07: 3,156,057 B with harness bridges. Answering a bridge call, holding an ask, the Claude hook
+// mapping, and a plugin's coverage load on first use. The two loop points' declarations, the hook
+// runner's `ask` branch, the ingress route, and the start's check for a handler load at boot. Add 8 KB.
+const limits = { ceiling: 3_157_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

@@ -27,8 +27,9 @@ The owner declares a hook in its manifest or through `ctx.hooks.declare`:
 
 - `payload` is the declared shape, in the vocabulary a remote tree's props use: `string`, `number`,
   `boolean`, and arrays of those. A payload is a decision's subject, not a document.
-- `allows` is the subset of `observe`, `transform`, and `veto` the owner permits. A handler asking
-  for an unlisted mode gets nothing.
+- `allows` is the subset of `observe`, `transform`, `veto`, and `ask` the owner permits. A handler
+  asking for an unlisted mode gets nothing. Allow `ask` only where the owner can hold its decision for
+  a person to answer.
 - `timeoutMs` limits each handler. `onTimeout` is `allow` or `deny` and applies to veto handlers only.
 - `order` is `priority` (the handler's own number, then install time) or `install`. Ties are stable.
 - `collect` runs every veto instead of stopping at the first, so the owner can show every reason.
@@ -59,6 +60,7 @@ registration, so nothing in the chain knows which it has.
 | `observe` | Anything | Drops it unread. Observers run beside the chain, never in it |
 | `transform` | `{ payload }` | Validates it against the owner's declared shape. A violation counts as no change and is recorded |
 | `veto` | `{ ok: true }` or `{ ok: false, reason }` | `reason` is capped display text, and the host stamps `by` with the contributor's id |
+| `ask` | `{ ask: true, reason }`, or anything else for no question | The verdict carries `ask: { reason, by }`, and the owner holds its decision for the person. `by` is stamped like a veto's |
 
 ## Chain rules
 
@@ -69,9 +71,15 @@ These rules have no exceptions:
 - A handler that throws or times out is skipped and recorded on its roster row. A timed-out veto is
   treated as `onTimeout` says. The default is to fail open, so a stalled plugin can't block a push.
 - The chain stops at the first veto unless the owner set `collect`.
+- An ask doesn't stop the chain, so a later veto still refuses outright. The first ask reaches the
+  verdict only when nothing vetoed. A timed-out ask asked nothing.
 - A transform's output is validated against the same shape as its input.
 - Both directions appear in the trust prompt with host-owned copy, such as "can stop a push in the
-  changes plugin". A handler that changes or stops another plugin's decision is a high grant.
+  changes plugin". A handler that changes, stops, or holds another plugin's decision is a high grant.
+  An ask reads "Make a tool wait for you before agents can “run any tool”", apart from a veto's line.
+
+An owner can ask which plugins handle one of its points with `ctx.hooks.handlers(id)`, to skip work
+nobody would see. Agents uses it to install a harness bridge only for a point with a handler.
 
 The owner draws the refusal in its own UI with the stamped provenance, and decides whether "push
 anyway" exists.
@@ -89,6 +97,8 @@ Core declares four hooks, because core owns those choke points:
 | changes | `changes:before-commit` | observe, transform, veto | Commit lint and message helpers |
 | changes | `changes:before-push` | observe, veto | Secret scanning, changesets, and branch protection |
 | agents | `agents:before-send` | observe, transform, veto | Prompt policy, redaction, and context injectors |
+| agents | `agents:before-tool` | observe, veto, ask | Every tool call a bridged harness makes, before it runs. A veto denies it with a reason the model reads, and an ask holds it on a card. Install order, 5 seconds, `onTimeout: allow` ([harness bridges](../managed-agents/loop-hooks.md)) |
+| agents | `agents:after-tool` | observe, transform | Every tool call a bridged harness finished. A transform's `note` reaches the model beside the result ([harness bridges](../managed-agents/loop-hooks.md)) |
 | agents | `agents:before-permission` | observe, veto | Refusing a harness permission request before anyone sees it. Install order, 5 seconds, `onTimeout: allow`, so a timeout means the person decides. Only requests the harness asks about arrive ([permission policy](../managed-agents/permission-policy.md)) |
 | terminal | `terminal:before-run-target` | observe, veto | Change freezes and environment checks. Runs after the repo-config trust gate and before the session starts |
 | workflows | `workflows:before-step` | observe, veto | "No deploys today" from an incident tool |

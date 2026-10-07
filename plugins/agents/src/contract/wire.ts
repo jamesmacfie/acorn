@@ -81,6 +81,10 @@ export type AgentCapability =
   | 'subagents'
   | 'attachments'
   | 'generated_artifacts'
+  /** acorn's bridge runs `agents:before-tool` on every tool call (docs/managed-agents/loop-hooks.md). */
+  | 'loop_before_tool'
+  /** acorn's bridge runs `agents:after-tool` on every finished tool call. */
+  | 'loop_after_tool'
 
 export type AgentConfigOption = {
   id: string

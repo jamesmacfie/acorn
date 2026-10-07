@@ -1,7 +1,180 @@
 # Phase 10: harness bridges
 
-Status: proposed, 2026-10-07. Entry: phase 09 accepted with its loaded consumers. Next:
-[phase 11](./11-programme-acceptance.md).
+Status: done with recorded limitations, 2026-10-07. Proposed 2026-10-07. Entry: phase 09 accepted
+with its loaded consumers. Next: [phase 11](./11-programme-acceptance.md).
+
+## Completion note, 2026-10-07
+
+**What landed.** On branch `phase-10-harness-bridges`, at the commit titled "Phase 10: Harness
+bridges". [Harness bridges](../../managed-agents/loop-hooks.md) is the owning contract.
+
+- **`ask`, a fourth hook mode** in `HOOK_MODES` (`@acorn/protocol/extensionPoints.ts`) and the
+  plugin types. `runHook` runs an ask handler in the chain like a veto, records the first
+  `{ ask: true, reason }`, and keeps going, so a later veto still refuses. The verdict gains
+  `ask: { reason, by }` only when nothing vetoed. A timed-out ask asked nothing. Only
+  `agents:before-tool` allows it. Trust copy: "Make a tool wait for you before agents can “run any
+  tool”", marked high.
+- **`ctx.hooks.handlers(id)`**, so an owner can ask which plugins handle one of its points. Async in
+  `hostCallModes`, so a loaded owner can call it too.
+- **`agents:before-tool` and `agents:after-tool`**, declared from `contract/loopHook.ts` with the
+  payloads the design gives. The subject is phase 02's `AgentPermissionSubject` plus `toolName` and
+  `title`. Both are install order, 5 s, `onTimeout: allow`.
+- **The bridge program**, `loop-hook.js`, built beside `mcp.js` from `apps/node/src/entries/loop-hook.ts`
+  and `packages/node-core/src/mcp/loopHook.ts`. It reads stdin, posts to the route its command line
+  names, and prints the reply. Every failure prints nothing and exits zero. `acornLoopHook()` in
+  `mcpRegister.ts` locates it beside the MCP entry.
+- **The ingress**, `POST /v1/p/agents/loop-hook` (`server/routes/loopHook.ts`), and the
+  `agents.loopHook.v1` request and reply types. Only a task token with a session gets an answer, and
+  the token, not the body, names the session.
+- **Claude Code's mapping** in `drivers/claudeLoopHook.ts`, tested from input recorded from Claude
+  Code 2.1.292. **Installation** in `claudeHarness.ts`: command hooks merged into the flag settings
+  acorn already sends, only for a point with a handler, read by the lifecycle at each start and resume.
+- **`ask` end to end** (`server/sessions/loopHooks.ts`, loaded on first use): an ordinary permission
+  request on the asking turn, detailed "`<plugin>` wants you to decide: `<reason>`", with **Allow**
+  and **Reject**. `resolveRequest` answers a held ask before it looks for a driver handle. Reject is a
+  deny, Allow is no decision, and no answer in 570 s expires the row and denies.
+- **Coverage.** `loop_before_tool` and `loop_after_tool` in `AgentCapability`, reported by an ACP
+  driver whose spec sets `loopHooks` and only where the Node has the bridge program. A core
+  `core:plugin-page` remote point on the plugin page's **Permissions** tab, which agents fills with
+  **Agents it reaches** from `GET /v1/p/agents/loop-coverage/:pluginId`.
+- **Consumer.** [`packages/permission-policy/`](./packages/permission-policy/README.md) 0.5.0:
+  `decide` as a veto and `warn` as an ask on `agents:before-tool`, and a hard-coded test-first guard
+  on `agents:after-tool`.
+
+No migration. `expirePendingRequests` takes an optional request id. Wire changes are additive: two
+capabilities, a route, two hook points, a hook mode, a verdict field, a registry method, and a core
+point. The manifest schema and the published surface pin were regenerated. Docs updated:
+[hooks](../../plugins/hooks.md), [node extension points](../../plugins/node-side-extension-points.md),
+[managed agents](../../managed-agents.md), [permission policy](../../managed-agents/permission-policy.md),
+[MCP](../../mcp.md), [security](../../security.md), [remote points](../../plugins/remote-points.md),
+[extensions](../../plugin-authoring/extensions.md), [mods.md](../mods.md) (the "shipping a mod" item
+is replaced), manual check 164 in [agents and providers](../../testing/agents-and-providers.md), and
+the docs index.
+
+**Decisions and deviations.**
+
+- **The bridge program names no plugin.** An architecture rule forbids a library naming a plugin
+  route, so agents writes the route and version into the installed command
+  (`loop-hook.js /v1/p/agents/loop-hook agents.loopHook.v1 claude PreToolUse`), and the program checks
+  only that the route is under `/v1/p/`.
+- **An ask that expires denies.** The design leaves expiry to this phase. Nobody approving is not
+  approval, and the bridge's own failures stay no decision. The hold is 570 s, 30 s inside the 600 s
+  hook timeout acorn installs, which is also Claude's default.
+- **A cancelled turn expires an ask's card at once, but the hold runs to its timer.** The comment in
+  `holdAsk` says so. The harness has usually killed the hook by then.
+- **`after-tool`'s `succeeded` is always `true` on Claude.** Claude sends `PostToolUse` only for a
+  call that finished. `PostToolUseFailure` isn't installed.
+- **Mods weren't used.** Command hooks work and cost about 57 ms a call, so the Mods module stays the
+  fallback the design names. Whether Mods still needs an early-access flag wasn't checked.
+- **The service boot budget rose 8 KB to 3,157,000 B.** HEAD measured 3,148,541 B. Answering a call,
+  holding an ask, the Claude mapping, and coverage load on first use. The two point declarations, the
+  `ask` branch, the route, and the start's handler check load at boot.
+- **No `omp` bridge.** `omp` isn't installed and its source isn't on this machine, so its
+  `tool_call` deny API couldn't be verified at phase 01's commit. Writing an extension blind would ship
+  unverified code. It joins DeepSeek on `before-permission` only.
+
+**Codex limitation, with evidence.** Codex 0.159.2 (`codex app-server generate-json-schema`, its
+binary, and its hooks documentation, checked 2026-10-07):
+
+- A hook added with `-c hooks.PreToolUse=…`, the session-flag layer that `thread/start`'s `config`
+  also feeds, is listed by `hooks/list` as `source: "sessionFlags"`, `isManaged: false`,
+  `trustStatus: "untrusted"`, with key `/<session-flags>/config.toml:pre_tool_use:0:0`.
+- Trust is a hash a person records with `/hooks`, written by `config/batchWrite` as
+  `hooks.state."<key>".trusted_hash` into `~/.codex/config.toml`. That's the person's own settings.
+- Managed hooks come only from system, MDM, cloud, or `requirements.toml` layers, which an
+  administrator owns.
+- The remaining doors are `--dangerously-bypass-hook-trust` and the `bypass_hook_trust` override,
+  which also skip trust for the person's own hooks. Passing a `hooks.state` hash as a session flag
+  would trust a hook from the same untrusted layer, which is the bypass by another name. Neither is
+  used.
+
+So Codex ships without a bridge and reports neither loop capability. Settings says its tool calls
+reach a policy only when Codex asks.
+
+**Verify-before-building answers.** The adapter still spreads `claudeCode.options`, `settings` and
+`hooks` included (`acp-agent.js`, claude-agent-acp 0.54.1, SDK 0.3.197). Claude's input carries
+`tool_use_id`, which equals the ACP `toolCallId`. Claude runs every matching hook from every source in
+parallel: on 2.1.292, in `bypassPermissions`, a deny from a `--settings` hook refused `git status`
+that James's own `rtk` `PreToolUse` hook approves. Codex's input carries `tool_use_id`, and its deny
+reaches the model through `permissionDecisionReason`, per its documentation; untested, because Codex
+has no bridge. Codex's default hook timeout is 600 s.
+
+**Verification.**
+
+- `pnpm lint` passes. `@acorn/arch-tests`: 86 passed, with the published surface pin regenerated for
+  `HookVerdict.ask` and `PluginHookRegistry.handlers`. `apps/node` `pnpm build` passes the budget at
+  3,156,057 B.
+- `hooks.test.ts`: an ask holds, the first ask wins, a later veto still refuses, a point that doesn't
+  allow `ask` never calls one, and a stalled ask asks nothing.
+- `loopHooks.test.ts`, through the real hook chain across two plugin contexts: no handler installs no
+  bridge and answers nothing, one handled point installs only that point, a veto denies with its
+  reason and the permission subject and `toolCallId`, another task's or an unknown session gets
+  nothing, an ask raises a card that a refusal denies and an approval leaves undecided, a throwing
+  handler leaves the call alone, and an after-tool note is trimmed and capped at 4,096 characters.
+- `claudeLoopHook.test.ts` from recorded Claude input: the subject, the three answers and no allow,
+  and settings that install only handled points with a quoted command. `routes/loopHook.test.ts`:
+  the token names the session, and a device, a token with no session, or an unknown body gets no
+  decision. `node-core` `mcp/loopHook.test.ts` runs the real program: it forwards with the token and
+  prints the reply, and a stopped Node, an error reply, or bad input prints nothing and exits zero.
+- `permissionLines.test.ts`: the `ask` line and its high mark. The manifest schema and the
+  `pluginDisable` and `routeRegistry` goldens carry the new route and capability.
+- The full `pnpm test` ran once on Node 24.11. On top of it, under Node 26.8.1: `@acorn/node-core`
+  1,628 passed, with the 3 known `storage/backup.test.ts` failures. `@acorn/node` 271 passed, with
+  the known `routeRegistry.test.ts` red, whose only remaining difference is
+  `POST /v1/p/terminal/tasks/:taskId/setup`. `@acorn/tui` 676, `create-acorn-plugin` 22,
+  `@acorn/plugin-api` 14. On Node 24.11: `@acorn/plugin-agents` 1,174, `@acorn/client-core` 2,460
+  with the known `scopes.test.ts` and `cssHygiene` reds, `@acorn/desktop` 171 with the 11 known
+  `clientPluginDisable.test.ts` cases, `@acorn/protocol` 294, `@acorn/plugin-workflows` 568, and every
+  other package green.
+- The package: `node --test` in `permission-policy` passes 14.
+
+Real host, `pnpm dev:agent -- --session pi-phase-10 --project /tmp/p10-repo`, Claude Code 2.1.292,
+Opus 5.5:
+
+- The policy installed through `POST /v1/core/plugins/install` and was active after a Node restart.
+  The trust prompt listed "Stop agents from doing “run any tool”" and "Make a tool wait for you before
+  agents can “run any tool”" (`p10-policy-trust.png`).
+- The **Permissions** tab's **Agents it reaches** read "Claude Code: Every tool call, and every tool
+  result." and "Codex: Only the tool calls it asks you about." That matches the providers' reported
+  capabilities (`p10-coverage.png`).
+- In **Bypass Permissions**, `git push --force nowhere-remote HEAD` failed before it ran, and the
+  agent quoted "PreToolUse:Bash hook error: Blocked by acorn-permission-policy: Force-pushing
+  rewrites shared history…" in the same turn (`p10-claude-veto.png`). James's `rtk` hook, which
+  approves git, didn't let it through. Phase 02's limitation is gone on Claude.
+- `git push nowhere-remote HEAD` raised a card, "acorn-permission-policy wants you to decide: This
+  pushes commits to a remote…", and the session showed **Needs you** (`p10-ask-card.png`). **Reject**
+  failed the call with "The person refused this when acorn-permission-policy asked them…"
+  (`p10-ask-refused.png`). **Allow** let Claude's own checks run, and git failed on the missing
+  remote (`p10-ask-allowed.png`).
+- An Edit to `src/push.ts` returned "PostToolUse:Edit hook additional context: Test first: you changed
+  src/push.ts before any test in this session…".
+- The Claude process's `--settings` held the hook, run by the app's bundled Node against
+  `dist/helper/loop-hook.js`. `~/.claude/settings.json` was last written 2026-10-06.
+- Latency: 15 calls from the bundled bridge to the live Node took a median of 57 ms (55 to 61), a
+  refusal 57 ms. With no Node to reach, 28 ms.
+- Screenshots are in the session's ignored `.acorn/agent-dev/pi-phase-10/screenshots/`.
+
+**Limitations.**
+
+- **No Codex bridge**, as above. **No `omp` or DeepSeek bridge**, by design for DeepSeek and for lack
+  of `omp`.
+- **A killed bridge, a stopped Node, and a slow handler weren't forced on the real host.**
+  `loopHook.test.ts` in node-core runs the real program against a stopped Node, an error reply, and
+  bad input. `loopHooks.test.ts` in agents covers a throwing handler, and the hook runner's own tests
+  cover a stalled one.
+- **The terminal client wasn't driven.** The ask card is the shared request card, which both hosts
+  draw, and the coverage section is desktop-only: the terminal client has no plugin page.
+- **The transform trust line reads "Change what agents does when it “read a tool result”s".** The
+  shared sentence appends an "s" to the label, as it does for `before-send`'s "send a prompt". Not
+  changed here.
+- **`~/.codex/config.toml` was rewritten at Node boot** by the terminal plugin's existing
+  `acorn-dev` MCP re-registration ([MCP § Configuration](../../mcp.md#configuration)), which now
+  points at this worktree. That's pre-existing behavior, not the bridge.
+
+**For phase 11.** Run manual check 164 with a signed-in Claude Code. Codex, DeepSeek, and `omp` reach
+policy only through `agents:before-permission`. A plugin's tool hooks reach a running session after
+its next resume. A bridged deny reaches the model in the turn, so the explanation note from phase 03 is
+only for permission-hook refusals.
 
 ## Outcome
 

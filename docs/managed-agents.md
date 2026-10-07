@@ -69,6 +69,8 @@ These pages cover harnesses and the work agents do:
 
 - [Permission policy](./managed-agents/permission-policy.md): `agents:before-permission`, a plugin's
   refusal of a harness permission request, and what it can't see.
+- [Harness bridges](./managed-agents/loop-hooks.md): `agents:before-tool` and `agents:after-tool` on
+  every tool call Claude Code makes, the bridge program, and why Codex has none.
 
 <a id="session-messages"></a>
 

@@ -5,7 +5,7 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
-import { CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { CORE_PLUGIN_PAGE_POINT, CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
 import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
 import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
@@ -36,6 +36,7 @@ const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionD
 const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
 const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
 const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
+const LoopCoverageSection = lazy(() => import('./settings/LoopCoverageSection'))
 
 export const agentsClientPlugin: ClientPlugin = {
   name: 'agents',
@@ -158,6 +159,12 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'agents.storage', point: CORE_STORAGE_POINT, label: 'Running agents', order: 10,
       requires: { plugin: 'agents' },
       component: AgentStorageSection,
+    })
+    // Which harnesses a plugin's tool hooks reach, on that plugin's own page (./settings/LoopCoverageSection.tsx).
+    ctx.extensions.register({
+      id: 'agents.loop-coverage', point: CORE_PLUGIN_PAGE_POINT, label: 'Agents it reaches', order: 10,
+      requires: { plugin: 'agents' },
+      component: LoopCoverageSection,
     })
     // Concurrency and pricing, which were two pages. Their old ids are aliases, so an old link, a
     // remembered page or another plugin's `openSettings('agent-pricing')` lands on its section here.

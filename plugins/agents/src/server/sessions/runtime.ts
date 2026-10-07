@@ -115,6 +115,7 @@ export class ManagedAgentRuntime {
 
   subscribe = (listener: Parameters<ManagedAgentEngine['subscribe']>[0]) => this.engine.subscribe(listener)
   providers = (force?: boolean) => this.engine.providers(force)
+  loopHook = (...args: Parameters<ManagedAgentEngine['loopHook']>) => this.engine.loopHook(...args)
   usableProvider = (pick: Parameters<ManagedAgentEngine['usableProvider']>[0]) => this.engine.usableProvider(pick)
   reconcile = () => this.engine.reconcile()
   stopTaskSessions = (taskId: string) => this.engine.stopTaskSessions(taskId)
@@ -511,8 +512,11 @@ export class ManagedAgentRuntime {
     if (!claim.claimed) return claim.request
     const session = await this.store.requireSession(sessionId)
     try {
-      const live = await this.engine.ensureSession(session)
-      await this.engine.withSessionHandle(live, (handle) => handle.resolveRequest(providerRequestId, resolution))
+      // A bridge's ask is held by the engine, not parked in the harness (./loopHooks.ts).
+      if (!this.engine.answerLoopAsk(providerRequestId, resolution)) {
+        const live = await this.engine.ensureSession(session)
+        await this.engine.withSessionHandle(live, (handle) => handle.resolveRequest(providerRequestId, resolution))
+      }
     } catch (error) {
       // The provider may have accepted the response before transport failure. Expire the durable
       // claim rather than making a second attempt that could grant a permission twice.

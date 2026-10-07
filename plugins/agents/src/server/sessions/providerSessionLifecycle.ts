@@ -1,7 +1,7 @@
 import { ProcessRetirementError } from '../processes/ownedProcess'
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { AgentSession } from '../../contract/wire'
-import type { AgentDriver, AgentDriverEvent, AgentDriverMcpServer, AgentDriverSession } from '../drivers/types'
+import type { AgentDriver, AgentDriverEvent, AgentDriverLoopHooks, AgentDriverMcpServer, AgentDriverSession } from '../drivers/types'
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
@@ -65,6 +65,8 @@ export type ProviderLifecyclePorts = {
    *  the report once a turn carried them. */
   skills(session: AgentSession, generation: ProviderGeneration, native: boolean): Promise<SkillStart>
   skillsDelivered(sessionId: string, report: SkillReport): Promise<void>
+  /** The bridge for a start of a driver with `loopHooks`, or null when no loop point has a handler. */
+  loopHooks(session: AgentSession): Promise<AgentDriverLoopHooks | null>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -256,9 +258,11 @@ export class ProviderSessionLifecycle {
       const skills = await read(() => this.ports.skills(session, live.generation, live.driver.nativeSkills === true))
       live.skills = skills
       live.skillsOwed = true
+      const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
       signal.throwIfAborted()
       const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
         cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, skillPlugins: skills.plugins,
+        ...(loopHooks ? { loopHooks } : {}),
         noProviderExecutionHistory, signal, session, measureStartup,
         onEvent: (event) => this.callback(live, () => {
           if (event.type === 'session_metadata') {

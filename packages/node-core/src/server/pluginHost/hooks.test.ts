@@ -34,7 +34,7 @@ const point = (over: Partial<Parameters<typeof registerHookPoint>[0]> = {}) =>
 
 const handler = (
   id: string,
-  mode: 'observe' | 'transform' | 'veto',
+  mode: 'observe' | 'transform' | 'veto' | 'ask',
   call: (payload: Record<string, unknown>, signal: AbortSignal) => Promise<unknown>,
   priority = 500,
 ) =>
@@ -111,6 +111,32 @@ describe('the chain', () => {
       { reason: 'a secret', by: 'scan' },
       { reason: 'no changeset', by: 'lint' },
     ])
+  })
+
+  it('holds for the person on an ask, and lets a later veto refuse outright', async () => {
+    point({ allows: ['veto', 'ask'] })
+    handler('scan', 'ask', async () => ({ ask: true, reason: 'This pushes to a remote.' }), 10)
+    handler('lint', 'ask', async () => ({ ask: true, reason: 'second' }), 20)
+    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({
+      ok: true,
+      payload: { branch: 'main' },
+      ask: { reason: 'This pushes to a remote.', by: 'scan' },
+    })
+    handler('watch', 'veto', async () => ({ ok: false, reason: 'no' }), 30)
+    const vetoed = await runHook('changes:before-push', { branch: 'main' })
+    expect(vetoed).toMatchObject({ ok: false, by: 'watch' })
+    expect(vetoed.ask).toBeUndefined()
+  })
+
+  it('never asks at a point that does not allow it, and a stalled ask has asked nothing', async () => {
+    point({ allows: ['veto'] })
+    handler('scan', 'ask', async () => ({ ask: true, reason: 'x' }))
+    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({ ok: true, payload: { branch: 'main' } })
+    clearHooks('changes')
+    clearHooks('scan')
+    point({ allows: ['ask'] })
+    handler('slow', 'ask', () => new Promise(() => {}))
+    await expect(runHook('changes:before-push', { branch: 'main' })).resolves.toEqual({ ok: true, payload: { branch: 'main' } })
   })
 
   it('hands each handler the payload as it stands when its turn comes, and never the previous answer', async () => {

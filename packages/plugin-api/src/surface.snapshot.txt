@@ -487,6 +487,7 @@ node: TelemetrySink
 node: ToolContext
 node: ToolError
 node: VersionedDataValue
+node: acornLoopHook
 node: acornMcp
 node: agentProfileRegistry
 node: brokerEnv

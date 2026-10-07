@@ -57,6 +57,11 @@ export type AgentDriverMcpServer =
   | { transport: 'stdio'; name: string; command: string; args: string[]; env: Record<string, string> }
   | { transport: 'http'; name: string; url: string; headers: Record<string, string> }
 
+/** The bridge program (docs/managed-agents/loop-hooks.md) and which of agents' two loop points have a
+ *  handler. `args` ends with the route and version the bridge posts. The harness runs
+ *  `command args… <harness> <event>` and does what it prints. */
+export type AgentDriverLoopHooks = { command: string; args: string[]; beforeTool: boolean; afterTool: boolean }
+
 export type AgentDriverStartOptions = {
   /** Local compiled-runtime cancellation. This signal never crosses plugin RPC. */
   signal?: AbortSignal
@@ -76,6 +81,9 @@ export type AgentDriverStartOptions = {
   /** For a driver with `nativeSkills`: the plugin folders of this start's skill copy (./skillFolder.ts),
    *  for the harness to load as its own. Absent means none. */
   skillPlugins?: readonly string[]
+  /** acorn's harness bridge for this start, for a driver with `loopHooks`. Absent when no point has a
+   *  handler, so a session nobody would gain from pays no process per tool call. */
+  loopHooks?: AgentDriverLoopHooks
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>
@@ -119,6 +127,8 @@ export interface AgentDriver {
   /** The harness loads skills from a folder with its own skill support, so the lifecycle writes one for
    *  each start and passes it as `skillPlugins` (docs/managed-agents/native-skills.md § Native skills). */
   readonly nativeSkills?: boolean
+  /** The harness takes acorn's bridge, so the lifecycle passes `loopHooks` when a point has a handler. */
+  readonly loopHooks?: boolean
   probe(): Promise<AgentProviderDescriptor>
   start(options: AgentDriverStartOptions): Promise<AgentDriverSession>
   classifyTurnFailure?(error: unknown): 'safe_transient' | 'uncertain' | 'permanent'

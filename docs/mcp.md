@@ -24,6 +24,10 @@ puts both identifiers in the provider process's environment. Managed Codex also 
 declaration with the signed token, data root, identifiers, and certificate path, because its MCP child
 doesn't inherit arbitrary environment variables (`plugins/agents/src/server/sessions/runtimeEngine.ts`).
 
+The harness bridge, `loop-hook.js`, runs from a harness's own command hook under the same environment
+and reaches the Node the same way, with the same task token
+([harness bridges](./managed-agents/loop-hooks.md#the-bridge-program)).
+
 The endpoint is resolved at call time, because Node ports are ephemeral. The signing key persists, so a
 tmux-reattached process still authenticates after a Node restart, and rotating the key revokes every
 outstanding token.

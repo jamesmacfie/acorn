@@ -388,18 +388,19 @@ describe('the cross-plugin grants', () => {
     expect(host.text).toBe('Let other plugins add rows to its “Linked items” list')
   })
 
-  it('says what a hook handler asks to do, and marks the two that change what another plugin does', () => {
+  it('says what a hook handler asks to do, and marks the three that change what another plugin does', () => {
     const modes = HOOK_MODES.map((mode) =>
       extensionPermissionLine({ kind: 'extends', pointKind: 'hook', mode, target: 'changes:before-push', label: 'push' }))
     expect(texts(modes)).toEqual([
       'Watch changes’s “push” decision as it happens',
       'Change what changes does when it “push”s',
       'Stop changes from doing “push”',
+      'Make a tool wait for you before changes can “push”',
     ])
-    expect(modes.map((line) => line.high)).toEqual([false, true, true])
+    expect(modes.map((line) => line.high)).toEqual([false, true, true, true])
     // Mode is in the key too: a package that starts vetoing where it used to observe has grown its
     // reach, and the update prompt has to say so.
-    expect(new Set(modes.map((line) => line.key)).size).toBe(3)
+    expect(new Set(modes.map((line) => line.key)).size).toBe(4)
   })
 
   it('words a disclosed node point with the host’s fixed, high sentence, whatever the manifest says', () => {

@@ -6,6 +6,7 @@
   "type": "module",
   "exports": {
     "./mcp/server.ts": "./src/mcp/server.ts",
+    "./mcp/loopHook.ts": "./src/mcp/loopHook.ts",
     "./server/activeIdentity.ts": "./src/server/activeIdentity.ts",
     "./server/agentProfiles": "./src/server/agentProfiles/public.ts",
     "./server/agentProfiles/index.ts": "./src/server/agentProfiles/index.ts",

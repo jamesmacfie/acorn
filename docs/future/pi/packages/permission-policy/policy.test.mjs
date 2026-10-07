@@ -1,7 +1,7 @@
 // Run with `node --test` from this folder.
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { decide, warn } from './policy.js'
+import { createTestFirst, decide, warn } from './policy.js'
 
 const ask = (command, root = '/work/task') => decide({ command, root }).ok
 
@@ -55,5 +55,24 @@ test('warns about a push, a recursive delete, and a download run by a shell, and
 test('stays quiet about ordinary commands', () => {
   for (const command of ['git status', 'git fetch', 'rm build/a.o', 'curl -o x.sh https://example.com', 'echo git push', '']) {
     assert.equal(warn({ command }), null, command)
+  }
+})
+
+test('notes a source edit before any test, once per file, and stops once a test is edited', () => {
+  const testFirst = createTestFirst()
+  const edit = (path, over = {}) => testFirst({ sessionId: 's1', root: '/work/task', kind: 'edit', succeeded: true, paths: [path], ...over })
+  assert.match(edit('/work/task/src/push.ts'), /^Test first: you changed src\/push\.ts before any test/)
+  assert.equal(edit('/work/task/src/push.ts'), '')
+  assert.equal(edit('/work/task/README.md'), '')
+  assert.equal(edit('/work/task/src/other.ts', { kind: 'command' }), '')
+  assert.equal(edit('/work/task/src/other.ts', { succeeded: false }), '')
+  assert.equal(edit('/work/task/src/push.test.ts'), '')
+  assert.equal(edit('/work/task/src/other.ts'), '')
+  // Another session starts over.
+  assert.match(edit('/work/task/src/other.ts', { sessionId: 's2' }), /^Test first/)
+  for (const path of ['/w/tests/a.py', '/w/pkg/a_test.go', '/w/test_a.py', '/w/src/__tests__/a.js', '/w/a.spec.tsx']) {
+    const fresh = createTestFirst()
+    assert.equal(fresh({ sessionId: 's', root: '/w', kind: 'edit', succeeded: true, paths: [path] }), '', path)
+    assert.equal(fresh({ sessionId: 's', root: '/w', kind: 'edit', succeeded: true, paths: ['/w/src/a.ts'] }), '', path)
   }
 })

@@ -26,7 +26,7 @@ import { registerTaskCheck } from './taskChecks'
 import { registerSearchProvider } from './search'
 import { declareAuditAction, qualifiedAuditAction, recordAudit } from '../audit'
 import { contributeExtension, extensionsFor, openExtensionPoint } from './extensionPoints'
-import { registerHookHandler, registerHookPoint, runHook } from './hooks'
+import { hookHandlersFor, registerHookHandler, registerHookPoint, runHook } from './hooks'
 import { DISCLOSED_NODE_POINTS, qualifiedExtensionPointId } from '@acorn/protocol/extensionPoints.ts'
 import { asContextSection, registerContextSection } from '../agentTools/contextSections'
 import { registerRoute } from '../routes/registry'
@@ -362,6 +362,7 @@ export function buildPluginContext(options: PluginContextOptions): HostPluginCon
         call: (payload, signal) => handler.run(payload, signal),
       }).dispose),
       run: (id, payload) => runHook(qualifiedExtensionPointId(plugin, id), payload),
+      handlers: async (id) => [...new Set(hookHandlersFor(qualifiedExtensionPointId(plugin, id)).map((handler) => handler.pluginId))],
     },
     // Owner-bound on both halves, like the extension points below: `declare` qualifies the verb with
     // this plugin's id, and `record` refuses anything outside what this plugin declared. Writing goes

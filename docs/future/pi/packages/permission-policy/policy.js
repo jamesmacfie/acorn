@@ -99,3 +99,32 @@ export function warn(payload) {
   }
   return null
 }
+
+// A test file, by the names the common test runners pick up.
+const TEST_FILE = /(^|\/)(__tests__|tests?)\/|\.(test|spec)\.[cm]?[jt]sx?$|_test\.(go|py)$|(^|\/)test_[^/]*\.py$/
+const SOURCE_FILE = /\.([cm]?[jt]sx?|py|go|rs|rb)$/
+
+/**
+ * The test-first guard for `agents:after-tool`: a note for an edit to a source file before the session
+ * has edited any test, or `''`. Once per file per session. It remembers sessions in memory, so a Node
+ * restart starts each session over, which only means one more note.
+ */
+export function createTestFirst() {
+  const tested = new Set()
+  const noted = new Set()
+  // A fixed cap, oldest first, like the warnings. A long-lived Node forgets old sessions.
+  const remember = (set, key) => { set.add(key); if (set.size > 500) set.delete(set.values().next().value) }
+  return (payload) => {
+    if (payload.kind !== 'edit' || !payload.succeeded) return ''
+    if (payload.paths.some((path) => TEST_FILE.test(path))) {
+      remember(tested, payload.sessionId)
+      return ''
+    }
+    if (tested.has(payload.sessionId)) return ''
+    const source = payload.paths.find((path) => SOURCE_FILE.test(path) && !noted.has(`${payload.sessionId}:${path}`))
+    if (!source) return ''
+    remember(noted, `${payload.sessionId}:${source}`)
+    const name = payload.root ? relative(payload.root, source) : source
+    return `Test first: you changed ${name} before any test in this session. Write a failing test that covers the change, then make it pass.`
+  }
+}

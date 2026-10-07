@@ -151,7 +151,7 @@ for (const point of CORE_POINTS) points.set(point.id, point)
 
 /** What each handler's last run did, for the developer view and the roster row. Kept out of the
  *  registrations so a re-register does not wipe the record of why the previous one failed. */
-export type HookRunRecord = { at: number; ms: number; outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed'; detail?: string }
+export type HookRunRecord = { at: number; ms: number; outcome: 'ok' | 'skipped' | 'timeout' | 'failed' | 'vetoed' | 'asked'; detail?: string }
 
 const lastRun = new Map<string, HookRunRecord>()
 
@@ -293,6 +293,8 @@ async function callOne(
  *   - The chain stops at the first veto unless the owner declared `collect`.
  *   - A timed-out veto is treated as the owner's `onTimeout` says. Fail open by default, because a
  *     plugin that stalls must not brick a push.
+ *   - An ask is recorded and the chain goes on, so a later veto still refuses outright. The first ask
+ *     wins, and only when nothing vetoed. A timed-out ask has asked nothing.
  */
 export async function runHook<T extends HookPayload>(pointId: string, payload: T): Promise<HookVerdict<T>> {
   const point = points.get(pointId)
@@ -323,6 +325,7 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
 
   let current = payload
   const reasons: { reason: string; by: string }[] = []
+  const asks: { reason: string; by: string }[] = []
   for (const handler of chain) {
     if (handler.mode === 'observe') continue
     const run = beginRun(traceId)
@@ -344,6 +347,17 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
         // Recorded rather than refused: a transform that answers with the wrong shape has said nothing,
         // and the author needs the developer view to tell them so.
         note(handler, run, 'skipped', 'answered with a payload the point does not declare')
+      }
+      continue
+    }
+    if (handler.mode === 'ask') {
+      const question = answer === 'timeout' ? null : answer as { ask?: unknown; reason?: unknown } | null
+      if (question?.ask === true) {
+        note(handler, run, 'asked', displayText(question.reason))
+        // `by` is stamped from the registration, the same rule a veto's follows.
+        asks.push({ reason: displayText(question.reason) ?? `${handler.pluginId} wants you to decide`, by: handler.pluginId })
+      } else {
+        note(handler, run, answer === 'timeout' ? 'timeout' : 'ok')
       }
       continue
     }
@@ -377,6 +391,7 @@ export async function runHook<T extends HookPayload>(pointId: string, payload: T
     payload: current,
     ...(first ? { reason: first.reason, by: first.by } : {}),
     ...(point.collect && reasons.length ? { reasons } : {}),
+    ...(!first && asks[0] ? { ask: asks[0] } : {}),
   }
 }
 

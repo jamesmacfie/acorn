@@ -21,7 +21,7 @@ const modes = {
     declare: 'sync', handle: 'sync', handlers: 'sync', open: 'sync',
     contribute: 'sync', entries: 'sync',
   },
-  hooks: { declare: 'sync', handle: 'sync', run: 'async' },
+  hooks: { declare: 'sync', handle: 'sync', run: 'async', handlers: 'async' },
   providers: { integration: 'sync', connection: 'sync', model: 'sync', nodes: 'sync', withConnection: 'async' },
   capabilities: { provide: 'sync', get: 'sync', require: 'sync', ids: 'sync' },
   storage: { open: 'sync' },

@@ -641,6 +641,9 @@ acorn-plugin-types: member GitOptions.maxOutputBytes
 acorn-plugin-types: member GitOptions.signal
 acorn-plugin-types: member GitOptions.stdin
 acorn-plugin-types: member GitOptions.timeoutMs
+acorn-plugin-types: member HookVerdict.ask
+acorn-plugin-types: member HookVerdict.ask.by
+acorn-plugin-types: member HookVerdict.ask.reason
 acorn-plugin-types: member HookVerdict.by
 acorn-plugin-types: member HookVerdict.ok
 acorn-plugin-types: member HookVerdict.payload
@@ -751,6 +754,7 @@ acorn-plugin-types: member PluginHookPoint.payload
 acorn-plugin-types: member PluginHookPoint.timeoutMs
 acorn-plugin-types: member PluginHookRegistry.declare
 acorn-plugin-types: member PluginHookRegistry.handle
+acorn-plugin-types: member PluginHookRegistry.handlers
 acorn-plugin-types: member PluginHookRegistry.run
 acorn-plugin-types: member PluginNotice.detail
 acorn-plugin-types: member PluginNotice.kind

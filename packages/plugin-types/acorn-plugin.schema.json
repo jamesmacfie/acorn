@@ -2781,14 +2781,15 @@
               },
               "allows": {
                 "minItems": 1,
-                "maxItems": 3,
+                "maxItems": 4,
                 "type": "array",
                 "items": {
                   "type": "string",
                   "enum": [
                     "observe",
                     "transform",
-                    "veto"
+                    "veto",
+                    "ask"
                   ]
                 }
               },
@@ -2893,7 +2894,8 @@
                 "enum": [
                   "observe",
                   "transform",
-                  "veto"
+                  "veto",
+                  "ask"
                 ]
               },
               "priority": {

@@ -1,5 +1,6 @@
 // Discovery is cheap. Protocol session ownership loads only when a session starts.
 import { awaitWithSignal, startCancellation } from '../processes/startCancellation'
+import { acornLoopHook } from '@acorn/plugin-api/node'
 import type { AgentProviderDescriptor } from '../../contract/wire.ts'
 import { resolveUsageCommand, usageProcessEnv } from '../usage/processRunner'
 import { harnessCapabilities, type HarnessLaunchSpec } from './harness'
@@ -32,6 +33,11 @@ export class AcpDriver implements AgentDriver {
 
   get nativeSkills(): boolean {
     return this.spec.nativeSkills === true
+  }
+
+  // Only where this node has the bridge program to install. A standalone node has none.
+  get loopHooks(): boolean {
+    return this.spec.loopHooks === true && acornLoopHook() != null
   }
 
   // Collects the reasons a launch cannot resolve instead of throwing, so an unavailable harness shows
@@ -83,7 +89,10 @@ export class AcpDriver implements AgentDriver {
         : null,
       ...(launch.executable ? { executable: launch.executable } : {}),
       statusAuthority: 'protocol',
-      capabilities: harnessCapabilities(this.spec.quirks),
+      capabilities: [
+        ...harnessCapabilities(this.spec.quirks),
+        ...(this.loopHooks ? (['loop_before_tool', 'loop_after_tool'] as const) : []),
+      ],
       configOptions: [],
       commands: [],
       skills: [],
