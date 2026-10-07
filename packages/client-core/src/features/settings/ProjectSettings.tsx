@@ -147,7 +147,7 @@ function GeneralTab(props: { project: Project; store: ProjectConfigStore; contex
       title: 'Delete project',
       actionLabel: count ? `Delete project and ${count} task${count === 1 ? '' : 's'}` : 'Delete project',
       goes: currentMode === 'off'
-        ? `${taskLoss} Its workspace, links, and datasets are removed. You will lose access to its Home boards, notes, saved queries, and workflow definitions; those records remain stored.`
+        ? `${taskLoss} Its project scope, links, and datasets are removed. You will lose access to its Home boards, notes, saved queries, and workflow definitions; those records remain stored.`
         : count ? `${props.project.name} is removed from acorn, with its ${count} task${count === 1 ? '' : 's'} and their history.` : taskLoss,
       stays: `Nothing on disk is removed. The folder${count ? ' and any task worktrees remain where they are' : ' remains where it is'}.`,
       danger: true,

@@ -81,7 +81,7 @@ const dateWords = (address: DataBindingAddress): string => {
   if (address.from !== 'context') return 'A specific date'
   if (address.name === 'now') return address.offset ? offsetLabel(address.offset) : 'Now'
   if (address.name === 'calendar') { const words = calendarLabel(address.boundary, address.offset); return words[0]!.toUpperCase() + words.slice(1) }
-  return address.name === 'viewer' ? 'You' : 'Workspace links'
+  return address.name === 'viewer' ? 'You' : 'Linked projects'
 }
 /** A picked day as the value a date column compares: the day itself for a calendar-day column, the
  *  local midnight's instant otherwise, as the relative dates resolve. */

@@ -1,5 +1,7 @@
 export { workspaceForProject } from './activeWorkspace.ts'
 export { createWorkspacesMode } from './workspacesMode.ts'
+export { createWorkspaceWords, workspaceWords } from './words.ts'
+export type { WorkspaceWords } from './words.ts'
 export { onboardingWizardVisible, ownOnboardingVisibility } from './onboardingVisibility.ts'
 export { noProjectsScreenVisible } from './noProjectsGate.ts'
 export { createProjectAddNavigation } from './projectAddNavigation.ts'

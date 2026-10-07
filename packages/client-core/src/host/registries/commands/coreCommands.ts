@@ -27,6 +27,9 @@ import {
 import { isStandaloneSettingsPage, SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
 import { sectionSearchWords, settingsSectionEntries } from '../shell/settingsSearch'
 import type { ContributedCommand } from './commands'
+import { createWorkspaceWords } from '../../../features/workspaces/words'
+import { workspaceWords } from '../../../features/workspaces/words'
+import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 
 // Core's own catalogue: the groups the shell's commands hang under, the Settings pages as rows, and
 // the two settings core owns (docs/command-palette-and-shortcuts.md).
@@ -71,11 +74,11 @@ export const CORE_NOTIFICATIONS_GROUP = 'core.notifications'
 
 /** Where the navigation searches live. Registered by each host, because what it can navigate to
  *  differs; the group is shared so the breadcrumb reads the same in both. */
-export const goToGroup = (): ContributedCommand => ({
+export const goToGroup = (words?: ReturnType<typeof createWorkspaceWords>): ContributedCommand => ({
   id: CORE_GO_TO_GROUP,
   kind: 'group',
   title: 'Go to',
-  hint: 'tasks, workspaces, and projects',
+  hint: words ? () => words().singular === 'project' ? 'tasks and projects' : 'tasks, workspaces, and projects' : 'tasks, workspaces, and projects',
   category: 'navigation',
   palette: true,
   scope: 'none',
@@ -102,8 +105,10 @@ export const goToGroup = (): ContributedCommand => ({
  *
  * The registry is a signal, so the caller re-registers when it changes.
  */
-export function settingsPageCommands(open: (target: string) => void): ContributedCommand[] {
+export function settingsPageCommands(open: (target: string) => void, mode?: () => WorkspacesMode | undefined): ContributedCommand[] {
   const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage)
+  const groupLabel = (category: keyof typeof SETTINGS_CATEGORY_LABELS) => category === 'workspaces' && mode?.() === 'off'
+    ? workspaceWords(mode()).capitalizedPlural : SETTINGS_CATEGORY_LABELS[category]
   return [
     {
       id: CORE_SETTINGS_GROUP,
@@ -119,7 +124,7 @@ export function settingsPageCommands(open: (target: string) => void): Contribute
       id: `${CORE_SETTINGS_GROUP}.${page.id}`,
       parentId: CORE_SETTINGS_GROUP,
       title: page.title ?? page.label,
-      hint: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)],
+      hint: () => groupLabel(settingsCategoryOf(page)),
       category: 'navigation',
       palette: true,
       scope: 'none',
@@ -134,7 +139,7 @@ export function settingsPageCommands(open: (target: string) => void): Contribute
         id: `${CORE_SETTINGS_GROUP}.${entry.page}#${entry.section}`,
         parentId: CORE_SETTINGS_GROUP,
         title: `${entry.pageLabel} › ${entry.sectionLabel}`,
-        hint: entry.group,
+        hint: () => groupLabel(settingsCategoryOf(page)),
         ...(words.length ? { keywords: words } : {}),
         category: 'navigation',
         palette: true,

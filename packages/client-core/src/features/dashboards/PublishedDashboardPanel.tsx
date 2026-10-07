@@ -26,6 +26,7 @@ import { Heading } from '../../kit/components/content/Heading'
 import Icon from '../../kit/components/content/Icon'
 import { dashboardClient, publishedDashboardPanelKey } from './dashboardClient'
 import { dashboardRecoveryStore } from './dashboardRecovery'
+import { createWorkspaceWords } from '../workspaces/words'
 import { TitleField } from './fields'
 import { publishNewPanel } from './panelPublish'
 import { toast } from '../notifications/toast'
@@ -56,6 +57,7 @@ export default function PublishedDashboardPanel(props: {
   /** Opens the studio on a panel, such as one just added from a drill-down. */
   onEditPanel?: (dashboardId: string) => void
 }) {
+  const words = createWorkspaceWords()
   const nodeId = activeCacheId()
   const scope = () => ({ workspaceId: props.workspaceId ?? '' })
   const client = dashboardClient(nodeId, scope())
@@ -152,7 +154,7 @@ export default function PublishedDashboardPanel(props: {
       const projects = new Set(recordProjects)
       const projectId = taskById(row.taskId ?? '')?.projectId ?? (projects.size === 1 ? recordProjects[0] : undefined)
       const project = allProjects().find(candidate => candidate.id === projectId && candidate.workspaceId === props.workspaceId)
-      if (!project) { setOutcome('This record needs a link to one project in this workspace before you can start a task.'); return }
+    if (!project) { setOutcome(`This record needs a link to one project in this ${words().singular} before you can start a task.`); return }
       setTaskProject(project.id)
       setTaskRow(row)
       return

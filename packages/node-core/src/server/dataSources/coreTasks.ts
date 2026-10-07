@@ -11,8 +11,8 @@ export const CORE_TASK_SOURCE_ID = 'tasks'
 
 // Starter panels for the Add panel launcher (docs/data-sources.md). Their scope names no workspace or
 // account: the launcher moves each one onto the scope the person picked.
-const taskSource: PanelPlan['sources'][number] = { id: 'tasks', label: 'Workspace tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
-  name: 'Workspace tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
+const taskSource: PanelPlan['sources'][number] = { id: 'tasks', label: 'Tasks', role: 'primary', reference: { kind: 'inline', bindings: {}, content: {
+  name: 'Tasks', parameters: { type: 'object', properties: {}, additionalProperties: false }, sourceParameters: {},
   query: { source: { pluginId: 'core', sourceId: CORE_TASK_SOURCE_ID }, scope: { parameters: {} }, sort: [] },
 } } }
 const taskColumn = (id: string, label: string, type: PanelPlan['columns'][number]['type']): PanelPlan['columns'][number] =>
@@ -46,7 +46,7 @@ export const coreTaskSourceDescription: DataSourceDescription = {
   fields: [
     { pointer: '/title', label: 'Task', origin: 'declared', display: { kind: 'text', role: 'title' }, query: { operators: ['eq', 'ne', 'contains'], sortable: false } },
     { pointer: '/project', label: 'Project', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
-    { pointer: '/workspace', label: 'Workspace', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
+    { pointer: '/workspace', label: 'Scope', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
     { pointer: '/origin', label: 'Origin', origin: 'declared', query: { operators: ['eq', 'ne'], sortable: false } },
     { pointer: '/branch', label: 'Branch', origin: 'declared', query: { operators: ['eq', 'ne', 'missing', 'present'], sortable: false } },
     { pointer: '/status', label: 'Status', origin: 'declared', display: { kind: 'status', role: 'status' }, query: { operators: ['eq', 'ne'], sortable: false }, choices: { kind: 'static', values: [
@@ -109,7 +109,7 @@ async function coreTasks(request: DataSourceRequest, env: Env) {
 
 registerCoreDataSource({
   sourceId: CORE_TASK_SOURCE_ID,
-  name: 'Workspace tasks', singular: 'Task', plural: 'Tasks',
+  name: 'Tasks', singular: 'Task', plural: 'Tasks',
   identityScope: 'Core task UUID; stable for the lifetime of the task',
   titlePointer: '/title', icon: 'circle-check',
 }, coreTasks)

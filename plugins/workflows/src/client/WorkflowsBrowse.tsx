@@ -3,6 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import {
   formatRelativeTime,
+  createWorkspaceWords,
   onPluginFrame,
   projectsOptions,
   tasksOptions,
@@ -74,6 +75,7 @@ function useScope() {
 }
 
 export function WorkflowsBrowseList() {
+  const words = createWorkspaceWords()
   // The same signal the source's list column reads, keyed by the source id, so rows and column
   // narrow together (client-core kit/lib/layout/collapseState.ts).
   const collapsed = sidebarCollapsed(WORKFLOWS_SOURCE_ID)
@@ -241,7 +243,7 @@ export function WorkflowsBrowseList() {
                     trailing={(
                       <>
                         <Show when={definition().problems?.length}><Badge tone="warn" size="xs">Can't read</Badge></Show>
-                        <Icon name={SOURCE_GLYPH[definition().source].icon} title={SOURCE_GLYPH[definition().source].title} />
+                        <Icon name={SOURCE_GLYPH[definition().source].icon} title={definition().source === 'database' ? `Saved in this ${words().singular}` : SOURCE_GLYPH[definition().source].title} />
                       </>
                     )}
                   >

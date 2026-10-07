@@ -34,7 +34,7 @@ export function writePreference(db: AppDatabase, userId: string, key: string, va
       }
       const stored = storedWorkspacesMode(tx, userId)
       if (stored !== null && stored !== value) {
-        throw new PreferenceWriteError(409, 'workspaces_fixed', 'Workspace mode is fixed once set.')
+        throw new PreferenceWriteError(409, 'workspaces_fixed', 'Project grouping is fixed once set.')
       }
       if (stored === null && projectCount(tx) > 0 && value !== 'on') {
         throw new PreferenceWriteError(409, 'workspaces_fixed', 'Existing projects use grouped workspaces.')

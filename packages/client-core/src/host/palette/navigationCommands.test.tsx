@@ -1,7 +1,7 @@
 import { render } from 'solid-js/web'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
-import { projectsKey, tasksKey, type Task } from '@acorn/protocol/api.ts'
+import { prefsKey, projectsKey, tasksKey, type Task } from '@acorn/protocol/api.ts'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import type { Disposable } from '../../kit/lib/state/registry'
 
@@ -53,7 +53,7 @@ function makeTask(id: string, title: string): Task {
 }
 
 const { registerNavigationCommands } = await import('./navigationCommands')
-const { commandRegistry } = await import('../registries/commands/commands')
+const { commandRegistry, commandTitle, commandHint } = await import('../registries/commands/commands')
 type SearchCommand = import('../registries/commands/commands').SearchCommand
 type CommandExecutionContext = import('../registries/commands/commands').CommandExecutionContext
 
@@ -63,13 +63,14 @@ const contextFor = (nodeId: string): CommandExecutionContext => ({
 })
 
 let host: HTMLElement
+let client: QueryClient
 let dispose: (() => void) | undefined
 const held: Disposable[] = []
 
 beforeEach(() => {
   host = document.createElement('div')
   document.body.append(host)
-  const client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
+  client = new QueryClient({ defaultOptions: { queries: { retry: false, enabled: false } } })
   client.setQueryData(tasksKey, [makeTask('t-local', 'Local task')])
   client.setQueryData(projectsKey, [
     { id: 'p1', name: 'acorn', color: null, hidden: false },
@@ -136,6 +137,20 @@ describe('go to project', () => {
     expect(rows.map((item) => item.id)).toEqual(['p1'])
     search('core.goto.project').select(rows[0], contextFor('node-a'))
     expect(navigated).toEqual(['/p/p1'])
+  })
+})
+
+describe('active Node wording', () => {
+  it('updates registered command words when the mode query changes', async () => {
+    client.setQueryData(prefsKey, { 'core.workspaces': 'off' })
+    await vi.waitFor(() => expect(commandTitle(search('core.goto.workspace'))).toBe('Switch project'))
+    expect(commandHint(commandRegistry.get('core.goto')!)).toBe('tasks and projects')
+    const placeholder = search('core.goto.workspace').placeholder
+    expect(typeof placeholder === 'function' ? placeholder() : placeholder).toBe('Find a project…')
+
+    client.setQueryData(prefsKey, { 'core.workspaces': 'on' })
+    await vi.waitFor(() => expect(commandTitle(search('core.goto.workspace'))).toBe('Switch workspace'))
+    expect(commandTitle(commandRegistry.get('core.goto.workspace-last')!)).toBe('Last workspace')
   })
 })
 

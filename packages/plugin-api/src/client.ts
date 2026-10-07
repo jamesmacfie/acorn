@@ -183,6 +183,8 @@ export { taskStatus, taskStatusRevision } from '@acorn/client-core/features/task
 
 // ── Workspaces and projects ───────────────────────────────────────────────────────────────────
 export { workspaceForProject } from '@acorn/client-core/features/workspaces'
+export { createWorkspaceWords, workspaceWords } from '@acorn/client-core/features/workspaces'
+export type { WorkspaceWords } from '@acorn/client-core/features/workspaces'
 export { canAddProjectFromFolder } from '@acorn/client-core/features/workspaces'
 export { ownOnboardingVisibility } from '@acorn/client-core/features/workspaces'
 export { createProject, createWorkspace, patchProject } from '@acorn/client-core/features/workspaces'

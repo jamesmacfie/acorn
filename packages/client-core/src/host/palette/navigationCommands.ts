@@ -11,6 +11,7 @@ import { nodes } from '../../infra/node/fleet'
 import { workspaceForProject } from '../../features/workspaces/activeWorkspace'
 import { selectFleetWorkspace, type FleetWorkspaceList } from '../../features/workspaces/fleetWorkspaces'
 import { previousWorkspaceId } from '../../features/workspaces/lastWorkspace'
+import { createWorkspaceWords } from '../../features/workspaces/words'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
 import { COMMAND_CLOSED, registerCommands, type CommandOutcome } from '../registries/commands/commands'
 import { CORE_GO_TO_GROUP, goToGroup } from '../registries/commands/coreCommands'
@@ -50,6 +51,7 @@ export function registerNavigationCommands(options: {
   const params = useParams()
   const tasks = createQuery(() => tasksOptions(true))
   const projects = createQuery(() => projectsOptions(true))
+  const words = createWorkspaceWords()
 
   // Fanned out only while the palette is open and only when there is more than one node, which is the
   // gate this had before it was a command.
@@ -83,7 +85,7 @@ export function registerNavigationCommands(options: {
 
   onMount(() => {
     const commands = registerCommands([
-      goToGroup(),
+      goToGroup(words),
       {
         id: 'core.goto.task',
         parentId: CORE_GO_TO_GROUP,
@@ -118,11 +120,11 @@ export function registerNavigationCommands(options: {
         id: 'core.goto.workspace',
         parentId: CORE_GO_TO_GROUP,
         kind: 'search',
-        title: 'Switch workspace',
+        title: () => `Switch ${words().singular}`,
         category: 'workspace',
         palette: true,
         order: 200,
-        placeholder: 'Find a workspace…',
+        placeholder: () => `Find a ${words().singular}…`,
         scope: 'fleet',
         ...localSearch((context) => workspaceEntries()
           .filter((entry) => entry.nodeId === (context.nodeId ?? ''))
@@ -130,13 +132,13 @@ export function registerNavigationCommands(options: {
           .map((entry): CommandSearchItem => ({
             id: entry.workspace.id,
             title: entry.workspace.name,
-            subtitle: projectCount(entry.workspace.projects.length),
+            ...(words().singular === 'workspace' ? { subtitle: projectCount(entry.workspace.projects.length) } : {}),
             workspaceId: entry.workspace.id,
           }))),
         select: (item, context): CommandOutcome => {
           const entry = workspaceEntries().find((candidate) =>
             candidate.workspace.id === item.id && candidate.nodeId === (context.nodeId ?? ''))
-          if (!entry) throw new Error("That workspace isn't here any more.")
+          if (!entry) throw new Error(`That ${words().singular} isn't here any more.`)
           // Mirrors the topbar picker, including the node switch
           // (features/workspaces/fleetWorkspaces.ts explains the order). The rail source is restored
           // per-workspace by the activeWorkspace effect in App.tsx.
@@ -147,8 +149,8 @@ export function registerNavigationCommands(options: {
       {
         id: 'core.goto.workspace-last',
         parentId: CORE_GO_TO_GROUP,
-        title: 'Last workspace',
-        hint: 'back to the workspace you came from',
+        title: () => `Last ${words().singular}`,
+        hint: () => `back to the ${words().singular} you came from`,
         category: 'workspace',
         palette: true,
         order: 250,
@@ -158,7 +160,7 @@ export function registerNavigationCommands(options: {
         when: () => !!previousWorkspaceId(),
         run: (): CommandOutcome => {
           const entry = workspaceEntries().find((candidate) => candidate.workspace.id === previousWorkspaceId())
-          if (!entry) throw new Error("That workspace isn't here any more.")
+          if (!entry) throw new Error(`That ${words().singular} isn't here any more.`)
           // Same handoff as the search above, node switch included.
           selectFleetWorkspace(entry, navigate)
           return COMMAND_CLOSED

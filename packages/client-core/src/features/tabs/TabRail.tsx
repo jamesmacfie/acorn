@@ -50,10 +50,12 @@ import { TaskDraftDialog } from './TaskDraftDialog'
 import type { TaskDraft } from './taskDraftStore'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
 import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
+import { createWorkspaceWords } from '../workspaces/words'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
 export default function TabRail() {
+  const words = createWorkspaceWords()
   const navigate = useNavigate()
   const params = useParams()
   const queryClient = useQueryClient()
@@ -261,7 +263,7 @@ export default function TabRail() {
     setMenuId(null)
     const options = (projects.data ?? []).filter((project) => !project.hidden && project.workspaceId === activeWorkspace()?.id)
     if (!options.length) {
-      toast('This workspace has no visible projects yet. Add one in Projects settings first.')
+        toast(words().singular === 'project' ? 'This project is hidden. Show it in Projects settings first.' : 'This workspace has no visible projects yet. Add one in Projects settings first.')
       return
     }
     const current = params.projectId

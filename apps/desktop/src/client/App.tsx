@@ -9,7 +9,7 @@ import { integrationsOptions, prefsOptions, type Project, projectsKey, projectsO
 import { setProjectsLookup } from '@acorn/client-core/features/projects/projectLookup.ts'
 import { setTaskLookup } from '@acorn/client-core/features/tasks'
 import {
-  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createProjectAddNavigation, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace,
+  addProjectFromFolder, canAddProjectFromFolder, createFleetWorkspaces, createProjectAddNavigation, createWorkspacesMode, noProjectsScreenVisible, onboardingWizardVisible, noteWorkspaceVisit, planWorkspaceViewTransition, selectFleetWorkspace, workspaceWords,
   viewToRemember, workspaceForProject, workspaceOwnsPath,
 } from '@acorn/client-core/features/workspaces'
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
@@ -149,8 +149,14 @@ export default function App() {
       { id: 'core.surface.toggle-maximize', command: 'core.surface.toggle-maximize', description: 'Maximize or restore the focused pane', category: 'Panes', defaultChord: 'meta+shift+enter', when: 'task' },
       // The command is the palette's own Last workspace row, registered with the rest of the Go to
       // group (client-core/host/palette/navigationCommands.ts); this is the chord that reaches it.
-      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Switch to the last workspace', category: 'Global', defaultChord: 'meta+;', when: 'global' },
     ])
+    createEffect(() => {
+      const description = `Switch to the last ${workspaceWords(workspaceMode()).singular}`
+      const binding = registerKeybindings([
+        { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description, category: 'Global', defaultChord: 'meta+;', when: 'global' },
+      ])
+      onCleanup(() => binding.dispose())
+    })
     // The two settings core owns, as bounded choices with the current value marked. Both write through
     // the same accessors Settings → Appearance and Settings → Notifications call
     // (client-core/host/registries/commands/coreCommands.ts), so there is one persistence path per
@@ -166,7 +172,7 @@ export default function App() {
   // One row per registered Settings page, rebuilt when the roster changes: a plugin contributes pages,
   // so a list taken once would go stale the moment one loads or is disabled.
   createEffect(() => {
-    const pages = registerCommands(settingsPageCommands(openSettings))
+    const pages = registerCommands(settingsPageCommands(openSettings, workspaceMode))
     onCleanup(() => pages.dispose())
   })
 

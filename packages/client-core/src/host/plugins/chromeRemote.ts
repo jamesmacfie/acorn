@@ -52,9 +52,9 @@ export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: O
     actions: {
       pickWorkspace: (selection) => {
         const selected = selection as { id?: unknown; nodeId?: unknown } | null
-        if (!selected || typeof selected.nodeId !== 'string') throw new Error('Workspace selection is unavailable')
+      if (!selected || typeof selected.nodeId !== 'string') throw new Error('Selection is unavailable')
         const entry = workspaces.find((item) => item.id === selected.id && item.nodeId === selected.nodeId)
-        if (!entry) throw new Error('Workspace selection is unavailable')
+      if (!entry) throw new Error('Selection is unavailable')
         value.pickWorkspace(entry.id, entry.nodeId)
       },
       pickProject: (id) => value.pickProject(known(id, projects)),

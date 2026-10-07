@@ -29,6 +29,7 @@ import Icon from '../../kit/components/content/Icon'
 import { Text } from '../../kit/components/content/Text'
 import { createAttentionInbox } from '../notifications/attentionInbox'
 import { createWorkspacesMode } from '../workspaces/workspacesMode'
+import { workspaceWords } from '../workspaces/words'
 import { createUnsavedChanges, UnsavedChangesContext } from './unsavedChanges'
 import { createSettingsDetails, SettingsDetailContext } from './settingsDetail'
 import { PluginStrip } from './plugins/PluginStrip'
@@ -134,6 +135,8 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
   const projects = createQuery(() => projectsOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
   const workspaceMode = createWorkspacesMode()
+  const categoryLabel = (category: keyof typeof SETTINGS_CATEGORY_LABELS) => category === 'workspaces' && workspaceMode() === 'off'
+    ? workspaceWords(workspaceMode()).capitalizedPlural : SETTINGS_CATEGORY_LABELS[category]
   const pages = createMemo(() => settingsPagesInOrder())
   const railPages = createMemo(() => pages().filter(isStandaloneSettingsPage))
   // The pages drawn for a workspace row and a project row (settingsDetailPage).
@@ -299,10 +302,10 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     const on = (id: string, names: readonly (string | { name: string; keywords: readonly string[] })[]): SettingsSearchObject[] => {
       const page = pageFor(id)
       if (!page) return []
-      const at = { page: id, pageLabel: page.title ?? page.label, group: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)], scope: settingsScopeOf(page) }
+      const at = { page: id, pageLabel: page.title ?? page.label, group: categoryLabel(settingsCategoryOf(page)), scope: settingsScopeOf(page) }
       return names.map((name) => ({ ...at, ...(typeof name === 'string' ? { name } : name) }))
     }
-    const group = SETTINGS_CATEGORY_LABELS.workspaces
+    const group = categoryLabel('workspaces')
     // Every workspace and every project is a page of its own, whether or not the rail has it expanded,
     // so search finds a project's name and its sections inside a collapsed workspace too.
     return [
@@ -328,7 +331,9 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
       ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] }))),
     ]
   })
-  const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects()))
+  const index = createMemo(() => buildSettingsIndex(railPages().map((page) => page.id === 'shortcuts' && workspaceMode() === 'off'
+    ? { ...page, sections: page.sections?.map((section) => ({ ...section, rows: section.rows?.map((row) => row.replace('last workspace', 'last project')) })) }
+    : page), searchObjects()))
   // A section named like its page reads as the page, so the page's own result would be a second line
   // with the same words. The section's lands deeper, so it is the one kept.
   const matches = createMemo(() => {
@@ -399,7 +404,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     const resolved = current()
     if (!resolved) return []
     const overview = overviewPage()
-    const group: Crumb = { label: SETTINGS_CATEGORY_LABELS[resolved.category] }
+    const group: Crumb = { label: categoryLabel(resolved.category) }
     if (overview && (resolved.workspace || resolved.project)) Object.assign(group, { to: overview.label, run: () => go({ page: overview.id }) })
     const steps = [group]
     const workspace = resolved.workspace
@@ -590,8 +595,8 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
             fallback={
               <Index each={groups()}>
                 {(group) => (
-                  <div class="settings-rail-group" role="group" aria-label={SETTINGS_CATEGORY_LABELS[group().category]}>
-                    <div class="settings-rail-heading" aria-hidden="true">{SETTINGS_CATEGORY_LABELS[group().category]}</div>
+                  <div class="settings-rail-group" role="group" aria-label={categoryLabel(group().category)}>
+                    <div class="settings-rail-heading" aria-hidden="true">{categoryLabel(group().category)}</div>
                     <Index each={group().rows}>{railItem}</Index>
                   </div>
                 )}

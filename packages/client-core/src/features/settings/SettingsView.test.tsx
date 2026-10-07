@@ -272,7 +272,7 @@ describe('SettingsView', () => {
       settingsRegistry.register(page('project.detail', { label: 'Project', category: 'workspaces', scope: 'project' })),
     )
     open({ target: 'workspaces' })
-    const rows = [...host.querySelectorAll('[aria-label="Workspaces and projects"] .settings-rail-item')].map((item) => item.textContent)
+    const rows = [...host.querySelectorAll('[aria-label="Projects"] .settings-rail-item')].map((item) => item.textContent)
     expect(rows).toEqual(['Overview', 'acorn'])
     railItem('acorn')!.click()
     expect(host.querySelector('.settings-breadcrumb')?.textContent).not.toContain('Runn')

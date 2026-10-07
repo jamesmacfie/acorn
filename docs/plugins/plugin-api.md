@@ -32,6 +32,13 @@ The facade has 14 entrypoints:
 | `@acorn/plugin-api/testkit/client` | The client half of the same, including the two extension registries a plugin's jsdom test reaches |
 | `@acorn/plugin-api/testkit/ws-client` | WebSocket client test helpers |
 
+Compiled client plugins can call `createWorkspaceWords()` in a Solid owner. It returns a reactive
+accessor with `singular`, `plural`, `capitalized`, and `capitalizedPlural` for the active Node's
+project grouping mode. Read the accessor where the text is drawn, including command title and hint
+functions, so switching between Nodes updates the words. `workspaceWords(mode)` provides the same
+forms for callers that already hold a mode accessor. Both are exported beside
+`workspaceForProject`; neither changes workspace IDs, routes, or stored scopes.
+
 The runtime draws the line between `/client`, `/ui`, and `/ui/host`. Solid compiles a component to
 code that touches `window` at module scope, so `/client` holds no `.tsx`. The `/ui` barrel holds
 presentation components. Router, query, and registry-connected components, and composed controls

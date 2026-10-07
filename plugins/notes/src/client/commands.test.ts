@@ -54,7 +54,7 @@ describe('the notes plugin catalogue', () => {
   it('combines the three lists under ids that cannot collide across scopes', async () => {
     expect(await find().query('', context(), signal())).toEqual([
       { id: 'task:deploy', title: 'deploy', subtitle: 'task', ref: 'deploy' },
-      { id: 'workspace:standards', title: 'standards', subtitle: 'workspace · plan', ref: 'standards' },
+      { id: 'workspace:standards', title: 'standards', subtitle: 'shared · plan', ref: 'standards' },
       // Same slug, different scope, different row — and both are reachable.
       { id: 'global:deploy', title: 'deploy', subtitle: 'global', ref: 'deploy' },
     ])
@@ -72,9 +72,9 @@ describe('the notes plugin catalogue', () => {
     mocks.list.mockImplementation((location: { scope: string }) =>
       Promise.resolve(location.scope === 'workspace' ? { error: 'device credential required' } : []))
     const rows = await find().query('', context(), signal())
-    expect(rows).toEqual([{ id: 'problem:workspace', title: 'workspace notes: device credential required', badge: 'error' }])
+    expect(rows).toEqual([{ id: 'problem:workspace', title: 'shared notes: device credential required', badge: 'error' }])
     // Enter on it restates the message rather than opening nothing.
-    expect(find().select(rows[0], context())).toEqual({ effect: 'stay', status: 'workspace notes: device credential required' })
+    expect(find().select(rows[0], context())).toEqual({ effect: 'stay', status: 'shared notes: device credential required' })
   })
 
   it('opens the pick through the retained notes intent, in its own scope', async () => {

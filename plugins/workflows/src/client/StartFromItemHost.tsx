@@ -4,6 +4,7 @@ import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
   activateTaskSignals,
+  createWorkspaceWords,
   pathForTask,
   tasksKey,
   tasksOptions,
@@ -39,6 +40,7 @@ export default function StartFromItemHost() {
 }
 
 function StartFromItem(props: { target: import('./startFromItem').WorkflowSourceItemTarget }) {
+  const words = createWorkspaceWords()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const tasks = createQuery(() => tasksOptions(true))
@@ -111,7 +113,7 @@ function StartFromItem(props: { target: import('./startFromItem').WorkflowSource
   createEffect(() => {
     if (defs.state !== 'ready' || definitions().length) return
     closeStartFromItem()
-    toast('This workspace has no runnable workflows. Create and publish one from the Workflows rail.')
+    toast(`This ${words().singular} has no runnable workflows. Create and publish one from the Workflows rail.`)
   })
 
   return (

@@ -131,11 +131,11 @@ const RULES: readonly RouteRule[] = [
 
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
-  { path: shape('/v1/core/workspaces/bootstrap'), scopes: {}, note: 'Creates a workspace; mutation.' },
+  { path: shape('/v1/core/workspaces/bootstrap'), scopes: {}, note: 'Creates a project collection; mutation.' },
   {
     path: shape(`/v1/core/workspaces/${SEG}`),
     scopes: { GET: 'core.workspaces:read' },
-    note: 'Every workspace mutation is unmappable: a workspace is the top-level unit a user organises by hand.',
+    note: 'A project collection mutation is unmappable: it changes the top-level unit a user organises by hand.',
   },
   { path: shape(`/v1/core/workspaces/${SEG}/external-projects`), scopes: { GET: 'core.workspaces:read' } },
 
@@ -354,7 +354,7 @@ const SCOPE_DESCRIPTIONS: Readonly<Record<string, GrantDescription>> = {
   'core.projects:write': { text: 'Create and update projects, including their on-disk locations', icon: 'folder-plus', high: true },
   'core.tasks:read': { text: 'Read tasks', icon: 'list' },
   'core.tasks:write': { text: 'Create and update tasks', icon: 'square-pen' },
-  'core.workspaces:read': { text: 'Read workspaces', icon: 'layout-grid' },
+  'core.workspaces:read': { text: 'Read project collections', icon: 'layout-grid' },
 }
 
 export const describeScope = (scope: string): GrantDescription | undefined => SCOPE_DESCRIPTIONS[scope]

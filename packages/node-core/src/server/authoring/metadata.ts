@@ -15,7 +15,7 @@ const sameScope = (expected: AuthoringTurnRequest['scope'], actual: DataSourceSc
   actual.workspaceId === expected.workspaceId && actual.projectId === expected.projectId
 
 function assertScope(expected: AuthoringTurnRequest['scope'], actual: DataSourceScope): void {
-  if (!sameScope(expected, actual)) throw new Error('The metadata request is outside the selected workspace or project.')
+  if (!sameScope(expected, actual)) throw new Error('The metadata request is outside the selected scope.')
 }
 
 /** Execute only the read operations the authoring protocol declares, under the caller's principal. */

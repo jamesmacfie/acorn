@@ -1,7 +1,7 @@
 import { createEffect, createMemo, createResource, createSignal, For, Show } from 'solid-js'
 import { useNavigate, useSearchParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activeTaskId, projectPath, tasksOptions, toast, workspacesOptions } from '@acorn/plugin-api/client'
+import { activeTaskId, createWorkspaceWords, projectPath, tasksOptions, toast, workspacesOptions } from '@acorn/plugin-api/client'
 import { addAiList } from './aiListDraft'
 import {
   Alert,
@@ -69,6 +69,7 @@ import { openWorkflowRun } from '../runs/runStore'
 // project-scoped surface lands on each host.
 
 export default function WorkflowEditor(props: { projectId: string; item?: string }) {
+  const words = createWorkspaceWords()
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const [searchParams] = useSearchParams()
@@ -88,7 +89,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
   }
   const sourceGlyph = () => {
     const source = store.ref()?.source
-    return source ? SOURCE_GLYPH[source] : undefined
+    return source ? { ...SOURCE_GLYPH[source], title: source === 'database' ? `Saved in this ${words().singular}` : SOURCE_GLYPH[source].title } : undefined
   }
   const workflowCatalogKey = () => JSON.stringify(store.catalog()?.workflows ?? [])
 
@@ -115,7 +116,7 @@ export default function WorkflowEditor(props: { projectId: string; item?: string
 
   async function createChild(stepId: string, itemSchema: DataSchema): Promise<void> {
     if (!workspaceId()) {
-      store.setMessage('Choose a workspace before creating a child workflow.')
+      store.setMessage(`Choose a ${words().singular} before creating a child workflow.`)
       return
     }
     const address = store.capture()

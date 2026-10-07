@@ -1,5 +1,41 @@
 # Phase 05: wording
 
+## Completion note — October 8, 2026
+
+Status: implemented on `phase-05-wording`.
+
+- `client-core` exports `workspaceWords(mode)` and the reactive `createWorkspaceWords()` through
+  `plugin-api`. Desktop components and first-party plugins read the active Node's mode when they
+  render. Palette commands evaluate their labels, hints, and placeholders when read; the palette
+  toggle and last-scope shortcut registrations refresh when the mode changes. This keeps labels
+  aligned when the active Node changes without changing command IDs or routes.
+- Separate mode says **project** in the desktop picker, rail feedback, Home and archive surfaces,
+  data-source reach, Settings navigation and search, Agent Center, notes, and workflows. Grouped
+  mode retains **workspace** in those views. Registration-time plugin metadata and Node-built
+  descriptions use neutral scope wording where they cannot safely read a reactive client mode.
+  The first-run grouping question remains intact while the mode is unset. TUI wording remains for
+  phase 06, which can use the shared helper.
+- The separate-mode project deletion confirmation says that deleting the project removes its
+  project scope, links, and datasets. It also says that Home boards, notes, saved queries, and
+  workflow definitions remain stored but become inaccessible. Disk content remains untouched.
+- Focused checks passed for navigation commands, Settings, project deletion, source queries,
+  notes commands, workflow launch, agent limits, Node task-source fields, and the plugin API.
+  Touched-package TypeScript checks, scoped oxlint, and all 87 architecture checks passed.
+  The stock Node build passed its size gate at 3,149,589 B of 3,150,000 B. The combined repository
+  lint and test gates remain for the coordinator after phase 06; the previously recorded backup,
+  client ratchet, and desktop plugin-disable failures have no established baseline here.
+- Isolated `--vite` desktop sessions with `--workspaces off` and `--workspaces on` covered the
+  picker, Home, Settings and deletion, Agent Center, workflows, archive, and notes. Off-mode
+  snapshots showed project wording; grouped-mode snapshots retained workspace wording. Screenshots
+  were inspected under `.acorn/agent-dev/pw-words-off/screenshots/` and
+  `.acorn/agent-dev/pw-words-on/screenshots/`. Both sessions were stopped. The desktop driver
+  cannot operate native menus or dialogs, so palette activation was checked through command tests
+  and shortcut labels in Settings. Automatic approval review rejected a computer-wide UI inventory
+  because it could enumerate unrelated desktop surfaces; no wider UI automation was used.
+- The task script status probe failed on sandbox loopback access, then reported `Task launch Node
+  identity changed` in a narrow unsandboxed run. Frozen-lockfile installation and the supported
+  Node 26 runtime succeeded for dependency-dependent checks.
+
 Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 02](./02-desktop-chrome.md).
 Read the [plan](./README.md) first, especially [decision](./README.md#decisions) 7.
 

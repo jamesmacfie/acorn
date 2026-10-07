@@ -119,7 +119,7 @@ export type GroupCommand = CommandCommon & { kind: 'group' }
 /** A live query. `query` is debounced and cancellable; `select` owns what picking a row does. */
 export type SearchCommand = CommandCommon & {
   kind: 'search'
-  placeholder?: string
+  placeholder?: string | (() => string)
   minQueryLength?: number
   debounceMs?: number
   query: (text: string, context: CommandExecutionContext, signal: AbortSignal) => Promise<readonly CommandSearchItem[]>

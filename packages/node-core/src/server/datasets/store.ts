@@ -78,7 +78,7 @@ export function createDataset(db: AppDatabase, input: DatasetCreate): DatasetDef
   for (const field of input.identityFields) if (!sourceFieldSchema(input.schema, field)) throw new DatasetError('invalid', `Identity ${field} is absent from the schema.`)
   if (input.eventTimeField && !sourceFieldSchema(input.schema, input.eventTimeField)) throw new DatasetError('invalid', 'Event time is absent from the schema.')
   const workspace = db.$client.prepare('SELECT 1 FROM workspaces WHERE id = ?').get(input.workspaceId)
-  if (!workspace) throw new DatasetError('not-found', 'Workspace does not exist.')
+  if (!workspace) throw new DatasetError('not-found', 'Scope does not exist.')
   if (input.projectId) {
     const project = db.$client.prepare('SELECT 1 FROM projects WHERE id = ? AND workspace_id = ?').get(input.projectId, input.workspaceId)
     if (!project) throw new DatasetError('forbidden', 'Project does not belong to workspace.')

@@ -1,5 +1,5 @@
 import { Show } from 'solid-js'
-import { openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
+import { createWorkspaceWords, openInAppUrl, openPane, type Task } from '@acorn/plugin-api/client'
 import { NOTE_AUTHOR_LABEL, NOTE_SCOPE_LABEL, SCRATCHPAD_SLUG } from '@acorn/protocol/notes.ts'
 import {
   Alert, Badge, Button, Checkbox, EmptyState, IconButton, Input, Markdown, Menu, Row, RowActions, Rows, Section,
@@ -11,10 +11,6 @@ import type { NoteScope, NoteSummary } from './notesClient'
 // The three regions of the Notes pane (docs/notes-and-memory.md § Notes). The host draws the split,
 // the divider and the drag handle; these fill `list-header`, `list` and `detail`. Everything they
 // share is in ./notesModel.ts.
-
-const NEW_NOTE_LABEL: Record<NoteScope, string> = {
-  task: 'New task note', workspace: 'New workspace note', global: 'New note for everywhere',
-}
 
 const virtualScratchpad = (): NoteSummary => ({
   slug: SCRATCHPAD_SLUG, title: 'Scratchpad', author: 'user', kind: 'scratch', included: true, originTaskId: null, updatedAt: 0,
@@ -43,6 +39,8 @@ export function NotesHeader(props: { task: Task; model: NotesModel }) {
 
 export function NotesList(props: { task: Task; model: NotesModel }) {
   const model = () => props.model
+  const words = createWorkspaceWords()
+  const scopeLabel = (scope: NoteScope) => scope === 'workspace' ? words().capitalized : NOTE_SCOPE_LABEL[scope]
 
   // "In the agent's context" as the checkbox it always was. It used to be a 10px round button with a
   // stylesheet of its own; the state it reports and the state a Checkbox reports are the same state.
@@ -94,7 +92,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
     <IconButton
       icon="plus"
       tone="accent"
-      label={NEW_NOTE_LABEL[headProps.scope]}
+      label={`New ${headProps.scope === 'global' ? 'note for everywhere' : headProps.scope === 'task' ? 'task note' : `${words().singular} note`}`}
       disabled={!model().locationFor(headProps.scope)}
       onPress={() => void model().createIn(headProps.scope).then((made) => {
         // Focus lands on the title after the create round-trip, so the first thing you type is the
@@ -136,7 +134,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
   return (
     <Stack gap="none">
       <Group label={NOTE_SCOPE_LABEL.task} scope="task" notes={taskRowsOf(model())} />
-      <Group label={NOTE_SCOPE_LABEL.workspace} scope="workspace" notes={model().wsNotes()} />
+      <Group label={scopeLabel('workspace')} scope="workspace" notes={model().wsNotes()} />
       <Group label={NOTE_SCOPE_LABEL.global} scope="global" notes={model().globalNotes()} />
     </Stack>
   )
@@ -144,6 +142,7 @@ export function NotesList(props: { task: Task; model: NotesModel }) {
 
 export function NoteBody(props: { task: Task; model: NotesModel }) {
   const model = () => props.model
+  const words = createWorkspaceWords()
   return (
     <>
       <Show when={model().actionError()}>{(error) => <Alert>{error()}</Alert>}</Show>
@@ -164,7 +163,7 @@ export function NoteBody(props: { task: Task; model: NotesModel }) {
                   ref={model().titleRef}
                   onInput={(value) => model().onTitleInput(value)}
                 />
-                <Badge size="xs">{NOTE_SCOPE_LABEL[sel().scope]}</Badge>
+                <Badge size="xs">{sel().scope === 'workspace' ? words().capitalized : NOTE_SCOPE_LABEL[sel().scope]}</Badge>
                 <Checkbox
                   size="sm"
                   checked={model().selectedIncluded()}
