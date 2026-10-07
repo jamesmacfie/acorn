@@ -1,3 +1,4 @@
+import { inlineReviewThreads } from './reviewThreadLocation'
 import { createEffect, createMemo, createSignal, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { useSearchParams } from '@solidjs/router'
@@ -90,7 +91,7 @@ export function DiffForPull(props: { route: PullRoute; router: boolean; taskId?:
     // own digest, so a base change that leaves the head blob alone still moves it.
     signature: () => topology()?.revision ?? '',
     selectedPath: () => typeof searchParams.file === 'string' ? searchParams.file : '',
-    threads: () => detail.data?.threads,
+    threads: () => inlineReviewThreads(detail.data, diff.data),
     mentions: () => mentionsQuery.data ?? [],
     loadSegments: (requests, signal) => fetchDiffSegments(owner, repo, requests, signal),
     search: async (request, signal) => {

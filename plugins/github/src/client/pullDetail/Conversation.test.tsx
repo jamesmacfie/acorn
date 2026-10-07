@@ -21,7 +21,7 @@ vi.mock('../queries', () => ({
   pullDiffOptions: (owner: string, repo: string, number: string, enabled: boolean) => ({
     queryKey: ['files', owner, repo, number, 'diff'],
     enabled,
-    queryFn: async () => ({ document: { files: document }, completeness: { state: 'complete' } }),
+    queryFn: async () => ({ revision: 'base:head', document: { files: document }, completeness: { state: 'complete' } }),
   }),
   fetchDiffSegments: async (_owner: string, _repo: string, requests: DiffSegmentRequest[]) => {
     asked.push(requests)
@@ -46,11 +46,11 @@ class TestIntersectionObserver {
 const bringNear = (key: string) => notify!([{ target: host.querySelector(`[data-turn="${key}"]`)!, isIntersecting: true }])
 
 const thread = (id: string, path: string, line: number | null, createdAt: number): Thread => ({
-  threadId: id, path, line, side: 'RIGHT', resolved: false,
+  threadId: id, path, line, originalLine: line, outdated: false, side: 'RIGHT', resolved: false,
   comments: [{ id: `${id}:c1`, databaseId: 1, author: 'octo', body: `<p>note ${id}</p>`, createdAt }],
 })
 const detail = (overrides: Partial<PullDetail>): PullDetail => ({
-  pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [], ...overrides,
+  revision: 'base:head', pull: null, labels: [], reviews: [], requestedReviewers: [], comments: [], commits: [], checks: [], threads: [], ...overrides,
 })
 
 let host: HTMLElement
@@ -78,6 +78,7 @@ const mount = (initial: PullDetail) => {
     scope: { owner: 'acorn', repo: 'web', number: '42' },
     readOnly: true,
     conversationEntries: entries,
+    detail: { get data() { return data() } },
   } as unknown as PrModel
   dispose = render(() => (
     <QueryClientProvider client={new QueryClient()}>
@@ -136,11 +137,51 @@ describe('the pull request conversation', () => {
     expect(after[1]?.textContent).toContain('Bea')
   })
 
-  it('links a thread to its file by name and line, with the full path in the tip', () => {
+  it('links a thread to its file by name and line, with the full path in the tip', async () => {
     mount(detail({ threads: [thread('t1', 'src/client/rail/RailBadge.tsx', 14, 1)] }))
+    await flush()
     const link = host.querySelector<HTMLElement>('[data-turn="thread:t1"] .ui-link')!
     expect(link.textContent).toBe('RailBadge.tsx, line 14')
     expect(link.dataset.tip).toBe('src/client/rail/RailBadge.tsx')
+  })
+
+  it('retains outdated and unverified history without snippets or diff navigation', async () => {
+    const outdated = { ...thread('outdated', 'a.ts', 3, 1), outdated: true, resolved: true, originalLine: 275 }
+    mount(detail({ threads: [outdated,
+      { ...thread('legacy', 'b.ts', 4, 2), outdated: undefined },
+      { ...thread('null-line', 'c.ts', null, 3), originalLine: 4 },
+    ] }))
+    for (const id of ['outdated', 'legacy', 'null-line']) bringNear(`thread:${id}`)
+    await flush()
+    await flush()
+    expect(asked).toEqual([])
+    expect(host.querySelectorAll('.ui-link')).toHaveLength(0)
+    const turn = host.querySelector('[data-turn="thread:outdated"]')!
+    expect(turn.textContent).toContain('Outdated')
+    expect(turn.textContent).toContain('Resolved')
+    expect(turn.textContent).toContain('Original line 275')
+    expect(turn.textContent).toContain('note outdated')
+    expect(host.querySelector('[data-turn="thread:legacy"]')?.textContent).toContain('Location unavailable')
+    expect(host.querySelector('[data-turn="thread:legacy"]')?.textContent).not.toContain('Outdated')
+  })
+
+  it('removes current code from a retained turn after refresh, including a revision mismatch', async () => {
+    const t = thread('t1', 'a.ts', 3, 1)
+    const view = mount(detail({ threads: [t] }))
+    bringNear('thread:t1')
+    await flush()
+    await flush()
+    const turn = host.querySelector('[data-turn="thread:t1"]')!
+    expect(turn.textContent).toContain('a.ts line 3')
+    view.setData(detail({ threads: [t], revision: 'base:another-head' }))
+    expect(turn.textContent).not.toContain('a.ts line 3')
+    expect(turn.querySelector('.ui-link')).toBeNull()
+    view.setData(detail({ threads: [{ ...t, outdated: true }] }))
+    expect(host.querySelector('[data-turn="thread:t1"]')).toBe(turn)
+    expect(turn.textContent).toContain('Outdated')
+    expect(turn.textContent).toContain('note t1')
+    expect(turn.textContent).not.toContain('a.ts line 3')
+    expect(turn.querySelector('.ui-link')).toBeNull()
   })
 
   it('tints a review by its verdict and leaves a bare approval without filler text', () => {

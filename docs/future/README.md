@@ -40,10 +40,8 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [integration-ideas.md](./integration-ideas.md) | The catalogue of integrations a workspace could hold, and the four shapes they collapse into. | Research notes. |
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [lazy-plugin-code.md](./lazy-plugin-code.md) | An opt-in `lazyFetch` helper that loads a plugin route's code on its first request, so heavy, rarely used routes stay out of the node's boot graph. | Proposal, October 6, 2026. Not started. |
-| [message.md](./message.md) | Delivery record for delegated-session messaging, with reference-app research and the optional queued-report merge. | Owner reports, blocked-request wakes, and live child rows shipped by 2026-09-26; merging awaits evidence of noise. |
 | [mods.md](./mods.md) | What acorn takes from Claude Code's function hooks: the comparison, and a veto-only `agents:before-permission` hook over every harness's permission requests. | Proposal, 2026-09-29. Not started. |
 | [multi-account.md](./multi-account.md) | Running more than one Claude Code or Codex subscription: how other tools do it, the terms risk, and a per-account config folder pinned to each session. | Research and proposal, October 6, 2026. Not started. |
-| [outdated-review-comments.md](./outdated-review-comments.md) | Hide outdated GitHub review threads from the code pane while preserving conversation history, location metadata, and refresh correctness. | Product requirements, 2026-10-01. Not implemented. |
 | [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
 | [rail-context-menus.md](./rail-context-menus.md) | Desktop source and pane icon menus, plugin ownership, replacement providers, and verification gates. | Implementation on isolated branch, 2026-10-03; integration acceptance open. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
@@ -67,6 +65,11 @@ beside them; nothing in it waits any more. Ecosystem's shipped rung-2 containmen
 `blockers.md`; `docs/security.md § The containment ladder` owns the behavior and the others point.
 
 ## Retired folders
+
+`outdated-review-comments.md` was implemented and deleted on October 7, 2026.
+[Review locations](../github-integration/mirror.md#review-locations) owns provider status, historical
+locations, legacy handling, and revision compatibility. [Conversation](../github-integration/surfaces.md#conversation)
+owns historical presentation. The proposal remains in Git history.
 
 `sandbox/` was deleted on 2026-10-03. The local task-isolation proposal did not establish how to
 preserve normal Git and host development workflows. The API gates, project configuration trust,

@@ -23,7 +23,8 @@ PR detail keeps the mirror's serve-then-revalidate behavior, including provider-
 That HTML can contain GitHub `private-user-images` URLs signed for only a few minutes, so a stale read
 may briefly carry an expired URL. `plugin:github:pr-synced` means that the local pull request mirror
 was committed or invalidated, so consumers re-read the identified pull request. The plugin sends it
-after a background refresh and after a successful PR mutation updates or invalidates mirror state.
+after a detail or file background refresh and after a successful PR mutation updates or invalidates
+mirror state.
 A provider refresh after a mutation can send a second event. This replaces signed HTML and keeps
 other clients and plugins in sync with the initiating client.
 

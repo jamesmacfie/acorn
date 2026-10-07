@@ -123,6 +123,8 @@ export type ReviewFeedback = {
     threadId: string
     path: string | null
     line: number | null
+    originalLine: number | null
+    outdated: boolean | null
     side: string | null
     resolved: boolean
     comments: { author: string | null; body: string | null; createdAt: number | null }[]
@@ -164,7 +166,7 @@ export async function taskReviewFeedback(
   for (const row of [...threadRows].sort((a, b) => (a.createdAt ?? 0) - (b.createdAt ?? 0))) {
     if (row.resolved && !options.includeResolved) continue
     const thread = byThread.get(row.threadId) ?? {
-      threadId: row.threadId, path: row.path, line: row.line, side: row.side, resolved: row.resolved, comments: [],
+      threadId: row.threadId, path: row.path, line: row.outdated == null ? null : row.line, originalLine: row.originalLine, outdated: row.outdated, side: row.side, resolved: row.resolved, comments: [],
     }
     thread.comments.push({ author: row.author, body: row.body, createdAt: row.createdAt })
     byThread.set(row.threadId, thread)

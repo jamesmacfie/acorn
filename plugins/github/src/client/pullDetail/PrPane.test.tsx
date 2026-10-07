@@ -162,10 +162,11 @@ describe('the PR pane', () => {
 
     // Provider names are case-insensitive even when the cache key preserves the project's spelling.
     seams.prSynced?.({ repoOwner: 'Runn-Fast', repoName: 'ACORN', pullNumber: 7 })
-    expect(seams.invalidateQueries).toHaveBeenCalledOnce()
+    expect(seams.invalidateQueries).toHaveBeenCalledTimes(3)
     expect(seams.invalidateQueries).toHaveBeenCalledWith({
       queryKey: ['pull', 'runn-fast', 'acorn', '7'],
     })
+    expect(seams.invalidateQueries).toHaveBeenCalledWith({ queryKey: ['files', 'runn-fast', 'acorn', '7', 'diff'] })
 
     _resetPrModels()
     expect(seams.offPrSynced).toHaveBeenCalledOnce()
