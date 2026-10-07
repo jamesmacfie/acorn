@@ -177,5 +177,8 @@ export function createShellModel(): ShellModel {
     scheduleSettle()
   }
 
-  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, projects: () => projectsQuery.data }
+  return {
+    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready,
+    projects: () => projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined,
+  }
 }

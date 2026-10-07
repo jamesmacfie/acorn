@@ -32,10 +32,15 @@ With workspaces off, setup omits workspace selection and creates a project witho
 With workspaces on, setup keeps the workspace step and passes its chosen ID.
 
 A successful empty project list opens setup at its first step, including after the last project is
-deleted. A pending or failed project read does not count as empty. Setup belongs to the active Node;
-responses from a Node that was switched away from do not change the open setup or navigation.
+deleted. A pending or failed project or preference read does not count as empty, even if its query
+retains cached data. Setup keeps that data visible while the read settles. Setup belongs to the active
+Node; responses from a Node that was switched away from do not change setup or navigation.
+The top bar keeps its last confirmed wording during a refetch.
 Switching Nodes remounts the shell under that Node's query cache and restores its saved workspace
 choice. The terminal clears the previous Node's open task and transient dialogs during the switch.
+
+A generic task route stays on its task after creation. The project fallback applies to project
+routes; a task route has no project segment to validate against the workspace roster.
 
 With no explicit task or source, the screen opens on the first available Menu source once its
 provider and workspace-link gates have loaded, with focus on that row. Switching workspace clears the

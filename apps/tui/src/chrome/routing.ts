@@ -92,6 +92,9 @@ export function installRouting(model: ShellModel): void {
   // surface with no project is an empty screen with an explanation on it, which is worse: the reader
   // has to find `p` before anything at all works.
   createEffect(() => {
+    // A task route has no project segment. Its task selection owns the destination, including the
+    // interval before a just-created task appears in the refreshed roster.
+    if (params.taskId) return
     const projects = model.workspace()?.projects ?? []
     if (!projects.length) return
     if (projects.some((project) => project.id === routedProjectId())) return

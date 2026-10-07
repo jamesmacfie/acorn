@@ -34,7 +34,13 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const [step, setStep] = createSignal<SetupStep>(props.initialStep ?? 'mode')
   const [choice, setChoice] = createSignal<WorkspacesMode>('off')
   const [savedMode, setSavedMode] = createSignal<WorkspacesMode | undefined>()
-  const mode = () => savedMode() ?? (prefs.data && projects.data ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.data.length) : undefined)
+  const loadedProjects = () => projects.isSuccess && !projects.isFetching ? projects.data : undefined
+  const loadedPrefs = () => prefs.isSuccess && !prefs.isFetching ? prefs.data : undefined
+  const mode = () => {
+    const preferences = loadedPrefs()
+    const roster = loadedProjects()
+    return savedMode() ?? (preferences && roster ? workspacesMode(preferences[WORKSPACES_PREF_KEY], roster.length) : undefined)
+  }
   const nodeId = activeNodeId()
   let disposed = false
   onCleanup(() => { disposed = true })
@@ -72,8 +78,10 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const inWorkspace = () => mode() === 'off' ? projects.data ?? [] : (projects.data ?? []).filter((project) => project.workspaceId === workspaceId())
   const project = () => (projects.data ?? []).find((row) => row.id === projectId())
   createEffect(() => {
-    if (busy() || !prefs.data || !projects.data) return
-    const needsAnswer = !prefs.data[WORKSPACES_PREF_KEY] && !projects.data.length && !savedMode()
+    const preferences = loadedPrefs()
+    const roster = loadedProjects()
+    if (busy() || !preferences || !roster) return
+    const needsAnswer = !preferences[WORKSPACES_PREF_KEY] && !roster.length && !savedMode()
     if (needsAnswer && (step() === 'workspace' || step() === 'project')) setStep('mode')
     else if (!needsAnswer && step() === 'mode') setStep(mode() === 'on' ? 'workspace' : 'project')
     else if (step() === 'workspace' && mode() === 'off') setStep('project')
@@ -85,8 +93,10 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     if (!inWorkspace().some((row) => row.id === projectId())) setProjectId(inWorkspace()[0]?.id ?? '')
   })
   createEffect(() => {
-    if (!projects.data) return
-    if (step() === 'task' && !inWorkspace().length) setStep(!prefs.data?.[WORKSPACES_PREF_KEY] && !savedMode() && !projects.data.length
+    const roster = loadedProjects()
+    const preferences = loadedPrefs()
+    if (!roster || !preferences) return
+    if (step() === 'task' && !inWorkspace().length) setStep(!preferences[WORKSPACES_PREF_KEY] && !savedMode() && !roster.length
       ? 'mode' : mode() === 'on' && !workspaceId() ? 'workspace' : 'project')
   })
 
@@ -105,7 +115,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   }
 
   const acceptMode = () => void run(async () => {
-    if (!prefs.data || !projects.data) throw new Error('Wait for this node to load, then try again.')
+    if (!loadedPrefs() || !loadedProjects()) throw new Error('Wait for this node to load, then try again.')
     const selected = choice()
     if (!await savePref(client, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true })) return
     if (!stillHere()) return
@@ -131,7 +141,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     const folder = path().trim()
     if (!folder) throw new Error('Enter an absolute folder path on this node.')
     if (!mode()) throw new Error('Wait for this node to load, then try again.')
-    if (!prefs.data?.[WORKSPACES_PREF_KEY] && !savedMode() && !projects.data?.length) throw new Error('Choose how to organize projects first.')
+    if (!loadedPrefs()?.[WORKSPACES_PREF_KEY] && !savedMode() && !loadedProjects()?.length) throw new Error('Choose how to organize projects first.')
     if (mode() === 'on' && !workspaceId()) throw new Error('Choose or create a workspace first.')
     const { project: created } = await createProject({ path: folder, ...(mode() === 'on' ? { workspaceId: workspaceId() } : {}) })
     if (!stillHere()) return
@@ -160,7 +170,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     const task: Task = await createTask({
       origin: 'local', projectId: selected.id, title: name,
       ...(selected.vcs === 'git' && !useCurrentBranch() ? { branch: candidate, skipSetup: skipSetup() } : {}),
-    })
+    }, nodeId)
     if (!stillHere()) return
     await client.invalidateQueries({ queryKey: tasksKey })
     if (!stillHere()) return
@@ -201,7 +211,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
               { value: 'off', label: 'Keep each project separate' },
               { value: 'on', label: 'Group projects into workspaces' },
             ]} onChange={(value) => setChoice(value as WorkspacesMode)} />
-            <Button disabled={busy() || !prefs.data || !projects.data} onPress={acceptMode}>Continue</Button>
+            <Button disabled={busy() || !loadedPrefs() || !loadedProjects()} onPress={acceptMode}>Continue</Button>
           </Show>
           <Show when={step() === 'workspace'}>
             <Line role="strong">1. Choose a workspace</Line>

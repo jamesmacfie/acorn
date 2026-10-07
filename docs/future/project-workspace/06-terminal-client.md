@@ -1,5 +1,24 @@
 # Phase 06: terminal client
 
+## Review follow-up — October 8, 2026
+
+The shell and setup treat project and preference queries as loaded only after a successful read has
+settled. Cached empty data from a pending or failed read cannot open setup or accept the first-run
+answer. Setup still displays cached project rows while a read settles. The keybinding list indentation
+is restored. The topbar keeps its last confirmed Node wording while a roster refetch settles.
+
+Focused renderer tests now exercise delayed and failed preference saves with retry, both grouping
+choices, the off-mode project payload, late save and create responses after Node switches and setup
+disposal, and navigation after setup closes itself. Those tests exposed a generic task route being
+redirected to the first project. The project fallback now leaves task routes alone, and setup passes
+its captured Node ID to task creation so its follow-up request stays on that Node.
+
+Checks: focused Setup suite 21 tests, chrome suite 25 tests, and Settings suite five tests passed.
+The TUI TypeScript lint and the three doc-citation checks passed. Changed-file oxlint exited cleanly
+with its existing warning on the unchanged spread in `Shell.tsx`. Two of three doc-path checks
+passed; the remaining check reports three missing generated Tauri schema paths in the security plan,
+the same paths recorded in the phase completion note. The coordinator still owns the combined gate.
+
 ## Completion note — October 8, 2026
 
 Status: implemented on `phase-06-terminal-client`.

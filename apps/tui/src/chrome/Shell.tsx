@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
@@ -87,10 +87,14 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     { defer: true },
   ))
   const prefs = createQuery(() => prefsOptions(true))
-  const mode = () => {
+  // Keep the last confirmed wording on screen during a refetch. The empty-node decision below still
+  // requires fresh successful reads, so retained labels cannot turn cached zero into an empty Node.
+  const mode = createMemo((previous: ReturnType<typeof workspacesMode> | undefined) => {
     const projects = model.projects()
-    return prefs.data && projects ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.length) : undefined
-  }
+    return prefs.isSuccess && !prefs.isFetching && projects
+      ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.length)
+      : previous
+  })
   const words = () => workspaceWords(mode())
   let root: Renderable | undefined
   const [strip, setStrip] = createSignal<Renderable | undefined>()
@@ -116,7 +120,7 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   createEffect(() => {
     const node = activeNodeId()
     const projects = model.projects()
-    if (!node || !projects || !prefs.data) return
+    if (!node || !projects || !prefs.isSuccess || prefs.isFetching) return
     if (projects.length) { emptyNode = null; return }
     if (emptyNode === node) return
     emptyNode = node
@@ -247,18 +251,18 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     createEffect(() => {
       const label = words().capitalized
       const bindings = registerKeybindings([
-      { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
-      { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
-      { id: 'core.workspace.switch', command: 'core.workspace.switch', description: label, category: 'Global', defaultChord: 'w', when: 'global' },
-      { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
-      // Beside `w`, because it is the other half of switching workspace, and bare for the same
-      // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
-      // dropped from this layer while there is nowhere to go back to.
-      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: `Last ${words().singular}`, category: 'Global', defaultChord: ';', when: 'global' },
-      { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
-      { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
-      { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
-      { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
+        { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
+        { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
+        { id: 'core.workspace.switch', command: 'core.workspace.switch', description: label, category: 'Global', defaultChord: 'w', when: 'global' },
+        { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
+        // Beside `w`, because it is the other half of switching workspace, and bare for the same
+        // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
+        // dropped from this layer while there is nowhere to go back to.
+        { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: `Last ${words().singular}`, category: 'Global', defaultChord: ';', when: 'global' },
+        { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
+        { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
+        { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
+        { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
       ])
       onCleanup(() => bindings.dispose())
     })
