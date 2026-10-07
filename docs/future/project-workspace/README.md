@@ -4,7 +4,7 @@ This plan makes a fresh install project-first. Each project gets its own workspa
 a project, and the Default workspace is never created. Read this page before you build a phase. It
 holds the research and the decisions the phase files depend on.
 
-Date: October 8, 2026. Status: all six phases implemented; combined validation in progress.
+Date: October 8, 2026. Status: all six phases implemented and integrated; ready for merge review.
 
 The phase completion notes record the implementation and review decisions. Shipped behavior is
 documented in [projects](../../workspaces-and-tasks/projects.md),
@@ -24,8 +24,18 @@ and the following integration drift:
 - The scaffolder task-source label matches the Node and SDK label. Error assertions and the workflow
   example prompt digest match the reviewed wording changes.
 
-All 87 architecture checks and the focused failure checks passed. The desktop package gate is
-finishing its boot and Rust checks. Three storage backup timeouts remain under investigation.
+All failed checks passed their focused reruns, including all 87 architecture checks. The complete
+desktop package rerun passed 188 client tests, 10 boot tests, and 65 Rust tests.
+
+The three storage backup timeouts reproduced on Node 26.8.1 even in isolation. A native SQLite
+backup promise needed an event-loop wake-up to settle. The SQLite wrapper keeps a timer only while
+a backup is pending and clears it on success or failure. The merged backup suite passed all 12
+tests; process broker checks passed 18 tests, and storage policy checks passed nine tests.
+
+Affected typechecks and lint passed after the fixes. Final builds passed the stock budgets:
+3,149,652 of 3,150,000 bytes for the Node service, and 718,210 of 720,000 bytes for terminal startup.
+The full gate ran once; the checks that failed were rerun after their fixes. No failures remain
+open. Phase notes record the isolated desktop and terminal checks and the native-dialog driver limit.
 
 ## Goal
 
