@@ -24,7 +24,7 @@ it.
 The terminal client draws the same hierarchy in fewer cells (`apps/tui/src/chrome/`):
 
 ```text
-Topbar:   one line. Workspace, project, task count, branch, and node state
+Topbar:   one line. Workspace and project when grouped, or Project when separate; task count, branch, and node state
 Left:     Menu sources, Browse list, and workspace Tasks in one column
 Main:     one pane or source detail, with a strip of pane labels above it
 Overlays: palette, cheat sheet, pickers, inbox, trust, and quit confirmation
@@ -35,6 +35,10 @@ Three things differ. The terminal draws one pane, not a row, because two panes a
 40-column panes and the kit's floor is 80, so `nextPane` switches which pane is drawn. The region
 cycle covers the whole screen for the same reason. And an overlay hides the pane instead of replacing
 it, so opening the palette keeps the pane's queries and model ([terminal chrome](../tui/chrome.md)).
+
+The terminal top bar follows the active Node's workspace mode. When workspaces are off, it prints
+**Project** and the paired project's name once. When they are on, it prints the workspace and routed
+project names. An empty Node opens terminal setup under the top bar after its project read succeeds.
 
 The desktop top bar, left rail, pane switcher, and rail task list each have a core provider in an
 exclusive slot. A selected plugin provider can draw one of them with the host's data and verbs. The

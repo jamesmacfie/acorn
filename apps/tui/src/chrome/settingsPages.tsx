@@ -1,9 +1,10 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { lazy } from 'solid-js'
 import { join } from 'node:path'
-import { CORE_SETTINGS_PAGES, type CoreSettingsPageId } from '@acorn/client-core/features/settings'
+import { CORE_SETTINGS_PAGES, settingsCategoryLabel, type CoreSettingsPageId } from '@acorn/client-core/features/settings'
+import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import {
-  SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsRegistry, settingsScopeOf, type SettingsContribution,
+  settingsCategoryOf, settingsRegistry, settingsScopeOf, type SettingsContribution,
 } from '@acorn/client-core/host/registries/shell'
 import { configDir } from '../node/paths'
 
@@ -57,11 +58,11 @@ export type DrawnElsewhere = {
 }
 
 /** What the route shows instead of a page this host does not draw, or `undefined` when it draws it. */
-export function drawnElsewhere(page: SettingsContribution): DrawnElsewhere | undefined {
+export function drawnElsewhere(page: SettingsContribution, mode?: WorkspacesMode): DrawnElsewhere | undefined {
   const pluginReason = PLUGIN_PAGES_NOT_DRAWN[page.id]
   const core = CORE_PAGE_IDS.has(page.id)
   if (!pluginReason && (!core || TERMINAL_FORMS[page.id as CoreSettingsPageId])) return undefined
-  const path = `Settings > ${SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)]} > ${page.title ?? page.label}`
+  const path = `Settings > ${settingsCategoryLabel(settingsCategoryOf(page), mode)} > ${page.title ?? page.label}`
   const why = pluginReason
     ?? WHY_NOT_HERE[page.id as CoreSettingsPageId]
     ?? 'The page is drawn with the desktop app\'s own controls, which have no terminal form.'
