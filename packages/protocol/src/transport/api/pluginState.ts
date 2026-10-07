@@ -116,7 +116,8 @@ export type PluginSkillStatus = 'ready' | 'disabled' | 'unapproved' | 'changed'
 export type PluginSkillState = {
   skills: Array<PluginSkillLine & {
     status: PluginSkillStatus
-    deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted' }>
+    /** `native` when the harness loaded the skill with its own skill support, not from acorn's index. */
+    deliveries: Array<{ harness: string; at: number; outcome: 'delivered' | 'omitted'; native?: true }>
   }>
 }
 

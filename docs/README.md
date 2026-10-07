@@ -233,7 +233,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   defaults](./managed-agents/defaults.md), [Managed delegation](./managed-agents/delegation.md),
   [Harnesses](./managed-agents/harnesses.md), [Archived agent
   history](./managed-agents/history-retention.md), [Operations](./managed-agents/operations.md),
-  [From the command palette](./managed-agents/palette.md), [Permission
+  [From the command palette](./managed-agents/palette.md), [Native
+  skills](./managed-agents/native-skills.md), [Permission
   policy](./managed-agents/permission-policy.md), [Providers and plan
   usage](./managed-agents/providers.md), [Session events and
   waits](./managed-agents/session-events.md), [Session

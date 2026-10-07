@@ -1,3 +1,4 @@
+import { join } from 'node:path'
 import { awaitWithSignal } from '../processes/startCancellation'
 import type { CoreServices, InternalEnvFactory, Launcher, PluginDatabase, PluginHookRegistry, PluginTelemetry, SecretService, SpanHandle } from '@acorn/plugin-api/node'
 import { agentProfileRegistry, createLogger, deliverableSkills, describeError, recordSkillDelivery } from '@acorn/plugin-api/node'
@@ -11,7 +12,7 @@ import type {
   AgentWsFrame,
 } from '../../contract/wire.ts'
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
-import type { SkillIndex } from '../drivers/skillIndex'
+import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
 import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
@@ -217,6 +218,8 @@ export class ManagedAgentEngine {
   protected readonly processes: ProviderSessionLifecycle
   protected readonly queue: QueueCoordinator
   protected readonly subagentQuietMs: number
+  // Each start's native skill folder, `<session id>/<generation>` (../drivers/skillFolder.ts).
+  private readonly skillFolders: string
   // Armed with the first provider start and cleared by stop(). A timer over the live map rather than a
   // node schedule, because what it sweeps exists only in this process (docs/managed-agents/operations.md
   // § Idle stop).
@@ -257,6 +260,7 @@ export class ManagedAgentEngine {
     this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.idleSweepMs = options.idleSweepMs ?? IDLE_SWEEP_MS
+    this.skillFolders = join(options.dataDir, 'agent-skills')
     this.store = new AgentStore(options.db, options.core, (frame) => { if (!this.stopped) this.publish?.(frame) })
     this.processes = new ProviderSessionLifecycle({
       registry: this.registry,
@@ -265,9 +269,13 @@ export class ManagedAgentEngine {
       hasProviderExecutionHistory: (sessionId) => this.store.hasProviderExecutionHistory(sessionId),
       scopedEnvironment: (session) => this.scopedProviderEnvironment(session),
       mcpServers: (session, env, signal) => this.providerMcpServers(session, env, signal),
-      // Loaded on the first start rather than at boot, like the rest of a start's preparation.
-      skills: async () => (await import('../drivers/skillIndex')).skillIndex(await deliverableSkills(options.dataDir)),
-      skillsDelivered: (sessionId, index) => this.skillsDelivered(sessionId, index),
+      // Loaded on the first start rather than at boot, like the rest of a start's preparation. A driver
+      // with its own skill support gets a folder per start, which the lifecycle removes when it's done.
+      skills: async (session, generation, native) => (await import('../drivers/skillIndex')).prepareSkillStart(await deliverableSkills(options.dataDir), {
+        folder: native ? join(this.skillFolders, session.id, String(generation.number)) : null,
+        lastTold: session.config.skillIndex,
+      }),
+      skillsDelivered: (sessionId, report) => this.skillsDelivered(sessionId, report),
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
         message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
@@ -441,6 +449,9 @@ export class ManagedAgentEngine {
     }
     await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
+    // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
+    // unless a session that started since is using it.
+    await (await import('../drivers/skillFolder')).sweepSkillFolders(this.skillFolders, (sessionId) => this.processes.has(sessionId))
     await this.webhooks.reconcile()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
@@ -557,27 +568,22 @@ export class ManagedAgentEngine {
     return env
   }
 
-  // A turn that carried the skills index ran (../drivers/skillIndex.ts). The catalogue hears which
-  // harness got which skills, the session row keeps the index's digest so a later start knows whether a
-  // withdrawal is owed, and the transcript gets one line a reader on either host can see.
-  private async skillsDelivered(sessionId: string, index: SkillIndex): Promise<void> {
+  // The first turn after a start ran with its skills (../drivers/skillIndex.ts). The catalogue hears which
+  // harness got which skills and how, the session row keeps the names the agent was told so a later
+  // start knows which are gone, and the transcript gets one line a reader on either host can see.
+  private async skillsDelivered(sessionId: string, report: SkillReport): Promise<void> {
     const session = await this.store.requireSession(sessionId)
-    if (index.delivered.length || index.omitted.length) {
-      recordSkillDelivery(agentProfileRegistry.get(session.profileId)?.label ?? session.providerId, index)
+    recordSkillDelivery(agentProfileRegistry.get(session.profileId)?.label ?? session.providerId, report)
+    if (JSON.stringify(session.config.skillIndex ?? []) !== JSON.stringify(report.told)) {
+      await this.store.patchSession(sessionId, { config: { ...session.config, skillIndex: report.told } })
     }
-    const digest = (await import('../drivers/skillIndex')).skillIndexDigest(index)
-    if ((session.config.skillIndex ?? '') !== digest) {
-      await this.store.patchSession(sessionId, { config: { ...session.config, skillIndex: digest } })
-    }
-    const left = index.omitted.length ? ` ${index.omitted.length} more didn't fit: ${index.omitted.join(', ')}.` : ''
     await this.record(sessionId, null, {
       type: 'diagnostic',
       level: 'info',
-      message: index.delivered.length
-        ? `Skills the agent can load: ${index.delivered.join(', ')}.${left}`
-        : index.omitted.length ? `No skills fit in the list.${left}` : 'The agent was told no skills are available now.',
+      message: (await import('../drivers/skillIndex')).skillReportLine(report),
     })
   }
+
 
   private async providerMcpServers(
     session: AgentSession,

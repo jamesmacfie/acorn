@@ -1,7 +1,7 @@
 import { AGENT_TOOL_PASSTHROUGH, brokerEnv, createLogger } from '@acorn/plugin-api/node'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { randomUUID } from 'node:crypto'
-import { basename, resolve } from 'node:path'
+import { basename, join, resolve } from 'node:path'
 import type {
   AgentConfigOption,
   AgentInputPart,
@@ -254,6 +254,13 @@ export async function startCodexSession(
     },
   }))
   rpc.notify('initialized')
+  // acorn's skills, as extra roots beside the person's own. Set for this process, before the thread, so
+  // its first turn lists them. Codex keeps the roots in memory and writes nothing to its config. An
+  // app-server without the method lists none of them, and the lifecycle then puts them all in the index.
+  // See docs/managed-agents/native-skills.md § Native skills.
+  if (options.skillPlugins?.length) {
+    await rpc.request('skills/extraRoots/set', { extraRoots: options.skillPlugins.map((plugin) => join(plugin, 'skills')) }).catch(() => undefined)
+  }
 
   // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
   // well as start, and unchanged, for the reason Claude's appended system prompt is.

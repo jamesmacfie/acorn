@@ -96,7 +96,9 @@ A plugin's skills are text an agent follows, so they're a prompt-injection path 
 trust hash doesn't cover them, because it covers only a client bundle. The Node approves each skill at
 the digest of its whole folder, a changed byte asks again, and the folder may hold no symlinks. A harness
 gets read access to each delivered skill folder and nothing else: no data root, no write access, and
-nothing in the worktree ([skills](./managed-agents/skills.md#approval)).
+nothing in the worktree ([skills](./managed-agents/skills.md#approval)). Claude Code and Codex load a
+per-process copy of the approved bytes natively. Codex's skill roots stay in its memory, and its home and
+login are never moved ([native delivery](./managed-agents/native-skills.md)).
 
 <a id="the-renderers-policy-and-its-dangerous-sinks"></a>
 <a id="untrusted-provider-data"></a>

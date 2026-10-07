@@ -57,7 +57,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // skill, the first settings read, or the first session start, and the skills index on the first start.
 // The manifest kind, the catalogue and its registration, the roster's projection, the owner's state
 // file, three device routes, and the per-turn delivery report load at boot. Add 16.5 KB.
-const limits = { ceiling: 3_144_500, floor: 1_000_000 }
+// 2026-10-07: 3,145,022 B with native skill delivery. Writing and sweeping a start's skill folder load
+// with the skills index on first use. The lifecycle's per-event check of what a harness advertised, the
+// folder's removal when a process stops, and the native flag on the drivers and delivery record run on
+// every start or event. Add 1 KB.
+const limits = { ceiling: 3_145_500, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

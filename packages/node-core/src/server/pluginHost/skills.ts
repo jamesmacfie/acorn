@@ -24,6 +24,8 @@ export type SkillDelivery = {
   at: number
   /** `omitted` when the index ran out of room before this skill. */
   outcome: 'delivered' | 'omitted'
+  /** The harness loaded it with its own skill support rather than from acorn's index. */
+  native?: true
 }
 
 /** What a plugin hands `ctx.skills`: one skill the loader already read out of its package. */
@@ -96,19 +98,24 @@ export async function deliverableSkills(dataDir: string): Promise<DeliverableSki
 }
 
 /** What one provider start actually received. Call it only once the start has succeeded, so a process
- *  that kept running with an older index never reads as refreshed. */
-export function recordSkillDelivery(harness: string, report: { delivered: readonly string[]; omitted: readonly string[] }): void {
+ *  that kept running with an older index never reads as refreshed. `native` names the skills the harness
+ *  loaded with its own skill support; `delivered` and `omitted` describe the index. */
+export function recordSkillDelivery(
+  harness: string,
+  report: { delivered: readonly string[]; omitted: readonly string[]; native?: readonly string[] },
+): void {
   const at = Date.now()
-  const note = (names: readonly string[], outcome: SkillDelivery['outcome']) => {
+  const note = (names: readonly string[], outcome: SkillDelivery['outcome'], native?: true) => {
     for (const name of names) {
       const skill = catalogue.get(name)
       if (!skill) continue
       const key = deliveryKey(skill)
       const byHarness = deliveries.get(key) ?? new Map<string, SkillDelivery>()
-      byHarness.set(harness, { harness, at, outcome })
+      byHarness.set(harness, { harness, at, outcome, ...(native ? { native } : {}) })
       deliveries.set(key, byHarness)
     }
   }
+  note(report.native ?? [], 'delivered', true)
   note(report.delivered, 'delivered')
   note(report.omitted, 'omitted')
 }

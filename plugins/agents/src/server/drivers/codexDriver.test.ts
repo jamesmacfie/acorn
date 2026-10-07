@@ -147,6 +147,7 @@ async function start(
   config: Record<string, unknown> = {},
   mcpServers: readonly AgentDriverMcpServer[] = [],
   measureStartup?: MeasureAgentStartup,
+  skillPlugins?: readonly string[],
 ) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
@@ -159,6 +160,7 @@ async function start(
     mcpServers,
     noProviderExecutionHistory: false,
     measureStartup,
+    skillPlugins,
     onEvent: (event) => {
       driverEvents.push(event)
       if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
@@ -227,6 +229,18 @@ describe('Codex collaboration modes', () => {
     wire.requests.length = 0
     await (await start()).handle.stop()
     expect(wire.requests.find((request) => request.method === 'thread/start')?.params).not.toHaveProperty('developerInstructions')
+  })
+
+  // Per process, beside the person's own skills, and before the thread, so its first turn lists them.
+  // See docs/managed-agents/native-skills.md § Native skills.
+  it.each([false, true])('adds acorn skill roots before the thread with resumed=%s, and only when there are skills', async (resumed) => {
+    await (await start(null, resumed, {}, [], undefined, ['/data/agent-skills/s1/1/acme'])).handle.stop()
+    const methods = wire.requests.map((request) => request.method)
+    expect(wire.requests.find((request) => request.method === 'skills/extraRoots/set')?.params).toEqual({ extraRoots: ['/data/agent-skills/s1/1/acme/skills'] })
+    expect(methods.indexOf('skills/extraRoots/set')).toBeLessThan(methods.indexOf(resumed ? 'thread/resume' : 'thread/start'))
+    wire.requests.length = 0
+    await (await start(null, resumed)).handle.stop()
+    expect(wire.requests.map((request) => request.method)).not.toContain('skills/extraRoots/set')
   })
 
   it.each([false, true])('passes explicit MCP credentials for a custom agent with resumed=%s', async (resumed) => {

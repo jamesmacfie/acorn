@@ -154,3 +154,16 @@ acceptance pass.
     advisor shows `provider_not_configured`. Turn reviews off and send a turn: no review runs. Restart
     the Node during a review: it isn't retried, and its charge stays
     ([plugin model grants](../integrations/model-providers.md#plugin-model-grants)).
+
+163. Native skills. Install `docs/future/pi/packages/skills/`, restart the Node, and approve the skill.
+    In a throwaway repository with one uncommitted change, start a Claude Code session and type
+    `/acorn`: the composer offers `/acorn-pi-skills:release-note` beside your own commands. Send it
+    with "for the uncommitted change". The transcript shows **Launching skill:
+    acorn-pi-skills:release-note**, a read of `format.md` under `agent-skills/` in the Node's data root,
+    a note ending "Formatted with the pi-skills release-note procedure.", and "Skills the agent can
+    load: acorn-pi-skills:release-note (native)." The plugin's page says **Loaded natively by Claude
+    Code**. Turn the skill off, restart the Node, and ask the session whether it can still load it: it
+    quotes "These procedures were removed…", and the `/` list no longer has it. `agent-skills/` is
+    empty after the restart. Repeat with Codex, using `$acorn-pi-skills:release-note`. The repository's
+    status shows only the seeded change, and neither harness's config file names the skill folder
+    ([native delivery](../managed-agents/native-skills.md)).

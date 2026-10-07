@@ -10,6 +10,8 @@ const DRIVER_VERSION = 'codex-app-server-v2'
 export class CodexAgentDriver implements AgentDriver {
   readonly providerId = 'codex'
   readonly profileId = 'codex'
+  // `skills/extraRoots/set` (./codexStart.ts).
+  readonly nativeSkills = true
 
   async probe(): Promise<AgentProviderDescriptor> {
     const env = usageProcessEnv()

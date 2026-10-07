@@ -1,6 +1,6 @@
 import { randomUUID } from 'node:crypto'
 import { SecretService } from '@acorn/plugin-api/testkit'
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { mkdir, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { eq } from 'drizzle-orm'
@@ -2328,7 +2328,82 @@ describe('managed agent runtime conformance', () => {
       await turn('Again.')
       await vi.waitFor(() => expect(sent).toHaveLength(3))
       expect(starts.at(-1)!.skillFolders).toEqual([])
-      expect(skillPart(sent[2]!)).toMatch(/^No procedures are available to load now/)
+      expect(skillPart(sent[2]!)).toMatch(/^These procedures were removed and can't be loaded now, .*: acme:review\.$/)
+    } finally {
+      registration.dispose()
+    }
+  })
+
+  // A start gets its own copy, the index drops a skill only once the harness lists it, and the copy goes
+  // when the process does. See docs/managed-agents/native-skills.md § Native skills.
+  it('gives a driver with its own skill support a folder per start, and indexes only what it has not listed', async () => {
+    const seed = await seedTask(testDb, dataDir)
+    const folder = join(dataDir, 'package', 'skills', 'review')
+    await mkdir(folder, { recursive: true })
+    await writeFile(join(folder, 'SKILL.md'), '---\nname: review\ndescription: Check a diff.\n---\nRead format.md.\n')
+    await writeFile(join(folder, 'format.md'), 'The format.\n')
+    const read = readPackageSkill(join(dataDir, 'package'), { id: 'review', path: 'skills/review' })
+    if (!read.ok) throw new Error(read.reason)
+    const registration = registerSkill('acme', read.skill)
+    try {
+      skillStateStore(dataDir).approve({ 'acme:review': read.skill.digest })
+      const registry = new AgentDriverRegistry()
+      const starts: AgentDriverStartOptions[] = []
+      const sent: AgentInputPart[][] = []
+      let advertise = true
+      class NativeDriver extends FakeAgentDriver {
+        readonly nativeSkills = true
+        override async start(options: AgentDriverStartOptions): Promise<AgentDriverSession> {
+          starts.push(options)
+          // What Claude Code's adapter reports once it has loaded the session plugins.
+          if (advertise) await options.onEvent({ type: 'session_metadata', commands: [{ name: 'acorn-acme:review' }] })
+          // A retired start's report counts for nothing in this one.
+          else await starts[0]!.onEvent({ type: 'session_metadata', commands: [{ name: 'acorn-acme:review' }] })
+          const handle = await super.start(options)
+          const send = handle.sendTurn.bind(handle)
+          handle.sendTurn = (turn) => { sent.push(turn.input); return send(turn) }
+          return handle
+        }
+      }
+      registry.registerNative('fake', () => new NativeDriver())
+      const boot = () => new ManagedAgentRuntime({ db: pluginDb.db, dataDir, core, internalEnv: () => ({}), secrets: SECRETS, currentUserId: () => null, registry })
+      runtime = boot()
+      const session = await runtime.createSession({ taskId: seed.taskId, providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} })
+      const turn = async (text: string) => {
+        await runtime!.enqueueTurn(session.id, { input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: { providerDefault: true }, idempotencyKey: randomUUID() })
+      }
+      const skillPart = (input: AgentInputPart[]) => input[0]?.type === 'context' && input[0].source === 'context.skills' ? input[0].content : null
+      const sessionFolders = join(dataDir, 'agent-skills', session.id)
+
+      await turn('Review this.')
+      await vi.waitFor(() => expect(sent).toHaveLength(1))
+      const [plugin] = starts[0]!.skillPlugins!
+      expect(plugin!.startsWith(sessionFolders)).toBe(true)
+      expect(await readFile(join(plugin!, 'skills', 'review', 'format.md'), 'utf8')).toBe('The format.\n')
+      expect(starts[0]!.skillFolders).toEqual([join(plugin!, 'skills', 'review')])
+      expect(skillPart(sent[0]!)).toBeNull()
+      await vi.waitFor(() => expect(skillDeliveries(catalogueSkills('acme')[0]!)).toMatchObject([{ outcome: 'delivered', native: true }]))
+      await vi.waitFor(async () => expect((await runtime!.store.requireSession(session.id)).config.skillIndex).toEqual(['acorn-acme:review']))
+
+      // Archived, the process stops and its copy goes. Restored, the next start writes a new one, and
+      // with the harness silent the skill reaches the agent through the index, at the copy's path.
+      await runtime.archive(session.id, true)
+      await expect(readdir(sessionFolders)).resolves.toEqual([])
+      await runtime.archive(session.id, false)
+      advertise = false
+      await turn('And this.')
+      await vi.waitFor(() => expect(sent).toHaveLength(2))
+      const latest = starts.at(-1)!.skillPlugins![0]!
+      expect(latest).not.toBe(plugin)
+      expect(skillPart(sent[1]!)).toContain(join(latest, 'skills', 'review', 'SKILL.md'))
+      // Only the live start's copy is left.
+      expect(await readdir(sessionFolders)).toEqual([latest.split('/').at(-2)])
+      // Listed natively before and offered again now, so nothing is named as removed.
+      expect(skillPart(sent[1]!)).not.toContain('removed')
+
+      // Shutdown takes the copy with the process.
+      await runtime.stop()
+      await expect(readdir(sessionFolders)).resolves.toEqual([])
     } finally {
       registration.dispose()
     }

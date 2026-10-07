@@ -118,4 +118,6 @@ These rules catch a manifest that parses and then does nothing:
   only from the other skills.
 - A `skills` entry's `path` must be a folder inside the package holding a valid `SKILL.md`. The host
   reads it at install and at every load, and refuses the package with the reason
-  ([skills](../managed-agents/skills.md#the-checks)).
+  ([skills](../managed-agents/skills.md#the-checks)). Acorn names the skill `<pluginId>:<id>`. Claude
+  Code and Codex load it natively as `acorn-<pluginId>:<id>`, whatever its frontmatter `name` says
+  ([native delivery](../managed-agents/native-skills.md)).

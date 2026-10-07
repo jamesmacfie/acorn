@@ -5,8 +5,7 @@ import type { AgentDriver, AgentDriverEvent, AgentDriverMcpServer, AgentDriverSe
 import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
-import type { SkillIndex } from '../drivers/skillIndex'
-import type { AgentContextSnapshot } from '@acorn/protocol/agentContext.ts'
+import type { SkillReport, SkillStart } from '../drivers/skillIndex'
 
 export type ProviderGeneration = Readonly<{ sessionId: string; number: number }>
 
@@ -44,9 +43,11 @@ type LiveSession = {
   reconnectAttempt: number
   acceptedResponse: boolean
   driver: AgentDriver
-  // This start's skills index, and the part still owed ahead of a turn (../drivers/skillIndex.ts).
-  skills: SkillIndex | null
-  skillsOwed: AgentContextSnapshot | null
+  // This start's skills, whether the first turn still owes their part, and every command or skill name
+  // the harness has advertised, which is how a native load is confirmed (../drivers/skillIndex.ts).
+  skills: SkillStart | null
+  skillsOwed: boolean
+  advertised: Set<string>
 }
 
 export type ProviderLifecyclePorts = {
@@ -60,9 +61,10 @@ export type ProviderLifecyclePorts = {
     unavailable: string[]
   }>
   mcpUnavailable(sessionId: string, names: string[]): Promise<void>
-  /** The skills index a start of this session receives, and the report once a turn carried it. */
-  skills(session: AgentSession): Promise<SkillIndex>
-  skillsDelivered(sessionId: string, index: SkillIndex): Promise<void>
+  /** The skills a start of this session receives, with a native folder when the driver loads one, and
+   *  the report once a turn carried them. */
+  skills(session: AgentSession, generation: ProviderGeneration, native: boolean): Promise<SkillStart>
+  skillsDelivered(sessionId: string, report: SkillReport): Promise<void>
   event(sessionId: string, generation: ProviderGeneration, event: AgentDriverEvent): Promise<void>
   closed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void>
   closeMessage(error?: Error): string
@@ -213,7 +215,7 @@ export class ProviderSessionLifecycle {
       workspaceId: admission?.workspaceId ?? '', providerId: session.providerId,
       stopping: false, closing: false, lastActivityAt: Date.now(),
       reconnectAttempt: existing?.reconnectAttempt ?? 0, acceptedResponse: false, driver,
-      skills: null, skillsOwed: null,
+      skills: null, skillsOwed: false, advertised: new Set(),
     }
     // Install before any task, ledger, environment, or driver await.
     this.live.set(session.id, live)
@@ -251,14 +253,19 @@ export class ProviderSessionLifecycle {
       signal.throwIfAborted()
       // Read at every start and resume, like the MCP servers above, so a skill switched off or approved
       // since the last one applies now. A process that keeps running keeps what it was given.
-      const skills = await read(() => this.ports.skills(session))
-      signal.throwIfAborted()
+      const skills = await read(() => this.ports.skills(session, live.generation, live.driver.nativeSkills === true))
       live.skills = skills
-      live.skillsOwed = (await import('../drivers/skillIndex')).owedSkillPart(skills, session.config.skillIndex)
+      live.skillsOwed = true
+      signal.throwIfAborted()
       const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
-        cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, noProviderExecutionHistory, signal, session,
-        measureStartup,
-        onEvent: (event) => this.callback(live, () => this.ports.event(session.id, live.generation, event)),
+        cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, skillPlugins: skills.plugins,
+        noProviderExecutionHistory, signal, session, measureStartup,
+        onEvent: (event) => this.callback(live, () => {
+          if (event.type === 'session_metadata') {
+            for (const item of [...event.commands ?? [], ...event.skills ?? []]) live.advertised.add(item.name)
+          }
+          return this.ports.event(session.id, live.generation, event)
+        }),
         onClosed: (error) => this.callback(live, () => this.closed(session.id, live, error)),
       })
       const handle = await (startup ? startup.provider(launch) : launch())
@@ -279,8 +286,17 @@ export class ProviderSessionLifecycle {
       throw error
     } finally {
       live.startPromise = null
+      if (!live.handle) await this.retireSkills(live)
       if (!live.handle && !live.stopping && !live.retirementFailure && this.live.get(session.id) === live) this.live.delete(session.id)
     }
+  }
+
+  // A start's skill folder outlives nothing that reads it: called once its process has stopped, or when
+  // the start never got one.
+  private async retireSkills(live: LiveSession): Promise<void> {
+    const skills = live.skills
+    live.skills = null
+    await skills?.retire()
   }
 
   private callback(live: LiveSession, work: () => Promise<void>): Promise<void> {
@@ -311,18 +327,19 @@ export class ProviderSessionLifecycle {
   ): void {
     const live = this.require(generation)
     if (!this.owns(generation) || !live.handle) throw new Error('Provider session is not connected.')
-    // The skills index rides ahead of the first turn after a start (../drivers/skillIndex.ts). It counts
-    // as delivered once that turn has run, and is owed again if the turn failed.
-    const owed = live.skillsOwed
-    live.skillsOwed = null
-    void live.handle.sendTurn(owed ? { ...request, input: [owed, ...request.input] } : request)
+    // The skills part rides ahead of the first turn after a start (../drivers/skillIndex.ts), decided now
+    // from what the harness has advertised so far. It counts as delivered once that turn has run, and is
+    // owed again if the turn failed.
+    const skills = live.skillsOwed ? live.skills?.firstTurn(live.advertised) ?? null : null
+    live.skillsOwed = false
+    void live.handle.sendTurn(skills?.part ? { ...request, input: [skills.part, ...request.input] } : request)
       .then(async (result) => {
         // A failed report must not turn a finished turn into a failed one.
-        if (owed && live.skills) await this.callback(live, () => this.ports.skillsDelivered(generation.sessionId, live.skills!)).catch(() => undefined)
+        if (skills) await this.callback(live, () => this.ports.skillsDelivered(generation.sessionId, skills.report)).catch(() => undefined)
         await this.callback(live, () => onSuccess(result))
       })
       .catch((error) => {
-        if (owed) live.skillsOwed ??= owed
+        if (skills) live.skillsOwed = true
         return this.callback(live, () => onError(error))
       })
   }
@@ -342,6 +359,7 @@ export class ProviderSessionLifecycle {
       if (failure instanceof ProcessRetirementError) live.retirementFailure = failure
       throw failure
     }
+    await this.retireSkills(live)
     if (!this.owns(live.generation)) return
     const attempt = live.reconnectAttempt++
     await this.ports.closed(sessionId, live.generation, attempt, error)
@@ -423,6 +441,7 @@ export class ProviderSessionLifecycle {
       await live.startPromise?.catch(() => undefined)
       if (live.retirementFailure) throw live.retirementFailure
       if (live.handle) await live.handle.stop()
+      await this.retireSkills(live)
       await Promise.allSettled([...live.callbacks])
       if (live.retirementFailure) throw live.retirementFailure
       await this.ports.retirementFlush(sessionId)

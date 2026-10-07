@@ -69,10 +69,13 @@ export type AgentDriverStartOptions = {
    *  § Configuration), followed by the user's servers this session has switched on (docs/mcp.md § Your
    *  own servers). Empty is a real answer, never a forgotten one. */
   mcpServers: readonly AgentDriverMcpServer[]
-  /** The folder of each skill this start indexes (./skillIndex.ts). A driver whose harness needs a grant
-   *  to read outside the worktree gives one for these and nothing else. The index itself goes ahead of
-   *  the first turn, from the lifecycle. Absent means none. */
+  /** The folder of each skill this start may point the agent at (./skillIndex.ts). A driver whose harness
+   *  needs a grant to read outside the worktree gives one for these and nothing else. The index itself
+   *  goes ahead of the first turn, from the lifecycle. Absent means none. */
   skillFolders?: readonly string[]
+  /** For a driver with `nativeSkills`: the plugin folders of this start's skill copy (./skillFolder.ts),
+   *  for the harness to load as its own. Absent means none. */
+  skillPlugins?: readonly string[]
   noProviderExecutionHistory: boolean
   onEvent(event: AgentDriverEvent): void | Promise<void>
   onClosed(error?: Error): void | Promise<void>
@@ -113,6 +116,9 @@ export interface AgentDriverSession {
 export interface AgentDriver {
   readonly providerId: string
   readonly profileId: string
+  /** The harness loads skills from a folder with its own skill support, so the lifecycle writes one for
+   *  each start and passes it as `skillPlugins` (docs/managed-agents/native-skills.md § Native skills). */
+  readonly nativeSkills?: boolean
   probe(): Promise<AgentProviderDescriptor>
   start(options: AgentDriverStartOptions): Promise<AgentDriverSession>
   classifyTurnFailure?(error: unknown): 'safe_transient' | 'uncertain' | 'permanent'

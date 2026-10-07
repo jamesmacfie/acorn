@@ -1,7 +1,8 @@
 # Skills
 
 A skill is a named procedure an agent loads when a task calls for it. A loaded plugin supplies it as
-a folder, and acorn tells every managed session its name, its description, and where its body is. The
+a folder. Claude Code and Codex load it with their own skill support, so a person can call it from the
+composer. Every other harness gets its name, its description, and where its body is. Either way the
 agent reads the body only when a task matches, so ten skills cost ten lines of context, not ten bodies.
 
 Always-on instructions stay [context sections](../agent-tools/context-sections.md). A skill is for a
@@ -93,8 +94,10 @@ Loaded plugins can't reach either. A loaded bundle that imported them would get 
 ### Delivery
 
 `ProviderSessionLifecycle.start` reads the deliverable skills at every provider start and resume, the
-same moment it resolves the session's MCP servers, and builds the index with
-`server/drivers/skillIndex.ts` in the agents plugin:
+same moment it resolves the session's MCP servers, and plans them with `prepareSkillStart` in
+`server/drivers/skillIndex.ts` in the agents plugin. A driver with its own skill support gets every
+skill natively ([native skills](./native-skills.md)). Any skill that harness hasn't listed by the first
+turn, and every skill on any other harness, goes in the index:
 
 ```
 These are procedures you can load. Read the file when a task matches the description.
@@ -112,29 +115,38 @@ theirs. It doesn't go in a system prompt, because Claude Code 2.1.292 keeps the 
 session was created with: a resumed session ignores a new one, so a skill switched off would stay. It's
 kept apart from standing context too, which is a snapshot taken when the session was created.
 
-A session that last received an index and now has none gets one sentence instead: "No procedures are
-available to load now. Earlier lists of procedures in this conversation no longer apply." The session
-row keeps a digest of the last index a turn carried in `config.skillIndex`, a key only the Node writes,
-which is how a later start knows the withdrawal is owed.
+A skill the agent was told about before and that's gone now is named in the same part: "These procedures
+were removed and can't be loaded now, even if an earlier list in this conversation names them:
+acorn-pi-skills:release-note." That holds for a native skill too, because neither Claude Code nor Codex
+tells the model on a resume that a skill went away, and the old listing stays in the conversation. The
+session row keeps the names the last delivery told the agent, native names first, in
+`config.skillIndex`, a key only the Node writes. A digest written there by phase 06's build is read as
+no names.
 
-| Harness | Body readable through |
-| --- | --- |
-| Claude Code | A read-only allow rule per indexed skill folder, `Read(//<folder>/**)`, in the SDK flag settings. Flag settings are per process, so the rule follows the current index on a resume |
-| Codex | Codex's built-in permission profiles read the whole disk. A custom profile that limits reads makes Codex ask |
-| DeepSeek, `omp`, other ACP | The harness's own tools and permission prompts. `omp`'s native `read` asks no permission |
+| Harness | Delivery | Body readable through |
+| --- | --- | --- |
+| Claude Code 2.1.292 | Native: session plugins | A read-only allow rule per skill folder, `Read(//<folder>/**)`, in the SDK flag settings. Flag settings are per process, so the rule follows the current start on a resume |
+| Codex 0.159.2 | Native: extra skill roots | Codex's built-in permission profiles read the whole disk. A custom profile that limits reads makes Codex ask |
+| DeepSeek, `omp`, other ACP | The index. ACP has no skill API | The harness's own tools and permission prompts. `omp`'s native `read` asks no permission |
 
-Nothing writes into the worktree, and no harness is granted the data root or any write access. There's
-no staging copy: the agent reads the installed package's folder, which the digest check guards.
+Nothing writes into the worktree, and no harness is granted the data root or any write access. On a
+harness without native support there's no staging copy: the agent reads the installed package's
+folder, which the digest check guards.
 
-A delivery counts once the turn that carried the index has run. Then the catalogue records which
-harness received which skills, and the transcript gets one line: "Skills the agent can load:
-pi-skills:release-note." or "The agent was told no skills are available now." If that turn fails, the
-index is owed again on the next turn of the same process. A process that keeps running keeps the index
+A delivery counts once the first turn after a start has run. Then the catalogue records which harness
+received which skills and whether natively, and the transcript gets one line, such as "Skills the
+agent can load: acorn-pi-skills:release-note (native)." or "The agent was told these are gone:
+acorn-pi-skills:release-note." If that turn fails, the part is owed again on the next turn of the same
+process, worked out afresh from what the harness has listed by then. A process that keeps running keeps the index
 it started with, and never reads as refreshed. Switching a skill off, approving one, or updating a
 package applies at each session's next start or resume, never in the middle of a turn.
 
 A compaction can drop the index from a long session's context, as it can drop a custom agent's
 instructions on a harness with no system prompt. The next start sends it again.
+
+<a id="native-delivery"></a>
+Claude Code and Codex load skills with their own skill support instead of the index. See
+[native skills](./native-skills.md).
 
 ### Settings
 
@@ -143,8 +155,8 @@ version has skills. Each skill has a switch, its description, and two lines kept
 
 - Its status, which says whether the next start may receive it: ready, off, waiting for approval, or
   changed on disk.
-- Which harnesses received it, and when, since the Node started. A start that left it out of a full
-  index says so.
+- Which harnesses received it, how, and when, since the Node started: "Loaded natively by Claude Code
+  at 04:15 PM", "Reached DeepSeek through acorn's list", or left out of a full list.
 
 `GET /v1/core/plugins/:id/skills` returns `PluginSkillState`. `PUT` with `{ name, enabled }` sets one
 switch. Both are device-only and can't be reached from a plugin frame. The section reads the active

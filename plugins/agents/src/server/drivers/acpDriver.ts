@@ -30,6 +30,10 @@ export class AcpDriver implements AgentDriver {
     return this.spec.profileId
   }
 
+  get nativeSkills(): boolean {
+    return this.spec.nativeSkills === true
+  }
+
   // Collects the reasons a launch cannot resolve instead of throwing, so an unavailable harness shows
   // up in the Agent Center as a row with a diagnostic rather than as a failed discovery.
   private launch(): AcpLaunch {

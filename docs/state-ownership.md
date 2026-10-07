@@ -47,6 +47,9 @@ active plugin loaded, and which harnesses each skill reached since the process s
 answers about it, the approved digest per skill and the switches, are `skill-state.json` in the data
 root, written only by device-only routes. A session start reads both on its own Node, so no client path
 or cached delivery status reaches another Node ([skills](./managed-agents/skills.md#the-catalogue)).
+Each Claude Code or Codex process also has its own copy of the skills, under `agent-skills/` in the
+data root, which the agents plugin removes when that process stops
+([native delivery](./managed-agents/native-skills.md)).
 
 Whether the Node collects telemetry is one Node preference, `telemetry.enabled`
 ([the switch](./telemetry/model.md#the-switch)). It belongs to the Node because the collector runs

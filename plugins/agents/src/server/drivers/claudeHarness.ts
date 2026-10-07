@@ -49,15 +49,22 @@ export const claudeHarness: HarnessLaunchSpec = {
   // instead (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
   // (`//` anchors at the filesystem root), so the agent reads a body without a prompt and gains no write
   // access anywhere new. Flag settings are per process, so the rule follows the current index.
-  acpSessionMeta: (session, skillFolders) => {
+  //
+  // The skills themselves go in as session plugins, the Agent SDK's `plugins` option, which the adapter
+  // passes through unchanged and the SDK turns into `--plugin-dir` on a create and a resume alike. Unlike
+  // the appended prompt, a resume loads the plugins it's given now. See
+  // docs/managed-agents/native-skills.md § Native skills.
+  nativeSkills: true,
+  acpSessionMeta: (session, skills) => {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
       UNATTENDED_KINDS.has(session.kind) ? UNATTENDED_TURN_ENDINGS : undefined,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
     ].filter(Boolean).join('\n\n')
-    const permissions = skillFolders.length ? { permissions: { allow: skillFolders.map((dir) => `Read(/${dir}/**)`) } } : {}
+    const permissions = skills.folders.length ? { permissions: { allow: skills.folders.map((dir) => `Read(/${dir}/**)`) } } : {}
+    const plugins = skills.plugins.length ? { plugins: skills.plugins.map((path) => ({ type: 'local', path })) } : {}
     return {
-      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions } } },
+      claudeCode: { options: { settings: { autoContinueAtUsageLimit: false, ...permissions }, ...plugins } },
       ...(append ? { systemPrompt: { append } } : {}),
     }
   },

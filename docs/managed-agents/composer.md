@@ -17,7 +17,9 @@ misspelled `/reviw` stays plain. File mentions come from the same worktree file 
 turn's file parts. An `@` token with no exact match stays plain text and doesn't block sending.
 
 Typing a sigil opens one dropdown: `@` lists worktree files, `/` the session's commands, and `$` its
-skills. Rows are `PickerRow`, with the name over the description. The list scrolls past 280px, and the
+skills. Both lists are what the harness reported at its last start or resume, so a plugin skill appears
+only once the harness loaded it natively: `/acorn-<pluginId>:<id>` in Claude Code and
+`$acorn-<pluginId>:<id>` in Codex ([native delivery](./native-skills.md)). Rows are `PickerRow`, with the name over the description. The list scrolls past 280px, and the
 arrow keys scroll it directly instead of calling `scrollIntoView`, which could scroll the transcript
 too. Only `@` waits on a fetch, which starts the first time the field takes focus, because the list
 runs to about 145 KB and most visits never type `@`. The `＋` picker inserts the same tokens.

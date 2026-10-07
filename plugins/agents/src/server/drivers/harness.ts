@@ -54,9 +54,12 @@ export type HarnessLaunchSpec = {
    *  harness's behavior must remain expressible through the public manifest contract. A function of
    *  the session because what an adapter is told can depend on whether anyone is watching. It is
    *  called on every create and every resume, so it must return the same value for the same session.
-   *  `skillFolders` are the folders this start's skills index names; a grant for them is per process, so
-   *  it may change on a resume. */
-  acpSessionMeta?: (session: AgentSession, skillFolders: readonly string[]) => Record<string, unknown>
+   *  `skills` are this start's: the folders the agent may be pointed at, and with `nativeSkills` the
+   *  plugin folders to load. Both are per process, so they may change on a resume. */
+  acpSessionMeta?: (session: AgentSession, skills: { folders: readonly string[]; plugins: readonly string[] }) => Record<string, unknown>
+  /** Built-in only. Set when `acpSessionMeta` passes `skills.plugins` to the harness's own skill loader,
+   *  so the lifecycle writes them (docs/managed-agents/native-skills.md § Native skills). */
+  nativeSkills?: true
   /** Built-in only. Set when `acpSessionMeta` puts a custom agent's instructions in the system prompt.
    *  Without it the generic driver sends them as a context block ahead of the first prompt of every
    *  provider session it creates, which a compaction can later drop (docs/managed-agents/custom-agents.md § Custom

@@ -25,10 +25,14 @@ const STATUS_TEXT: Record<Skill['status'], string> = {
   changed: 'Its files changed since the Node started this plugin, so agents don’t get it. Reload or restart the plugin to review it.',
 }
 
-// Eligibility above, verified delivery here: only a start that succeeded is counted.
+// Eligibility above, verified delivery here: only a start that succeeded is counted. A harness with its
+// own skill support loads it natively; any other reads it from acorn's list.
 const reached = (skill: Skill): string => {
   if (!skill.deliveries.length) return 'No session has started with it since the Node started.'
-  return skill.deliveries.map((delivery) => `${delivery.outcome === 'delivered' ? 'Reached' : 'Left out of a full list for'} ${delivery.harness} at ${
+  const how = (delivery: Skill['deliveries'][number]) =>
+    delivery.outcome === 'omitted' ? `Left out of a full list for ${delivery.harness}`
+      : delivery.native ? `Loaded natively by ${delivery.harness}` : `Reached ${delivery.harness} through acorn’s list`
+  return skill.deliveries.map((delivery) => `${how(delivery)} at ${
     new Date(delivery.at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`).join('. ') + '.'
 }
 

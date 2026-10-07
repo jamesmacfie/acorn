@@ -10,7 +10,8 @@ These pages cover the rest of the client:
 
 - [The transcript](./transcript.md) covers the timeline window, tool cards, request cards, and
   subagent views.
-- [The composer](./composer.md) covers the message field, mentions, and composer slots.
+- [The composer](./composer.md) covers the message field, mentions, and composer slots. Its `/` and
+  `$` choices are the harness's own, plugin skills included once the harness loaded them natively.
 - [The transcript store](./transcript-store.md) covers how the client holds and reads a session's
   events.
 - [Transcript search](./transcript-search.md) covers the full-text index.
