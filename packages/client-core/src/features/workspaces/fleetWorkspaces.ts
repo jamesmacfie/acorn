@@ -49,8 +49,14 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
   )
   return createMemo<FleetWorkspaceList>(() => {
     const current = result()
-    const preferences = new Map(prefs().rows.map((row) => [row.nodeId, row.data]))
-    const projectRows = new Map(projects().rows.map((row) => [row.nodeId, row.data]))
+    const preferenceResult = prefs()
+    const projectResult = projects()
+    const preferences = new Map(preferenceResult.rows.map((row) => [row.nodeId, row.data]))
+    const projectRows = new Map(projectResult.rows.map((row) => [row.nodeId, row.data]))
+    const unavailable = new Map<string, FleetUnavailable>()
+    for (const node of [...current.unavailable, ...preferenceResult.unavailable, ...projectResult.unavailable]) {
+      if (!unavailable.has(node.nodeId)) unavailable.set(node.nodeId, node)
+    }
     return {
       // Node order (main's list) then the node's own workspace order, so the picker does not reshuffle
       // because one node answered faster. A workspace with no projects is left out: it has nowhere to
@@ -62,7 +68,7 @@ export function createFleetWorkspaces(): () => FleetWorkspaceList {
         return pickerWorkspaces(row.data, allProjects, nodePrefs[WORKSPACES_PREF_KEY])
           .map((workspace) => ({ workspace, nodeId: row.nodeId, node: row.node }))
       }),
-      unavailable: current.unavailable,
+      unavailable: [...unavailable.values()],
       grouped: nodes().length > 1,
     }
   })

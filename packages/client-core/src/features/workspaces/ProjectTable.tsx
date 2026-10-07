@@ -270,6 +270,7 @@ function BulkBar(props: {
         >
           <form class="ws-add-form" onSubmit={(event) => void moveToNew(event)}>
             <Input label="New workspace name" placeholder="Workspace name" value={naming() ?? ''}
+              ref={(input) => queueMicrotask(() => input.focus())}
               onInput={setNaming} onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); setNaming(null) } }} />
             <Button submit disabled={busy() || !naming()?.trim()}>Create and move</Button>
             <Button variant="ghost" onPress={() => setNaming(null)}>Cancel</Button>

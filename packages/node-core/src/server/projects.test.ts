@@ -6,7 +6,8 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from './db'
 import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { createProject, createProjectRef, deleteProject, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import { createProject, createProjectRef, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import { deleteProject } from './projectDeletion'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' })
 

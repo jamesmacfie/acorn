@@ -1,15 +1,12 @@
-import { taskScripts } from './taskScripts/service'
 import { randomUUID } from 'node:crypto'
 import { existsSync, realpathSync, statSync } from 'node:fs'
 import { basename, isAbsolute, join } from 'node:path'
-import { and, asc, eq, inArray, max, sql } from 'drizzle-orm'
+import { and, asc, eq, max, sql } from 'drizzle-orm'
 import type { AppDatabase } from './db'
 import { schema } from './db'
 import { git } from './core/git'
-import { retireTaskHead } from './worktrees/taskHeadObserver'
-import { broadcastProjectChanged, broadcastTasksChanged, broadcastWorkspaceChanged } from './notify'
+import { broadcastProjectChanged, broadcastWorkspaceChanged } from './notify'
 import { nodeWorkspacesMode, settleWorkspacesMode, WORKSPACES_OFF_MESSAGE } from './workspacesMode'
-import { notifyWorkspaceRemoved, removeWorkspaceRows } from './workspaceRemoval'
 
 // A project is a folder on this machine (server/db/schema.ts `projects`; docs/workspaces-and-tasks.md
 // § Workspace and project covers facets generally). Adding one needs only an absolute existing
@@ -23,35 +20,6 @@ function nextProjectSort(db: AppDatabase, workspaceId: string): number {
   const row = db.select({ value: max(schema.projects.sort) }).from(schema.projects)
     .where(eq(schema.projects.workspaceId, workspaceId)).get()
   return (row?.value ?? -1) + 1
-}
-
-// Validate membership and save the whole order together. A stale table must not reorder a project
-// that another client moved to a different workspace, or leave a partially saved order.
-export function reorderWorkspaceProjects(db: AppDatabase, workspaceId: string, projectIds: readonly string[]) {
-  const result = db.transaction((tx) => {
-    if (!tx.select({ id: schema.workspaces.id }).from(schema.workspaces).where(eq(schema.workspaces.id, workspaceId)).get()) {
-      return 'not_found' as const
-    }
-    const members = tx.select({ id: schema.projects.id, sort: schema.projects.sort }).from(schema.projects)
-      .where(eq(schema.projects.workspaceId, workspaceId)).all()
-    const ids = new Set(projectIds)
-    if (ids.size !== projectIds.length || members.length !== ids.size || members.some((project) => !ids.has(project.id))) {
-      return 'membership_changed' as const
-    }
-    const sorts = new Map(members.map((project) => [project.id, project.sort]))
-    const changed: string[] = []
-    const now = Date.now()
-    projectIds.forEach((id, sort) => {
-      if (sorts.get(id) === sort) return
-      tx.update(schema.projects).set({ sort, updatedAt: now }).where(eq(schema.projects.id, id)).run()
-      changed.push(id)
-    })
-    return changed
-  })
-  if (Array.isArray(result)) {
-    for (const projectId of result) broadcastProjectChanged({ projectId })
-  }
-  return result
 }
 
 async function projectAtPath(db: AppDatabase, path: string, exceptId?: string): Promise<ProjectRow | undefined> {
@@ -324,34 +292,6 @@ export async function patchProject(db: AppDatabase, id: string, patch: PatchProj
   broadcastProjectChanged({ projectId: id })
   if (patch.path !== undefined) return { ok: true, project: (await detectProject(db, id))! }
   return { ok: true, project: (await getProject(db, id))! }
-}
-
-/**
- * Delete a project and the tasks that belong to it (docs/workspaces-and-tasks/projects.md
- * § Delete a project). Row-only: the project's folder and any task worktrees are never touched from here.
- */
-export async function deleteProject(db: AppDatabase, id: string, ownerId = ''): Promise<void> {
-  const project = await getProject(db, id)
-  if (!project) return
-  const removeWorkspace = nodeWorkspacesMode(db, ownerId) === 'off'
-  const taskIds = (await db.select({ id: schema.tasks.id }).from(schema.tasks).where(eq(schema.tasks.projectId, id))).map((row) => row.id)
-  for (const taskId of taskIds) taskScripts(db).interruptTask(taskId, 'cancelled')
-  const removedProviders = db.transaction((tx) => {
-    if (taskIds.length) {
-      tx.delete(schema.taskPulls).where(inArray(schema.taskPulls.taskId, taskIds)).run()
-      tx.delete(schema.taskScriptAttempts).where(inArray(schema.taskScriptAttempts.taskId, taskIds)).run()
-      tx.delete(schema.taskLinks).where(inArray(schema.taskLinks.taskId, taskIds)).run()
-      tx.delete(schema.tasks).where(inArray(schema.tasks.id, taskIds)).run()
-    }
-    tx.delete(schema.projects).where(eq(schema.projects.id, id)).run()
-    return removeWorkspace ? removeWorkspaceRows(tx, db, project.workspaceId, ownerId) : []
-  })
-  for (const taskId of taskIds) retireTaskHead(taskId)
-  if (removeWorkspace) notifyWorkspaceRemoved(project.workspaceId, removedProviders)
-  // The rail's task list just lost a batch of tasks in this project (./notify.ts §
-  // broadcastTasksChanged). No task event when the project had none: public task state did not move.
-  if (taskIds.length) broadcastTasksChanged({ taskId: null })
-  broadcastProjectChanged({ projectId: id })
 }
 
 // Core-only write seam for importer plugins. The public project routes remain the richer UI/config

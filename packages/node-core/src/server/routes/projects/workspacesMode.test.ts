@@ -92,6 +92,19 @@ describe('workspace mode at Node routes and plugin seam', () => {
     expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'off' }))).error.code).toBe('workspaces_fixed')
   })
 
+  it('keeps grouped deletion behavior: reassigns projects and removes the workspace datasets', async () => {
+    await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'on' })
+    const created = await add('one')
+    const project = ((await created.json()) as { project: { id: string; workspaceId: string } }).project
+    const grouped = (await (await request('/workspaces', 'POST', { name: 'Team' })).json()) as { id: string }
+    expect((await request(`/projects/${project.id}`, 'PATCH', { workspaceId: grouped.id })).status).toBe(200)
+    t.db.insert(schema.datasets).values({ id: 'dataset', workspaceId: grouped.id, name: 'Data', mode: 'snapshot', feeder: 'manual', feederConfig: '{}', identityFields: '[]', retentionDays: 1, maxRows: 10, maxBytes: 1000, createdAt: 1, updatedAt: 1 }).run()
+    expect((await request(`/workspaces/${grouped.id}`, 'DELETE')).status).toBe(200)
+    expect(t.db.select().from(schema.projects).get()?.workspaceId).toBe(project.workspaceId)
+    expect(t.db.select().from(schema.workspaces).all()).toMatchObject([{ id: project.workspaceId, isDefault: true }])
+    expect(t.db.select().from(schema.datasets).all()).toEqual([])
+  })
+
   it('rejects invalid preferences without settling an empty Node', async () => {
     expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'sometimes' }))).error.code).toBe('bad_request')
     expect(t.db.select().from(schema.prefs).all()).toEqual([])
