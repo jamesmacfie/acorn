@@ -5,7 +5,7 @@ import { schema } from './db'
 
 type ModeDatabase = Pick<AppDatabase, 'select' | 'insert'>
 
-export const WORKSPACES_OFF_MESSAGE = 'Workspaces are off on this Node, so each project has its own. Add a project instead.'
+export const WORKSPACES_OFF_MESSAGE = 'Projects are separate on this Node. Add a project instead.'
 
 export function projectCount(db: ModeDatabase): number {
   return db.select({ count: sql<number>`count(*)` }).from(schema.projects).get()!.count

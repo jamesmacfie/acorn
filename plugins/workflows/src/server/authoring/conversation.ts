@@ -69,7 +69,7 @@ export async function authorWorkflowConversation(args: {
       const result = await args.sources.invoke({ operation: 'query', query: request.query, mode: 'preview', evaluationTime: Date.now(), pageSize: AUTHORING_LIMITS.sampleRecords }, invocation)
       return boundedAuthoringSample(request.query, request.fields, result.records)
     }
-      if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected scope.')
+    if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected scope.')
     if (request.operation === 'describe-source') return args.sources.invoke({ operation: 'describe', source: request.source, scope: request.scope }, invocation)
     return args.sources.invoke(request, invocation)
   }

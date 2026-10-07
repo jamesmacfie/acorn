@@ -58,6 +58,7 @@ import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { takePluginRequest } from './plugins/installed'
 import { takeConnectionRequest } from './connections/connections'
+import { CORE_SETTINGS_PAGES } from './corePages'
 
 const page = (id: string, extra: Partial<SettingsContribution> = {}): SettingsContribution => ({
   id, label: id, order: 10, component: () => <p data-page={id}>{id} body</p>, ...extra,
@@ -278,6 +279,17 @@ describe('SettingsView', () => {
     expect(host.querySelector('.settings-breadcrumb')?.textContent).not.toContain('Runn')
     mocks.workspaces = () => []
     mocks.projects = []
+  })
+
+  it.each(['off', 'on'] as const)('searches only available Overview terms with %s mode', (mode) => {
+    mocks.mode = mode
+    const declaration = CORE_SETTINGS_PAGES.find((candidate) => candidate.id === 'workspaces')!
+    held.push(settingsRegistry.register(page('workspaces', declaration)))
+    open({ target: 'workspaces' })
+    expect(groupOf('Overview')).toBe(mode === 'off' ? 'Projects' : 'Workspaces and projects')
+    search('new workspace')
+    expect(results().includes('Overview')).toBe(mode === 'on')
+    if (mode === 'off') expect(host.querySelector('.settings-rail-empty')?.textContent).toContain('No settings match')
   })
 
   it('ranks page names, then section names, then row labels, then keywords, and lands on the section', async () => {

@@ -79,7 +79,7 @@ describe('issue_detail', () => {
     await connect(db, 'conn-stale', 'tracker', 'needs-auth')
 
     await expect(issueDetailTool({ db: db.db, secrets: db.secrets }).handler({ identifier: 'ENG-42' }, ctx))
-      .rejects.toThrow(/no connected tracker workspace has 'ENG-42'/i)
+      .rejects.toThrow(/no connected tracker account has 'ENG-42'/i)
     expect(asked).toEqual([])
   })
 

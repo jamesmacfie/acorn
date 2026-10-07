@@ -14,7 +14,7 @@ import { pluginRosterKnown } from '../../infra/node/hostCapabilities'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { buildSettingsIndex, searchSettings, type SettingsSearchObject, type SettingsSearchResult } from '../../host/registries/shell/settingsSearch'
 import {
-  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, projectSettingsTarget, resolveSettingsAlias, SETTINGS_CATEGORY_LABELS,
+  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, projectSettingsTarget, resolveSettingsAlias,
   settingsCategoryOf, settingsDetailPage, settingsPagesInOrder, settingsRegistry, settingsScopeOf, WORKSPACE_SETTINGS_PREFIX,
   workspaceSettingsTarget, type SettingsContribution, type SettingsNavigate, type SettingsPageContext,
 } from '../../host/registries/shell/settings'
@@ -29,7 +29,7 @@ import Icon from '../../kit/components/content/Icon'
 import { Text } from '../../kit/components/content/Text'
 import { createAttentionInbox } from '../notifications/attentionInbox'
 import { createWorkspacesMode } from '../workspaces/workspacesMode'
-import { workspaceWords } from '../workspaces/words'
+import { settingsCategoryLabel, settingsPageForMode } from './settingsPresentation'
 import { createUnsavedChanges, UnsavedChangesContext } from './unsavedChanges'
 import { createSettingsDetails, SettingsDetailContext } from './settingsDetail'
 import { PluginStrip } from './plugins/PluginStrip'
@@ -135,9 +135,8 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
   const projects = createQuery(() => projectsOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
   const workspaceMode = createWorkspacesMode()
-  const categoryLabel = (category: keyof typeof SETTINGS_CATEGORY_LABELS) => category === 'workspaces' && workspaceMode() === 'off'
-    ? workspaceWords(workspaceMode()).capitalizedPlural : SETTINGS_CATEGORY_LABELS[category]
-  const pages = createMemo(() => settingsPagesInOrder())
+  const categoryLabel = (category: SettingsCategory) => settingsCategoryLabel(category, workspaceMode())
+  const pages = createMemo(() => settingsPagesInOrder().map((page) => settingsPageForMode(page, workspaceMode())))
   const railPages = createMemo(() => pages().filter(isStandaloneSettingsPage))
   // The pages drawn for a workspace row and a project row (settingsDetailPage).
   const workspacePage = createMemo(() => settingsDetailPage(pages(), 'workspace'))
@@ -331,9 +330,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
       ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] }))),
     ]
   })
-  const index = createMemo(() => buildSettingsIndex(railPages().map((page) => page.id === 'shortcuts' && workspaceMode() === 'off'
-    ? { ...page, sections: page.sections?.map((section) => ({ ...section, rows: section.rows?.map((row) => row.replace('last workspace', 'last project')) })) }
-    : page), searchObjects()))
+  const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects(), categoryLabel))
   // A section named like its page reads as the page, so the page's own result would be a second line
   // with the same words. The section's lands deeper, so it is the one kept.
   const matches = createMemo(() => {

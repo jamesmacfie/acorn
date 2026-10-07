@@ -120,6 +120,6 @@ describe('NotesStore over a temp dir', () => {
 
   it('rejects traversal slugs and workspace ids at the boundary', async () => {
     await expect(store.read(workspace, '../evil')).rejects.toThrow('Invalid note slug')
-    await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow('Invalid workspace id')
+    await expect(store.read({ scope: 'workspace', workspaceId: '../ws' }, 'x')).rejects.toThrow('Invalid note location id')
   })
 })

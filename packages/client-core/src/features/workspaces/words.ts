@@ -2,18 +2,18 @@ import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { createWorkspacesMode } from './workspacesMode'
 
 export type WorkspaceWords = {
-  singular: 'project' | 'workspace'
-  plural: 'projects' | 'workspaces'
-  capitalized: 'Project' | 'Workspace'
-  capitalizedPlural: 'Projects' | 'Workspaces'
+  readonly singular: 'project' | 'workspace'
+  readonly plural: 'projects' | 'workspaces'
+  readonly capitalized: 'Project' | 'Workspace'
+  readonly capitalizedPlural: 'Projects' | 'Workspaces'
 }
 
-const PROJECT_WORDS: WorkspaceWords = {
+const PROJECT_WORDS: WorkspaceWords = Object.freeze({
   singular: 'project', plural: 'projects', capitalized: 'Project', capitalizedPlural: 'Projects',
-}
-const WORKSPACE_WORDS: WorkspaceWords = {
+})
+const WORKSPACE_WORDS: WorkspaceWords = Object.freeze({
   singular: 'workspace', plural: 'workspaces', capitalized: 'Workspace', capitalizedPlural: 'Workspaces',
-}
+})
 
 /** Use the active Node's mode at read time, so a fleet switch cannot retain another Node's label. */
 export const workspaceWords = (mode: WorkspacesMode | undefined): WorkspaceWords =>

@@ -34,7 +34,8 @@ The facade has 14 entrypoints:
 
 Compiled client plugins can call `createWorkspaceWords()` in a Solid owner. It returns a reactive
 accessor with `singular`, `plural`, `capitalized`, and `capitalizedPlural` for the active Node's
-project grouping mode. Read the accessor where the text is drawn, including command title and hint
+project grouping mode. The shared forms are readonly. Read the accessor where the text is drawn,
+including command title and hint
 functions, so switching between Nodes updates the words. `workspaceWords(mode)` provides the same
 forms for callers that already hold a mode accessor. Both are exported beside
 `workspaceForProject`; neither changes workspace IDs, routes, or stored scopes.

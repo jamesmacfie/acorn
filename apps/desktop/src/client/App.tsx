@@ -172,7 +172,7 @@ export default function App() {
   // One row per registered Settings page, rebuilt when the roster changes: a plugin contributes pages,
   // so a list taken once would go stale the moment one loads or is disabled.
   createEffect(() => {
-    const pages = registerCommands(settingsPageCommands(openSettings, workspaceMode))
+    const pages = registerCommands(settingsPageCommands(openSettings, workspaceMode()))
     onCleanup(() => pages.dispose())
   })
 

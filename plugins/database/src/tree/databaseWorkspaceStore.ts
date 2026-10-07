@@ -93,7 +93,7 @@ export async function saveDatabaseWorkspace(state: AcornBridge['state'], taskId:
   }
   const revision = `${Date.now()}:${++revisionSequence}:${Math.random()}`
   const chunks = Math.ceil(text.length / CHUNK_CHARS)
-  if (chunks > 256 || new TextEncoder().encode(text).byteLength > 32 * 1024 * 1024) throw new Error('The database workspace exceeds the 32 MiB restoration limit.')
+  if (chunks > 256 || new TextEncoder().encode(text).byteLength > 32 * 1024 * 1024) throw new Error('The database view exceeds the 32 MiB restoration limit.')
   // Admit every write while this mount's bridge is live. The host processes messages in order and
   // saves values through its own preference queue; no later callback borrows a retired bridge.
   await Promise.all([

@@ -4,6 +4,32 @@
 
 Status: implemented on `phase-05-wording`.
 
+Review follow-up, October 8, 2026:
+
+- The queued-turn limit notice reads **per project** or **per workspace** from the active Node's
+  mode. A component test renders the blocked-by-limits view in each mode and checks the full limit
+  sentence. The earlier desktop walk remains the UI evidence for the other surfaces.
+- Settings projects its core declarations once for each Node mode before rail search and palette
+  registration. Separate mode removes the unavailable **new workspace** and move-project search
+  terms and the hidden Workspace row, and renames the last-scope shortcut. The search index receives
+  the same category label as the rail. Focused tests cover off/on search results and command
+  registrations rebuilt after a mode change; grouped wording remains intact.
+- A TypeScript AST audit of first-party desktop, client, Node, protocol, and plugin literals found
+  the remaining visible agent handoff prompt, database restoration error, Linear connection hint,
+  and reachable Node errors. The Linear hint explicitly names Linear workspaces. Grouped-only
+  controls, the first-run grouping question, and stable identifiers retain their workspace terms.
+  The `WorkspaceWords` type is readonly and its shared values are frozen. Workflow server formatting
+  and the duplicate words import are corrected.
+- Focused runs passed: Settings index (4), Settings view (21), command registration (10), queued
+  turns (4), Node workspace mode (9), linked projects (4), issue detail (4), source context (1),
+  database restoration (1), notes storage (11), and Linear provider (14). Client-core, desktop,
+  Node-core, agents, workflows, notes, Linear, and plugin-api scoped type checks passed; all 87
+  architecture checks passed. The stock Node build measured 3,149,554 B against the 3,150,000 B
+  ceiling. The database
+  package type check reports `src/server/routes/database.test.ts:73` calling `createProjectService`
+  with one argument where its signature requires two. That test and signature were untouched by
+  this follow-up, but no independent baseline run was made. The database restoration test passed.
+
 - `client-core` exports `workspaceWords(mode)` and the reactive `createWorkspaceWords()` through
   `plugin-api`. Desktop components and first-party plugins read the active Node's mode when they
   render. Palette commands evaluate their labels, hints, and placeholders when read; the palette

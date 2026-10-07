@@ -51,7 +51,7 @@ export function workspaceSourceQuery(query: DataSourceQuery, description: DataSo
     value = selected === MISSING ? ids : (selected as string[]).map(id => containerId(id, linked.kind)).filter(id => linked.projects.has(id))
   } else {
     const id = typeof selected === 'string' ? containerId(selected, linked.kind) : undefined
-    if (!id || !linked.projects.has(id)) throw new DataSourceError('invalid-request', { reason: 'Choose a project linked to this workspace.' })
+    if (!id || !linked.projects.has(id)) throw new DataSourceError('invalid-request', { reason: 'Choose a linked project.' })
     value = id
   }
   return { ...query, scope: { ...query.scope, parameters: { ...query.scope.parameters, [key]: value } } }
@@ -62,6 +62,6 @@ export function recordProjectId(data: DataValue, mapping: ProjectScope, linked: 
   const value = readDataPointer(data, mapping.record)
   if (typeof value !== 'string') throw new DataSourceError('invalid-response')
   const projects = linked.projects.get(containerId(value, linked.kind))
-  if (!projects) throw new DataSourceError('invalid-response', { reason: 'The source returned a record outside this workspace.' })
+  if (!projects) throw new DataSourceError('invalid-response', { reason: 'The source returned a record outside the linked projects.' })
   return projects.size === 1 ? [...projects][0] : undefined
 }

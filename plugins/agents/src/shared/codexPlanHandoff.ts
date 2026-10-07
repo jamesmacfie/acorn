@@ -1,6 +1,6 @@
 import type { AgentEventRecord, AgentSession, AgentTurn } from '../contract/wire.ts'
 
-export const CODEX_PLAN_IMPLEMENTATION_PROMPT = 'Implement the plan you just proposed. Follow its steps, make the changes in this workspace, and verify the result.'
+export const CODEX_PLAN_IMPLEMENTATION_PROMPT = 'Implement the plan you just proposed. Follow its steps, make the changes in this working tree, and verify the result.'
 
 export const codexModeOption = (session: AgentSession) => {
   const options = session.config.configOptions

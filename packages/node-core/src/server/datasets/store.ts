@@ -81,7 +81,7 @@ export function createDataset(db: AppDatabase, input: DatasetCreate): DatasetDef
   if (!workspace) throw new DatasetError('not-found', 'Scope does not exist.')
   if (input.projectId) {
     const project = db.$client.prepare('SELECT 1 FROM projects WHERE id = ? AND workspace_id = ?').get(input.projectId, input.workspaceId)
-    if (!project) throw new DatasetError('forbidden', 'Project does not belong to workspace.')
+    if (!project) throw new DatasetError('forbidden', 'Project does not belong to this scope.')
   }
   const id = randomUUID(), now = Date.now()
   db.$client.transaction(() => {

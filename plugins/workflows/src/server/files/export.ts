@@ -69,7 +69,7 @@ export async function prepareWorkflowExport(db: PluginDatabase, id: string, scop
     if (chain.length > 4) throw new Error('Workflow nesting exceeds four levels')
     const prior = visited.get(key)
     if (prior) return prior
-  if (ref.source === 'user') throw new Error('Copy user-file dependencies into the project scope before exporting')
+    if (ref.source === 'user') throw new Error('Copy user-file dependencies into the project scope before exporting')
     const resolved = await resolveScopedWorkflowDefinition(db, ref, { ...scope, userDir: null }, deps.catalog)
     const def = structuredClone(resolved.definition)
     for (const input of def.inputs ?? []) reservedInputs.add(input.name)

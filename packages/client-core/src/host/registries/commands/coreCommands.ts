@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
+import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
 import { canSetBadge } from '../../../infra/platform'
 import { activeTaskId } from '../../../features/tasks/tasks'
@@ -24,12 +25,11 @@ import {
   themeChoices,
   themeFollowsSystem,
 } from '../../../features/settings/appearancePrefs'
-import { isStandaloneSettingsPage, SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
+import { settingsCategoryLabel, settingsPageForMode } from '../../../features/settings/settingsPresentation'
+import { createWorkspaceWords } from '../../../features/workspaces/words'
+import { isStandaloneSettingsPage, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
 import { sectionSearchWords, settingsSectionEntries } from '../shell/settingsSearch'
 import type { ContributedCommand } from './commands'
-import { createWorkspaceWords } from '../../../features/workspaces/words'
-import { workspaceWords } from '../../../features/workspaces/words'
-import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 
 // Core's own catalogue: the groups the shell's commands hang under, the Settings pages as rows, and
 // the two settings core owns (docs/command-palette-and-shortcuts.md).
@@ -105,10 +105,9 @@ export const goToGroup = (words?: ReturnType<typeof createWorkspaceWords>): Cont
  *
  * The registry is a signal, so the caller re-registers when it changes.
  */
-export function settingsPageCommands(open: (target: string) => void, mode?: () => WorkspacesMode | undefined): ContributedCommand[] {
-  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage)
-  const groupLabel = (category: keyof typeof SETTINGS_CATEGORY_LABELS) => category === 'workspaces' && mode?.() === 'off'
-    ? workspaceWords(mode()).capitalizedPlural : SETTINGS_CATEGORY_LABELS[category]
+export function settingsPageCommands(open: (target: string) => void, mode?: WorkspacesMode): ContributedCommand[] {
+  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage).map((page) => settingsPageForMode(page, mode))
+  const groupLabel = (category: Parameters<typeof settingsCategoryLabel>[0]) => settingsCategoryLabel(category, mode)
   return [
     {
       id: CORE_SETTINGS_GROUP,
@@ -124,7 +123,7 @@ export function settingsPageCommands(open: (target: string) => void, mode?: () =
       id: `${CORE_SETTINGS_GROUP}.${page.id}`,
       parentId: CORE_SETTINGS_GROUP,
       title: page.title ?? page.label,
-      hint: () => groupLabel(settingsCategoryOf(page)),
+      hint: groupLabel(settingsCategoryOf(page)),
       category: 'navigation',
       palette: true,
       scope: 'none',
@@ -132,14 +131,14 @@ export function settingsPageCommands(open: (target: string) => void, mode?: () =
       ...(page.requires ? { requires: page.requires } : {}),
       run: () => open(page.id),
     })),
-    ...settingsSectionEntries(pages).map((entry, index): ContributedCommand => {
+    ...settingsSectionEntries(pages, groupLabel).map((entry, index): ContributedCommand => {
       const page = pages.find((candidate) => candidate.id === entry.page)!
       const words = sectionSearchWords(page, entry.section!)
       return {
         id: `${CORE_SETTINGS_GROUP}.${entry.page}#${entry.section}`,
         parentId: CORE_SETTINGS_GROUP,
         title: `${entry.pageLabel} › ${entry.sectionLabel}`,
-        hint: () => groupLabel(settingsCategoryOf(page)),
+        hint: groupLabel(settingsCategoryOf(page)),
         ...(words.length ? { keywords: words } : {}),
         category: 'navigation',
         palette: true,

@@ -2,7 +2,7 @@ import { createMemo, createSignal, For, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { AgentRuntimeState, AgentTurn } from '../../contract/wire.ts'
 import { Button, Card, IconButton, Inline, Section, Stack, Text, Textarea } from '@acorn/plugin-api/ui'
-import { clientEvents } from '@acorn/plugin-api/client'
+import { clientEvents, createWorkspaceWords } from '@acorn/plugin-api/client'
 import { agentConcurrencyOptions } from '../settings/concurrencyClient'
 import AgentAttachmentCard from '../sessions/AgentAttachmentCard'
 import { managedAgentApi } from '../sessions/managedClient'
@@ -22,6 +22,7 @@ export default function QueuedAgentTurns(props: {
   onChanged(): void | Promise<unknown>
   onError(message: string): void
 }) {
+  const words = createWorkspaceWords()
   const queued = createMemo(() =>
     props.turns.filter((turn) => turn.status === 'queued').sort((a, b) => a.ordinal - b.ordinal))
   const scheduled = createMemo(() => queued().find((turn) => turn.notBefore != null && turn.notBefore > Date.now()))
@@ -78,7 +79,7 @@ export default function QueuedAgentTurns(props: {
             >
               <Text emphasis="muted" wrap>
                 Waiting for a free slot. This Node runs {limits.data?.provider ?? 2} turns at once per
-                provider and {limits.data?.workspace ?? 3} per workspace.
+                provider and {limits.data?.workspace ?? 3} per {words().singular}.
               </Text>
               <Button
                 variant="bare"
