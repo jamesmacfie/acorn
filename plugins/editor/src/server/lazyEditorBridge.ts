@@ -21,5 +21,10 @@ export function lazyEditorBridge(
     lineMarkers: (...args) => bridge().then((owner) => owner.lineMarkers(...args)),
     markerSnapshot: (...args) => bridge().then((owner) => owner.markerSnapshot!(...args)),
     write: (...args) => bridge().then((owner) => owner.write(...args)),
+    entry: (...args) => bridge().then((owner) => owner.entry(...args)),
+    trashAvailability: (...args) => bridge().then((owner) => owner.trashAvailability(...args)),
+    create: (...args) => bridge().then((owner) => owner.create(...args)),
+    rename: (...args) => bridge().then((owner) => owner.rename(...args)),
+    trash: (...args) => bridge().then((owner) => owner.trash(...args)),
   }
 }

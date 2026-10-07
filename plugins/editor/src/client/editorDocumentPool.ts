@@ -24,8 +24,8 @@ export type EditorPool = {
   externalEditors: Set<string>
 }
 
-export function flushEditorDocument(custody: DocumentCustody, api: EditorApi, taskId: string, path: string): Promise<void> {
-  return custody.flush(async (text) => {
+export function flushEditorDocument(custody: DocumentCustody, api: EditorApi, taskId: string, path: string, fileAction = false): Promise<void> {
+  const write = async (text: string) => {
     const expected = custody.acknowledgedRevision
     if (!expected) throw new Error('The saved disk version is unknown. Reload or compare before saving.')
     const result = await api.write(taskId, path, text, expected)
@@ -34,7 +34,8 @@ export function flushEditorDocument(custody: DocumentCustody, api: EditorApi, ta
       throw new Error(result.reason)
     }
     return result
-  })
+  }
+  return fileAction ? custody.flushForFileAction(write) : custody.flush(write)
 }
 
 /** The pane model holds open view states; dirty custody survives model retirement. */

@@ -80,6 +80,22 @@ focus refresh loaded directories, parents first. The worktree event carries no p
 directory refreshes, including collapsed ones, and unopened directories stay unloaded. A failed
 refresh keeps the last listing and shows **Retry**.
 
+The tree's ellipsis, right-click, and focused-row menu show file actions without opening a preview or
+saving a draft. F2 renames the focused row. Name entry stays in the row when it is visible; the root
+creation command uses a dialog with an optional relative destination folder, so it can create beside
+an open file. Names are single basenames, including dotfiles. Create uses an
+exclusive Node operation and opens a file as a kept tab. Rename stays in the same folder. Both
+operations leave Git staging and imports alone.
+
+**Move to trash…** names the task and entry and warns when a folder's descendants are affected. The
+menu disables it when the owning Node lacks a supported trash command. An unsaved descendant needs
+**Save and move to trash**; a failed or conflicted save stops the action. Opening the menu suspends
+ordinary writes before focus changes. Cancel and failures release that hold. A confirmed rename
+updates open tabs, document custody, recovery, view state, and expanded paths. Confirmed trash
+removes affected tabs. Quick-open reads a fresh file list each time; the Node invalidates Git status
+and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
+system Trash. The editor has no permanent-delete action or in-app trash browser.
+
 ## Reload on focus
 
 Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text

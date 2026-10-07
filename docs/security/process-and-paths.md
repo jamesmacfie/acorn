@@ -28,6 +28,20 @@ before writing. Editor-owned writes to the same canonical path serialize. A proc
 can still change the file between comparison and write. The revision check is not an atomic
 compare-and-swap against an arbitrary writer.
 
+Editor tree actions resolve the parent through `resolveInRoot`, then inspect the leaf with `lstat`.
+This lets rename and trash act on a link entry without following an outside-pointing target. The
+Node re-derives the task root, compares the captured entry identity, and refuses the root and `.git`
+metadata. The canonical checkout lock includes saves and folder actions. A Node-wide PTY claim also
+blocks rename or trash while `$EDITOR` owns the entry or a descendant. An external process can still
+replace an entry between the final check and the filesystem call; the check is not an atomic
+no-replace operation against arbitrary writers.
+
+Node trash uses the owning host's system command through the process broker. macOS uses
+`/usr/bin/trash`; Linux uses `gio trash`. Other hosts report unavailable. The command must exit
+successfully and leave the source absent before Editor retires its tabs. No route removes an entry
+permanently. The host's Trash is the recovery location; its permissions and filesystem support
+determine whether a move succeeds.
+
 ## Processes
 
 Short-lived work goes through the process broker, `packages/node-core/src/server/core/proc.ts`. It

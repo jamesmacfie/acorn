@@ -3,14 +3,17 @@
 // re-derives the worktree root from the DB. Path confinement is `resolveInRoot` (docs/security/process-and-paths.md §
 // Process, path, and configuration controls). Pure Node, so it works in dev:node too. Wired in
 // node/index.ts.
-import { BridgeError, type CoreServices, gitOrThrow, invalidateWorktreeStatus, type PluginHookRegistry } from '@acorn/plugin-api/node'
+import { BridgeError, type CoreServices, gitOrThrow, type PluginHookRegistry } from '@acorn/plugin-api/node'
 import { createHash } from 'node:crypto'
-import { open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { lstat, open, readdir, readFile, stat, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
 import type { EditorBridge, EditorEntry } from '../server/routes/editor'
 import type { EditorLineMarkerProvider } from '../contract/lineMarkers'
 import { MAX_IMAGE_PREVIEW_BYTES } from '../contract/imagePreview'
 import { markerSnapshot, readMarkerProviders } from './markerSnapshot'
-import { canonicalFileKey, withFileWriteLock } from './fileWriteLock'
+import { canonicalCheckoutKey, withFileWriteLock } from './fileWriteLock'
+import { createFileActions, entryIdentity, entryKind } from './fileActions'
+import { editorWorktreeChanged } from './worktreeInvalidation'
 
 const revisionOf = (bytes: Uint8Array): string => createHash('sha256').update(bytes).digest('hex')
 
@@ -22,7 +25,7 @@ async function diskRevision(path: string): Promise<string | null> {
   }
 }
 
-export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs'>
+export type EditorCoreServices = Pick<CoreServices, 'tasks' | 'fs' | 'proc'>
 
 // Confine relPath to the task's worktree; throw the HTTP-classified error the route surfaces.
 // No worktree yet (unmapped repo) → 404; a path that escapes the root → 403 (never leaks whether
@@ -51,6 +54,7 @@ export const editorBridge = (
   /** Providers are resolved per read because plugin init order and unload are runtime facts. */
   markerProviders: () => readonly EditorLineMarkerProvider[] = () => [],
 ): EditorBridge => ({
+  ...createFileActions(core, changed),
   root: (taskId) => core.tasks.root(taskId),
 
   list: async (taskId, relPath) => {
@@ -58,9 +62,15 @@ export const editorBridge = (
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return [] // no worktree / bad path → empty tree, never an error
     const ents = await readdir(abs, { withFileTypes: true })
-    return ents
+    const entries = await Promise.all(ents
       .filter((e) => e.name !== '.git' && e.name !== 'node_modules')
-      .map((e): EditorEntry => ({ name: e.name, dir: e.isDirectory() }))
+      .map(async (e): Promise<EditorEntry | null> => {
+        try {
+          const info = await lstat(join(abs, e.name))
+          return { name: e.name, dir: info.isDirectory(), kind: entryKind(info), identity: entryIdentity(info), root }
+        } catch { return null } // a disappearing row is absent, not a stale target
+      }))
+    return entries.filter((entry): entry is EditorEntry => entry !== null)
       .sort((a, b) => (a.dir === b.dir ? a.name.localeCompare(b.name) : a.dir ? -1 : 1))
   },
 
@@ -130,7 +140,7 @@ export const editorBridge = (
     const root = await core.tasks.root(taskId)
     const abs = root && core.fs.resolveInRoot(root, relPath)
     if (!abs) return { ok: false, kind: 'failure', reason: 'Path is outside the worktree.' }
-    const key = await canonicalFileKey(abs).catch(() => null)
+    const key = await canonicalCheckoutKey(root).catch(() => null)
     if (!key) return { ok: false, kind: 'failure', reason: 'Cannot resolve the file path.' }
     return withFileWriteLock(key, async () => {
     // Format on save, as somebody else's plugin (docs/plugins/hooks.md § Hooks). The autosave loop calls this
@@ -161,12 +171,11 @@ export const editorBridge = (
       }
       // The coalesced `git status` for this worktree is now a lie, and `changed` below is what makes
       // every client re-read it (@acorn/plugin-api/node § worktreeStatusText).
-      invalidateWorktreeStatus(root)
       // Deliberately the ordinary invalidation ping and NOT an event: "file saved" stays refused
       // (docs/plugins/events.md § What is not an event). A save from another client used to move nothing on this one —
       // its tree, its dirty markers and its git status all went stale until something else pinged
       // (docs/plugins/events.md § Hearing a core event).
-      changed(taskId)
+      await editorWorktreeChanged(core, root, taskId, changed)
       const revision = revisionOf(Buffer.from(text, 'utf8'))
       const visible = await diskRevision(abs)
       if (visible !== revision) return {

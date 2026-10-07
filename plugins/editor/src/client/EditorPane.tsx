@@ -12,6 +12,7 @@ import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
+import { createFileActionModel } from './fileActionModel'
 import { canRevealActiveFile, type FileTreeRevealRequest } from './fileTreeReveal'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import SearchPanel from './search/SearchPanel'
@@ -217,6 +218,11 @@ export default function EditorPane(props: { task: Task }) {
       if (custody) { custody.state = view.state; custody.viewState = state; custody.flushRecovery() }
     }
   }
+  const fileActions = createFileActionModel(api, pool, taskId, nodeId, () => {
+    scheduleSave.cancel()
+    saveViewState()
+    if (view && currentPath) remember(currentPath, view.state)
+  })
 
   // Everything a file's own state carries beyond its text: the grammar, the theme, autosave, and the
   // explicit-flush chord. Built per path, because the language is the file's and the update listener
@@ -812,6 +818,7 @@ export default function EditorPane(props: { task: Task }) {
               <TabPanel idPrefix="editor-side" id="files" active={side()}>
                 <FileTree
                   taskId={taskId}
+                  actions={fileActions}
                   onOpen={openPath}
                   openPath={active()}
                   reveal={treeReveal()}

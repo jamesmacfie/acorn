@@ -18,10 +18,12 @@ creates a file only while it remains absent. The successful response carries the
 and revision. A formatter replaces the submitted edit only when nobody typed after admission.
 Graphical clients refuse a Node that omits the read revision or save acknowledgement.
 
-Editor file writes to the same canonical checkout path queue behind one another, including writes
-through task-root aliases. File operations join the admitted write and suspend follow-up saves.
-Overlapping file-operation suspensions each keep their own hold until released.
-Folder operations must acquire descendant file locks in sorted canonical-path order. External CLI
+Editor file writes and file actions take the canonical checkout lock, including task-root aliases.
+This serializes a folder action with admitted and queued descendant writes without nested locks.
+File actions suspend affected custody owners before they join admitted saves. Overlapping
+suspensions each keep their own hold until released. A confirmed trash choice can flush a draft
+while ordinary writers stay suspended. A conflict or recovered draft that requires resolution
+refuses that flush. External CLI
 writers do not use these locks. The hash comparison and write have a remaining filesystem race
 against those writers; they are not an atomic compare-and-swap.
 

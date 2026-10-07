@@ -3,6 +3,10 @@ import { Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import type { ItemProps } from '../../keys/collection'
 import { hasNode, Line, slot } from '../cells'
+import { Menu } from '../grouping/menu'
+import { bindKeys } from '../../keys/install'
+import { focusedRenderable } from '../../keys/regions'
+import { PANE } from '../../keys/tiers'
 
 /** The fewest cells a row's own words are worth. Below it the row stops giving and runs off the right
  *  edge instead, where the frame cuts it — so in a twenty-eight cell rail a pull request reads as its
@@ -52,6 +56,7 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
+  onRename?: () => void
   /** Accepted for kit parity. A terminal has no double-click activation gesture. */
   onDoublePress?: () => void
   href?: string
@@ -98,6 +103,11 @@ export function Row(props: {
         if (!props.item) return
         element.focusable = true
         props.item.ref(element)
+        if (props.onRename) bindKeys(element, [{ key: 'f2', cmd: () => {
+          if (focusedRenderable() !== element) return false
+          props.onRename?.()
+          return true
+        } }], PANE)
       }}
     >
       <box flexShrink={0}><Line tone="accent">{isActive() ? '›' : ' '}</Line></box>
@@ -144,6 +154,8 @@ export function TreeRow(props: {
   depth?: number
   selected?: boolean
   onPress?: () => void
+  onMenu?: () => void
+  onRename?: () => void
   /** Accepted for kit parity. A terminal has no double-click activation gesture. */
   onDoublePress?: () => void
   leading?: JSX.Element
@@ -166,6 +178,7 @@ export function TreeRow(props: {
       trailing={props.trailing}
       keepTrailing={props.keepTrailing}
       onPress={props.onPress}
+      onRename={props.onRename}
       leading={<box flexDirection="row" gap={1}><Line>{props.expandable ? (props.expanded ? '▾' : '▸') : ' '}</Line>{slot(props.leading)}</box>}
     >
       {props.children}
@@ -184,7 +197,15 @@ export function TreeRow(props: {
  *  pointer to open a hover menu with, so the context they are handed
  *  closes nothing, because there is no list to close.
  */
-export function RowActions(props: { ariaLabel: string; children: (menu: { close: () => void }) => JSX.Element }) {
+export function RowActions(props: {
+  ariaLabel: string
+  open?: () => boolean
+  onBeforeOpen?: () => void
+  onOpenChange?: (open: boolean) => void
+  children: (menu: { close: () => void }) => JSX.Element
+}) {
+  if (props.open) return <Menu ariaLabel={props.ariaLabel} open={props.open}
+    onBeforeOpen={props.onBeforeOpen} onOpenChange={props.onOpenChange}
+    trigger={() => <Line>[Actions]</Line>}>{props.children}</Menu>
   return <box flexDirection="row" gap={1}>{props.children({ close: () => {} })}</box>
 }
-

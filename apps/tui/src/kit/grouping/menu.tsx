@@ -18,6 +18,7 @@ export function Menu(props: {
   placement?: string
   ariaLabel: string
   open?: () => boolean
+  onBeforeOpen?: () => void
   onOpenChange?: (open: boolean) => void
   disabled?: () => boolean
   children: (context: { close: () => void }) => JSX.Element
@@ -25,6 +26,7 @@ export function Menu(props: {
   const [local, setLocal] = createSignal(false)
   const open = () => props.open?.() ?? local()
   const set = (next: boolean) => {
+    if (next) props.onBeforeOpen?.()
     setLocal(next)
     props.onOpenChange?.(next)
   }

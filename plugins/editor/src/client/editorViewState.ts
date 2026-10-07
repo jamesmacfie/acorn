@@ -1,5 +1,6 @@
 import { activeNodeId, onScopeEvicted } from '@acorn/plugin-api/client'
 import type { EditorViewState } from '@acorn/plugin-api/ui/editor'
+import { movedPath, pathContains } from './editorState'
 
 // Where the reader was in each open file. Selection and scroll, as data this plugin owns, rather
 // than an editor library's opaque blob (docs/editor/document-surface.md § View state).
@@ -15,6 +16,22 @@ export const editorViewState = (taskId: string, path: string, nodeId = activeNod
 
 export const forgetEditorViewState = (taskId: string, path: string, nodeId = activeNodeId()): void => {
   viewStates.delete(viewKey(taskId, path, nodeId))
+}
+
+export function moveEditorViewStates(taskId: string, from: string, to: string, nodeId = activeNodeId()): void {
+  const prefix = `${nodeId ?? ''}/${taskId}:`
+  for (const [key, state] of [...viewStates]) {
+    if (!key.startsWith(prefix)) continue
+    const path = key.slice(prefix.length)
+    if (!pathContains(from, path)) continue
+    viewStates.delete(key)
+    viewStates.set(viewKey(taskId, movedPath(path, from, to), nodeId), state)
+  }
+}
+
+export function removeEditorViewStates(taskId: string, path: string, nodeId = activeNodeId()): void {
+  const prefix = `${nodeId ?? ''}/${taskId}:`
+  for (const key of viewStates.keys()) if (key.startsWith(prefix) && pathContains(path, key.slice(prefix.length))) viewStates.delete(key)
 }
 
 export function evictEditorViewStates(taskId: string, nodeId = activeNodeId()): void {

@@ -122,7 +122,17 @@ export class DocumentCustody {
 
   /** Matching flushes share one operation; later edits occupy one follow-up slot. Failures reject. */
   flush(write: DocumentWriter): Promise<void> {
-    if (this.suspensionCount || this.writeBlock || this.requiresResolution) return Promise.reject(new Error(this.writeBlock || 'Document writes are suspended.'))
+    return this.flushWithPermission(write, false)
+  }
+
+  /** A confirmed file operation may save a draft while its ordinary writers stay suspended. */
+  flushForFileAction(write: DocumentWriter): Promise<void> {
+    if (!this.suspensionCount) return Promise.reject(new Error('Suspend document writes before a file action.'))
+    return this.flushWithPermission(write, true)
+  }
+
+  private flushWithPermission(write: DocumentWriter, allowSuspended: boolean): Promise<void> {
+    if ((this.suspensionCount && !allowSuspended) || this.writeBlock || this.requiresResolution) return Promise.reject(new Error(this.writeBlock || 'Document writes are suspended.'))
     this.requested = true
     this.nextWrite = write
     if (this.pending) return this.pending
@@ -130,7 +140,7 @@ export class DocumentCustody {
     this.flushRecovery()
     const run = async () => {
       try {
-        while (this.requested && !this.suspensionCount && !this.writeBlock && !this.requiresResolution) {
+        while (this.requested && (!this.suspensionCount || allowSuspended) && !this.writeBlock && !this.requiresResolution) {
           this.requested = false
           if (!this.dirty) continue
           const submitted = this.current

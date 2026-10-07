@@ -63,6 +63,24 @@ export const editorSetDirty = (taskId: string, path: string, dirty: boolean): vo
   update(taskId, (s) => ({ ...s, files: setFileDirty(s.files, path, dirty) }))
 export const editorActivate = (taskId: string, path: string): void => update(taskId, (s) => ({ ...s, active: path }))
 
+/** One synchronous state change keeps tab order, preview, dirtiness, and active identity together. */
+export const editorMovePaths = (taskId: string, from: string, to: string): void =>
+  update(taskId, (s) => ({
+    files: s.files.map((file) => ({ ...file, path: movedPath(file.path, from, to) })),
+    active: s.active ? movedPath(s.active, from, to) : null,
+  }))
+
+export const editorRemovePaths = (taskId: string, path: string): void =>
+  update(taskId, (s) => {
+    const removed = s.files.filter((file) => pathContains(path, file.path))
+    const files = s.files.filter((file) => !pathContains(path, file.path))
+    return { files, active: s.active && removed.some((file) => file.path === s.active) ? files[0]?.path ?? null : s.active }
+  })
+
+export const pathContains = (parent: string, child: string): boolean => !parent || child === parent || child.startsWith(`${parent}/`)
+export const movedPath = (path: string, from: string, to: string): string =>
+  pathContains(from, path) ? `${to}${path.slice(from.length)}` : path
+
 export function evictEditorState(taskId: string): void {
   setByTask((current) => {
     if (!(taskId in current)) return current

@@ -169,6 +169,20 @@ describe('document custody', () => {
     expect(document.acknowledgedRevision).toBe('disk-follow-up')
   })
 
+  it('saves a confirmed trash draft while ordinary writes remain suspended', async () => {
+    const document = owner()
+    document.editText('draft to save')
+    const release = await document.suspendWrites()
+    await document.flushForFileAction(async (text) => ({ text, revision: 'saved-before-trash' }))
+    expect(document.dirty).toBe(false)
+    expect(document.acknowledgedRevision).toBe('saved-before-trash')
+    document.editText('later edit')
+    await expect(document.flush(async () => ({}))).rejects.toThrow('suspended')
+    release()
+    await document.flush(async (text) => ({ text, revision: 'later' }))
+    expect(document.acknowledgedRevision).toBe('later')
+  })
+
   it('moves dirty recovery to the new address after a confirmed rename', async () => {
     const stored = new Map<string, string>()
     vi.stubGlobal('localStorage', {

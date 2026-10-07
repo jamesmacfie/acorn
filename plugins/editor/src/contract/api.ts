@@ -9,7 +9,11 @@ export const searchRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/sea
 
 // Editor pane: read, write, and list worktree files. relPath rides a query param so a nested path
 // never collides with the route segments.
-export type EditorEntry = { name: string; dir: boolean }
+export type EditorEntry = { name: string; dir: boolean; kind?: 'file' | 'folder' | 'link'; identity?: string; root?: string }
+export type FileEntryKind = 'file' | 'folder' | 'link'
+export type FileTarget = { path: string; kind: FileEntryKind; identity: string; root: string }
+export type FileActionResult = { ok: true; path: string } | { ok: false; reason: string; partial?: boolean }
+export type TrashAvailability = { available: boolean; reason?: string }
 export type EditorReadResult = { text: string; revision: string }
 export type EditorWriteResult =
   | { ok: true; text: string; revision: string }
@@ -21,5 +25,10 @@ export const editorReadRoute = (taskId: string, relPath: string) => `/v1/p/edito
 export const editorImageRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/image?path=${encodeURIComponent(relPath)}`
 export const editorLineMarkersRoute = (taskId: string, relPath: string, revision?: string) => `/v1/p/editor/tasks/${taskId}/editor/line-markers?path=${encodeURIComponent(relPath)}${revision === undefined ? '' : `&revision=${encodeURIComponent(revision)}`}`
 export const editorWriteRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/file`
+export const editorEntryRoute = (taskId: string, relPath: string) => `/v1/p/editor/tasks/${taskId}/editor/entry?path=${encodeURIComponent(relPath)}`
+export const editorCreateRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/create`
+export const editorRenameRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/rename`
+export const editorTrashRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash`
+export const editorTrashAvailabilityRoute = (taskId: string) => `/v1/p/editor/tasks/${taskId}/editor/trash-availability`
 
 export type { EditorLineMarkerSet, EditorLineMarkerSnapshot } from './lineMarkers'

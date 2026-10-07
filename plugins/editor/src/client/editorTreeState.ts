@@ -1,5 +1,6 @@
 import { createSignal } from 'solid-js'
 import { onScopeEvicted } from '@acorn/plugin-api/client'
+import { movedPath, pathContains } from './editorState'
 
 // Session-only expanded-directory state, scoped to the task whose worktree the tree represents.
 // Keeping this outside EditorPane lets pane and task navigation unmount the lazy tree without
@@ -18,6 +19,28 @@ export function setEditorTreeDirectoryOpen(taskId: string, path: string, open: b
 
     const next = new Map(current)
     if (expanded.size) next.set(taskId, expanded)
+    else next.delete(taskId)
+    return next
+  })
+}
+
+export function moveEditorTreeDirectories(taskId: string, from: string, to: string): void {
+  setExpandedByTask((current) => {
+    const expanded = current.get(taskId)
+    if (!expanded) return current
+    const next = new Map(current)
+    next.set(taskId, new Set([...expanded].map((path) => movedPath(path, from, to))))
+    return next
+  })
+}
+
+export function removeEditorTreeDirectories(taskId: string, path: string): void {
+  setExpandedByTask((current) => {
+    const expanded = current.get(taskId)
+    if (!expanded) return current
+    const next = new Map(current)
+    const remaining = new Set([...expanded].filter((entry) => !pathContains(path, entry)))
+    if (remaining.size) next.set(taskId, remaining)
     else next.delete(taskId)
     return next
   })

@@ -110,7 +110,7 @@ failure looks like an unknown session and returns 404.
 | `/v1/p/terminal/tasks/:taskId/run-targets` | Run target options for a workflow step field |
 | `/v1/p/changes/tasks/:id/local/*` | Status, stage, unstage, discard, commit, fetch, pull, push, abort, the diff document, and a model-written commit message |
 | `/v1/p/changes/tasks/:id/review-notes[/:noteId][/sent]` | Review notes |
-| `/v1/p/editor/tasks/:id/editor/*` | [Guarded file reads and writes](./editor.md), listings, images, and line markers |
+| `/v1/p/editor/tasks/:id/editor/*` | [Guarded file reads, writes, and file actions](./editor.md), listings, images, and line markers |
 | `/v1/p/editor/tasks/:id/search` | Search a task's files |
 | `/v1/p/docker/*` | Node inventory: containers, images, volumes, networks, compose, prune, and `info` |
 | `/v1/p/docker/tasks/:id/containers`, `/teardown` | Task containers and their cleanup |

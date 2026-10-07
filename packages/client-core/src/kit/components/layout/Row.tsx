@@ -76,7 +76,8 @@ export function Row(props: {
   reveal?: boolean
   density?: 'compact' | 'default' | 'roomy'
   onPress?: () => void
-  onMenu?: () => void
+  onMenu?: (event?: MouseEvent) => void
+  onRename?: () => void
   /** A mouse double-click, for rows where the second press has a distinct conventional meaning. */
   onDoublePress?: () => void
   /** Renders an <a class="ui-row">.
@@ -179,8 +180,12 @@ export function Row(props: {
           event.preventDefault()
           activate()
         }}
-        onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.() } : undefined}
-        onKeyDown={props.onMenu ? (event) => { if (event.target === event.currentTarget && (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey)) { event.preventDefault(); props.onMenu?.() } } : undefined}
+        onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.(event) } : undefined}
+        onKeyDown={(props.onMenu || props.onRename) ? (event) => {
+          if (event.target !== event.currentTarget) return
+          if (event.key === 'F2' && props.onRename) { event.preventDefault(); props.onRename(); return }
+          if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.() }
+        } : undefined}
         onDblClick={(event) => {
           if (!fromNestedControl(event)) props.onDoublePress?.()
         }}
@@ -212,13 +217,15 @@ export function Row(props: {
       role={props.item?.role ?? (props.onPress || props.onMenu ? 'button' : undefined)}
       tabindex={props.item ? props.item.tabindex : props.onPress || props.onMenu ? 0 : undefined}
       onClick={props.onPress ? (event) => { if (!fromNestedControl(event)) activate() } : undefined}
-      onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.() } : undefined}
+      onContextMenu={props.onMenu ? (event) => { event.preventDefault(); props.onMenu?.(event) } : undefined}
       onDblClick={props.onDoublePress ? (event) => { if (!fromNestedControl(event)) props.onDoublePress?.() } : undefined}
-      onKeyDown={(props.onPress || props.onMenu) && !props.item
+      onKeyDown={(props.onRename || (props.onPress || props.onMenu) && !props.item)
         ? (event) => {
           // Only when the row itself has focus; a button nested inside owns its own keys. Inside a
           // collection this is the `activate` intent instead, so the row does not answer twice.
           if (event.target !== event.currentTarget) return
+          if (event.key === 'F2' && props.onRename) { event.preventDefault(); props.onRename(); return }
+          if (props.item) return
           if (event.key === 'ContextMenu' || event.key === 'F10' && event.shiftKey) { event.preventDefault(); props.onMenu?.(); return }
           if (!props.onPress) return
           if (event.key !== 'Enter' && event.key !== ' ') return

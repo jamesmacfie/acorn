@@ -32,7 +32,7 @@ the whole plugin system in one page.
 | [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, protocol versioning, request processing, idempotency, and the error envelope. |
 | [api-reference/core-routes.md](./api-reference/core-routes.md) | Every `/v1/core` route with its gate. |
 | [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
-| [api-reference/editor.md](./api-reference/editor.md) | Editor file read revisions, guarded writes, and mixed-version behavior. |
+| [api-reference/editor.md](./api-reference/editor.md) | Editor file reads, guarded writes, task-addressed file actions, and mixed-version behavior. |
 | [api-reference/workflow-routes.md](./api-reference/workflow-routes.md) | The workflows plugin's run, processing history, definition, and schedule binding routes. |
 | [api-reference/websocket.md](./api-reference/websocket.md) | `/v1/events`, logical viewers, the preview tunnel, and the Node event channels. |
 | [data-layer.md](./data-layer.md) | The map of Node storage, and the ownership rules for provider data, identity, and blobs. |

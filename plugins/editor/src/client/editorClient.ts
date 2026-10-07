@@ -10,6 +10,8 @@ import {
   editorReadRoute,
   editorRootRoute,
   editorWriteRoute,
+  editorEntryRoute, editorCreateRoute, editorRenameRoute, editorTrashRoute, editorTrashAvailabilityRoute,
+  type FileTarget, type FileActionResult, type TrashAvailability,
   type EditorEntry,
   type EditorReadResult,
   type EditorLineMarkerSnapshot,
@@ -29,6 +31,11 @@ export type EditorApi = {
   readImage(taskId: string, relPath: string): Promise<{ bytes: Uint8Array; type: string }>
   lineMarkers(taskId: string, relPath: string, revision: string): Promise<EditorLineMarkerSnapshot | null>
   write(taskId: string, relPath: string, content: string, expectedRevision: string | null): Promise<EditorWriteResult>
+  entry(taskId: string, path: string): Promise<FileTarget>
+  trashAvailability(taskId: string): Promise<TrashAvailability>
+  create(taskId: string, parent: FileTarget, name: string, kind: 'file' | 'folder'): Promise<FileActionResult>
+  rename(taskId: string, source: FileTarget, name: string): Promise<FileActionResult>
+  trash(taskId: string, source: FileTarget): Promise<FileActionResult>
 }
 
 export const editorApi = (queryClient?: QueryClient): EditorApi => {
@@ -48,6 +55,17 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
     // An old Node ignores the added query parameter and returns an unverifiable array.
     return !Array.isArray(result) && result.revision === revision ? result : null
   },
+  entry: (taskId, path) => readJson<FileTarget>(editorEntryRoute(taskId, path), { nodeId }),
+  trashAvailability: (taskId) => readJson<TrashAvailability>(editorTrashAvailabilityRoute(taskId), { nodeId }),
+  create: (taskId, parent, name, kind) => writeJson<FileActionResult>(editorCreateRoute(taskId), {
+    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ parent, name, kind }),
+  }),
+  rename: (taskId, source, name) => writeJson<FileActionResult>(editorRenameRoute(taskId), {
+    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source, name }),
+  }),
+  trash: (taskId, source) => writeJson<FileActionResult>(editorTrashRoute(taskId), {
+    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ source }),
+  }),
   write: (taskId, relPath, content, expectedRevision) =>
     writeJson<EditorWriteResult>(editorWriteRoute(taskId), {
       method: 'PUT',

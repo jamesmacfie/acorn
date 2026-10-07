@@ -13,11 +13,17 @@ import { Menu, type MenuContext } from '../overlays/Menu'
 export function RowActions(props: {
   ariaLabel: string
   children: (menu: MenuContext) => JSX.Element
+  open?: () => boolean
+  onOpenChange?: (open: boolean) => void
+  onBeforeOpen?: () => void
 }) {
   return (
     <span class="ui-row-actions">
       <Menu
         ariaLabel={props.ariaLabel}
+        open={props.open}
+        onOpenChange={props.onOpenChange}
+        onBeforeOpen={props.onBeforeOpen}
         placement="bottom-end"
         trigger={({ toggle, open }) => (
           <IconButton

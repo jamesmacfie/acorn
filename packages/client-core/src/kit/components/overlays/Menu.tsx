@@ -62,6 +62,8 @@ export function Menu(props: {
    *  open; see createAnchoredPopover's note. */
   open?: () => boolean
   onOpenChange?: (open: boolean) => void
+  /** Prepare a captured action before trigger focus can blur an editor. Does not open the menu. */
+  onBeforeOpen?: () => void
   children: (context: MenuContext) => JSX.Element
 }) {
   let anchorRef: HTMLSpanElement | undefined
@@ -78,7 +80,9 @@ export function Menu(props: {
 
   return (
     <>
-      <span class="ui-popover-anchor" ref={anchorRef}>
+      <span class="ui-popover-anchor" ref={anchorRef}
+        onPointerDown={() => { if (!popover.open()) props.onBeforeOpen?.() }}
+        onKeyDown={(event) => { if (!popover.open() && (event.key === 'Enter' || event.key === ' ')) props.onBeforeOpen?.() }}>
         {props.trigger({ open: popover.open, toggle: popover.toggle })}
       </span>
       <Show when={popover.open()}>
