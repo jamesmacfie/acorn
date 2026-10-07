@@ -33,6 +33,8 @@ export function DocumentTabs(props: {
   onClose?: (id: string) => void
   /** Double-click. The editor idiom: it promotes an ephemeral preview tab to a kept one. */
   onPromote?: (id: string) => void
+  /** Optional caller-owned actions for one tab; the kit does not interpret the id. */
+  menu?: (id: string, control?: { open: () => boolean; onOpenChange: (open: boolean) => void }) => JSX.Element
   /** Right-pinned slot, after the strip. */
   actions?: JSX.Element
   idPrefix: string
@@ -112,6 +114,7 @@ export function DocumentTabs(props: {
                 onPress={() => props.onClose?.(tab.id)}
               />
             </Show>
+            <Show when={props.menu}>{props.menu?.(tab.id)}</Show>
           </div>
         )}</For>
       </div>

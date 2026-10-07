@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandExecutionContext, SearchCommand } from '@acorn/plugin-api/client'
 
-const mocks = vi.hoisted(() => ({ files: vi.fn(), dispatchLayout: vi.fn(), editorOpen: vi.fn() }))
+const mocks = vi.hoisted(() => ({ files: vi.fn(), reveal: vi.fn() }))
 vi.mock('./editorClient', () => ({ editorApi: () => ({ files: mocks.files }) }))
-vi.mock('./editorState', () => ({ editorOpen: mocks.editorOpen }))
+vi.mock('./editorState', () => ({ requestEditorReveal: mocks.reveal, activeFile: () => 'src/a.ts' }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
   activeTaskId: () => 'task-1',
-  dispatchLayout: mocks.dispatchLayout,
+  activeNodeId: () => 'node-1',
 }))
 
 import { editorCommands } from './commands'
@@ -18,6 +18,7 @@ import { editorCommands } from './commands'
 // ephemeral tab.
 
 const goTo = editorCommands.find((command) => command.id === 'editor.files.open') as SearchCommand
+const goToLine = editorCommands.find((command) => command.id === 'editor.navigation.go-to-line') as SearchCommand
 
 const context = (taskId: string): CommandExecutionContext => ({
   host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null,
@@ -74,11 +75,41 @@ describe('go to file', () => {
     expect(mocks.files).toHaveBeenCalledTimes(2)
   })
 
-  it('shows the editor pane and opens the pick as an ephemeral tab', async () => {
+  it('retains a reveal for the chosen file', async () => {
     const world = context('task-1')
     const rows = await goTo.query('boot', world, signal())
     expect(goTo.select(rows[0], world)).toEqual({ effect: 'close' })
-    expect(mocks.dispatchLayout).toHaveBeenCalledWith('task-1', { type: 'show', pane: 'editor' })
-    expect(mocks.editorOpen).toHaveBeenCalledWith('task-1', 'src/node/boot.ts', true)
+    expect(mocks.reveal).toHaveBeenCalledWith('task-1', 'src/node/boot.ts', 1, undefined)
+  })
+
+  it('keeps an exact colon filename and uses a numeric suffix only for a listed path', async () => {
+    mocks.files.mockResolvedValue(['src/a.ts', 'src/a.ts:12', 'src/z.ts'])
+    const world = context('task-1')
+    const literal = await goTo.query('src/a.ts:12', world, signal())
+    expect(literal.map((row) => row.ref)).toEqual(['src/a.ts:12'])
+    goTo.select(literal[0], world)
+    expect(mocks.reveal).toHaveBeenCalledWith('task-1', 'src/a.ts:12', 1, undefined)
+
+    const positioned = await goTo.query('src/a.ts:200:4', world, signal())
+    expect(positioned.map((row) => row.ref)).toEqual(['src/a.ts'])
+    goTo.select(positioned[0], world)
+    expect(mocks.reveal).toHaveBeenCalledWith('task-1', 'src/a.ts', 200, 4)
+    expect((await goTo.query('src/a.ts:0', world, signal()))).toEqual([])
+  })
+
+  it('rejects a selection whose captured Node is no longer active', async () => {
+    const world = { ...context('task-1'), nodeId: 'retired-node' }
+    expect(await goTo.query('', world, signal())).toEqual([])
+    expect(mocks.files).not.toHaveBeenCalled()
+    goTo.select({ id: 'README.md', title: 'README.md', ref: 'README.md' }, world)
+    expect(mocks.reveal).not.toHaveBeenCalled()
+  })
+
+  it('accepts only positive line coordinates for a focused file jump', async () => {
+    const world = context('task-1')
+    expect(await goToLine.query('0:4', world, signal())).toEqual([])
+    const rows = await goToLine.query('12:4', world, signal())
+    goToLine.select(rows[0], world)
+    expect(mocks.reveal).toHaveBeenCalledWith('task-1', 'src/a.ts', 12, 4)
   })
 })

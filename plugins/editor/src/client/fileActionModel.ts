@@ -6,6 +6,7 @@ import { flushEditorDocument, rebindEditorFile, suspendEditorFile, type EditorPo
 import { captureTaskEditorState, editorMovePaths, editorOpen, editorRemovePaths, movePathsInEditorState, movedPath, openFiles, pathContains, removePathsInEditorState, type TaskEditorState } from './editorState'
 import { moveEditorTreeDirectories, removeEditorTreeDirectories } from './editorTreeState'
 import { moveEditorViewStates, removeEditorViewStates } from './editorViewState'
+import { reconcileEditorMetadata } from './editorNavigation'
 
 export type ArmedFileAction = {
   target: FileTarget
@@ -123,6 +124,7 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
       else if (persistInactiveTabs) await persistInactiveTabs(movePathsInEditorState(armed.tabs, from, result))
       else throw new Error('The captured Node tab state could not be persisted.')
       moveEditorViewStates(taskId, from, result, nodeId)
+      reconcileEditorMetadata(nodeId, taskId, from, result)
       moveEditorTreeDirectories(taskId, from, result, nodeId)
       return result
     } catch (cause) {
@@ -168,6 +170,7 @@ export function createFileActionModel(api: EditorApi, pool: EditorPool, taskId: 
       else if (persistInactiveTabs) await persistInactiveTabs(removePathsInEditorState(armed.tabs, target.path))
       else throw new Error('The captured Node tab state could not be persisted.')
       removeEditorViewStates(taskId, target.path, nodeId)
+      reconcileEditorMetadata(nodeId, taskId, target.path)
       removeEditorTreeDirectories(taskId, target.path, nodeId)
     } catch (cause) {
       if (mutated) {

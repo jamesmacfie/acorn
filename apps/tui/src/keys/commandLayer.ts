@@ -102,6 +102,7 @@ export function installCommandLayer(engine: TuiKeymap, scope: CommandScope): voi
       }))
     const runnable = new Set(commands.map((command) => command.name))
     const bindings = resolveKeybindings(keybindingRegistry.entries(), scope.prefs())
+      .sort((a, b) => Number(b.when === 'pane') - Number(a.when === 'pane'))
       .flatMap((binding): Binding<Renderable, KeyEvent>[] => {
         const spelled = binding.chord && toKeymapKey(binding.chord)
         const key = spelled && asCtrl(spelled)

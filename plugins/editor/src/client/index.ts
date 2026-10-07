@@ -38,6 +38,11 @@ export const editorClientPlugin: ClientPlugin = {
       defaultChord: 'meta+shift+f',
       when: 'task',
     })
+    for (const binding of [
+      { id: 'editor.tabs.reopen-closed', description: 'Reopen closed file', defaultChord: 'meta+shift+t' },
+      { id: 'editor.navigation.back', description: 'Go back in editor', defaultChord: 'alt+left' },
+      { id: 'editor.navigation.forward', description: 'Go forward in editor', defaultChord: 'alt+right' },
+    ]) ctx.keybindings.register({ ...binding, command: binding.id, category: 'Editor', when: 'pane', pane: 'editor' })
     ctx.persistedStateSlices.register(editorOpenFilesSlice)
   },
 }

@@ -11,9 +11,10 @@ lockfile install order, with the plugin ID breaking ties. The losing binding is 
 a conflict. No fallback chord is invented.
 
 `resolveKeybindings` applies the overrides, the order, and the conflict rule before the engine sees
-anything, and hands the engine one binding per chord. A losing binding arrives with a null chord and
-registers nothing. That's why Settings can show it as a conflict while the keyboard acts as if it
-weren't there.
+anything. A losing binding arrives with a null chord and registers nothing. Pane and task bindings
+may share a chord: both hosts try the focused pane binding first, then the task binding when focus
+is elsewhere. Other overlapping defaults still conflict. Settings can show a conflict while the
+keyboard acts as if the losing binding weren't there.
 
 Settings stores overrides by command ID in the device's `keybindings` preference. A `null` or empty
 override unbinds a command, and resetting it restores the default.

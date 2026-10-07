@@ -47,6 +47,16 @@ Tabs decide what's kept. Replacing a clean preview tab releases its text, saved 
 Promoted and dirty tabs keep their state when the pane is toggled on the same task. Archiving a scope
 evicts view state only for its own Node, so equal IDs on two Nodes keep separate positions.
 
+Duplicate basenames gain the shortest parent suffix that distinguishes the open paths. Each desktop
+tab has its own menu, including inactive tabs. In the terminal strip, arrows move a separate tab
+caret without activating it, and Shift+F10 opens that caret tab's menu below the strip.
+Close others, to the right, and all capture their ordered targets and ask the pane's guarded close
+for each one. A save failure, conflict, or intervening edit stops the run and reports how many closed.
+Only successful explicit closes enter the 20-entry session reopen stack. Reopen checks the Node file
+before opening it and inserts a kept tab at its former tab order position. A closed preview reopens
+as kept. Preview replacement and trash do not
+count as closes.
+
 ### Graphical admission
 
 The build's host token decides whether graphical editing is supported. On the desktop, remembered
@@ -128,6 +138,9 @@ invalidates Git status
 and broadcasts worktree changes to task aliases. Restore trashed entries from the owning Node's
 system Trash. The editor has no permanent-delete action or in-app trash browser.
 
+Rename also rewrites closed-tab, navigation, and device recent paths under the captured Node and
+task. Trash prunes those references. These records contain paths and positions, never document text.
+
 ## Reload on focus
 
 Window focus, worktree invalidation, reconnect, and **Reload status** revalidate the active text
@@ -167,28 +180,5 @@ or changing tabs mid-edit drops the cache the same way.
 
 ## From the command palette
 
-The plugin's client half registers two commands (`plugins/editor/src/client/commands.ts`). Both
-declare `requires: { plugin: 'editor' }`:
-
-| Command | Kind | Chord | What it does |
-| --- | --- | --- | --- |
-| Go to file (`editor.files.open`) | `search`, task-scoped | `⌘P` | Lists the task's worktree and opens the pick |
-| Find in files… (`editor.search.open`) | action | `⌘⇧F` | Opens the editor pane on its search panel |
-
-`⌘P` is bound `global` with an `active` check for an open task, and `⌘⇧F` is bound `task`
-(`plugins/editor/src/client/index.ts`). `plugins/editor/src/client/commands.test.ts` checks three
-things about **Go to file**:
-
-- It ranks over the whole path. A row draws as a file name with its folder dimmed, but the score uses
-  `src/client/App.tsx` whole, so a query like `client/App` matches across the join. That's why the
-  command ranks its own rows instead of using the host's `localSearch`, which scores title and
-  subtitle apart.
-- An empty query shows the listing, in `git ls-files` order. `minQueryLength` and `debounceMs` are
-  both `0`. The command returns at most 100 rows, and the session draws at most 50. A failed listing
-  isn't cached, so Enter on the error tries again.
-- Picking a row shows the editor pane and opens the file as a preview tab, as a click in the tree
-  does.
-
-The terminal client draws the same palette session, so it gets **Go to file** too. Editing,
-autosave, `⌘S`, and the terminal-editor switch stay in the pane, because they're about the buffer on
-screen.
+See [file navigation](./file-navigation.md) for quick open, positioned reveals, reopen, and
+back/forward commands on both hosts.

@@ -1691,6 +1691,35 @@ it('keeps terminal Git status text and the unsaved dot distinct in document tabs
   } finally { screen.done() }
 })
 
+it('targets an inactive editor tab menu without activating that document', async () => {
+  const opened: string[] = []
+  const targeted: string[] = []
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="editor-menu-target" label="Editor"
+    regions={{ body: () => <DocumentTabs idPrefix="editor-menu" ariaLabel="Open files" active="a"
+      onActivate={(id) => opened.push(id)} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
+        open={control?.open} onOpenChange={control?.onOpenChange}
+        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
+        {(menu) => <Menu.Item context={menu} onSelect={() => targeted.push(id)}>Reveal {id}</Menu.Item>}
+      </Menu>}
+      tabs={[{ id: 'a', label: 'a.ts' }, { id: 'b', label: 'b.ts' }]} /> }} />,
+  { width: 80, height: 24 })
+  try {
+    expect(screen.text).toContain('Actions for a')
+    const clicked = await screen.click(...cellOf(screen, 'b.ts'))
+    expect(clicked.text).toContain('Actions for b')
+    expect(opened).toEqual([])
+    const reset = await clicked.click(...cellOf(clicked, 'a.ts'))
+    const moved = await reset.press('ARROW_RIGHT')
+    expect(moved.text).toContain('Actions for b')
+    expect(opened).toEqual([])
+    const menu = await moved.press('F10', { shift: true })
+    expect(menu.text).toContain('Reveal b')
+    await menu.press('RETURN')
+    expect(targeted).toEqual(['b'])
+    expect(opened).toEqual([])
+  } finally { screen.done() }
+})
+
 describe('every control is a stop', () => {
   const behaviours = BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const)
   const driveCase = async (_name: string, entry: Behaviour): Promise<void> => {

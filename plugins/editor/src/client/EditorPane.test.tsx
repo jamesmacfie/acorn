@@ -6,7 +6,7 @@ import { EditorView } from '@codemirror/view'
 import { prefsKey } from '@acorn/protocol/api.ts'
 import type { Task } from '@acorn/plugin-api/client'
 import { paneCollapseKey, Rectangle, sidebarCollapse } from '@acorn/plugin-api/ui'
-import { setActiveNode } from '@acorn/plugin-api/testkit/client'
+import { commandRegistry, setActiveNode } from '@acorn/plugin-api/testkit/client'
 
 // The editor pane against a real CodeMirror, in jsdom. What is stubbed is the worktree behind it and
 // the two sidebar panels, because neither is what this file is about; the editor, its per-file state,
@@ -46,6 +46,7 @@ vi.mock('./editorClient', async (importOriginal) => ({
     list: async () => [],
     files: async () => [...disk.keys()],
     fileStatus: async () => ({ kind: 'unavailable' }),
+    entry: async (_taskId: string, path: string) => ({ root: '/worktree', path, kind: 'file', entryId: path }),
     read: async (taskId: string, path: string) => {
       const text = await read(taskId, path)
       return { text, revision: createHash('sha256').update(text).digest('hex') }
@@ -78,7 +79,7 @@ vi.mock('./EditorTerminal', () => ({
 }))
 
 const { default: EditorPane } = await import('./EditorPane')
-const { editorOpen, openFiles } = await import('./editorState')
+const { activeFile, editorClose, editorOpen, openFiles, requestEditorReveal } = await import('./editorState')
 const { saveEditorMode } = await import('./editorPrefs')
 const { editorViewState } = await import('./editorViewState')
 
@@ -102,7 +103,7 @@ beforeEach(() => {
 })
 afterEach(() => {
   cleanups.splice(0).forEach((dispose) => dispose())
-  write.mockClear()
+  write.mockReset()
   write.mockImplementation(async (_taskId, path, content) => { disk.set(path, content); return { ok: true } })
   read.mockClear()
   readImage.mockClear()
@@ -186,6 +187,106 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(openFiles(taskId)[0]?.dirty).toBe(true))
     expect(openFiles(taskId)[0]?.path).toBe('a.ts')
     expect(view.state.doc.toString()).toContain('// later')
+  })
+
+  it('does not close a replacement tab at the same path after a delayed save', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let resolve!: (result: { ok: true }) => void
+    write.mockImplementationOnce(() => new Promise((done) => { resolve = done }))
+    view.dispatch({ changes: { from: 0, insert: '// first\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(write).toHaveBeenCalledOnce())
+    editorClose(taskId, 'a.ts')
+    editorOpen(taskId, 'a.ts', false)
+    resolve({ ok: true })
+    await vi.waitFor(() => expect(disk.get('a.ts')).toContain('// first'))
+    await vi.waitFor(() => expect(openFiles(taskId).map((file) => file.path)).toEqual(['a.ts']))
+  })
+
+  it('closes the captured tab order until a guarded save fails, leaving later tabs open', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    view.dispatch({ changes: { from: 0, insert: '// draft\n' } })
+    write.mockRejectedValueOnce(new Error('disk conflict'))
+    host.querySelector<HTMLButtonElement>('[aria-label="Actions for a.ts"]')!.click()
+    await vi.waitFor(() => expect(document.querySelector('[role="menu"]')).not.toBeNull())
+    const closeAll = [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent === 'Close all')!
+    closeAll.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('Closed 1 of 2 files'))
+    expect(openFiles(taskId).map((file) => file.path)).toEqual(['b.ts'])
+    expect(openFiles(taskId)[0].dirty).toBe(true)
+  })
+
+  it('cancels a pending bulk close without taking a newly opened tab', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    let resolve!: (result: { ok: true }) => void
+    write.mockReset()
+    write.mockImplementation(async (_taskId, path) => path === 'b.ts'
+      ? new Promise((done) => { resolve = done }) : { ok: true })
+    view.dispatch({ changes: { from: 0, insert: '// draft\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Actions for b.ts"]')!.click()
+    const closeAll = await vi.waitFor(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent === 'Close all')!)
+    closeAll.click()
+    await vi.waitFor(() => expect(resolve).toBeTypeOf('function'))
+    editorOpen(taskId, 'new.ts', false)
+    const cancel = await vi.waitFor(() => [...host.querySelectorAll<HTMLButtonElement>('button')]
+      .find((button) => button.textContent === 'Cancel close')!)
+    cancel.click()
+    resolve({ ok: true })
+    await vi.waitFor(() => expect(host.textContent).toContain('Closed 1 of 2 files. Canceled'))
+    expect(openFiles(taskId).map((file) => file.path)).toEqual(['b.ts', 'new.ts'])
+  })
+
+  it('replays file jumps without truncating forward, then branches on a same-file jump', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    requestEditorReveal(taskId, 'b.ts', 1, 3)
+    await showing(() => view, 'const b = 2')
+    requestEditorReveal(taskId, 'a.ts', 1, 4)
+    await showing(() => view, 'const a = 1')
+    const run = (id: string) => {
+      const command = commandRegistry.entries().find((entry) => entry.id === id)
+      if (!command || !('run' in command)) throw new Error(`Missing action command: ${id}`)
+      command.run({ nodeId: null, workspaceId: null, projectId: null, taskId: null, paneId: null, surfaceId: null })
+    }
+    run('editor.navigation.back')
+    await vi.waitFor(() => expect(activeFile(taskId)).toBe('b.ts'))
+    run('editor.navigation.forward')
+    await vi.waitFor(() => expect(activeFile(taskId)).toBe('a.ts'))
+    run('editor.navigation.back')
+    await vi.waitFor(() => expect(activeFile(taskId)).toBe('b.ts'))
+    requestEditorReveal(taskId, 'b.ts', 1, 6)
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(5))
+    run('editor.navigation.forward')
+    await Promise.resolve()
+    expect(activeFile(taskId)).toBe('b.ts')
+  })
+
+  it('places a new file reveal at its clamped line and column', async () => {
+    disk.set('position.ts', Array.from({ length: 16 }, (_, index) => `line ${index + 1}`).join('\n'))
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    requestEditorReveal(taskId, 'position.ts', 12, 4)
+    await showing(() => view, 'line 12')
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(view.state.doc.line(12).from + 3))
+    requestEditorReveal(taskId, 'position.ts', 200, 400)
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(view.state.doc.length))
   })
 
   it('rejects a held focus reload after typing and does not save an acknowledged reload', async () => {

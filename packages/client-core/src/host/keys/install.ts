@@ -137,7 +137,8 @@ export function installKeymap(root: HTMLElement, context: ScopeContext): void {
       enabled: () => commandAvailable(command),
       run: () => { void executeCommand(command.id).catch((error) => log.error(command.id, error, { 'command.id': command.id })) },
     }))
-    const bindings = context.bindings().flatMap((binding): Binding<HTMLElement, HtmlKeymapEvent>[] => {
+    const bindings = [...context.bindings()].sort((a, b) => Number(b.when === 'pane') - Number(a.when === 'pane'))
+      .flatMap((binding): Binding<HTMLElement, HtmlKeymapEvent>[] => {
       const key = binding.chord && toKeymapKey(binding.chord)
       if (!key) return []
       return [{

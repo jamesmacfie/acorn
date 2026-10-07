@@ -3,13 +3,13 @@ import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import type { EditorState, Extension } from '@codemirror/state'
 import type { EditorView } from '@codemirror/view'
 import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Button, ConfirmButton, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
+import { Alert, Button, ConfirmButton, copyText, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
-import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
+import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorReopen, editorSetDirty, editorTabIdentity, openFiles, requestEditorReveal } from './editorState'
 import { editorViewState, forgetEditorViewState, rememberEditorViewState } from './editorViewState'
 import FileTree from './FileTree'
 import { createFileActionModel } from './fileActionModel'
@@ -21,6 +21,8 @@ import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
 import type { EditorReadResult } from '../contract/api'
 import { createFileStatusReader } from './fileStatusReader'
+import { historyStep, navigate, noteActivated, noteClosed, takeClosed, type EditorLocation } from './editorNavigation'
+import { tabLabels } from './tabLabels'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
 const EditorTerminal = lazy(() => import('./EditorTerminal'))
@@ -61,9 +63,12 @@ export default function EditorPane(props: { task: Task }) {
   const [pendingReveal, setPendingReveal] = createSignal<{ path: string; line: number; column?: number } | null>(null)
   const [treeReveal, setTreeReveal] = createSignal<FileTreeRevealRequest | null>(null)
   const [side, setSide] = createSignal<'files' | 'search'>('files')
+  const [bulkRun, setBulkRun] = createSignal<{ cancel: () => void } | null>(null)
   const sidebarKey = paneCollapseKey('editor')
   const [, setSidebarCollapsed] = sidebarCollapse(sidebarKey)
   let treeRevealRevision = 0
+  let replayScroll: number | null = null
+  let replayPath: string | null = null
 
   let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
@@ -72,6 +77,7 @@ export default function EditorPane(props: { task: Task }) {
   // file.
   let currentPath: string | null = null
   let currentCustody: DocumentCustody | undefined
+  let showGeneration = 0
   // The pane model retains open view states; the document owner retains failed dirty work.
   const pool = paneModel<EditorPool>('editor', taskId, () => createEditorDocumentPool(api, taskId))
   const saved = pool.saved
@@ -88,16 +94,19 @@ export default function EditorPane(props: { task: Task }) {
   // Keep tab definitions stable when only the active path changes. DocumentTabs reconciles by tab
   // object identity, so rebuilding every definition here would replace the focused tab on each
   // keyboard move even though the open files themselves had not changed.
-  const documentTabs = createMemo(() => files().map((file) => ({
+  const documentTabs = createMemo(() => {
+    const labels = tabLabels(files().map((file) => file.path))
+    return files().map((file) => ({
     id: file.path,
-    label: file.path.split('/').pop() ?? file.path,
+    label: labels.get(file.path) ?? file.path,
     title: fileStatus.projection().files.get(file.path)
       ? `${file.path} — ${fileStatus.projection().files.get(file.path)!.label}${fileStatus.stale() ? ' (Git status may be stale)' : ''}`
       : file.path,
     fileStatus: fileStatus.projection().files.get(file.path),
     dirty: file.dirty,
     ephemeral: file.ephemeral,
-  })))
+    }))
+  })
   let disposed = false
   let applyingAcknowledgement = false
   let reloadGeneration = 0
@@ -164,8 +173,37 @@ export default function EditorPane(props: { task: Task }) {
     const checkout = root()
     if (!path || !checkout) return
     const text = absolute ? `${checkout}/${path}` : path
-    void navigator.clipboard.writeText(text)
-    toast(`Copied ${text}`)
+    void copyText(text).then((copied) => toast(copied ? `Copied ${text}` : text))
+  }
+
+  const replay = async (direction: -1 | 1) => {
+    while (live()) {
+      const place = historyStep(nodeId, taskId, direction, location(active()))
+      if (!place) return
+      try { await api.read(taskId, place.path) }
+      catch { toast(`Skipped unavailable file: ${place.path}`); continue }
+      if (!live()) return
+      replayPath = place.path
+      replayScroll = place.scroll
+      requestEditorReveal(taskId, place.path, place.line, place.column)
+      return
+    }
+  }
+  const reopen = async () => {
+    if (!live()) return
+    const closed = takeClosed(nodeId, taskId)
+    if (!closed) return
+    try { await api.read(taskId, closed.path) }
+    catch (cause) {
+      if (live()) {
+        if ((cause as { status?: number }).status !== 404) noteClosed(nodeId, taskId, closed)
+        toast(`Could not reopen ${closed.path}: ${cause instanceof Error ? cause.message : 'file unavailable'}`)
+      }
+      return
+    }
+    if (!live()) return
+    recordNavigation(closed.path)
+    editorReopen(taskId, closed.path, closed.index)
   }
 
   onMount(() => {
@@ -202,6 +240,18 @@ export default function EditorPane(props: { task: Task }) {
       palette: true,
       when,
       run: () => copyPath(true),
+    }, {
+      id: 'editor.tabs.reopen-closed', title: 'Reopen closed file', category: 'navigation', palette: true,
+      when: () => activeTaskId() === taskId && focusedPane(taskId) === 'editor',
+      run: () => { void reopen() },
+    }, {
+      id: 'editor.navigation.back', title: 'Go back in editor', category: 'navigation', palette: true,
+      when: () => activeTaskId() === taskId && focusedPane(taskId) === 'editor',
+      run: () => { void replay(-1) },
+    }, {
+      id: 'editor.navigation.forward', title: 'Go forward in editor', category: 'navigation', palette: true,
+      when: () => activeTaskId() === taskId && focusedPane(taskId) === 'editor',
+      run: () => { void replay(1) },
     }])
     onCleanup(() => commands.dispose())
   })
@@ -223,6 +273,25 @@ export default function EditorPane(props: { task: Task }) {
       const custody = currentCustody ?? pool.files.get(currentPath)?.custody
       if (custody) { custody.state = view.state; custody.viewState = state; custody.flushRecovery() }
     }
+  }
+  const location = (path: string | null): EditorLocation | null => {
+    if (!path) return null
+    const state = currentPath === path && view ? view.state : pool.files.get(path)?.state
+    const place = currentPath === path && view ? captureViewState(view) : editorViewState(taskId, path, nodeId)
+    const head = Math.min(place?.head ?? 0, state?.doc.length ?? 0)
+    const line = state?.doc.lineAt(head)
+    return { path, line: line?.number ?? 1, column: line ? head - line.from + 1 : 1, scroll: place?.scrollTop ?? 0 }
+  }
+  const recordNavigation = (path: string, line?: number, column?: number) => {
+    const from = location(active())
+    const to = location(path) ?? { path, line: 1, column: 1, scroll: 0 }
+    if (line) { to.line = line; to.column = column ?? 1 }
+    if (!from || from.path !== path || line !== undefined) navigate(nodeId, taskId, from, to)
+  }
+  const activatePath = (path: string) => {
+    if (path === active()) return
+    recordNavigation(path)
+    editorActivate(taskId, path)
   }
   const fileActions = createFileActionModel(api, pool, taskId, nodeId, () => {
     scheduleSave.cancel()
@@ -316,6 +385,9 @@ export default function EditorPane(props: { task: Task }) {
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
+      for (const held of menuHolds.values()) held.release()
+      menuHolds.clear()
+      menuTargets.clear()
       refreshQueue.stop()
       warmedText.clear()
       for (const unsubscribe of subscriptions.values()) unsubscribe()
@@ -364,6 +436,12 @@ export default function EditorPane(props: { task: Task }) {
   const prefs = createQuery(() => prefsOptions(true))
   const mode = createMemo(() => readEditorMode(prefs.data))
   const imagePath = createMemo(() => mode() === 'graphical' && imageTypeForPath(active() ?? '') ? active() : null)
+  createEffect(on(active, (path) => {
+    if (!path || graphical && !imageTypeForPath(path)) return
+    void api.entry(taskId, path).then(() => {
+      if (live() && active() === path) noteActivated(nodeId, taskId, path)
+    }).catch(() => {})
+  }))
   const wantsTerminal = createMemo(() => (mode() === 'terminal' ? active() : null))
   const [ptyPath, setPtyPath] = createSignal<string | null>(null)
 
@@ -514,6 +592,7 @@ export default function EditorPane(props: { task: Task }) {
   // Swaps the reused instance to a path. The only place currentPath changes.
   async function show(relPath: string) {
     if (!view) return
+    const admitted = ++showGeneration
     scheduleSave.flush() // persist the outgoing file (pending arg is its path) before the swap
     saveViewState() // remember the outgoing file's scroll/cursor before we swap states
     setSaveErr('')
@@ -532,14 +611,15 @@ export default function EditorPane(props: { task: Task }) {
     })
     // A read may finish after the reader chose another tab. Active state changes synchronously at
     // the interaction boundary; a stale read must not put its document on screen afterward.
-    if (disposed || !view || active() !== relPath) return
+    if (disposed || !view || active() !== relPath || admitted !== showGeneration) return
     if (!state) { view.setState(emptyState()); return }
     const entryAtShow = pool.files.get(relPath)
     if (!entryAtShow) return
     if (entryAtShow.stale) await revalidate(relPath)
-    if (!live() || !view || active() !== relPath || pool.files.get(relPath) !== entryAtShow) return
+    if (!live() || !view || active() !== relPath || pool.files.get(relPath) !== entryAtShow || admitted !== showGeneration) return
     currentPath = relPath
     currentCustody = entryAtShow.custody
+    noteActivated(nodeId, taskId, relPath)
     view.setState(adopt(relPath, entryAtShow))
     // A cached state carries the theme it was built with, so a file opened before a theme change
     // comes back wearing the old one until this line.
@@ -562,6 +642,7 @@ export default function EditorPane(props: { task: Task }) {
     const line = doc.line(Math.min(Math.max(1, r.line), doc.lines))
     const pos = Math.min(line.from + Math.max(0, (r.column ?? 1) - 1), line.to)
     view.dispatch({ selection: { anchor: pos }, effects: engine!.EditorView.scrollIntoView(pos, { y: 'center' }) })
+    if (replayScroll !== null) { view.scrollDOM.scrollTop = replayScroll; replayScroll = null }
     view.focus()
     setPendingReveal(null)
   }
@@ -575,11 +656,13 @@ export default function EditorPane(props: { task: Task }) {
       return
     }
     if (intent.kind !== 'editor:reveal') return
+    if (replayPath === intent.path) replayPath = null
+    else recordNavigation(intent.path, intent.line, intent.column)
     setPendingReveal({ path: intent.path, line: intent.line, column: intent.column })
     // Reveal implies open: cross-pane senders such as find-in-files and stack frames reach this only
     // through the core intent bus and cannot call editorOpen. No-op when the tab is already current.
-    openPath(intent.path, true)
-    if (currentPath === intent.path) maybeReveal(intent.path)
+    editorOpen(taskId, intent.path, true)
+    if (currentPath === intent.path) { maybeReveal(intent.path); noteActivated(nodeId, taskId, intent.path) }
   }
   onMount(() => {
     const off = clientEvents.on('presentation:pane-intent', ({ taskId: targetTaskId, paneId, intent }) => {
@@ -590,6 +673,7 @@ export default function EditorPane(props: { task: Task }) {
   createEffect(() => applyPaneIntent(consumePaneIntent(taskId, 'editor')))
 
   function openPath(relPath: string, ephemeral: boolean) {
+    recordNavigation(relPath)
     editorOpen(taskId, relPath, ephemeral) // the active() effect swaps the surface
   }
 
@@ -718,12 +802,19 @@ export default function EditorPane(props: { task: Task }) {
     } finally { resume() }
   }
 
-  async function close(relPath: string) {
+  async function close(relPath: string, options: { identity?: object; canCommit?: () => boolean; focus?: boolean } = {}): Promise<boolean> {
+    const tab = files().find((file) => file.path === relPath)
+    if (!tab) return false
+    const index = files().indexOf(tab)
+    const identity = 'identity' in options ? options.identity : editorTabIdentity(taskId, relPath)
+    if (!identity || editorTabIdentity(taskId, relPath) !== identity) return false
     scheduleSave.cancel()
     const entry = pool.files.get(relPath)
     const revision = entry?.custody.revision
-    if (entry && !await save(relPath)) return
-    if (!live() || pool.files.get(relPath) !== entry || entry?.custody.revision !== revision || entry?.custody.dirty) return
+    if (entry && !await save(relPath)) return false
+    if (!live() || pool.files.get(relPath) !== entry || entry?.custody.revision !== revision || entry?.custody.dirty
+      || editorTabIdentity(taskId, relPath) !== identity || options.canCommit?.() === false) return false
+    noteClosed(nodeId, taskId, { path: relPath, index })
     editorClose(taskId, relPath)
     subscriptions.get(relPath)?.()
     subscriptions.delete(relPath)
@@ -731,6 +822,95 @@ export default function EditorPane(props: { task: Task }) {
     pool.files.delete(relPath)
     saved.delete(relPath)
     forgetEditorViewState(taskId, relPath, nodeId)
+    if (options.focus !== false && HOST === 'dom') queueMicrotask(focusSurvivor)
+    return true
+  }
+
+  const focusSurvivor = () => {
+    if (!live() || HOST !== 'dom') return
+    const path = active()
+    if (path) document.getElementById(`editor-tab-${path}`)?.focus()
+    else view?.focus()
+  }
+
+  const closeMany = async (paths: readonly string[]) => {
+    if (bulkRun()) return
+    const targets = paths.map((path) => ({ path, identity: editorTabIdentity(taskId, path) }))
+    let canceled = false
+    const run = { cancel: () => { canceled = true } }
+    setBulkRun(run)
+    let closed = 0
+    try {
+      for (const target of targets) {
+        if (canceled || !await close(target.path, { identity: target.identity, canCommit: () => !canceled, focus: false })) {
+          if (live()) {
+            const message = `Closed ${closed} of ${targets.length} files. ${canceled ? 'Canceled' : `Stopped at ${target.path}; review its draft or disk state`}.`
+            setSaveErr(message)
+            toast(message)
+          }
+          return
+        }
+        closed++
+      }
+    } finally {
+      if (!disposed && bulkRun() === run) setBulkRun(null)
+      if (live() && HOST === 'dom') queueMicrotask(focusSurvivor)
+    }
+  }
+  const tabMenu = (path: string, control?: { open: () => boolean; onOpenChange: (open: boolean) => void }) => {
+    const owner = {}
+    onCleanup(() => releaseTabMenu(path, owner))
+    if (control) {
+      createEffect(() => { if (control.open()) prepareTabMenu(path, owner) })
+    }
+    return <Menu ariaLabel={`Actions for ${path}`} open={control?.open} onBeforeOpen={() => prepareTabMenu(path, owner)}
+      onOpenChange={(open) => { control?.onOpenChange(open); if (open) prepareTabMenu(path, owner); else releaseTabMenu(path, owner) }} trigger={({ toggle }) =>
+      <IconButton icon="ellipsis" label={`Actions for ${path}`} onPress={toggle} />}
+    >{(menu) => <>
+      <Show when={files().find((file) => file.path === path)?.ephemeral}>
+        <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => editorPromote(taskId, path))}>Keep open</Menu.Item>
+      </Show>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, (identity) => { void close(path, { identity }) })}>Close</Menu.Item>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => { void closeMany(files().filter((file) => file.path !== path).map((file) => file.path)) })}>Close others</Menu.Item>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => { void closeMany(files().slice(files().findIndex((file) => file.path === path) + 1).map((file) => file.path)) })}>Close to the right</Menu.Item>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => { void closeMany(files().map((file) => file.path)) })}>Close all</Menu.Item>
+      <Menu.Separator />
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => copyTabPath(path, false))}>Copy relative path</Menu.Item>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => copyTabPath(path, true))}>Copy absolute path</Menu.Item>
+      <Menu.Item context={menu} onSelect={() => withTabTarget(path, () => revealTab(path))}>Reveal in file tree</Menu.Item>
+    </>}</Menu>
+  }
+  const menuHolds = new Map<string, { owner: object; target: { identity: object | undefined }; release: () => void }>()
+  const menuTargets = new Map<string, { identity: object | undefined }>()
+  const withTabTarget = (path: string, action: (identity: object | undefined) => void) => {
+    const identity = menuTargets.get(path)?.identity
+    menuTargets.delete(path)
+    if (!identity || editorTabIdentity(taskId, path) !== identity || !live()) return
+    action(identity)
+  }
+  const prepareTabMenu = (path: string, owner: object) => {
+    if (!live() || menuHolds.has(path)) return
+    const identity = editorTabIdentity(taskId, path)
+    const target = { identity }
+    menuTargets.set(path, target)
+    menuHolds.set(path, { owner, target, release: pool.files.get(path)?.custody.holdWrites() ?? (() => {}) })
+  }
+  const releaseTabMenu = (path: string, owner: object) => {
+    const held = menuHolds.get(path)
+    if (!held || held.owner !== owner) return
+    menuHolds.delete(path)
+    held.release()
+    if (isDirty(path)) scheduleSave(path)
+    queueMicrotask(() => { if (menuTargets.get(path) === held.target) menuTargets.delete(path) })
+  }
+  const copyTabPath = (path: string, absolute: boolean) => {
+    const text = absolute && root() ? `${root()}/${path}` : path
+    void copyText(text).then((copied) => toast(copied ? `Copied ${text}` : text))
+  }
+  const revealTab = (path: string) => {
+    setSidebarCollapsed(false)
+    setSide('files')
+    setTreeReveal({ path, revision: ++treeRevealRevision })
   }
 
   // Worktree events have no path. Keep inactive entries stale and read only the visible file.
@@ -851,9 +1031,10 @@ export default function EditorPane(props: { task: Task }) {
             idPrefix="editor"
             ariaLabel="Open files"
             active={active() ?? ''}
-            onActivate={(path) => editorActivate(taskId, path)}
+            onActivate={activatePath}
             onClose={(path) => void close(path)}
             onPromote={(path) => editorPromote(taskId, path)}
+            menu={tabMenu}
             tabs={documentTabs()}
             actions={
               <>
@@ -901,6 +1082,7 @@ export default function EditorPane(props: { task: Task }) {
             }
           />
           {/* Under the strip rather than in it: a sentence does not fit a 48-pixel bar. */}
+          <Show when={bulkRun()}>{(run) => <Alert variant="banner" tone="warn">Closing files… <Button onPress={() => run().cancel()}>Cancel close</Button></Alert>}</Show>
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
           <Show when={active() && diskState()}>
             <Alert variant="banner" tone="warn">

@@ -598,6 +598,7 @@ testkit/client: Project
 testkit/client: RemoteRoot
 testkit/client: activeRefPanel
 testkit/client: closeRefPanel
+testkit/client: commandRegistry
 testkit/client: contentLinkRegistry
 testkit/client: createRemoteRoot
 testkit/client: evictScope
