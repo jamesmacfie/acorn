@@ -1,6 +1,8 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
+import { createSignal } from 'solid-js'
 import { contentLinkRegistry, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
+import { paneRegistry } from '@acorn/client-core/host/registries/panes/panes.ts'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
 import { TASK } from '../fixture'
 import { renderFixture } from '../harness'
@@ -12,6 +14,39 @@ describe('terminal startup links', () => {
     const frame = await screen.until('Scratchpad')
     expect(frame).toContain('Task: fix-login')
     expect(frame).toContain('[Notes]')
+    screen.done()
+  }, 30_000)
+
+  it('waits for a loaded pane contribution before resolving its task link', async () => {
+    const [ready, setReady] = createSignal(false)
+    const screen = await renderFixture({
+      link: { nodeId: 'node-1', kind: 'task', taskId: TASK.id, pane: 'fixture.late' },
+      linkReady: ready,
+    })
+    expect(await screen.frame()).not.toContain('The pane fixture.late is not available')
+    const pane = paneRegistry.register({
+      id: 'fixture.late', label: 'Late pane', glyph: 'link', order: 1,
+      component: () => <Line>Loaded pane content</Line>,
+    })
+    try {
+      setReady(true)
+      const frame = await screen.until('Loaded pane content')
+      expect(frame).toContain('[Late pane]')
+      screen.done()
+    } finally {
+      pane.dispose()
+    }
+  }, 30_000)
+
+  it('refuses an unavailable pane when contribution preparation reaches its deadline', async () => {
+    const [ready, setReady] = createSignal(false)
+    const screen = await renderFixture({
+      link: { nodeId: 'node-1', kind: 'task', taskId: TASK.id, pane: 'fixture.missing' },
+      linkReady: ready,
+    })
+    setReady(true)
+    const frame = await screen.until('The pane fixture.missing is not available')
+    expect(frame).not.toContain('Task: fix-login')
     screen.done()
   }, 30_000)
 

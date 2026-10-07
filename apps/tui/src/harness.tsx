@@ -208,6 +208,7 @@ export async function renderFixture(size: {
    *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
   trust?: readonly PluginTrustRequest[]
   link?: import('@acorn/client-core/host/registries/commands/addresses').Address
+  linkReady?: import('solid-js').Accessor<boolean>
   register?: () => () => void
 } = {}): Promise<Screen> {
   const { render } = await import('./tree/renderer')
@@ -322,7 +323,7 @@ export async function renderFixture(size: {
   // (./tree/renderer.ts § render).
   const target = (renderer as unknown as { root: unknown }).root
   const mounted = await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false}
-    link={size.link} linkReady={() => true} onQuit={() => { quits += 1 }} />, target as never)
+    link={size.link} linkReady={size.linkReady ?? (() => true)} onQuit={() => { quits += 1 }} />, target as never)
   const tearDown = (): void => {
     ;(mounted as unknown as () => void)()
     disposeRegistrations?.()

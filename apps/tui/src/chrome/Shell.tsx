@@ -5,7 +5,8 @@ import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
-import { pluginRosterKnown } from '@acorn/client-core/infra/node'
+import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
@@ -57,6 +58,7 @@ import { Confirmation } from './Confirmation'
 import { activeConfirmation } from './confirmStore'
 import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { placeRestored } from './state'
+import { startLinkRequest } from './linkRequest'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -71,6 +73,7 @@ import { placeRestored } from './state'
 // down the screen: rail, pane strip, the pane's own regions. The footer is not in it — it is a label,
 // and a stop that does nothing is a hole a reader falls into (../keys/regions.ts § moveRegion).
 const STRIP_ORDER = -50
+const log = createLogger('tui-link')
 
 export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
   const model = createShellModel()
@@ -135,17 +138,31 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // memory of what was open in it (./restore.ts).
   installRestore(model, () => prefs.data)
   const [settingsReady, setSettingsReady] = createSignal(false)
-  const [rosterDeadline, setRosterDeadline] = createSignal(false)
-  if (props.link?.kind === 'task' && props.link.pane) {
-    const timer = setTimeout(() => setRosterDeadline(true), 15_000)
-    onCleanup(() => clearTimeout(timer))
-  }
   let linked = false
+  let cancelLinkRequest: (() => void) | undefined
+  onCleanup(() => cancelLinkRequest?.())
   createEffect(() => {
-    if (!props.link || linked || !props.linkReady?.() || !placeRestored() || !model.ready() || !model.sourcesReady() || !settingsReady()) return
-    if (props.link.kind === 'task' && props.link.pane && !pluginRosterKnown() && !rosterDeadline()) return
+    const link = props.link
+    if (!link || linked || !props.linkReady?.() || !placeRestored() || !model.ready() || !settingsReady()) return
+    // A project source is visible only after the destination workspace's provider scope answers.
+    // Switch first, then let this effect run again with that workspace's source list.
+    const projectId = link.kind === 'project' ? link.projectId
+      : link.kind === 'task' ? model.allTasks().find((task) => task.id === link.taskId)?.projectId
+        : undefined
+    const owner = projectId && model.workspaces().find((workspace) => workspace.projects.some((project) => project.id === projectId))
+    if (owner && model.workspace()?.id !== owner.id) {
+      model.chooseWorkspace(owner.id)
+      return
+    }
+    if (!model.sourcesReady()) return
     linked = true
-    void import('./link').then(({ openTerminalLink }) => openTerminalLink(props.link!, model))
+    cancelLinkRequest = startLinkRequest({
+      load: () => import('./link'),
+      apply: ({ openTerminalLink }) => openTerminalLink(link, model),
+      currentNodeId: activeNodeId,
+      nodeId: props.nodeId,
+      onError: (error) => log.warn('could not open terminal link', error),
+    })
   })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody

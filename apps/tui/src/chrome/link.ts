@@ -35,7 +35,7 @@ export function openTerminalLink(address: Address, model: ShellModel): void {
     const surfaceSource = surface && sourceRegistry.entries().find((entry) => entry.projectSurfaceId === surface.id)?.id
     const sourceId = sourceIdForPath(path) ?? surfaceSource
     const source = sourceId ? sourceRegistry.get(sourceId) : undefined
-    const sourceVisible = model.workspace()?.id !== owner.id || model.sources().some((entry) => entry.id === sourceId)
+    const sourceVisible = model.workspace()?.id === owner.id && model.sources().some((entry) => entry.id === sourceId)
     const unavailable = path !== base && (!sourceId || (!source?.regions && !source?.component) || !sourceVisible)
     const destination = unavailable ? base : path
     batch(() => {
