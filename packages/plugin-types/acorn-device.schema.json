@@ -83,6 +83,9 @@
     "leftCollapsed": {
       "type": "boolean"
     },
+    "workspaceRail": {
+      "type": "boolean"
+    },
     "railVisibility": {
       "type": "object",
       "propertyNames": {

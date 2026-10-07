@@ -163,9 +163,9 @@
    terminal plugin's own stylesheet, which is how a plugin came to own where the shell's rails are. */
 .ui-drawer {
   position: fixed;
-  /* Between the two icon rails (left TabRail, right pane switcher, both --tabrail-w wide) rather than
-     over either. A drawer only shows in the Task view, where the right rail is present. */
-  left: var(--tabrail-w);
+  /* The shell publishes the combined left rail width on the document root for this body portal.
+     A drawer only shows in the Task view, where the right pane switcher is present. */
+  left: var(--left-rails-w, var(--tabrail-w));
   right: var(--tabrail-w);
   bottom: var(--task-footer-h);
   min-height: 160px;

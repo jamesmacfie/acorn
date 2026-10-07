@@ -8,7 +8,7 @@ import { dirname, join, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { WebSocket } from 'ws'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
-import { HELPER_PROTOCOL, type HelperMethod } from '../src/shell/wire'
+import { HELPER_PROTOCOL, type HelperMethod, type WireFetchBody, type WireFetchResponse } from '../src/shell/wire'
 import { ACORN_BASELINE } from '@acorn/protocol/baseline.ts'
 import { PLUGIN_API_MAJOR } from '@acorn/protocol/plugin/apiVersion.ts'
 
@@ -239,6 +239,36 @@ describe('the Tauri shell boots its world', () => {
     // whole custody stack end to end.
     expect(response.status).toBe(200)
     expect(JSON.parse(Buffer.from(response.body, 'base64').toString('utf8'))).toMatchObject({ nodeId })
+  })
+
+  it('saves glyphs and normalizes image uploads through the packaged workspace routes', async () => {
+    const fleet = await call<{ nodes: { nodeId: string; local: boolean }[] }>('fleet-list')
+    const nodeId = fleet.nodes.find((node) => node.local)!.nodeId
+    const request = (path: string, method = 'GET', body?: WireFetchBody) => call<WireFetchResponse>('node-fetch', {
+      nodeId, request: { requestId: `workspace-boot-${nextId}`, path, method, headers: body?.kind === 'bytes' ? { 'content-type': 'application/json' } : {}, body },
+    })
+    const jsonBody = (value: unknown): WireFetchBody => ({ kind: 'bytes', bytes: Buffer.from(JSON.stringify(value)).toString('base64') })
+    const bootstrap = await request('/v1/core/workspaces/bootstrap', 'POST')
+    expect(bootstrap.status).toBe(200)
+    const [workspace] = JSON.parse(Buffer.from(bootstrap.body, 'base64').toString()) as { id: string }[]
+    const path = `/v1/core/workspaces/${workspace.id}`
+    const glyph = await request(path, 'PATCH', jsonBody({ appearance: {
+      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'solid', color: 'blue' },
+    } }))
+    expect([glyph.status, Buffer.from(glyph.body, 'base64').toString()]).toEqual([200, '{"ok":true}'])
+    // An 8×8 PNG fixture. The staged native decoder must be loadable without the checkout's packages.
+    const png = 'iVBORw0KGgoAAAANSUhEUgAAAAgAAAAICAIAAABLbSncAAAACXBIWXMAAAPoAAAD6AG1e1JrAAAAEUlEQVQImWNQSruLFTEMLQkAsQZZQb/FUPIAAAAASUVORK5CYII='
+    const upload = await request(`${path}/icon-image`, 'POST', { kind: 'form', parts: [
+      { name: 'image', filename: 'icon.png', type: 'image/png', bytes: png },
+      { name: 'crop', value: JSON.stringify({ x: 0.5, y: 0.5, size: 1 }) },
+    ] })
+    expect(upload.status, Buffer.from(upload.body, 'base64').toString()).toBe(200)
+    const { appearance } = JSON.parse(Buffer.from(upload.body, 'base64').toString()) as { appearance: { imageId: string } }
+    const image = await request(`/v1/core/workspaces/icon-images/${appearance.imageId}`)
+    expect(image.status).toBe(200)
+    const thumbnail = Buffer.from(image.body, 'base64')
+    expect(thumbnail.readUInt32BE(16)).toBe(128)
+    expect(thumbnail.readUInt32BE(20)).toBe(128)
   })
 
   it('refuses a socket without the secret', async () => {

@@ -15,6 +15,7 @@ import {
 import { initSystemNotices, initWorkflowNotices } from '@acorn/client-core/features/notifications/deliver.ts'
 import { initSoundNotices } from '@acorn/client-core/features/notifications'
 import { sessionSummaries } from '@acorn/client-core/features/tasks'
+import { workspaceRailShown } from '@acorn/client-core/features/workspaces/workspaceRailPrefs.ts'
 import TabRail from '@acorn/client-core/features/tabs/TabRail.tsx'
 import Tips from '@acorn/client-core/kit/components/overlays/tips.tsx'
 import { ToastHost } from '@acorn/client-core/features/notifications/ToastHost.tsx'
@@ -65,6 +66,7 @@ import { isPanelStudioOpen } from '@acorn/client-core/features/dashboards/studio
 // navigation intent so the editor, xterm, Shiki/diff rendering, settings plugins, and onboarding do not
 // compete with the first interactive paint.
 const SettingsView = lazy(() => import('@acorn/client-core/features/settings/SettingsView.tsx'))
+const WorkspaceRail = lazy(() => import('@acorn/client-core/features/workspaces/WorkspaceRail.tsx').then((module) => ({ default: module.WorkspaceRail })))
 
 // Layout root (Router root): top bar + three panes. Panes are params-driven: PullList (left)
 // and PullDetail (mid) read useParams() directly; routes exist only to populate params.
@@ -276,6 +278,10 @@ export default function App() {
   // Always refetched on mount, because the startup restore waits for the node's answer and a cached
   // value inside its stale time would otherwise never be asked for again.
   const prefs = createQuery(() => ({ ...prefsOptions(nodeReady()), refetchOnMount: 'always' as const }))
+  // Drawers mount in a body portal, so shell geometry must also reach those siblings.
+  createEffect(() => document.documentElement.style.setProperty('--left-rails-w',
+    workspaceRailShown(prefs.data) ? 'calc(2 * var(--tabrail-w))' : 'var(--tabrail-w)'))
+  onCleanup(() => document.documentElement.style.removeProperty('--left-rails-w'))
   const mountedAt = Date.now()
   const integrations = createQuery(() => integrationsOptions(nodeReady()))
   const projects = createQuery(() => projectsOptions(nodeReady()))
@@ -476,9 +482,9 @@ export default function App() {
       projectRoute: projectPath,
     })
     return {
-      workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name } : null,
+      workspace: activeWorkspace() ? { id: activeWorkspace()!.id, label: activeWorkspace()!.name, appearance: activeWorkspace()!.appearance } : null,
       workspaces: fleetWorkspaces().entries.map((entry) => ({
-        id: entry.workspace.id, label: entry.workspace.name, nodeId: entry.nodeId,
+        id: entry.workspace.id, label: entry.workspace.name, appearance: entry.workspace.appearance, nodeId: entry.nodeId,
         nodeLabel: entry.node.label, projectCount: entry.workspace.projects.length,
       })),
       project: project ? { id: project.id, label: project.name } : null,
@@ -541,11 +547,17 @@ export default function App() {
   return (
     <Show when={!nodeGateHolds() && !isRestoring() && clientPluginsReady()} fallback={<NodeGate />}>
     <div class="shell">
+      {/* Install the keymap before chrome collections run their mount callbacks. A rail enabled
+          at startup must register its intent layer against the same engine as a later toggle.
+          Settings and the panel studio cover the task, so its chords stand down while either is
+          open; otherwise they could move focus into a terminal under the layer. */}
+      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest() && !isPanelStudioOpen()} focusedPane={focusedPane(activeTaskId())} />
     <header class="topbar-host">
       <ExclusiveSlotHost slot="topbar" value={topbarProps()}
         nestedSlots={[{ ref: rightSlotRef, render: () => <SlotHost slot="topbar.right" context={slotContext()} /> }]} />
     </header>
     <div class="shell-body">
+    <Show when={workspaceRailShown(prefs.data)}><WorkspaceRail value={topbarProps()} /></Show>
     <TabRail />
     <div class="app">
       <Switch fallback={<main class="panes panes-empty"><Acorn /></main>}
@@ -568,10 +580,6 @@ export default function App() {
           </Show>
         </Match>
       </Switch>
-      {/* Settings and the panel studio cover the task, so the task's own chords stand down while either
-          is open: a pane chord would act on a surface nobody can see, and could move focus into a
-          terminal under the layer. */}
-      <KeybindingDispatcher prefs={prefs.data ?? {}} taskActive={inTaskView() && !settingsRequest() && !isPanelStudioOpen()} focusedPane={focusedPane(activeTaskId())} />
       {/* The active bindings, read back out of the keymap's own catalog. Mounted here rather than
           from the dispatcher because `registries/keybindings.ts` is deliberately `.ts` and may not
           hold markup. */}

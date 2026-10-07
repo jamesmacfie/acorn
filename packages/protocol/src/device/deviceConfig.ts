@@ -25,6 +25,7 @@ export const deviceConfigSchema = z.looseObject({
   keybindings: z.record(preferenceId, z.union([z.string().max(64), z.null()])).optional(),
   railOrder: z.strictObject({ pinned: z.array(preferenceId), order: z.array(preferenceId), sources: z.array(preferenceId).optional() }).optional(),
   leftCollapsed: z.boolean().optional(),
+  workspaceRail: z.boolean().optional(),
   // `<pluginId>:<sourceId>` → shown. Only explicit choices live here; an absent entry reads the
   // source's own default.
   railVisibility: z.record(preferenceId, z.boolean()).optional(),

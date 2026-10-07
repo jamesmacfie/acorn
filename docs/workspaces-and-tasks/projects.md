@@ -35,7 +35,7 @@ bar that moves them to a workspace, hides or shows them, or sets their color. Th
 option creates a workspace. A row opens its project's settings page, which holds the name, folder,
 color, workspace, visibility, and [project configuration](./project-config.md).
 
-A workspace's own page renames and deletes it. The default workspace can't be renamed or deleted,
+A workspace's own page edits its [icon](./workspace-icons.md), renames it, and deletes it. The default workspace can't be renamed or deleted,
 because a deleted workspace's projects move there. A project whose workspace has vanished shows under
 `Unassigned`, so you can rescue it. [Frontend](../frontend/settings-groups.md) § Workspaces and
 projects has the pages.

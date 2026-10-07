@@ -20,6 +20,7 @@ import { SettingRow } from '../../kit/components/layout/SettingRow'
 import { SettingsSection } from '../../kit/components/layout/SettingsSection'
 import { createSettingSave } from './settingSave'
 import { DEFAULT_STYLE } from './uiStyles'
+import { workspaceRailShown, saveWorkspaceRailShown } from '../workspaces/workspaceRailPrefs'
 
 // Settings → Appearance. Two orthogonal axes (docs/ui-design/tokens.md § Token axes): style owns shape,
 // typography, spacing and density; theme owns colour. They compose freely, because the two token sets
@@ -42,9 +43,16 @@ export default function AppearanceSettings() {
   const theme = createSettingSave()
   const light = createSettingSave()
   const dark = createSettingSave()
+  const workspaceRail = createSettingSave()
 
   return (
     <>
+      <SettingsSection id="navigation" label="Navigation">
+        <SettingRow label="Show workspace rail" scope="device" error={workspaceRail.error()}>
+          <Checkbox switch ariaLabel="Show workspace rail" checked={workspaceRailShown(prefs.data)}
+            onChange={(shown) => workspaceRail.run(() => saveWorkspaceRailShown(qc, shown))} />
+        </SettingRow>
+      </SettingsSection>
       <SettingsSection id="style" label="Style" help="Style sets shapes, fonts, and spacing. Theme sets the colours.">
         <SettingRow
           label="Style"

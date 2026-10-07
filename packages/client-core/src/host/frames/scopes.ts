@@ -132,6 +132,8 @@ const RULES: readonly RouteRule[] = [
   // ── Workspaces ──────────────────────────────────────────────────────────────────────────────────
   { path: shape('/v1/core/workspaces'), scopes: { GET: 'core.workspaces:read' } },
   { path: shape('/v1/core/workspaces/bootstrap'), scopes: {}, note: 'Creates a workspace; mutation.' },
+  { path: shape(`/v1/core/workspaces/icon-images/${SEG}`), scopes: {}, note: 'Workspace artwork is fetched by the authenticated host, not plugin frames.' },
+  { path: shape(`/v1/core/workspaces/${SEG}/icon-image`), scopes: {}, note: 'Workspace appearance uploads are owner mutations.' },
   {
     path: shape(`/v1/core/workspaces/${SEG}`),
     scopes: { GET: 'core.workspaces:read' },

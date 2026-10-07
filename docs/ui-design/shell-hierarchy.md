@@ -10,6 +10,7 @@ The desktop shell has this hierarchy:
 
 ```text
 Topbar: Node/workspace context, repo/PR controls, global actions
+Workspace rail (optional): workspace icons
 TabRail: sources → workspaces → tasks
 Main: Home, Fleet overview, source browse, or active task
 Task: ordered pane row
@@ -45,7 +46,7 @@ status slot. Settings warns when a provider says it leaves out either. The termi
 ### Geometry
 
 The top bar spans the window, and the rails and panes start under its bottom border, so that border
-is one line across the app. The left TabRail is the first thing in `.shell-body`, and the right pane
+is one line across the app. The optional workspace rail comes before the left TabRail in `.shell-body`, and the right pane
 switcher is fixed at `top: var(--topbar-h)`.
 
 Both rails are built from one component, `tabs/RailTab.tsx`, a square control styled by
@@ -56,6 +57,10 @@ moves the rails too. Every rail control uses it, including the bottom-pinned **+
 control changes only its icon and background on hover, and `.ui-btn:hover` also changes the border
 color. `.pane-switcher` restates only what differs on the right: the glyph font, and the active accent
 on the right edge.
+
+The workspace rail uses the same width and controls, and draws its selected marker outside the icon.
+The shell allocates both left rails through `--left-rails-w`; the terminal drawer reads that token.
+See [workspace icons](../workspaces-and-tasks/workspace-icons.md).
 
 ### Chrome bars
 

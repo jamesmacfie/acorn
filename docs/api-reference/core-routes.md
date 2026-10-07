@@ -1,7 +1,6 @@
 # Core routes
 
-This page lists core's `/v1/core` routes by owner and gate. It's part of the [API reference](../api-reference.md).
-The modules under `packages/node-core/src/server/routes/` own the bodies and validation.
+This page lists core's `/v1/core` routes by owner and gate ([API reference](../api-reference.md)). The modules under `packages/node-core/src/server/routes/` own bodies and validation.
 
 `packages/node-core/src/server/mountCoverage.test.ts` builds the app and fails unless every core
 route is behind a gate mount or named, with its reason, as open to a task token.
@@ -93,8 +92,7 @@ fields, such as `{ "credentials": { "token": "…" } }`. A top-level `token` fie
 `credentials` object gets `400 provider_bad_config`. Secret values are write-only.
 
 `POST /v1/core/telemetry` takes `{ runtime, records }`, at most one mebibyte, and refuses the whole
-batch for one malformed record. `runtime` can't say `node`. It answers `202` with `{ accepted }`,
-which is `0` when the preference is off or no sink is subscribed.
+batch for one malformed record. `runtime` can't say `node`. It answers `202` with `{ accepted }` (zero when disabled).
 [Telemetry runtimes](../telemetry/runtimes.md#other-runtimes) owns the contract.
 `GET /v1/core/telemetry/summary` answers counters, not records, because it names the subscribed sink
 plugins ([diagnosis](../telemetry/diagnosis.md#what-the-page-shows)).
@@ -106,13 +104,15 @@ this machine. See model providers in [integrations](../integrations.md).
 
 ## Workspaces, projects, and tasks
 
-Workspace and project routes are device-only. Task routes are open to a task token for its own task.
+Workspace and project routes are device-only. Task tokens reach only their own task.
 
 | Method | Path | Purpose |
 | --- | --- | --- |
 | `GET`, `POST` | `/v1/core/workspaces` | List workspaces with project membership, or create one |
 | `POST` | `/v1/core/workspaces/bootstrap` | Create the default workspace |
-| `PATCH`, `DELETE` | `/v1/core/workspaces/:id` | Rename, or delete a non-default workspace |
+| `PATCH`, `DELETE` | `/v1/core/workspaces/:id` | Rename or set appearance; delete a non-default workspace |
+| `POST` | `/v1/core/workspaces/:id/icon-image` | [Normalize and save a workspace image crop](../workspaces-and-tasks/workspace-icons.md#images-and-limits) |
+| `GET` | `/v1/core/workspaces/icon-images/:imageId` | Read a durable workspace PNG thumbnail |
 | `PUT` | `/v1/core/workspaces/:id/project-order` | [Save the complete project order](../workspaces-and-tasks/projects.md#arrange-projects) |
 | `GET`, `PUT` | `/v1/core/workspaces/:id/external-projects` | Read or replace provider projects linked to a workspace |
 | `GET`, `POST` | `/v1/core/projects` | List projects and their facets, or add one |

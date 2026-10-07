@@ -1,3 +1,4 @@
+import type { WorkspaceAppearance } from '../appearance/workspaceAppearance.ts'
 /** Data and host verbs supplied to replacement chrome. No renderer or DOM types cross this boundary. */
 export type SlotRef = string & { readonly __slotRef: unique symbol }
 
@@ -37,8 +38,8 @@ export type RailProps = RailData & {
 }
 
 export type TopbarData = {
-  workspace: { id: string; label: string } | null
-  workspaces: readonly { id: string; label: string; nodeId: string; nodeLabel: string; projectCount: number }[]
+  workspace: { id: string; label: string; appearance?: WorkspaceAppearance | null } | null
+  workspaces: readonly { id: string; label: string; nodeId: string; nodeLabel: string; projectCount: number; appearance?: WorkspaceAppearance | null }[]
   project: { id: string; label: string } | null
   projects: readonly { id: string; label: string }[]
   projectPickerVisible: boolean

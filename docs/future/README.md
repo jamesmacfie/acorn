@@ -49,7 +49,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
-| [workspace-icons.md](./workspace-icons.md) | Workspace glyphs on colour or gradient backgrounds, uploaded images, icons in the desktop switcher, and an optional further-left workspace rail. The TUI keeps its workspace switcher. | Agreed product requirements, October 7, 2026. Implementation not started. |
+| [workspace-icons.md](./workspace-icons.md) | Workspace glyphs on colour or gradient backgrounds, uploaded images, icons in the desktop switcher, and an optional further-left workspace rail. The TUI keeps its workspace switcher. | Implemented October 7, 2026. See the [reference](../workspaces-and-tasks/workspace-icons.md) and proposal evidence. |
 
 ## How these relate
 
