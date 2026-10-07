@@ -1,8 +1,10 @@
+import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { integrationsKey, prefsKey, projectsKey, workspacesKey, type Project, type Workspace } from '@acorn/protocol/api.ts'
+import { integrationsKey, modelBackendsKey, prefsKey, projectsKey, workspacesKey, type Project, type Workspace } from '@acorn/protocol/api.ts'
 import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
+import { activeNodeId, setActiveNode } from '@acorn/plugin-api/client'
 
 const platform = vi.hoisted(() => ({
   pickFolder: vi.fn<() => Promise<string | null>>(),
@@ -10,9 +12,10 @@ const platform = vi.hoisted(() => ({
   patchProject: vi.fn(),
   createWorkspace: vi.fn(),
 }))
+const navigation = vi.hoisted(() => ({ navigate: vi.fn() }))
 vi.mock('@solidjs/router', async (original) => ({
   ...await original<typeof import('@solidjs/router')>(),
-  useNavigate: () => vi.fn(),
+  useNavigate: () => navigation.navigate,
 }))
 vi.mock('@acorn/plugin-api/client', async (original) => ({
   ...await original<typeof import('@acorn/plugin-api/client')>(),
@@ -41,6 +44,7 @@ let projects: Project[]
 let pendingWrite: Promise<void> | undefined
 let releaseWrite: (() => void) | undefined
 let saveError: Error | undefined
+let originalNodeId: string | null
 const writes: { key: string; value: string }[] = []
 
 const view = () => document.body
@@ -53,23 +57,43 @@ const click = (label: string) => {
 }
 const waitForText = async (value: string) => vi.waitFor(() => expect(view().textContent).toContain(value))
 
-function mount(mode?: WorkspacesMode) {
+function mount(mode?: WorkspacesMode, options: { unmountOnClose?: boolean } = {}) {
   stored = mode ? { 'core.workspaces': mode } : {}
   client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
   client.setQueryData(prefsKey, stored)
   client.setQueryData(projectsKey, projects)
   client.setQueryData(workspacesKey, [workspace('Alpha'), workspace('Beta')])
   client.setQueryData(integrationsKey, { providers: [], integrations: [] })
+  client.setQueryData(modelBackendsKey, { backends: [], missing: [] })
   host = document.createElement('div')
   document.body.append(host)
+  const [open, setOpen] = createSignal(true)
+  const onClose = vi.fn(() => { if (options.unmountOnClose) setOpen(false) })
   dispose = render(() => (
     <QueryClientProvider client={client}>
-      <OnboardingWizard workspacesPreference={mode} onClose={() => {}} />
+      <Show when={open()}>
+        <OnboardingWizard workspacesPreference={mode} onClose={onClose} />
+      </Show>
     </QueryClientProvider>
   ), host)
+  return { onClose }
+}
+
+async function advanceToDone() {
+  click('Get started')
+  await waitForText('Add your first project')
+  const folder = [...view().querySelectorAll<HTMLButtonElement>('button.ui-card')]
+    .find((element) => element.textContent?.includes('Open a folder'))!
+  folder.click()
+  await vi.waitFor(() => expect(view().querySelector('h2')?.textContent).toBe('Name your project'))
+  click('Continue')
+  await vi.waitFor(() => expect(view().querySelector('h2')?.textContent).toBe('Generate with AI'))
+  click('Continue')
+  await vi.waitFor(() => expect(view().querySelector('h2')?.textContent).toBe("You're set"))
 }
 
 beforeEach(() => {
+  originalNodeId = activeNodeId()
   projects = []
   writes.length = 0
   pendingWrite = undefined
@@ -104,6 +128,7 @@ afterEach(() => {
   host?.remove()
   client?.clear()
   vi.unstubAllGlobals()
+  setActiveNode(originalNodeId)
 })
 
 describe('first-run workspace choice', () => {
@@ -145,10 +170,12 @@ describe('first-run workspace choice', () => {
   })
 
   it('skips without writing the workspace mode', async () => {
-    mount()
+    const { onClose } = mount(undefined, { unmountOnClose: true })
     click('Skip setup')
     await vi.waitFor(() => expect(writes).toHaveLength(1))
     expect(writes).toEqual([{ key: 'onboarded', value: '1' }])
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+    expect(navigation.navigate).not.toHaveBeenCalled()
   })
 
   it.each(['off', 'on'] as const)('uses saved %s mode without offering a choice', async (mode) => {
@@ -205,5 +232,42 @@ describe('first-run workspace choice', () => {
     click('Get started')
     await waitForText('Add your first project')
     expect(writes).toHaveLength(1)
+  })
+
+  it('opens the first project after Finish closes and unmounts the wizard', async () => {
+    const { onClose } = mount('off', { unmountOnClose: true })
+    await advanceToDone()
+    click('Open acorn')
+    await vi.waitFor(() => expect(onClose).toHaveBeenCalledOnce())
+    expect(view().querySelector('[role="dialog"]')).toBeNull()
+    expect(writes).toEqual([{ key: 'onboarded', value: '1' }])
+    expect(navigation.navigate).toHaveBeenCalledWith('/p/Alpha')
+  })
+
+  it('keeps Finish open after a failed completion save', async () => {
+    const { onClose } = mount('off', { unmountOnClose: true })
+    await advanceToDone()
+    saveError = new Error('Preference unavailable')
+    click('Open acorn')
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+    await vi.waitFor(() => expect(button('Open acorn')?.disabled).toBe(false))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(navigation.navigate).not.toHaveBeenCalled()
+    expect(view().querySelector('[role="dialog"]')).toBeTruthy()
+  })
+
+  it.each(['node switch', 'disposal'] as const)('ignores a pending Finish after external %s', async (interruption) => {
+    const { onClose } = mount('off', { unmountOnClose: true })
+    await advanceToDone()
+    pendingWrite = new Promise<void>((resolve) => { releaseWrite = resolve })
+    click('Open acorn')
+    await vi.waitFor(() => expect(writes).toHaveLength(1))
+    if (interruption === 'node switch') setActiveNode('another-node')
+    else dispose()
+    releaseWrite!()
+    await vi.waitFor(() => expect(stored.onboarded).toBe('1'))
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(onClose).not.toHaveBeenCalled()
+    expect(navigation.navigate).not.toHaveBeenCalled()
   })
 })

@@ -145,7 +145,13 @@ export default function OnboardingWizard(props: { onClose: () => void; workspace
   const close = async (landOn?: string) => {
     setBusy(true)
     try {
-      if (await saveOnboardingCompletion(queryClient, () => { if (stillHere()) props.onClose() }) && landOn && stillHere()) navigate(landOn)
+      await saveOnboardingCompletion(queryClient, () => {
+        if (!stillHere()) return
+        // Closing unmounts this wizard. Complete its navigation in the same successful-save
+        // callback, after checking the lifetime and before treating that expected unmount as stale.
+        props.onClose()
+        if (landOn) navigate(landOn)
+      })
     } finally {
       if (stillHere()) setBusy(false)
     }

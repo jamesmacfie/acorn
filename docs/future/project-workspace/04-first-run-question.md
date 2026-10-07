@@ -4,6 +4,17 @@
 
 Status: implemented on `phase-04-first-run-question`.
 
+Review follow-up, October 7, 2026:
+
+- Finish validates that the wizard still belongs to the active Node when the `onboarded` preference
+  save succeeds. Its callback then closes the overlay and opens the first added project together.
+  Closing unmounts the wizard, so a lifetime check after the callback suppressed navigation.
+- A component test mounts the wizard inside a real Solid `Show`, unmounts it from `onClose`, and
+  confirms Finish opens the first project's path. Separate checks cover Skip, a failed completion
+  save, and a pending save followed by a Node switch or external disposal.
+- The onboarding suite and touched TypeScript checks passed for this follow-up. The full repository
+  gate remains for after all phases.
+
 - The welcome step offers separate projects (the default) or grouped workspaces only when
   `core.workspaces` is unset. It waits for the Node to accept the preference before entering the add
   step, keeps a failed save visible for retry, and shows the fixed answer on return to Welcome.
