@@ -1,6 +1,6 @@
 # Project-first workspaces: refused alternatives
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 7, 2026. Status: decisions retained through all six implemented phases.
 Read the [plan](./README.md) before you change these boundaries.
 
 ## Refused alternatives

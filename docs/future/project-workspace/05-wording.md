@@ -63,7 +63,7 @@ Review follow-up, October 8, 2026:
   identity changed` in a narrow unsandboxed run. Frozen-lockfile installation and the supported
   Node 26 runtime succeeded for dependency-dependent checks.
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 02](./02-desktop-chrome.md).
+Original phase plan: October 7, 2026. Dependencies: [phase 02](./02-desktop-chrome.md).
 Read the [plan](./README.md) first, especially [decision](./README.md#decisions) 7.
 
 ## Deliverable

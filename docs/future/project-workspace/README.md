@@ -4,7 +4,12 @@ This plan makes a fresh install project-first. Each project gets its own workspa
 a project, and the Default workspace is never created. Read this page before you build a phase. It
 holds the research and the decisions the phase files depend on.
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 8, 2026. Status: all six phases implemented; combined validation in progress.
+
+The phase completion notes record the implementation and review decisions. Shipped behavior is
+documented in [projects](../../workspaces-and-tasks/projects.md),
+[Settings](../../frontend/settings.md), and [terminal chrome](../../tui/chrome.md).
+The research below describes the code as it stood when the plan was written on October 7, 2026.
 
 ## Goal
 

@@ -38,7 +38,7 @@ Status: implemented on `phase-03-no-projects-screen`.
 - Later phases should keep the visibility signal owned by core, use the shared add controls when
   offering project creation, and preserve the undefined loading state of `createWorkspacesMode`.
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 01](./01-node-switch.md).
+Original phase plan: October 7, 2026. Dependencies: [phase 01](./01-node-switch.md).
 Read the [plan](./README.md) first, especially [decision](./README.md#decisions) 6.
 
 ## Deliverable

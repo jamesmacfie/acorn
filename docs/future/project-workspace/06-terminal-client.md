@@ -52,7 +52,7 @@ Status: implemented on `phase-06-terminal-client`.
 
 The coordinator should run the combined gate after generating the desktop's Tauri schema files.
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 01](./01-node-switch.md),
+Original phase plan: October 7, 2026. Dependencies: [phase 01](./01-node-switch.md),
 [phase 04](./04-first-run-question.md), and [phase 05](./05-wording.md).
 Read the [plan](./README.md) first, especially [decisions](./README.md#decisions) 2, 6, and 7.
 

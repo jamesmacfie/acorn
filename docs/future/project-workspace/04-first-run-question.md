@@ -39,7 +39,7 @@ Review follow-up, October 7, 2026:
 - Later phases should read the fixed Node preference through the protocol mode contract. The
   terminal client still needs its own setup question in phase 06.
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: [phase 02](./02-desktop-chrome.md).
+Original phase plan: October 7, 2026. Dependencies: [phase 02](./02-desktop-chrome.md).
 Read the [plan](./README.md) first, especially [decisions](./README.md#decisions) 1 and 2.
 
 ## Deliverable

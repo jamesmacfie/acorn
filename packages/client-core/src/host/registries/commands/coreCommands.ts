@@ -26,7 +26,7 @@ import {
   themeFollowsSystem,
 } from '../../../features/settings/appearancePrefs'
 import { settingsCategoryLabel, settingsPageForMode } from '../../../features/settings/settingsPresentation'
-import { createWorkspaceWords } from '../../../features/workspaces/words'
+import type { WorkspaceWords } from '../../../features/workspaces/words'
 import { isStandaloneSettingsPage, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
 import { sectionSearchWords, settingsSectionEntries } from '../shell/settingsSearch'
 import type { ContributedCommand } from './commands'
@@ -74,7 +74,7 @@ export const CORE_NOTIFICATIONS_GROUP = 'core.notifications'
 
 /** Where the navigation searches live. Registered by each host, because what it can navigate to
  *  differs; the group is shared so the breadcrumb reads the same in both. */
-export const goToGroup = (words?: ReturnType<typeof createWorkspaceWords>): ContributedCommand => ({
+export const goToGroup = (words?: () => WorkspaceWords): ContributedCommand => ({
   id: CORE_GO_TO_GROUP,
   kind: 'group',
   title: 'Go to',

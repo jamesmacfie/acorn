@@ -315,9 +315,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
       ...(projectPage() ? (projects.data ?? []) : []).map((project): SettingsSearchObject => ({
         name: project.name, page: projectSettingsTarget(project.id), pageLabel: project.name,
         group, scope: 'project', isPage: true,
-        sections: workspaceMode() === 'off'
-          ? (projectPage()?.sections ?? []).map((section) => ({ ...section, rows: section.rows?.filter((row) => row !== 'Workspace') }))
-          : projectPage()?.sections ?? [],
+        sections: projectPage()?.sections ?? [],
       })),
       // A connection's name opens its own page, on Services or AI models, whichever lists it.
       ...(integrations.data?.integrations ?? []).flatMap((connection) => {
