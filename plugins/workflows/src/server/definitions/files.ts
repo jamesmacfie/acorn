@@ -7,7 +7,6 @@ import { parse as parseToml } from 'smol-toml'
 import { z } from 'zod'
 import { dataBindingSchema } from '@acorn/protocol/dataBindings.ts'
 import { agentProfileRegistry, resolveInRoot } from '@acorn/plugin-api/node'
-import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { BUILTIN_POLICIES, BUILTIN_STEP_KINDS, BUILTIN_STEP_VALIDATORS } from './builtinDefinitions'
 import type {
   ChildWorkflowConfig,
@@ -32,7 +31,7 @@ const defaultCatalog = (): WorkflowValidationCatalog => ({
   policies: new Set<string>(BUILTIN_POLICIES),
   profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
   structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
-  managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => managedProviderForProfile(profile.id)).map((profile) => profile.id)),
+  managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.managedProvider).map((profile) => profile.id)),
   validateStepKind: (kind, step, context) => BUILTIN_STEP_VALIDATORS[kind as (typeof BUILTIN_STEP_KINDS)[number]]?.(step, context) ?? [],
 })
 

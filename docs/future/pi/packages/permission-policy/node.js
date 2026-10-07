@@ -36,7 +36,7 @@ export default {
         const warning = verdict.ok ? warn(payload) : null
         if (warning) {
           warnings.set(`${payload.sessionId}:${payload.requestId}`, warning)
-          // ponytail: a fixed cap, oldest first; a pending request older than 200 others has lost its note.
+          // A fixed cap, oldest first; a pending request older than 200 others has lost its note.
           if (warnings.size > 200) warnings.delete(warnings.keys().next().value)
         }
         return Response.json(verdict)

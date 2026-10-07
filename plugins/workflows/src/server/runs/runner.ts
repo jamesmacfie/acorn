@@ -15,7 +15,6 @@ import { stepKindContributionProblems } from '../../shared/stepKindAvailability'
 import { gateFormEdited, gateFormProblems, type GateFormOutput, type GateFormProposal } from '../../shared/gateForm'
 import type { DataValue } from '@acorn/protocol/dataValues.ts'
 import { BUILTIN_STEP_DESCRIPTIONS } from '../../shared/stepFields'
-import { managedProviderForProfile } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { WORKFLOW_POLICY, WORKFLOW_STEP_KIND, WORKFLOW_TRIGGER } from '../../contract/extensions'
 import { MAX_STEP_TURNS, buildBuiltinWorkflowContributions } from '../steps/builtins'
 import { WorkflowTreeSafety } from '../validation/treeSafety'
@@ -203,7 +202,7 @@ export class WorkflowRunner {
       policies: new Set([...this.#builtins.policies.keys(), ...this.#extensions.entries(WORKFLOW_POLICY).map((entry) => entry.id)]),
       profiles: new Set(agentProfileRegistry.list().map((profile) => profile.id)),
       structuredProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.aiArgv).map((profile) => profile.id)),
-      managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => managedProviderForProfile(profile.id)).map((profile) => profile.id)),
+      managedProfiles: new Set(agentProfileRegistry.list().filter((profile) => profile.managedProvider).map((profile) => profile.id)),
       // A contributed kind joins the agent kinds by saying so in its description, which is the only
       // place `isolation`, `inputs` and `configOptions` are ever allowed from.
       agentStepKinds: new Set(kinds.filter((kind) => kind.contribution.describe?.runsAgent).map((kind) => kind.id)),
@@ -223,7 +222,7 @@ export class WorkflowRunner {
       profiles: agentProfileRegistry.list().map((profile) => ({
         id: profile.id,
         label: profile.label,
-        managed: managedProviderForProfile(profile.id) !== null,
+        managed: !!profile.managedProvider,
         structured: !!profile.aiArgv,
       })),
     }

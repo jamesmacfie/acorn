@@ -37,38 +37,16 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,115,487 B with startup phase call sites. Timing helpers and CLI auth/version probes
 // load on first use; the remaining labels and callbacks stay beside their operations. Add 1 KB,
 // keeping the previous lazy-import cuts protected.
-// 2026-10-07: 3,117,742 B with `agents:before-permission`. The policy step (about 3 KB) loads on the
-// first permission request; the hook declaration and the `blocked` branches in the request projection,
-// state reducers, webhook filter, and event bounds run on every boot or event. Add 2 KB.
-// 2026-10-07: 3,123,120 B with `agents:session-messenger`. The messenger (about 6 KB) loads on the
-// first contribution. The point's declaration and loader, the per-plugin count in the turn store, the
-// typed veto error, the manifest rule for a carrier-less declaration, and the host check that a loaded
-// plugin declared the point all load at boot. Add 5.5 KB.
-// 2026-10-07: 3,130,976 B with plugin model grants and `agents.reviewInput.v1`. The grant runtime
-// (about 8 KB) loads on a loaded plugin's first call or a settings read, and the reader's shaping on its
-// first read. The two tables and the boot charge for interrupted calls, the three settings routes, and
-// the reader's query load at boot. Add 8 KB.
-// 2026-10-07: 3,126,635 B with `agents:turn-follow-up`. `agents.sessionExecute` (about 14 KB) moved to
-// the first workflow step, which paid for the point's declaration and disclosure, the two follow-up turn
-// queries, and the startup cancel. The operation registry loads on first use. Lower the ceiling to keep
-// the cut.
-// 2026-10-07: 3,143,980 B with plugin skills. The branch head already measured 3,129,438 B after the
-// last merge from main. The SKILL.md reader (about 6.4 KB) loads on the first package that declares a
-// skill, the first settings read, or the first session start, and the skills index on the first start.
-// The manifest kind, the catalogue and its registration, the roster's projection, the owner's state
-// file, three device routes, and the per-turn delivery report load at boot. Add 16.5 KB.
-// 2026-10-07: 3,145,022 B with native skill delivery. Writing and sweeping a start's skill folder load
-// with the skills index on first use. The lifecycle's per-event check of what a harness advertised, the
-// folder's removal when a process stops, and the native flag on the drivers and delivery record run on
-// every start or event. Add 1 KB.
-// 2026-10-07: 3,148,541 B with the activity feed and session control. The activity projection and its
-// read, and the option change, load on first use. The per-event check that starts a frame, the usage
-// dedupe, the roster's advertised options, the host's caller binding for capabilities, and the request
-// card point's constant load at boot. Add 3.5 KB.
-// 2026-10-07: 3,156,057 B with harness bridges. Answering a bridge call, holding an ask, the Claude hook
-// mapping, and a plugin's coverage load on first use. The two loop points' declarations, the hook
-// runner's `ask` branch, the ingress route, and the start's check for a handler load at boot. Add 8 KB.
-const limits = { ceiling: 3_157_000, floor: 1_000_000 }
+// 2026-10-07: 3,118,217 B with setup run by hand: the rule core checks before admitting it, the
+// terminal route and bridge verb that spawn it, and the status flag the palette reads. All three are
+// registered at boot, so the ceiling moves by 3 KB.
+// 2026-10-07: 3,148,767 B with the pi programme (docs/future/pi): the permission veto, session
+// messages, plugin model grants, unattended follow-ups, plugin skills, the activity feed and session
+// control, and harness bridges. Each feature's runtime loads on first use, and `agents.sessionExecute`
+// moved to the first workflow step. What stays at boot is the hook and extension point declarations,
+// the device routes, the boot charge for interrupted model calls, and the per-event checks that decide
+// whether any of that work is needed. About 1 KB of margin keeps the lazy-load cuts protected.
+const limits = { ceiling: 3_150_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
