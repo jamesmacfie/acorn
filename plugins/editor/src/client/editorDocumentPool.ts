@@ -61,10 +61,16 @@ export async function suspendEditorFile(pool: EditorPool, path: string): Promise
 }
 
 /** Called only after the Node confirms a rename. The next mount rebuilds path-bound extensions. */
-export function rebindEditorFile(pool: EditorPool, oldPath: string, newPath: string, address: readonly (string | null)[]): void {
+export function assertCanRebindEditorFile(pool: EditorPool, oldPath: string, newPath: string, address: readonly (string | null)[]): PooledFile {
   const entry = pool.files.get(oldPath)
-  if (!entry) return
+  if (!entry) throw new Error('The source document is no longer open.')
   if (pool.files.has(newPath)) throw new Error('The destination document is already open.')
+  entry.custody.assertCanRebind(address)
+  return entry
+}
+
+export function rebindEditorFile(pool: EditorPool, oldPath: string, newPath: string, address: readonly (string | null)[]): void {
+  const entry = assertCanRebindEditorFile(pool, oldPath, newPath, address)
   entry.custody.rebind(address)
   pool.files.delete(oldPath)
   entry.mount = {}

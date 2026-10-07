@@ -1155,13 +1155,13 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'ConfirmButton',
     does: 'arms on the first press and confirms on the second',
-    render: (record) => <ConfirmButton label="Delete" onConfirm={() => record('confirm')} />,
+    render: (record) => <ConfirmButton label="Delete" onArm={() => record('arm')} onConfirm={() => record('confirm')} />,
     drive: async (screen, pressed) => {
       const armed = await screen.press('RETURN')
       expect(armed.text).toContain('Delete?')
-      expect(pressed).toEqual([])
+      expect(pressed).toEqual(['arm'])
       await armed.press('RETURN')
-      expect(pressed).toEqual(['confirm'])
+      expect(pressed).toEqual(['arm', 'confirm'])
     },
   },
   {

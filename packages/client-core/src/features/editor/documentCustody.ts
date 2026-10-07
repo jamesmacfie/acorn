@@ -19,6 +19,8 @@ export class DocumentCustody {
   acknowledgedRevision?: string
   /** A file conflict or missing file pauses automatic writes; host documents leave this empty. */
   writeBlock = ''
+  /** Set by the file editor when dirty recovery needs a person's decision. */
+  requiresResolution = false
   state?: EditorState
   viewState?: EditorViewState
   error = ''
@@ -28,7 +30,7 @@ export class DocumentCustody {
   private recoveryTimer?: ReturnType<typeof setTimeout>
   private readers = 0
   private listeners = new Set<() => void>()
-  private suspended = false
+  private suspensionCount = 0
 
   subscribe(listener: () => void): () => void {
     this.listeners.add(listener)
@@ -83,6 +85,7 @@ export class DocumentCustody {
     this.current = this.acknowledged = textOf(text)
     this.acknowledgedRevision = diskRevision
     this.writeBlock = ''
+    this.requiresResolution = false
     this.revision++
     this.flushRecovery()
   }
@@ -93,6 +96,7 @@ export class DocumentCustody {
     this.acknowledgedRevision = diskRevision
     if (this.revision === admittedRevision) this.current = this.acknowledged
     this.writeBlock = ''
+    this.requiresResolution = false
     this.flushRecovery()
     for (const listener of this.listeners) listener()
   }
@@ -118,7 +122,7 @@ export class DocumentCustody {
 
   /** Matching flushes share one operation; later edits occupy one follow-up slot. Failures reject. */
   flush(write: DocumentWriter): Promise<void> {
-    if (this.suspended || this.writeBlock) return Promise.reject(new Error(this.writeBlock || 'Document writes are suspended.'))
+    if (this.suspensionCount || this.writeBlock || this.requiresResolution) return Promise.reject(new Error(this.writeBlock || 'Document writes are suspended.'))
     this.requested = true
     this.nextWrite = write
     if (this.pending) return this.pending
@@ -126,7 +130,7 @@ export class DocumentCustody {
     this.flushRecovery()
     const run = async () => {
       try {
-        while (this.requested && !this.suspended && !this.writeBlock) {
+        while (this.requested && !this.suspensionCount && !this.writeBlock && !this.requiresResolution) {
           this.requested = false
           if (!this.dirty) continue
           const submitted = this.current
@@ -165,18 +169,31 @@ export class DocumentCustody {
 
   /** Stop new and queued writes, then join an admitted write before a file mutation. */
   async suspendWrites(): Promise<() => void> {
-    this.suspended = true
+    this.suspensionCount++
     this.requested = false
     await this.pending?.catch(() => {})
-    return () => { this.suspended = false }
+    let resumed = false
+    return () => {
+      if (resumed) return
+      resumed = true
+      this.suspensionCount--
+    }
   }
 
   /** Move a suspended file's recovery identity after a successful path mutation. */
-  rebind(address: readonly (string | null)[]): void {
-    if (!this.suspended) throw new Error('Suspend document writes before rebinding.')
+  assertCanRebind(address: readonly (string | null)[]): void {
     const next = recoveryKey(address)
+    if (next === this.key) return
     const held = documents.get(next)
-    if (held && held !== this) throw new Error('The destination document is already open.')
+    if ((held && held !== this) || readLocal(next) !== null) {
+      throw new Error('The destination document already has open or recovered text.')
+    }
+  }
+
+  rebind(address: readonly (string | null)[]): void {
+    if (!this.suspensionCount) throw new Error('Suspend document writes before rebinding.')
+    const next = recoveryKey(address)
+    this.assertCanRebind(address)
     const previous = this.key
     if (documents.get(previous) === this) documents.delete(previous)
     this.key = next

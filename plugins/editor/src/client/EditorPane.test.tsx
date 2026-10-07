@@ -258,6 +258,136 @@ describe('the editor pane', () => {
     await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const a = 1\n'))
   })
 
+  it('keeps an unchanged explicit reload in the same editor state', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// draft\n' }, selection: { anchor: 4 } })
+    disk.set('a.ts', view.state.doc.toString())
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Changed on disk'))
+    const before = view.state
+    const reload = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Reload from disk')!
+    reload.click()
+    expect(reload.textContent).toContain('a.ts')
+    reload.click()
+    await vi.waitFor(() => expect(host.textContent).not.toContain('Changed on disk'))
+    expect(view.state).toBe(before)
+    expect(view.state.selection.main.anchor).toBe(4)
+    expect(write).not.toHaveBeenCalled()
+    view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', { key: 'z', code: 'KeyZ', keyCode: 90, ctrlKey: true, bubbles: true }))
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('const a = 1\n'))
+  })
+
+  it('refuses an armed overwrite after the shown disk revision changes', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// my draft\n' } })
+    disk.set('a.ts', '// first external\n')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Changed on disk'))
+    const compare = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Compare')!
+    compare.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('first external'))
+    const overwrite = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Overwrite disk…')!
+    overwrite.click()
+    expect(overwrite.textContent).toContain('a.ts')
+    const reads = read.mock.calls.length
+    disk.set('a.ts', '// newer external\n')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(read.mock.calls.length).toBeGreaterThan(reads))
+    await vi.waitFor(() => expect(host.textContent).toContain('newer external'))
+    overwrite.click()
+    expect(write).not.toHaveBeenCalled()
+    expect(disk.get('a.ts')).toBe('// newer external\n')
+    expect(view.state.doc.toString()).toContain('// my draft')
+  })
+
+  it('does not redirect an armed overwrite after a tab switch', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// a draft\n' } })
+    disk.set('a.ts', '// a external\n')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Changed on disk'))
+    const overwrite = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Overwrite disk…')!
+    overwrite.click()
+    expect(overwrite.textContent).toContain('a.ts')
+
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    view.dispatch({ changes: { from: 0, insert: '// b draft\n' } })
+    disk.set('b.ts', '// b external\n')
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Changed on disk'))
+    const nextOverwrite = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Overwrite disk…')!
+    nextOverwrite.click()
+    expect(write).not.toHaveBeenCalled()
+    expect(disk.get('a.ts')).toBe('// a external\n')
+    expect(disk.get('b.ts')).toBe('// b external\n')
+    expect(openFiles(taskId).find((file) => file.path === 'a.ts')?.dirty).toBe(true)
+  })
+
+  it('coalesces focus bursts and applies the newest disk response', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    read.mockClear()
+    let release!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise<string>((resolve) => { release = resolve }))
+    for (let i = 0; i < 8; i++) window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(1))
+    disk.set('a.ts', '// latest\n')
+    for (let i = 0; i < 8; i++) window.dispatchEvent(new Event('focus'))
+    release('const a = 1\n')
+    await vi.waitFor(() => expect(view.state.doc.toString()).toBe('// latest\n'))
+    expect(read).toHaveBeenCalledTimes(2)
+  })
+
+  it('keeps useful text and distinguishes a failed refresh from deletion', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    read.mockRejectedValueOnce(new Error('Node unavailable'))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Could not read disk'))
+    expect(host.textContent).not.toContain('Deleted on disk')
+    expect(view.state.doc.toString()).toBe('const a = 1\n')
+    read.mockRejectedValueOnce(Object.assign(new Error('File not found.'), { status: 404, code: 'not_found' }))
+    const reloadStatus = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Reload status')!
+    reloadStatus.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('Deleted on disk'))
+    expect(view.state.doc.toString()).toBe('const a = 1\n')
+  })
+
+  it.each(['node-switch', 'task-eviction'] as const)('discards a late refresh after %s', async (change) => {
+    const { host, unmount } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    let release!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise<string>((resolve) => { release = resolve }))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(typeof release).toBe('function'))
+    if (change === 'node-switch') setActiveNode('other-node')
+    else {
+      const { paneModel } = await import('@acorn/plugin-api/client')
+      paneModel('editor', 'other-task', () => ({}))
+      unmount()
+    }
+    release('// stale response\n')
+    await Promise.resolve()
+    expect(view.state.doc.toString()).toBe('const a = 1\n')
+    expect(write).not.toHaveBeenCalled()
+  })
+
   it('keeps a dirty draft and opens a read-only comparison when disk changes', async () => {
     const { host } = mount()
     const view = await editor(host)
@@ -298,6 +428,93 @@ describe('the editor pane', () => {
     expect(disk.has('a.ts')).toBe(false)
     recreate.click()
     await vi.waitFor(() => expect(disk.get('a.ts')).toContain('// keep me'))
+  })
+
+  it.each([
+    { record: 'known-baseline', revision: true, status: 'Recovered draft' },
+    { record: 'legacy', revision: false, status: 'Changed on disk' },
+  ])('keeps a $record recovered draft blocked through close and retirement until resolution', async ({ revision, status }) => {
+    const base = disk.get('a.ts')!
+    const draft = `// recovered\n${base}`
+    localStorage.setItem(`acorn.document.recovery.${JSON.stringify([null, 'file', taskId, 'a.ts'])}`, JSON.stringify({
+      text: draft, acknowledged: base,
+      ...(revision ? { acknowledgedRevision: createHash('sha256').update(base).digest('hex') } : {}),
+    }))
+    const first = mount()
+    const view = await editor(first.host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, '// recovered')
+    await vi.waitFor(() => expect(first.host.textContent).toContain(status))
+    view.contentDOM.dispatchEvent(new Event('blur', { bubbles: true }))
+    first.host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await Promise.resolve()
+    expect(write).not.toHaveBeenCalled()
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    const { paneModel } = await import('@acorn/plugin-api/client')
+    paneModel('editor', 'other-task', () => ({}))
+    first.unmount()
+    await Promise.resolve()
+    expect(write).not.toHaveBeenCalled()
+
+    const second = mount(true)
+    const reopened = await editor(second.host)
+    await showing(() => reopened, '// recovered')
+    await vi.waitFor(() => expect(second.host.textContent).toContain(status))
+    const compare = [...second.host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Compare')!
+    compare.click()
+    await vi.waitFor(() => expect(second.host.textContent).toContain('Disk snapshot → Live draft'))
+    const overwrite = [...second.host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Overwrite disk…')!
+    overwrite.click()
+    overwrite.click()
+    await vi.waitFor(() => expect(disk.get('a.ts')).toBe(draft))
+    expect(write).toHaveBeenCalledTimes(1)
+  })
+
+  it('refuses Save as when the destination has recovered custody without clearing the source draft', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// source draft\n' } })
+    disk.delete('a.ts')
+    read.mockRejectedValueOnce(Object.assign(new Error('File not found.'), { status: 404, code: 'not_found' }))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Deleted on disk'))
+    const destinationKey = `acorn.document.recovery.${JSON.stringify([null, 'file', taskId, 'new.ts'])}`
+    localStorage.setItem(destinationKey, JSON.stringify({ text: 'other draft', acknowledged: '' }))
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="Save as path"]')!
+    input.value = 'new.ts'
+    input.dispatchEvent(new InputEvent('input', { bubbles: true }))
+    const saveAs = [...host.querySelectorAll<HTMLButtonElement>('button')].find((button) => button.textContent === 'Save as…')!
+    saveAs.click()
+    await vi.waitFor(() => expect(host.textContent).toContain('destination document already has open or recovered text'))
+    expect(write).not.toHaveBeenCalled()
+    expect(view.state.doc.toString()).toContain('// source draft')
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    expect(localStorage.getItem(destinationKey)).toContain('other draft')
+
+    // A destination can also become owned while the Node is writing. The source must still retain
+    // its dirty recovery when the post-write rebind refuses that new owner.
+    const { documentCustody } = await import('@acorn/plugin-api/ui/editor')
+    const source = documentCustody([null, 'file', taskId, 'a.ts'], '')
+    const sourceKey = `acorn.document.recovery.${JSON.stringify([null, 'file', taskId, 'a.ts'])}`
+    source.flushRecovery()
+    const recoveryBefore = localStorage.getItem(sourceKey)
+    expect(recoveryBefore).toContain('// source draft')
+    localStorage.removeItem(destinationKey)
+    let finish!: (value: { ok: true }) => void
+    write.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
+    saveAs.click()
+    await vi.waitFor(() => expect(write).toHaveBeenCalledTimes(1))
+    localStorage.setItem(destinationKey, JSON.stringify({ text: 'late draft', acknowledged: '' }))
+    finish({ ok: true })
+    await vi.waitFor(() => expect(disk.get('new.ts')).toContain('// source draft'))
+    await new Promise((resolve) => setTimeout(resolve, 10))
+    expect(source.dirty).toBe(true)
+    expect(localStorage.getItem(sourceKey)).toBe(recoveryBefore)
+    expect(source.current.toString()).toContain('// source draft')
+    expect(openFiles(taskId)[0]?.path).toBe('a.ts')
+    expect(localStorage.getItem(destinationKey)).toContain('late draft')
   })
 
   it('requests the exact displayed UTF-8 body including BOM, Unicode, and CRLF', async () => {

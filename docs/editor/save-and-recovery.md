@@ -20,6 +20,7 @@ Graphical clients refuse a Node that omits the read revision or save acknowledge
 
 Editor file writes to the same canonical checkout path queue behind one another, including writes
 through task-root aliases. File operations join the admitted write and suspend follow-up saves.
+Overlapping file-operation suspensions each keep their own hold until released.
 Folder operations must acquire descendant file locks in sorted canonical-path order. External CLI
 writers do not use these locks. The hash comparison and write have a remaining filesystem race
 against those writers; they are not an atomic compare-and-swap.
@@ -35,7 +36,9 @@ with no eviction limit. Storage can fail or run out of quota. The full document 
 restart can't bring back undo history or a record storage refused. Reopening the same file restores
 recovery without reading from an offline Node. Recovery never replays a write on its own. A file
 recovery record also keeps the acknowledged disk revision. A record written before that field existed
-has an unknown baseline and requires a deliberate reload or overwrite after a disk read.
+has an unknown baseline and requires a deliberate reload or overwrite after a disk read. A recovered
+draft with a known baseline remains write-blocked even when disk still matches that revision; the
+match informs comparison but does not authorize blur, close, or retirement to save it.
 
 A host document flush rejects when saving fails. A surface action runs only after its revision is
 acknowledged and still current. Autosave and retirement absorb that rejection and keep the recovery

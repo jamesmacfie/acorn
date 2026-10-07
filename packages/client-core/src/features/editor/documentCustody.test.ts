@@ -147,6 +147,28 @@ describe('document custody', () => {
     expect(document.acknowledgedRevision).toBe('disk-later')
   })
 
+  it('keeps overlapping suspension holders independent while an admitted write settles', async () => {
+    const document = owner()
+    let finish!: (value: { text: string; revision: string }) => void
+    const writer = vi.fn((_value: string) => new Promise<{ text: string; revision: string }>((resolve) => { finish = resolve }))
+    document.editText('first')
+    const admitted = document.flush(writer)
+    const firstHolder = document.suspendWrites()
+    const secondHolder = document.suspendWrites()
+    document.editText('follow-up')
+    finish({ text: 'first', revision: 'disk-first' })
+    await admitted
+    const releaseFirst = await firstHolder
+    const releaseSecond = await secondHolder
+    releaseFirst()
+    releaseFirst() // a holder cannot release another holder by resuming twice
+    await expect(document.flush(writer)).rejects.toThrow('suspended')
+    expect(writer).toHaveBeenCalledTimes(1)
+    releaseSecond()
+    await document.flush(async (text) => ({ text, revision: 'disk-follow-up' }))
+    expect(document.acknowledgedRevision).toBe('disk-follow-up')
+  })
+
   it('moves dirty recovery to the new address after a confirmed rename', async () => {
     const stored = new Map<string, string>()
     vi.stubGlobal('localStorage', {

@@ -5,7 +5,8 @@ import type { EditorView } from '@codemirror/view'
 import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
-import { createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
+import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
+import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
 import { readEditorMode, saveEditorMode } from './editorPrefs'
 import { activeFile, editorActivate, editorClose, editorOpen, editorPromote, editorSetDirty, openFiles } from './editorState'
@@ -47,7 +48,8 @@ export default function EditorPane(props: { task: Task }) {
   const taskId = props.task.id
   const [root, setRoot] = createSignal<string | null | undefined>(undefined) // undefined = loading
   const [saveErr, setSaveErr] = createSignal('')
-  const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | null>(null)
+  const [diskState, setDiskState] = createSignal<'changed' | 'deleted' | 'read-failed' | 'unknown' | 'recovered' | null>(null)
+  const [armedDecision, setArmedDecision] = createSignal<FileDecision | null>(null)
   const [compare, setCompare] = createSignal(false)
   const [comparisonDisk, setComparisonDisk] = createSignal<EditorReadResult | null>(null)
   const [comparisonDraft, setComparisonDraft] = createSignal('')
@@ -94,6 +96,24 @@ export default function EditorPane(props: { task: Task }) {
   let reloadGeneration = 0
   const subscriptions = new Map<string, () => void>()
   const live = () => !disposed && !pool.retired && activeNodeId() === nodeId
+  const refreshQueue = createEditorRefreshQueue(async (path) => {
+    if (path === active()) await revalidate(path)
+  })
+
+  const captureDecision = (action: FileDecision['action'], destination?: string): FileDecision | null => {
+    const path = active()
+    const entry = path ? pool.files.get(path) : undefined
+    if (!path || !entry || !live()) return null
+    return captureFileDecision(action, nodeId, taskId, path, entry, destination)
+  }
+  const armDecision = (action: FileDecision['action']) => setArmedDecision(captureDecision(action))
+  const confirmDecision = (action: FileDecision['action']): FileDecision | null => {
+    const decision = armedDecision()
+    setArmedDecision(null)
+    if (decision && live() && fileDecisionIsCurrent(decision, action, nodeId, taskId, active(), pool.files.get(decision.path))) return decision
+    setSaveErr('The document or disk version changed. Review it and confirm again.')
+    return null
+  }
 
   /** Put a file's live state back in the pool. Only for a file still open: `close()` deletes its
    *  entry after flushing it, and re-adding it there would keep a closed file's text forever. */
@@ -282,6 +302,7 @@ export default function EditorPane(props: { task: Task }) {
       // bookkeeping either way now that the bookkeeping outlives the mount.
       scheduleSave.flush()
       disposed = true
+      refreshQueue.stop()
       warmedText.clear()
       for (const unsubscribe of subscriptions.values()) unsubscribe()
       subscriptions.clear()
@@ -416,6 +437,7 @@ export default function EditorPane(props: { task: Task }) {
     watchCustody(relPath, entry)
     if (live()) editorSetDirty(taskId, relPath, custody.dirty)
     if (recovery?.dirty) {
+      custody.requiresResolution = true
       custody.writeBlock = 'Recovered draft: compare with disk before saving.'
       if (active() === relPath) setDiskState('unknown')
       void revalidate(relPath)
@@ -578,66 +600,103 @@ export default function EditorPane(props: { task: Task }) {
     }
   }
 
-  async function reloadFromDisk(path: string): Promise<void> {
-    const entry = pool.files.get(path)
-    if (!entry) return
-    const generation = ++reloadGeneration
-    const editRevision = entry.custody.revision
-    try {
-      const disk = await api.read(taskId, path)
-      if (!live() || generation !== reloadGeneration || pool.files.get(path) !== entry || active() !== path) return
-      if (entry.custody.revision !== editRevision) { entry.stale = true; return }
-      if (entry.custody.writing) { entry.stale = true; return }
-      const place = view && currentPath === path ? captureViewState(view) : entry.custody.viewState
-      entry.custody.reload(disk.text, disk.revision)
-      entry.disk = disk
+  function applyDiskRead(path: string, entry: PooledFile, disk: EditorReadResult, discardDraft: boolean): void {
+    const custody = entry.custody
+    const place = view && currentPath === path ? captureViewState(view) : custody.viewState
+    const outcome = reconcileEditorDisk(entry, disk, discardDraft)
+    setComparisonDisk(disk)
+    if (outcome.kind === 'held') {
+      setDiskState(outcome.status)
+      if (custody.writeBlock) scheduleSave.cancel()
+      return
+    }
+    if (outcome.kind === 'replace') {
       const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language) })
-      entry.state = entry.custody.state = state
+      entry.state = custody.state = state
       if (view && currentPath === path) {
         view.setState(state)
         if (place) applyViewState(view, place)
+        remember(path, view.state)
       }
-      setDiskState(null)
-      setCompare(false)
-      setSaveErr('')
-      editorSetDirty(taskId, path, false)
+      void refreshLineMarkers(path)
+    }
+    saved.set(path, custody.acknowledged)
+    editorSetDirty(taskId, path, false)
+    setDiskState(null)
+    setCompare(false)
+    setSaveErr('')
+  }
+
+  async function reloadFromDisk(decision: FileDecision): Promise<void> {
+    const { path, entry } = decision
+    const generation = ++reloadGeneration
+    try {
+      const disk = await api.read(taskId, path)
+      if (!live() || generation !== reloadGeneration || !fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path))) return
+      if (entry.custody.writing) { entry.stale = true; return }
+      if (disk.revision !== decision.disk?.revision) {
+        entry.stale = true
+        setSaveErr('The disk changed after confirmation was shown. Review it and confirm again.')
+        void revalidate(path)
+        return
+      }
+      applyDiskRead(path, entry, disk, true)
     } catch (cause) {
-      if (live() && generation === reloadGeneration && pool.files.get(path) === entry && active() === path)
+      if (live() && generation === reloadGeneration && fileDecisionIsCurrent(decision, 'reload', nodeId, taskId, active(), pool.files.get(path)))
         setSaveErr(cause instanceof Error ? cause.message : 'Unable to reload the file.')
     }
   }
 
-  async function resolveWrite(path: string, destination = path, recreate = false): Promise<void> {
-    const entry = pool.files.get(path)
-    if (!entry) return
-    const snapshot = destination === path ? entry.disk : null
-    if (destination === path && !snapshot && !recreate) { await revalidate(path); return }
-    const resume = await entry.custody.suspendWrites()
-    const admitted = entry.custody.revision
-    const draft = entry.custody.current.toString()
+  async function resolveWrite(decision: FileDecision): Promise<void> {
+    const { path, destination, entry } = decision
+    if (!live() || !fileDecisionIsCurrent(decision, decision.action, nodeId, taskId, active(), pool.files.get(path))) {
+      setSaveErr('The document or disk version changed. Review it and confirm again.')
+      return
+    }
+    if (decision.action === 'overwrite' && !decision.disk) { await revalidate(path); return }
+    const destinationAddress = [nodeId, 'file', taskId, destination]
     try {
-      const result = await api.write(taskId, destination, draft, recreate ? null : snapshot?.revision ?? null)
+      if (destination !== path) assertCanRebindEditorFile(pool, path, destination, destinationAddress)
+    } catch (cause) {
+      setSaveErr(cause instanceof Error ? cause.message : 'The destination document is unavailable.')
+      return
+    }
+    const resume = await entry.custody.suspendWrites()
+    try {
+      if (!fileDecisionIsCurrent(decision, decision.action, nodeId, taskId, active(), pool.files.get(path))) {
+        setSaveErr('The document or disk version changed. Review it and confirm again.')
+        return
+      }
+      if (destination !== path) assertCanRebindEditorFile(pool, path, destination, destinationAddress)
+      const admitted = entry.custody.revision
+      const draft = entry.custody.current.toString()
+      const expected = decision.action === 'overwrite' ? decision.disk!.revision : null
+      const result = await api.write(taskId, destination, draft, expected)
       if (!live() || pool.files.get(path) !== entry) return
       if (!result.ok) {
         setSaveErr(result.reason)
         if (destination === path) await revalidate(path)
         return
       }
+      if (destination !== path) {
+        // Rebinding can still lose a race to another open tab during the request. Keep source
+        // recovery untouched until the new address is actually ours.
+        rebindEditorFile(pool, path, destination, destinationAddress)
+      }
       entry.custody.acknowledgeResolved(result.text, result.revision, admitted)
+      entry.disk = { text: result.text, revision: result.revision }
       if (destination === path) {
-        setDiskState(null)
-        setCompare(false)
-        setSaveErr('')
+        if (active() === path) { setDiskState(null); setCompare(false); setSaveErr('') }
         editorSetDirty(taskId, path, entry.custody.dirty)
       } else {
-        rebindEditorFile(pool, path, destination, [nodeId, 'file', taskId, destination])
+        const activeAtCompletion = active()
         subscriptions.get(path)?.()
         subscriptions.delete(path)
         editorClose(taskId, path)
         editorOpen(taskId, destination, false)
+        if (activeAtCompletion && activeAtCompletion !== path) editorActivate(taskId, activeAtCompletion)
         setSaveAsPath('')
-        setDiskState(null)
-        setSaveErr('')
+        if (activeAtCompletion === path) { setDiskState(null); setSaveErr('') }
       }
     } catch (cause) {
       if (live()) setSaveErr(cause instanceof Error ? cause.message : 'Unable to write the file.')
@@ -683,49 +742,13 @@ export default function EditorPane(props: { task: Task }) {
     if (!live() || generation !== reloadGeneration || pool.files.get(path) !== entry || active() !== path
       || entry.custody.revision !== editRevision) { entry.stale = true; return }
     entry.stale = false
-    entry.disk = disk
-    setComparisonDisk(disk)
-    const custody = entry.custody
-    if (custody.dirty) {
-      if (!custody.acknowledgedRevision) {
-        custody.writeBlock = 'The recovered draft has no known disk baseline.'
-        setDiskState('unknown')
-      } else if (disk.revision !== custody.acknowledgedRevision) {
-        custody.writeBlock = 'Changed on disk.'
-        setDiskState('changed')
-      } else {
-        custody.writeBlock = ''
-        setDiskState(null)
-      }
-      if (custody.writeBlock) scheduleSave.cancel()
-      return
-    }
-    custody.writeBlock = ''
-    setDiskState(null)
-    setSaveErr('')
-    if (disk.revision === custody.acknowledgedRevision) return
-    if (disk.text === custody.current.toString()) {
-      custody.acknowledgedRevision = disk.revision
-      return
-    }
-    const place = view && currentPath === path ? captureViewState(view) : custody.viewState
-    custody.reload(disk.text, disk.revision)
-    const state = engine!.EditorState.create({ doc: disk.text, extensions: perFile(path, entry.language) })
-    entry.state = custody.state = state
-    if (view && currentPath === path) {
-      view.setState(state)
-      if (place) applyViewState(view, place)
-      remember(path, view.state)
-    }
-    saved.set(path, custody.acknowledged)
-    editorSetDirty(taskId, path, false)
-    void refreshLineMarkers(path)
+    applyDiskRead(path, entry, disk, false)
   }
 
   const invalidate = () => {
     for (const entry of pool.files.values()) entry.stale = true
     const path = currentPath
-    if (path) void revalidate(path)
+    if (path) refreshQueue.request(path)
   }
   function onFocus() { invalidate() }
 
@@ -830,7 +853,11 @@ export default function EditorPane(props: { task: Task }) {
                   <Show when={activeTab()?.dirty} fallback={
                     <Button size="sm" variant="bare" onPress={() => { const path = active(); if (path) void revalidate(path) }}>Reload from disk</Button>
                   }>
-                    <ConfirmButton size="sm" variant="bare" timeoutMs={10_000} confirmLabel="Discard draft and reload?" onConfirm={() => { const path = active(); if (path) void reloadFromDisk(path) }}>Reload from disk</ConfirmButton>
+                    <ConfirmButton size="sm" variant="bare" timeoutMs={10_000}
+                      confirmLabel={`Discard ${armedDecision()?.path ?? active()} and reload?`}
+                      onArm={() => armDecision('reload')}
+                      onConfirm={() => { const decision = confirmDecision('reload'); if (decision) void reloadFromDisk(decision) }}
+                    >Reload from disk</ConfirmButton>
                   </Show>
                   <IconButton
                     icon="send"
@@ -857,19 +884,31 @@ export default function EditorPane(props: { task: Task }) {
           <Show when={saveErr()}><Alert variant="banner" tone="danger">{saveErr()}</Alert></Show>
           <Show when={active() && diskState()}>
             <Alert variant="banner" tone="warn">
-              {diskState() === 'deleted' ? 'Deleted on disk' : diskState() === 'read-failed' ? 'Could not read disk' : 'Changed on disk'}
+              {diskState() === 'deleted' ? 'Deleted on disk' : diskState() === 'read-failed' ? 'Could not read disk' : diskState() === 'recovered' ? 'Recovered draft' : 'Changed on disk'}
               <Button onPress={() => { const path = active(); if (path) void revalidate(path) }}>Reload status</Button>
               <Show when={diskState() !== 'deleted' && diskState() !== 'read-failed'}>
                 <Button onPress={() => { setComparisonDisk(pool.files.get(active()!)?.disk ?? null); setComparisonDraft(pool.files.get(active()!)?.custody.current.toString() ?? ''); setCompare((shown) => !shown) }}>Compare</Button>
               </Show>
-              <ConfirmButton timeoutMs={10_000} confirmLabel="Discard draft and reload from disk?" onConfirm={() => { const path = active(); if (path) void reloadFromDisk(path) }}>Reload from disk</ConfirmButton>
-              <Show when={diskState() === 'changed' || diskState() === 'unknown'}>
-                <ConfirmButton timeoutMs={10_000} confirmLabel="Overwrite the disk version shown?" onConfirm={() => { const path = active(); if (path) void resolveWrite(path) }}>Overwrite disk…</ConfirmButton>
+              <ConfirmButton timeoutMs={10_000}
+                confirmLabel={`Discard ${armedDecision()?.path ?? active()} and reload from disk?`}
+                onArm={() => armDecision('reload')}
+                onConfirm={() => { const decision = confirmDecision('reload'); if (decision) void reloadFromDisk(decision) }}
+              >Reload from disk</ConfirmButton>
+              <Show when={diskState() === 'changed' || diskState() === 'unknown' || diskState() === 'recovered'}>
+                <ConfirmButton timeoutMs={10_000}
+                  confirmLabel={`Overwrite ${armedDecision()?.path ?? active()} at the shown disk version?`}
+                  onArm={() => armDecision('overwrite')}
+                  onConfirm={() => { const decision = confirmDecision('overwrite'); if (decision) void resolveWrite(decision) }}
+                >Overwrite disk…</ConfirmButton>
               </Show>
               <Show when={diskState() === 'deleted'}>
-                <ConfirmButton timeoutMs={10_000} confirmLabel="Recreate the missing file?" onConfirm={() => { const path = active(); if (path) void resolveWrite(path, path, true) }}>Recreate file…</ConfirmButton>
+                <ConfirmButton timeoutMs={10_000}
+                  confirmLabel={`Recreate ${armedDecision()?.path ?? active()}?`}
+                  onArm={() => armDecision('recreate')}
+                  onConfirm={() => { const decision = confirmDecision('recreate'); if (decision) void resolveWrite(decision) }}
+                >Recreate file…</ConfirmButton>
                 <Input label="Save as path" value={saveAsPath()} onInput={setSaveAsPath} />
-                <Button onPress={() => { const path = active(); if (path && saveAsPath()) void resolveWrite(path, saveAsPath()) }}>Save as…</Button>
+                <Button onPress={() => { const decision = saveAsPath() && captureDecision('save-as', saveAsPath()); if (decision) void resolveWrite(decision) }}>Save as…</Button>
               </Show>
             </Alert>
           </Show>
