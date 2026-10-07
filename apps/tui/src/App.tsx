@@ -1,5 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, lazy, type JSX } from 'solid-js'
+import { createEffect, lazy, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
@@ -17,6 +17,7 @@ import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurfa
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/remoteTreeLoader'
 import { Shell } from './chrome/Shell'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 
 // The composition root's client half: the host seams and the shell under the one query client
 // this node has. What is on screen is `chrome/Shell.tsx`; this is what has to be true before it draws.
@@ -119,6 +120,8 @@ export function App(props: {
   nodeId: string
   supervised: boolean
   task?: string
+  link?: Address
+  linkReady?: Accessor<boolean>
   onNoTask?: (id: string) => void
   onQuit: () => void
 }) {
@@ -126,7 +129,7 @@ export function App(props: {
     <QueryClientProvider client={props.client}>
       <Telemetry />
       <TaskArg id={props.task} onMissing={props.onNoTask}>
-        <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} />
+        <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} link={props.link} linkReady={props.linkReady} />
       </TaskArg>
     </QueryClientProvider>
   )

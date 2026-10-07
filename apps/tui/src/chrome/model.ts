@@ -43,6 +43,7 @@ export type ShellModel = {
    *  empty array, which reads the same as a node with nothing on it, so anything that must not act on
    *  a guess asks this instead (./restore.ts). */
   ready: Accessor<boolean>
+  sourcesReady: Accessor<boolean>
 }
 
 export function createShellModel(): ShellModel {
@@ -174,5 +175,5 @@ export function createShellModel(): ShellModel {
     scheduleSettle()
   }
 
-  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready }
+  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady }
 }

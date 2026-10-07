@@ -7,7 +7,7 @@ const PROFILES = new Set(['small', 'scale', 'canonical'])
 export function parseTuiAgentOptions(argv) {
   const options = {
     session: null, fixture: null, project: null, profile: 'small', seed: 1,
-    reuse: false, onboarding: false, cols: 80, rows: 24, keyboard: 'kitty',
+    reuse: false, onboarding: false, cols: 80, rows: 24, keyboard: 'kitty', link: null, build: true,
   }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
@@ -24,6 +24,8 @@ export function parseTuiAgentOptions(argv) {
     else if (arg === '--cols') options.cols = Number(argv[++index])
     else if (arg === '--rows') options.rows = Number(argv[++index])
     else if (arg === '--keyboard') options.keyboard = argv[++index] ?? ''
+    else if (arg === '--link') options.link = argv[++index] ?? ''
+    else if (arg === '--no-build') options.build = false
     else if (arg === '--reuse') options.reuse = true
     else if (arg === '--onboarding') options.onboarding = true
     else throw new Error(`Unknown option: ${arg}`)

@@ -75,6 +75,24 @@ the renderer starts.
 `acorn` remembers what it pairs with, so the next time is `acorn --node <name>`. The list is the fleet
 store's. A revoked token shows as `revoked` in the footer and stops reconnecting.
 
+## Open a link
+
+`acorn --link 'acorn://<node>/<place>'` opens a shared place in the terminal client. The Node slot
+is a paired Node ID, or `local` for this machine's data root. A link never starts pairing. `--link`
+cannot be combined with `--node` or `--task`. The client validates the address before opening a Node;
+an invalid link exits with a usage error, and an unpaired ID takes the usual remembered-Node error.
+
+Task links open a task and, when available on this Node, its named pane and selected item. Project
+links open the project or a route whose source has a terminal view. A missing plugin page opens the
+project and says which page was unavailable. Source links select the named Menu source and move the
+caret with it. Settings links open the named page; this host does not scroll to a `#section`, and a
+page with desktop-only controls says so in the terminal. `open?url=` uses the terminal's registered
+content-link recognisers and opens only routes the terminal can draw. A recogniser that offers only
+a reference panel or overlay has no terminal destination and gets a specific refusal.
+
+`new-task?url=` exits with an instruction to open the link in the desktop app, where creation needs
+confirmation. Link startup does not create a task or promote an outside item.
+
 ## Where the TUI keeps things
 
 The config directory belongs to the client. It holds the fleet store, the device tokens at mode

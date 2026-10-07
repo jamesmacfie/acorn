@@ -1,5 +1,43 @@
 # Phase 05: terminal client
 
+## Completion note, October 8, 2026
+
+`acorn --link` parses a pure address before opening a Node. It rejects malformed links, `--task` or
+`--node` combinations, and `new-task` with nonzero exits. A concrete Node ID must already be in the
+terminal's fleet; link startup never pairs. `local` keeps the normal local data-root behavior, except
+that attaching without a saved token refuses instead of asking for a pairing code.
+
+The terminal opens task, pane, project, settings, and rail-source destinations after place restore,
+queries, and source registration settle. A link wins over a remembered task or source. Plugin paths
+and outside URLs wait for the selected Node's loaded contributions, with a 15-second deadline that
+also covers a starting Node's handshake. The terminal resolves outside URLs through its registered
+content-link recognisers. It opens a route only when a terminal source renders it. A plugin page
+without a terminal view opens its project and names the unavailable page; an unclaimed URL or a
+recogniser with only a reference panel receives a refusal. Source IDs select the rail, while
+provider IDs remain the recogniser's concern. Project path segments are decoded by the address
+parser and encoded once for the router.
+
+The isolated `tui-navigation` session showed the linked Notes pane, project, Connections settings
+page, and Agents source in snapshots. A pull route without a connected GitHub source fell back to
+its project and wrote an unavailable-page notice. A registered test recogniser reached its terminal
+source, and a registered project surface without a terminal source produced the specific refusal.
+The fixture cannot show a live GitHub pull or loaded plugin page. Settings sections do not scroll in
+this host, and desktop-only settings controls continue to say so. Every isolated session was stopped.
+
+The TUI build and scoped TypeScript checks for TUI and client-core passed. The first-frame startup
+closure measured 722,619 bytes in 164 chunks; its guard moved from 720,000 to 723,000 bytes for the
+pure parser and rail identity work. The roster and linked-place resolver remain after first frame.
+The scoped TUI run passed 670 tests, with the boot file unable to bind loopback in the sandbox; its
+10 tests passed on a narrow host-permission rerun. Focused link, chrome, source-switch, and startup
+budget tests passed. The architecture run passed 86 of 87 tests; its only failure names three
+missing generated Tauri schemas in the unrelated desktop security design, which desktop staging
+generates. Malformed, unpaired, action, conflicting-option, and empty links returned the expected
+messages and nonzero codes in direct startup checks. The coordinator owns full repository gates and
+installed release checks.
+
+Later work can add terminal renderers for plugin pages and reference-panel content links. It should
+keep the link resolver behind the first frame and retain the no-pairing and no-write startup rules.
+
 Date: October 7, 2026. Status: planned; implementation not started. Dependencies: phase 01.
 Read the [plan](./README.md), especially [the address format](./README.md#the-address-format).
 

@@ -15,7 +15,7 @@
 // this host inherits rather than invents (docs/frontend/registries.md § Registries and plugins). A path that
 // names a source moves the rail to it; choosing a source does not rewrite the path.
 
-import { createEffect, untrack } from 'solid-js'
+import { createEffect, on, untrack } from 'solid-js'
 import { projectPath } from '@acorn/client-core/host/registries/commands'
 import { sourceIdForPath } from '@acorn/client-core/host/registries/sources'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
@@ -80,10 +80,10 @@ export function installRouting(model: ShellModel): void {
   // Tracked, it also ran on every Menu choice — and since choosing a source does not rewrite the
   // path, the path's owner was still the old source, and the choice was snapped straight back: once
   // a reader had browsed into any source-claimed path, the Menu stopped working.
-  createEffect(() => {
-    const owner = sourceIdForPath(currentPath())
+  createEffect(on(currentPath, (path) => {
+    const owner = untrack(() => sourceIdForPath(path))
     if (owner && owner !== untrack(selectedSource)) setSelectedSource(owner)
-  })
+  }))
 
   // Keep the path on a project this workspace has. Two cases, and they are the same check: nothing is
   // chosen yet, or the reader switched workspace and the path still names the old one's project.
@@ -94,6 +94,9 @@ export function installRouting(model: ShellModel): void {
   createEffect(() => {
     const projects = model.workspace()?.projects ?? []
     if (!projects.length) return
+    // A task route names its own project through the task record. Do not replace that explicit
+    // destination with the workspace's first browse project during startup.
+    if (params.taskId) return
     if (projects.some((project) => project.id === routedProjectId())) return
     chooseProject(projects[0].id)
   })

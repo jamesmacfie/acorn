@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { parseArgs } from 'node:util'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
 import { bootMark, heldLines, holdLine, printBootMarks } from './boot'
 import { render } from './tree/renderer'
@@ -27,15 +28,39 @@ const { values } = parseArgs({
   options: {
     node: { type: 'string' },
     task: { type: 'string' },
+    link: { type: 'string' },
+    help: { type: 'boolean', short: 'h' },
   },
   allowPositionals: false,
 })
+if (values.help) {
+  process.stdout.write('Usage: acorn [--node <name|id|https://endpoint>] [--task <id>]\n       acorn --link <acorn://node/place>\n')
+  process.exit(0)
+}
+if (values.link !== undefined && (values.task !== undefined || values.node !== undefined)) {
+  process.stderr.write('acorn: --link cannot be used with --task or --node.\n')
+  process.exit(2)
+}
+let link: Address | undefined
+if (values.link !== undefined) {
+  const { parseLink } = await import('@acorn/client-core/host/registries/commands/addresses')
+  const parsed = parseLink(values.link)
+  if (parsed.kind === 'refused') {
+    process.stderr.write(`acorn: ${parsed.reason}.\n`)
+    process.exit(2)
+  }
+  link = parsed.address
+  if (link.kind === 'new-task') {
+    process.stderr.write('acorn: Open this new-task link in the desktop app to review and confirm it.\n')
+    process.exit(2)
+  }
+}
 
 // Before the renderer: pairing asks a question on stdin, and it is the one thing here that does. What
 // no longer happens before the renderer is waiting for a node this run started — `openNode` returns as
 // soon as the child is spawned, and the shell draws from the persisted cache while it boots
 // (./node/open.ts, docs/tui/process.md § Attach or start).
-const opened = await openNode(values.node).catch((error: unknown) => {
+const opened = await openNode(link ? (link.nodeId === 'local' ? undefined : link.nodeId) : values.node, undefined, !link).catch((error: unknown) => {
   log.error(error instanceof Error ? error.message : String(error))
   process.exit(1)
 })
@@ -70,10 +95,11 @@ const { watchConnectionChanges } = await import('@acorn/client-core/features/int
 const { watchProjectChanges } = await import('@acorn/client-core/features/projects/watchProjectChanges.ts')
 const { watchWorkspaceChanges } = await import('@acorn/client-core/features/workspaces/watchWorkspaceChanges.ts')
 const { watchNodeEvents } = await import('@acorn/client-core/infra/node/watchNodeEvents.ts')
-const { createEffect, createRoot } = await import('solid-js')
+const { createEffect, createRoot, createSignal } = await import('solid-js')
 const { setHostFocused } = await import('@acorn/client-core/features/notifications/deliver.ts')
 const { startClientTelemetry } = await import('@acorn/client-core/infra/telemetry/emitter.ts')
 const { postTelemetryBatch } = await import('@acorn/client-core/infra/telemetry/post.ts')
+const [linkReady, setLinkReady] = createSignal(false)
 
 // This host's telemetry, wired before anything can emit. Wiring is not collecting: the emitter stays
 // off until `./App.tsx` reads `telemetry.enabled` off the node and says otherwise, which is the same
@@ -236,6 +262,27 @@ async function fillIn(): Promise<void> {
   // reachable. Fired from here it asked a node this run had just spawned and was still `offline`, found
   // no roster, and never ran again — the same boot race the effect above answers for the query cache.
   watchPluginChanges()
+  if (link) {
+    // Core places need the compiled roster, which is already installed above. Plugin paths and
+    // sources need the selected Node's loaded contributions too. A stalled roster read must not
+    // keep the terminal on its remembered place forever; after the deadline, the resolver gives a
+    // specific unavailable-view refusal if the contribution still has not arrived.
+    if (link.kind === 'task' || link.kind === 'settings' || (link.kind === 'project' && !link.rest.length)) {
+      setLinkReady(true)
+    } else {
+      const { preparePluginContributionsForNode } = await import('@acorn/client-core/host/plugins/reload.ts')
+      let deadline: ReturnType<typeof setTimeout> | undefined
+      await Promise.race([
+        (async () => {
+          if (opened.starting) await opened.starting.catch(() => undefined)
+          await preparePluginContributionsForNode(opened.nodeId)
+        })().catch((error: unknown) => log.warn('could not load linked node plugin contributions', error)),
+        new Promise<void>((resolve) => { deadline = setTimeout(resolve, 15_000) }),
+      ])
+      if (deadline) clearTimeout(deadline)
+      setLinkReady(true)
+    }
+  }
 
   // The sound channel: an unseen agent edge rings the terminal.
   const { initBellNotices } = await import('./kit/bell')
@@ -328,6 +375,7 @@ await render(
       nodeId={opened.nodeId}
       supervised={opened.supervised}
       {...(values.task ? { task: values.task } : {})}
+      {...(link ? { link, linkReady } : {})}
       onNoTask={(id) => {
         log.warn(`No task ${id} on this node.`)
         // Not from here. A warm cache answers the tasks query on the first tick, so this callback can

@@ -207,6 +207,8 @@ export async function renderFixture(size: {
    *  raises its trust overlay. Seeded here rather than by the caller because the reset below would
    *  clear anything seeded before the call (client-core/host/plugins/distribution.ts). */
   trust?: readonly PluginTrustRequest[]
+  link?: import('@acorn/client-core/host/registries/commands/addresses').Address
+  register?: () => () => void
 } = {}): Promise<Screen> {
   const { render } = await import('./tree/renderer')
   const { installKeymap } = await import('./keys/install')
@@ -292,6 +294,7 @@ export async function renderFixture(size: {
   // keybinding registry when the command layer builds its first table.
   const { installFixtureExtensions } = await import('./fixtureExtensions')
   installFixtureExtensions()
+  const disposeRegistrations = size.register?.()
 
   // The renderer first and the tree second, rather than `testRender`, which builds both at once. The
   // keymap has to be installed before anything mounts: a layout, a collection and a trap all register
@@ -318,9 +321,11 @@ export async function renderFixture(size: {
   // The tree mounts on the screen's root node rather than on the surface around it
   // (./tree/renderer.ts § render).
   const target = (renderer as unknown as { root: unknown }).root
-  const mounted = await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false} onQuit={() => { quits += 1 }} />, target as never)
+  const mounted = await render(() => <App client={client} nodeId="node-1" supervised={size.supervised ?? false}
+    link={size.link} linkReady={() => true} onQuit={() => { quits += 1 }} />, target as never)
   const tearDown = (): void => {
     ;(mounted as unknown as () => void)()
+    disposeRegistrations?.()
     surface.destroy()
   }
   previous = tearDown

@@ -1,10 +1,11 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type JSX } from 'solid-js'
+import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
+import { pluginRosterKnown } from '@acorn/client-core/infra/node'
 import { PrefKeys } from '@acorn/client-core/infra/persistence'
 import { keymap } from '@acorn/client-core/kit/keys/keymapHost.ts'
 import { focusedPane, selectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
@@ -54,6 +55,8 @@ import { SettingsHost } from './SettingsHost'
 import { closeSettings, openSettings, settingsPlace } from './settingsStore'
 import { Confirmation } from './Confirmation'
 import { activeConfirmation } from './confirmStore'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
+import { placeRestored } from './state'
 
 // The arrangement: topbar, rail beside the pane, notifications, footer, and whatever overlay is on
 // top of it all.
@@ -69,7 +72,7 @@ import { activeConfirmation } from './confirmStore'
 // and a stop that does nothing is a hole a reader falls into (../keys/regions.ts § moveRegion).
 const STRIP_ORDER = -50
 
-export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void }) {
+export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () => void; link?: Address; linkReady?: Accessor<boolean> }) {
   const model = createShellModel()
   // One session for the whole shell, not one per open: `./Palette.tsx` is mounted only while the
   // overlay is up, and a shortcut aimed at a group has to be able to open it (./paletteSession.ts).
@@ -131,6 +134,19 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // …and where the last run left off: the workspace that was open, and from there the per-workspace
   // memory of what was open in it (./restore.ts).
   installRestore(model, () => prefs.data)
+  const [settingsReady, setSettingsReady] = createSignal(false)
+  const [rosterDeadline, setRosterDeadline] = createSignal(false)
+  if (props.link?.kind === 'task' && props.link.pane) {
+    const timer = setTimeout(() => setRosterDeadline(true), 15_000)
+    onCleanup(() => clearTimeout(timer))
+  }
+  let linked = false
+  createEffect(() => {
+    if (!props.link || linked || !props.linkReady?.() || !placeRestored() || !model.ready() || !model.sourcesReady() || !settingsReady()) return
+    if (props.link.kind === 'task' && props.link.pane && !pluginRosterKnown() && !rosterDeadline()) return
+    linked = true
+    void import('./link').then(({ openTerminalLink }) => openTerminalLink(props.link!, model))
+  })
 
   // A bundle this device has never decided about. Raised rather than opened by a key, because nobody
   // asked for it: the distribution pass found code a node is offering and nothing runs until the
@@ -282,7 +298,9 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   onMount(() => {
     let unregister: (() => void) | undefined
     let live = true
-    void import('./settingsPages').then(({ registerCoreSettingsPages }) => { if (live) unregister = registerCoreSettingsPages() })
+    void import('./settingsPages').then(({ registerCoreSettingsPages }) => {
+      if (live) { unregister = registerCoreSettingsPages(); setSettingsReady(true) }
+    })
     const offEvent = clientEvents.on('presentation:open-settings', ({ tab }) => openSettings(tab))
     const offTarget = registerNoticeTargetHandler('settings', (_taskId, target) => openSettings(target.resourceId))
     onCleanup(() => { live = false; offTarget(); offEvent(); unregister?.() })
