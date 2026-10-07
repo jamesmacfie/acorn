@@ -89,19 +89,24 @@ as with workspace deletion while workspaces are on.
 
 ## The first-run wizard
 
-A Node with no projects opens the first-run wizard in `plugins/onboarding`. Its steps are welcome,
-add projects by folder or from GitHub, name them and pick their workspaces, pick a model for text
-generation, and done. Everything it offers is also in Settings → Overview.
+A Node with no projects opens the first-run wizard in `plugins/onboarding`. Its welcome step asks
+whether to keep projects separate or group them into workspaces when `core.workspaces` is unset.
+Separate projects is the default choice. The wizard saves the answer before it adds a project, and
+the Node fixes the mode after that write. If the mode is already set, the wizard shows the saved
+answer without offering another choice. The following steps add projects by folder or from GitHub,
+name them, pick a model for text generation, and finish.
 
 `shouldShowOnboarding` opens it when there are no projects and no `onboarded` preference. Finishing
-and skipping both write the preference, so the wizard opens once. Once open, `onboardingVisible`
+and skipping both write the preference, so the wizard opens once. Skipping before answering leaves
+`core.workspaces` unset; the Node chooses the mode when the first project is created. Once open, `onboardingVisible`
 keeps it open until it closes itself. The wizard's first step creates a project, so re-checking "no
 projects yet" on every render would unmount it mid-flow.
 
 The GitHub step takes a batch. The repository list stays put with a running tally of what you added,
-until you press **Done adding**. The naming step then shows a name field and a workspace picker for
-each project. The picker's last option creates a workspace, and a workspace you create appears in the
-next row's list.
+until you press **Done adding**. The naming step shows a name field for each project. With
+workspaces on, it also shows a workspace picker. The picker's last option creates a workspace, and
+a workspace you create appears in the next row's list. With workspaces off, the Node pairs each
+project with its own workspace and keeps its name in sync.
 
 The batch is the list of project IDs that `ProjectImporterProps.onImported` reports. An import can
 repair a path-less project instead of creating one, so diffing the project list would miss it.

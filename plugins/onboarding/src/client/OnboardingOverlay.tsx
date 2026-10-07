@@ -1,6 +1,6 @@
 import { createEffect, createSignal, lazy, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { activeNodeId, nodeReady, ownOnboardingVisibility, PrefKeys, prefsOptions, projectsOptions } from '@acorn/plugin-api/client'
+import { activeNodeId, nodeReady, ownOnboardingVisibility, PrefKeys, prefsOptions, projectsOptions, WORKSPACES_PREF_KEY } from '@acorn/plugin-api/client'
 import { onboardingVisible, shouldShowOnboarding } from './gate'
 
 const OnboardingWizard = lazy(() => import('./OnboardingWizard'))
@@ -49,6 +49,7 @@ export default function OnboardingOverlay() {
   return (
     <Show when={onboardingVisible({ ...gate(), open: opened() })}>
       <OnboardingWizard
+        workspacesPreference={prefs.data?.[WORKSPACES_PREF_KEY]}
         onClose={() => {
           setOpened(false)
           setDismissed(true)

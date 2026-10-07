@@ -1,23 +1,27 @@
-import { createMemo, createSignal, Index, lazy, Show, Suspense } from 'solid-js'
+import { createMemo, createSignal, Index, lazy, onCleanup, Show, Suspense } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import {
-  canPickFolder,
+  activeNodeId,
+  canAddProjectFromFolder,
   createProject,
   createWorkspace,
   integrationsOptions,
   nodeReady,
   patchProject,
   pickFolder,
-  type Project,
   projectPath,
   projectsOptions,
+  savePref,
+  type Project,
+  type WorkspacesMode,
+  WORKSPACES_PREF_KEY,
   workspacesKey,
   workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { Acorn, Wizard } from '@acorn/plugin-api/ui/host'
 import {
-  Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Kbd, Modal, Select, Stack, Text,
+  Alert, Badge, Button, Card, DescriptionList, Field, Heading, Inline, Input, Kbd, Modal, SegmentedControl, Select, Stack, Text,
 } from '@acorn/plugin-api/ui'
 
 import { AddedTally } from './AddedTally'
@@ -70,7 +74,7 @@ const SHORTCUTS: [string, string][] = [
   ['⌘P', 'Find a file'],
 ]
 
-export default function OnboardingWizard(props: { onClose: () => void }) {
+export default function OnboardingWizard(props: { onClose: () => void; workspacesPreference?: string }) {
   const queryClient = useQueryClient()
   const navigate = useNavigate()
   const projects = createQuery(() => projectsOptions(nodeReady()))
@@ -93,6 +97,14 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   const [drafts, setDrafts] = createSignal<Record<string, string>>({})
   const [busy, setBusy] = createSignal(false)
   const [error, setError] = createSignal('')
+  const [mode, setMode] = createSignal<WorkspacesMode | undefined>(
+    props.workspacesPreference === 'on' || props.workspacesPreference === 'off' ? props.workspacesPreference : undefined,
+  )
+  const [choice, setChoice] = createSignal<WorkspacesMode>('off')
+  const nodeId = activeNodeId()
+  let disposed = false
+  onCleanup(() => { disposed = true })
+  const stillHere = () => !disposed && activeNodeId() === nodeId
 
   const added = createMemo(() => {
     const byId = new Map((projects.data ?? []).map((project) => [project.id, project]))
@@ -133,38 +145,61 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   const close = async (landOn?: string) => {
     setBusy(true)
     try {
-      if (await saveOnboardingCompletion(queryClient, props.onClose) && landOn) navigate(landOn)
+      if (await saveOnboardingCompletion(queryClient, () => { if (stillHere()) props.onClose() }) && landOn && stillHere()) navigate(landOn)
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
   const finish = () => close(added()[0] ? projectPath(added()[0].id) : undefined)
   const skip = () => close()
+
+  async function advanceWelcome() {
+    if (mode()) return go('add')
+    setBusy(true)
+    setError('')
+    try {
+      const selected = choice()
+      // The Node fixes this preference on its first write. Do not start project creation until it
+      // has accepted the answer; an optimistic cache update alone is not enough.
+      if (!await savePref(queryClient, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true })) return
+      if (!stillHere()) return
+      setMode(selected)
+      go('add')
+    } catch (cause) {
+      if (stillHere()) setError(cause instanceof Error ? cause.message : 'Could not save your choice.')
+    } finally {
+      if (stillHere()) setBusy(false)
+    }
+  }
 
   const remember = (ids: readonly string[]) => {
     setAddedIds((current) => [...current, ...ids.filter((id) => !current.includes(id))])
   }
 
   async function openFolder() {
+    if (!canAddProjectFromFolder()) return
     const path = await pickFolder()
-    if (!path) return
+    if (!path || !stillHere()) return
     setBusy(true)
     setError('')
     try {
       const { project: created } = await createProject({ path })
+      if (!stillHere()) return
       remember([created.id])
       await refresh()
+      if (!stillHere()) return
       go('organize')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not add that folder.')
+      if (stillHere()) setError(cause instanceof Error ? cause.message : 'Could not add that folder.')
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 
   // Runs after every successful import and does not navigate on its own: the owner decides when
   // the batch is finished.
   async function afterImport(ids: readonly string[] = []) {
+    if (!stillHere()) return
     remember(ids)
     await refresh()
   }
@@ -180,17 +215,19 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   // let the refreshed list offer it to every other row. That is how a batch ends up spread across
   // several new workspaces.
   async function createHome(project: Project, name: string) {
+    if (mode() !== 'on') return
     setBusy(true)
     setError('')
     try {
       const workspace = await createWorkspace(name)
+      if (!stillHere()) return
       setHomes((current) => ({ ...current, [project.id]: workspace.id }))
       dropDraft(project)
       await queryClient.invalidateQueries({ queryKey: workspacesKey })
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not create that workspace.')
+      if (stillHere()) setError(cause instanceof Error ? cause.message : 'Could not create that workspace.')
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 
@@ -200,19 +237,21 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
     try {
       for (const current of added()) {
         const name = names()[current.id]?.trim()
-        const home = homes()[current.id]
+        const home = mode() === 'on' ? homes()[current.id] : undefined
         const patch = {
           ...(name && name !== current.name ? { name } : {}),
           ...(home && home !== current.workspaceId ? { workspaceId: home } : {}),
         }
         if (Object.keys(patch).length) await patchProject(current.id, patch)
+        if (!stillHere()) return
       }
       await refresh()
+      if (!stillHere()) return
       go('ai')
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : 'Could not save those changes.')
+      if (stillHere()) setError(cause instanceof Error ? cause.message : 'Could not save those changes.')
     } finally {
-      setBusy(false)
+      if (stillHere()) setBusy(false)
     }
   }
 
@@ -220,8 +259,10 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
   // trail rather than the strip's previous entry, because `github` shares a place with `add` and the
   // strip cannot tell which of the two you came from. Forward off `organize` is the save.
   const onStep = (id: string) => {
+    if (busy()) return
     const order = STEPS.map((entry) => entry.id) as string[]
     if (order.indexOf(id) < order.indexOf(place(step()))) return back()
+    if (step() === 'welcome') return void advanceWelcome()
     if (step() === 'organize') return void saveNames()
     go(id as Step)
   }
@@ -247,6 +288,20 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
             acorn is where you run coding tasks on your projects, with agents, terminals, and editors side
             by side. Setup takes about a minute.
           </Text>
+          <Show when={!mode()} fallback={<Text emphasis="muted">Projects will {mode() === 'on' ? 'be grouped into workspaces' : 'stay separate'} on this Node.</Text>}>
+            <Field label="How do you want to arrange your projects?">
+              <SegmentedControl
+                ariaLabel="How to arrange projects"
+                options={[
+                  { value: 'off', label: 'Keep each project separate' },
+                  { value: 'on', label: 'Group projects into workspaces' },
+                ]}
+                value={choice()}
+                onChange={setChoice}
+              />
+            </Field>
+          </Show>
+          <Show when={error()}>{(message) => <Alert>{message()}</Alert>}</Show>
         </Stack>
       </Show>
 
@@ -266,7 +321,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
           </Text>
           <AddedTally added={added()} />
           <Inline gap="stack" even>
-            <Card interactive disabled={!canPickFolder() || busy()} onPress={() => void openFolder()}>
+            <Card interactive disabled={!canAddProjectFromFolder() || busy()} onPress={() => void openFolder()}>
               <Stack gap="row">
                 <Show when={githubOffered()}><Text emphasis="eyebrow">Recommended</Text></Show>
                 <Text emphasis="strong">Open a folder</Text>
@@ -283,8 +338,8 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
               </Card>
             </Show>
           </Inline>
-          <Show when={!canPickFolder()}>
-            <Text emphasis="muted">To choose a folder, use the desktop app.</Text>
+          <Show when={!canAddProjectFromFolder()}>
+            <Text emphasis="muted">Choose the local Node in the desktop app to open a folder.</Text>
           </Show>
           <Show when={error()}>{(text) => <Alert>{text()}</Alert>}</Show>
         </Stack>
@@ -304,7 +359,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
         <Stack gap="row">
           <Heading
             level={2}
-            help="A workspace is a group of projects. The switcher at the top of the window shows one workspace at a time."
+            help={mode() === 'on' ? 'A workspace is a group of projects. The switcher at the top of the window shows one workspace at a time.' : undefined}
           >
             {added().length > 1 ? 'Name your projects' : 'Name your project'}
           </Heading>
@@ -337,11 +392,9 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                           onInput={(value) => setNames((all) => ({ ...all, [current().id]: value }))}
                         />
                       </Field>
-                      {/* Per project, not per batch. Adding four repositories at once is normal, and
-                          they do not all belong together, so each picks its workspace, and each can
-                          make one the next row will find waiting in its list. */}
-                      <Show
-                        when={drafts()[current().id] === undefined}
+                      {/* In grouped mode each project can choose a different workspace. */}
+                      <Show when={mode() === 'on'}>
+                        <Show when={drafts()[current().id] === undefined}
                         fallback={
                           <Stack gap="row">
                             <Field label="New workspace">
@@ -381,6 +434,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
                             }}
                           />
                         </Field>
+                        </Show>
                       </Show>
                     </Inline>
                   </Stack>
@@ -437,7 +491,7 @@ export default function OnboardingWizard(props: { onClose: () => void }) {
         onFinish={() => void finish()}
         skipLabel="Skip setup"
         skipTip="You can do all of this later in Settings."
-        onSkip={() => void skip()}
+        onSkip={() => { if (!busy()) void skip() }}
         regions={{ step: () => <StepBody /> }}
       />
     </Modal>

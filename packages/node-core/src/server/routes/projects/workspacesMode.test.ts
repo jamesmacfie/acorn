@@ -92,6 +92,15 @@ describe('workspace mode at Node routes and plugin seam', () => {
     expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'off' }))).error.code).toBe('workspaces_fixed')
   })
 
+  it.each(['off', 'on'] as const)('places two folders in the expected workspaces after the wizard saves %s', async (mode) => {
+    expect((await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: mode })).status).toBe(200)
+    const first = ((await (await add('one')).json()) as { project: { id: string; workspaceId: string } }).project
+    const second = ((await (await add('two')).json()) as { project: { id: string; workspaceId: string } }).project
+    expect(first.id).not.toBe(second.id)
+    expect(first.workspaceId === second.workspaceId).toBe(mode === 'on')
+    expect(t.db.select().from(schema.workspaces).all()).toHaveLength(mode === 'on' ? 1 : 2)
+  })
+
   it('keeps grouped deletion behavior: reassigns projects and removes the workspace datasets', async () => {
     await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'on' })
     const created = await add('one')

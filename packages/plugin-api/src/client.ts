@@ -187,6 +187,8 @@ export { canAddProjectFromFolder } from '@acorn/client-core/features/workspaces'
 export { ownOnboardingVisibility } from '@acorn/client-core/features/workspaces'
 export { createProject, createWorkspace, patchProject } from '@acorn/client-core/features/workspaces'
 export type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
+export { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
+export type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 
 // ── The fleet: which node a request goes to ───────────────────────────────────────────────────
 export { activeNodeId, nodeReady, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
