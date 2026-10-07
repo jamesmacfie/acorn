@@ -39,11 +39,20 @@ const fake = (over: Partial<TerminalBridge> = {}): TerminalBridge => ({
   remove: async () => true,
   resize: async () => true,
   sendToAgent: async () => ({ ok: true }),
+  runSetup: async () => ({ sessionId: 's1' }),
   ...over,
 })
 
 describe('terminal control routes', () => {
   afterEach(() => setTerminalBridge(null))
+
+  it('starts setup for the task in the path and answers the new session', async () => {
+    let asked: string | null = null
+    setTerminalBridge(fake({ runSetup: async (taskId) => ((asked = taskId), { sessionId: 's9' }) }))
+    const res = await authed().fetch(req('/api/tasks/task1/setup', 'POST'), {} as Env)
+    expect(await res.json()).toEqual({ sessionId: 's9' })
+    expect(asked).toBe('task1')
+  })
 
   it('creates a session, lists, and resizes via the bridge', async () => {
     const seen: string[] = []

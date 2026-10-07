@@ -177,6 +177,7 @@ export { isArchiving } from '@acorn/client-core/features/tasks'
 export { agentSessionsFor, focusSession, refreshSessionSources, sendToSession, sessionSummaries } from '@acorn/client-core/features/tasks'
 export type { SessionSummary, SessionSubmit } from '@acorn/client-core/features/tasks'
 export { runApi } from '@acorn/client-core/features/tasks'
+export { cachedTaskScripts } from '@acorn/client-core/features/tasks'
 export { taskBridge } from '@acorn/client-core/features/tasks'
 export { taskStatus, taskStatusRevision } from '@acorn/client-core/features/tasks'
 
@@ -247,7 +248,7 @@ export { registerNoticeTargetHandler } from '@acorn/client-core/features/notific
 // The attention model: an adapter turns a session row into a state, and the gate decides whether
 // that state changing is news (docs/notifications.md).
 export { defaultDeliveryContext, forgetAttentionSource, observeAttention, replaceAttentionSource, pushManagedAgentNotice } from '@acorn/client-core/features/notifications/deliver.ts'
-export { markAttentionSeen } from '@acorn/client-core/features/notifications'
+export { markAttentionSeen, markTargetsRead } from '@acorn/client-core/features/notifications'
 // Transient feedback. Notices persist in the bell, and a toast says "that worked" then gets out of
 // the way.
 export { toast } from '@acorn/client-core/features/notifications'

@@ -7,6 +7,7 @@ import {
   dropNoticesForTask,
   hydrateNotices,
   markAllRead,
+  markTargetsRead,
   markTaskRead,
   NOTICE_CAP,
   notices,
@@ -84,6 +85,22 @@ describe('notices are scoped to the node that raised them', () => {
     markAllRead()
     setActiveNode('node-a')
     // Still unread: the popover that "marked all read" never displayed it.
+    expect(unreadCount()).toBe(1)
+  })
+
+  it('marks read the notices that point at the given resources, on this node only', () => {
+    setActiveNode('node-a')
+    markAllRead()
+    const agent = (id: string) => ({ kind: 'managed-agent', resourceId: id })
+    pushNotice({ taskId: 't', kind: 'agent-completed', title: 'one', at: 1, target: agent('s1') })
+    pushNotice({ taskId: 't', kind: 'agent-completed', title: 'two', at: 2, target: agent('s2') })
+    pushNotice({ taskId: 't', kind: 'workflow', title: 'run', at: 3, target: { kind: 'workflow-run', resourceId: 's1' } })
+    setActiveNode('node-b')
+    pushNotice({ taskId: 't', kind: 'agent-completed', title: 'elsewhere', at: 4, target: agent('s1') })
+    setActiveNode('node-a')
+    markTargetsRead('managed-agent', new Set(['s1']))
+    expect(noticesForActiveNode().filter((n) => !n.read).map((n) => n.title)).toEqual(['run', 'two'])
+    setActiveNode('node-b')
     expect(unreadCount()).toBe(1)
   })
 })

@@ -2,7 +2,7 @@ import type { RailData, RailProps, TopbarData, TopbarProps } from '@acorn/protoc
 import type { OwnerActions } from '../tree/hostRequests'
 
 export const RAIL_ACTIONS = ['selectSource', 'openWorkspace', 'toggleCollapsed', 'reorderSources', 'createTask', 'openContextMenu'] as const
-export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'collapseRail', 'navigate', 'clearCache', 'addProject'] as const
+export const TOPBAR_ACTIONS = ['pickWorkspace', 'pickProject', 'pickNode', 'openSettings', 'navigate', 'clearCache', 'addProject'] as const
 
 const known = (id: unknown, list: readonly { id: string }[]): string => {
   if (typeof id !== 'string' || !list.some((item) => item.id === id)) throw new Error('That choice is unavailable')
@@ -45,10 +45,10 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
 
 export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: OwnerActions } {
   const { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
-    breadcrumb, node, nodes, account, railCollapsed, canAddProject, slots } = value
+    breadcrumb, node, nodes, account, canAddProject, slots } = value
   return {
     data: { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
-      breadcrumb, node, nodes, account, railCollapsed, canAddProject, slots },
+      breadcrumb, node, nodes, account, canAddProject, slots },
     actions: {
       pickWorkspace: (selection) => {
         const selected = selection as { id?: unknown; nodeId?: unknown } | null
@@ -60,7 +60,6 @@ export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: O
       pickProject: (id) => value.pickProject(known(id, projects)),
       pickNode: (id) => value.pickNode(known(id, nodes)),
       openSettings: () => value.openSettings(),
-      collapseRail: () => value.collapseRail(),
       navigate: (route) => {
         if (typeof route !== 'string' || !breadcrumb.some((item) => item.route === route)) {
           throw new Error('That breadcrumb is unavailable')

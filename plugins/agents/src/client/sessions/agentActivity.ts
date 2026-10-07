@@ -27,6 +27,12 @@ export const canStopAgent = (session: AgentSession): boolean =>
 // Center's filter, its header count and the attention inbox all have to agree.
 export const needsAttention = (session: AgentSession): boolean => !['none', 'unread'].includes(session.attention)
 
+// What "Mark all agents read" clears: a turn that finished or failed while nobody was looking. An
+// agent waiting on a permission, a question or a gate keeps its flag, because it cannot move until
+// the owner answers, and clearing the flag would leave it stuck with nothing pointing at it.
+export const hasClearableAttention = (session: AgentSession): boolean =>
+  session.attention === 'completed' || session.attention === 'error'
+
 // How each reason reads on an attention row. `permission` and `question` are the agent waiting on the
 // owner, which is the inbox's purpose. `error` is a failure. `completed` is informational: the turn
 // finished and nobody has looked, which is a nudge rather than a block.

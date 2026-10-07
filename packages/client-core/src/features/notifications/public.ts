@@ -4,7 +4,7 @@ export { trackBadge } from './badge.ts'
 export { initSoundNotices } from './chime.ts'
 export { noticeKindContributions } from './kindContributions.ts'
 export {
-  markRead, noticesForActiveNode, openNoticeTarget, openTarget,
+  markRead, markTargetsRead, noticesForActiveNode, openNoticeTarget, openTarget,
   pushNotice, registerNoticeTargetHandler, unreadCount,
 } from './notifications.ts'
 export { activeToasts, dismissToast, toast } from './toast.ts'

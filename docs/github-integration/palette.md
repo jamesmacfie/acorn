@@ -67,9 +67,9 @@ because it is registered in its plugin's `init` ([editor.md](../editor/editor-pa
 routed repository's open pull requests and there is no fleet or workspace query behind it to widen it
 to. One read serves a whole palette session, so typing after the frame opens costs nothing, and
 matching reuses the browse list's own `filterPulls`, so the palette finds a pull request by the same
-words the filter box does: its number, its title and its author. `MAX_PULL_ROWS` is 50, the same
-number the session caps any search at, said here so the provider keeps its own promise rather than
-leaning on the host to keep it. Picking a row selects the GitHub rail source and then navigates, in
+words the filter box does: its number, its title, its author and its branch. `MAX_PULL_ROWS` is 50,
+the same number the session caps any search at, said here so the provider keeps its own promise
+rather than leaning on the host to keep it. Picking a row selects the GitHub rail source and then navigates, in
 that order, because the shell draws from the selected source rather than from the location.
 
 What is deliberately not a command: merging, converting a draft, submitting a review, commenting,

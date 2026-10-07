@@ -109,6 +109,17 @@ export function markTaskRead(taskId: string): void {
   )
 }
 
+// Clearing the things the notices point at clears the notices too, so the bell agrees with the rows
+// the owner just dismissed. Active node only, like `markTaskRead`: the resource ids are that node's.
+export function markTargetsRead(kind: string, resourceIds: ReadonlySet<string>): void {
+  const visible = new Set(noticesForActiveNode()
+    .filter((n) => n.target?.kind === kind && resourceIds.has(n.target.resourceId))
+    .map((n) => n.id))
+  setNotices((prev) =>
+    prev.some((n) => !n.read && visible.has(n.id)) ? prev.map((n) => (visible.has(n.id) ? { ...n, read: true } : n)) : prev,
+  )
+}
+
 // Archiving a task takes its notices with it. A notice is a pointer at a task, so once the task is
 // gone the row still counts in the pill and clicking it navigates to an id that resolves to nothing.
 // Wired to `runtime:task-archived` in deliver.ts.

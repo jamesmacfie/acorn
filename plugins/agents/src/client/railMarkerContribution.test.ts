@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { agentRailMarkers } from './railMarkerContribution'
+import { agentRailMarkerContribution, agentRailMarkers } from './railMarkerContribution'
 
 describe('agentRailMarkers', () => {
   it('says nothing about a task with no agents in it', () => {
@@ -24,5 +24,12 @@ describe('agentRailMarkers', () => {
   it('counts agents in the label rather than saying the same thing for two as for ten', () => {
     expect(agentRailMarkers({ working: 4, attention: 0 })[0]!.label).toBe('4 agents working')
     expect(agentRailMarkers({ working: 0, attention: 2 })[0]!.label).toBe('2 agents need you')
+  })
+})
+
+describe('agentRailMarkerContribution targets', () => {
+  it('answers for the Agent pane button and stays quiet for every other pane', () => {
+    expect(agentRailMarkerContribution.markers({ kind: 'pane', id: 'changes', taskId: 't1' })).toEqual([])
+    expect(agentRailMarkerContribution.markers({ kind: 'source', id: 'agents' })).toEqual([])
   })
 })

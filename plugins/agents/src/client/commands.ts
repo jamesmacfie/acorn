@@ -12,6 +12,7 @@ import {
 import type { AgentPaneModel, SessionAction } from './sessions/agentPaneModel'
 import { managedAgentApi } from './sessions/managedClient'
 import { openManagedSession, requestComposerFocus } from './sessions/managedSelection'
+import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
 import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
@@ -123,6 +124,18 @@ export const agentsCommands: readonly ContributedCommand[] = [
     scope: 'none',
     requires: { plugin: 'agents' },
     run: () => setSelectedSource('agents'),
+  },
+  {
+    id: 'agents.sessions.mark-read',
+    title: 'Mark all agents read',
+    hint: 'clear finished and failed agents; ones waiting on you stay flagged',
+    keywords: ['agents', 'clear', 'attention', 'needs you', 'dismiss', 'notifications'],
+    category: 'action',
+    palette: true,
+    scope: 'none',
+    requires: { plugin: 'agents' },
+    when: () => clearableAgents().length > 0,
+    run: () => markAgentsRead(),
   },
   {
     id: 'agents.sessions.find',

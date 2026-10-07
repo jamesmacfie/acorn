@@ -4,7 +4,7 @@
 // PTY verbs only. Task lifecycle, per-repo checkout/config, preview URLs and agent delivery are
 // platform concerns and live in client-core/features/tasks/taskBridge.ts.
 import type { CreateOpts, ServerMsg, TerminalProfile, TerminalSession } from '@acorn/plugin-terminal/contract/wire.ts'
-import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute } from '../shared/api'
+import { terminalProfilesRoute, terminalSessionActionRoute, terminalSessionsRoute, terminalTaskSetupRoute } from '../shared/api'
 import type { SendSubmit } from '../shared/send'
 import { activeNodeId, readJson, writeJson, wsOnNotice, wsOnWorkflowStepEvent, type WorkflowNotice } from '@acorn/plugin-api/client'
 import { wsAttach, wsRememberSize, wsWrite } from './wsChannel'
@@ -18,6 +18,8 @@ export type TerminalApi = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   send(id: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
+  /** Start the setup script in the task's worktree. A refusal rejects with the node's reason. */
+  runSetup(taskId: string): Promise<{ sessionId: string }>
   write(id: string, data: string): void
   attach(id: string, on: (m: ServerMsg) => void, size?: { cols: number; rows: number }): () => void
   // Workflow commands use workflowClient's HTTP routes; notices and live step events use WebSocket.
@@ -45,6 +47,7 @@ export const terminalApi = (nodeId: string | null = activeNodeId()): TerminalApi
       return post<boolean>(terminalSessionActionRoute(id, 'resize'), { cols, rows })
     },
     send: (id, text, submit) => post(terminalSessionActionRoute(id, 'send'), { text, submit }),
+    runSetup: (taskId) => post<{ sessionId: string }>(terminalTaskSetupRoute(taskId)),
     write: (id, data) => wsWrite(id, data, nodeId),
     attach: (id, on, size) => wsAttach(id, on, size, nodeId),
     workflow: {

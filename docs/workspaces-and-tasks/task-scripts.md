@@ -13,7 +13,8 @@ doesn't resolve a worktree or run a script. A usable task root, or an agent sess
 doesn't prove that setup finished.
 
 Each run or explicit skip gets a unique `attemptId` and a task `generation`. Creating or restoring a
-worktree advances the generation, and a teardown retry gets its own attempt. The current phase reads
+worktree advances the generation. A teardown retry, or setup run by hand from the palette, adds an
+attempt in the current generation. The current phase reads
 the latest attempt in the current generation. Status also returns up to 50 recent attempts and
 `attemptsTruncated`. Pass an attempt ID to read an older one. A configuration edit can't rewrite an
 attempt's outcome, and late evidence from an older generation can't change the current one.
@@ -35,6 +36,8 @@ A null exit code doesn't mean success. A lazy setup stays `not_started` until it
 Teardown stays unrequested until archive reaches the script, so an archive refused earlier records no
 teardown attempt. A teardown can succeed while a later cleanup or the worktree removal fails.
 `archiveInProgress` covers the whole archive, not only the script.
+`setupRunnable` says whether a person can start setup by hand on this task, by the rules in
+[Run the setup script](./worktrees.md#run-the-setup-script).
 
 The desktop's setup rail marker reads this snapshot. Script sessions stay in the terminal drawer, and
 the CLI and the task script tools read retained output. The terminal client's task chrome shows both

@@ -1,5 +1,6 @@
 import { and, eq, inArray } from 'drizzle-orm'
 import { taskScriptLogsInputSchema, taskScriptWaitInputSchema, taskScriptSettled, type TaskScriptLogs, type TaskScriptPhase, type TaskScriptReason, type TaskScriptSnapshot, type TaskScriptWait } from '@acorn/protocol/taskScripts.ts'
+import { BridgeError } from '../bridge'
 import { schema, type AppDatabase } from '../db'
 import { TaskScriptStore, type AttemptIdentity } from './store'
 import { utf8Tail } from './output'
@@ -31,6 +32,13 @@ export class TaskScriptService {
     const snapshot = this.admit(taskId, 'setup', skip)
     if (!skip && script) this.pendingSetup.set(snapshot.attemptId!, script)
     return snapshot
+  }
+  /** A setup run the user asked for. It joins the current generation, because the worktree has not
+   *  changed, and leaves the task's `skipSetup` alone: that still decides automatic runs. */
+  admitManualSetup(taskId: string): TaskScriptSnapshot {
+    const setup = this.store.manualSetup(taskId)
+    if (!('script' in setup)) throw new BridgeError(409, setup.code, setup.message)
+    return this.prepareSetup(taskId, setup.script)
   }
   takeSetup(taskId: string): { identity: AttemptIdentity; script: string } | null {
     const current = this.select(taskId, 'setup')
@@ -144,12 +152,13 @@ export function taskScripts(db: AppDatabase): TaskScriptService {
   return service
 }
 // First-party process evidence seam. Loaded plugins receive neither a ledger writer nor a DB handle.
-export type TaskScriptEvidenceService = Pick<TaskScriptService, 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'>
+export type TaskScriptEvidenceService = Pick<TaskScriptService, 'admitManualSetup' | 'takeSetup' | 'report' | 'forSession' | 'reconcile' | 'close'>
 
 /** Runtime projection: process owners receive no storage handle or worktree policy methods. */
 export function taskScriptEvidence(db: AppDatabase): TaskScriptEvidenceService {
   const service = taskScripts(db)
   return {
+    admitManualSetup: service.admitManualSetup.bind(service),
     takeSetup: service.takeSetup.bind(service), report: service.report.bind(service),
     forSession: service.forSession.bind(service), reconcile: service.reconcile.bind(service),
     close: service.close.bind(service),

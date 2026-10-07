@@ -114,7 +114,16 @@ signals the plugin owns. Registering through `ctx` lets the host remove the mark
 is disabled.
 
 The agents plugin's marker is the task row's top-right corner: a spinning loader while any agent in
-the task is working, replaced by the alert glyph when one needs the owner.
+the task is working, replaced by the alert glyph when one needs the owner. It answers the same for the
+task's Agent button in the pane rail, so the state shows on both sides. The Workflows button gets the
+spinner only while one of the task's workflow agents is working, so a spinner on the Agent button with
+none on Workflows means the working agent isn't the workflow's. Docker marks its pane button with a
+green dot in the top-right corner, in place of the whale the button already draws. The changes plugin puts a dot
+on its own pane button: green when the uncommitted changes only add lines, red when they only remove
+them, and the `diff` dot, half green and half red, for both.
+
+A dot marker's `dotTone` is one of `ok`, `warn`, `bad`, `mixed` (half red, half yellow), or `diff`
+(half green, half red).
 
 A loaded plugin publishes task status through an `extensions` entry aimed at the `core:task`
 annotation point ([task annotations](./rows-and-annotations.md#task-annotations)). The host turns the

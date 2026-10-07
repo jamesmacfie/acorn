@@ -19,7 +19,8 @@ export const taskScriptSnapshotSchema = z.object({
 })
 export const taskScriptsStatusSchema = z.object({
   taskId: z.string(), generation: z.number().int(), archiveInProgress: z.boolean(), setup: taskScriptSnapshotSchema, teardown: taskScriptSnapshotSchema,
-  attempts: z.array(taskScriptSnapshotSchema), attemptsTruncated: z.boolean(),
+  // Whether a person can start setup by hand now. The node decides, so a client gate needs no rules.
+  setupRunnable: z.boolean(), attempts: z.array(taskScriptSnapshotSchema), attemptsTruncated: z.boolean(),
 })
 export const taskScriptSelectionSchema = z.strictObject({ phase: taskScriptPhaseSchema, attemptId: z.string().min(1).max(200).optional() })
 export const taskScriptWaitInputSchema = taskScriptSelectionSchema.extend({ timeoutMs: z.number().int().min(0).max(TASK_SCRIPT_WAIT_MS).default(TASK_SCRIPT_WAIT_MS) })

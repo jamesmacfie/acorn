@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
-import type { CommandExecutionContext, SearchCommand } from '@acorn/plugin-api/client'
+import type { CommandExecutionContext, ContributedCommand, SearchCommand } from '@acorn/plugin-api/client'
 
 const mocks = vi.hoisted(() => ({
   targets: vi.fn(),
@@ -15,6 +15,9 @@ const mocks = vi.hoisted(() => ({
   sessions: vi.fn(),
   rememberActiveTerminal: vi.fn(),
   requestTerminalFocus: vi.fn(),
+  activeTaskId: vi.fn(),
+  cachedTaskScripts: vi.fn(),
+  runSetup: vi.fn(),
 }))
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...await importOriginal<Record<string, unknown>>(),
@@ -22,7 +25,10 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   setTerminalOpen: mocks.setTerminalOpen,
   dispatchLayout: mocks.dispatchLayout,
   clientCapability: vi.fn(() => mocks.previewRecipeSelection),
+  activeTaskId: mocks.activeTaskId,
+  cachedTaskScripts: mocks.cachedTaskScripts,
 }))
+vi.mock('./terminalClient', () => ({ terminalApi: () => ({ runSetup: mocks.runSetup }) }))
 vi.mock('./sessionStore', () => ({
   refreshSessions: mocks.refreshSessions,
   sessions: mocks.sessions,
@@ -39,6 +45,7 @@ import { terminalCommands, TERMINAL_GROUP } from './commands'
 // failed configuration read is now a message rather than an empty list, and one frame is one fetch.
 
 const search = (id: string): SearchCommand => terminalCommands.find((command) => command.id === id) as SearchCommand
+const setupCommand = () => terminalCommands.find((command) => command.id === 'terminal.run.setup') as Extract<ContributedCommand, { run: unknown }>
 
 const context = (taskId: string): CommandExecutionContext => ({
   host: 'desktop', nodeId: 'node-1', workspaceId: 'w-1', projectId: 'p-1', taskId, paneId: null, surfaceId: null,
@@ -57,11 +64,11 @@ describe('the terminal plugin catalogue', () => {
     mocks.stop.mockResolvedValue({ ok: true })
   })
 
-  it('hangs three task-scoped searches under its own group, never core’s', () => {
+  it('hangs its task-scoped commands under its own group, never core’s', () => {
     // `terminal.run`, not `core.terminal`: the drawer and the plain shell belong to the shell, and a
     // plugin may not name another owner's group as its parent (graph.ts § cross-owner-parent).
     expect(terminalCommands.map((command) => command.id)).toEqual([
-      TERMINAL_GROUP, 'terminal.run.targets', 'terminal.run.layouts', 'terminal.run.sessions',
+      TERMINAL_GROUP, 'terminal.run.setup', 'terminal.run.targets', 'terminal.run.layouts', 'terminal.run.sessions',
     ])
     for (const command of terminalCommands) {
       expect(command.scope, command.id).toBe('task')
@@ -205,5 +212,35 @@ describe('the terminal plugin catalogue', () => {
     expect(mocks.requestTerminalFocus).toHaveBeenCalledWith('task-1', 's1')
     // No request at all: the roster is a signal this window already keeps.
     expect(mocks.targets).not.toHaveBeenCalled()
+  })
+
+  it('offers setup only when the node says the open task can run it', () => {
+    const setup = setupCommand()
+    mocks.activeTaskId.mockReturnValue('task-1')
+    mocks.cachedTaskScripts.mockReturnValue({ setupRunnable: true })
+    expect(setup.when?.()).toBe(true)
+    expect(mocks.cachedTaskScripts).toHaveBeenCalledWith('task-1')
+    mocks.cachedTaskScripts.mockReturnValue({ setupRunnable: false })
+    expect(setup.when?.()).toBe(false)
+    // Status not loaded yet, or no task open.
+    mocks.cachedTaskScripts.mockReturnValue(undefined)
+    expect(setup.when?.()).toBe(false)
+    mocks.activeTaskId.mockReturnValue(null)
+    mocks.cachedTaskScripts.mockReturnValue({ setupRunnable: true })
+    expect(setup.when?.()).toBe(false)
+  })
+
+  it('runs setup, then opens the drawer on the new session; a refusal rejects with its reason', async () => {
+    const setup = setupCommand()
+    mocks.runSetup.mockResolvedValue({ sessionId: 's9' })
+    expect(await setup.run(context('task-1'))).toEqual({ effect: 'close' })
+    expect(mocks.runSetup).toHaveBeenCalledWith('task-1')
+    expect(mocks.setTerminalOpen).toHaveBeenCalledWith('task-1', true)
+    expect(mocks.requestTerminalFocus).toHaveBeenCalledWith('task-1', 's9')
+
+    vi.clearAllMocks()
+    mocks.runSetup.mockRejectedValue(new Error('Setup is already running.'))
+    await expect(setup.run(context('task-1'))).rejects.toThrow('Setup is already running.')
+    expect(mocks.setTerminalOpen).not.toHaveBeenCalled()
   })
 })

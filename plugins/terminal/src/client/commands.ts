@@ -1,6 +1,8 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
+  activeTaskId,
+  cachedTaskScripts,
   clientCapability,
   dispatchLayout,
   localSearch,
@@ -12,6 +14,7 @@ import {
 } from '@acorn/plugin-api/client'
 import { refreshSessions, rememberActiveTerminal, requestTerminalFocus, sessions } from './sessionStore'
 import { invokeLayoutRecipe, type RecipeSpec } from './recipes'
+import { terminalApi } from './terminalClient'
 import { PREVIEW_RECIPE_SELECTION } from '../contract/previewSelection'
 
 // The three things this plugin knows about the open task: what it can run, how it can be laid out, and
@@ -102,6 +105,36 @@ export const terminalCommands: readonly ContributedCommand[] = [
     scope: 'task',
     order: 310,
     requires: { plugin: 'terminal' },
+  },
+  {
+    id: 'terminal.run.setup',
+    parentId: TERMINAL_GROUP,
+    title: 'Run setup script',
+    hint: "run the project's setup script in this task",
+    keywords: ['setup', 'install', 'bootstrap'],
+    category: 'terminal',
+    palette: true,
+    scope: 'task',
+    order: 50,
+    requires: { plugin: 'terminal' },
+    // The node decides whether setup can run by hand (`setupRunnable`), so this only reads the status
+    // the window already holds. `activeTaskId` is the task both hosts capture the palette against. A
+    // task whose status has not loaded shows nothing rather than a row that may only fail.
+    when: () => {
+      const taskId = activeTaskId()
+      return !!taskId && cachedTaskScripts(taskId)?.setupRunnable === true
+    },
+    run: async (context): Promise<CommandOutcome> => {
+      const taskId = context.taskId
+      if (!taskId) return COMMAND_CLOSED
+      // A refusal rejects with the node's reason, which the palette shows and stays open on.
+      const { sessionId } = await terminalApi().runSetup(taskId)
+      await refreshSessions()
+      setTerminalOpen(taskId, true)
+      rememberActiveTerminal(taskId, sessionId)
+      requestTerminalFocus(taskId, sessionId)
+      return COMMAND_CLOSED
+    },
   },
   {
     id: 'terminal.run.targets',

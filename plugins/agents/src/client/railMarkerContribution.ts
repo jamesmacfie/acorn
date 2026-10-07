@@ -10,6 +10,7 @@ import { agentSessionsFor, type RailMarker, type RailMarkerContribution } from '
 import type { AgentSession } from '../contract/wire.ts'
 import { isActiveAgent, needsAttention } from './sessions/agentActivity'
 import { managedAgentStore } from './sessions/managedStore'
+import { AGENT_PANE_ID } from './paneIdentity'
 import { runtimeIcon } from './sessions/stateTone'
 
 export type AgentRailState = { working: number; attention: number }
@@ -45,17 +46,29 @@ export function agentRailMarkers({ working, attention }: AgentRailState): RailMa
 const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) =>
   managedAgentStore.sessionsForTask(taskId).filter(predicate).length
 
+// The workflows plugin's pane id, by value: a plugin cannot import another's modules. Its button gets a
+// spinner only for this task's workflow agents, so a spinner on the Agent button with none here says
+// the agent at work is not the workflow's.
+const WORKFLOWS_PANE_ID = 'workflows'
+const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && isActiveAgent(session)
+
 export const agentRailMarkerContribution: RailMarkerContribution = {
   id: 'agents',
   order: 10,
   markers: (target) => {
-    if (target.kind !== 'task') return []
+    if (target.kind === 'pane' && target.id === WORKFLOWS_PANE_ID)
+      return agentRailMarkers({ working: forTask(target.taskId, isWorkingWorkflowAgent), attention: 0 })
+    // The same answer on the task's rail row and on its Agent button in the pane rail, so the corner
+    // that says "working" on the left says it on the right too.
+    const taskId = target.kind === 'task' ? target.id
+      : target.kind === 'pane' && target.id === AGENT_PANE_ID ? target.taskId : null
+    if (!taskId) return []
     return agentRailMarkers({
       // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
       // working" (docs/terminal/activity.md § Activity and status).
-      working: agentSessionsFor(target.id).filter((session) => !session.idle).length
-        + forTask(target.id, isActiveAgent),
-      attention: forTask(target.id, needsAttention),
+      working: agentSessionsFor(taskId).filter((session) => !session.idle).length
+        + forTask(taskId, isActiveAgent),
+      attention: forTask(taskId, needsAttention),
     })
   },
 }

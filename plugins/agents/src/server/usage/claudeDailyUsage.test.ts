@@ -58,7 +58,13 @@ async function fixtureRoot(): Promise<{ root: string; project: string }> {
 describe('Claude JSONL parsing and pricing', () => {
   it('reads only usage-bearing assistant messages and tolerates malformed lines', () => {
     const records = parseClaudeUsageJsonl(
-      [usageLine(now), '{bad', JSON.stringify({ type: 'user' }), usageLine(now, { messageId: 'msg-2', input: 0 })].join('\n'),
+      [
+        usageLine(now),
+        '{bad',
+        JSON.stringify({ type: 'user' }),
+        usageLine(now, { messageId: 'msg-2', input: 0 }),
+        usageLine(now, { messageId: 'msg-3', model: '<synthetic>' }),
+      ].join('\n'),
     )
     expect(records).toHaveLength(2)
     expect(records[0]).toMatchObject({

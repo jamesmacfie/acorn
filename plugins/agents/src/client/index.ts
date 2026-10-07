@@ -14,6 +14,7 @@ import { ATTENTION_COPY, isActiveAgent, needsAttention } from './sessions/agentA
 import { managedAgentApi } from './sessions/managedClient'
 import { activateManagedAgentNoticeTargets, activateManagedAgentPaneIntents, agentAttentionItemId } from './sessions/managedSelection'
 import { activateManagedAgentNotifications, managedAgentStore } from './sessions/managedStore'
+import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { agentPaneContribution } from './paneContribution'
 import { agentRailMarkerContribution } from './railMarkerContribution'
 import { activateManagedAgentReferences } from './referenceContribution'
@@ -90,6 +91,12 @@ export const agentsClientPlugin: ClientPlugin = {
     // owns the corner and the collision rules; this plugin only says what is true.
     ctx.railMarkers.register(agentRailMarkerContribution)
     ctx.sources.register(agentCenterSourceContribution)
+    ctx.contextMenus.register({
+      id: 'agents.sessions.mark-read', location: 'rail.source', surface: 'agents',
+      label: 'Mark all agents read', icon: 'check', order: 110,
+      when: () => clearableAgents().length > 0,
+      run: () => { void markAgentsRead() },
+    })
     // A terminal running one of this plugin's harness CLIs (./terminalProfileCommands.ts). The shell
     // keeps the drawer toggle and the plain shell; it no longer knows a harness by name.
     for (const contribution of harnessTerminalCommands) ctx.commands.register(contribution)

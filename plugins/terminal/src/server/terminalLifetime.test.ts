@@ -384,3 +384,28 @@ it('does not treat a successful tmux attachment exit as confirmed teardown comma
   expect(await f.taskSessions.runTeardown('synthetic', '/tmp', {}, 'task', attempt)).toMatchObject({ exitCode: null })
   expect(f.core.taskScripts.report).toHaveBeenCalledWith(attempt, { type: 'interrupted', reason: 'process_lost' })
 })
+
+it('runs setup by hand as a "Setup" session in the existing worktree', async () => {
+  const f = fixture({ resolveCwd: async () => ({ cwd: '/tmp/worktree', isWorktree: true, created: false }) })
+  const identity = { attemptId: 'manual', generation: 3 }
+  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => identity), takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })) })
+  const { sessionId } = await f.terminal.runSetup('task')
+  expect((await f.terminal.list()).find((session) => session.id === sessionId)).toMatchObject({ title: 'Setup', cwd: '/tmp/worktree' })
+  expect(f.core.taskScripts.report).toHaveBeenCalledWith(identity, { type: 'started', terminalSessionId: sessionId })
+})
+
+it('fails a manual setup attempt when the spawn fails, and spawns nothing when core refuses', async () => {
+  const f = fixture({ resolveCwd: async () => ({ cwd: '/tmp/worktree', isWorktree: true, created: false }) })
+  const identity = { attemptId: 'manual', generation: 3 }
+  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => identity), takeSetup: vi.fn(() => ({ identity, script: 'pnpm install' })) })
+  state.spawnThrows = true
+  await expect(f.terminal.runSetup('task')).rejects.toThrow('spawn unavailable')
+  expect(f.core.taskScripts.report).toHaveBeenCalledWith(identity, { type: 'failed', reason: 'spawn_failed' })
+
+  state.spawnThrows = false
+  vi.mocked(f.core.taskScripts.report).mockClear()
+  Object.assign(f.core.taskScripts, { admitManualSetup: vi.fn(() => { throw Object.assign(Error('Setup is already running.'), { code: 'already_running' }) }) })
+  await expect(f.terminal.runSetup('task')).rejects.toThrow('Setup is already running.')
+  expect(f.core.taskScripts.report).not.toHaveBeenCalled()
+  expect(await f.terminal.list()).toEqual([])
+})

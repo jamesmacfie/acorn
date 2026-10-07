@@ -7,6 +7,8 @@ export function StatusDot(props: {
   /* Half this tone and half warn. A prop rather than a seventh tone, because it is two states at
      once rather than one more state: core's rail status and github's PR rows both draw it. */
   mixed?: boolean
+  /* Half ok and half bad, the colours of a diff's added and removed lines. */
+  diff?: boolean
   pulse?: boolean
   label?: string
   /** What the colour means, on hover. Asked for rather than taken from `label`: a dot inside a tipped
@@ -19,6 +21,7 @@ export function StatusDot(props: {
       class="ui-dot"
       data-tone={props.tone}
       data-mixed={props.mixed ? '' : undefined}
+      data-diff={props.diff ? '' : undefined}
       data-size={props.size ?? 'sm'}
       data-pulse={props.pulse ? '' : undefined}
       role={props.label ? 'status' : undefined}

@@ -20,6 +20,8 @@ export type TerminalBridge = {
   remove(id: string): Promise<boolean>
   resize(id: string, cols: number, rows: number): Promise<boolean>
   sendToAgent(sessionId: string, text: string, submit: SendSubmit): Promise<{ ok: boolean; queued?: boolean; reason?: string }>
+  // Start the project's setup script in the task's existing worktree. A refusal throws a BridgeError.
+  runSetup(taskId: string): Promise<{ sessionId: string }>
 }
 
 export const TERMINAL_ROUTE = routeCapability<TerminalBridge>('terminal.route')
@@ -82,6 +84,8 @@ export const terminal = new Hono<AppEnv>()
       return { options: (result.targets ?? []).map((target) => ({ value: target.id, label: target.id, ...(target.command ? { description: target.command } : {}) })) }
     }),
   )
+  // The task is in the path, so core's task-scope gate already covers this route.
+  .post('/tasks/:taskId/setup', (c) => viaBridge(c, TERMINAL_ROUTE, (t) => t.runSetup(c.req.param('taskId'))))
   .post('/sessions', async (c) => {
     const p = createBody.safeParse(await c.req.json().catch(() => null))
     if (!p.success) return respondError(c, 400, 'bad_request')

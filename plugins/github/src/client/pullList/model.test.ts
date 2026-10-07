@@ -20,7 +20,7 @@ const pull = (overrides: Partial<Pull>): Pull => ({
 describe('pull list model', () => {
   const pulls = [
     pull({ number: 12, title: 'Fix report totals', author: 'alice' }),
-    pull({ number: 34, title: 'Refactor import flow', author: 'bob' }),
+    pull({ number: 34, title: 'Refactor import flow', author: 'bob', headRef: 'bob/import-flow' }),
     pull({ number: 56, title: 'Chore dependency bumps', author: null }),
   ]
 
@@ -28,10 +28,11 @@ describe('pull list model', () => {
     expect(filterPulls(pulls, '   ')).toBe(pulls)
   })
 
-  it('filters by number, title, and author case-insensitively', () => {
+  it('filters by number, title, author, and branch case-insensitively', () => {
     expect(filterPulls(pulls, '#12').map((p) => p.number)).toEqual([12])
     expect(filterPulls(pulls, 'IMPORT').map((p) => p.number)).toEqual([34])
     expect(filterPulls(pulls, 'alice').map((p) => p.number)).toEqual([12])
+    expect(filterPulls(pulls, 'bob/import-flow').map((p) => p.number)).toEqual([34])
   })
 
   it('returns no rows for unmatched text', () => {

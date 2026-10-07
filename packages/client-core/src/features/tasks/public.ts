@@ -17,4 +17,4 @@ export { archiveTask, createTask } from './taskMutations.ts'
 export { taskStatus, taskStatusRevision, taskStatusScheduleContribution } from './taskStatus.ts'
 export { expandedWorkflowRoots, toggleWorkflowRoot } from './taskTreeViewState.ts'
 
-export { createTaskScripts, scriptLabel } from './taskScripts'
+export { cachedTaskScripts, createTaskScripts, scriptLabel } from './taskScripts'
