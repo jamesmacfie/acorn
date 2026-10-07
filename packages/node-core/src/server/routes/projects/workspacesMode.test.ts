@@ -82,6 +82,21 @@ describe('workspace mode at Node routes and plugin seam', () => {
     expect((await error(await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'off' }))).error.code).toBe('workspaces_fixed')
   })
 
+  it('changes paired workspace artwork while off and removes only unreferenced images on project deletion', async () => {
+    const first = ((await (await add('one')).json()) as { project: { id: string; workspaceId: string } }).project
+    const second = ((await (await add('two')).json()) as { project: { id: string; workspaceId: string } }).project
+    const imageId = 'a'.repeat(64)
+    t.db.insert(schema.workspaceIconImages).values({ id: imageId, bytes: Buffer.from('thumbnail') }).run()
+    const appearance = { version: 1, kind: 'image', imageId }
+    for (const project of [first, second]) {
+      expect((await request(`/workspaces/${project.workspaceId}`, 'PATCH', { appearance })).status).toBe(200)
+    }
+    expect((await request(`/projects/${first.id}`, 'DELETE')).status).toBe(200)
+    expect(t.db.select().from(schema.workspaceIconImages).all()).toHaveLength(1)
+    expect((await request(`/projects/${second.id}`, 'DELETE')).status).toBe(200)
+    expect(t.db.select().from(schema.workspaceIconImages).all()).toEqual([])
+  })
+
   it('honours an explicit on preference on an empty Node and keeps Default', async () => {
     expect((await request('/prefs', 'PUT', { key: WORKSPACES_PREF_KEY, value: 'on' })).status).toBe(200)
     const response = await add('one')

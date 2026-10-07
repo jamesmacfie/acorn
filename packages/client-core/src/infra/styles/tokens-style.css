@@ -185,6 +185,7 @@
   /* Shell geometry. --shell-pad + --pane-gap are what turn the flat three-pane grid into inset
      cards with no markup change at all. */
   --shell-pad: 0;
+  --left-rails-w: var(--tabrail-w); /* shell overrides this when the optional workspace rail is shown */
   --pane-gap: 0;
   --pane-radius: var(--radius-surface);
 

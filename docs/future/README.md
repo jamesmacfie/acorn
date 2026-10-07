@@ -27,7 +27,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [ui-extension/](./ui-extension/README.md) | Contextual plugin UI: link previews, transcript media, workflow bodies, resource actions, detail regions, annotations, selections, document intelligence, fences, and toolbar additions. Fifteen sequential phases after Editor file viewers, ending with documentation. | Planned, October 6, 2026; implementation not started. |
-| [pi/](./pi/README.md) | What acorn takes from oh-my-pi and Claude Mods: eleven sequential phases, each holding its design and handoff, including the Mods permission design, real loaded consumers, unattended ownership, plugin skills, a measured resource-read experiment, and bridges through each harness's own hooks. | Proposed, 2026-10-02; all 11 phases done, 2026-10-07, with recorded limitations; phase 08 removed. Phase 11 lists the checks still open. |
 | [deerflow/](./deerflow/README.md) | What acorn takes from DeerFlow: five standalone product requirement documents for session references, session goals, agent history search, checks on delegated work, and one unattended turn policy, plus what it refused. | Proposed, October 6, 2026; nothing built. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
@@ -49,7 +48,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |
 | [workflows-gaps.md](./workflows-gaps.md) | Known workflow gaps: graph navigation, prompt display, retries of unknown outcomes, and agent control of runs. | Moved from workflows.md, 2026-10-04. Not started. |
-| [workspace-icons.md](./workspace-icons.md) | Workspace glyphs on colour or gradient backgrounds, uploaded images, icons in the desktop switcher, and an optional further-left workspace rail. The TUI keeps its workspace switcher. | Agreed product requirements, October 7, 2026. Implementation not started. |
+| [workspace-icons.md](./workspace-icons.md) | Workspace glyphs on colour or gradient backgrounds, uploaded images, icons in the desktop switcher, and an optional further-left workspace rail. The TUI keeps its workspace switcher. | Implemented October 7, 2026. See the [reference](../workspaces-and-tasks/workspace-icons.md) and proposal evidence. |
 
 ## How these relate
 
@@ -112,6 +111,15 @@ in git history.
 owns the help mark, tooltips, dialogs, states, and the heading levels; [the closed kit](../ui-design/closed-kit.md)
 owns the `description` against `help` rule; and [frontend](../frontend.md) owns the page forms. The
 house patterns, the deferred findings, and the open product decisions remain in git history.
+
+`pi/` shipped its eleven phases on 2026-10-07 and was deleted. [Permission policy](../managed-agents/permission-policy.md),
+[session messages](../managed-agents/session-messages.md),
+[unattended follow-ups](../managed-agents/unattended-follow-ups.md), [skills](../managed-agents/skills.md),
+[session control](../managed-agents/session-control.md), [loop hooks](../managed-agents/loop-hooks.md), and
+[plugin model grants](../integrations/model-providers.md#plugin-model-grants) own its contracts. Its
+consumer plugins moved to their own repositories: `acorn-permission-policy`, `acorn-advisor`,
+`acorn-session-meter`, `acorn-skills`, and `acorn-omp-harness`. The phase records, including the dropped
+resource-read experiment, remain in git history.
 
 `phased-review-steps/`, `user-extensions/`, `node-first/`, `node/`, `acp/`, `tauri/`, `events/` and the later
 `events.md` follow-up (shipped on 2026-09-11), `layout/`, `structure/`,

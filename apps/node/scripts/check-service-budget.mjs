@@ -40,13 +40,15 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,118,217 B with setup run by hand: the rule core checks before admitting it, the
 // terminal route and bridge verb that spawn it, and the status flag the palette reads. All three are
 // registered at boot, so the ceiling moves by 3 KB.
-// 2026-10-07: 3,148,767 B with the pi programme (docs/future/pi): the permission veto, session
+// 2026-10-07: 3,148,767 B with the pi programme: the permission veto, session
 // messages, plugin model grants, unattended follow-ups, plugin skills, the activity feed and session
 // control, and harness bridges. Each feature's runtime loads on first use, and `agents.sessionExecute`
 // moved to the first workflow step. What stays at boot is the hook and extension point declarations,
 // the device routes, the boot charge for interrupted model calls, and the per-event checks that decide
 // whether any of that work is needed. About 1 KB of margin keeps the lazy-load cuts protected.
-const limits = { ceiling: 3_150_000, floor: 1_000_000 }
+// 2026-10-07: 3,151,546 B with workspace icons. Image handlers, decoding, and appearance validation
+// load on first use. The additive tables and route callbacks add about 3 KB to registration.
+const limits = { ceiling: 3_153_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

@@ -43,6 +43,12 @@ export function stageRuntimeDependencies(pkg, helper, stageTarget, names = requi
     })
     const manifest = JSON.parse(readFileSync(join(source, 'package.json'), 'utf8'))
     const localRequire = createRequire(join(source, 'package.json'))
+    if (name === 'sharp') {
+      // Cross builds must install the target's optional native packages before staging.
+      const platform = `${stageTarget.platform}-${stageTarget.arch}`
+      installedPackage(`@img/sharp-${platform}`, localRequire)
+      if (stageTarget.platform !== 'win32') installedPackage(`@img/sharp-libvips-${platform}`, localRequire)
+    }
     const parents = new Map(ancestors)
     parents.set(name, source)
     const dependencies = {
@@ -55,6 +61,12 @@ export function stageRuntimeDependencies(pkg, helper, stageTarget, names = requi
         || manifest.peerDependenciesMeta?.[dependency]?.optional === true
       const installed = installedPackage(dependency, localRequire, optional)
       if (!installed || (parents.get(dependency) ?? roots.get(dependency)) === installed) continue
+      if (optional) {
+        const metadata = JSON.parse(readFileSync(join(installed, 'package.json'), 'utf8'))
+        const supports = (values, wanted) => !values || (!values.includes(`!${wanted}`) && (values.every((value) => value.startsWith('!')) || values.includes(wanted)))
+        if (!supports(metadata.os, stageTarget.platform) || !supports(metadata.cpu, stageTarget.arch)) continue
+        if (stageTarget.platform === 'linux' && !supports(metadata.libc, 'glibc')) continue
+      }
       // Hoist shared packages so NSIS can read their paths within Windows' legacy path limit.
       // A conflicting version stays beside its consumer, where Node resolves it first.
       if (!parents.has(dependency) && !roots.has(dependency)) {

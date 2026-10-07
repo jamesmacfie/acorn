@@ -109,6 +109,19 @@ describe('wsClient', () => {
     expect(named).toEqual(['board', undefined, undefined])
   })
 
+  it('delivers fleet workspace changes with their owning Node while keeping ordinary subscriptions scoped', () => {
+    const fleet: string[] = [], active: string[] = []
+    const off = client.wsOnFleetWorkspaceChanged((nodeId, event) => fleet.push(`${nodeId}:${event.workspaceId}`))
+    client.wsOnNodeEvent('workspace:changed', (event) => active.push(event.workspaceId))
+    bridge.emitFrame({ channel: 'workspace:changed', workspaceId: 'shared' }, 'n2')
+    bridge.emitFrame({ channel: 'workspace:changed', workspaceId: 'local' }, 'n1')
+    expect(fleet).toEqual(['n2:shared', 'n1:local'])
+    expect(active).toEqual(['local'])
+    off()
+    bridge.emitFrame({ channel: 'workspace:changed', workspaceId: 'after' }, 'n2')
+    expect(fleet).toHaveLength(2)
+  })
+
   it('routes core worktree invalidation', () => {
     const worktrees: (string | null)[] = []
     client.wsOnNodeEvent('worktree:status-changed', (event) => worktrees.push(event.taskId))

@@ -80,10 +80,17 @@ export const configAcks = sqliteTable(
 export const workspaces = sqliteTable('workspaces', {
   id: text('id').primaryKey(), // opaque uuid
   name: text('name').notNull(), // editable label
+  appearance: text('appearance', { mode: 'json' }).$type<import('@acorn/protocol/workspaceAppearance.ts').WorkspaceAppearance>(),
   isDefault: integer('is_default', { mode: 'boolean' }).notNull().default(false), // the catch-all group
   sort: integer('sort').notNull().default(0), // selector ordering
   createdAt: integer('created_at').notNull(),
   updatedAt: integer('updated_at').notNull(),
+})
+
+// Durable thumbnails are backed up with core.sqlite; the original upload is discarded.
+export const workspaceIconImages = sqliteTable('workspace_icon_images', {
+  id: text('id').primaryKey(),
+  bytes: blob('bytes', { mode: 'buffer' }).notNull(),
 })
 
 // A project: a folder on this machine a workspace groups and tasks run in.

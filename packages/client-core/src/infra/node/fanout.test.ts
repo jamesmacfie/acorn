@@ -1,7 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { QueryObserver } from '@tanstack/solid-query'
 import type { NodeRecord, NodeStatus } from '@acorn/protocol/broker.ts'
 import { clientFor, refreshFleet, _resetFleet } from './fleet'
 import { cachedFleet, fetchFleet, onFleetInvalidation, retryDelayMs } from './fanout'
+import { setWorkspaceAppearance } from '../../features/workspaces/workspaceMutations'
+import { workspacesKey, type Workspace } from '@acorn/protocol/api.ts'
+
+vi.mock('./apiClient', () => ({ writeJson: vi.fn(async () => ({ ok: true })), postJson: vi.fn(), sendForm: vi.fn() }))
 
 // The fan-out is what makes "a slow or offline node yields a partial-result banner, never a failed
 // page" (docs/architecture/fleet.md § Client state and fleet behavior) true in one place. These
@@ -196,6 +201,31 @@ describe('cachedFleet', () => {
 // The link between a mutation and the fan-out. `createFleetQuery` is a resource and Solid resolves to
 // its server build here, so this covers the subscription directly instead.
 describe('onFleetInvalidation', () => {
+  it('keeps fleet data current when a mounted reader also refetches the shared key', async () => {
+    const client = clientFor('a').client
+    const key = workspacesKey
+    const solid: Workspace = { id: 'workspace', name: 'Acorn', isDefault: true, sort: 0, projects: [], appearance: {
+      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'solid', color: 'blue' },
+    } }
+    const gradient: Workspace = { ...solid, appearance: {
+      version: 1, kind: 'icon', icon: 'rocket', background: { kind: 'gradient', colors: ['blue', 'purple'], angle: 135 },
+    } }
+    client.setQueryData(key, [solid])
+    const fetch = async () => { await new Promise((resolve) => setTimeout(resolve, 25)); return [gradient] }
+    const observer = new QueryObserver(client, { queryKey: key, queryFn: fetch, staleTime: Infinity })
+    const unobserve = observer.subscribe(() => {})
+    let refreshed: ReturnType<typeof fetchFleet<Workspace[]>> | undefined
+    const stop = onFleetInvalidation(key, () => { refreshed = fetchFleet(key, fetch, { nodeIds: ['a'] }) })
+    try {
+      const eventRefresh = client.invalidateQueries({ queryKey: key })
+      await new Promise((resolve) => setTimeout(resolve, 1))
+      const mutationRefresh = setWorkspaceAppearance('workspace', gradient.appearance!, 'a')
+      await Promise.all([eventRefresh, mutationRefresh])
+      expect(client.getQueryData(key)).toEqual([gradient])
+      expect((await refreshed)?.rows.map((row) => row.data)).toEqual([[gradient]])
+    } finally { stop(); unobserve(); observer.destroy() }
+  })
+
   it('fires when any node invalidates the key, and stops on unsubscribe', async () => {
     // The fan-out's own fetch puts the entry in each node's cache, so nothing is invalidated first.
     clientFor('b').client.setQueryData(KEY, 'fetched-by-the-fan-out')

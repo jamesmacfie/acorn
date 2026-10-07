@@ -14,9 +14,10 @@ project-scoped panel uses its project by default.
 
 ## Workspace and project
 
-A workspace has a name and a sort order, and no icon or color, because the
-workspace switcher is navigation, not repository identity. The node publishes
-`workspace:changed { workspaceId }` after a create, a rename, or a delete.
+A workspace has a name, a sort order, and optional appearance metadata.
+[Workspace icons](./workspaces-and-tasks/workspace-icons.md) covers glyph backgrounds, durable image
+thumbnails, and the optional desktop rail. The Node publishes `workspace:changed { workspaceId }`
+after a create, rename, appearance change, or delete.
 
 The Node stores `core.workspaces` as `on` or `off`. While on, a workspace can group projects.
 While off, each project owns one workspace with the same name. If the preference is unset,

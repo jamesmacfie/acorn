@@ -26,9 +26,13 @@ export async function projectInWorkspace(db: ReturnType<typeof getDb>, projectId
   return !!row
 }
 
-const workspacePatchBody = z.object({ name: z.string().trim().min(1) }).strict()
+const workspacePatchBody = z.object({
+  name: z.string().trim().min(1).optional(),
+  appearance: z.unknown().optional(),
+}).strict().refine((body) => Object.keys(body).length > 0)
 
 async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]> {
+  const { resolveWorkspaceAppearance } = await import('@acorn/protocol/workspaceAppearance.ts')
   const rows = await db.select().from(schema.workspaces).orderBy(schema.workspaces.sort)
   if (!rows.length) return []
   const ids = rows.map((r) => r.id)
@@ -45,6 +49,7 @@ async function listWorkspaces(db: ReturnType<typeof getDb>): Promise<Workspace[]
     name: r.name,
     isDefault: r.isDefault,
     sort: r.sort,
+    appearance: resolveWorkspaceAppearance(r.appearance),
     projects: (projectsByWs.get(r.id) ?? []).sort((a, b) => a.sort - b.sort),
   }))
 }
@@ -84,21 +89,34 @@ export const workspaces = new Hono<AppEnv>()
     broadcastWorkspaceChanged({ workspaceId: id })
     return c.json({ id, name: body.name.trim(), isDefault: false, sort: (value ?? -1) + 1, projects: [] } satisfies Workspace)
   })
-  // Workspace identity is its name. Project colour and project configuration belong to project routes.
+  // Workspace appearance is core-owned. Project colour belongs to project routes.
   .patch('/:id', async (c) => {
-    if (nodeWorkspacesMode(getDb(c.env), ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const parsed = workspacePatchBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const db = getDb(c.env)
+    if (parsed.data.name !== undefined && nodeWorkspacesMode(db, ownerId(c)) === 'off') return respondError(c, 409, 'workspaces_off', [WORKSPACES_OFF_MESSAGE])
     const id = c.req.param('id')
     const [existing] = await db.select({ id: schema.workspaces.id, name: schema.workspaces.name }).from(schema.workspaces).where(eq(schema.workspaces.id, id))
     if (!existing) return respondError(c, 404, 'not_found')
-    if (existing.name !== parsed.data.name) {
+    if (parsed.data.appearance !== undefined) {
+      const { workspaceAppearanceSchema, isWorkspaceIconName } = await import('@acorn/protocol/workspaceAppearance.ts')
+      const appearance = workspaceAppearanceSchema.nullable().safeParse(parsed.data.appearance)
+      if (!appearance.success) return respondError(c, 400, 'bad_request', ['Choose a valid workspace icon and background.'])
+      if (appearance.data?.kind === 'icon' && !(await isWorkspaceIconName(appearance.data.icon))) return respondError(c, 400, 'bad_request', ['Choose an icon from the catalogue.'])
+      const { saveWorkspaceAppearance } = await import('../../workspaceImages')
+      try { if (!saveWorkspaceAppearance(db, id, appearance.data)) return respondError(c, 404, 'not_found') }
+      catch (error) { return respondError(c, 400, 'bad_request', [error instanceof Error ? error.message : 'Could not save the workspace icon.']) }
+      broadcastWorkspaceChanged({ workspaceId: id })
+    }
+    if (parsed.data.name !== undefined && existing.name !== parsed.data.name) {
       await db.update(schema.workspaces).set({ name: parsed.data.name, updatedAt: Date.now() }).where(eq(schema.workspaces.id, id))
       broadcastWorkspaceChanged({ workspaceId: id })
     }
     return c.json({ ok: true })
   })
+  .get('/icon-images/:imageId', async (c) => (await import('./workspaceIconRoutes')).readWorkspaceIcon(c))
+  .use('/:id/icon-image', async (c, next) => (await import('./workspaceIconRoutes')).limitWorkspaceUpload(c, next))
+  .post('/:id/icon-image', async (c) => (await import('./workspaceIconRoutes')).uploadWorkspaceIcon(c))
   .put('/:id/project-order', async (c) => {
     const parsed = workspaceProjectOrderBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request', ['Supply each project ID once.'])

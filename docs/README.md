@@ -224,7 +224,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   workspaces](./workspaces-and-tasks/projects.md), [Task creation and
   navigation](./workspaces-and-tasks/task-creation.md), [Task script
   results](./workspaces-and-tasks/task-scripts.md), [Worktrees and
-  setup](./workspaces-and-tasks/worktrees.md).
+  setup](./workspaces-and-tasks/worktrees.md), [Workspace
+  icons](./workspaces-and-tasks/workspace-icons.md).
 - [managed-agents.md](./managed-agents.md): [Web activity and file
   changes](./managed-agents/activity.md), [App-access approval](./managed-agents/app-access.md),
   [Context, files, and attachments](./managed-agents/attachments.md), [Client

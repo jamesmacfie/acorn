@@ -174,7 +174,9 @@
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
     "./testkit/large-diff": "./src/testkit/largeDiff.ts",
-    "./testkit/ws-client": "./src/testkit/wsClient.client.ts"
+    "./testkit/ws-client": "./src/testkit/wsClient.client.ts",
+    "./features/workspaces/WorkspaceRail.tsx": "./src/features/workspaces/WorkspaceRail.tsx",
+    "./features/workspaces/workspaceRailPrefs.ts": "./src/features/workspaces/workspaceRailPrefs.ts"
   },
   "scripts": {
     "icons": "node scripts/icon-census.mjs",

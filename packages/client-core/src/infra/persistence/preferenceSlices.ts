@@ -53,6 +53,7 @@ export const directPreferenceSlices: readonly PersistedStateSlice<unknown>[] = [
   direct('core.diff-view', PrefKeys.diffView, 'view'),
   jsonObject('core.rail-order', PrefKeys.railOrder, 'view'),
   jsonObject('core.rail-visibility', PrefKeys.railVisibility, 'view', 16 * 1024),
+  direct('core.workspace-rail', PrefKeys.workspaceRail, 'view'),
   direct('terminal.rail-default', PrefKeys.terminalRailDefault),
   direct('terminal.height', PrefKeys.terminalHeight, 'panes'),
   direct('terminal.font-size', PrefKeys.terminalFontSize, 'panes'),
