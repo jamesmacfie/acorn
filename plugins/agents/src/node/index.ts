@@ -33,6 +33,7 @@ import { managedAgentsBridge } from '../server/routes/managedBridge'
 import { agentUsage, AGENT_USAGE } from '../server/routes/usage'
 import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
 import { agentLoopHooks, AGENT_LOOP_HOOKS } from '../server/routes/loopHook'
+import { agentInstructionReview, AGENT_INSTRUCTION_REVIEW } from '../server/routes/instructionReview'
 import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
 import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
@@ -109,10 +110,12 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
   let followUps: Promise<TurnFollowUps> | null = null
   let reconcileMessages: (() => Promise<void>) | null = null
   let pluginsChanged: { dispose(): void } | null = null
+  let projectChanged: { dispose(): void } | null = null
   let managedRoute: { dispose(): void } | null = null
   let usageRoute: { dispose(): void } | null = null
   let mcpServersRoute: { dispose(): void } | null = null
   let loopHooksRoute: { dispose(): void } | null = null
+  let instructionReviewRoute: { dispose(): void } | null = null
   let harnessRoute: { dispose(): void } | null = null
   let customAgentRoute: { dispose(): void } | null = null
   let draftAttachmentsRoute: { dispose(): void } | null = null
@@ -156,13 +159,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
       })
-      // This plugin's own handler on it: the instruction file check, off until the owner turns it on in
-      // Settings > Security and backup. Loaded on first use, to stay inside the service boot budget.
-      ctx.hooks.handle('agents:before-send', {
-        id: 'instruction-check',
-        mode: 'veto',
-        run: async (payload) => (await import('../server/sessions/instructionCheck')).checkBeforeSend(core, dataDir, payload.taskId as string),
-      })
+      // Required instruction checks run in the queue dispatcher immediately before driver send.
+      // This extension point retains its optional plugin-hook failure semantics.
       // The second: a harness permission request, before anyone sees it. Observe and veto only
       // (../server/sessions/permissionPolicy.ts).
       ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
@@ -341,6 +339,17 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         saveCustomAgent: (userId, id, input) => saveCustomAgent(core.prefs, userId, id, input),
         deleteCustomAgent: (userId, id) => deleteCustomAgent(core.prefs, userId, id),
       })
+      instructionReviewRoute = ctx.capabilities.provide(AGENT_INSTRUCTION_REVIEW, {
+        tasks: async () => (await core.tasks.active()).map(({ id, title, projectId }) => ({ id, title, projectId })),
+        admission: () => runtime!.instructionAdmission(),
+      })
+      projectChanged = ctx.events.on('project:changed', (event) => {
+        if (typeof event.projectId !== 'string') return
+        const projectId = event.projectId
+        void core.projects.byId(projectId).then(async (project) => {
+          if (!project) await (await runtime!.instructionAdmission()).store.deleteProject(projectId)
+        }).catch(() => undefined)
+      })
 
       // agents.harnessRegistry (docs/managed-agents/harnesses.md § Harnesses). The plugin host resolves this per
       // contributed harness, so a node with agents disabled drops them and re-enabling redelivers.
@@ -363,6 +372,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         search: (query) => runtime!.store.searchTaskSessions(query.text, query.taskIds, query.limit),
       })
       ctx.routes.register(agentUsage, { prefix: '', note: '/usage, /pricing, /concurrency, /session-defaults, /custom-agents — account-scoped provider usage, dispatch limits, new-session defaults, and saved agents' })
+      ctx.routes.register(agentInstructionReview, { prefix: '', note: 'device-only instruction review and approval' })
 
       // Settings → MCP servers (docs/mcp.md § Your own servers). The test reveals the server's secrets
       // the way a session start does, and redacts them out of whatever the server printed.
@@ -466,6 +476,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       managedRoute?.dispose()
       draftAttachmentsRoute?.dispose()
       usageRoute?.dispose()
+      instructionReviewRoute?.dispose()
+      projectChanged?.dispose()
       mcpServersRoute?.dispose()
       loopHooksRoute?.dispose()
       harnessRoute?.dispose()

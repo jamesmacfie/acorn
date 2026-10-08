@@ -1,6 +1,45 @@
 # Phase 06: review changed agent instructions
 
-Date: October 8, 2026. Status: proposed product requirements; implementation not started.
+Completion note, October 9, 2026. **Status: implemented.** The agents plugin now discovers
+repository instruction files, imports, repository skills, delivered plugin skills, and supporting
+files with one bounded scanner. The runtime applies enabled checks at the shared queued-turn
+dispatch point before a driver send. A device-only review route stores encrypted snapshots in the
+agents database, compares changed bytes and canonical paths, and rejects approval drift. Settings
+offers separate hidden-character and changed-instruction switches. The review shows advisory
+findings before collapsed, credential-redacted diffs. Project deletion removes its snapshots.
+
+The installed harnesses inspected were Claude Code 2.1.294 and Codex 0.159.2. The exact scanner
+scope, exclusions, quotas, and host-access limits are recorded in
+[instruction file checks and review](../../security.md#instruction-file-checks-and-review) and
+shown in the review. Acorn scans nested Claude and Codex instruction names before the harness
+visits those directories. It follows Claude imports through five hops, enters repository and
+delivered plugin skill folders, and reports unsupported skill formats. Instruction approval stays
+separate from plugin-skill and executable-config trust. The optional `agents:before-send` hook keeps
+its fail-open extension contract; mandatory checks run directly in the dispatcher. The service
+budget ceiling is 3,186,000 B for a measured 3,184,959 B combined build. No runtime pin or CI
+runtime line changed.
+
+Acceptance evidence: the focused scanner, hidden-character, admission, encrypted store, device
+route, settings UI, and 20 durable queue tests pass. The queue tests cover interactive, workflow,
+delegation, delegation report, automation, import, plugin, and goal sources, plus cancellation.
+The workflow consumer suite passes 570 tests; focused Node core secrets, hook, and project tests
+pass 45 tests. Plugin TypeScript, 87 architecture tests, database migration checks, and the Node
+service build pass. The Node route registry passes 35 of 36 tests; the only golden mismatch is its
+pre-existing missing GitHub pull search route. This phase's six mounted review-route entries are in
+the golden list. An isolated desktop session showed first-use
+refusal, baseline approval, added command and domain findings after a file change, a stale-review
+approval conflict, and refusal of a subsequent managed turn. The isolated session had one Node, so
+the real desktop Node-switch case was not exercised; a settings UI test verifies that switching
+Nodes clears the pending review and prevents a cross-Node approval. The agents suite previously
+passed 1,276 tests with one unrelated sandbox process-inventory failure. The broad Node core suite
+was stopped after unchanged loopback and socket tests failed or timed out under this sandbox. No
+full repository test or lint run was made; the coordinator owns that gate.
+
+Phase 07 can add harness-configuration diagnostics without changing this snapshot approval.
+Phase 10 can replace the local credential-pattern redactor with a shared detector; the UI consumes
+only redacted patches and never stores displayed secrets in preferences or audit details.
+
+Original proposal, October 8, 2026.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`, plus the uncommitted instruction-check
 changes described below. Dependency: none of phases 01 to 05.
 
@@ -39,7 +78,7 @@ Read these owners and their colocated tests:
 - `packages/node-core/src/server/pluginHost/hooks.ts` owns optional hooks that continue after failure.
 
 Read [skills](../../managed-agents/skills.md), [process and configuration controls](../../security/process-and-paths.md),
-and [the instruction check](../../security.md#hidden-characters-in-instruction-files).
+and [the instruction check](../../security.md#instruction-file-checks-and-review).
 
 ## Required behaviour
 

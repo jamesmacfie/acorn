@@ -3,9 +3,10 @@ import { createSettingSave, readJson, writeJson } from '@acorn/plugin-api/client
 import { Checkbox, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 import { agentSessionDefaultsRoute, type AgentSessionDefaults } from '../../shared/sessionDefaults'
 import { agentSessionDefaultsQueryKey } from './sessionDefaultsClient'
+import InstructionReviewPanel from './InstructionReviewPanel'
 
 // This plugin's section of Settings > Security and backup, drawn in core's `core:security` point. The
-// switch turns on the instruction file check that this plugin's `before-send` handler runs on the node
+// switches enable required checks in the managed-turn dispatcher on the selected Node.
 // (../../server/sessions/instructionCheck.ts). The value is one field of the session defaults record,
 // whose write route takes only a device, so an agent can't turn the check off.
 //
@@ -25,16 +26,16 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
   }))
   const save = createSettingSave()
 
-  const write = async (on: boolean) => {
+  const write = async (field: 'checkInstructionFiles' | 'reviewChangedInstructions', on: boolean) => {
     const saved = await writeJson<AgentSessionDefaults>(
       agentSessionDefaultsRoute,
       {
         method: 'PUT',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ checkInstructionFiles: on }),
+        body: JSON.stringify({ [field]: on }),
         nodeId: nodeId(),
       },
-      (response) => `instruction file check ${response.status}`,
+      (response) => `instruction setting ${response.status}`,
     )
     queryClient.setQueryData(queryKey(), saved)
     // The agents settings pages read the active node's copy of the same record.
@@ -45,7 +46,7 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
     <SettingsSection
       id="agent-instructions"
       label="Agent instruction files"
-      help="Hidden characters draw as nothing in an editor or a diff, so they can carry instructions you never saw. The check reads CLAUDE.md and AGENTS.md at the worktree root, and the skill folders in the repo and in your plugins."
+      help="Acorn checks discovered repository instructions and skills before a managed agent turn."
     >
       <SettingRow
         label={LABEL}
@@ -59,9 +60,20 @@ export default function AgentSecuritySection(props: { nodeId?: string | null }) 
           ariaLabel={LABEL}
           checked={stored.data?.checkInstructionFiles ?? false}
           disabled={!stored.isSuccess}
-          onChange={(next) => save.run(() => write(next))}
+          onChange={(next) => save.run(() => write('checkInstructionFiles', next))}
         />
       </SettingRow>
+      <SettingRow
+        label="Review changed instruction files"
+        description="Stop managed turns until you approve the current instruction and skill snapshot. Off by default."
+        error={save.error() ?? (stored.isError ? "Couldn't load this setting." : undefined)}
+      >
+        <Checkbox switch ariaLabel="Review changed instruction files"
+          checked={stored.data?.reviewChangedInstructions ?? false}
+          disabled={!stored.isSuccess}
+          onChange={(next) => save.run(() => write('reviewChangedInstructions', next))} />
+      </SettingRow>
+      <InstructionReviewPanel nodeId={props.nodeId} />
     </SettingsSection>
   )
 }

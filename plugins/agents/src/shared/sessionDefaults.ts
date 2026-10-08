@@ -55,6 +55,8 @@ export type AgentSessionDefaults = {
   /** Refuse a turn while an instruction file or skill the harness reads holds hidden characters
    *  (../server/sessions/instructionCheck.ts). Drawn on Settings > Security and backup. */
   checkInstructionFiles: boolean
+  /** Require an owner-approved snapshot of discovered instruction and skill files. */
+  reviewChangedInstructions: boolean
   /**
    * Carry each change forward instead of using `pinned`. On, a model or effort switch inside a
    * session becomes the value the next session of that provider starts with.
@@ -79,6 +81,7 @@ export const defaultAgentSessionDefaults = (): AgentSessionDefaults => ({
   keepArchivedHistoryDays: 0,
   // Off, because it reads files before every turn and can stop work the owner didn't expect to stop.
   checkInstructionFiles: false,
+  reviewChangedInstructions: false,
   followLastSession: true,
   pinned: {},
   last: {},
@@ -167,6 +170,9 @@ export function validateAgentSessionDefaults(
   if (record.checkInstructionFiles != null && typeof record.checkInstructionFiles !== 'boolean') {
     errors.push('checkInstructionFiles must be true or false.')
   }
+  if (record.reviewChangedInstructions != null && typeof record.reviewChangedInstructions !== 'boolean') {
+    errors.push('reviewChangedInstructions must be true or false.')
+  }
   const pinned = record.pinned == null ? undefined : values(record.pinned, 'pinned', errors)
   const last = record.last == null ? undefined : values(record.last, 'last', errors)
   const inlineRecord = record.inline
@@ -213,6 +219,7 @@ export function validateAgentSessionDefaults(
       ...(typeof record.keepArchivedHistoryDays === 'number' ? { keepArchivedHistoryDays: record.keepArchivedHistoryDays } : {}),
       ...(typeof record.followLastSession === 'boolean' ? { followLastSession: record.followLastSession } : {}),
       ...(typeof record.checkInstructionFiles === 'boolean' ? { checkInstructionFiles: record.checkInstructionFiles } : {}),
+      ...(typeof record.reviewChangedInstructions === 'boolean' ? { reviewChangedInstructions: record.reviewChangedInstructions } : {}),
       ...(pinned ? { pinned } : {}),
       ...(last ? { last } : {}),
       ...(inline ? { inline } : {}),

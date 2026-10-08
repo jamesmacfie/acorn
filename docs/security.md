@@ -70,37 +70,67 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).
 
-## Hidden characters in instruction files
+## Instruction file checks and review
 
 Some characters draw as nothing in an editor or a diff: zero-width and direction characters, the soft
 hyphen, fillers, variation selectors, and Unicode tag characters. A line in `CLAUDE.md`, `AGENTS.md`,
 or a skill can carry instructions that nobody reviewing it saw, and a harness reads those files
 itself, with no tool call for a hook to see.
 
-**Check instruction files before each agent turn**, under Settings > Security and backup, is off by
-default. When it's on, the agents plugin's own `agents:before-send` handler reads the root
-instruction files and the files they import with `@path`, the repo's `.claude/skills`,
-`.agents/skills`, and `.codex/skills` folders, and every plugin skill a session may load. If any holds
-a character in Unicode's `Default_Ignorable_Code_Point` set, outside a real emoji sequence, it
-refuses the turn and names the file and line. The code is in
-`plugins/agents/src/server/sessions/instructionCheck.ts`.
+**Check instruction files before each agent turn** and **Review changed instruction files** are
+separate, off-by-default settings under Settings > Security and backup. The agents runtime applies
+both immediately before it sends any queued turn to a driver. A failure to scan a required input
+stops that turn as incomplete and tells you to retry or change the setting. Optional plugin
+`agents:before-send` hooks keep their established failure behavior.
 
-The check reads as a harness does rather than as a careful reader would, because a file it skipped
-is one the harness may still read:
+The hidden-character check finds Unicode `Default_Ignorable_Code_Point` characters outside real
+emoji sequences and names their file and line. The review compares exact byte hashes and canonical
+path identities with an approved snapshot. First use requires a baseline review. Findings for the
+baseline or changed files identify
+commands, domains, sensitive paths, permission language, override phrases, and hidden characters.
+They are advisory: security documentation can mention these subjects without instructing misuse.
+Findings appear before the files, and each file starts collapsed. Acorn redacts credential-shaped
+spans from displayed text. Approval checks the discovered bytes again and returns a conflict when
+they changed. The next turn checks again, even after approval.
 
-- It follows `@path` imports up to five hops and enters linked skill folders.
-- A text file with a NUL byte or an invalid UTF-8 byte is still read, and a byte order mark selects
-  UTF-16. Only a non-text file in a skill folder that isn't valid UTF-8, such as an image, is skipped.
-- A file over 1 MB, or more than 500 files in all, refuses the turn instead of being skipped.
+The scan covers root and nested `AGENTS.md`, `AGENTS.override.md`, `CLAUDE.md`, and
+`CLAUDE.local.md`, including `.claude/CLAUDE.md`. It follows Claude `@path` imports up to five hops.
+It includes repository `.claude/skills`, `.agents/skills`, and `.codex/skills`, their supporting
+scripts, and delivered plugin skills. The installed Codex 0.159.2 prefers `AGENTS.override.md` in a
+directory; the review includes both spellings so a later removal also appears. The installed Claude
+Code 2.1.294 reads nested Claude files when it works in their folders. The scan includes them before
+the harness reaches them.
 
-The switch is the `checkInstructionFiles` field of the [agent defaults](./managed-agents/defaults.md),
-whose write route takes only a device, so an agent can't turn it off. The check has these limits:
+The scan has explicit bounds and failure behavior:
 
-- It covers turns that acorn sends: managed chats, workflow steps, and delegated agents. Text you type
-  into a harness in a terminal doesn't pass `agents:before-send`.
-- It doesn't read nested `CLAUDE.md` or `AGENTS.md` files that no instruction file imports, which a
-  harness loads later when it works in that folder, or a file that changes partway through a turn.
-- An unexpected failure, or the hook's 5-second timeout, lets the turn through.
+- It follows linked skill folders, deduplicates canonical directory walks and file reads, and
+  binds each discovered alias to approval. Import or link cycles stop the scan. Missing optional
+  paths are allowed; present unreadable files, broken links, and special inputs stop the scan.
+- A text file with damaged UTF-8 is decoded with replacement characters. A byte order mark selects
+  UTF-16. An unknown skill file format receives an unsupported-analysis finding.
+- One file may hold at most 1 MB. A scan may read at most 500 files, 5,000 directories, 8 MiB of
+  file bytes, 20 directory levels, and five seconds. Expiry aborts the scan.
+- Advisory analysis inspects the first 20,000 lines per file and reports at most 2,000 findings.
+  The review marks a reached analysis limit and leaves the full file available in the project.
+- Dependency and generated trees named `.git`, `.acorn`, `.turbo`, `.venv`, `venv`,
+  `__pycache__`, `node_modules`, `vendor`, `.pnpm`, `.next`, `dist`, `build`, `target`, and `coverage`
+  are excluded. Repository symlink directories outside explicit skill roots are not traversed.
+
+The switches are the `checkInstructionFiles` and `reviewChangedInstructions` fields of the
+[agent defaults](./managed-agents/defaults.md). Only a device can edit them, open a review, or
+approve it. The agents plugin keeps at most two encrypted snapshots per project in its own database.
+Approval metadata and digests are separate from encrypted bodies. A missing key or damaged body
+requires another review. Project deletion removes its snapshots. Instruction approval does not
+approve [plugin skills](./managed-agents/skills.md#approval) or
+[executable repository configuration](./security/process-and-paths.md).
+
+These checks have limits:
+
+- It covers turns that Acorn sends: managed chats, resumed and queued turns, workflow steps, and
+  delegated agents. Text you type into a harness in a terminal does not pass Acorn's dispatcher.
+- A pre-turn scan cannot intercept a file a harness loads or changes during the turn. Global
+  instructions outside the discovered scope are not covered. A process with the owner's host access
+  can change Acorn's on-disk approval state.
 - Text that legitimately uses a zero-width joiner or non-joiner, such as Persian, is refused too.
 
 ## Pages

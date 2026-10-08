@@ -62,6 +62,43 @@ describe('durable queue admission', () => {
     input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
   })
 
+  it('applies required admission at the shared dispatch point for every queued source', async () => {
+    const admission = await runtime.instructionAdmission()
+    const gate = vi.spyOn(admission, 'admit').mockRejectedValue(new Error('Instruction review required.'))
+    for (const source of ['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import', 'plugin', 'goal'] as const) {
+      const item = await session(source === 'workflow' ? 'workflow' : 'interactive')
+      const { turn } = await runtime.store.enqueueTurn(item.id, {
+        source, input: [{ type: 'text', text: source }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+      })
+      await runtime['engine'].pump()
+      await vi.waitFor(async () => expect((await runtime.store.turn(turn.id))?.status).toBe('failed'))
+    }
+    expect(gate).toHaveBeenCalledTimes(8)
+    expect(sends).toEqual([])
+  })
+
+  it('aborts an in-flight instruction scan when its turn is cancelled', async () => {
+    const admission = await runtime.instructionAdmission()
+    let entered = false
+    let aborted = false
+    vi.spyOn(admission, 'admit').mockImplementation(async (_taskId, signal) => {
+      entered = true
+      await new Promise<void>((_resolve, reject) => signal?.addEventListener('abort', () => {
+        aborted = true
+        reject(new Error('Turn cancelled.'))
+      }, { once: true }))
+    })
+    const item = await session()
+    const { turn } = await runtime.store.enqueueTurn(item.id, {
+      source: 'interactive', input: [{ type: 'text', text: 'Cancel' }], effectivePolicy: {}, idempotencyKey: randomUUID(),
+    })
+    void runtime['engine'].pump()
+    await vi.waitFor(() => expect(entered).toBe(true))
+    await runtime.cancelTurn(item.id, turn.id)
+    await vi.waitFor(() => expect(aborted).toBe(true))
+    expect(sends).toEqual([])
+  })
+
   it('pauses a goal when its active provider disconnects', async () => {
     const item = await session()
     await runtime.setGoal(item.id, 'Finish the task')

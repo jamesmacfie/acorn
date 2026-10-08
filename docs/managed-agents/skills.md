@@ -72,6 +72,10 @@ The Node keeps both answers in `skill-state.json` in its data root: `approved` m
 approved digest, and `disabled` lists the skills switched off. Uninstalling forgets both. An update
 keeps them, so the switch survives and a changed body asks again.
 
+The optional [instruction review](../security.md#instruction-file-checks-and-review) also includes
+delivered skill bodies and supporting scripts in a project's pre-turn snapshot. Its approval is
+separate from this plugin skill grant: neither approval substitutes for the other.
+
 ### The catalogue
 
 The catalogue is `server/pluginHost/skills.ts` in node-core. The host fills it from each active loaded

@@ -128,6 +128,7 @@ export class ManagedAgentRuntime {
   stopIdleSessionsNow = () => this.engine.stopIdleSessionsNow()
   processFootprint = (...args: Parameters<ManagedAgentEngine['processFootprint']>) => this.engine.processFootprint(...args)
   diskFootprint = (now?: number) => this.engine.diskFootprint(now)
+  instructionAdmission = () => this.engine.instructionAdmission()
 
   /** Read once per spawn so the delegation ledger can retain the resolved choices for recovery. */
   async spawnedAgentDefaults(): Promise<SpawnedAgentDefaults> {
@@ -447,6 +448,7 @@ export class ManagedAgentRuntime {
     const live = this.engine.currentSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id
+    if (target) this.engine.cancelInstructionScan(target)
     if (!target) {
       const session = await this.store.getSession(sessionId)
       // Disconnect interrupts the turn before recovery starts. Stop must retire that recovery,

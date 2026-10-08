@@ -45,6 +45,7 @@ import {
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+import type { InstructionAdmission } from './instructionAdmission'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
@@ -245,6 +246,10 @@ export class ManagedAgentEngine {
   // The probe running now, which every caller that needs one joins.
   protected providerProbe: { generation: number; promise: Promise<AgentProviderDescriptor[]> } | null = null
   protected readonly shutdown = new AbortController()
+  private instructionAdmissionPromise: Promise<InstructionAdmission> | null = null
+  private readonly instructionDataDir: string
+  private readonly instructionSecrets: SecretService
+  private readonly instructionScans = new Map<string, AbortController>()
   protected stopped = false
   private stopPromise: Promise<void> | null = null
   private readonly publicationCallbacks = new Set<Promise<void>>()
@@ -254,6 +259,8 @@ export class ManagedAgentEngine {
     private readonly enqueueGoal: (sessionId: string, prompt: string, key: string, signal?: AbortSignal) => Promise<void>,
   ) {
     this.db = options.db
+    this.instructionDataDir = options.dataDir
+    this.instructionSecrets = options.secrets
     this.core = options.core
     this.internalEnv = options.internalEnv
     this.mcp = options.mcp ?? (() => null)
@@ -815,6 +822,19 @@ export class ManagedAgentEngine {
     return this.queue.pump()
   }
 
+  instructionAdmission(): Promise<InstructionAdmission> {
+    return this.instructionAdmissionPromise ??= (async () => {
+      const [{ InstructionAdmission }, { InstructionReviewStore }] = await Promise.all([
+        import('./instructionAdmission'), import('./instructionReviewStore'),
+      ])
+      return new InstructionAdmission(this.core, this.instructionDataDir, new InstructionReviewStore(this.db, this.instructionSecrets))
+    })()
+  }
+
+  cancelInstructionScan(turnId: string): void {
+    this.instructionScans.get(turnId)?.abort(new Error('Turn cancelled.'))
+  }
+
   private async dispatchQueuedTurn(session: AgentSession, turn: AgentTurn, generation: ProviderGeneration): Promise<boolean> {
     this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
@@ -844,6 +864,19 @@ export class ManagedAgentEngine {
             }] as const
           }),
       )))
+      if (!this.processes.owns(generation)) return false
+      // The queue is shared by interactive, resumed, workflow, operation and delegated turns.
+      // Admission belongs immediately before the driver, including retries of a durable turn.
+      const scan = new AbortController()
+      this.instructionScans.set(turn.id, scan)
+      const stopScan = () => scan.abort(this.shutdown.signal.reason)
+      if (this.shutdown.signal.aborted) stopScan()
+      else this.shutdown.signal.addEventListener('abort', stopScan, { once: true })
+      try { await (await this.instructionAdmission()).admit(session.taskId, scan.signal) }
+      finally {
+        this.instructionScans.delete(turn.id)
+        this.shutdown.signal.removeEventListener('abort', stopScan)
+      }
       if (!this.processes.owns(generation)) return false
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false

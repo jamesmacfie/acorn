@@ -67,7 +67,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // -> renewingEnv.ts. It restores session credential files and starts their refresh timer before
 // plugin initialization can launch children, so it belongs at boot. Keep 840 B of margin; the lazy
 // authoring, sampler, and renderer imports above remain outside this graph.
-const limits = { ceiling: 3_184_000, floor: 1_000_000 }
+// 2026-10-09: 3,184,959 B with the device-only instruction review route and its per-Node setting.
+// The scanner, analyzer, and encrypted snapshot store load on first review or required admission;
+// only route registration, the settings field, and the dispatch call site join the boot graph.
+// Leave about 1 KB for the same narrow registration paths as the previous limits.
+const limits = { ceiling: 3_186_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))
