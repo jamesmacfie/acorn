@@ -23,8 +23,11 @@ measured a 53.57 ms/four-process first 100-row page, 57.97 ms/four-process next 
 39.02 ms/four-process topology, 17.75 ms/two-process first diff segment, and a one-entry
 183-byte parsed cache. Those unchanged history/diff paths and Phase 03 bounded stash
 roster and checkout admission tests remain applicable. The new explanation request is
-explicit and does not enter those caches. Production Node service is
-3,197,524/3,200,000 bytes; terminal startup is 729,585/730,000 bytes.
+explicit and does not enter those caches. A 70-file fixture with long metadata, binary
+content, and tracked plus captured-untracked text exceeding the combined patch budget
+measured at most 60 summaries, 12 KiB metadata, and 40 KiB combined patch input; each
+excluded category was named. Production Node service is 3,197,524/3,200,000 bytes;
+terminal startup after the paired-node fix is 729,607/730,000 bytes.
 
 **Real hosts:** Isolated desktop `git-phase04` used the disposable two-commit, 22-file
 repository and a captured-untracked stash. A locally installed one-shot model fixture
@@ -36,41 +39,62 @@ final build it showed a complete, wrapped answer with named binary and 40 KiB pa
 omissions. Isolated terminal `git-phase04-tui` selected the same fixture model and
 showed the stash answer, captured-untracked file, and named omissions at 120×40.
 `git-phase04-tui2` showed commit model choice, generation, cancellation, provider
-failure, retry, and a recovered answer. One terminal driver click inadvertently
-used Claude Code before the deterministic fixture was selected; ordinary automated
-tests made no paid model call. All sessions were stopped. The terminal driver did
-not successfully switch selected history rows during generation; desktop host and
-shared client state tests cover late scope output, so independent terminal scope
-acceptance remains open.
+failure, retry, and a recovered answer. `git-phase04-scope-tui` at 120×40 selected
+**Fixture answer** before each Generate. Its SGR mouse input opened the action; `h`
+then `j` switched from revision `5b4a53f3` to `fec50ff4` while generation was visible.
+The root showed **Explain commit** without the delayed answer. A second slow call on
+the root was followed by `ctrl+k`, **Switch node**, and the paired remote fixture;
+the remote's own History 3 and task sentinel appeared, with no local explanation.
+The model process log recorded cancellation in 20,656 ms, and switching back still
+showed no late result. The driver input trace is in the isolated session's
+`.acorn/agent-dev/tui/git-phase04-scope-tui/logs/input.jsonl`; the desktop screenshot
+is `.acorn/agent-dev/git-phase04/screenshots/git-explanation-root.png`. Reproduce
+the mouse action with `dev:tui:agent:ui type $'\033[<0;44;14M\033[<0;44;14m'`,
+then use the driver `press` and `snapshot` commands above. One earlier terminal
+driver click inadvertently used Claude Code before the fixture was selected;
+ordinary automated tests and these follow-up checks made no paid model call.
+All isolated desktop, terminal, and standalone Node sessions were stopped.
 
 **External replacement:** The source checkout at
 `/Users/jamesmacfie/Source/acorn-worktree-manage` identifies its plugin as
 `worktree-manager` with source `worktrees`; it was preserved. No external registration
-was installed on the disposable Node initially. The public installer rejected the
-actual built package because it uses plugin API 2 and this Node accepts API 3. An
-isolated API 3 identity fixture with the verified plugin ID was installed, disabled,
-and uninstalled via **Keep its data**; no real external registration was removed or
-purged. The public management contract takes an explicit Node ID for remote writes,
-and the UI labels the local target. No remote Node was connected in this fixture, so
-remote acceptance was limited to contract review. Built-in Git was toggled off in the
-disposable Node; its status said it remains active until restart. It was restored,
-and no unrelated activation or layout preference was changed. On each actual Node,
-verify built-in Git first, then retire only an installed `worktree-manager` there.
+was installed on either the selected local Node or the connected disposable second
+Node when their public **Installed** inventories were read. The actual source remains
+plugin API 2 and the API 3 installer rejected its built package; that checkout was
+not altered. An API 3 fixture with the same verified ID was installed only on the
+second Node. Its plugin database held a sentinel. The remote Git source showed a
+three-commit history, captured-untracked stash, three worktrees, and a task worktree;
+the local Node's two-commit project and registration inventory remained separate.
+Remote built-in Git was disabled through public management and the isolated Node was
+restarted: its effective status was **Off**. No external retirement was attempted
+while Git was unavailable. Git was reenabled and the Node restarted; its history,
+stash, worktrees, and task remained. The fixture was then uninstalled on that Node
+through public **Keep its data**, followed by another restart. The fixture registration
+became **Not installed**, its plugin database sentinel survived, and all Git/task
+sentinels remained. The local Node still had active Git and no `worktree-manager`.
+No actual external registration existed to retire, so none was disabled or removed.
+The source checkout, unrelated preferences, and repository data were preserved.
+Replacement is per Node: verify that Node's built-in Git is effective after restart,
+then retire only a verified installed `worktree-manager` on that same Node.
 
-**Verification:** Git plugin suite passed (13 files, 46 tests), including real Git
-fixtures for bounded context, captured untracked content, model validation,
-cancellation, provider error, and the Git process truncation flag. Git, Node, desktop,
-terminal, client-core, and plugin-api type checks passed. Touched-source oxlint and
-the relevant architecture boundaries, doc paths, and published plugin surface passed.
+**Verification:** Git plugin suite passed (13 files, 49 tests), including the expanded
+real Git budget and abort fixtures, empty-result retry, model validation, provider
+error, and Git process truncation. Git, Node, desktop, terminal, client-core, and
+plugin-api type checks passed; terminal was rechecked after the saved-node broker
+fix. Touched-source oxlint and relevant architecture boundaries, doc paths, source
+fields, and published plugin surface passed. The terminal production build passed
+startup and runtime-import checks. The saved-node fix was also exercised in the
+connected terminal host: its public Node switch reached the second Node's own Git
+history instead of reporting **Unknown node**.
 The sole architecture failure is unchanged `docs/api-reference/plugin-routes.md` at
 201 lines against the 200-line limit. Root lint and full `pnpm test` were deliberately
 deferred to the coordinator's all-eight-phase gate. The unrelated AgentPane turnId,
 workflowMapLifecycle HeadlessArgv, and worktree GET-body failures were not changed.
 
-**Later phases:** Phases 05–08 remain planned. A compatible external package and a
-connected remote Node are needed to complete real-package and remote replacement
-acceptance. Repeat terminal-specific scope-change acceptance with a stable fixture
-driver if the release gate requires independent host proof.
+**Later phases:** Phases 05–08 remain planned. If a real external
+`worktree-manager` registration is installed on a later Node, repeat the per-Node
+identity, replacement, and non-purging retirement check there. The API 2 source
+requires its own compatibility work before it can install on an API 3 Node.
 
 Original plan dated October 7, 2026.
 Depends on [phase 03](./03-stashes.md).

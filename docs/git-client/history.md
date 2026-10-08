@@ -9,6 +9,8 @@ Open **Git > History** for the selected Git project. The project selector choose
 repository; Git does not accept a working directory from the client. The task Git pane opens on
 history reachable from its recorded branch. If that branch is unavailable, the pane names the
 condition and falls back to repository refs and HEAD. **Worktrees** remains a separate section.
+Select a commit and press **Explain commit** for an explicit model-generated summary. See
+[Git explanations](./explanations.md) for model choice, context limits, and cancellation.
 
 `plugins/git/src/server/history.ts` reads up to 100 commits per page. A cursor pins the object IDs
 of the selected ref tips and an offset. A ref moving after the first page cannot insert a commit

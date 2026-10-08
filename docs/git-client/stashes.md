@@ -12,6 +12,8 @@ The detail compares tracked changes with the stash's base through the same segme
 viewer as [Git history](./history.md). **Captured untracked content** opens the untracked parent
 as an empty-tree comparison in the same viewer. The stash's index and untracked parents are not
 history merges.
+Press **Explain stash** for an explicit model-generated summary of tracked and captured untracked
+content. See [Git explanations](./explanations.md) for model choice and context limits.
 
 The source asks you to choose a target task. The task pane fixes that target to its task. Each
 dialog shows its captured Node, project, task, and stash identity. A moved target or changed Node

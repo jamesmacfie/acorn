@@ -84,3 +84,17 @@ it('shows a provider failure with a retry action, then replaces it with a succes
   await tick()
   expect(host!.textContent).toContain('Recovered explanation')
 })
+
+it('shows an empty answer as retryable and does not retain it', async () => {
+  setRevision('d'.repeat(40))
+  writeJson.mockResolvedValueOnce(answer('')).mockResolvedValueOnce(answer('Useful explanation'))
+  draw()
+  button('Explain commit').click()
+  await tick()
+  expect(host!.textContent).toContain('empty explanation')
+  expect(button('Retry explanation')).toBeTruthy()
+  button('Retry explanation').click()
+  await tick()
+  expect(host!.textContent).toContain('Useful explanation')
+  expect(host!.textContent).not.toContain('empty explanation')
+})

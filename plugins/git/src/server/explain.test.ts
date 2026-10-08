@@ -73,6 +73,54 @@ it('includes captured untracked stash content and names missing patch context', 
   expect(result.omissions).toEqual([])
 })
 
+it('bounds large stash metadata, file summaries, and combined tracked and untracked patches', async () => {
+  const root = fixture()
+  for (let index = 0; index < 70; index++) writeFileSync(join(root, `file-${String(index).padStart(2, '0')}.txt`), 'before\n')
+  writeFileSync(join(root, 'image.bin'), Buffer.from([0, 1, 2]))
+  git(root, 'add', '.')
+  git(root, 'commit', '-qm', 'Fixture files')
+  for (let index = 0; index < 70; index++) writeFileSync(join(root, `file-${String(index).padStart(2, '0')}.txt`), `${'tracked content '.repeat(20)}\n`)
+  writeFileSync(join(root, 'image.bin'), Buffer.from([0, 3, 4]))
+  writeFileSync(join(root, 'captured.txt'), 'untracked content\n'.repeat(4_000))
+  git(root, 'stash', 'push', '-u', '-m', 'long metadata '.repeat(1_300))
+  const id = git(root, 'rev-parse', 'stash@{0}')
+  const base = git(root, 'rev-parse', 'stash@{0}^1')
+  const { core, generateText } = service(root)
+  const result = await explain(core, 'owner', 'project', 'stash', id, { ...request, base }, new AbortController().signal)
+  const context = JSON.parse(generateText.mock.calls[0]![0].input.prompt)
+  expect(Buffer.byteLength(context.metadata)).toBeLessThanOrEqual(12 << 10)
+  expect(Buffer.byteLength(context.trackedPatch) + Buffer.byteLength(context.capturedUntrackedPatch)).toBeLessThanOrEqual(40 << 10)
+  expect(context.trackedPatch).toContain('tracked content')
+  expect(context.capturedUntrackedPatch).toContain('untracked content')
+  expect(result.omissions).toEqual(expect.arrayContaining([
+    expect.stringContaining('file summaries omitted after 60'),
+    expect.stringContaining('binary content omitted'),
+    expect.stringContaining('Metadata truncated at 12 KiB'),
+    expect.stringContaining('Captured untracked patch truncated'),
+  ]))
+  expect(context.omissions).toEqual(result.omissions)
+})
+
+it('stops before follow-on stash reads when the roster read is cancelled', async () => {
+  const root = fixture()
+  writeFileSync(join(root, 'tracked'), 'changed\n')
+  git(root, 'stash', 'push', '-m', 'Fixture')
+  const id = git(root, 'rev-parse', 'stash@{0}')
+  const base = git(root, 'rev-parse', 'stash@{0}^1')
+  const { core, calls, generateText } = service(root)
+  const controller = new AbortController()
+  const original = core.git.git
+  core.git.git = async (args, options) => {
+    const result = await original(args, options)
+    if (args[0] === 'stash' && args[1] === 'list') controller.abort()
+    return result
+  }
+  await expect(explain(core, 'owner', 'project', 'stash', id, { ...request, base }, controller.signal))
+    .rejects.toMatchObject({ name: 'AbortError' })
+  expect(calls.some(({ args }) => args[0] === 'rev-list')).toBe(false)
+  expect(generateText).not.toHaveBeenCalled()
+})
+
 it('names a patch clipped by the public Git process output limit', async () => {
   const root = fixture(), id = git(root, 'rev-parse', 'HEAD')
   const { core } = service(root)
