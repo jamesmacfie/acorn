@@ -31,12 +31,33 @@ const { buildConversationItems, visibleConversationItems } = await import('./con
 const fileChange = (event: Extract<AgentConversationItem['event'], { type: 'file_change' }>): AgentConversationItem =>
   ({ key: 'change', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'turn-1', event })
 
-const drawCard = (item: AgentConversationItem) => {
+const drawCard = (item: AgentConversationItem, turn?: AgentTurn) => {
   const host = document.createElement('div')
   document.body.append(host)
-  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" />, host)
+  const dispose = render(() => <AgentEventCard item={item} taskId="task" sessionId="session" turn={turn} />, host)
   return { host, dispose: () => { dispose(); host.remove() } }
 }
+
+it('draws saved host verdicts on the delegation report card', () => {
+  const item: AgentConversationItem = {
+    key: 'report', firstSeq: 1, lastSeq: 1, createdAt: 1, turnId: 'report',
+    event: { type: 'user_message', text: 'Child finished.\n\nFinal message: done' },
+  }
+  const turn = {
+    source: 'delegation_report',
+    input: [{ type: 'text', text: 'Child finished.' }],
+    effectivePolicy: { checkResults: { checkedAt: Date.parse('2026-10-08T00:00:00Z'), verdicts: [
+      { check: { kind: 'file-exists', path: 'output.txt' }, status: 'holds', reason: 'Regular file exists.' },
+      { check: { kind: 'commits-ahead' }, status: 'fails', reason: 'No commits ahead of spawn base.' },
+    ] } },
+  } as unknown as AgentTurn
+  const { host, dispose } = drawCard(item, turn)
+  try {
+    expect(host.textContent).toContain('Host checks')
+    expect(host.textContent).toContain('holds: file-exists · output.txt · Regular file exists.')
+    expect(host.textContent).toContain('fails: commits-ahead · No commits ahead of spawn base.')
+  } finally { dispose() }
+})
 
 const openInChanges = (host: HTMLElement) =>
   [...host.querySelectorAll('button')].find((element) => element.textContent?.includes('Open in Changes'))

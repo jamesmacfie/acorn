@@ -59,7 +59,8 @@ The terminal drawer runs shells, run targets, raw provider TUIs, and tool termin
 sessions use the Node's process broker, PTY and tmux reconciliation, bounded replay, and the
 authenticated event socket. [Terminal](./terminal.md) covers it.
 
-The Agent pane and Agent Center manage structured Claude Code and Codex sessions. They provide
+The Agent pane and Agent Center manage structured Claude Code and Codex sessions. Interactive sessions
+can hold a completion goal that checks each settled turn and queues bounded continuations. They provide
 durable normalized event ledgers, queued turns, permission and question requests, attachments,
 artifacts, usage, search, archive, fork, compact, import, terminal handoff, delegated sessions, and
 short generated titles after the first accepted prompt. Delegation can share the parent task or

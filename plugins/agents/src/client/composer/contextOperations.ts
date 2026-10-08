@@ -53,7 +53,7 @@ export async function captureContext(
   state.setCapturing(contributionId)
   state.setError('')
   try {
-    const captured = await contribution.capture({ taskId: session.taskId }, optionIds)
+    const captured = await contribution.capture({ taskId: session.taskId, sessionId: session.id }, optionIds)
     if (!state.captureCurrent(operation) || activeNodeId() !== owner.nodeId || state.revisions()[2] !== revision) return
     state.setContexts((current) => [...current.filter((item) => !contextBelongsTo(item, contribution)), ...captured])
     if (owner.visible()) closePicker()

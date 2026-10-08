@@ -58,7 +58,8 @@ What the reader gets:
   word**, **Regular expression**, **Select all matches**, a **Replace** disclosure, and close. A
   narrow pane wraps the buttons onto a second line.
 - **Replace** opens a second row with a replacement field, **Replace next**, and **Replace all**.
-  It starts collapsed each time the panel opens. Its text stays in the query, so collapsing the row
+  It starts collapsed each time the panel opens, unless the editor's **Replace in file** command
+  opened it through `openReplacePanel(view)`. Its text stays in the query, so collapsing the row
   keeps it. A read-only document has no **Replace** control. **Replace next** follows CodeMirror's
   rule: the first press selects the next match, and the press after that replaces it.
 - The count reads `3/17` when the selection is on a match, and `17 matches` when it's not. Counting

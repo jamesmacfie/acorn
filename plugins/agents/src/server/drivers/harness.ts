@@ -61,6 +61,7 @@ export type HarnessLaunchSpec = {
     session: AgentSession,
     skills: { folders: readonly string[]; plugins: readonly string[] },
     loopHooks?: AgentDriverLoopHooks,
+    attendanceInstructions?: string,
   ) => Record<string, unknown>
   /** Built-in only. Set when `acpSessionMeta` installs `loopHooks` in the harness's own hooks, so the
    *  lifecycle passes them and the descriptor reports the loop capabilities. */

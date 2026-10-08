@@ -3,20 +3,28 @@ import { createSignal } from 'solid-js'
 import { render } from 'solid-js/web'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { EditorEntry } from './editorClient'
+import type { createFileActionModel } from './fileActionModel'
 import { evictEditorTreeState, setEditorTreeDirectoryOpen } from './editorTreeState'
+import { projectFileStatus } from './fileStatusModel'
+import type { FileStatusProjection } from './fileStatusModel'
+import { prefsKey } from '@acorn/protocol/api.ts'
+import { saveEditorShowIgnored } from './editorPrefs'
 
 Element.prototype.scrollIntoView ??= () => {}
 
-const listing = vi.fn(async (_taskId: string, path: string): Promise<EditorEntry[]> => {
+const defaultListing = async (_taskId: string, path: string): Promise<EditorEntry[]> => {
   if (path === '') return [{ name: 'src', dir: true }]
   if (path === 'src') return [{ name: 'nested', dir: true }, { name: 'app.ts', dir: false }]
   if (path === 'src/nested') return [{ name: 'model.ts', dir: false }]
   return []
-})
+}
+const listing = vi.fn(defaultListing)
+const ignored = vi.fn(async (_task: string, _dir: string, _names: string[]) => ({ available: true as const, ignored: [] as string[] }))
 
 vi.mock('./editorClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./editorClient')>()),
-  editorApi: () => ({ list: listing }),
+  editorApi: () => ({ list: listing, ignored, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root', entryId: path || 'root' }),
+    trashAvailability: async () => ({ available: false, reason: 'Unsupported in this test.' }), renameAvailability: async () => ({ available: true }) }),
 }))
 
 const { default: FileTree } = await import('./FileTree')
@@ -24,31 +32,193 @@ const { default: FileTree } = await import('./FileTree')
 let dispose: (() => void) | undefined
 let host: HTMLElement
 const taskId = 'file-tree-test'
+const actions = { arm: vi.fn(), create: vi.fn(), rename: vi.fn(), trash: vi.fn() } as unknown as ReturnType<typeof createFileActionModel>
 
 afterEach(() => {
   dispose?.()
   dispose = undefined
   host?.remove()
-  listing.mockClear()
+  listing.mockReset().mockImplementation(defaultListing)
+  ignored.mockReset().mockResolvedValue({ available: true, ignored: [] })
+  vi.mocked(actions.arm).mockReset()
+  vi.mocked(actions.create).mockReset()
+  vi.mocked(actions.rename).mockReset()
   evictEditorTreeState(taskId)
+  localStorage.clear()
 })
 
-const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void }) => {
+it('renames the focused tree target with F2 without opening its file', async () => {
+  listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'seen', root: '/work' }])
+  const release = vi.fn()
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
+  vi.mocked(actions.rename).mockResolvedValue('renamed.txt')
+  const onOpen = mount()
+  const row = await vi.waitFor(() => {
+    const element = host.querySelector<HTMLElement>('[title="draft.txt"]')
+    if (!element) throw new Error('row not loaded')
+    return element
+  })
+  row.focus()
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))
+  const input = await vi.waitFor(() => {
+    const element = row.querySelector<HTMLInputElement>('input')
+    if (!element) throw new Error('inline rename not open')
+    return element
+  })
+  input.value = 'renamed.txt'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  await vi.waitFor(() => expect(actions.rename).toHaveBeenCalledWith(expect.objectContaining({ target: {
+    root: '/work', path: 'draft.txt', kind: 'file', identity: 'seen', entryId: 'seen',
+  } }), 'renamed.txt'))
+  expect(onOpen).not.toHaveBeenCalled()
+  await vi.waitFor(() => expect(release).toHaveBeenCalledTimes(1))
+})
+
+it('keeps the armed action through Enter, Escape, and a delayed Node response', async () => {
+  listing.mockResolvedValueOnce([{ name: 'draft.txt', dir: false, kind: 'file', identity: 'seen', entryId: 'inode', root: '/work' }])
+  const release = vi.fn()
+  const end = vi.fn()
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => end, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
+  let complete!: (path: string) => void
+  vi.mocked(actions.rename).mockImplementation(() => new Promise((resolve) => { complete = resolve }))
+  mount()
+  const row = await vi.waitFor(() => {
+    const element = host.querySelector<HTMLElement>('[title="draft.txt"]')
+    if (!element) throw new Error('row not loaded')
+    return element
+  })
+  row.focus()
+  row.dispatchEvent(new KeyboardEvent('keydown', { key: 'F2', bubbles: true }))
+  const input = await vi.waitFor(() => {
+    const element = row.querySelector<HTMLInputElement>('input')
+    if (!element) throw new Error('inline rename not open')
+    return element
+  })
+  input.value = 'renamed.txt'
+  input.dispatchEvent(new Event('input', { bubbles: true }))
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }))
+  await vi.waitFor(() => expect(actions.rename).toHaveBeenCalledOnce())
+  input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+  expect(row.querySelector('input')).toBe(input)
+  expect(release).not.toHaveBeenCalled()
+  expect(end).not.toHaveBeenCalled()
+  complete('renamed.txt')
+  await vi.waitFor(() => expect(release).toHaveBeenCalledOnce())
+  expect(end).toHaveBeenCalledOnce()
+})
+
+it('keeps the captured root target and uses an explicit destination folder', async () => {
+  const release = vi.fn()
+  vi.mocked(actions.arm).mockImplementation((target) => ({ target, ready: Promise.resolve(), release, hold: () => () => {}, block: () => {}, dirty: () => [], custodies: new Map(), sourceCustodies: () => new Map(), savedRevisions: new Map(), tabs: { files: [], active: null } }))
+  vi.mocked(actions.create).mockResolvedValue('src/new.txt')
+  mount()
+  const trigger = await vi.waitFor(() => {
+    const element = [...host.querySelectorAll('button')].find((button) => button.textContent === 'New…')
+    if (!element) throw new Error('root action not loaded')
+    return element
+  })
+  trigger.click()
+  const item = await vi.waitFor(() => {
+    const element = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((button) => button.textContent === 'New file…')
+    if (!element) throw new Error('new file item not open')
+    return element
+  })
+  item.click()
+  const dialog = await vi.waitFor(() => {
+    const element = document.querySelector<HTMLElement>('[role="dialog"]')
+    if (!element) throw new Error('create dialog not open')
+    return element
+  })
+  expect(release).not.toHaveBeenCalled()
+  const [name, folder] = [...dialog.querySelectorAll('input')]
+  for (const [input, value] of [[name, 'new.txt'], [folder, 'src']] as const) {
+    input!.value = value
+    input!.dispatchEvent(new Event('input', { bubbles: true }))
+  }
+  const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent === 'Confirm')!
+  confirm.click()
+  await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
+})
+
+const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean }) => {
   host = document.createElement('div')
   document.body.append(host)
+  const queryClient = new QueryClient()
+  if (options?.hideIgnored) {
+    queryClient.setQueryData(prefsKey, { editor_show_ignored: '0' })
+    void saveEditorShowIgnored(queryClient, false)
+  }
   dispose = render(() => (
-    <QueryClientProvider client={new QueryClient()}><FileTree
+    <QueryClientProvider client={queryClient}><FileTree
       taskId={options?.task?.() ?? taskId}
-      openPath={null}
+      fileStatus={() => options?.fileStatus ?? { files: new Map(), folders: new Map() }}
+      statusStale={() => false}
+      onStatusChanged={() => {}}
+      openPath={options?.openPath?.() ?? null}
       reveal={options?.reveal?.() ?? null}
       onOpen={onOpen}
       onRevealed={options?.onRevealed ?? (() => {})}
+      onRevealActive={() => {}}
+      actions={actions}
     /></QueryClientProvider>
   ), host)
   return onOpen
 }
 
 describe('the editor file tree', () => {
+  it('hides ignored rows, temporarily reveals an ignored active path, and clears it on file change', async () => {
+    listing.mockImplementation(async (_task, dir) => dir === ''
+      ? [{ name: 'build', dir: true }, { name: 'source.ts', dir: false }]
+      : [{ name: 'output.ts', dir: false }])
+    ignored.mockImplementation(async (_task, dir) => ({ available: true, ignored: dir ? ['output.ts'] : ['build'] }))
+    const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+    const [openPath, setOpenPath] = createSignal<string | null>('build/output.ts')
+    mount(vi.fn(), { hideIgnored: true, reveal, openPath })
+    await vi.waitFor(() => expect(host.textContent).toContain('source.ts'))
+    expect([...host.querySelectorAll('button')].find((button) => button.textContent === 'Show ignored files')?.getAttribute('aria-pressed')).toBe('false')
+    expect(ignored).toHaveBeenCalled()
+    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
+    expect(host.textContent).not.toContain('output.ts')
+    setReveal({ path: 'build/output.ts', revision: 1 })
+    await vi.waitFor(() => expect(host.textContent).toContain('output.ts'))
+    setOpenPath('source.ts')
+    await vi.waitFor(() => expect(host.textContent).not.toContain('output.ts'))
+  })
+
+  it('keeps a listing usable when Git ignore metadata fails', async () => {
+    ignored.mockRejectedValue(new Error('Git unavailable'))
+    mount()
+    await vi.waitFor(() => expect(host.textContent).toContain('src'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Ignore filtering unavailable'))
+    expect(host.textContent).toContain('Git unavailable')
+  })
+
+  it('shows a refreshed listing while its replacement ignore metadata is pending', async () => {
+    listing.mockImplementation(async () => [{ name: 'build', dir: true }])
+    let finishIgnore!: (result: { available: true; ignored: string[] }) => void
+    ignored.mockResolvedValueOnce({ available: true, ignored: ['build'] })
+      .mockImplementationOnce(() => new Promise((resolve) => { finishIgnore = resolve }))
+    mount(vi.fn(), { hideIgnored: true })
+    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(1))
+    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
+    window.dispatchEvent(new Event('focus'))
+    await vi.waitFor(() => expect(ignored).toHaveBeenCalledTimes(2))
+    expect(host.textContent).toContain('build')
+    finishIgnore({ available: true, ignored: [] })
+    await vi.waitFor(() => expect(host.querySelector('[title="build"]')).not.toBeNull())
+  })
+
+  it('keeps a large listing virtual and shows a status badge without opening the file', async () => {
+    listing.mockResolvedValueOnce(Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false })))
+    const status = projectFileStatus({ kind: 'ready', changes: [{ path: '0.txt', status: 'untracked', staged: false }] })
+    const onOpen = mount(vi.fn(), { fileStatus: status })
+    await vi.waitFor(() => expect(host.querySelector('[title^="0.txt"]')).not.toBeNull())
+    expect(host.querySelectorAll('[role="treeitem"]').length).toBeLessThan(100)
+    expect(host.textContent).toContain('?')
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
   it('reloads retained expanded branches when the tree mounts again', async () => {
     setEditorTreeDirectoryOpen(taskId, 'src', true)
     setEditorTreeDirectoryOpen(taskId, 'src/nested', true)
@@ -128,4 +298,18 @@ it('stops a superseded reveal before opening its next directory or acknowledging
   await Promise.resolve(); await Promise.resolve()
   expect(listing.mock.calls.some(([, path]) => path === 'one/nested')).toBe(false)
   expect(onRevealed).toHaveBeenCalledTimes(1)
+})
+
+it('does not finish a cached-listing reveal after Collapse all', async () => {
+  setEditorTreeDirectoryOpen(taskId, 'src', true)
+  const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+  const onRevealed = vi.fn()
+  mount(vi.fn(), { reveal, onRevealed })
+  await vi.waitFor(() => expect(host.textContent).toContain('app.ts'))
+  setReveal({ path: 'src/app.ts', revision: 1 })
+  const collapse = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Collapse all folders')!
+  collapse.click()
+  await Promise.resolve(); await Promise.resolve()
+  expect(onRevealed).not.toHaveBeenCalled()
+  expect(host.textContent).not.toContain('app.ts')
 })

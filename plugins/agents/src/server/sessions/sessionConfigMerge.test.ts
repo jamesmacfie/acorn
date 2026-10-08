@@ -4,6 +4,7 @@ import { mergeSessionConfigChange, retainSessionAuthority } from './sessionConfi
 describe('session configuration merge', () => {
   it('retains admitted identity and authority during replacement and ignores invented identity', () => {
     const identity = {
+      initialAttendance: 'autonomous',
       workflowRunId: 'run', workflowStepId: 'step', delegationSpawnId: 'spawn',
       customAgent: { id: 'reviewer', instructions: 'Review only.' },
       toolCeiling: { maxRisk: 'read' }, mcpServers: ['approved'],

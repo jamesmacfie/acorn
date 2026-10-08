@@ -229,8 +229,11 @@ it('upgrades a populated pre-0012 database without changing the ledger or its wh
   const legacy = makeTestPluginDb('agents', folder)
   let ctx: TestNodeContext | undefined
   try {
-    legacy.db.insert(schema.agentSessions).values({ id: 's', taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive',
-      driverKind: 'acp', driverVersion: '1', runtimeState: 'ready', statusAuthority: 'protocol', title: 'migration', createdAt: 1, updatedAt: 1, lastEventSeq: 2 }).run()
+    // Insert with the legacy schema: Drizzle's current session shape includes goal columns that
+    // this pre-0012 database does not have yet.
+    legacy.db.run(sql`INSERT INTO agent_sessions (id, task_id, provider_id, profile_id, kind,
+      driver_kind, driver_version, runtime_state, status_authority, title, created_at, updated_at, last_event_seq)
+      VALUES ('s', 'task', 'fake', 'fake', 'interactive', 'acp', '1', 'ready', 'protocol', 'migration', 1, 1, 2)`)
     legacy.db.insert(schema.agentEvents).values([
       { id: 'first', sessionId: 's', seq: 1, schemaVersion: 1, eventJson: JSON.stringify(chunk('flux ca')), searchText: 'flux capacitor', createdAt: 1 },
       { id: 'rest', sessionId: 's', seq: 2, schemaVersion: 1, eventJson: JSON.stringify(chunk('pacitor')), searchText: null, createdAt: 2 },

@@ -99,6 +99,21 @@ describe('which harness a step runs on', () => {
   })
 })
 
+describe('workflow attendance ownership', () => {
+  it.each(['gated', 'autonomous'] as const)('passes the run posture %s and fails a blocked step', async (posture) => {
+    const testDb = makeTestPluginDb('workflows');
+    const profile = agentProfileRegistry.register({ id: DEFAULT_PROFILE_ID, label: 'Claude', kind: 'agent', command: 'claude', backendPreference: 'tmux', transport: 'pty' });
+    const runStep = vi.fn<RunnerDeps['runStep']>().mockResolvedValue({ ...ok, status: 'error', stderrTail: 'BLOCKED: Choose a deployment target.' });
+    try {
+      const runner = new WorkflowRunner(testDb.db, { runStep, writeHandoff: async () => {}, assembleContext: async () => '', evaluatePolicy: async () => ({ pass: true }), failingChecks: async () => '', notify: () => {} }, noExtensions);
+      const runId = await runner.start('task-1', v2({ baseline: 'acorn-1', name: 'Blocked', posture, tools: { maxRisk: 'read' }, steps: [{ name: 'deploy', prompt: 'Deploy.' }] }));
+      await vi.waitFor(async () => expect((await runner.run(runId))?.status).toBe('failed'));
+      expect(runStep).toHaveBeenCalledOnce();
+      expect(runStep.mock.calls[0][2].posture).toBe(posture);
+    } finally { profile(); testDb.cleanup(); }
+  });
+});
+
 describe('a step running in a managed session', () => {
   it('records the session while the step is still working', async () => {
     const testDb = makeTestPluginDb('workflows')

@@ -7,6 +7,7 @@ import { Line } from '../kit/cells'
 import { EmptyState } from '../kit/showing'
 import { PaneFailure } from '../panel'
 import { panesFor, showPane, shownPane } from './panes'
+import { PaneIdContext } from '../kit/paneContext'
 
 // The pane row: one line of pane labels, and the pane under it.
 //
@@ -85,9 +86,11 @@ export function PaneBody(props: { task: Task; nodeId: string }) {
                     an empty string — which a cell host refuses outright where the DOM would have drawn a
                     text node nobody sees. A pending `lazy()` region is an empty string. The
                     layout mount path already has this guard; a component pane does not go through it. */}
-                <Suspense fallback={null}>
-                  {createComponent(pane.component, { get task() { return props.task } })}
-                </Suspense>
+                <PaneIdContext.Provider value={pane.id}>
+                  <Suspense fallback={null}>
+                    {createComponent(pane.component, { get task() { return props.task } })}
+                  </Suspense>
+                </PaneIdContext.Provider>
               </ErrorBoundary>
             </box>
           )}

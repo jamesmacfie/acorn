@@ -38,6 +38,7 @@ describe('agents:before-permission', () => {
   let parked: Set<string>
   let options: AgentPermissionOption[]
   let askDuringStart: boolean
+  let askForm: 'question' | 'elicitation' | null
   let emit: AgentDriverStartOptions['onEvent']
 
   const ask = (requestId = 'permission-1') => {
@@ -66,7 +67,7 @@ describe('agents:before-permission', () => {
     agents.hooks.declare(BEFORE_PERMISSION_HOOK)
     vi.spyOn(agents.core.tasks, 'requireRoot').mockResolvedValue('/work/task')
     vi.spyOn(agents.core.tasks, 'workspaceId').mockResolvedValue('workspace')
-    frames = []; answers = []; parked = new Set(); options = CODEX_OPTIONS; askDuringStart = false
+    frames = []; answers = []; parked = new Set(); options = CODEX_OPTIONS; askDuringStart = false; askForm = null
     const registry = new AgentDriverRegistry()
     registry.registerNative('fake', () => ({
       providerId: 'fake',
@@ -80,8 +81,12 @@ describe('agents:before-permission', () => {
         if (askDuringStart) await ask()
         return {
           providerSessionRef: start.session.id, ready: true,
-          sendTurn: async () => { if (!askDuringStart) void ask(); return {} },
-          cancel: async () => {}, resolveRequest: async () => {}, stop: async () => {},
+          sendTurn: async () => {
+            if (askForm) void emit({ type: 'request', requestId: 'question-1', kind: askForm, title: 'Which target?' })
+            else if (!askDuringStart) void ask()
+            return {}
+          },
+          cancel: async () => {}, resolveRequest: async (_id, resolution) => { answers.push(resolution) }, stop: async () => {},
         }
       },
     }))
@@ -93,16 +98,49 @@ describe('agents:before-permission', () => {
   })
   afterEach(async () => { await runtime.stop(); policy.cleanup(); agents.cleanup(); vi.restoreAllMocks() })
 
-  const start = async (kind: AgentSessionKind = 'interactive') => {
+  const start = async (kind: AgentSessionKind = 'interactive', posture?: 'gated' | 'autonomous') => {
     const session = await runtime.store.createSession({
       taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind, config: {},
-    }, await new FakeAgentDriver().probe())
+    }, await new FakeAgentDriver().probe(), posture)
     const turn = await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Push it.' }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
-    })
+    }, { posture })
     return { session, turn }
   }
   const requestStatuses = () => frames.flatMap((frame) => frame.channel === 'plugin:agents:request-changed' ? [frame.status] : [])
+
+  it('rejects an autonomous permission once without an attention row', async () => {
+    const { session, turn } = await start('workflow', 'autonomous')
+    await vi.waitFor(async () => expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('resolved'))
+    expect(answers).toEqual([{ optionId: 'decline' }])
+    expect((await runtime.store.turn(turn.id))?.effectivePolicy.attendance).toBe('autonomous')
+    expect((await runtime.store.requireSession(session.id)).attention).not.toBe('permission')
+    expect(requestStatuses()).toEqual(['resolved'])
+  })
+
+  it('rejects an autonomous startup request before the driver handle exists', async () => {
+    askDuringStart = true
+    const { session } = await start('workflow', 'autonomous')
+    await vi.waitFor(() => expect(answers).toEqual([{ optionId: 'decline' }]))
+    expect((await runtime.store.snapshot(session.id)).requests.every((request) => request.status === 'resolved')).toBe(true)
+    expect(requestStatuses()).toEqual(['resolved'])
+  })
+
+  it('keeps a supervised workflow permission pending for the person', async () => {
+    const { session } = await start('workflow', 'gated')
+    await vi.waitFor(async () => expect((await runtime.store.request(session.id, 'permission-1'))?.status).toBe('pending'))
+    expect(answers).toEqual([])
+    expect((await runtime.store.requireSession(session.id)).attention).toBe('permission')
+  })
+
+  it.each(['question', 'elicitation'] as const)('cancels an autonomous %s without a person waiting', async (kind) => {
+    askForm = kind
+    const { session } = await start('workflow', 'autonomous')
+    await vi.waitFor(async () => expect((await runtime.store.request(session.id, 'question-1'))?.status).toBe('resolved'))
+    await vi.waitFor(() => expect(answers).toHaveLength(1))
+    expect(answers[0]).toMatchObject({ cancelled: true })
+    expect((await runtime.store.requireSession(session.id)).attention).not.toBe('question')
+  })
 
   it('refuses with the first reject-once option and records the request already resolved', async () => {
     const seen: AgentBeforePermissionPayload[] = []

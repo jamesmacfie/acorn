@@ -19,6 +19,11 @@ export function TreeRow(props: {
   selected?: boolean
   onPress?: () => void
   onDoublePress?: () => void
+  onMenu?: (event?: MouseEvent) => void
+  onBeforeMenu?: () => void
+  onRename?: () => void
+  /** Terminal-only Ctrl+N root creation; desktop uses the visible New trigger. */
+  onCreate?: () => void
   leading?: JSX.Element
   trailing?: JSX.Element
   /** Trailing metadata: Row's slot, forwarded. */
@@ -52,6 +57,9 @@ export function TreeRow(props: {
       meta={props.meta}
       onPress={props.onPress}
       onDoublePress={props.onDoublePress}
+      onMenu={props.onMenu}
+      onBeforeMenu={props.onBeforeMenu}
+      onRename={props.onRename}
       leading={
         <>
           <Show

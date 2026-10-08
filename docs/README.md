@@ -32,6 +32,7 @@ the whole plugin system in one page.
 | [api-reference/transport.md](./api-reference/transport.md) | Namespaces, the broker deadline, pairing, protocol versioning, request processing, idempotency, and the error envelope. |
 | [api-reference/core-routes.md](./api-reference/core-routes.md) | Every `/v1/core` route with its gate. |
 | [api-reference/plugin-routes.md](./api-reference/plugin-routes.md) | Each first-party plugin's route families, and the GitHub and Changes diff contracts. |
+| [api-reference/editor.md](./api-reference/editor.md) | Editor file reads, guarded writes, task-addressed file actions, and mixed-version behavior. |
 | [api-reference/workflow-routes.md](./api-reference/workflow-routes.md) | The workflows plugin's run, processing history, definition, and schedule binding routes. |
 | [api-reference/websocket.md](./api-reference/websocket.md) | `/v1/events`, logical viewers, the preview tunnel, and the Node event channels. |
 | [data-layer.md](./data-layer.md) | The map of Node storage, and the ownership rules for provider data, identity, and blobs. |
@@ -139,6 +140,8 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/native-overlays.md](./testing/native-overlays.md) | Native overlay acceptance scenarios, test evidence, performance targets, and outstanding graphical checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
+| [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
+| [testing/editor-phase06-follow-up-2026-10-08.md](./testing/editor-phase06-follow-up-2026-10-08.md) | Review fixes, connected desktop/terminal checks, and measured Editor acceptance. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |
@@ -193,6 +196,8 @@ Each landing page in the tables above has topic pages in a folder of the same na
   [Diff review threads and marks](./diff-rendering/review.md).
 - [editor.md](./editor.md): [Composed panes](./editor/composed-panes.md),
   [The document surface](./editor/document-surface.md), [The editor pane](./editor/editor-pane.md),
+  [File navigation](./editor/file-navigation.md),
+  [Editing controls](./editor/editing-controls.md),
   [Find in files](./editor/find-in-files.md), [Line markers](./editor/line-markers.md),
   [Saving and recovery](./editor/save-and-recovery.md).
 - [notifications.md](./notifications.md): [Notification channels and settings](./notifications/channels.md),
@@ -296,13 +301,6 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file.
   Shipped behavior belongs in an owning doc above.
-- [DeerFlow review](./future/deerflow/README.md): five proposals taken from DeerFlow,
-  [session references](./future/deerflow/01-session-references.md),
-  [session goals](./future/deerflow/02-session-goals.md),
-  [agent history search](./future/deerflow/03-history-search.md),
-  [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
-  [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
-  [what it refused](./future/deerflow/refused.md).
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
 - [Lazy plugin routes](./future/lazy-plugin-code.md): an opt-in helper that loads a plugin route's

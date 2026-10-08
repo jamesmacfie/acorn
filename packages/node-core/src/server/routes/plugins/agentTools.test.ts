@@ -261,6 +261,32 @@ describe('agent-tool harness projection (docs/agent-tools.md)', () => {
     expect((await post('/api/tasks/ready/tools/orchestration_tool', {}, signed)).status).toBe(200)
   })
 
+  it('hides read-tier history tools from task tokens without a signed session claim', async () => {
+    const names = ['session_history_search', 'session_history_read']
+    for (const name of names) registerAgentTool(OWNER, {
+      name,
+      description: 'Read the claimed session history.',
+      input: z.object({}),
+      scope: 'task',
+      risk: 'read',
+      requiresSession: true,
+      handler: async () => ({ ok: true }),
+    })
+    const taskToken = { 'x-test-task': 'ready' }
+    const hidden = (await (await get('/api/tasks/ready/tools', taskToken)).json()) as { tools: { name: string }[] }
+    for (const name of names) {
+      expect(hidden.tools.map((tool) => tool.name)).not.toContain(name)
+      expect((await post(`/api/tasks/ready/tools/${name}`, {}, taskToken)).status).toBe(404)
+    }
+
+    const signed = { ...taskToken, 'x-test-session': 'signed-sess' }
+    const visible = (await (await get('/api/tasks/ready/tools', signed)).json()) as { tools: { name: string }[] }
+    for (const name of names) {
+      expect(visible.tools.map((tool) => tool.name)).toContain(name)
+      expect((await post(`/api/tasks/ready/tools/${name}`, {}, signed)).status).toBe(200)
+    }
+  })
+
   it('does not expose session-required tools to the same session token on another task', async () => {
     await setPerms({ tiers: { execute: true } })
     const foreign = { 'x-test-task': 'task-one', 'x-test-session': 'signed-sess' }

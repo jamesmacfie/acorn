@@ -3,6 +3,7 @@ import { z } from 'zod'
 export type AgentContextCaptureScope = {
   taskId: string
   workspaceId?: string
+  sessionId?: string
 }
 
 export type AgentContextSnapshot = {

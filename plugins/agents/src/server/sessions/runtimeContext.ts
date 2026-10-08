@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto'
 import type { AgentSession, AgentTurn } from '../../contract/wire.ts'
 import type { AgentStore } from './store'
+import { renderSessionConversation } from './sessionReference'
 
 export const agentTurnInputText = (turn: AgentTurn): string =>
   turn.input.flatMap((part) => {
@@ -12,19 +13,12 @@ export const agentTurnInputText = (turn: AgentTurn): string =>
 
 export async function buildForkContext(store: AgentStore, source: AgentSession): Promise<Extract<AgentTurn['input'][number], { type: 'context' }>> {
   const snapshot = await store.exportSnapshot(source.id)
-  const lines = snapshot.events.slice(-200).flatMap((record) => {
-    if (record.event.type === 'user_message') return [`User:\n${record.event.text}`]
-    if (record.event.type === 'assistant_message') return [`Assistant:\n${record.event.text}`]
-    if (record.event.type === 'file_change') return [`File change: ${record.event.path ?? record.event.summary ?? 'unspecified'}`]
-    if (record.event.type === 'plan') return [`Plan:\n${record.event.entries.map((entry) => `- [${entry.status}] ${entry.text}`).join('\n')}`]
-    return []
-  })
-  const content = lines.join('\n\n').slice(-100_000)
+  const { text } = renderSessionConversation(snapshot)
   const snapshotContent = [
     'This is an explicit Acorn context-copy fork, not provider-native history.',
     'The provider has not seen this snapshot until it is included with a new turn.',
     '',
-    content || '(The source session has no displayable conversation events.)',
+    text,
   ].join('\n')
   return {
     type: 'context',

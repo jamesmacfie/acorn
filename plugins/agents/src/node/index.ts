@@ -39,6 +39,7 @@ import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profile
 import { AgentDelegationStore } from '../server/delegation/store'
 import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
+import { sessionHistoryTools } from '../server/sessions/sessionHistoryTools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
 import { usageSource } from '../shared/usageRegistration'
@@ -291,8 +292,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         core.tasks,
         deps.reconciled,
         followUpRegistry,
+        core,
       )
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
+      for (const tool of sessionHistoryTools(runtime.store)) ctx.tools.register(tool)
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
       lifecycleCapabilities = [

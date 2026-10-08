@@ -166,8 +166,13 @@ export function Card(props: {
  *  which stock Solid refuses as `Stale read from <Show>`. Our copy holds the last value instead
  *  (patches/README.md), but the bar still has no reason to re-run its children. An open panel widens
  *  itself instead (§ `Menu`). */
-export function Toolbar(props: { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }) {
-  return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>{props.children}</box>
+type ToolbarProps = { variant?: 'bar' | 'actions'; size?: 'sm' | 'md'; ariaLabel?: string; children: JSX.Element }
+  | { variant: 'status'; size?: 'sm' | 'md'; ariaLabel?: string; primary: JSX.Element; secondary?: JSX.Element; essential: JSX.Element; actions?: JSX.Element; children?: never }
+
+export function Toolbar(props: ToolbarProps) {
+  return <box flexDirection="row" flexWrap="wrap" columnGap={spaceCells('inline')}>
+    {props.variant === 'status' ? <>{props.primary}{props.essential}{props.actions}{props.secondary}</> : props.children}
+  </box>
 }
 
 /** `flexGrow` on an empty box is what "push what follows to the far end" is in a cell layout. */

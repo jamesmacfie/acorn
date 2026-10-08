@@ -1,28 +1,60 @@
 import { useQueryClient } from '@tanstack/solid-query'
-import { createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
-import { activeNodeId, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Button, Rows, Stack, TreeRow } from '@acorn/plugin-api/ui'
+import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
+import { createQuery } from '@tanstack/solid-query'
+import { activeNodeId, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, ToggleButton, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
+import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { editorApi, type EditorEntry } from './editorClient'
-import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
+import type { FileTarget, TrashAvailability } from '../contract/api'
+import type { ArmedFileAction } from './fileActionModel'
+import { createFileActionModel } from './fileActionModel'
+import { collapseEditorTreeDirectories, editorTreeDirectoryOpen, editorTreeCollectionId, registerEditorTreeFolders, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { type FileTreeRevealRequest } from './fileTreeReveal'
+import { findInFolder, searchScopePathChanged } from './search/searchState'
+import { pathContains } from './editorState'
+import { readEditorShowIgnored, saveEditorShowIgnored } from './editorPrefs'
+import type { FileStatusProjection } from './fileStatusModel'
 
-/** The collection id, so the reveal below and the host's stored place agree on one name. */
-const TREE = 'editor.file-tree'
+const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
+  tone === 'muted' ? 'neutral' : tone
 
 export default function FileTree(props: {
   taskId: string
+  fileStatus: () => FileStatusProjection
+  statusStale: () => boolean
+  onStatusChanged: () => void
   onOpen: (path: string, ephemeral: boolean) => void
   openPath: string | null
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
+  onRevealActive: () => void
+  actions: ReturnType<typeof createFileActionModel>
 }) {
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const treeId = () => editorTreeCollectionId(props.taskId, nodeId)
   const api = editorApi(queryClient)
+  const prefs = createQuery(() => prefsOptions(true))
+  const showIgnored = () => readEditorShowIgnored(prefs.data)
+  const [ignoreByDir, setIgnoreByDir] = createSignal<ReadonlyMap<string, { ignored: ReadonlySet<string>; error?: string }>>(new Map())
+  const [temporaryReveal, setTemporaryReveal] = createSignal<string | null>(null)
   const [listings, setListings] = createSignal<ReadonlyMap<string, EditorEntry[]>>(new Map())
   const [errors, setErrors] = createSignal<ReadonlyMap<string, string>>(new Map())
+  const [rootEntry, setRootEntry] = createSignal<FileTarget | null>(null)
+  const [trashSupport, setTrashSupport] = createSignal<TrashAvailability>({ available: false, reason: 'Checking Node trash support…' })
+  const [renameSupport, setRenameSupport] = createSignal<TrashAvailability>({ available: false, reason: 'Checking Node rename support…' })
+  const [menuPath, setMenuPath] = createSignal<string | null>(null)
+  const [armed, setArmed] = createSignal<ArmedFileAction | null>(null)
+  const [dialog, setDialog] = createSignal<'create-file' | 'create-folder' | 'rename' | 'trash' | null>(null)
+  const [inlinePath, setInlinePath] = createSignal<string | null>(null)
+  const [name, setName] = createSignal('')
+  const [destinationFolder, setDestinationFolder] = createSignal('')
+  const [actionError, setActionError] = createSignal('')
+  const [busy, setBusy] = createSignal(false)
   const loading = new Map<string, { generation: number; run: Promise<boolean> }>()
+  const ignoreReads = new Map<string, number>()
+  let ignoreReadId = 0
   let generation = 0
   let disposed = false
   let taskId = props.taskId
@@ -39,10 +71,27 @@ export default function FileTree(props: {
       if (!live(revision, task)) return false
       setErrors((current) => { const next = new Map(current); next.delete(dir); return next })
       setListings((current) => new Map(current).set(dir, entries))
+      const read = ++ignoreReadId
+      ignoreReads.set(dir, read)
+      // A fresh listing has no verified ignore classification yet. Show its entries until Git
+      // answers, so a stale hidden set never suppresses names added or changed by this listing.
+      setIgnoreByDir((current) => { const next = new Map(current); next.delete(dir); return next })
+      void Promise.resolve().then(() => api.ignored(task, dir, entries.map((entry) => entry.name))).then((result) => {
+        if (!live(revision, task) || ignoreReads.get(dir) !== read) return
+        setIgnoreByDir((current) => new Map(current).set(dir, result.available
+          ? { ignored: new Set(result.ignored) } : { ignored: new Set(), error: result.reason }))
+      }).catch((cause: unknown) => {
+        if (live(revision, task) && ignoreReads.get(dir) === read) setIgnoreByDir((current) => new Map(current).set(dir, {
+          ignored: new Set(), error: cause instanceof Error ? cause.message : 'Git ignore rules are unavailable.',
+        }))
+      })
       return true
     }).catch((cause: unknown) => {
-      if (live(revision, task)) setErrors((current) => new Map(current).set(dir,
-        cause instanceof Error ? cause.message : 'Unable to read directory.'))
+      if (live(revision, task)) {
+        ignoreReads.delete(dir)
+        setIgnoreByDir((current) => new Map(current).set(dir, { ignored: new Set(), error: 'Ignore filtering unavailable while the directory listing is stale.' }))
+        setErrors((current) => new Map(current).set(dir, cause instanceof Error ? cause.message : 'Unable to read directory.'))
+      }
       return false
     }).finally(() => {
       if (loading.get(dir) === entry) loading.delete(dir)
@@ -57,6 +106,7 @@ export default function FileTree(props: {
   const refresh = async () => {
     const revision = ++generation
     const task = taskId
+    void api.entry(task, '').then((entry) => { if (live(revision, task)) setRootEntry(entry) }).catch(() => {})
     const dirs = [...new Set(['', ...listings().keys(), ...loading.keys(), ...errors().keys()])]
       .sort((a, b) => a.split('/').length - b.split('/').length)
     for (const dir of dirs) {
@@ -76,52 +126,194 @@ export default function FileTree(props: {
   createEffect(() => {
     const next = props.taskId
     if (next === taskId) return
+    release()
     taskId = next
     generation++
     loading.clear()
+    ignoreReads.clear()
     setErrors(new Map())
     setListings(new Map())
+    setIgnoreByDir(new Map())
+    setTemporaryReveal(null)
+    setRootEntry(null)
     void load('')
+    void api.entry(next, '').then((entry) => { if (taskId === next) setRootEntry(entry) }).catch(() => {})
   })
   onMount(() => {
     void load('')
+    void api.entry(taskId, '').then(setRootEntry).catch((cause: unknown) => setActionError(cause instanceof Error ? cause.message : String(cause)))
+    void api.trashAvailability(taskId).then(setTrashSupport).catch((cause: unknown) => setTrashSupport({ available: false, reason: cause instanceof Error ? cause.message : String(cause) }))
+    void api.renameAvailability(taskId).then(setRenameSupport).catch((cause: unknown) => setRenameSupport({ available: false, reason: cause instanceof Error ? cause.message : String(cause) }))
     const offWorktree = wsOnNodeEvent('worktree:status-changed', (event) => {
       if (event.taskId === taskId && activeNodeId() === nodeId) void refresh()
     })
     const offReconnect = wsOnReconnect(() => { if (activeNodeId() === nodeId) void refresh() })
     const focus = () => { if (activeNodeId() === nodeId) void refresh() }
-    if (typeof window !== 'undefined') window.addEventListener('focus', focus)
+    if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') window.addEventListener('focus', focus)
     onCleanup(() => {
       disposed = true
+      release()
       generation++
+      ignoreReads.clear()
       offWorktree()
       offReconnect()
-      if (typeof window !== 'undefined') window.removeEventListener('focus', focus)
+      if (typeof window !== 'undefined' && typeof window.removeEventListener === 'function') window.removeEventListener('focus', focus)
     })
   })
 
-  const isOpen = (path: string) => editorTreeDirectoryOpen(props.taskId, path)
+  const isOpen = (path: string) => editorTreeDirectoryOpen(props.taskId, path, nodeId)
+  createEffect(on(() => props.openPath, (path) => {
+    if (temporaryReveal() && temporaryReveal() !== path) setTemporaryReveal(null)
+  }))
+
+  const targetOf = (item: TreeItem): FileTarget | null => {
+    const entry = listings().get(item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : '')
+      ?.find((candidate) => candidate.name === item.label)
+    return entry?.identity && entry.entryId && entry.kind && entry.root
+      ? { path: item.key, kind: entry.kind, identity: entry.identity, entryId: entry.entryId, root: entry.root }
+      : null
+  }
+  const release = () => { armed()?.release(); setArmed(null); setMenuPath(null) }
+  const restoreFocus = (path: string) => queueMicrotask(() => {
+    const rows = items()
+    const surviving = rows.some((item) => item.key === path) ? path : rows[0]?.key
+    if (surviving && !disposed) revealCollectionItem(treeId(), surviving)
+  })
+  const dismissMenu = () => {
+    const closing = armed()
+    queueMicrotask(() => {
+      if (!busy() && !dialog() && armed() === closing) {
+        const path = closing?.target.path
+        release()
+        if (path !== undefined) restoreFocus(path)
+      }
+    })
+  }
+  const prepareMenu = (target: FileTarget) => {
+    if (armed()?.target.path === target.path) return
+    release()
+    try { setArmed(props.actions.arm(target)); setActionError('') }
+    catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)) }
+  }
+  const openMenu = (target: FileTarget) => { prepareMenu(target); if (armed()) setMenuPath(target.path) }
+  const begin = (next: 'create-file' | 'create-folder' | 'rename' | 'trash') => {
+    const target = armed()?.target
+    if (!target) return
+    if (next === 'rename' && !renameSupport().available) { setActionError(renameSupport().reason ?? 'Rename is unavailable on this Node.'); return }
+    setName(next === 'rename' ? target.path.split('/').pop() ?? '' : '')
+    setDestinationFolder('')
+    setActionError('')
+    setDialog(next)
+    setInlinePath(HOST === 'dom' && next !== 'trash' && target.path && items().some((item) => item.key === target.path) ? target.path : null)
+    setMenuPath(null)
+  }
+  const closeAction = (focusPath?: string) => {
+    if (busy()) return
+    setDialog(null); setInlinePath(null); release()
+    if (focusPath !== undefined) restoreFocus(focusPath)
+  }
+  const finish = () => closeAction(armed()?.target.path)
+  const act = async (saveDrafts = false, suppliedName?: string) => {
+    const current = armed()
+    const operation = dialog()
+    if (!current || !operation || busy()) return
+    const operationTask = taskId
+    const actions = props.actions
+    const endOperation = current.hold()
+    setBusy(true)
+    setActionError('')
+    try {
+      let reveal: string | null = null
+      if (operation === 'create-file' || operation === 'create-folder') {
+        const parent = !current.target.path && destinationFolder()
+          ? await api.entry(operationTask, destinationFolder()) : current.target
+        reveal = await actions.create(parent, suppliedName ?? name(), operation === 'create-file' ? 'file' : 'folder')
+      } else if (operation === 'rename') reveal = await actions.rename(current, suppliedName ?? name())
+      else await actions.trash(current, saveDrafts)
+      if (disposed || taskId !== operationTask || activeNodeId() !== nodeId) return
+      if (operation === 'rename' || operation === 'trash') searchScopePathChanged(taskId, current.target.path, nodeId)
+      await refresh()
+      props.onStatusChanged()
+      if (reveal) {
+        setTemporaryReveal(reveal)
+        const segments = reveal.split('/').slice(0, -1)
+        let parent = ''
+        for (const segment of segments) { parent = parent ? `${parent}/${segment}` : segment; setEditorTreeDirectoryOpen(operationTask, parent, true, nodeId); await load(parent) }
+        revealCollectionItem(treeId(), reveal)
+      }
+      setBusy(false)
+      closeAction(reveal ?? current.target.path)
+    } catch (cause) { setActionError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { endOperation(); setBusy(false) }
+  }
+  const copyPath = (absolute: boolean) => {
+    const target = armed()?.target
+    if (!target) return
+    const value = absolute ? `${target.root}/${target.path}` : target.path
+    void copyText(value).then((copied) => { if (!copied) setActionError(`Copy this path manually: ${value}`) })
+  }
+  const menuItems = (menu: Parameters<Parameters<typeof Menu>[0]['children']>[0]) => {
+    const target = armed()?.target
+    if (!target) return null
+    return <>
+      {target.kind === 'folder' && <>
+        <Menu.Item context={menu} onSelect={() => findInFolder(taskId, target.path, nodeId)}>Find in folder</Menu.Item>
+        <Menu.Item context={menu} onSelect={() => begin('create-file')}>New file…</Menu.Item>
+        <Menu.Item context={menu} onSelect={() => begin('create-folder')}>New folder…</Menu.Item>
+      </>}
+      {!!target.path && <Menu.Item context={menu} disabled={!renameSupport().available} title={renameSupport().reason} onSelect={() => begin('rename')}>Rename…</Menu.Item>}
+      {!!target.path && <>
+        <Menu.Item context={menu} onSelect={() => copyPath(false)}>Copy relative path</Menu.Item>
+        <Menu.Item context={menu} onSelect={() => copyPath(true)}>Copy absolute path</Menu.Item>
+        <Menu.Separator />
+        <Menu.Item context={menu} tone="danger" disabled={!trashSupport().available} title={trashSupport().reason}
+          onSelect={() => begin('trash')}>Move to trash…</Menu.Item>
+      </>}
+    </>
+  }
   const setOpen = (path: string, open: boolean) => {
-    setEditorTreeDirectoryOpen(props.taskId, path, open)
+    setEditorTreeDirectoryOpen(props.taskId, path, open, nodeId)
     if (open) void load(path)
+  }
+  const collapseAll = () => {
+    generation++
+    loading.clear()
+    ignoreReads.clear()
+    collapseEditorTreeDirectories(taskId, nodeId)
+    setListings((current) => new Map([['', current.get('') ?? []]]))
+    setIgnoreByDir((current) => new Map(current.has('') ? [['', current.get('')!]] : []))
+    setErrors(new Map())
+    setTemporaryReveal(null)
   }
 
   // The visible rows, flat. A tree is a flat collection with a depth on each row, which is what lets
   // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop: the recursive
   // component this replaced had a `<ul>` per directory and no keyboard at all.
   type TreeItem = { key: string; label: string; depth: number; dir: boolean }
+  let previousItems = new Map<string, TreeItem>()
   const items = createMemo<TreeItem[]>(() => {
     const rows: TreeItem[] = []
+    const nextItems = new Map<string, TreeItem>()
     const walk = (dir: string, depth: number): void => {
       for (const entry of listings().get(dir) ?? []) {
         const path = dir ? `${dir}/${entry.name}` : entry.name
-        rows.push({ key: path, label: entry.name, depth, dir: entry.dir })
+        if (!showIgnored() && ignoreByDir().get(dir)?.ignored.has(entry.name) && !pathContains(path, temporaryReveal() ?? '')) continue
+        const previous = previousItems.get(path)
+        const item = previous?.label === entry.name && previous.depth === depth && previous.dir === entry.dir
+          ? previous : { key: path, label: entry.name, depth, dir: entry.dir }
+        rows.push(item)
+        nextItems.set(path, item)
         if (entry.dir && isOpen(path)) walk(path, depth + 1)
       }
     }
     walk('', 0)
+    previousItems = nextItems
     return rows
   })
+
+  createEffect(on(() => props.taskId, (task) => {
+    onCleanup(registerEditorTreeFolders(task, nodeId, (path) => items().some((item) => item.key === path && item.dir)))
+  }))
 
   // Expansion outlives this component, while its lazy listings do not. Rebuild every retained open
   // branch as its parent listing arrives, so returning to the pane cannot show an open twist beside
@@ -142,7 +334,10 @@ export default function FileTree(props: {
   createEffect(on(() => [props.taskId, props.reveal] as const, ([, request]) => {
     if (!request) return
     const task = taskId
-    const current = () => !disposed && task === taskId && props.reveal?.revision === request.revision
+    const revision = generation
+    const current = () => live(revision, task) && props.reveal?.revision === request.revision
+    if (!current()) return
+    setTemporaryReveal(request.path)
     void (async () => {
       if (!await load('') || !current()) return
       const segments = request.path.split('/').slice(0, -1)
@@ -150,21 +345,65 @@ export default function FileTree(props: {
       for (const segment of segments) {
         if (!current()) return
         dir = dir ? `${dir}/${segment}` : segment
-        setEditorTreeDirectoryOpen(task, dir, true)
+        setEditorTreeDirectoryOpen(task, dir, true, nodeId)
         if (!await load(dir) || !current()) return
       }
       if (!current()) return
-      revealCollectionItem(TREE, request.path)
+      revealCollectionItem(treeId(), request.path)
       props.onRevealed(request.revision)
     })()
   }))
 
   return (
     <Stack grow>
+      <Toolbar size="sm" ariaLabel="Tree controls">
+        <Button onPress={collapseAll}>Collapse all folders</Button>
+        <Button disabled={!props.openPath} onPress={props.onRevealActive}>Reveal active file</Button>
+      </Toolbar>
+      {actionError() && <Alert tone="danger">{actionError()}</Alert>}
+      {props.statusStale() && <Alert tone="warn">Git status may be stale. Files remain available.</Alert>}
+      <ToggleButton variant="bare" size="sm" tip="Show ignored files. .git and node_modules remain excluded." pressed={showIgnored()}
+        onPressedChange={(enabled) => { void saveEditorShowIgnored(queryClient, enabled) }}>Show ignored files</ToggleButton>
+      {Array.from(ignoreByDir()).filter(([, info]) => info.error).map(([dir, info]) =>
+        <Alert tone="warn">Ignore filtering unavailable for {dir || 'worktree'}: {info.error}. All entries remain visible.</Alert>)}
+      {rootEntry() && (HOST !== 'tui' || !dialog() && (menuPath() === null || menuPath() === '')) && <Menu ariaLabel="Worktree actions" open={() => menuPath() === ''}
+        onBeforeOpen={() => prepareMenu(rootEntry()!)} onOpenChange={(open) => {
+        if (open) openMenu(rootEntry()!)
+        else dismissMenu()
+      }} trigger={({ toggle }) => <Button onPress={toggle}>New…</Button>}>
+        {menuItems}
+      </Menu>}
+      <Only hosts={['tui']}>
+        {menuPath() && !dialog() && <Menu ariaLabel="Entry actions" open={() => !!menuPath() && !dialog()}
+          onOpenChange={(open) => { if (!open) dismissMenu() }}
+          trigger={() => <Text>Actions for {menuPath()}</Text>}>
+          {menuItems}
+        </Menu>}
+      </Only>
       {Array.from(errors()).map(([dir, message]) => <Alert tone="danger">{dir || 'Worktree'}: {message} <Button onPress={() => void load(dir, true)}>Retry</Button></Alert>)}
-    <Rows
+    {dialog() && armed() && !inlinePath() && <Modal title={dialog() === 'trash' ? 'Move to trash' : dialog() === 'rename' ? 'Rename entry' : 'Create entry'}
+      role={dialog() === 'trash' ? 'alertdialog' : 'dialog'} onDismiss={finish}>
+      <Modal.Body>
+        {dialog() === 'trash'
+          ? <Text wrap>Move {armed()!.target.path} from task {taskId} to this Node’s trash? {armed()!.target.kind === 'folder' ? 'The folder and its descendants are affected.' : ''}</Text>
+          : <>
+            <Input label="Name" value={name()} onInput={setName} onSubmit={(value) => void act(false, value)} />
+            {(dialog() === 'create-file' || dialog() === 'create-folder') && !armed()!.target.path
+              && <Input label="Destination folder (relative to root)" value={destinationFolder()} onInput={setDestinationFolder} />}
+          </>}
+        {actionError() && <Alert tone="danger">{actionError()}</Alert>}
+      </Modal.Body>
+      <Modal.Actions>
+        <Button disabled={busy()} onPress={finish}>Cancel</Button>
+        {dialog() === 'trash' ? <>
+          {!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act()}>Move to trash</Button>}
+          {!!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act(true)}>Save and move to trash</Button>}
+        </> : <Button disabled={busy()} onPress={() => void act()}>Confirm</Button>}
+      </Modal.Actions>
+    </Modal>}
+    {(HOST !== 'tui' || !dialog() && menuPath() === null) && <Show when={treeId()} keyed>{(id) => <Rows
       virtual
-      id={TREE}
+      id={id}
       tree
       ariaLabel="Worktree files"
       items={items()}
@@ -185,9 +424,19 @@ export default function FileTree(props: {
         setOpen(key, expand)
         return true
       }}
+      onMenu={(key) => {
+        const item = items().find((candidate) => candidate.key === key)
+        const target = item && targetOf(item)
+        if (target) openMenu(target)
+      }}
     >
-      {(item, itemProps, selected, place) => (
-        <TreeRow
+      {(item, itemProps, selected, place) => {
+        const folderMark = () => item.dir ? props.fileStatus().folders.get(item.key) : undefined
+        const fileMark = () => item.dir ? undefined : props.fileStatus().files.get(item.key)
+        const statusLabel = () => folderMark()?.label ?? fileMark()?.label
+        const parent = item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : ''
+        const ignored = () => ignoreByDir().get(parent)?.ignored.has(item.label) ?? false
+        return <TreeRow
           item={itemProps}
           offset={place.offset}
           height={place.height}
@@ -198,12 +447,44 @@ export default function FileTree(props: {
           onToggle={() => setOpen(item.key, !isOpen(item.key))}
           onPress={() => (item.dir ? setOpen(item.key, !isOpen(item.key)) : props.onOpen(item.key, true))}
           onDoublePress={!item.dir ? () => props.onOpen(item.key, false) : undefined}
-          title={item.key}
+          onMenu={() => { const target = targetOf(item); if (target) openMenu(target) }}
+          onBeforeMenu={() => { const target = targetOf(item); if (target) prepareMenu(target) }}
+          onRename={() => { const target = targetOf(item); if (target) { prepareMenu(target); begin('rename') } }}
+          onCreate={() => { const root = rootEntry(); if (root) openMenu(root) }}
+          trailing={<><Only hosts={['dom']}><RowActions ariaLabel={`Actions for ${item.key}`} open={() => menuPath() === item.key}
+            onBeforeOpen={() => { const target = targetOf(item); if (target) prepareMenu(target) }}
+            onOpenChange={(open) => {
+              if (open) { const target = targetOf(item); if (target) openMenu(target) }
+              else dismissMenu()
+            }}>{menuItems}</RowActions></Only>
+            <Only hosts={['tui']}><Button onPress={() => { const target = targetOf(item); if (target) openMenu(target) }}>Actions</Button></Only></>}
+          title={`${item.key}${ignored() ? ' — ignored by Git' : ''}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
+          label={`${item.key}${ignored() ? ', ignored by Git' : ''}${statusLabel() ? `, ${statusLabel()}` : ''}`}
+          meta={item.dir
+            ? folderMark() && <><Badge size="xs" tone={folderMark()!.tone === 'danger' ? 'danger' : 'neutral'}
+                tip={folderMark()!.label}>{folderMark()!.count}</Badge>
+                <Only hosts={['tui']}><Text emphasis="muted">{` ${folderMark()!.label}`}</Text></Only></>
+            : fileMark() && <><Badge size="xs" tone={badgeTone(fileMark()!.tone)}
+                tip={fileMark()!.label}>{fileMark()!.letter}</Badge>
+                <Only hosts={['tui']}><Text emphasis="muted">{` ${fileMark()!.label}`}</Text></Only></>}
         >
-          {item.label}
+          <Text tone={folderMark()?.tone ?? fileMark()?.tone} emphasis={ignored() ? 'muted' : undefined}>{item.label}</Text>
+          {inlinePath() === item.key && <Input label={dialog() === 'rename' ? 'Rename entry' : 'New name'}
+            value={name()} onInput={setName} onSubmit={(value) => void act(false, value)}
+            onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); finish() } }}
+            ref={(element) => queueMicrotask(() => {
+              if (!element.isConnected) return
+              element.focus()
+              if (dialog() === 'rename') {
+                const value = name()
+                const dotfile = value.startsWith('.') && value.indexOf('.', 1) < 0
+                const end = dotfile ? value.length : value.lastIndexOf('.') > 0 ? value.lastIndexOf('.') : value.length
+                element.setSelectionRange(0, end)
+              }
+            })} />}
         </TreeRow>
-      )}
-    </Rows>
+      }}
+    </Rows>}</Show>}
     </Stack>
   )
 }

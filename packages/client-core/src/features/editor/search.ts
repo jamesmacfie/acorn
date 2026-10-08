@@ -5,6 +5,7 @@ import {
   findNext,
   findPrevious,
   getSearchQuery,
+  openSearchPanel,
   replaceAll,
   replaceNext,
   search,
@@ -63,9 +64,17 @@ let view: typeof import('./FindPanel') | undefined
 let loading: Promise<unknown> | undefined
 const loadView = () => (loading ??= import('./FindPanel').then((loaded) => { view = loaded }))
 
+// Each view's open panel, so a Replace command can show the replace row of the panel it just opened.
+const replaceOpeners = new WeakMap<EditorView, () => void>()
+
 function createFindPanel(editor: EditorView): Panel {
   const dom = document.createElement('div')
   let field: HTMLInputElement | undefined
+  let replaceField: HTMLInputElement | undefined
+  // Presentation only, so it resets when the panel is rebuilt for another document. The replacement
+  // text itself lives in the query, so collapsing the row keeps it.
+  const [replacing, setReplacing] = createSignal(false)
+  let focusTarget: 'find' | 'replace' = 'find'
   let mounted = false
   let destroyed = false
   let dispose: (() => void) | undefined
@@ -99,7 +108,10 @@ function createFindPanel(editor: EditorView): Panel {
 
   const props: FindPanelProps = {
     snapshot: current,
+    replacing,
+    setReplacing,
     field: (element) => { field = element },
+    replaceField: (element) => { replaceField = element },
     change,
     next: () => findNext(editor),
     previous: () => findPrevious(editor),
@@ -110,9 +122,17 @@ function createFindPanel(editor: EditorView): Panel {
   }
 
   const focusField = () => {
-    field?.focus()
-    field?.select()
+    const target = focusTarget === 'replace' ? replaceField : field
+    target?.focus()
+    target?.select()
   }
+  const openReplace = () => {
+    if (editor.state.readOnly) return
+    focusTarget = 'replace'
+    setReplacing(true)
+    focusField()
+  }
+  replaceOpeners.set(editor, openReplace)
   const draw = () => {
     if (destroyed || dispose || !view) return
     dispose = view.renderFindPanel(dom, props)
@@ -147,12 +167,20 @@ function createFindPanel(editor: EditorView): Panel {
     },
     destroy: () => {
       destroyed = true
+      if (replaceOpeners.get(editor) === openReplace) replaceOpeners.delete(editor)
       dispose?.()
     },
   }
 }
 
 const extension = search({ createPanel: createFindPanel })
+
+/** Open find with the replace row showing and its field focused. A read-only document gets find. */
+export function openReplacePanel(editor: EditorView): boolean {
+  if (!openSearchPanel(editor)) return false
+  replaceOpeners.get(editor)?.()
+  return true
+}
 
 /** The search panel for a graphical editor. Put it beside `basicSetup`, whose keymap opens it. */
 export function editorSearch(): Extension {

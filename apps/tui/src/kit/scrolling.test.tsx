@@ -2,7 +2,7 @@
 import { createSignal, Show } from 'solid-js'
 import { describe, expect, it } from 'vitest'
 import { Button } from './asking'
-import { Sections } from './grouping'
+import { Sections, TabPanel } from './grouping'
 import { Row, Rows, Text } from './showing'
 import { renderCells } from './render'
 import { HeaderBodyFooter } from '../layouts/HeaderBodyFooter'
@@ -23,6 +23,41 @@ const lit = (screen: { runs: () => { text: string; fg: { r: number; g: number; b
   screen.runs().filter((run) => run.text.trim() && run.fg.r < run.fg.g && (run.attributes & 1) === 1).map((run) => run.text)
 
 describe('scrolling detail viewports', () => {
+  it('restores a panel reading place after remote offset and content arrive', async () => {
+    const [offset, setOffset] = createSignal<number>()
+    const [ready, setReady] = createSignal(false)
+    const screen = await renderCells(() => <box flexDirection="column" flexGrow={1}>
+      <Button>Outside the results</Button>
+      <TabPanel idPrefix="retained" id="results" active="results" scrollOffset={offset()}>
+        <Show when={ready()}>{items(40).map((row) => <Text>{row.label}</Text>)}</Show>
+      </TabPanel>
+    </box>, { width: 44, height: 10 })
+    try {
+      setOffset(20)
+      await screen.frame()
+      setReady(true)
+      const restored = await screen.frame()
+      expect(restored.text).toContain('Row 21')
+      expect(restored.lines.some((line) => line.trim() === 'Row 1')).toBe(false)
+    } finally { screen.done() }
+  })
+
+  it('clamps a scrolled viewport when an action menu disappears above surviving rows', async () => {
+    const [menuOpen, setMenuOpen] = createSignal(true)
+    const screen = await renderCells(() => (
+      <HeaderBodyFooter stateKey="shrinking-menu" label="Files" regions={{ body: () => <>
+        <Button onPress={() => setMenuOpen(false)}>Dismiss menu</Button>
+        <Show when={menuOpen()}>{items(24).map((row) => <Text>{row.label}</Text>)}</Show>
+        <Text>Surviving file row</Text>
+      </> }} />
+    ), { width: 44, height: 10 })
+    try {
+      await screen.press('END')
+      const dismissed = await screen.press('RETURN')
+      expect(dismissed.text).toContain('Surviving file row')
+    } finally { screen.done() }
+  }, 30_000)
+
   it('enters a selected tab with Down, reveals keyboard rows, and returns with Escape', async () => {
     const rows = items(18)
     const screen = await renderCells(() => (

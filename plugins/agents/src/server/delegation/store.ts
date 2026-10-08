@@ -3,6 +3,7 @@ import { and, desc, eq, inArray, or } from 'drizzle-orm'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import type { AgentSession } from '../../contract/wire.ts'
 import type { ToolCeiling } from '@acorn/protocol/toolPolicy.ts'
+import type { AgentCheck } from '../../shared/delegationSchemas'
 import * as schema from '../../node/schema'
 
 export type AgentSpawnState = 'creating' | 'provisioned' | 'failed'
@@ -39,6 +40,7 @@ export type AgentSpawnProvisioning = {
   parentTurnId: string | null
   toolCeiling: ToolCeiling
   resultSchema?: object
+  checks?: AgentCheck[]
   configOptions?: Record<string, string>
   customAgentId?: string
 }

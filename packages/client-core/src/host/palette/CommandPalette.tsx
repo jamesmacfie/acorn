@@ -12,6 +12,7 @@ import { registerHiddenSourceOpeners } from './sourceOpeners'
 import { createCommandPaletteView } from './paletteView'
 import { Alert } from '../../kit/components/primitives'
 import { PaletteSurface } from './PaletteSurface'
+import { focusedCollectionTarget } from '../../kit/keys/collection'
 
 // ⌘K, as a renderer over the shared session.
 //
@@ -46,6 +47,7 @@ export default function CommandPalette() {
       taskId: taskId ?? null,
       paneId: null,
       surfaceId: null,
+      focusedCollection: focusedCollectionTarget(),
       // The shell's own navigator, for the closed chrome verbs that address a URL rather than a task
       // layout. Taken here because `useNavigate` needs a router context and the command registry has
       // none (../registries/commands/commands.ts).

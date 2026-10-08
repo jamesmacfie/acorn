@@ -89,6 +89,7 @@ export const createWorkflowExecution = (
         managedSessionId: opts.managedSessionId,
         runId: opts.workflowRunId,
         stepId: opts.workflowStepId,
+        posture: opts.posture ?? 'gated',
         onEvent: opts.onEvent,
         signal: opts.signal,
       })

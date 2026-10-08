@@ -17,11 +17,12 @@ export const isActiveAgent = (session: AgentSession): boolean => ACTIVE_AGENT_ST
 
 // Narrower than active: a run that a cancel request can actually reach. `creating` and `connecting`
 // have no turn to stop yet, and `cancelling` stays in because a second stop is how you lean on a
-// harness that is taking its time. Three places ask it: the pane header's Stop button, the sidebar
+// harness that is taking its time. `reconnecting` can still have a live turn or recovery to stop.
+// Three places ask it: the pane header's Stop button, the sidebar
 // row's Stop item, and Escape in the composer. Shared rather than inlined because a shortcut that
 // fires when the button next to it is greyed out is a shortcut nobody trusts.
 export const canStopAgent = (session: AgentSession): boolean =>
-  ['working', 'waiting', 'cancelling'].includes(session.runtimeState)
+  ['working', 'waiting', 'cancelling', 'reconnecting'].includes(session.runtimeState)
 
 // "Needs you": anything but a settled or merely-unread attention state. Same reasoning, since Agent
 // Center's filter, its header count and the attention inbox all have to agree.

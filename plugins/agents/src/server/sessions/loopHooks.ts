@@ -7,7 +7,7 @@
 // The engine loads this on the first bridge call, not at boot (apps/node/scripts/check-service-budget.mjs).
 import { randomUUID } from 'node:crypto'
 import { createLogger, describeError, type PluginHookRegistry } from '@acorn/plugin-api/node'
-import type { AgentCapability, AgentNormalizedEvent, AgentProviderDescriptor, AgentSession } from '../../contract/wire.ts'
+import type { AgentCapability, AgentNormalizedEvent, AgentProviderDescriptor, AgentSession, AgentTurn } from '../../contract/wire.ts'
 import { BEFORE_PERMISSION_HOOK } from '../../contract/permissionHook.ts'
 import {
   AFTER_TOOL_HOOK,
@@ -24,10 +24,9 @@ import {
 import { claudeHookOutput, claudeToolSubject } from '../drivers/claudeLoopHook'
 import type { PendingAgentEvent } from './durableEventBuffer'
 import type { ProviderGeneration } from './providerSessionLifecycle'
+import { AUTONOMOUS_REQUEST_MESSAGE, persistedAttendance, sessionAttendance } from './attendance'
 
 const log = createLogger('agents', 'agents')
-
-const UNATTENDED_KINDS: ReadonlySet<AgentSession['kind']> = new Set(['workflow', 'delegated'])
 
 /** How the person answered an ask. `expired` is nobody answering before the hold ran out. */
 export type LoopAskAnswer = 'allowed' | 'refused' | 'expired'
@@ -37,6 +36,7 @@ export type LoopAskAnswer = 'allowed' | 'refused' | 'expired'
 export type LoopHookPorts = {
   hooks?: Pick<PluginHookRegistry, 'run' | 'handlers'>
   session(sessionId: string): Promise<AgentSession | null>
+  turn(turnId: string): Promise<AgentTurn | null>
   taskRoot(taskId: string): Promise<string>
   live(sessionId: string): { generation: ProviderGeneration; activeTurnId: string | null } | null
   materialize(sessionId: string, turnId: string | null, event: AgentNormalizedEvent): Promise<AgentNormalizedEvent[]>
@@ -63,11 +63,15 @@ export async function answerLoopHook(
     const point = request.event === 'PreToolUse' ? BEFORE_TOOL_HOOK.id : AFTER_TOOL_HOOK.id
     // Installed only where a point had a handler, but a handler can go away mid-session.
     if (!(await hooks.handlers(point)).length) return reply('')
+    const activeTurnId = ports.live(session.id)?.activeTurnId
+    const turn = activeTurnId ? await ports.turn(activeTurnId) : null
+    const attendance = turn
+      ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source }) : sessionAttendance(session)
     const before: AgentBeforeToolPayload = {
       sessionId: session.id,
       taskId: session.taskId,
       providerId: session.providerId,
-      unattended: UNATTENDED_KINDS.has(session.kind),
+      unattended: attendance !== 'attended',
       root: await ports.taskRoot(session.taskId).catch(() => ''),
       // Provider-owned values, bounded before a stranger's handler reads them, as for a permission.
       toolCallId: subject.toolCallId.slice(0, 2_000),
@@ -87,6 +91,14 @@ export async function answerLoopHook(
       return reply(claudeHookOutput('PreToolUse', { deny: `Blocked by ${verdict.by ?? 'a plugin'}: ${verdict.reason ?? ''}`.trim() }))
     }
     if (!verdict.ask) return reply('')
+    if (attendance === 'autonomous') {
+      const live = ports.live(session.id)
+      if (live && live.activeTurnId === activeTurnId) {
+        await ports.accept({ sessionId: session.id, turnId: activeTurnId, generation: live.generation,
+          event: { type: 'diagnostic', level: 'info', message: AUTONOMOUS_REQUEST_MESSAGE } })
+      }
+      return reply(claudeHookOutput('PreToolUse', { deny: AUTONOMOUS_REQUEST_MESSAGE }))
+    }
     const { by, reason } = verdict.ask
     const answer = await holdAsk(ports, session.id, { title: before.title, by, reason })
     // An approval is no decision, so the harness's own checks still run. Never an allow.

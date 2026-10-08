@@ -1,4 +1,4 @@
-import { createEffect, For, Show, type JSX } from 'solid-js'
+import { createEffect, For, on, onCleanup, Show, type JSX } from 'solid-js'
 import Icon from '../content/Icon'
 import { createCollection } from '../../keys/collection'
 import { revealActiveTab, trackTabOverflow } from './tabScroll'
@@ -96,16 +96,66 @@ export function Tabs(props: {
  *
  *  A name of its own as well as `Tabs.Panel`, because a remote tree names one type per node and has
  *  nowhere to put the dot. */
-export const TabPanel = (props: { idPrefix: string; id: string; active: string; children: JSX.Element }) => (
-  <section
+export const TabPanel = (props: {
+  idPrefix: string; id: string; active: string; children: JSX.Element
+  /** The panel viewport's reading place, owned by the feature showing it. */
+  scrollOffset?: number
+  onChange?: (offset: number) => void
+}) => {
+  let panel: HTMLElement | undefined
+  let restoration: ReturnType<typeof setTimeout> | undefined
+  let restoreDeadline: ReturnType<typeof setTimeout> | undefined
+  let contentObserver: MutationObserver | undefined
+  let restorePending = false
+  let lastVisibleOffset = 0
+  const stopRestore = () => {
+    if (restoration) clearTimeout(restoration)
+    if (restoreDeadline) clearTimeout(restoreDeadline)
+    contentObserver?.disconnect()
+    contentObserver = undefined
+    restorePending = false
+  }
+  const restore = () => {
+    if (!panel || props.active !== props.id) return
+    const desired = lastVisibleOffset || props.scrollOffset || 0
+    panel.scrollTop = desired
+    if (panel.scrollTop >= desired || desired === 0) { stopRestore(); return }
+    // A remote tree can mount the panel before its result rows arrive. Retry only while
+    // content is changing, and retire the observer even if the result shrinks.
+    if (!contentObserver) {
+      contentObserver = new MutationObserver(restore)
+      contentObserver.observe(panel, { childList: true, subtree: true })
+      restoreDeadline = setTimeout(stopRestore, 5000)
+    }
+  }
+  createEffect(on(() => [props.active === props.id, props.scrollOffset] as const, ([active, offset], previous) => {
+    if (previous && active === previous[0] && offset === previous[1]) return
+    stopRestore()
+    if (!active && previous?.[0]) {
+      if (panel?.scrollTop) lastVisibleOffset = panel.scrollTop
+      props.onChange?.(lastVisibleOffset)
+    }
+    // Remote props can arrive after active. The retained offset is part of the source,
+    // so a panel that mounted before receiving it still restores its reading place.
+    restorePending = !!active && offset !== undefined
+    if (active && offset !== undefined) restoration = setTimeout(restore, 0)
+  }))
+  onCleanup(stopRestore)
+  return <section
+    ref={panel}
     id={`${props.idPrefix}-panel-${props.id}`}
     class="ui-tab-panel"
     role="tabpanel"
     aria-labelledby={`${props.idPrefix}-tab-${props.id}`}
     hidden={props.active !== props.id}
+    onScroll={(event) => {
+      if (props.active !== props.id || event.currentTarget.hidden || restorePending) return
+      lastVisibleOffset = event.currentTarget.scrollTop
+      props.onChange?.(lastVisibleOffset)
+    }}
   >
     {props.children}
   </section>
-)
+}
 
 Tabs.Panel = TabPanel

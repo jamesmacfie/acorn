@@ -28,6 +28,8 @@ describe('document custody', () => {
       expect(reloaded.current.toString()).toBe(full)
       expect(reloaded.acknowledged.toString()).toBe('acknowledged')
       expect(reloaded.viewState).toEqual(document.viewState)
+      stored.set(key, JSON.stringify({ text: 'legacy draft', acknowledged: 'old disk' }))
+      expect(new DocumentCustody(key, 'new disk', 'new-revision').acknowledgedRevision).toBeUndefined()
       storage.setItem = () => { throw new Error('quota') }
       document.edit(text(full + '\nlatest'))
       release()
@@ -78,8 +80,11 @@ describe('document custody', () => {
   it('acknowledges formatter output while a later human edit wins', async () => {
     const document = owner()
     document.edit(text('unformatted'))
+    const writing: boolean[] = []
+    const unsubscribe = document.subscribe(() => writing.push(document.writing))
     let resolve!: (value: { text: string; revision: string }) => void
     const saving = document.flush(() => new Promise((done) => { resolve = done }))
+    expect(writing).toContain(true)
     document.edit(text('later edit'))
     resolve({ text: 'formatted', revision: 'exact-file-revision' })
     await saving
@@ -87,6 +92,8 @@ describe('document custody', () => {
     expect(document.acknowledged.toString()).toBe('formatted')
     expect(document.acknowledgedRevision).toBe('exact-file-revision')
     expect(document.dirty).toBe(true)
+    expect(writing.at(-1)).toBe(false)
+    unsubscribe()
   })
 
   it('applies formatting when the submitted edit is still current', async () => {
@@ -125,5 +132,81 @@ describe('document custody', () => {
     expect(a.dirty).toBe(true)
     resolve({})
     await saving
+  })
+
+  it('suspends queued follow-up writes until a file operation releases custody', async () => {
+    const document = owner()
+    let finish!: (value: { text: string; revision: string }) => void
+    const writer = vi.fn((_value: string) => new Promise<{ text: string; revision: string }>((resolve) => { finish = resolve }))
+    document.editText('first')
+    const admitted = document.flush(writer)
+    const suspended = document.suspendWrites()
+    document.editText('later')
+    await expect(document.flush(writer)).resolves.toBeUndefined()
+    finish({ text: 'first', revision: 'disk-first' })
+    await admitted
+    const resume = await suspended
+    expect(writer).toHaveBeenCalledTimes(1)
+    resume()
+    await document.flush(async (value) => ({ text: value, revision: 'disk-later' }))
+    expect(document.acknowledgedRevision).toBe('disk-later')
+  })
+
+  it('keeps overlapping suspension holders independent while an admitted write settles', async () => {
+    const document = owner()
+    let finish!: (value: { text: string; revision: string }) => void
+    const writer = vi.fn((_value: string) => new Promise<{ text: string; revision: string }>((resolve) => { finish = resolve }))
+    document.editText('first')
+    const admitted = document.flush(writer)
+    const firstHolder = document.suspendWrites()
+    const secondHolder = document.suspendWrites()
+    document.editText('follow-up')
+    finish({ text: 'first', revision: 'disk-first' })
+    await admitted
+    const releaseFirst = await firstHolder
+    const releaseSecond = await secondHolder
+    releaseFirst()
+    releaseFirst() // a holder cannot release another holder by resuming twice
+    await expect(document.flush(writer)).resolves.toBeUndefined()
+    expect(writer).toHaveBeenCalledTimes(1)
+    releaseSecond()
+    await document.flush(async (text) => ({ text, revision: 'disk-follow-up' }))
+    expect(document.acknowledgedRevision).toBe('disk-follow-up')
+  })
+
+  it('saves a confirmed trash draft while ordinary writes remain suspended', async () => {
+    const document = owner()
+    document.editText('draft to save')
+    const release = await document.suspendWrites()
+    await document.flushForFileAction(async (text) => ({ text, revision: 'saved-before-trash' }))
+    expect(document.dirty).toBe(false)
+    expect(document.acknowledgedRevision).toBe('saved-before-trash')
+    document.editText('later edit')
+    await expect(document.flush(async () => ({}))).resolves.toBeUndefined()
+    release()
+    await document.flush(async (text) => ({ text, revision: 'later' }))
+    expect(document.acknowledgedRevision).toBe('later')
+  })
+
+  it('moves dirty recovery to the new address after a confirmed rename', async () => {
+    const stored = new Map<string, string>()
+    vi.stubGlobal('localStorage', {
+      getItem: (key: string) => stored.get(key) ?? null,
+      setItem: (key: string, value: string) => { stored.set(key, value) },
+      removeItem: (key: string) => { stored.delete(key) },
+    })
+    try {
+      const oldAddress = ['node-a', 'file', 'task', `old-${++serial}`]
+      const newAddress = ['node-a', 'file', 'task', `new-${serial}`]
+      const document = documentCustody(oldAddress, 'base', 'disk-revision')
+      document.editText('draft')
+      document.flushRecovery()
+      const resume = await document.suspendWrites()
+      document.rebind(newAddress)
+      resume()
+      expect(documentCustody(newAddress, 'other')).toBe(document)
+      expect(stored.has(`acorn.document.recovery.${JSON.stringify(oldAddress)}`)).toBe(false)
+      expect(JSON.parse(stored.get(`acorn.document.recovery.${JSON.stringify(newAddress)}`)!)).toMatchObject({ text: 'draft', acknowledgedRevision: 'disk-revision' })
+    } finally { vi.unstubAllGlobals() }
   })
 })

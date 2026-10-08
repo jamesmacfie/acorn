@@ -170,7 +170,7 @@ export class SessionMessages {
       const turn = session.kind === 'interactive'
         ? await this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key))
         : await (await this.ports.followUps()).admit(session.id, pluginId, message.originTurnId, (origin) =>
-            this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key, origin)))
+            this.ports.runtime.enqueueTurn(session.id, pluginTurn(pluginId, message, key, origin), { originTurnId: origin.id }))
       if (!turn) return refusal('operation-closed')
       return { ok: true, turnId: turn.id }
     } catch (error) {

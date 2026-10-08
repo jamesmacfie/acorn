@@ -5,6 +5,8 @@ import {
   editorClose,
   editorOpen,
   editorSetDirty,
+  editorReopen,
+  editorTabIdentity,
   hydrateEditorState,
   nextActive,
   openFileIn,
@@ -51,6 +53,17 @@ describe('open/promote/close/dirty transitions (docs/panes.md)', () => {
 })
 
 describe('store + persistence round-trip', () => {
+  it('keeps tab identity through dirty updates and changes it on a same-path reopen', () => {
+    const task = 'identity-test'
+    editorOpen(task, 'a.ts', false)
+    const first = editorTabIdentity(task, 'a.ts')
+    editorSetDirty(task, 'a.ts', true)
+    expect(editorTabIdentity(task, 'a.ts')).toBe(first)
+    editorClose(task, 'a.ts')
+    editorReopen(task, 'a.ts', 0)
+    expect(editorTabIdentity(task, 'a.ts')).not.toBe(first)
+    expect(openFiles(task)[0]).toMatchObject({ path: 'a.ts', ephemeral: false })
+  })
   it('open/activate/close through the store; serialize → hydrate restores tabs without dirty', () => {
     editorOpen('t9', 'src/a.ts', false)
     editorOpen('t9', 'src/b.ts', true)

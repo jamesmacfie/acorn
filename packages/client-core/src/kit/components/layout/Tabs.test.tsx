@@ -1,7 +1,52 @@
-import { createSignal } from 'solid-js'
+import { createSignal, Show } from 'solid-js'
 import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
-import { Tabs } from './Tabs'
+import { TabPanel, Tabs } from './Tabs'
+
+it('records scrolling when remote props are replaced without changing the retained offset', async () => {
+  const host = document.createElement('div')
+  const [row, setRow] = createSignal({ active: 'search', offset: 0, revision: 1 })
+  const changed = vi.fn()
+  const dispose = render(() => <TabPanel idPrefix="stable" id="search" active={row().active}
+    scrollOffset={row().offset} onChange={changed}><div>{row().revision}</div></TabPanel>, host)
+  try {
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    setRow({ active: 'search', offset: 0, revision: 2 })
+    const panel = host.querySelector<HTMLElement>('.ui-tab-panel')!
+    panel.scrollTop = 321
+    panel.dispatchEvent(new Event('scroll'))
+    expect(changed).toHaveBeenCalledWith(321)
+  } finally { dispose() }
+})
+
+it('restores a retained panel offset when remote props and content arrive after mounting', async () => {
+  const host = document.createElement('div')
+  document.body.append(host)
+  const [ready, setReady] = createSignal(false)
+  const [offset, setOffset] = createSignal<number>()
+  const dispose = render(() => <TabPanel idPrefix="delayed" id="search" active="search" scrollOffset={offset()}>
+    <Show when={ready()}><div>Late results</div></Show>
+  </TabPanel>, host)
+  try {
+    const panel = host.querySelector<HTMLElement>('.ui-tab-panel')!
+    let position = 0
+    Object.defineProperty(panel, 'scrollTop', {
+      configurable: true,
+      get: () => position,
+      set: (offset: number) => { position = ready() ? offset : 0 },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(position).toBe(0)
+    setOffset(321)
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(position).toBe(0)
+    setReady(true)
+    await vi.waitFor(() => expect(position).toBe(321))
+  } finally {
+    dispose()
+    host.remove()
+  }
+})
 
 // A remote tree's props are validated one at a time and a bad one is dropped, so a node can be asked
 // to draw without a prop its type says is required. Throwing here unmounts the region the tree is in,

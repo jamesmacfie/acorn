@@ -26,3 +26,26 @@ The panel captures its query client's Node, the task, the query, and the options
 or a toggle, or disposing the panel, aborts its request through the client transport. The Node owns
 ending the process, and escalates past SIGTERM when it has to. Hiding the panel keeps its query,
 results, and request.
+
+**Find in folder** on a tree folder opens this panel with that relative folder captured. **Clear
+folder scope** returns to the task root. **Search details** accepts comma-separated ripgrep globs in
+**Files to include** and **Files to exclude**. Whitespace around commas and empty entries are ignored.
+Excludes win. Negative globs belong in the exclude field; literal commas in patterns are unsupported.
+Each field accepts 20 patterns of at most 256 characters, with a combined 4 KiB limit. The Node
+rejects invalid filters, missing folders, and symlink scopes outside the task before searching.
+
+Filtered searches intersect ripgrep's default filename listing with its glob-filtered listing,
+then pass the same bounded globs to the text search. This uses three processes and preserves
+default ignore and hidden-file rules, which positive globs can otherwise override. Excluded large
+text files are not scanned. Ripgrep owns glob matching; there is no shell expansion or JavaScript
+matcher. Each pass joins process closure after cancellation, overflow, or its timeout, with
+SIGTERM followed by SIGKILL when needed. An invalid regex remains an error when no path is selected.
+
+Scope and pattern changes abort immediately and debounce the replacement by 200 ms. Query, scope,
+filters, results, and reading place remain in the Node/task session through hiding and remount.
+`TabPanel` carries the serialized `scrollOffset` and reports changes through the kit's `onChange`
+event. The host restores after remote result rows arrive. A rename or trash affecting the scope
+leaves a reset action instead of redirecting the search. The focused-folder command captures a live
+tree row whose collection identity includes its Node and task before the palette takes focus.
+Only visible folders in the mounted tree are admitted. Editor resolves the entry through the
+explicit Node and rejects completion after the captured tree owner unmounts.

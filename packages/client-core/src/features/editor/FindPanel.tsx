@@ -1,4 +1,4 @@
-import { createSignal, Show, type Accessor } from 'solid-js'
+import { Show, type Accessor } from 'solid-js'
 import { render } from 'solid-js/web'
 import type { SearchQuery } from '@codemirror/search'
 import { Button } from '../../kit/components/inputs/Button'
@@ -23,8 +23,12 @@ export type FindSnapshot = {
 
 export type FindPanelProps = {
   snapshot: Accessor<FindSnapshot>
+  /** Whether the replace row is open. */
+  replacing: Accessor<boolean>
+  setReplacing: (replacing: boolean) => void
   /** The find input, for the engine to focus and select. */
   field: (element: HTMLInputElement) => void
+  replaceField: (element: HTMLInputElement) => void
   change: (patch: { search?: string; replace?: string; caseSensitive?: boolean; wholeWord?: boolean; regexp?: boolean }) => void
   next: () => void
   previous: () => void
@@ -35,9 +39,6 @@ export type FindPanelProps = {
 }
 
 function FindPanel(props: FindPanelProps) {
-  // Presentation only, so it resets when the panel is rebuilt for another document. The replacement
-  // text itself lives in the query, so collapsing the row keeps it.
-  const [replacing, setReplacing] = createSignal(false)
   const query = () => props.snapshot().query
   const noMatches = () => !props.snapshot().count?.total
   const option = (o: { label: string; icon: string; key: 'caseSensitive' | 'wholeWord' | 'regexp' }) => (
@@ -69,14 +70,15 @@ function FindPanel(props: FindPanelProps) {
             </Toolbar.Group>
             <IconButton icon="text-cursor-input" label="Select all matches" disabled={noMatches()} onPress={props.selectAll} />
             <Show when={!props.snapshot().readOnly}>
-              <IconButton icon="replace" label="Replace" expanded={replacing()} onPress={() => setReplacing(!replacing())} />
+              <IconButton icon="replace" label="Replace" expanded={props.replacing()} onPress={() => props.setReplacing(!props.replacing())} />
             </Show>
           </>
         }
       />
-      <Show when={replacing() && !props.snapshot().readOnly}>
+      <Show when={props.replacing() && !props.snapshot().readOnly}>
         <Toolbar size="sm" ariaLabel="Replace">
           <Input
+            ref={props.replaceField}
             kind="filter"
             size="sm"
             label="Replace"

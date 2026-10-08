@@ -117,6 +117,7 @@ export function Rows<T extends CollectionItem>(props: {
   }
 
   const [scrollEl, setScrollEl] = createSignal<HTMLDivElement>()
+  const [scrollOffset, setScrollOffset] = createSignal(0)
   // Row height comes from --row-h-virt so a style pack's density reaches the list. The virtualizer
   // writes its answer back as an inline height, which beats any stylesheet rule, so a number read from
   // the token is the only way density is real here (./metrics.ts).
@@ -152,6 +153,7 @@ export function Rows<T extends CollectionItem>(props: {
     cancelAnimationFrame(publishFrame)
     publishFrame = requestAnimationFrame(() => {
       setScrollEl(element)
+      setViewportHeight(element.clientHeight)
       virt?.measure()
     })
   }
@@ -159,10 +161,26 @@ export function Rows<T extends CollectionItem>(props: {
 
   // Key visible owners by their reconciled item, rather than by virtualizer slot index.
   // Placement remains reactive when expansion moves a surviving row to another slot.
-  const placements = createMemo(() => new Map(virt!.getVirtualItems().flatMap((slot) => {
-    const row = items()[slot.index]
-    return row ? [[row.key, slot.start] as const] : []
-  })))
+  const placements = createMemo(() => {
+    const rows = items()
+    const height = viewportHeight()
+    const offset = scrollOffset()
+    const slots = virt!.getVirtualItems()
+    // WebKit can expose a scrollable element before the virtualizer has its viewport or scroll
+    // offset. Derive a bounded window from the element while its slots still describe the top.
+    const stale = !slots.length || slots[slots.length - 1]!.end < offset
+      || slots[0]!.start > offset + height
+    if (height > 0 && (!virt!.scrollRect?.height || stale)) {
+      const size = rowH()
+      const start = Math.max(0, Math.floor(offset / size) - 4)
+      const end = Math.min(rows.length, Math.ceil((offset + height) / size) + 4)
+      return new Map(rows.slice(start, end).map((row, index) => [row.key, (start + index) * size] as const))
+    }
+    return new Map(slots.flatMap((slot) => {
+      const row = rows[slot.index]
+      return row ? [[row.key, slot.start] as const] : []
+    }))
+  })
   const visible = createMemo(() => {
     const positions = placements()
     return positions.size ? [...positions.keys()].map((key) => cache.get(key)!) : items().slice(0, 12)
@@ -177,7 +195,10 @@ export function Rows<T extends CollectionItem>(props: {
   })
 
   return (
-    <div class="ui-rows-scroll" ref={publish}>
+    <div class="ui-rows-scroll" ref={publish} onScroll={(event) => {
+      setScrollOffset(event.currentTarget.scrollTop)
+      setViewportHeight(event.currentTarget.clientHeight)
+    }}>
       <div
         class="ui-rows"
         aria-label={props.ariaLabel}

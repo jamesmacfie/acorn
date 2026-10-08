@@ -7,6 +7,7 @@ import type { AgentTurn } from '../../contract/wire.ts'
 // (server/sessions/sessionExecute.ts). A plugin's note names the plugin the host stamped in `sentBy`
 // (server/sessions/sessionMessages.ts). Anything else is the reader's own turn.
 export const senderLabel = (turn: AgentTurn | undefined): string => {
+  if (turn?.source === 'goal') return 'Goal'
   if (turn?.source === 'workflow') return turn.effectivePolicy.continuationOf ? 'Acorn' : 'Workflow'
   if (turn?.source === 'plugin') {
     const sentBy = turn.effectivePolicy.sentBy as { pluginId?: unknown } | undefined

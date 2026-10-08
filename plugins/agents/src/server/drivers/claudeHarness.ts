@@ -5,24 +5,12 @@
 // persisted, the first on every session row, the second on session rows and workflow steps
 // (docs/managed-agents/harnesses.md § Harnesses).
 import { createRequire } from 'node:module'
-import type { AgentSession } from '../../contract/wire.ts'
 import { sessionCustomAgent } from '../../shared/customAgents'
 import { LOOP_HOOK_TIMEOUT_SECONDS, type AgentLoopHookEvent } from '../../contract/loopHook.ts'
 import type { HarnessLaunchSpec } from './harness'
 import type { AgentDriverLoopHooks } from './types'
 
 const nodeRequire = createRequire(import.meta.url)
-
-// A workflow step or a delegated child. Nobody reads either turn as it ends: a workflow step takes the
-// final message as the step's result, and a delegated child's final message becomes its report. An
-// interactive chat is left out on purpose, because there a person is there to answer.
-const UNATTENDED_KINDS: ReadonlySet<AgentSession['kind']> = new Set(['workflow', 'delegated'])
-
-// Anthropic's suggested addition for Opus 5.5 agents that run unattended, used as published. That model
-// sometimes ends a turn on a progress report ("done A, next I'll do B"), and an unattended caller takes
-// that report as the finished work. For the source, see
-// https://platform.claude.com/docs/en/build-with-claude/prompt-engineering/prompting-claude-opus-5-5#unattended-agentic-runs
-export const UNATTENDED_TURN_ENDINGS = 'A standing instruction from the user, the person you are working for. It is about how your turns end. A message with no tool call in it ends your turn, and the work stops there until you are asked to continue. The user has seen you end turns in four ways while work they asked for was still owed, and does not want any of them. One: a long summary of what was done that closes by announcing the next step and has no tool call, so the next thing never starts. Two: an offer to carry on with something unless the user would prefer otherwise, which stops to wait for an answer the user was not going to give. Three: a list of decisions for the user when, by your own account, none of them blocks the rest of the work. Four: deciding that this is a good place to report, because the turn has been long or a milestone is done. Status notes are welcome, and so are your recommendations on open decisions, but put them in the same message as your next tool call and carry on with whatever does not depend on the user\'s answer. If you notice yourself inviting the user to redirect you or offering to wait, delete it and do the next thing. The stops the user does want are the ones where nothing can move without them, or where the thing blocking you is deliberately protected from you. This does not override the need for confirmation on risky or destructive actions.'
 
 const shellQuote = (value: string): string => `'${value.replace(/'/g, `'\\''`)}'`
 
@@ -61,10 +49,8 @@ export const claudeHarness: HarnessLaunchSpec = {
   // session-local behavior so the durable runtime owns the timer, the opt-out setting, restart
   // recovery, and the transcript notice consistently with Codex and contributed harnesses.
   //
-  // A session nobody is watching also gets the turn-ending instruction appended to Claude Code's
-  // system prompt, after any custom agent's own instructions. It is appended at creation and again,
-  // unchanged, on every resume, because a system prompt that changes partway through a session
-  // invalidates the model's earlier thinking.
+  // Host attendance is fixed at session creation and supplies bootstrap instructions. The runtime
+  // also supplies per-turn instructions for legacy sessions and other harness prompt channels.
   // Claude Code 2.1.292 keeps the appended prompt a session was created with and ignores a new one on
   // resume, so nothing that can change between starts goes here. The skills index goes ahead of a turn
   // instead (docs/managed-agents/skills.md § Delivery). Each skill's folder gets a read-only allow rule
@@ -80,10 +66,10 @@ export const claudeHarness: HarnessLaunchSpec = {
   // person's own and never writes anywhere (claudeLoopHookSettings above, docs/managed-agents/loop-hooks.md).
   // Like the allow rules, flag settings follow each process, so a resume installs what has a handler now.
   loopHooks: true,
-  acpSessionMeta: (session, skills, loopHooks) => {
+  acpSessionMeta: (session, skills, loopHooks, attendanceInstructions) => {
     const append = [
       sessionCustomAgent(session.config)?.instructions,
-      UNATTENDED_KINDS.has(session.kind) ? UNATTENDED_TURN_ENDINGS : undefined,
+      attendanceInstructions,
       typeof session.config.standingContext === 'string' ? session.config.standingContext : undefined,
     ].filter(Boolean).join('\n\n')
     const permissions = skills.folders.length ? { permissions: { allow: skills.folders.map((dir) => `Read(/${dir}/**)`) } } : {}

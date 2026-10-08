@@ -6,6 +6,9 @@ export type SearchOpts = {
   caseSensitive?: boolean
   wholeWord?: boolean
   regex?: boolean
+  folder?: string
+  include?: string[]
+  exclude?: string[]
 }
 
 // One match within a file. `col`/`endCol` are 1-based UTF-16 columns, matching JavaScript string
@@ -28,7 +31,7 @@ export type SearchResult = {
   truncated: boolean // hit the total-match cap, so the pane shows a "results truncated" note
 }
 
-export type SearchFailureCode = 'unavailable_root' | 'invalid_query' | 'launch_failed' | 'timeout' | 'overflow' | 'invalid_output' | 'cancelled' | 'execution_failed'
+export type SearchFailureCode = 'unavailable_root' | 'invalid_scope' | 'invalid_filter' | 'invalid_query' | 'launch_failed' | 'timeout' | 'overflow' | 'invalid_output' | 'cancelled' | 'execution_failed'
 
 export class SearchFailure extends Error {
   constructor(readonly code: SearchFailureCode, message: string) {

@@ -40,6 +40,8 @@ const METHODS = [
   'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
+  'referenceContext',
+  'setGoal', 'resumeGoal',
   'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow', 'sessionMcp', 'setSessionMcp',
@@ -72,10 +74,32 @@ const executionControls = [
   ['POST', '/sessions/s1/verify-imported-resume', undefined, 'verifyImportedResume'],
   ['GET', '/sessions/s1/mcp', undefined, 'sessionMcp'],
   ['PUT', '/sessions/s1/mcp', { enabled: [] }, 'setSessionMcp'],
+  ['PUT', '/sessions/s1/goal', { objective: 'Finish the migration' }, 'setGoal'],
+  ['POST', '/sessions/s1/goal/resume', undefined, 'resumeGoal'],
 ] as const
 
 describe('managed execution requires device authority', () => {
   afterEach(() => setManagedAgentsBridge(null))
+
+  it.each(['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture'])('refuses host-owned %s in HTTP policy JSON', async (key) => {
+    const enqueue = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ enqueueTurn: enqueue as never }))
+    const result = await authed().fetch(req('/api/sessions/s1/turns', 'POST', {
+      input: [{ type: 'text', text: 'Continue' }], effectivePolicy: { [key]: 'autonomous' },
+    }), {} as Env)
+    expect(result.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
+
+  it.each(['attendance', 'posture'])('refuses host-owned top-level %s in HTTP turns', async (key) => {
+    const enqueue = vi.fn(async () => ({}))
+    setManagedAgentsBridge(fake({ enqueueTurn: enqueue as never }))
+    const result = await authed().fetch(req('/api/sessions/s1/turns', 'POST', {
+      input: [{ type: 'text', text: 'Continue' }], [key]: 'autonomous',
+    }), {} as Env)
+    expect(result.status).toBe(400)
+    expect(enqueue).not.toHaveBeenCalled()
+  })
 
   it.each(executionControls)('denies internal callers before runtime access: %s %s', async (method, path, body) => {
     const ownership = vi.fn(unreached('taskIdForSession'))
@@ -130,6 +154,26 @@ describe('managed execution requires device authority', () => {
     expect((await app.fetch(req('/api/sessions/s1/turns/t1', 'DELETE'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/sessions/s2/cancel', 'POST', {}), {} as Env)).status).toBe(404)
     expect(cancel).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('session reference context', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('returns only sessions owned by the requested task', async () => {
+    const referenceContext = vi.fn(async () => ({ type: 'context', content: 'snapshot' }))
+    const task1 = '00000000-0000-4000-8000-000000000001'
+    const task2 = '00000000-0000-4000-8000-000000000002'
+    setManagedAgentsBridge(fake({
+      taskIdForSession: async (id) => ({ s1: task1, s2: task2 })[id as 's1' | 's2'] ?? null,
+      referenceContext: referenceContext as never,
+    }))
+    const path = (id: string) => `/api/sessions/${id}/reference-context?taskId=${task1}`
+    expect((await authed().fetch(req(path('s1')), {} as Env)).status).toBe(200)
+    expect((await authed().fetch(req(path('s2')), {} as Env)).status).toBe(404)
+    expect((await authed().fetch(req(path('missing')), {} as Env)).status).toBe(404)
+    expect((await asTask1().fetch(req(path('s1')), {} as Env)).status).toBe(403)
+    expect(referenceContext).toHaveBeenCalledTimes(1)
   })
 })
 

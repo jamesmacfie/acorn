@@ -16,6 +16,7 @@ import { clearableAgents, markAgentsRead } from './sessions/markAgentsRead'
 import { managedAgentStore } from './sessions/managedStore'
 import { choiceDescription, choiceGlyph, choiceLabel, newSessionChoices, type NewSessionChoice } from './sessions/newSessionChoices'
 import { customAgentsRoute, type CustomAgent } from '../shared/customAgents'
+import { requestSessionGoalEditor } from './sessions/sessionGoalCommand'
 
 // What this plugin puts in the palette: the rail source it owns, a way to start a session in the open
 // task, and one search over that task's managed sessions
@@ -61,6 +62,10 @@ export async function startSessionFromPalette(
 const MAX_SESSION_ROWS = 50
 
 export const agentsCommands: readonly ContributedCommand[] = [
+  {
+    id: 'agents.goal.set', title: 'Set session goal', category: 'action', palette: true,
+    scope: 'task', requires: { plugin: 'agents' }, run: (context) => requestSessionGoalEditor(context.taskId),
+  },
   {
     id: 'agents.sessions.new',
     kind: 'search',

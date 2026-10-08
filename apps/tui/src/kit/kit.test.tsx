@@ -1006,6 +1006,17 @@ describe('the kit in cells', () => {
   })
 
   it.each(drawable(cases))('%s', drawCase, 20_000)
+  it.each([80, 120])('shows status essentials and details at %i columns', async (width) => {
+    const frame = await renderCells(() => <Toolbar variant="status" ariaLabel="File status"
+      primary={<Text>src/deep/example.ts</Text>}
+      secondary={<Text>TypeScript Spaces: 2</Text>}
+      essential={<Text>Ln 12, Col 4 Saved</Text>}
+      actions={<Button onPress={() => {}}>Details</Button>}
+    />, { width, height: 4 })
+    try {
+      for (const fact of ['src/deep/example.ts', 'Ln 12, Col 4', 'Saved', 'Details', 'Spaces: 2']) has(frame, fact)
+    } finally { frame.done() }
+  })
   // The held half, as skips rather than as absences, so the report says which node is waiting and why
   // (§ HELD).
   if (held(cases).length) it.skip.each(held(cases))('%s', drawCase)
@@ -1155,13 +1166,13 @@ const BEHAVIOURS: Behaviour[] = [
   {
     node: 'ConfirmButton',
     does: 'arms on the first press and confirms on the second',
-    render: (record) => <ConfirmButton label="Delete" onConfirm={() => record('confirm')} />,
+    render: (record) => <ConfirmButton label="Delete" onArm={() => record('arm')} onConfirm={() => record('confirm')} />,
     drive: async (screen, pressed) => {
       const armed = await screen.press('RETURN')
       expect(armed.text).toContain('Delete?')
-      expect(pressed).toEqual([])
+      expect(pressed).toEqual(['arm'])
       await armed.press('RETURN')
-      expect(pressed).toEqual(['confirm'])
+      expect(pressed).toEqual(['arm', 'confirm'])
     },
   },
   {
@@ -1680,6 +1691,89 @@ const NOT_DRIVEN_HERE: Partial<Record<KitNodeName, string>> = {
 /** Every renderable under one, for a case that has to reach past what the store will hand it. */
 const every = (from: Renderable): Renderable[] =>
   from.getChildren().flatMap((child) => [child, ...every(child)])
+
+it('keeps terminal Git status text and the unsaved dot distinct in document tabs', async () => {
+  const screen = await renderCells(() => <DocumentTabs idPrefix="status" ariaLabel="Open files" active="a" onActivate={() => {}}
+    tabs={[{ id: 'a', label: 'a.ts', dirty: true, fileStatus: { letter: 'M', label: 'Modified — Staged and unstaged', tone: 'muted' } }]} />,
+  { width: 80, height: 4 })
+  try {
+    expect(screen.text).toContain('a.ts [M] ●')
+    expect(screen.text).toContain('Modified — Staged and unstaged')
+  } finally { screen.done() }
+})
+
+it('keeps terminal-session tab clicks and arrows activating once', async () => {
+  const activated: string[] = []
+  const [active, setActive] = createSignal('a')
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="terminal-tabs" label="Terminal"
+    regions={{ body: () => <DocumentTabs idPrefix="terminal-tabs" ariaLabel="Sessions" active={active()}
+      onActivate={(id) => { activated.push(id); setActive(id) }} tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]} /> }} />,
+  { width: 80, height: 8 })
+  try {
+    await screen.click(...cellOf(screen, 'two'))
+    expect(activated).toEqual(['b'])
+    await screen.press('ARROW_LEFT')
+    expect(activated).toEqual(['b', 'a'])
+  } finally { screen.done() }
+})
+
+it('targets an inactive editor tab menu without activating that document', async () => {
+  const opened: string[] = []
+  const targeted: string[] = []
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="editor-menu-target" label="Editor"
+    regions={{ body: () => <DocumentTabs idPrefix="editor-menu" ariaLabel="Open files" active="a"
+      onActivate={(id) => opened.push(id)} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
+        open={control?.open} onOpenChange={control?.onOpenChange}
+        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
+        {(menu) => <Menu.Item context={menu} onSelect={() => targeted.push(id)}>Reveal {id}</Menu.Item>}
+      </Menu>}
+      tabs={[{ id: 'a', label: 'a.ts' }, { id: 'b', label: 'b.ts' }]} /> }} />,
+  { width: 80, height: 24 })
+  try {
+    expect(screen.text).not.toContain('Actions for a')
+    const moved = await screen.press('ARROW_RIGHT')
+    expect(moved.text).toContain('›b.ts')
+    expect(opened).toEqual([])
+    const menu = await moved.press('F10', { shift: true })
+    expect(menu.text).toContain('Reveal b')
+    const dismissed = await menu.press('ESCAPE')
+    expect(dismissed.text).not.toContain('Reveal b')
+    const reopened = await dismissed.press('F10', { shift: true })
+    const selected = await reopened.press('RETURN')
+    expect(targeted).toEqual(['b'])
+    expect(opened).toEqual([])
+    const afterAction = await selected.press('F10', { shift: true })
+    expect(afterAction.text).toContain('Reveal b')
+    await afterAction.press('ESCAPE')
+    const clicked = await screen.click(...cellOf(screen, 'b.ts'))
+    expect(opened).toEqual(['b'])
+    const row = clicked.lines.findIndex((line) => line.includes('a.ts'))
+    const action = await clicked.click(clicked.lines[row]!.indexOf('⋯') + 1, row)
+    expect(action.text).toContain('Reveal a')
+    expect(opened).toEqual(['b'])
+  } finally { screen.done() }
+})
+
+it('reveals late tab-menu actions when the detail has only a few rows', async () => {
+  const chosen: string[] = []
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="short-tab-menu" label="Editor"
+    regions={{ body: () => <DocumentTabs idPrefix="short-tab-menu" ariaLabel="Open files" active="a"
+      onActivate={() => {}} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
+        maxVisibleRows={9} open={control?.open} onOpenChange={control?.onOpenChange}
+        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
+        {(menu) => <>{Array.from({ length: 7 }, (_, index) =>
+          <Menu.Item context={menu} onSelect={() => chosen.push(`early ${index}`)}>Early {index}</Menu.Item>)}
+          <Menu.Item context={menu} onSelect={() => chosen.push(id)}>Reveal {id}</Menu.Item></>}
+      </Menu>} tabs={[{ id: 'a', label: 'a.ts' }]} /> }} />,
+  { width: 80, height: 8 })
+  try {
+    let frame = await screen.press('F10', { shift: true })
+    for (let index = 0; index < 7; index++) frame = await frame.press('ARROW_DOWN')
+    expect(frame.text).toContain('Reveal a')
+    await frame.press('RETURN')
+    expect(chosen).toEqual(['a'])
+  } finally { screen.done() }
+})
 
 describe('every control is a stop', () => {
   const behaviours = BEHAVIOURS.map((entry) => [`${entry.node}: ${entry.does}`, entry] as const)

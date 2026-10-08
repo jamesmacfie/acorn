@@ -8,7 +8,7 @@ import { wsChannelPrefixes } from '@acorn/client-core/infra/node'
 //
 // Core registers eagerly; compiled plugins register in the post-paint pass.
 describe('registered ws channel prefixes', () => {
-  it('are exactly the eighteen the app expects', async () => {
+  it('are exactly the nineteen the app expects', async () => {
     const { startClientPlugins } = await import('../../src/client/activate')
     await startClientPlugins()
     // term, workflow, plugins, tasks, connection, head, run, agent-session, project, terminal,
@@ -22,6 +22,6 @@ describe('registered ws channel prefixes', () => {
     // one letter from `plugins` and deliberately distinct — is the namespace core claims for every
     // loaded plugin's own live channel (client-core/host/plugins/pluginChannel.ts). docker, editor and agent are
     // their plugins'. `editor` is the editor pane's `$EDITOR`-in-a-PTY handoff.
-    expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'editor', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'terminal', 'workflow', 'workspace', 'workspace-projects', 'worktree', 'ws'])
+    expect(wsChannelPrefixes()).toEqual(['agent', 'agent-session', 'connection', 'docker', 'editor', 'head', 'plugin', 'plugins', 'project', 'run', 'tasks', 'term', 'terminal', 'workflow', 'workspace', 'workspace-projects', 'workspaces-mode', 'worktree', 'ws'])
   })
 })

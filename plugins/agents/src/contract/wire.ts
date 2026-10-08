@@ -28,11 +28,29 @@ export type AgentAttentionReason =
 export type AgentStatusAuthority = 'protocol' | 'lifecycle_hook' | 'process' | 'terminal_screen'
 export type AgentController = 'acorn' | 'terminal' | 'external'
 export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'imported'
+export type AgentAttendance = 'attended' | 'supervised' | 'autonomous'
 // `delegation` is a turn an owner queued on its delegated child; `delegation_report` is the child's
 // settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
 // `plugin` is a note a plugin queued through `agents:session-messenger`; its `effectivePolicy.sentBy`
 // names the plugin (docs/managed-agents/session-messages.md).
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
+export type AgentGoalStatus = 'active' | 'satisfied' | 'blocked' | 'paused' | 'exhausted' | 'cleared'
+export type AgentGoalBlocker = 'none' | 'missing_evidence' | 'needs_user_input' | 'run_failed' | 'external_wait' | 'goal_not_met_yet'
+export type AgentGoalVerdict = {
+  turnId: string
+  satisfied: boolean
+  blocker: AgentGoalBlocker
+  reason: string
+  evidence_summary: string
+  relied_on_assumption: boolean
+}
+export type AgentGoal = {
+  objective: string
+  status: AgentGoalStatus
+  continuations: number
+  noProgress: number
+  verdict: AgentGoalVerdict | null
+}
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'
@@ -317,7 +335,7 @@ export type AgentNormalizedEvent =
   /** Codex's completed plan item, separate from turn/plan/updated progress steps. */
   | { type: 'plan_proposal'; itemId: string; providerTurnId: string; text: string }
   | { type: 'usage'; usage: AgentUsage }
-  /** `blocked` marks a permission a policy plugin refused before anyone saw it. The row is written
+  /** `blocked` marks a request refused by unattended policy or a permission policy plugin. The row is written
    *  resolved, never pending, and an older client draws it as an ordinary resolved request. */
   | { type: 'request'; requestId: string; kind: AgentRequestKind; title: string; detail?: string; options?: AgentPermissionOption[]; questions?: AgentQuestion[]; approval?: AgentAppApproval; blocked?: AgentRequestBlocked }
   | { type: 'request_resolved'; requestId: string; resolution: unknown }
@@ -355,6 +373,7 @@ export type AgentSession = {
   statusAuthority: AgentStatusAuthority
   title: string
   model: string | null
+  goal?: AgentGoal | null
   config: Record<string, unknown>
   parentSessionId: string | null
   parentTurnId: string | null
@@ -388,7 +407,7 @@ export type AgentTurn = {
   continuationInput?: AgentInputPart[] | null
   /** Earliest time the durable dispatcher may send this queued turn. */
   notBefore?: number | null
-  effectivePolicy: Record<string, unknown>
+  effectivePolicy: Record<string, unknown> & { attendance?: AgentAttendance }
   providerTurnRef: string | null
   stopReason: string | null
   usage: AgentUsage | null

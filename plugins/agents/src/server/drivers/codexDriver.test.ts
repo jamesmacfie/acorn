@@ -148,6 +148,7 @@ async function start(
   mcpServers: readonly AgentDriverMcpServer[] = [],
   measureStartup?: MeasureAgentStartup,
   skillPlugins?: readonly string[],
+  attendanceInstructions?: string,
 ) {
   const events: AgentNormalizedEvent[] = []
   const driverEvents: AgentDriverEvent[] = []
@@ -161,9 +162,10 @@ async function start(
     noProviderExecutionHistory: false,
     measureStartup,
     skillPlugins,
+    attendanceInstructions,
     onEvent: (event) => {
       driverEvents.push(event)
-      if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+      if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
     },
     onClosed: () => {},
   })
@@ -187,6 +189,15 @@ describe('Codex collaboration modes', () => {
     wire.onRequest = undefined
     wire.onNotification = undefined
   })
+
+  it('supplies host attendance in the developer channel on creation and resume', async () => {
+    for (const resumed of [false, true]) {
+      const { handle } = await start(null, resumed, {}, [], undefined, undefined, 'Nobody is waiting to answer.');
+      expect(wire.requests.find((request) => request.method === (resumed ? 'thread/resume' : 'thread/start'))?.params)
+        .toMatchObject({ developerInstructions: 'Nobody is waiting to answer.' });
+      await handle.stop();
+    }
+  });
 
   it('separates a slow metadata request from initialization and records an optional failure', async () => {
     const ctx = makeTestNodeContext({ plugin: { name: 'agents' } })

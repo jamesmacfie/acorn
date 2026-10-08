@@ -32,6 +32,7 @@ function utf16OffsetAtUtf8Byte(text: string, byteOffset: number): number {
 
 // Retain accepted hits only. An extra supported hit proves truncation.
 export class RgResults {
+  constructor(private readonly allowedPaths?: ReadonlySet<string>) {}
   private files: FileHits[] = []
   private current: FileHits | null = null
   private total = 0
@@ -46,7 +47,7 @@ export class RgResults {
     if (ev.type === 'begin') {
       const rawPath = ev.data?.path?.text
       const path = rawPath?.startsWith('./') ? rawPath.slice(2) : rawPath
-      this.current = path ? { path, hits: [] } : null
+      this.current = path && (!this.allowedPaths || this.allowedPaths.has(path)) ? { path, hits: [] } : null
     } else if (ev.type === 'end') this.current = null
     else if (ev.type === 'match' && this.current) {
       const line = ev.data?.line_number

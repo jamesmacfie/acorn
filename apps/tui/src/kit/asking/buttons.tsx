@@ -41,6 +41,7 @@ export function ConfirmButton(props: ButtonProps & {
   confirmLabel?: string
   timeoutMs?: number
   skipConfirm?: boolean
+  onArm?: () => void
   onConfirm: () => void
 }) {
   const armed = createArmedConfirm(() => props.timeoutMs ?? 3000)
@@ -48,6 +49,7 @@ export function ConfirmButton(props: ButtonProps & {
   // One button, so one key: `request` is keyed because the armed state usually lives outside a single
   // control, and this is the degenerate case the DOM's ConfirmButton is too.
   const press = () => {
+    if (!props.skipConfirm && !armed.armed()) props.onArm?.()
     if (props.skipConfirm || armed.request('confirm')) props.onConfirm()
   }
   const isArmed = () => armed.armed() !== null

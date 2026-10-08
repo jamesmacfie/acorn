@@ -19,8 +19,9 @@ Acorn also registers its own commands through `generate_handler!` in `apps/deskt
 
 In Tauri 2.11.5, a custom command is rejected by the access-control layer only when the request is a
 plugin command, or the app ships an application manifest, or the origin is not local. Acorn ships no
-application manifest: `apps/desktop/src-tauri/gen/schemas/acl-manifests.json` holds only plugin
-manifest keys such as `core`, `dialog`, and `opener`. So for any request whose origin is local, none
+application manifest: the Tauri build writes `gen/schemas/acl-manifests.json` under
+`apps/desktop/src-tauri`, with only plugin manifest keys such as `core`, `dialog`, and `opener`.
+So for any request whose origin is local, none
 of Acorn's own commands is access-checked, and the `webviews: ["main"]` scope does not apply to them.
 
 Tauri treats every registered custom scheme as a local origin. That includes `app-plugin://`, the
@@ -52,8 +53,8 @@ Inspect these files and their tests:
   other hand-written commands.
 - `apps/desktop/src-tauri/src/webviews.rs` and `apps/desktop/src-tauri/src/plugin_scheme.rs` own the
   child webviews and the `app-plugin://` origin.
-- `apps/desktop/src-tauri/gen/schemas/acl-manifests.json` and
-  `apps/desktop/src-tauri/gen/schemas/capabilities.json` are the generated access-control inputs.
+- The Tauri build generates `gen/schemas/acl-manifests.json` and `gen/schemas/capabilities.json`
+  under `apps/desktop/src-tauri`. Inspect these access-control inputs after building the desktop.
 
 Read the Tauri access-control model for application versus plugin manifests, and
 [host-owned webviews](../../security/webviews.md).

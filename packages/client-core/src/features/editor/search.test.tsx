@@ -3,7 +3,7 @@ import { basicSetup } from 'codemirror'
 import { Compartment, EditorState, type Extension } from '@codemirror/state'
 import { EditorView, runScopeHandlers } from '@codemirror/view'
 import { openSearchPanel, searchPanelOpen } from '@codemirror/search'
-import { editorSearch, MAX_COUNTED_MATCHES } from './search'
+import { editorSearch, MAX_COUNTED_MATCHES, openReplacePanel } from './search'
 
 // The find panel as a reader meets it: kit controls in place of CodeMirror's stock ones, every action
 // going through the engine's own commands, and nothing left behind when the editor changes documents.
@@ -130,6 +130,15 @@ describe('editorSearch', () => {
     expect(panel(view)!.querySelector('input[aria-label="Replace"]')).toBeNull()
     button(view, 'Replace').click()
     expect(panel(view)!.querySelector<HTMLInputElement>('input[aria-label="Replace"]')?.value).toBe('b')
+  })
+
+  it('opens straight to the replace row for a Replace command', async () => {
+    const view = mount('a a')
+    await open(view)
+    openReplacePanel(view)
+    const replacement = panel(view)!.querySelector<HTMLInputElement>('input[aria-label="Replace"]')
+    expect(replacement).toBe(document.activeElement)
+    expect(button(view, 'Replace').getAttribute('aria-expanded')).toBe('true')
   })
 
   it('drops replacement for a read-only document and brings it back when editable', async () => {

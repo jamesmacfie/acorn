@@ -3,19 +3,20 @@ import { createSignal, Show, type JSX } from 'solid-js'
 import type { Renderable } from '../../tree/compat'
 import { Line } from '../cells'
 import { ScrollViewport } from '../scrolling'
+import { regionFocus } from '../../keys/regions'
+import { paneIdForFocus } from '../paneContext'
 
 // The narrow ceiling for the two-column nodes. The same number the `list-detail` layout uses, and for
 // the same reason: below it there is no room for a list and a document side by side. A node asks its
-// own box how wide it turned out; nothing here reads the terminal.
+// parent box how wide it turned out; nothing here reads the terminal.
 const NARROW_AT = 80
 const LIST_CELLS = 32
 
-/** reduced: two columns above 80 cells, one at a time below. Which one is drawn below the ceiling is
- *  "the detail if there is one", because a caller that passed a detail has something to show.
+/** Two columns above 80 cells; below it the list stays reachable above the detail.
  *
  *  `collapseKey` is ignored. Collapsing a sidebar to a rail of marks only reads because the names it
  *  drops come back as tooltips, and this host has neither hover nor `tip` (../ui.ts). Narrowing here
- *  is the `NARROW_AT` switch below, which shows one column at a time and loses no names. */
+ *  is the `NARROW_AT` switch below, which stacks the regions and loses no names. */
 export function ListDetail(props: {
   list?: JSX.Element
   split?: boolean
@@ -28,6 +29,11 @@ export function ListDetail(props: {
   collapseContent?: 'rows' | 'empty'
   children: JSX.Element
 }) {
+  const paneId = paneIdForFocus()
+  // JSX props can be getters. Hold each subtree once so a width update cannot recreate its
+  // document and discard an armed file action while the dialog takes focus.
+  const list = props.list
+  const detail = props.children
   let box: Renderable | undefined
   const [width, setWidth] = createSignal(NARROW_AT)
   const narrow = () => width() < NARROW_AT
@@ -35,24 +41,27 @@ export function ListDetail(props: {
     <box
       flexDirection="row"
       flexGrow={1}
-      ref={(element: Renderable) => { box = element; setWidth(element.width) }}
-      onSizeChange={() => setWidth(box?.width ?? NARROW_AT)}
+      minWidth={0}
+      width="100%"
+      ref={(element: Renderable) => { box = element; setWidth(element.parent?.width ?? element.width) }}
+      onSizeChange={() => setWidth(box?.parent?.width ?? box?.width ?? NARROW_AT)}
     >
       {/* `split` is the form where both columns are children — a `ListColumn` and a `DetailColumn` —
           rather than one of them arriving in `list`. The DOM hands those straight to its grid; this
           gated on `list ?? split` and so drew an empty 32-cell gutter beside the pr pane's navigator
           for a `list` nobody passed (docs/tui.md).
-          Below 80 cells the two stack instead of sitting side by side, which is this node's own
-          answer to "one column at a time": it has no keys of its own to switch with, and a column of
-          38 cells is a column nobody can read. */}
-      <Show when={props.list !== undefined} fallback={
-        <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>{props.children}</box>
+          Below 80 cells the two stack instead of sitting side by side. */}
+      <Show when={list !== undefined} fallback={
+        <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1}>{detail}</box>
       }>
-        <Show when={!narrow()}>
-          <box flexDirection="column" width={LIST_CELLS}>{props.list}</box>
-          <box width={1}><Line>│</Line></box>
-        </Show>
-        <box flexDirection="column" flexGrow={1}>{props.children}</box>
+        <box flexDirection={narrow() ? 'column' : 'row'} flexGrow={1} minWidth={0}>
+          <box flexDirection="column" width={narrow() ? '100%' : LIST_CELLS}
+            height={narrow() ? 12 : undefined} flexShrink={0} minWidth={0}
+            ref={paneId ? regionFocus({ paneId, regionId: 'list' }, 0) : undefined}>{list}</box>
+          <Show when={!narrow()}><box width={1}><Line>│</Line></box></Show>
+          <box flexDirection="column" flexGrow={1} minWidth={0}
+            ref={paneId ? regionFocus({ paneId, regionId: 'detail' }, 1) : undefined}>{detail}</box>
+        </box>
       </Show>
     </box>
   )

@@ -131,6 +131,7 @@ client: Workspace
 client: WorkspaceWords
 client: WorkspacesMode
 client: activateTaskSignals
+client: activeCollectionItem
 client: activeNodeId
 client: activeTaskId
 client: agentContextContributions
@@ -297,6 +298,7 @@ client: setSelectedSource
 client: setTerminalOpen
 client: sourceRegistry
 client: splitRefTokens
+client: storageKeyFor
 client: summarizeFileStats
 client: taskBridge
 client: taskStatus
@@ -604,6 +606,7 @@ testkit/client: Project
 testkit/client: RemoteRoot
 testkit/client: activeRefPanel
 testkit/client: closeRefPanel
+testkit/client: commandRegistry
 testkit/client: contentLinkRegistry
 testkit/client: createRemoteRoot
 testkit/client: evictScope
@@ -617,6 +620,8 @@ testkit/client: provideClientCapability
 testkit/client: refPanelRegistry
 testkit/client: refreshFleet
 testkit/client: setActiveNode
+testkit/client: setActiveTaskId
+testkit/client: setFocusedPane
 testkit/client: setProjectsLookup
 testkit/ws-client: _resetWsClient
 testkit: AppDatabase
@@ -738,10 +743,14 @@ ui/editor: captureViewState
 ui/editor: documentCustody
 ui/editor: editorSearch
 ui/editor: editorTheme
+ui/editor: fileDocumentCustodies
 ui/editor: languageForPath
 ui/editor: mountEmbeddedEditor
+ui/editor: openReplacePanel
 ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
+ui/editor: reserveDocumentDestinations
+ui/editor: reserveFileSourceCustodies
 ui/editor: shouldHighlightDocument
 ui/editor: watchEditorTheme
 ui/host: Acorn
@@ -1010,6 +1019,7 @@ ui: ToolbarSpacer
 ui: TreeRow
 ui: UserAvatar
 ui: attachPty
+ui: copyText
 ui: createArmedConfirm
 ui: createSplitDrag
 ui: createTimelineWindow

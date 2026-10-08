@@ -14,6 +14,7 @@
     "commands": [
       "task.terminal.new-claude",
       "task.terminal.new-codex",
+      "agents.goal.set",
       "agents.sessions.new",
       "source.agents.open",
       "agents.sessions.mark-read",
@@ -22,7 +23,11 @@
       "context.open",
       "source.docker.open",
       "docker.find",
+      "editor.tree.collapse",
+      "editor.tree.reveal-active",
+      "editor.search.folder",
       "editor.files.open",
+      "editor.navigation.go-to-line",
       "editor.search.open",
       "source.github.open",
       "memory.search",
@@ -79,7 +84,8 @@
       "github:summary-badges"
     ],
     "extensions": [
-      "agents.storage",       "agents.security",
+      "agents.storage",
+      "agents.security",
       "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",
@@ -89,6 +95,7 @@
       "github-pull"
     ],
     "agentContexts": [
+      "agents.sessions",
       "acorn-task-context",
       "acorn-docker",
       "acorn-terminals"
@@ -219,7 +226,11 @@
         "editor"
       ],
       "commands": [
+        "editor.tree.collapse",
+        "editor.tree.reveal-active",
+        "editor.search.folder",
         "editor.files.open",
+        "editor.navigation.go-to-line",
         "editor.search.open"
       ],
       "persistedStateSlices": [

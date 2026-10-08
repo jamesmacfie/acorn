@@ -233,7 +233,7 @@ export function buildCommandGraph(
     const title = commandTitle(draft.command)
     const breadcrumb = [...trail, title]
     const available = inherited.available
-      && commandAvailable(draft.command)
+      && commandAvailable(draft.command, context)
       && (context === undefined || commandScopeSatisfied(draft.command, context))
     const discoverable = available && inherited.discoverable && !!draft.command.palette
     const children = draft.children

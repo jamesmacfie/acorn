@@ -62,6 +62,39 @@ describe('durable queue admission', () => {
     input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
   })
 
+  it('pauses a goal when its active provider disconnects', async () => {
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(() => expect(sends).toHaveLength(1))
+    await starts[0]!.onClosed(new Error('Provider closed'))
+    expect((await runtime.store.turn(sends[0]!))?.status).toBe('interrupted')
+    expect((await runtime.store.requireSession(item.id)).goal?.status).toBe('paused')
+  })
+
+  it('blocks a goal when dispatch fails', async () => {
+    launch = async (options) => {
+      await options.onEvent({ type: 'session_state', state: 'ready' })
+      return { providerSessionRef: options.session.id, ready: true,
+        sendTurn: async () => { throw new Error('Dispatch failed') },
+        cancel: async () => {}, resolveRequest: async () => {}, stop: async () => {} }
+    }
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(async () => {
+      const goal = (await runtime.store.requireSession(item.id)).goal
+      expect(goal).toMatchObject({ status: 'blocked', verdict: { blocker: 'run_failed' } })
+    })
+  })
+
+  it('pauses a goal when the person cancels its active turn', async () => {
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(() => expect(sends).toHaveLength(1))
+    await runtime.cancelTurn(item.id)
+    expect((await runtime.store.turn(sends[0]!))?.status).toBe('cancelled')
+    expect((await runtime.store.requireSession(item.id)).goal?.status).toBe('paused')
+  })
+
   it('acknowledges 20 public enqueues during startup and starts only admitted providers', async () => {
     const held = deferred<void>(), start = launch
     launch = async (options) => { await held.promise; return start(options) }
@@ -103,6 +136,50 @@ describe('durable queue admission', () => {
     await new Promise((resolve) => setImmediate(resolve))
     expect(starts).toHaveLength(0)
     expect(sends).toHaveLength(0)
+  })
+
+  it('cancels an active turn even when the provider reports reconnecting', async () => {
+    const cancel = vi.fn(async () => {})
+    const start = launch
+    launch = async (options) => ({ ...await start(options), cancel })
+    const item = await session(), turn = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+    await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+
+    await runtime.cancelTurn(item.id)
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect((await runtime.store.turn(turn.id))?.status).toBe('cancelled')
+  })
+
+  it.each(['disconnect', 'incorrect status'] as const)('stops recovery after %s and resumes when another turn is sent', async (reason) => {
+    const item = await session(), turn = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+    vi.useFakeTimers()
+    try {
+      if (reason === 'disconnect') {
+        await starts[0]!.onClosed(new Error('Synthetic disconnect'))
+      } else {
+        await starts[0]!.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+      }
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('reconnecting')
+      expect((await runtime.store.turn(turn.id))?.status).toBe(reason === 'disconnect' ? 'interrupted' : 'completed')
+
+      await runtime.cancelTurn(item.id)
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(starts).toHaveLength(1)
+      expect(stops).toContain(item.id)
+      await starts[0]!.onEvent({ type: 'session_state', state: 'ready' })
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const next = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id, next.id]))
+    expect(starts).toHaveLength(2)
   })
 
   it('scans again for a public enqueue that arrives during a held workspace read', async () => {

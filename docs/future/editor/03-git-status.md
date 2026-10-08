@@ -1,5 +1,54 @@
 # Phase 03: show Git status beside files
 
+> **Completion note — October 8, 2026.** Editor shows one Changes-owned Git status
+> snapshot per task in file rows, folder counts, and open tabs. The public
+> `editor:file-status` Node point returns only paths, status, scope, and rename source.
+> Changes reuses its porcelain parser and the shared worktree status cache; Editor
+> groups distinct paths and gives conflicts priority. A Solid memo projects each
+> snapshot once. File actions and successful saves refresh it directly, alongside
+> worktree events, reconnects, and focus. Plugin roster changes clear marks before
+> rereading. A missing provider or non-Git folder has no marks; transient failures
+> retain the last snapshot with a stale explanation. Node, task, provider, and read
+> revisions fence late results. Disk revision reads still decide whether a deleted
+> document can save.
+>
+> **Decisions and limits.** A deleted open tab can show `D`; the tree does not add
+> an absent file row. The status-only read runs no numstats, patches, or per-file
+> Git commands. Worktree status reads use canonical checkout paths so aliases share
+> one cache entry, and invalidation drops a pending entry. The kit owns tab badge
+> styling; Editor owns Git grouping. The proposed `editor:file` annotation point
+> has not shipped, so this phase keeps its narrow status point. The terminal's
+> three-column 120×40 layout clips long inline tree status explanations, while
+> retaining the letter, folder count, and file controls. The active document tab
+> prints its full status text. Provider disablement through Settings takes effect
+> after a Node restart, as Settings states; the reader also handles a live roster
+> change immediately. Later UI work can give a focused tree row a wider detail
+> line without changing the Git provider contract. The Node service build is
+> 3,149,676 bytes against a 3,150,000-byte ceiling; later phases should keep
+> optional work lazy rather than adding it to service startup.
+>
+> **Verification.** Temporary Git repositories covered staged addition, both
+> modification scopes, untracked files, rename source, deletion, unresolved
+> conflict, and a non-Git folder. Reader and route tests covered transient failure,
+> provider retirement, late responses, and Node switches. Two readers of 10,000
+> untracked files used one status subprocess in 73 ms; 500 map lookups took 4 ms
+> without reprojection. The 10,000-row virtual tree stayed under 100 mounted rows;
+> the shared Rows scroller stayed under 40 after a scroll. The isolated desktop
+> fixture showed file and folder marks and an open tab in light and dark captures
+> (`.acorn/agent-dev/phase03-status-desktop/screenshots/editor-light-open.png` and
+> `editor-dark-open.png`). After Changes was disabled and the isolated Node
+> restarted, Editor still listed files with no Git marks. Live terminal snapshots
+> at 80×24 and 120×40 showed counts and file letters; at 80×24 the modified row
+> showed its full unstaged label. The terminal host tab contract has a separate
+> status-and-dirty-dot test. Editor passed 152 tests (1 skipped), Changes 271
+> (1 skipped), Node core 1,636, plugin API 14, protocol 294, and TUI 679
+> (2 skipped). Lint passed 37 tasks and architecture passed 87 tests. Client core
+> had 2,467 passes and the two failures previously reproduced on untouched
+> `bf1143d08` (workspace route classification and CSS shadow-token count).
+> Desktop had 171 passes and the 11 activation snapshot failures previously
+> reproduced on that untouched parent. Those are parent-commit checks, not a
+> claim about main. No unfiltered repository suite ran in this phase.
+
 Date: October 7, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 02](./02-file-management.md).

@@ -20,6 +20,7 @@ import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
 import { parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import { defaultAgentConcurrency } from '../../shared/concurrency'
+import { persistedAttendance, sessionAttendance } from './attendance'
 import { readAgentConcurrency } from '../concurrencyStore'
 import { AGENT_IDLE_STOP_CHOICES, defaultAgentSessionDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
@@ -44,6 +45,7 @@ import {
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
   USAGE_CONTINUATION_GRACE_MS,
@@ -218,6 +220,7 @@ export class ManagedAgentEngine {
   protected readonly turnSpans = new Map<string, SpanHandle>()
   protected readonly processes: ProviderSessionLifecycle
   protected readonly queue: QueueCoordinator
+  private goalServicePromise: Promise<SessionGoalGeneration> | null = null
   protected readonly subagentQuietMs: number
   // Each start's native skill folder, `<session id>/<generation>` (../drivers/skillFolder.ts).
   private readonly skillFolders: string
@@ -246,7 +249,10 @@ export class ManagedAgentEngine {
   private stopPromise: Promise<void> | null = null
   private readonly publicationCallbacks = new Set<Promise<void>>()
 
-  constructor(options: AgentRuntimeOptions) {
+  constructor(
+    options: AgentRuntimeOptions,
+    private readonly enqueueGoal: (sessionId: string, prompt: string, key: string, signal?: AbortSignal) => Promise<void>,
+  ) {
     this.db = options.db
     this.core = options.core
     this.internalEnv = options.internalEnv
@@ -343,6 +349,30 @@ export class ManagedAgentEngine {
     this.mcpServers = new AgentMcpServerStore(options.db, options.secrets)
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
     this.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
+  }
+
+  private goals(): Promise<SessionGoalGeneration> {
+    return this.goalServicePromise ??= import('./sessionGoalGeneration').then(({ SessionGoalGeneration }) =>
+      new SessionGoalGeneration({
+        db: this.db,
+        store: this.store,
+        models: this.core.models,
+        currentUserId: this.currentUserId,
+        publish: (session) => this.emit({ channel: 'agent:session', session }),
+        enqueue: this.enqueueGoal,
+      }))
+  }
+
+  async setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {
+    return (await this.goals()).set(sessionId, objective)
+  }
+
+  async resumeGoal(sessionId: string): Promise<AgentSession> {
+    return (await this.goals()).resume(sessionId)
+  }
+
+  async pauseGoal(sessionId: string): Promise<void> {
+    await (await this.goals()).pause(sessionId)
   }
 
   subscribe(listener: RuntimeListener): () => void {
@@ -464,6 +494,7 @@ export class ManagedAgentEngine {
     // unless a session that started since is using it.
     await (await import('../drivers/skillFolder')).sweepSkillFolders(this.skillFolders, (sessionId) => this.processes.has(sessionId))
     await this.webhooks.reconcile()
+    await (await this.goals()).recover()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().
@@ -498,6 +529,7 @@ export class ManagedAgentEngine {
   private async stopEngine(): Promise<void> {
     this.stopped = true
     this.shutdown.abort(new Error('The managed agent runtime is shutting down.'))
+    if (this.goalServicePromise) await (await this.goalServicePromise).stop()
     this.processes.abortAndClearTimers()
     const queueDrain = this.queue.stop()
     // Stops at its next step. Awaited, because the database closes once stop() returns.
@@ -558,6 +590,7 @@ export class ManagedAgentEngine {
     return answerLoopHook({
       hooks: this.hooks,
       session: (sessionId) => this.store.getSession(sessionId),
+      turn: (turnId) => this.store.turn(turnId),
       taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
       live: (sessionId) => this.processes.current(sessionId),
       materialize: (sessionId, turnId, event) => this.eventMaterializer.map(sessionId, turnId, event),
@@ -647,18 +680,31 @@ export class ManagedAgentEngine {
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
     const turnId = live.activeTurnId
-    if (event.type === 'permission_request') {
-      // Before the event queue, and loaded on first use (./permissionPolicy.ts). The asking turn is the
-      // one captured above, however long the hook takes.
-      const { settlePermissionRequest } = await import('./permissionPolicy')
-      return settlePermissionRequest({
-        hooks: this.hooks,
-        session: () => this.store.requireSession(sessionId),
-        taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
-        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+    if (event.type === 'request' || event.type === 'permission_request' || event.type === 'input_request') {
+      const session = await this.store.requireSession(sessionId)
+      const turn = turnId ? await this.store.turn(turnId) : null
+      const attendance = turn
+        ? persistedAttendance(turn.effectivePolicy, { session, source: turn.source }) : sessionAttendance(session)
+      const { settleAutonomousRequest } = await import('./requestPolicy')
+      if (await settleAutonomousRequest({
+        attendance,
         owned: () => this.processes.owns(generation),
+        materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
         accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
-      }, event)
+        respond: (requestId, resolution) => this.withSessionHandle(generation, (handle) => handle.resolveRequest(requestId, resolution)),
+      }, event)) return
+      if (event.type === 'permission_request') {
+        const { settlePermissionRequest } = await import('./permissionPolicy')
+        return settlePermissionRequest({
+          attendance,
+          hooks: this.hooks,
+          session: () => this.store.requireSession(sessionId),
+          taskRoot: (taskId) => this.core.tasks.requireRoot(taskId),
+          materialize: (request) => this.eventMaterializer.map(sessionId, turnId, request),
+          owned: () => this.processes.owns(generation),
+          accept: (recorded) => this.providerEvents.accept({ sessionId, turnId, event: recorded, generation }),
+        }, event)
+      }
     }
     for (const normalized of await this.eventMaterializer.map(sessionId, turnId, event)) {
       if (!this.processes.owns(generation)) return
@@ -719,6 +765,7 @@ export class ManagedAgentEngine {
     // are deliberately not on this list, and a session with no children never holds a timer.
     if (event.type === 'subagent' || eventSubagentId(event)) this.processes.armQuiet(sessionId)
     if (settlesTurn) {
+      if (turnId) void this.goals().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
     }
   }
@@ -749,8 +796,10 @@ export class ManagedAgentEngine {
   protected async onProviderClosed(sessionId: string, generation: ProviderGeneration, attempt: number, error?: Error): Promise<void> {
     if (!this.processes.owns(generation)) return
     const message = safeProviderMessage(error, 'Provider process closed.', this.mintedSecrets)
+    const interruptedTurnId = this.processes.current(sessionId)?.activeTurnId
     await this.store.interruptActiveTurn(sessionId, message)
     if (!this.processes.owns(generation)) return
+    if (interruptedTurnId) await this.pauseGoal(sessionId)
     await this.store.expirePendingRequests(sessionId)
     if (!this.processes.owns(generation)) return
     const turnId = this.processes.takeActive(generation)
@@ -770,11 +819,15 @@ export class ManagedAgentEngine {
     this.processes.beginDispatch(generation)
     await this.store.dispatchTurn(turn.id)
     try {
+      turn = await this.store.restoreTurnAttendance(turn.id)
       const input = turn.continuationInput ?? turn.input
+      const { attendanceInstructions } = await import('./attendanceInstructions')
+      const instructions = attendanceInstructions(persistedAttendance(turn.effectivePolicy, { session, source: turn.source }))
+      const driverInput = instructions ? [{ type: 'text' as const, text: instructions }, ...input] : input
       await this.record(session.id, turn.id, {
         type: 'user_message',
         text: agentTurnInputText({ ...turn, input }),
-        ...(turn.continuationInput ? { automatic: true } : {}),
+        ...(turn.continuationInput || turn.source === 'goal' ? { automatic: true } : {}),
       })
       const attachments = Object.fromEntries((await Promise.all(
         [...new Set(input.flatMap((part) =>
@@ -795,7 +848,7 @@ export class ManagedAgentEngine {
       await this.store.startTurn(turn.id)
       if (!this.processes.owns(generation)) return false
       this.beginTurnSpan(turn.id, session.id, session.providerId, turn.source)
-      this.processes.sendTurn(generation, { turn, input, attachments },
+      this.processes.sendTurn(generation, { turn, input: driverInput, attachments },
         async (result) => {
           if (!this.processes.owns(generation)) return
           if (result.providerTurnRef) await this.store.setTurnProviderRef(turn.id, result.providerTurnRef)
@@ -806,7 +859,7 @@ export class ManagedAgentEngine {
           if (
             failure === 'safe_transient'
             && !this.processes.accepted(generation)
-            && turn.attempt + 1 < 3
+            && turn.attempt < 3
           ) {
             const message = safeProviderMessage(
               error,
@@ -820,7 +873,7 @@ export class ManagedAgentEngine {
             await this.record(session.id, turn.id, {
               type: 'diagnostic',
               level: 'warning',
-              message: `Provider rejected the turn before accepting output; retrying (${turn.attempt + 2}/3).`,
+              message: `Provider rejected the turn before accepting output; retrying (${turn.attempt + 1}/3).`,
             })
             await this.record(session.id, turn.id, {
               type: 'session_state',
@@ -979,6 +1032,7 @@ export class ManagedAgentEngine {
       // recorded as a provider failure.
       await this.stopLive(sessionId)
       await this.store.interruptActiveTurn(sessionId, 'The task was archived while the provider turn was active.')
+      if (turnId) await this.pauseGoal(sessionId)
       await this.store.expirePendingRequests(sessionId)
       if (turnId) this.endTurnSpan(turnId, 'interrupted')
       await this.record(sessionId, null, {

@@ -7,8 +7,8 @@ workflows plugin, which has [its own page](./workflow-routes.md). It's part of t
 A plugin's routes mount under its registry namespace. A router that names its own top-level segment
 repeats it, so a literal path can carry the plugin name twice, as in `/v1/p/memory/memory`. The route
 builders in `@acorn/protocol/api.ts` and each plugin's `shared/api.ts` are authoritative.
-`apps/node/test/integration/routeRegistry.snapshot.json` is the golden list of every compiled plugin
-route. A loaded plugin's routes reach the server through the fetch dispatcher and aren't in it.
+`apps/node/test/integration/routeRegistry.snapshot.json` lists every compiled plugin route. Loaded
+plugin routes reach the server through the fetch dispatcher and aren't in it.
 
 The task-scope gate covers `/v1/p/<plugin>/tasks/:id` and everything under it. A route addressed by
 another id, such as a session or a run, checks scope in its own handler
@@ -80,10 +80,11 @@ query is never logged. A path in either body is at most 4,096 characters.
 | `/v1/p/agents/custom-agents[/:id]` | Custom agent definitions |
 | `/v1/p/agents/mcp-servers[/:name][/test]` | The owner's MCP servers. Device-only ([MCP](../mcp.md#your-own-servers)) |
 | `/v1/p/agents/sessions`, `/sessions/search` | Session list and transcript search |
-| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait` |
+| `/v1/p/agents/sessions/:id` | One session, its `events`, `artifacts`, `mcp`, `export`, and `wait`. `GET reference-context?taskId=...` is device-only and checks that the source session belongs to the task |
 | `/v1/p/agents/sessions/:id/turns[/:turnId]` | Queue, edit, or remove a turn |
 | `/v1/p/agents/sessions/:id/requests/:requestId/resolve` | Answer a permission or question request |
 | `/v1/p/agents/sessions/:id/{cancel,fork,compact}` | Session controls |
+| `/v1/p/agents/sessions/:id/goal[/resume]` | Device-only interactive goal set, clear, and resume ([operations](../managed-agents/operations.md#session-goals)) |
 | `/v1/p/agents/sessions/:id/{handoff-terminal,implement-plan,regenerate-title}` | Session actions |
 | `/v1/p/agents/sessions/:id/{resume-managed,verify-imported-resume}`, `/transcript-imports` | Resume and transcript import |
 | `/v1/p/agents/attachments[/:id][/content]`, `/artifacts/:id[/content]` | Attachments and artifacts |
@@ -110,7 +111,7 @@ failure looks like an unknown session and returns 404.
 | `/v1/p/terminal/tasks/:taskId/run-targets` | Run target options for a workflow step field |
 | `/v1/p/changes/tasks/:id/local/*` | Status, stage, unstage, discard, commit, fetch, pull, push, abort, the diff document, and a model-written commit message |
 | `/v1/p/changes/tasks/:id/review-notes[/:noteId][/sent]` | Review notes |
-| `/v1/p/editor/tasks/:id/editor/*` | File reads, writes, listings, images, and line markers |
+| `/v1/p/editor/tasks/:id/editor/*` | [Guarded file reads, writes, and file actions](./editor.md), listings, images, and line markers |
 | `/v1/p/editor/tasks/:id/search` | Search a task's files |
 | `/v1/p/docker/*` | Node inventory: containers, images, volumes, networks, compose, prune, and `info` |
 | `/v1/p/docker/tasks/:id/containers`, `/teardown` | Task containers and their cleanup |
@@ -168,8 +169,7 @@ These ship as loaded packages, so their routes run in the plugin's worker:
 | `linear` | Issues, comments, uploads, and rail rows |
 | `rollbar` | Items, occurrences, details, and rail rows |
 
-`GET /v1/p/database/projects/:projectId/saved-queries` answers a workflow step field and refuses a
-task token, because no task in the path means no scope gate.
+`GET /v1/p/database/projects/:projectId/saved-queries` answers a workflow step field and refuses a task token because the path has no task scope gate.
 
 ### Command palette routes
 

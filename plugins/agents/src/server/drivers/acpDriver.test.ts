@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { fileURLToPath } from 'node:url'
 import type { AgentNormalizedEvent, AgentSession } from '../../contract/wire.ts'
-import type { AgentDriverPermissionRequest, AgentDriverStartOptions } from './types'
+import type { AgentDriverEvent, AgentDriverPermissionRequest, AgentDriverStartOptions } from './types'
 import { AcpDriver } from './acpDriver'
 import { acpMcpServers, clientFor, type PendingRequest } from './acpSession'
 import { harnessCapabilities } from './harness'
@@ -115,7 +115,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     }))
@@ -162,7 +162,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -198,7 +198,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: !history,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -230,7 +230,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
         mcpServers: [],
         noProviderExecutionHistory: false,
         onEvent: (event) => {
-          if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+          if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
         },
         onClosed: () => {},
       })
@@ -274,7 +274,7 @@ describe('the generic ACP driver describes a harness before it starts one', () =
       mcpServers: [],
       noProviderExecutionHistory: false,
       onEvent: (event) => {
-        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event)
+        if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event)
       },
       onClosed: () => {},
     })
@@ -343,9 +343,9 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
   }
 
   const parked = () => {
-    const events: AgentNormalizedEvent[] = []
+    const events: AgentDriverEvent[] = []
     const pending = new Map<string, PendingRequest>()
-    const options = { onEvent: async (event: AgentNormalizedEvent) => { events.push(event) } }
+    const options = { onEvent: async (event: AgentDriverEvent) => { events.push(event) } }
     return { events, pending, client: clientFor(options as AgentDriverStartOptions, 'Stub', pending, () => false) }
   }
 
@@ -355,7 +355,7 @@ describe('the generic ACP driver parks a question until somebody answers it', ()
     const [requestId] = [...pending.keys()]
     pending.get(requestId)!.resolve({ answers: { pick: 'second' } })
     expect(await response).toEqual({ action: 'accept', content: { pick: 'second' } })
-    expect(events[0]).toMatchObject({ type: 'request', kind: 'question', requestId, title: 'Which one?' })
+    expect(events[0]).toMatchObject({ type: 'input_request', request: { type: 'request', kind: 'question', requestId, title: 'Which one?' } })
   })
 
   it('cancels a question the turn left behind rather than answering it empty', async () => {
@@ -420,7 +420,7 @@ describe('a question the agent stopped waiting for is released with the turn', (
       env: {},
       mcpServers: [],
       noProviderExecutionHistory: false,
-      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' ? event.request : event) },
+      onEvent: (event) => { if (event.type !== 'generated_artifact') events.push(event.type === 'permission_request' || event.type === 'input_request' ? event.request : event) },
       onClosed: () => {},
     })
 

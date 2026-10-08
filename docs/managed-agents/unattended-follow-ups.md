@@ -31,7 +31,8 @@ Anything else is `operation-closed`: no `originTurnId`, a turn in another sessio
 cancelled operation, and a reviewer's note after its window closed.
 
 The note's turn has source `plugin` and `effectivePolicy.followUpOf`, the owner's turn id. It takes
-the owner's model, effort, provider options, workflow run and step ids, and result schema. It never
+the owner's model, effort, provider options, workflow run and step ids, result schema, and host-resolved
+attendance. Autonomous corrections keep the same immediate request denial/cancellation policy. It never
 takes `reportTo`. The tool ceiling is the session's, so a note can't widen it. When the operation has
 a result schema, the visible text asks the agent to end with the `json` result block again, because
 its reply replaces the result. The 20-note cap per plugin per session still applies.

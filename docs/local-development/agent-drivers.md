@@ -29,6 +29,16 @@ The launcher adds the current checkout as a local project. These flags change th
 | `--vite` | Serves the live Vite renderer instead of the staged one, to check hot reload. |
 | `--fixture NAME` | Seeds a generated fixture. See [the large-surface flow](#large-surface-flow). |
 
+Use `--fixture delegation-checks` to open a settled delegated report with one holding and one
+failing host check. It seeds an imported session in the isolated data root, so the report card can
+be inspected without changing execute-tool permissions.
+
+Use `--fixture unattended-policy` to execute a fake managed harness through the real runtime before
+opening the window. It raises a permission, question, and form under autonomous posture and asserts
+that they resolve without waiting. Its final `BLOCKED:` reply must end the workflow execution with
+one turn. Inspect the saved transcript in the task's Agent pane. This checks runtime policy and
+rendering, without relying on a commercial harness to ask or changing personal permission settings.
+
 By default the window serves the staged renderer through the app scheme, as a packaged build does.
 That avoids Vite's burst of cold module loads during startup. `pnpm dev` stays the normal live loop.
 

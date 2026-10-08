@@ -16,9 +16,11 @@ export function ConfirmButton(props: ButtonProps & {
   confirmLabel?: string
   timeoutMs?: number
   skipConfirm?: boolean
+  /** Capture the target before the button shows its second-click prompt. */
+  onArm?: () => void
   onConfirm: () => void
 }) {
-  const [own, rest] = splitProps(props, ['confirmLabel', 'timeoutMs', 'skipConfirm', 'onConfirm', 'children', 'tone'])
+  const [own, rest] = splitProps(props, ['confirmLabel', 'timeoutMs', 'skipConfirm', 'onArm', 'onConfirm', 'children', 'tone'])
   const armed = createArmedConfirm(() => own.timeoutMs ?? 3000)
   let wrap: HTMLSpanElement | undefined
   const button = () => (wrap?.firstElementChild instanceof HTMLElement ? wrap.firstElementChild : undefined)
@@ -46,6 +48,7 @@ export function ConfirmButton(props: ButtonProps & {
           // Measured before the label swaps, while the button still shows its resting face.
           const resting = button()
           if (!own.skipConfirm && !armed.armed() && resting) resting.style.minWidth = `${resting.offsetWidth}px`
+          if (!own.skipConfirm && !armed.armed()) own.onArm?.()
           if (own.skipConfirm || armed.request('self')) own.onConfirm()
         }}
       >
