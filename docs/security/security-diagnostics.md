@@ -28,11 +28,14 @@ environment entry, credential value, or provider output.
 
 Project policy inspection calls Changes' typed, passive static policy capability when it is
 available. It reports npm or pnpm identity and version, policy setting names, numeric release age,
-script suppression, build approval and ignore counts, allow-all-builds intent, release-age exception
+script suppression, build approval and denial counts, allow-all-builds intent, release-age exception
 counts, and registry origins without
 credentials. Unknown values remain unknown. The capability reads at most 32 KiB per fixed config file
 and 128 KiB total after the selected project's canonical root is resolved. It does not parse lockfile
 contents. The capability call shares the diagnostic's timeout and cancellation fence.
+Only `true` entries in `allowBuilds` count as approvals; `false` entries and explicit ignored-build
+names count as denials. Workspace `onlyBuiltDependencies` takes precedence over its manifest setting
+when `allowBuilds` is absent. Malformed build policy leaves its count unknown.
 If Changes is unavailable, the diagnostic uses its smaller fixed-file summary. Neither path proves
 that every install follows those files. Pnpm policy cannot cover npm, npx, Python, or arbitrary scripts.
 Revision-specific dependency changes appear in [Changes](../diff-rendering/changes-pane.md#the-file-list).

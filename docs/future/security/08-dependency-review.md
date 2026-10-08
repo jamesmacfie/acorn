@@ -1,5 +1,19 @@
 # Phase 08: explain dependency and install-policy changes
 
+## Final correctness note: October 9, 2026
+
+Pnpm importer versions now resolve ordinary and scoped `name@version` coordinates as well as alias
+coordinates. Matching package records and peer snapshots are both direct, while a missing non-link
+resolution or peer snapshot makes coverage partial. Malformed importer entries are partial instead of silently becoming
+unknown specifiers. Static policy counts only `allowBuilds: true` as approval, combines `false` entries
+with explicit ignored-build names as denials, and reads workspace `onlyBuiltDependencies` before a
+manifest fallback. Invalid build settings yield unknown counts with an interpretation limit.
+
+Evidence: dependency parser 24 focused tests passed, including ordinary and scoped pnpm versions,
+missing and malformed importer entries, true/false/invalid build maps, workspace build lists, and
+the repository-sized pnpm lock. Affected TypeScript, scoped lint, architecture docs, and Node build
+checks are recorded with this follow-up commit. No metadata fetch or package manager was run.
+
 ## Follow-up completion note: October 9, 2026
 
 Status: implemented on the Phase 08 branch after the coordinator's correctness review. Analyzer

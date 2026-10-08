@@ -246,14 +246,22 @@ function parsePnpm(out: Parsed, lock: Record<string, unknown>) {
     out.importers.add(importer === '.' ? 'package.json' : `${importer}/package.json`)
     for (const group of ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies']) {
       for (const [name, entry] of Object.entries(record(record(raw)[group]))) {
+        if (!entry || typeof entry !== 'object' || Array.isArray(entry)) throw new Error('invalid pnpm importer dependency')
         const item = record(entry)
+        if (typeof item.specifier !== 'string' || !item.specifier || typeof item.version !== 'string' || !item.version) throw new Error('invalid pnpm importer specifier or version')
         const path = importer === '.' ? 'package.json' : `${importer}/package.json`
-        addDirect(out, `${path}:lock ${group}:${name}`, item.specifier ?? 'unknown')
-        addDirect(out, `${path}:resolved ${group}:${name}`, item.version ?? 'unknown')
-        if (typeof item.version === 'string') {
-          const resolved = out.resolutions.get(item.version) ?? out.resolutions.get(item.version.replace(/\(.+$/, ''))
-          if (resolved) resolved.direct = true
-        }
+        addDirect(out, `${path}:lock ${group}:${name}`, item.specifier)
+        addDirect(out, `${path}:resolved ${group}:${name}`, item.version)
+        if (/^(?:link:|workspace:)/.test(item.version)) continue
+        const coordinate = [`${name}@${item.version}`, item.version].find((candidate) =>
+          out.resolutions.has(candidate) || out.resolutions.has(candidate.replace(/\(.+$/, '')))
+        if (!coordinate) { out.limits.push(`${path}:${group}:${name}: lockfile resolution metadata is missing.`); continue }
+        const base = coordinate.replace(/\(.+$/, '')
+        if (coordinate !== base && !out.resolutions.has(coordinate)) out.limits.push(`${path}:${group}:${name}: peer snapshot is missing.`)
+        const packageEntry = out.resolutions.get(base)
+        const snapshot = out.resolutions.get(coordinate)
+        if (packageEntry) packageEntry.direct = true
+        if (snapshot) snapshot.direct = true
       }
     }
   }
@@ -482,12 +490,37 @@ export async function staticDependencyPolicy(root: string, signal?: AbortSignal)
   const age = workspace.minimumReleaseAge
   const releaseAgeMinutes = typeof age === 'number' && Number.isSafeInteger(age) && age >= 0 ? age : ageFromRc
   if (age !== undefined && !(typeof age === 'number' && Number.isSafeInteger(age) && age >= 0)) limits.push('pnpm minimumReleaseAge could not be interpreted.')
-  const builds = workspace.allowBuilds ?? pnpm.onlyBuiltDependencies
-  const buildApprovalCount = Array.isArray(builds) ? builds.length : builds && typeof builds === 'object' ? Object.keys(record(builds)).length : null
-  if (builds !== undefined && buildApprovalCount === null) limits.push('Build approvals could not be interpreted.')
+  const buildList = (value: unknown, label: string): Set<string> | null => {
+    if (!Array.isArray(value) || value.some((entry) => typeof entry !== 'string' || !entry)) {
+      limits.push(`${label} could not be interpreted.`)
+      return null
+    }
+    return new Set(value)
+  }
+  let approvals: Set<string> | null = null
+  let deniedByMap: Set<string> | null = null
+  if (workspace.allowBuilds !== undefined) {
+    const allowBuilds = workspace.allowBuilds
+    if (!allowBuilds || typeof allowBuilds !== 'object' || Array.isArray(allowBuilds)
+      || Object.values(record(allowBuilds)).some((value) => typeof value !== 'boolean')) {
+      limits.push('allowBuilds could not be interpreted.')
+    } else {
+      approvals = new Set(Object.entries(record(allowBuilds)).filter(([, allowed]) => allowed === true).map(([name]) => name))
+      deniedByMap = new Set(Object.entries(record(allowBuilds)).filter(([, allowed]) => allowed === false).map(([name]) => name))
+    }
+  } else if (workspace.onlyBuiltDependencies !== undefined) approvals = buildList(workspace.onlyBuiltDependencies, 'Workspace onlyBuiltDependencies')
+  else if (pnpm.onlyBuiltDependencies !== undefined) approvals = buildList(pnpm.onlyBuiltDependencies, 'Manifest onlyBuiltDependencies')
   const ignoredBuilds = workspace.ignoredBuiltDependencies ?? pnpm.ignoredBuiltDependencies
-  const buildIgnoreCount = Array.isArray(ignoredBuilds) ? ignoredBuilds.length : null
+  let denied = deniedByMap
+  if (ignoredBuilds !== undefined) {
+    const ignoredList = buildList(ignoredBuilds, 'ignoredBuiltDependencies')
+    denied = ignoredList && (workspace.allowBuilds === undefined || deniedByMap !== null)
+      ? new Set([...(denied ?? []), ...ignoredList]) : null
+  }
+  const buildApprovalCount = approvals?.size ?? null
+  const buildIgnoreCount = denied?.size ?? null
   const allowAllBuilds = typeof workspace.dangerouslyAllowAllBuilds === 'boolean' ? workspace.dangerouslyAllowAllBuilds : null
+  if (workspace.dangerouslyAllowAllBuilds !== undefined && allowAllBuilds === null) limits.push('dangerouslyAllowAllBuilds could not be interpreted.')
   const exceptions = workspace.minimumReleaseAgeExclude
   const releaseAgeExceptionCount = Array.isArray(exceptions) ? exceptions.length : null
   if (exceptions !== undefined && releaseAgeExceptionCount === null) limits.push('Release-age exceptions could not be interpreted.')

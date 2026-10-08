@@ -124,6 +124,69 @@ it('retains optional, workspace, alias, and peer resolution identities', async (
   expect(review.findings.some((item) => item.name.includes('local'))).toBe(false)
 })
 
+it('marks ordinary and scoped pnpm base and peer resolutions direct', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', dependencies: { normal: '^1', '@scope/named': '^1' } }))
+  const lock = (version: string) => `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      normal:\n        specifier: ^1\n        version: ${version}(peer@1)\n      '@scope/named':\n        specifier: ^1\n        version: ${version}(peer@1)\npackages:\n  normal@${version}:\n    resolution:\n      integrity: sha512-normal\n  '@scope/named@${version}':\n    resolution:\n      integrity: sha512-scoped\nsnapshots:\n  normal@${version}(peer@1): {}\n  '@scope/named@${version}(peer@1)': {}\n`
+  await put('pnpm-lock.yaml', lock('1.0.0'))
+  git('add', '.')
+  git('commit', '-qm', 'initial')
+  await put('pnpm-lock.yaml', lock('2.0.0'))
+  const review = await dependencyReview(root, 'unstaged')
+  for (const name of ['normal', '@scope/named']) {
+    expect(review.findings.some((finding) => finding.kind === 'direct' && finding.name === name && finding.before === '1.0.0')).toBe(true)
+    expect(review.findings.some((finding) => finding.kind === 'direct' && finding.name === name && finding.after === '2.0.0')).toBe(true)
+    expect(review.findings.some((finding) => finding.kind === 'transitive' && finding.name === name)).toBe(false)
+  }
+  expect(review.coverage).toBe('complete')
+})
+
+it('reports missing pnpm importer resolution metadata as partial', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', dependencies: { missing: '1.0.0' } }))
+  await put('pnpm-lock.yaml', "lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      missing:\n        specifier: 1.0.0\n        version: 1.0.0\n")
+  const review = await dependencyReview(root, 'unstaged')
+  expect(review.coverage).toBe('partial')
+  expect(review.limits.join(' ')).toContain('lockfile resolution metadata is missing')
+})
+
+it('reports a missing pnpm peer snapshot as partial', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', dependencies: { pkg: '1.0.0' } }))
+  await put('pnpm-lock.yaml', "lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      pkg:\n        specifier: 1.0.0\n        version: 1.0.0(peer@1)\npackages:\n  pkg@1.0.0:\n    resolution:\n      integrity: sha512-pkg\n")
+  const review = await dependencyReview(root, 'unstaged')
+  expect(review.coverage).toBe('partial')
+  expect(review.limits.join(' ')).toContain('peer snapshot is missing')
+})
+
+it.each(['bad', '{ specifier: 1.0.0 }', '{ specifier: 1.0.0, version: 9 }'])(
+  'marks malformed pnpm importer entry %s partial', async (entry) => {
+    await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', dependencies: { invalid: '1.0.0' } }))
+    await put('pnpm-lock.yaml', `lockfileVersion: '9.0'\nimporters:\n  .:\n    dependencies:\n      invalid: ${entry}\n`)
+    const review = await dependencyReview(root, 'unstaged')
+    expect(review.coverage).toBe('partial')
+    expect(review.limits.join(' ')).toContain('Lockfile is malformed')
+  },
+)
+
+it('counts only true allowBuilds entries and combines explicit denials', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0' }))
+  await put('pnpm-workspace.yaml', 'allowBuilds:\n  one: true\n  two: false\n  three: true\nignoredBuiltDependencies:\n  - two\n  - four\n')
+  expect(await staticDependencyPolicy(root)).toMatchObject({ buildApprovalCount: 2, buildIgnoreCount: 2 })
+})
+
+it('keeps malformed build policy unknown even when a manifest fallback exists', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', pnpm: { onlyBuiltDependencies: ['fallback'] } }))
+  await put('pnpm-workspace.yaml', 'allowBuilds:\n  invalid: yes\n')
+  const policy = await staticDependencyPolicy(root)
+  expect(policy.buildApprovalCount).toBeNull()
+  expect(policy.buildIgnoreCount).toBeNull()
+  expect(policy.limits.join(' ')).toContain('allowBuilds could not be interpreted')
+})
+
+it('uses workspace onlyBuiltDependencies before manifest build approvals', async () => {
+  await put('package.json', JSON.stringify({ packageManager: 'pnpm@11.0.0', pnpm: { onlyBuiltDependencies: ['manifest'] } }))
+  await put('pnpm-workspace.yaml', 'onlyBuiltDependencies:\n  - one\n  - two\n  - two\n')
+  expect(await staticDependencyPolicy(root)).toMatchObject({ buildApprovalCount: 2, buildIgnoreCount: null })
+})
+
 it('detects a changed existing lifecycle command and policy edits beyond the display cap', async () => {
   const make = (command: string, last: string) => JSON.stringify({ packageManager: 'pnpm@11.0.0', scripts: { postinstall: command }, pnpm: { overrides: Object.fromEntries(Array.from({ length: 120 }, (_, i) => [`pkg-${i}`, i === 119 ? last : '1'])) } })
   await put('package.json', make('node harmless.js', '1'))
@@ -187,6 +250,7 @@ it('accepts the repository-sized supported pnpm lock within structural bounds', 
   await copyFile(resolve(import.meta.dirname, '../../../..', 'pnpm-lock.yaml'), join(root, 'pnpm-lock.yaml'))
   const review = await dependencyReview(root, 'unstaged')
   expect(review.limits.join(' ')).not.toContain('Lockfile is malformed')
+  expect(review.limits.join(' ')).not.toContain('lockfile resolution metadata is missing')
 })
 
 it('refuses a mixed index generation while reading immutable blobs', async () => {
