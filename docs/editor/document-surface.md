@@ -19,6 +19,8 @@ rectangle. The plugin declares in its manifest, and serves from its own routes:
 The host owns, so the plugin can't get them wrong:
 
 - The editor instance, its theme, and its appearance subscription.
+- Find and replace ([find in a file](../editor.md#find-in-a-file)). A replacement is an edit like
+  any other, so it autosaves and undoes like one.
 - Dirty state, autosave, the save chord (`⌘S`), the unsaved-changes guard, and the flush when the
   surface unmounts ([saving and recovery](./save-and-recovery.md)).
 - View state across tab switches and remounts, and evicting it when a task is archived or the Node
@@ -115,7 +117,8 @@ itself, because a host that can't draw them would carry them.
 `@acorn/plugin-api/ui/editor` exports `mountEmbeddedEditor(element, { doc, languageId, readOnly,
 onChange })` for this. It returns `read`, `write`, and `destroy`, and the caller keeps the text. The
 element comes from a `Rectangle kind="editor"`, the same box the document surface uses, so getting the
-keys in and out works the same. The grammar arrives after the first paint.
+keys in and out works the same. The grammar arrives after the first paint. The box has the shared
+find panel, and a replacement reaches `onChange` like typing does.
 
 The terminal client aliases that entrypoint (`apps/tui/src/kit/editor.ts`), so there
 `mountEmbeddedEditor` does nothing and the rectangle keeps what it drew for cells. Workflows draws a

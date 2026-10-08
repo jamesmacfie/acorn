@@ -2,7 +2,7 @@
 
 Date: October 7, 2026
 
-Status: Proposed product requirements. Implementation has not started.
+Status: Shipped October 8, 2026. [Editor](../editor.md#find-in-a-file) owns the shipped behavior.
 
 This PRD defines find and replace controls built from Acorn's UI components for its graphical text
 editors. Use it to implement and verify the shared panel without changing document ownership or saving.

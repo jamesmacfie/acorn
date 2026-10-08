@@ -28,6 +28,7 @@ import {
 } from './documentModel'
 import { documentCustody, recoverDocumentCustody, type DocumentCustody } from './documentCustody'
 import { languageFor, shouldHighlightDocument } from './language'
+import { editorSearch } from './search'
 import { editorTheme, watchEditorTheme } from './theme'
 import { applyViewState, captureViewState, type EditorViewState } from './viewState'
 import { saveFile } from '../../infra/platform'
@@ -299,6 +300,7 @@ export default function DocumentSurface(props: DocumentSurfaceProps) {
       const autocomplete = completions()
       const extensions: Extension[] = [
           basicSetup,
+          editorSearch(),
           editorTheme(),
           grammar,
           // Highest precedence, so a surface action wins over whatever the editor would have done with

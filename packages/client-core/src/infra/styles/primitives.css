@@ -1553,8 +1553,12 @@ button.ui-chip:hover { background: var(--bg-hover); border-color: var(--accent);
 
 /* ── FindBar ────────────────────────────────────────────────────────────────────────────────
    Toolbar geometry plus the search semantics. */
-.ui-findbar-search { flex: 1; min-width: 0; display: flex; }
+/* The bar wraps rather than clipping in a narrow pane: the field keeps a usable width and the
+   buttons after it move to a second line. */
+.ui-toolbar:has(> .ui-findbar-search) { flex-wrap: wrap; row-gap: var(--space-2); }
+.ui-findbar-search { flex: 1 1 10rem; min-width: 0; display: flex; }
 .ui-findbar-count { flex: none; color: var(--text-muted); font-variant-numeric: var(--tabular); white-space: nowrap; }
+.ui-findbar-count[data-error] { color: var(--danger); }
 .ui-findbar-status { flex: none; font-size: var(--fs-xs); white-space: nowrap; }
 /* One highlight vocabulary, replacing three. Callers put these on their own <mark> elements. */
 .ui-find-mark,
