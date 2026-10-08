@@ -2,6 +2,7 @@ import { Hono } from 'hono'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { AppEnv } from '@acorn/plugin-api/testkit'
 import type { Env } from '@acorn/plugin-api/testkit'
+import { ProviderOperationError } from '@acorn/plugin-api/node'
 import { managedAgents, setManagedAgentsBridge, type ManagedAgentsBridge } from './managed'
 
 const req = (url: string, method = 'GET', body?: unknown) =>
@@ -43,7 +44,7 @@ const METHODS = [
   'referenceContext',
   'setGoal', 'resumeGoal',
   'implementCodexPlan',
-  'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
+  'patchSession', 'fork', 'compact', 'regenerateTitle', 'summarizeSession', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow', 'sessionMcp', 'setSessionMcp',
 ] as const
 
@@ -69,6 +70,7 @@ const executionControls = [
   ['POST', '/sessions/s1/fork', {}, 'fork'],
   ['POST', '/sessions/s1/compact', undefined, 'compact'],
   ['POST', '/sessions/s1/regenerate-title', undefined, 'regenerateTitle'],
+  ['POST', '/sessions/s1/summarize', { backendId: 'harness:codex', context: 'For a handoff' }, 'summarizeSession'],
   ['POST', '/sessions/s1/handoff-terminal', undefined, 'handoffToTerminal'],
   ['POST', '/sessions/s1/resume-managed', undefined, 'resumeManaged'],
   ['POST', '/sessions/s1/verify-imported-resume', undefined, 'verifyImportedResume'],
@@ -175,6 +177,41 @@ describe('session reference context', () => {
     expect((await asTask1().fetch(req(path('s1')), {} as Env)).status).toBe(403)
     expect(referenceContext).toHaveBeenCalledTimes(1)
   })
+})
+
+describe('session summary requests', () => {
+  afterEach(() => setManagedAgentsBridge(null))
+
+  it('reports a provider failure without exposing upstream response details', async () => {
+    setManagedAgentsBridge(fake({ summarizeSession: async () => {
+      throw new ProviderOperationError('provider_needs_auth', 401)
+    } }))
+    const response = await authed().fetch(req('/api/sessions/s1/summarize', 'POST', { backendId: 'harness:codex' }), {} as Env)
+    expect(response.status).toBe(401)
+    expect(await response.json()).toMatchObject({ error: { code: 'provider_needs_auth' } })
+  })
+
+  it('uses the device identity and passes the chosen model and additional context', async () => {
+    const summarizeSession = vi.fn(async () => ({ markdown: '# Summary', truncated: false, throughSeq: 42 }))
+    setManagedAgentsBridge(fake({ summarizeSession }))
+    const response = await authed().fetch(req('/api/sessions/s1/summarize', 'POST', {
+      backendId: 'harness:codex', modelId: 'fast', context: 'For the next developer', userId: 'other',
+    }), {} as Env)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toEqual({ markdown: '# Summary', truncated: false, throughSeq: 42 })
+    expect(summarizeSession).toHaveBeenCalledWith('s1', 'james', {
+      backendId: 'harness:codex', modelId: 'fast', context: 'For the next developer',
+    }, expect.any(AbortSignal))
+  })
+
+  it.each([{ backendId: 'invalid' }, { backendId: 'harness:codex', context: 'x'.repeat(10_001) }])(
+    'refuses invalid or oversized input before spending model usage', async (body) => {
+      const summarizeSession = vi.fn()
+      setManagedAgentsBridge(fake({ summarizeSession }))
+      expect((await authed().fetch(req('/api/sessions/s1/summarize', 'POST', body), {} as Env)).status).toBe(400)
+      expect(summarizeSession).not.toHaveBeenCalled()
+    },
+  )
 })
 
 describe('a task-scoped credential is confined to its own agent sessions', () => {

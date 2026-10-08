@@ -24,6 +24,7 @@ import { managedAgentApi } from './managedClient'
 import { agentPricingOptions } from '../pricingClient'
 import { emptyAgentPricingPreferences } from '../../shared/pricing'
 import { sameSessionHeaderProps, sessionHeaderContext } from './sessionHeaderContext'
+import SessionSummaryModal from './SessionSummaryModal'
 
 // The Agent pane's `detail` region: the open session's header, and the conversation under it.
 //
@@ -242,6 +243,9 @@ function AgentSessionDialogs(props: { task: Task; model: AgentPaneModel }) {
   const model = props.model
   return (
     <>
+      <Show when={model.dialog()?.kind === 'summary' ? model.dialog()!.session : undefined} keyed>
+        {(session) => <SessionSummaryModal session={session} onDismiss={() => model.setDialog(null)} />}
+      </Show>
       <Show when={model.dialog()?.kind === 'rename'}>
         <Modal onDismiss={() => model.setDialog(null)} title="Rename session" size="sm">
           <Modal.Body>
