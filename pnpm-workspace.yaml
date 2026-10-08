@@ -3,6 +3,10 @@ packages:
   - "packages/*"
   - "plugins/*"
   - "tools/*"
+# Install a version only after it has been on the registry for seven days. A poisoned release is usually
+# found and pulled within that time, and agents add packages here without a person picking the version.
+# To take an urgent security fix sooner, name the package in minimumReleaseAgeExclude.
+minimumReleaseAge: 10080
 allowBuilds:
   esbuild: true
   node-pty: true
