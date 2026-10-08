@@ -138,6 +138,50 @@ describe('durable queue admission', () => {
     expect(sends).toHaveLength(0)
   })
 
+  it('cancels an active turn even when the provider reports reconnecting', async () => {
+    const cancel = vi.fn(async () => {})
+    const start = launch
+    launch = async (options) => ({ ...await start(options), cancel })
+    const item = await session(), turn = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+    await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+
+    await runtime.cancelTurn(item.id)
+
+    expect(cancel).toHaveBeenCalledOnce()
+    expect((await runtime.store.turn(turn.id))?.status).toBe('cancelled')
+  })
+
+  it.each(['disconnect', 'incorrect status'] as const)('stops recovery after %s and resumes when another turn is sent', async (reason) => {
+    const item = await session(), turn = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id]))
+    vi.useFakeTimers()
+    try {
+      if (reason === 'disconnect') {
+        await starts[0]!.onClosed(new Error('Synthetic disconnect'))
+      } else {
+        await starts[0]!.onEvent({ type: 'turn_completed', stopReason: 'end_turn' })
+        await starts[0]!.onEvent({ type: 'session_state', state: 'reconnecting' })
+      }
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('reconnecting')
+      expect((await runtime.store.turn(turn.id))?.status).toBe(reason === 'disconnect' ? 'interrupted' : 'completed')
+
+      await runtime.cancelTurn(item.id)
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+      await vi.advanceTimersByTimeAsync(6_000)
+      expect(starts).toHaveLength(1)
+      expect(stops).toContain(item.id)
+      await starts[0]!.onEvent({ type: 'session_state', state: 'ready' })
+      expect((await runtime.store.requireSession(item.id)).runtimeState).toBe('stopped')
+    } finally {
+      vi.useRealTimers()
+    }
+
+    const next = await enqueue(item.id)
+    await vi.waitFor(() => expect(sends).toEqual([turn.id, next.id]))
+    expect(starts).toHaveLength(2)
+  })
+
   it('scans again for a public enqueue that arrives during a held workspace read', async () => {
     const workspace = deferred<string>()
     vi.mocked(ctx.core.tasks.workspaceId).mockReturnValueOnce(workspace.promise)
