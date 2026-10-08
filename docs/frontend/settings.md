@@ -53,7 +53,7 @@ It starts on the active Node each time Settings opens and never changes `activeN
 remount the shell on another Node's cache. Switching remounts the page, so nothing from one Node shows
 under another, and a form with changes asks first. Installed, Security and backup, Audit log,
 Schedules, Run history, Telemetry, and Storage and memory follow it. Storage and memory passes the
-switcher's Node to each section a plugin draws in its `core:storage` point. Every other Node page reads
+switcher's Node to each section a plugin draws in its `core:storage` point, and Security and backup does the same for `core:security`. Every other Node page reads
 the active Node, because a compiled page uses the ambient API client and a loaded frame is pinned to
 the active Node, and its chip names that Node as text.
 

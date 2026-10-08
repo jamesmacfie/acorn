@@ -1,7 +1,10 @@
 import { createEffect, createResource, createSignal, on, Show } from 'solid-js'
 import type { NodeSecurityPosture } from '@acorn/protocol/api.ts'
+import { CORE_SECURITY_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { nodes } from '../../infra/node/fleet'
 import { createNodeBackup, nodeSecurityPosture, suggestedBackupPath } from '../../infra/node/nodeSecurity'
+import { extensionPointRegistry } from '../../host/registries/extensionPoints/extensionPoints'
+import { Slot } from '../../host/tree/Slot'
 import { Alert, Button, Input } from '../../kit/components/primitives'
 import { Facts } from '../../kit/components/content/Facts'
 import { Text } from '../../kit/components/content/Text'
@@ -15,6 +18,18 @@ import './settings.css'
 //
 // Per node, following the settings header's node switcher: "is the disk encrypted" isn't a property a
 // fleet has.
+//
+// A plugin that runs a security check on the node draws its switch through CORE_SECURITY_POINT, the way
+// Storage and memory takes plugin sections, so core never calls a plugin's route.
+
+extensionPointRegistry.register({
+  id: CORE_SECURITY_POINT,
+  ownerId: 'core',
+  label: 'Security and backup',
+  kind: 'remote',
+  mode: 'stack',
+  max: 4,
+})
 
 export default function SecuritySettings(props: { nodeId: string | null }) {
   const nodeId = () => props.nodeId
@@ -85,6 +100,8 @@ export default function SecuritySettings(props: { nodeId: string | null }) {
           items={[{ label: 'Full-disk encryption', value: posture() ? encryption(posture()!) : posture.loading ? 'Checking…' : 'Unknown' }]}
         />
       </SettingsSection>
+
+      <Slot point={CORE_SECURITY_POINT} props={() => ({ nodeId: nodeId() })} />
 
       <SettingsSection
         id="backup"

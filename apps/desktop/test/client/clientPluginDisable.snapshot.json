@@ -79,7 +79,7 @@
       "github:summary-badges"
     ],
     "extensions": [
-      "agents.storage",
+      "agents.storage",       "agents.security",
       "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",

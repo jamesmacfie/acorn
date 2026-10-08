@@ -66,6 +66,28 @@ The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).
 
+## Hidden characters in instruction files
+
+Zero-width, text-direction, and Unicode tag characters draw as nothing in an editor or a diff. A line
+in `CLAUDE.md`, `AGENTS.md`, or a skill can carry instructions that nobody reviewing it saw, and a
+harness reads those files itself, with no tool call for a hook to see.
+
+**Check instruction files before each agent turn**, under Settings > Security and backup, is off by
+default. When it's on, the agents plugin's own `agents:before-send` handler reads the root
+instruction files, the repo's `.claude/skills`, `.agents/skills`, and `.codex/skills` folders, and
+every plugin skill a session may load. If any holds a hidden character, it refuses the turn and names
+the file and line. The code is in `plugins/agents/src/server/sessions/instructionCheck.ts`.
+
+The switch is the `checkInstructionFiles` field of the [agent defaults](./managed-agents/defaults.md),
+whose write route takes only a device, so an agent can't turn it off. The check has these limits:
+
+- It covers turns that acorn sends: managed chats, workflow steps, and delegated agents. Text you type
+  into a harness in a terminal doesn't pass `agents:before-send`.
+- It doesn't read nested `CLAUDE.md` or `AGENTS.md` files, which a harness loads later when it works
+  in that folder, or a file that changes partway through a turn.
+- It reads at most 500 files of up to 1 MB each, and skips binary files. A failure, or the hook's
+  5-second timeout, lets the turn through.
+
 ## Pages
 
 <a id="transport-and-auth"></a>

@@ -5,7 +5,7 @@
 // exist.
 import { lazy } from 'solid-js'
 import type { ClientPlugin } from '@acorn/plugin-api/client'
-import { CORE_PLUGIN_PAGE_POINT, CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
+import { CORE_PLUGIN_PAGE_POINT, CORE_SECURITY_POINT, CORE_STORAGE_POINT } from '@acorn/protocol/extensionPoints.ts'
 import { AGENTS_CONVERSATION } from '../contract/conversation'
 import { AGENTS_INLINE_DIFF } from '../contract/inlineDiffClient.ts'
 import { isStale, reportPatches } from './inlineDiff/patchStatus.ts'
@@ -36,6 +36,7 @@ const AgentSessionDefaultsSettings = lazy(() => import('./settings/AgentSessionD
 const AgentMcpServersSettings = lazy(() => import('./settings/AgentMcpServersSettings'))
 const CustomAgentsSettings = lazy(() => import('./settings/CustomAgentsSettings'))
 const AgentStorageSection = lazy(() => import('./settings/AgentStorageSection'))
+const AgentSecuritySection = lazy(() => import('./settings/AgentSecuritySection'))
 const LoopCoverageSection = lazy(() => import('./settings/LoopCoverageSection'))
 
 export const agentsClientPlugin: ClientPlugin = {
@@ -159,6 +160,13 @@ export const agentsClientPlugin: ClientPlugin = {
       id: 'agents.storage', point: CORE_STORAGE_POINT, label: 'Running agents', order: 10,
       requires: { plugin: 'agents' },
       component: AgentStorageSection,
+    })
+    // The instruction file check's switch, on core's Settings > Security and backup page
+    // (./settings/AgentSecuritySection.tsx).
+    ctx.extensions.register({
+      id: 'agents.security', point: CORE_SECURITY_POINT, label: 'Agent instruction files', order: 10,
+      requires: { plugin: 'agents' },
+      component: AgentSecuritySection,
     })
     // Which harnesses a plugin's tool hooks reach, on that plugin's own page (./settings/LoopCoverageSection.tsx).
     ctx.extensions.register({

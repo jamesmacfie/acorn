@@ -155,6 +155,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
       })
+      // This plugin's own handler on it: the instruction file check, off until the owner turns it on in
+      // Settings > Security and backup. Loaded on first use, to stay inside the service boot budget.
+      ctx.hooks.handle('agents:before-send', {
+        id: 'instruction-check',
+        mode: 'veto',
+        run: async (payload) => (await import('../server/sessions/instructionCheck')).checkBeforeSend(core, dataDir, payload.taskId as string),
+      })
       // The second: a harness permission request, before anyone sees it. Observe and veto only
       // (../server/sessions/permissionPolicy.ts).
       ctx.hooks.declare(BEFORE_PERMISSION_HOOK)
