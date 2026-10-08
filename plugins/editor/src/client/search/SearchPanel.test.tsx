@@ -125,7 +125,7 @@ it('aborts work when scope or filters change and ignores late results', async ()
   expect(requests).toHaveLength(1)
   await vi.waitFor(() => expect(requests).toHaveLength(2))
   expect(requests[1].opts.folder).toBe('src')
-  const details = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Search details')!
+  const details = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Search details')!
   details.click()
   const include = host.querySelectorAll<HTMLInputElement>('input')[1]
   include.value = '*.tsx'
@@ -151,7 +151,7 @@ it('debounces clearing a folder scope and sends the task root after aborting', a
   dispose = render(() => <QueryClientProvider client={new QueryClient()}><SearchPanel taskId={task} active /></QueryClientProvider>, host)
   input('needle')
   await vi.waitFor(() => expect(requests).toHaveLength(1))
-  const clear = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Clear folder scope')!
+  const clear = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Clear folder scope')!
   clear.click()
   expect(requests[0].signal.aborted).toBe(true)
   expect(requests).toHaveLength(1)

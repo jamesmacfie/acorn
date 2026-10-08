@@ -57,6 +57,7 @@
       "agent-limits",
       "docker",
       "docker.project",
+      "editor",
       "terminal",
       "workflows"
     ],
@@ -232,6 +233,9 @@
         "editor.files.open",
         "editor.navigation.go-to-line",
         "editor.search.open"
+      ],
+      "settingsPages": [
+        "editor"
       ],
       "persistedStateSlices": [
         "editor.open-files"

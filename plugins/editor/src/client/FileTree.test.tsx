@@ -114,7 +114,7 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   vi.mocked(actions.create).mockResolvedValue('src/new.txt')
   mount()
   const trigger = await vi.waitFor(() => {
-    const element = [...host.querySelectorAll('button')].find((button) => button.textContent === 'New…')
+    const element = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'New file or folder')
     if (!element) throw new Error('root action not loaded')
     return element
   })
@@ -131,12 +131,16 @@ it('keeps the captured root target and uses an explicit destination folder', asy
     return element
   })
   expect(release).not.toHaveBeenCalled()
+  expect(dialog.textContent).toContain('Create file')
+  expect(dialog.textContent).toContain('File name')
+  expect(dialog.textContent).toContain('Destination folder (optional)')
+  expect(dialog.textContent).toContain('Leave blank to create in the root.')
   const [name, folder] = [...dialog.querySelectorAll('input')]
   for (const [input, value] of [[name, 'new.txt'], [folder, 'src']] as const) {
     input!.value = value
     input!.dispatchEvent(new Event('input', { bubbles: true }))
   }
-  const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent === 'Confirm')!
+  const confirm = [...dialog.querySelectorAll('button')].find((button) => button.textContent?.trim() === 'Create file')!
   confirm.click()
   await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
@@ -152,6 +156,7 @@ const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () =>
   dispose = render(() => (
     <QueryClientProvider client={queryClient}><FileTree
       taskId={options?.task?.() ?? taskId}
+      taskTitle="Editor task"
       fileStatus={() => options?.fileStatus ?? { files: new Map(), folders: new Map() }}
       statusStale={() => false}
       onStatusChanged={() => {}}
@@ -176,7 +181,7 @@ describe('the editor file tree', () => {
     const [openPath, setOpenPath] = createSignal<string | null>('build/output.ts')
     mount(vi.fn(), { hideIgnored: true, reveal, openPath })
     await vi.waitFor(() => expect(host.textContent).toContain('source.ts'))
-    expect([...host.querySelectorAll('button')].find((button) => button.textContent === 'Show ignored files')?.getAttribute('aria-pressed')).toBe('false')
+    expect([...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Show ignored files')?.getAttribute('aria-pressed')).toBe('false')
     expect(ignored).toHaveBeenCalled()
     await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
     expect(host.textContent).not.toContain('output.ts')
@@ -307,7 +312,7 @@ it('does not finish a cached-listing reveal after Collapse all', async () => {
   mount(vi.fn(), { reveal, onRevealed })
   await vi.waitFor(() => expect(host.textContent).toContain('app.ts'))
   setReveal({ path: 'src/app.ts', revision: 1 })
-  const collapse = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Collapse all folders')!
+  const collapse = [...host.querySelectorAll('button')].find((button) => button.getAttribute('aria-label') === 'Collapse all folders')!
   collapse.click()
   await Promise.resolve(); await Promise.resolve()
   expect(onRevealed).not.toHaveBeenCalled()

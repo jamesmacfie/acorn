@@ -2,7 +2,7 @@ import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, ToggleButton, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
+import { Alert, Badge, Button, copyText, Field, IconButton, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { editorApi, type EditorEntry } from './editorClient'
 import type { FileTarget, TrashAvailability } from '../contract/api'
@@ -20,6 +20,7 @@ const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok'
 
 export default function FileTree(props: {
   taskId: string
+  taskTitle: string
   fileStatus: () => FileStatusProjection
   statusStale: () => boolean
   onStatusChanged: () => void
@@ -357,22 +358,22 @@ export default function FileTree(props: {
   return (
     <Stack grow>
       <Toolbar size="sm" ariaLabel="Tree controls">
-        <Button onPress={collapseAll}>Collapse all folders</Button>
-        <Button disabled={!props.openPath} onPress={props.onRevealActive}>Reveal active file</Button>
+        <IconButton icon="fold-vertical" label="Collapse all folders" onPress={collapseAll} />
+        <IconButton icon="locate-fixed" label="Reveal active file" disabled={!props.openPath} onPress={props.onRevealActive} />
+        <IconButton icon="eye" label="Show ignored files" tipSub=".git and node_modules remain excluded."
+          pressed={showIgnored()} onPress={() => { void saveEditorShowIgnored(queryClient, !showIgnored()) }} />
+        {rootEntry() && (HOST !== 'tui' || !dialog() && (menuPath() === null || menuPath() === '')) && <Menu ariaLabel="Worktree actions" open={() => menuPath() === ''}
+          onBeforeOpen={() => prepareMenu(rootEntry()!)} onOpenChange={(open) => {
+          if (open) openMenu(rootEntry()!)
+          else dismissMenu()
+        }} trigger={({ toggle }) => <IconButton icon="plus" label="New file or folder" onPress={toggle} />}>
+          {menuItems}
+        </Menu>}
       </Toolbar>
       {actionError() && <Alert tone="danger">{actionError()}</Alert>}
       {props.statusStale() && <Alert tone="warn">Git status may be stale. Files remain available.</Alert>}
-      <ToggleButton variant="bare" size="sm" tip="Show ignored files. .git and node_modules remain excluded." pressed={showIgnored()}
-        onPressedChange={(enabled) => { void saveEditorShowIgnored(queryClient, enabled) }}>Show ignored files</ToggleButton>
       {Array.from(ignoreByDir()).filter(([, info]) => info.error).map(([dir, info]) =>
         <Alert tone="warn">Ignore filtering unavailable for {dir || 'worktree'}: {info.error}. All entries remain visible.</Alert>)}
-      {rootEntry() && (HOST !== 'tui' || !dialog() && (menuPath() === null || menuPath() === '')) && <Menu ariaLabel="Worktree actions" open={() => menuPath() === ''}
-        onBeforeOpen={() => prepareMenu(rootEntry()!)} onOpenChange={(open) => {
-        if (open) openMenu(rootEntry()!)
-        else dismissMenu()
-      }} trigger={({ toggle }) => <Button onPress={toggle}>New…</Button>}>
-        {menuItems}
-      </Menu>}
       <Only hosts={['tui']}>
         {menuPath() && !dialog() && <Menu ariaLabel="Entry actions" open={() => !!menuPath() && !dialog()}
           onOpenChange={(open) => { if (!open) dismissMenu() }}
@@ -381,16 +382,23 @@ export default function FileTree(props: {
         </Menu>}
       </Only>
       {Array.from(errors()).map(([dir, message]) => <Alert tone="danger">{dir || 'Worktree'}: {message} <Button onPress={() => void load(dir, true)}>Retry</Button></Alert>)}
-    {dialog() && armed() && !inlinePath() && <Modal title={dialog() === 'trash' ? 'Move to trash' : dialog() === 'rename' ? 'Rename entry' : 'Create entry'}
+    {dialog() && armed() && !inlinePath() && <Modal title={dialog() === 'trash' ? 'Move to trash' : dialog() === 'rename' ? 'Rename entry' : dialog() === 'create-folder' ? 'Create folder' : 'Create file'}
       role={dialog() === 'trash' ? 'alertdialog' : 'dialog'} onDismiss={finish}>
       <Modal.Body>
         {dialog() === 'trash'
-          ? <Text wrap>Move {armed()!.target.path} from task {taskId} to this Node’s trash? {armed()!.target.kind === 'folder' ? 'The folder and its descendants are affected.' : ''}</Text>
-          : <>
-            <Input label="Name" value={name()} onInput={setName} onSubmit={(value) => void act(false, value)} />
+          ? <Text wrap>Move {armed()!.target.path} from task “{props.taskTitle}” to this Node’s trash? {armed()!.target.kind === 'folder' ? 'The folder and its descendants are affected.' : ''}</Text>
+          : <Stack gap="stack">
+            <Text wrap>{dialog() === 'rename' ? 'Rename' : 'Create in'} {armed()!.target.path || 'the task root'}.</Text>
+            <Field label={dialog() === 'create-file' ? 'File name' : dialog() === 'create-folder' ? 'Folder name' : 'Name'}
+              hint="Enter a name without folder separators.">
+              <Input autofocus placeholder={dialog() === 'create-folder' ? 'e.g. components' : 'e.g. notes.md'}
+                value={name()} onInput={setName} onSubmit={(value) => void act(false, value)} />
+            </Field>
             {(dialog() === 'create-file' || dialog() === 'create-folder') && !armed()!.target.path
-              && <Input label="Destination folder (relative to root)" value={destinationFolder()} onInput={setDestinationFolder} />}
-          </>}
+              && <Field label="Destination folder (optional)" hint="Relative to the task root. Leave blank to create in the root. The folder must already exist.">
+                <Input placeholder="e.g. src/components" value={destinationFolder()} onInput={setDestinationFolder} />
+              </Field>}
+          </Stack>}
         {actionError() && <Alert tone="danger">{actionError()}</Alert>}
       </Modal.Body>
       <Modal.Actions>
@@ -398,7 +406,9 @@ export default function FileTree(props: {
         {dialog() === 'trash' ? <>
           {!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act()}>Move to trash</Button>}
           {!!armed()!.dirty().length && <Button disabled={busy()} onPress={() => void act(true)}>Save and move to trash</Button>}
-        </> : <Button disabled={busy()} onPress={() => void act()}>Confirm</Button>}
+        </> : <Button variant="solid" disabled={busy() || !name().trim()} onPress={() => void act()}>
+          {dialog() === 'rename' ? 'Rename' : dialog() === 'create-folder' ? 'Create folder' : 'Create file'}
+        </Button>}
       </Modal.Actions>
     </Modal>}
     {(HOST !== 'tui' || !dialog() && menuPath() === null) && <Show when={treeId()} keyed>{(id) => <Rows
