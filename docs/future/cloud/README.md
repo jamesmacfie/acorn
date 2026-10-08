@@ -63,6 +63,8 @@ These are the biggest unanswered questions. Each is listed in full in the phase 
   unknown on the client side ([phase 5](./phases/05-cloud-task.md)).
 - How egress is enforced on a provider VM that may not filter it
   ([phase 7](./phases/07-isolation.md)).
+- How an agent session continues after its worker is gone, so a cloud task keeps the agent's
+  memory of the conversation the way a local one does ([phase 6](./phases/06-archive.md)).
 - Where admins edit plugin policy, cloud connections, and secrets, given that the web app never
   talks to a Node ([phase 8](./phases/08-plugins.md#open-questions)).
 - Where the per-team archive key lives ([phase 6](./phases/06-archive.md)).

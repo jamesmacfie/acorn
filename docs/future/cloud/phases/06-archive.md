@@ -29,6 +29,9 @@ from the saved work. Still internal.
 - Verify-then-destroy.
 - Restore Nodes, credential rotation, and read-only mode.
 - Continuing from a branch, a new snapshot, or an archived worktree.
+- Continuing an agent session on a new attempt from its harness session files.
+- Measuring pause and resume on the chosen provider, and deciding whether workers pause before
+  they archive ([projects and tasks](../projects-and-tasks.md#pause-before-archiving)).
 - Deleting archives, and storage accounting.
 
 ## Out of scope
@@ -93,9 +96,15 @@ terminal, and run an agent, both from the UI and with a direct API call. Each is
 attempt starts from the pushed branch or the archived worktree. Its history appends to the same
 logical task, and the client shows both attempts in order.
 
+**Checkpoint 9: the agent remembers.** Run a Claude session and a Codex session on a cloud task, and
+let the worker archive. Reply in each session. A new attempt starts, the worktree is at the same
+path, and each agent answers with the earlier conversation in context. Break one session's files
+on purpose: the transcript says resume failed and offers a fresh session with the old transcript
+attached.
+
 ### 6. Deletion and storage
 
-**Checkpoint 9: delete means gone.** Delete an archived task. Its archive objects disappear from the
+**Checkpoint 10: delete means gone.** Delete an archived task. Its archive objects disappear from the
 bucket, and the team Node's audit trail records the deletion. Storage totals drop.
 
 Remove the phase 5 **Stop and delete** path, or keep it only as an explicit **Discard without
@@ -125,9 +134,14 @@ archiving**.
 6. What are the default retention rules for archives and snapshots, and does the first release need
    any automatic deletion?
 7. Should **Continue** restore the whole root, so plugin state carries forward, or only the worktree?
+   Either way, it restores the harness session files, or the agent forgets the conversation.
 8. Which agent harnesses can checkpoint and resume a pending question, so a waiting worker can be
-   archived?
+   archived? A paused worker sidesteps this until it archives.
 9. Are logs part of the archive, given they can hold output an agent printed?
+10. Does a worker pause before it archives? How long does a paused worker wait before archiving, and
+    how often does resume fail on the chosen provider?
+11. Does a harness resume a session restored on a different machine at the same path? Test Claude
+    Code and Codex, including a session that used subagents.
 
 ## Evidence
 

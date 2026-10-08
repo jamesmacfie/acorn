@@ -25,6 +25,7 @@ blanks credentials, and restoring it is a manual step into a fresh root. A cloud
 | `core.sqlite` and `plugins/*.sqlite` | Yes | Online backup API, after the drain. |
 | `plugins/<id>/` packages | Yes | So restore does not depend on a registry. |
 | `worktrees/` for the task | Yes | Including `.git` objects the remote does not have. |
+| Harness session files | Yes | Claude Code's and Codex's own session files from the worker's home folder, so **Continue** can resume a session. See [projects and tasks](./projects-and-tasks.md#continuing-a-finished-task). |
 | `blobs/` | Non-refetchable only | Artifacts, attachments, and patches. |
 | `node.json` | Yes | The Node ID is rewritten on restore. |
 | `tls/`, `internal-token`, `session.key` | No | A restored Node mints new ones. See [restore](#restore). |
@@ -75,6 +76,8 @@ principal allowed to use the key, is the likely answer.
 ## Restore
 
 A restore is for reading plugin detail from a finished task. It is not a way to resume a worker.
+Continuing an agent conversation uses a new attempt instead, which restores the worktree and the
+harness session files ([projects and tasks](./projects-and-tasks.md#continuing-a-finished-task)).
 
 1. A person with read access opens a plugin pane on an archived task and chooses **Restore detail**.
 2. The team Node reserves a restore Node and asks the provisioner for a machine, like a worker but
