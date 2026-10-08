@@ -53,7 +53,8 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: session goals add durable row fields, two device routes, and the engine's settlement
 // and recovery calls. Verdict parsing and evaluation stay behind a dynamic import. The remaining
 // registration grows the static graph to 3,159,369 B, so the ceiling moves by 4 KB.
-const limits = { ceiling: 3_160_000, floor: 1_000_000 }
+// Delegation check contracts and durable report assembly add about 7 KiB to the boot graph.
+const limits = { ceiling: 3_170_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

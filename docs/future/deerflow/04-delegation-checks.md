@@ -1,6 +1,24 @@
 # Checks on delegated work
 
-Status: proposed, October 6, 2026. Not started. Part of the [DeerFlow review](./README.md).
+Completion note, October 8, 2026: `agent_spawn` and `agent_prompt` accept up to eight host checks.
+The child turn stores the check requests and, once settled, the host stores bounded verdicts and an
+observation time on that turn. Reports and `agent_read` reuse those verdicts after restart. File
+checks use core's path confinement, JSON reads stop at 1 MiB plus one byte and reject invalid UTF-8,
+and worktree spawns record the child HEAD commit before queuing its first turn. Shared isolation
+rejects `commits-ahead`. The report keeps host verdicts outside the child's pasted text, and the
+transcript draws a host check list. The Node service size ceiling rose by 10 KiB for the additional
+boot graph after the check runner was moved to a deferred import.
+
+Verification: focused delegation, check, report-card, and service-budget tests; agents and Node
+typechecks; targeted oxlint; and boundary, contract, documentation citation, and path checks passed.
+The desktop app launched and a managed Codex session used `session_history_search` and
+`session_history_read` with its signed session claim to recover its stored prompt text, completing
+Phase 3's live tool check. A live checked-child report and screenshot remain unverified: execute tools
+were off in the isolated app, and automatic approval review rejected enabling that persistent
+security setting. The report-card rendering test covers the visible verdict list. The coordinator
+can run the live report check if execute tools are already enabled in an authorized test session.
+
+Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome
 

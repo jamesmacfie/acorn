@@ -1,4 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { mkdtemp, rm, writeFile } from 'node:fs/promises'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { makeTestNodeContext, type TestNodeContext } from '@acorn/plugin-api/testkit'
 import type { ToolContext } from '@acorn/plugin-api/node'
 import type { AgentProviderDescriptor, AgentRequestKind } from '../../contract/wire.ts'
@@ -343,6 +346,27 @@ describe('agent delegation service', () => {
     )
     expect(childTasks.has(first.taskId)).toBe(true)
     expect((await sessions.turn(first.turnId!))?.status).toBe('cancelled')
+  })
+
+  it('records the actual child worktree base commit before its first turn', async () => {
+    const path = await mkdtemp(join(tmpdir(), 'acorn-delegation-base-'))
+    try {
+      const git = (args: string[]) => ctx.core.git.gitText(args, { cwd: path })
+      await git(['init'])
+      await writeFile(join(path, 'base'), 'base')
+      await git(['add', 'base'])
+      await git(['-c', 'user.name=Test', '-c', 'user.email=test@example.com', 'commit', '-m', 'base'])
+      const base = await git(['rev-parse', 'HEAD'])
+      vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
+      const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
+        { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+      const parent = await managedCaller()
+      const child = await checked.spawn({ title: 'Child', prompt: 'Make a change.', isolation: 'worktree',
+        checks: [{ kind: 'commits-ahead' }] }, context(parent.taskId, parent.id))
+      expect((await sessions.turn(child.turnId!))?.effectivePolicy).toMatchObject({
+        baseCommit: base, checks: [{ kind: 'commits-ahead' }],
+      })
+    } finally { await rm(path, { recursive: true, force: true }) }
   })
 
   it('reconciles creating worktree rows from each durable provisioning boundary', async () => {
@@ -893,6 +917,43 @@ describe('agent delegation service', () => {
       expect(queued[0]!.input).toContainEqual(expect.objectContaining({
         type: 'context', source: 'delegation_report', label: 'Child', resourceId: child.sessionId,
       }))
+    })
+
+    it('saves host verdicts once and places them outside the child message after restart', async () => {
+      const path = await mkdtemp(join(tmpdir(), 'acorn-delegation-report-'))
+      try {
+        await writeFile(join(path, 'output.txt'), 'ready')
+        vi.spyOn(ctx.core.tasks, 'root').mockResolvedValue(path)
+        const checked = new AgentDelegationService(runtime, service.store, async () => terminals,
+          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        const parent = await managedCaller()
+        const child = await checked.spawn({ title: 'Child', prompt: 'Write output.', isolation: 'shared',
+          checks: [{ kind: 'file-exists', path: 'output.txt' }] }, context(parent.taskId, parent.id))
+        await finish(child.sessionId!, child.turnId!, 'I wrote output.txt.')
+        const first = await checked.reports.checkResults((await sessions.turn(child.turnId!))!)
+        expect(first?.verdicts[0]?.status).toBe('holds')
+        await rm(join(path, 'output.txt'))
+
+        const restarted = new AgentDelegationService(runtime, service.store, async () => terminals,
+          { createChild: createChildTask }, Promise.resolve(), undefined, ctx.core)
+        await restarted.reports.deliver(child.turnId!)
+        const [report] = await reports(parent.id)
+        expect(report?.effectivePolicy.checkResults).toEqual(first)
+        const text = (report!.input[0] as { text: string }).text
+        expect(text.indexOf('Host checks:')).toBeGreaterThan(text.indexOf('</pasted_content>'))
+        expect(text).toContain('file-exists output.txt: holds')
+        const page = await restarted.read({ sessionId: child.sessionId!, afterSeq: 0, limit: 100 }, context(parent.taskId, parent.id, 'read'))
+        expect(page.items).toContainEqual(expect.objectContaining({ type: 'checks', results: first }))
+      } finally { await rm(path, { recursive: true, force: true }) }
+    })
+
+    it('refuses commits-ahead on shared isolation at spawn and prompt', async () => {
+      const parent = await managedCaller()
+      await expect(service.spawn({ title: 'Child', prompt: 'Do work.', isolation: 'shared',
+        checks: [{ kind: 'commits-ahead' }] }, context(parent.taskId, parent.id))).rejects.toMatchObject({ kind: 'bad_request' })
+      const child = await service.spawn({ title: 'Child', prompt: 'Do work.', isolation: 'shared' }, context(parent.taskId, parent.id, 'second'))
+      await expect(service.prompt({ sessionId: child.sessionId!, prompt: 'Commit.', checks: [{ kind: 'commits-ahead' }] },
+        context(parent.taskId, parent.id, 'third'))).rejects.toMatchObject({ kind: 'bad_request' })
     })
 
     it.each([

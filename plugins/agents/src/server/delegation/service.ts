@@ -1,4 +1,5 @@
 import { ToolError, type ToolContext } from '@acorn/plugin-api/node'
+import type { CoreServices } from '@acorn/plugin-api/node'
 import type {
   AgentSession,
   AgentSessionDelegation,
@@ -123,9 +124,10 @@ export class AgentDelegationService {
     tasks?: WorktreeTaskService,
     private readonly reconciled: Promise<void> = Promise.resolve(),
     followUps?: () => Promise<TurnFollowUps>,
+    core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
   ) {
-    this.worktrees = new WorktreeProvisioning(runtime, store, tasks)
-    this.reports = new DelegationReports(runtime, store, followUps)
+    this.worktrees = new WorktreeProvisioning(runtime, store, tasks, core)
+    this.reports = new DelegationReports(runtime, store, followUps, core)
   }
 
   async canSpawn(context: ToolContext): Promise<boolean> {
@@ -180,6 +182,9 @@ export class AgentDelegationService {
     if (input.baseBranch !== undefined && input.isolation !== 'worktree') {
       throw new ToolError('bad_request', 'baseBranch requires worktree isolation.')
     }
+    if (input.isolation === 'shared' && input.checks?.some((check) => check.kind === 'commits-ahead')) {
+      throw new ToolError('bad_request', 'commits-ahead requires worktree isolation.')
+    }
     if (!context.callId) throw new ToolError('bad_request', 'agent_spawn requires a stable tool call id.')
     const sessionId = context.sessionId
     if (!sessionId) throw new ToolError('not_found', 'Session not found.')
@@ -201,7 +206,10 @@ export class AgentDelegationService {
     assertBoundedDelegationConfig(input.resultSchema, 'The result schema')
     assertBoundedDelegationConfig(input.configOptions, 'Provider configuration')
     assertDelegationResultSchema(input.resultSchema)
-    const { session } = await this.ownedSession(context, input.sessionId)
+    const { session, spawn } = await this.ownedSession(context, input.sessionId)
+    if (spawn.isolation === 'shared' && input.checks?.some((check) => check.kind === 'commits-ahead')) {
+      throw new ToolError('bad_request', 'commits-ahead requires worktree isolation.')
+    }
     const key = operationKey(context, 'agent_prompt')
     const replay = await this.runtime.store.operationResult<AgentPromptResult>(key, 'delegation.prompt')
     if (replay) return replay
@@ -236,9 +244,13 @@ export class AgentDelegationService {
       await this.runtime.applyRequestedConfig(session.id, input.configOptions)
     }
     const cursor = (await this.runtime.store.requireSession(session.id)).lastEventSeq
+    const first = await this.runtime.store.firstTurn(session.id)
+    const baseCommit = first?.effectivePolicy.baseCommit
     const turn = await this.runtime.enqueueTurn(session.id, {
       ...delegatedTurn(owner, input.prompt, input.resultSchema, {
         ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+        ...(input.checks ? { checks: input.checks } : {}),
+        ...(typeof baseCommit === 'string' ? { baseCommit } : {}),
         ...(input.configOptions ? { configOptions: input.configOptions } : {}),
       }),
       source: 'delegation',
@@ -331,6 +343,7 @@ export class AgentDelegationService {
               parentTurnId: caller.parentTurnId,
               toolCeiling,
               ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+              ...(input.checks ? { checks: input.checks } : {}),
               ...(input.configOptions ? { configOptions: input.configOptions } : {}),
               ...(custom ? { customAgentId: custom.id } : {}),
             },
@@ -380,6 +393,7 @@ export class AgentDelegationService {
           delegationSpawnId: reserved.spawn.id,
           toolCeiling,
           ...(input.resultSchema ? { resultSchema: input.resultSchema } : {}),
+          ...(input.checks ? { checks: input.checks } : {}),
           ...(input.configOptions ? { configOptions: input.configOptions } : {}),
         }),
         source: 'delegation',
@@ -420,6 +434,8 @@ export class AgentDelegationService {
       if (!turn || turn.sessionId !== session.id) continue
       // The owner is reading this result itself, so a report still waiting in its queue says it twice.
       await this.reports.withdraw(context.sessionId!, turnId)
+      const checks = await this.reports.checkResults(turn)
+      if (checks) items.push({ type: 'checks', results: checks, turnId, seq })
       const resultSchema = turnResultSchema(turn)
       if (!resultSchema) continue
       const text = assistantResult(await this.runtime.store.eventsForTurn(turnId))

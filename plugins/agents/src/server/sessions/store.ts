@@ -5,6 +5,7 @@ import type { AgentEventPage, AgentEventRecord, AgentProviderDescriptor, AgentSe
 import { readWaitFacts } from './waitFacts'
 import { readExecutionCapture } from './executionCapture'
 import type { CreateAgentSessionInput, EnqueueAgentTurnInput } from '../../shared/schemas'
+import type { CheckResults } from '../../shared/delegationSchemas'
 import { clientEventRecord, mapAgentEvent, mapAgentRequest, mapAgentSession, mapAgentTurn } from './rowMapping'
 import { AgentSessionRepository } from './sessionRepository'
 import { isActiveSubagent } from './stateMachine'
@@ -442,6 +443,20 @@ export class AgentStore extends AgentSessionRepository {
    */
   async turn(turnId: string): Promise<AgentTurn | null> {
     const [row] = await this.db.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).limit(1)
+    return row ? mapAgentTurn(row) : null
+  }
+
+  /** Save host check facts once. Reconciliation reuses them even if the worktree later changes. */
+  async saveCheckResultsOnce(turnId: string, results: CheckResults): Promise<AgentTurn | null> {
+    const row = this.db.transaction((tx) => {
+      const current = tx.select().from(schema.agentTurns).where(eq(schema.agentTurns.id, turnId)).get()
+      if (!current) return null
+      const policy = JSON.parse(current.effectivePolicyJson) as Record<string, unknown>
+      if (policy.checkResults !== undefined) return current
+      const next = JSON.stringify({ ...policy, checkResults: results })
+      tx.update(schema.agentTurns).set({ effectivePolicyJson: next }).where(eq(schema.agentTurns.id, turnId)).run()
+      return { ...current, effectivePolicyJson: next }
+    })
     return row ? mapAgentTurn(row) : null
   }
 

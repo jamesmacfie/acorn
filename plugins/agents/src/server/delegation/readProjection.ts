@@ -1,10 +1,12 @@
 import type { AgentEventRecord, AgentSession } from '../../contract/wire.ts'
+import type { CheckResults } from '../../shared/delegationSchemas'
 
 export type AgentReadItem =
   | { type: 'assistant_message'; text: string; turnId: string | null; fromSeq: number; toSeq: number; truncated?: boolean }
   | { type: 'diagnostic'; level: 'info' | 'warning'; message: string; turnId?: string; seq: number; truncated?: boolean }
   | { type: 'error'; code: string; message: string; retryable: boolean; turnId: string | null; seq: number; truncated?: boolean }
   | { type: 'structured_output'; value: unknown; turnId: string; seq: number }
+  | { type: 'checks'; results: CheckResults; turnId: string; seq: number }
 
 export type AgentReadResult = {
   sessionId: string

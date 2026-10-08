@@ -6,6 +6,8 @@ import type { TurnFollowUps } from '../sessions/turnFollowUps'
 import { TURN_FOLLOW_UP_DEADLINE_MS } from '../../contract/turnFollowUp.ts'
 import type { AgentDelegationStore } from './store'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from '../sessions/resultContract'
+import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CheckResults } from '../../shared/delegationSchemas'
 
 const log = createLogger('agents:delegation', 'agents')
 
@@ -90,7 +92,22 @@ export class DelegationReports {
     // The unattended operations a plugin's note joins (../sessions/turnFollowUps.ts). Absent, a turn
     // reports as soon as it settles.
     private readonly followUps?: () => Promise<TurnFollowUps>,
+    private readonly core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
   ) {}
+
+  async checkResults(turn: AgentTurn): Promise<CheckResults | null> {
+    const { DelegationChecks, savedCheckResults, turnChecks } = await import('./checks')
+    if (!turnChecks(turn).length) return null
+    const saved = savedCheckResults(turn)
+    if (saved) return saved
+    if (!this.core) return null
+    const child = await this.runtime.store.getSession(turn.sessionId)
+    const root = child ? await this.core.tasks.root(child.taskId) : null
+    const baseCommit = typeof turn.effectivePolicy.baseCommit === 'string' ? turn.effectivePolicy.baseCommit : undefined
+    const result = await new DelegationChecks(this.core).runInRoot(turn, root, baseCommit)
+    const persisted = await this.runtime.store.saveCheckResultsOnce(turn.id, result)
+    return persisted ? savedCheckResults(persisted) : result
+  }
 
   /** A pending request is a pause, not a settled turn. The request row is read after commit. */
   async deliverRequest(sessionId: string, providerRequestId: string): Promise<void> {
@@ -180,6 +197,7 @@ export class DelegationReports {
       return
     }
     const text = assistantResult(await store.eventsForTurn(last.id))
+    const checks = await this.checkResults(turn)
     const schema = turnResultSchema(turn)
     const structured = schema && text ? parseStructuredResult(text, schema) : null
     const notes = last.id === turn.id ? [] : [`A plugin sent it notes about that turn. The outcome and message below are from its reply to the last one, turn ${last.id}.`]
@@ -191,6 +209,8 @@ export class DelegationReports {
       `Outcome: ${last.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : last.status}`,
       ...(last.error ? [`Error: ${last.error.message}`] : []),
       ...(text ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)] : ['The turn ended with no message.']),
+      ...(checks ? ['Host checks:', `Checked at: ${new Date(checks.checkedAt).toISOString()}`, ...checks.verdicts.map(({ check, status, reason }) =>
+        `- ${check.kind}${'path' in check ? ` ${check.path}` : ''}: ${status} (${reason})`)] : []),
       ...(structured != null ? ['Structured result:', '```json', JSON.stringify(structured, null, 2), '```'] : []),
     ].join('\n\n')
     await this.runtime.enqueueTurn(ownerId, {
@@ -207,7 +227,7 @@ export class DelegationReports {
         ),
       ],
       source: 'delegation_report',
-      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id } },
+      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id }, ...(checks ? { checkResults: checks } : {}) },
       idempotencyKey: reportKey(turn.id),
     })
   }

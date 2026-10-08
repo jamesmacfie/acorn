@@ -285,6 +285,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         core.tasks,
         deps.reconciled,
         followUpRegistry,
+        core,
       )
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
       for (const tool of sessionHistoryTools(runtime.store)) ctx.tools.register(tool)
