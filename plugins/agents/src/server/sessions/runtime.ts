@@ -96,7 +96,11 @@ export class ManagedAgentRuntime {
   private readonly terminalHandoffRunning: AgentRuntimeOptions['terminalHandoffRunning']
 
   constructor(options: AgentRuntimeOptions) {
-    this.engine = new ManagedAgentEngine(options)
+    this.engine = new ManagedAgentEngine(options, async (sessionId, prompt, key, signal) => {
+      await this.enqueueTurn(sessionId, {
+        source: 'goal', input: [{ type: 'text', text: prompt }], effectivePolicy: {}, idempotencyKey: key,
+      }, {}, signal)
+    })
     this.store = this.engine.store
     this.attachments = this.engine.attachments
     this.artifacts = this.engine.artifacts
@@ -360,7 +364,7 @@ export class ManagedAgentRuntime {
     return (await this.transcriptCommands()).verifyResume(sessionId)
   }
 
-  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput, context: TurnAttendanceContext = {}): Promise<AgentTurn> {
+  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput, context: TurnAttendanceContext = {}, signal?: AbortSignal): Promise<AgentTurn> {
     const session = await this.store.requireSession(sessionId)
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
     if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
@@ -377,6 +381,7 @@ export class ManagedAgentRuntime {
     const enqueued = prompt && prompt.payload.text !== undefined
       ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
       : input
+    signal?.throwIfAborted()
     const outcome = await this.store.enqueueTurn(sessionId, enqueued, context)
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.

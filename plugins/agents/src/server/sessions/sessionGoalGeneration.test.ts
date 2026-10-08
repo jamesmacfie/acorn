@@ -26,6 +26,7 @@ describe('session goal generation', () => {
   let enqueued: Array<{ sessionId: string; key: string }>
   let published: AgentSession[]
   let generateText: ReturnType<typeof vi.fn>
+  let enqueue: ReturnType<typeof vi.fn>
 
   beforeEach(() => {
     ctx = makeTestNodeContext({ plugin: { name: 'agents' } })
@@ -40,9 +41,10 @@ describe('session goal generation', () => {
     generateText = vi.fn(async () => ({ text: answer('goal_not_met_yet'), modelId: 'cheap',
       providerId: 'fake', backendId: 'harness:goal-test' }))
     ctx.core.models.generateText = generateText as CoreServices['models']['generateText']
+    enqueue = vi.fn(async (sessionId: string, _prompt: string, key: string) => { enqueued.push({ sessionId, key }) })
     generation = new SessionGoalGeneration({ store, db, models: ctx.core.models,
       currentUserId: () => 'owner', publish: (session) => published.push(session),
-      enqueue: async (sessionId, _prompt, key) => { enqueued.push({ sessionId, key }) } })
+      enqueue })
   })
   afterEach(async () => { await generation.stop(); disposeProfile(); ctx.cleanup(); vi.restoreAllMocks() })
 
@@ -80,6 +82,17 @@ describe('session goal generation', () => {
     await new Promise((resolve) => setImmediate(resolve))
     expect(generateText).not.toHaveBeenCalled()
     expect(enqueued).toEqual([])
+  })
+
+  it('blocks the goal when admission refuses a continuation', async () => {
+    const { session, turn } = await settled()
+    enqueue.mockRejectedValueOnce(new Error('Instruction check refused the turn.'))
+    generation.check(session.id, turn.id)
+    await vi.waitFor(async () => expect((await store.requireSession(session.id)).goal?.status).toBe('blocked'))
+    await generation.recover()
+    expect(enqueue).toHaveBeenCalledOnce()
+    expect(enqueued).toEqual([])
+    expect((await store.snapshot(session.id)).turns).toHaveLength(1)
   })
 
   it('does not enqueue behind a person turn accepted during judgment', async () => {

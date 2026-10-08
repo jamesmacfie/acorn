@@ -249,7 +249,10 @@ export class ManagedAgentEngine {
   private stopPromise: Promise<void> | null = null
   private readonly publicationCallbacks = new Set<Promise<void>>()
 
-  constructor(options: AgentRuntimeOptions) {
+  constructor(
+    options: AgentRuntimeOptions,
+    private readonly enqueueGoal: (sessionId: string, prompt: string, key: string, signal?: AbortSignal) => Promise<void>,
+  ) {
     this.db = options.db
     this.core = options.core
     this.internalEnv = options.internalEnv
@@ -356,16 +359,7 @@ export class ManagedAgentEngine {
         models: this.core.models,
         currentUserId: this.currentUserId,
         publish: (session) => this.emit({ channel: 'agent:session', session }),
-        enqueue: async (sessionId, prompt, key) => {
-          const outcome = await this.store.enqueueTurn(sessionId, {
-            source: 'goal', input: [{ type: 'text', text: prompt }], effectivePolicy: {}, idempotencyKey: key,
-          })
-          if (outcome.inserted) {
-            this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
-            this.emit({ channel: 'agent:turn', turn: outcome.turn })
-            void this.pump()
-          }
-        },
+        enqueue: this.enqueueGoal,
       }))
   }
 

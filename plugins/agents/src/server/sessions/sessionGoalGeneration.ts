@@ -13,7 +13,7 @@ type GoalPorts = {
   models: CoreServices['models']
   currentUserId(): string | null
   publish(session: AgentSession): void
-  enqueue(sessionId: string, prompt: string, key: string): Promise<void>
+  enqueue(sessionId: string, prompt: string, key: string, signal?: AbortSignal): Promise<void>
 }
 
 /** Owns goal checks until shutdown; persisted verdicts and turn keys make recovery idempotent. */
@@ -34,7 +34,7 @@ export class SessionGoalGeneration {
     if (objective) {
       const snapshot = await this.ports.store.snapshot(sessionId)
       if (!snapshot.turns.some((turn) => ['queued', 'dispatching', 'active'].includes(turn.status))) {
-        await this.ports.enqueue(sessionId, objective, `goal-first:${sessionId}:${Date.now()}`)
+        await this.enqueue(sessionId, objective, `goal-first:${sessionId}:${Date.now()}`)
       }
     }
     return session
@@ -47,7 +47,7 @@ export class SessionGoalGeneration {
     this.ports.publish(resumed)
     const snapshot = await this.ports.store.snapshot(sessionId)
     if (!snapshot.turns.some((turn) => ['queued', 'dispatching', 'active'].includes(turn.status))) {
-      await this.ports.enqueue(sessionId, goalContinuationPrompt(session.goal.objective, 'The person resumed the goal.'),
+      await this.enqueue(sessionId, goalContinuationPrompt(session.goal.objective, 'The person resumed the goal.'),
         `goal-resume:${sessionId}:${Date.now()}`)
     }
     return resumed
@@ -180,6 +180,16 @@ export class SessionGoalGeneration {
     if (signal.aborted || this.stopped) return
     if (latest.turns.at(-1)?.id !== turn.id) return
     if (latest.turns.some((item) => item.id !== turn.id && ['queued', 'dispatching', 'active'].includes(item.status))) return
-    await this.ports.enqueue(session.id, goalContinuationPrompt(session.goal.objective, verdict.reason), `goal:${turn.id}`)
+    await this.enqueue(session.id, goalContinuationPrompt(session.goal.objective, verdict.reason), `goal:${turn.id}`, signal)
+  }
+
+  private async enqueue(sessionId: string, prompt: string, key: string, signal?: AbortSignal): Promise<void> {
+    try {
+      await this.ports.enqueue(sessionId, prompt, key, signal)
+    } catch (error) {
+      const session = await this.ports.store.requireSession(sessionId)
+      if (!signal?.aborted && session.goal?.status === 'active') this.ports.publish(await this.goals.status(sessionId, 'blocked'))
+      throw error
+    }
   }
 }

@@ -24,7 +24,7 @@ decided not to do and why, so a later session argues with the reasoning rather t
 
 | [dynamic-ui/](./dynamic-ui/README.md) | Agent-built apps: task apps drawn as transcript cards and panes in host components, published to the project, edited through drafts, and exported as plugins. A spike and five phases. | Proposed, 2026-10-01; nothing built. |
 | [ui-extension/](./ui-extension/README.md) | Contextual plugin UI: link previews, transcript media, workflow bodies, resource actions, detail regions, annotations, selections, document intelligence, fences, and toolbar additions. Fifteen sequential phases after Editor file viewers, ending with documentation. | Planned, October 6, 2026; implementation not started. |
-| [deerflow/](./deerflow/README.md) | What acorn takes from DeerFlow: five standalone product requirement documents for session references, session goals, agent history search, checks on delegated work, and one unattended turn policy, plus what it refused. | Proposed, October 6, 2026; nothing built. |
+| [deerflow/](./deerflow/README.md) | Review reasoning, shipped feature references, deferred smaller ideas, and what Acorn refused. | All five phases shipped October 8, 2026; completed plans deleted. Doctor, loop alerts, and edit-and-rerun remain deferred. |
 | [marketing/](./marketing/README.md) | The public site and the plugin docs on it. | Not started. |
 | [tui-review/](./tui-review/README.md) | Live terminal UX audit, feature inventory, host projections, and acceptance plan. | Icon removal, startup repair, and the Settings route (the navigation P0) implemented; broader acceptance open. |
 

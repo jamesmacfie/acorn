@@ -1,11 +1,8 @@
 # What acorn takes from DeerFlow
 
-Status: proposed, October 6, 2026. Nothing in this folder is built or scheduled. Where a file here
-disagrees with a shipped contract, the owning reference doc wins.
-
-This folder holds five product requirement documents for ideas taken from DeerFlow. Each one stands
-alone, so a developer can pick up any of them without reading the others. Read this page first for
-the reasoning that decided what to take.
+Status: all five phases shipped, October 8, 2026. The completed phase plans and their completion
+notes are retained in Git history. This folder keeps the review's reasoning and deferred ideas.
+Where it disagrees with a shipped contract, the owning reference doc wins.
 
 ## What DeerFlow is
 
@@ -25,21 +22,15 @@ contributed ACP harness. The [oh-my-pi review](https://github.com/jamesmacfie/ac
 five ideas taken here all work from outside the loop. Each one reads acorn's own durable record of a
 session, or queues a turn through acorn's own turn queue, or checks something on disk.
 
-## The five designs
+## Shipped features
 
-The numbers are the suggested build order, smallest and most self-contained first:
-
-| File | What it adds | Rough size |
-| --- | --- | --- |
-| [01-session-references.md](./01-session-references.md) | Attach another agent session's conversation to your next message from the composer's context picker. | About a day. It reuses the fork snapshot and the context contribution kind. |
-| [02-session-goals.md](./02-session-goals.md) | Give a session a completion condition. After each turn, a cheap model call judges the transcript, and acorn sends another turn only when useful work remains. | About a week, including the goal strip, storage, and restart recovery. |
-| [03-history-search.md](./03-history-search.md) | Two read-tier agent tools that search and page an agent's own transcript, including what the harness compacted away. | Two to three days. The full-text index exists. |
-| [04-delegation-checks.md](./04-delegation-checks.md) | Host-run checks on delegated work, such as "this file exists" or "the child committed", reported beside the child's own account. | Three to four days. |
-| [05-unattended-policy.md](./05-unattended-policy.md) | One resolved answer to "is anyone watching this turn", used by the prompt, the request handling, and the goal judge. | About a week, most of it in request handling and tests. |
-
-Two links between them are worth knowing. Session references can later page a referenced transcript
-through the history tools in 03. The goal judge in 02 reads the unattended policy in 05 when both
-exist, and ships without it.
+| Feature | Owning reference |
+| --- | --- |
+| Capture another same-task session's conversation for the next message. | [Composer](../../managed-agents/composer.md) |
+| Persist a completion condition, check bounded ledger evidence, and queue limited continuations. | [Session goals](../../managed-agents/operations.md#session-goals) |
+| Search and page a managed agent's own durable transcript through read-tier tools. | [Transcript search](../../managed-agents/transcript-search.md) |
+| Persist host checks on delegated work and show their verdicts beside the child's report. | [Delegation](../../managed-agents/delegation.md) |
+| Resolve host attendance for accepted turns and settle autonomous requests without human input. | [Turn operations](../../managed-agents/operations.md) and [workflow execution](../../workflows/execution.md) |
 
 ## Smaller ideas not written up
 
@@ -59,7 +50,7 @@ These came up in the review and are recorded here so a later session doesn't red
 [refused.md](./refused.md) lists the DeerFlow features this review decided against, with the reason
 for each.
 
-## Verify before building
+## Before taking up a deferred idea
 
-Each design ends with its own list. Paths in these files are hints from October 6, 2026. Confirm them
-against the checkout before you build.
+Read its owning runtime's reference and trace the current contribution and capability seams. This
+review describes the checkout from October 6, 2026; it is a decision record rather than a code map.

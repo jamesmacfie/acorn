@@ -296,12 +296,8 @@ Each feature landing page above has topic pages in a folder of the same name:
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
   delivery records kept while acceptance is open. Its README indexes every programme and single file.
   Shipped behavior belongs in an owning doc above.
-- [DeerFlow review](./future/deerflow/README.md): five proposals taken from DeerFlow,
-  [session references](./future/deerflow/01-session-references.md),
-  [session goals](./future/deerflow/02-session-goals.md),
-  [agent history search](./future/deerflow/03-history-search.md),
-  [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
-  [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
+- [DeerFlow review](./future/deerflow/README.md): references for the five shipped features,
+  review reasoning, deferred smaller ideas, and
   [what it refused](./future/deerflow/refused.md).
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.

@@ -33,7 +33,7 @@ blocks later turns in its session. Workflow work gets a dispatch slot after five
 automation turns.
 
 The store captures provider settings and host attendance at the same acceptance boundary, including
-goal turns that the engine queues directly. Interactive and imported sessions resolve to `attended`,
+goal turns. Goal turns use the same admission hooks as person turns. Interactive and imported sessions resolve to `attended`,
 delegated sessions to `supervised`, and workflow sessions to `supervised` under `gated` or
 `autonomous` under the host's autonomous posture. Plugin follow-ups inherit their admitted origin's
 attendance. Usage-limit continuations retain the original row and policy. Unknown persisted values
@@ -64,6 +64,7 @@ Only a verdict that says useful work remains queues another **Goal** turn. A goa
 continuations or two consecutive goal turns without a tool call or file change. **Stop** pauses an
 active goal. **Resume** queues a turn to carry on. A restart interrupts an active provider turn and
 pauses its goal, as does a provider disconnect during a turn. A dispatch failure blocks the goal.
+An admission refusal also blocks the goal and queues no turn.
 A completed turn whose check was interrupted is checked after startup. The session
 row stores the objective, counters, status, and last verdict, so every client sees the same state.
 
