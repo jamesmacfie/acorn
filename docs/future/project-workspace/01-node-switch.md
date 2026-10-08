@@ -1,6 +1,58 @@
 # Phase 01: Node switch
 
-Date: October 7, 2026. Status: planned; implementation not started. Dependencies: none.
+## Combined gate follow-up — October 8, 2026
+
+The three Node 26 backup timeouts are resolved. In an isolated test, the third sequential
+`node:sqlite` online-backup promise settled only when Vitest's 20-second deadline woke the event
+loop. A live 50 ms timer made all three copies settle in milliseconds; disabling Vitest's
+`fsModuleCache` did not change the stall. The SQLite wrapper now keeps that timer only while an
+online backup is pending and clears it on success or failure. Archive scrubbing, private staging,
+atomic replacement, and cleanup are unchanged.
+
+On Node 26.8.1, the full backup file passed (12 tests), as did storage policy (9) and process
+broker (18) tests. `@acorn/node-core` and `@acorn/node` typechecks, changed-file oxlint, and the
+stock Node build passed. The service bundle is 3,149,652 bytes against a 3,150,000-byte limit.
+The full repository gate was not rerun.
+
+## Completion note — October 7, 2026
+
+Status: implemented on `phase-01-node-switch`.
+
+- Review follow-up (October 7, 2026): `core.workspaces` validation and its write now run together
+  in the synchronous preference transaction shared by HTTP and the raw plugin service seam. The
+  first write, same-value write, and legacy-project fallback use the same rule. Off mode refuses
+  explicit workspace membership even when re-adding an existing project path; plain re-adds remain
+  idempotent. The CLI's HTTP decoder is tested with a 409 Node error envelope. Driver parsers cover
+  both flag values, invalid values, and onboarding conflicts. Repeat desktop seeding reads the bound
+  owner ID after identity adoption, preserving one preference row and the saved mode on `--reuse`.
+- Follow-up checks: Node `workspacesMode.test.ts` (6) and `core/prefs.test.ts` (2), CLI `node.test.ts`
+  (4) and `commands.test.ts` (6), desktop `options.test.mjs` (3) and `seed.test.mjs` (4) all pass.
+  Typechecks for `@acorn/node-core`, `@acorn/cli`, `@acorn/desktop`, and `@acorn/tui` pass; oxlint
+  passes on changed TypeScript files. The full repository gate was not rerun for this follow-up.
+- The protocol owns `core.workspaces` and its unset-value rule. Node project creation settles the
+  preference, inserts a project, and creates either its own workspace or Default in one transaction.
+  Routes and the plugin project seam use the active owner ID. Broadcasts follow commit.
+- The Node refuses explicit membership, project moves, and workspace create, rename, and delete while
+  off. The rename refusal is an extra guard so a paired workspace cannot diverge from its project.
+  Project rename and delete keep that pair in sync; deletion removes links and datasets.
+- The CLI accepts `project add` without `--workspace`, resolves `agent list` and `run list`
+  `--project` filters, and reports `workspaces_off` as a usage error. Both dev drivers pass
+  `--workspaces on|off` to the seed. The `tui-navigation` fixture creates a second paired workspace
+  while off and retains its grouped layout with `--workspaces on`.
+- The grouped Default fallback now lives inside the project transaction rather than calling the old
+  `defaultWorkspaceId` helper. Its observable behavior is unchanged. The preboot seed writes the
+  preference under the empty owner ID; Node boot adopts it into the bound owner as it does other
+  preferences. Subsequent seed calls use that bound owner.
+- Later phases should read `core.workspaces` through the protocol helper, omit explicit workspace IDs
+  from project creation while off, and account for the existing workspace-scoped records that both
+  workspace and project deletion leave behind. The desktop and terminal UI still use grouped-mode
+  controls until their phases land.
+- Initial focused Node, CLI, protocol, and seed checks passed; the CLI and protocol package suites
+  passed. Three Node 26 storage backup tests timed out, including when run alone; the October 8
+  follow-up above resolved them. The architecture doc check reported three missing
+  generated Tauri schema files cited by the security plan; that check is pending desktop staging.
+
+Date: October 7, 2026. Status: implemented. Dependencies: none.
 Read the [plan](./README.md) first, especially [decisions](./README.md#decisions) 1 to 5 and
 [facts from the code](./README.md#facts-from-the-code).
 

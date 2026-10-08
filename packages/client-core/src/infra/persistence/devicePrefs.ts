@@ -11,6 +11,7 @@ const DEVICE_KEYS: ReadonlySet<string> = new Set<string>([
   PrefKeys.keybindings,
   PrefKeys.railOrder,
   PrefKeys.railVisibility,
+  PrefKeys.workspaceRail,
   PrefKeys.leftCollapsed,
   PrefKeys.diffView,
   PrefKeys.terminalRailDefault,

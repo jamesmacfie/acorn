@@ -9,10 +9,21 @@ both.
 
 Archive opens a confirmation dialog with the task title above the confirmation text. The dialog asks
 every plugin what it has to say about the task, such as running containers, uncommitted files, or
-live sessions, and offers each cleanup the plugin declared. With nothing to report, the dialog still
+live sessions, and offers each cleanup the plugin declared. It also warns that all subtasks, including
+nested subtasks, will be archived. With nothing to report, the dialog still
 appears as the explicit barrier. A plugin reaches that dialog only through a
 [task check](../plugins/task-checks.md#task-checks). A cleanup that fails names
 its plugin, and the task is archived anyway.
+
+The Node archives descendants before their parent, running the lifecycle below for each task.
+It claims the whole tree before teardown, so another archive cannot overlap it and plugins cannot
+create more subtasks while it runs. A failure leaves the parent active and names the failing subtask.
+Subtasks already archived stay archived, and retry skips them. Selected plugin cleanups apply to the
+task whose concerns appeared in the dialog. Restore acts on one task at a time.
+
+Without the terminal capability, the status-only archive also archives every descendant and runs
+each task's archiving hook. It retains their worktrees. Task-scoped callers cannot archive a tree
+containing tasks outside their scope.
 
 Archive first claims the task's worktree lifecycle. While the claim holds, root reads return no path,
 and archive waits for a worktree creation already in flight before it reads the path to remove. An

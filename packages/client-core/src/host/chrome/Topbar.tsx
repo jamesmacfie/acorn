@@ -5,6 +5,7 @@ import { Button, Select } from '../../kit/components/primitives'
 import NodeChip from '../../features/fleet/NodeChip'
 import OverflowMenu from '../../features/settings/OverflowMenu'
 import { NestedChromeSlot } from '../plugins/NestedChromeSlot'
+import { WorkspaceIdentity } from '../../features/workspaces/WorkspaceIcon'
 
 /** Core's topbar uses the same public data and verbs as an offered replacement. */
 export default function Topbar(own: { value?: unknown }) {
@@ -20,14 +21,17 @@ export default function Topbar(own: { value?: unknown }) {
   return (
     <div class="topbar">
       <div class="topbar-side">
-        <Show when={props().workspaces.length}>
+        <Show when={props().workspacesMode && props().workspacePickerVisible !== false && props().workspaces.length}>
           <Picker
             size="sm"
-            label={props().workspace?.label ?? 'Select a workspace'}
-            placeholder="Filter workspaces…" emptyText="No workspaces."
+            label={<span class="workspace-identity-label"><Show when={props().workspace}>{(workspace) => <WorkspaceIdentity name={workspace().label} appearance={workspace().appearance} nodeId={props().node?.id} />}</Show>{props().workspace?.label ?? (props().workspacesMode === 'off' ? 'Select a project' : 'Select a workspace')}</span>}
+            ariaLabel={props().workspacesMode === 'off' ? 'Project' : 'Workspace'}
+            placeholder={props().workspacesMode === 'off' ? 'Filter projects…' : 'Filter workspaces…'}
+            emptyText={props().workspacesMode === 'off' ? 'No projects.' : 'No workspaces.'}
             results={workspaceResults}
+            leading={(entry) => <WorkspaceIdentity name={entry.label} appearance={entry.appearance} nodeId={entry.nodeId} />}
             rowLabel={(entry) => `${entry.label}${props().nodes.length > 1 ? ` · ${entry.nodeLabel}` : ''}`}
-            rowDescription={(entry) => entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
+            rowDescription={(entry) => props().workspacesMode === 'off' ? undefined : entry.projectCount ? `${entry.projectCount} project${entry.projectCount === 1 ? '' : 's'}` : undefined}
             isActive={(entry) => entry.id === props().workspace?.id && entry.nodeId === props().node?.id}
             onSelect={(entry) => props().pickWorkspace(entry.id, entry.nodeId)}
             footer={props().canAddProject
@@ -37,7 +41,7 @@ export default function Topbar(own: { value?: unknown }) {
               : undefined}
           />
         </Show>
-        <Show when={props().projectPickerVisible}>
+        <Show when={props().workspacesMode === 'on' && props().projectPickerVisible}>
           <Picker
             size="sm"
             label={props().project?.label ?? 'Select a project'}

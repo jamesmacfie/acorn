@@ -74,6 +74,7 @@
     "./features/workspaces": "./src/features/workspaces/public.ts",
     "./features/workspaces/Home.tsx": "./src/features/workspaces/Home.tsx",
     "./features/workspaces/WorkspaceProjectAssignments.tsx": "./src/features/workspaces/WorkspaceProjectAssignments.tsx",
+    "./features/workspaces/NoProjects.tsx": "./src/features/workspaces/NoProjects.tsx",
     "./features/workspaces/watchWorkspaceChanges.ts": "./src/features/workspaces/watchWorkspaceChanges.ts",
     "./host/annotations": "./src/host/annotations/public.ts",
     "./host/annotations/annotationKey.ts": "./src/host/annotations/annotationKey.ts",
@@ -174,7 +175,9 @@
     "./kit/tokens": "./src/kit/tokens/public.ts",
     "./testkit/notifications": "./src/testkit/notifications.client.ts",
     "./testkit/large-diff": "./src/testkit/largeDiff.ts",
-    "./testkit/ws-client": "./src/testkit/wsClient.client.ts"
+    "./testkit/ws-client": "./src/testkit/wsClient.client.ts",
+    "./features/workspaces/WorkspaceRail.tsx": "./src/features/workspaces/WorkspaceRail.tsx",
+    "./features/workspaces/workspaceRailPrefs.ts": "./src/features/workspaces/workspaceRailPrefs.ts"
   },
   "scripts": {
     "icons": "node scripts/icon-census.mjs",

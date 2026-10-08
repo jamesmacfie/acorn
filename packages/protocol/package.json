@@ -13,6 +13,7 @@
     "./authoring.ts": "./src/data/authoring.ts",
     "./baseline.ts": "./src/baseline.ts",
     "./branch.ts": "./src/projects/branch.ts",
+    "./workspacesMode.ts": "./src/projects/workspacesMode.ts",
     "./broker.ts": "./src/transport/broker.ts",
     "./browserRules.ts": "./src/integrations/browserRules.ts",
     "./chrome.ts": "./src/chrome/surfaces.ts",
@@ -84,7 +85,8 @@
     "./tree/props.ts": "./src/tree/props.ts",
     "./webview.ts": "./src/content/webview.ts",
     "./ws.ts": "./src/transport/ws.ts",
-    "./taskScripts.ts": "./src/projects/taskScripts.ts"
+    "./taskScripts.ts": "./src/projects/taskScripts.ts",
+    "./workspaceAppearance.ts": "./src/appearance/workspaceAppearance.ts"
   },
   "scripts": {
     "lint": "tsc --noEmit",

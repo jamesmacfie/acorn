@@ -3,7 +3,7 @@ import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import { createEffect, createMemo, createResource, createSignal, For, on, onCleanup, onMount, Show } from 'solid-js'
 import {
-  activateTaskSignals, activeNodeId, createFleetQuery, nodes, openPane, pathForTask, readJson,
+  activateTaskSignals, activeNodeId, createFleetQuery, createWorkspaceWords, nodes, openPane, pathForTask, readJson,
   setActiveNode, type Task, tasksOptions, workspaceForProject, workspacesOptions,
 } from '@acorn/plugin-api/client'
 import { tasksRoute } from '@acorn/protocol/api.ts'
@@ -38,6 +38,7 @@ type AgentRow = { session: AgentSession; nodeId: string; nodeLabel: string; task
 // rather than a layout: a layout is a pane's arrangement and this is a source's
 // (docs/panes/layout.md § Layout model).
 export default function AgentCenter() {
+  const words = createWorkspaceWords()
   const view = startAgentView('agents.center.open')
   onCleanup(view.dispose)
   const navigate = useNavigate()
@@ -229,7 +230,7 @@ export default function AgentCenter() {
       <DetailColumn scroll>
         <Stack gap="section">
           <Inline wrap gap="section">
-            <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : 'Workspace'}>Agent Center</Heading>
+            <Heading level={1} eyebrow={fleetScope() ? 'Fleet' : words().capitalized}>Agent Center</Heading>
             <Inline wrap gap="section">
               <Stack gap="none">
                 <Text emphasis="eyebrow">active</Text>
@@ -300,7 +301,7 @@ export default function AgentCenter() {
                 value={scope()}
                 onChange={setScope}
                 options={[
-                  { value: 'workspace', label: 'workspace' },
+                  { value: 'workspace', label: words().singular },
                   { value: 'fleet', label: 'fleet' },
                 ]}
               />

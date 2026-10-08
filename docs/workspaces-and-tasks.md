@@ -14,9 +14,15 @@ project-scoped panel uses its project by default.
 
 ## Workspace and project
 
-A workspace groups projects. It has a name and a sort order, and no icon or color, because the
-workspace switcher is navigation, not repository identity. The node publishes
-`workspace:changed { workspaceId }` after a create, a rename, or a delete.
+A workspace has a name, a sort order, and optional appearance metadata.
+[Workspace icons](./workspaces-and-tasks/workspace-icons.md) covers glyph backgrounds, durable image
+thumbnails, and the optional desktop rail. The Node publishes `workspace:changed { workspaceId }`
+after a create, rename, appearance change, or delete.
+
+The Node stores `core.workspaces` as `on` or `off`. While on, a workspace can group projects.
+While off, each project owns one workspace with the same name. If the preference is unset,
+the Node uses `on` when projects exist and `off` when none do. Project creation stores that
+choice with the project. Once stored, the mode cannot change.
 
 A project belongs to one workspace. It's a folder on the Node's machine, either a plain folder or a
 Git checkout. The project row in `packages/node-core/src/server/db/schema.ts` holds a stable opaque

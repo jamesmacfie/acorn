@@ -10,6 +10,7 @@ The desktop shell has this hierarchy:
 
 ```text
 Topbar: Node/workspace context, repo/PR controls, global actions
+Workspace rail (optional): workspace icons
 TabRail: sources → workspaces → tasks
 Main: Home, Fleet overview, source browse, or active task
 Task: ordered pane row
@@ -24,7 +25,7 @@ it.
 The terminal client draws the same hierarchy in fewer cells (`apps/tui/src/chrome/`):
 
 ```text
-Topbar:   one line. Workspace, project, task count, branch, and node state
+Topbar:   one line. Workspace and project when grouped, or Project when separate; task count, branch, and node state
 Left:     Menu sources, Browse list, and workspace Tasks in one column
 Main:     one pane or source detail, with a strip of pane labels above it
 Overlays: palette, cheat sheet, pickers, inbox, trust, and quit confirmation
@@ -36,16 +37,33 @@ Three things differ. The terminal draws one pane, not a row, because two panes a
 cycle covers the whole screen for the same reason. And an overlay hides the pane instead of replacing
 it, so opening the palette keeps the pane's queries and model ([terminal chrome](../tui/chrome.md)).
 
+The terminal top bar follows the active Node's workspace mode. When workspaces are off, it prints
+**Project** and the paired project's name once. When they are on, it prints the workspace and routed
+project names. An empty Node opens terminal setup under the top bar after its project read succeeds.
+
 The desktop top bar, left rail, pane switcher, and rail task list each have a core provider in an
 exclusive slot. A selected plugin provider can draw one of them with the host's data and verbs. The
 rail provider places the host's task-list slot, and the top bar provider places the host's right-side
 status slot. Settings warns when a provider says it leaves out either. The terminal hosts only
 `rail.taskList`.
 
+The desktop topbar follows the active Node's `core.workspaces` mode. With workspaces on, its first
+picker selects a workspace and a second picker appears for project-scoped sources. With workspaces
+off, the first picker is labeled **Project**, lists visible projects across the fleet, and offers
+**Add project…** on a local Node. The second picker is hidden. A paired workspace whose only project
+is hidden is absent from the picker. The label follows the active Node while other Nodes may use a
+different mode.
+
+When the active Node has no projects, the main area shows **Add a project** after the project read
+finishes, unless the first-run wizard is visible. The rail and source view give way to that prompt;
+the topbar stays mounted for Node switching and Settings. A failed or unfinished project read does
+not claim the Node is empty. The optional onboarding plugin publishes its visible state through a
+core seam, so disabling it leaves the prompt available.
+
 ### Geometry
 
 The top bar spans the window, and the rails and panes start under its bottom border, so that border
-is one line across the app. The left TabRail is the first thing in `.shell-body`, and the right pane
+is one line across the app. The optional workspace rail comes before the left TabRail in `.shell-body`, and the right pane
 switcher is fixed at `top: var(--topbar-h)`.
 
 Both rails are built from one component, `tabs/RailTab.tsx`, a square control styled by
@@ -56,6 +74,10 @@ moves the rails too. Every rail control uses it, including the bottom-pinned **+
 control changes only its icon and background on hover, and `.ui-btn:hover` also changes the border
 color. `.pane-switcher` restates only what differs on the right: the glyph font, and the active accent
 on the right edge.
+
+The workspace rail uses the same width and controls, and draws its selected marker outside the icon.
+The shell allocates both left rails through `--left-rails-w`; the terminal drawer reads that token.
+See [workspace icons](../workspaces-and-tasks/workspace-icons.md).
 
 ### Chrome bars
 

@@ -101,7 +101,7 @@ export function createCoreServices(options: {
   activeIdentity: ActiveIdentityStore
 }): CompiledCoreServices {
   const tasks = createTaskService(options.db)
-  const projects = createProjectService(options.db)
+  const projects = createProjectService(options.db, options.activeIdentity)
   const identity = createIdentityService(options.activeIdentity)
   const models = createModelService(options.db, options.secrets)
   return {

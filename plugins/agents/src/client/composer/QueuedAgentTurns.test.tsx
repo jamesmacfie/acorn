@@ -2,7 +2,12 @@ import { render } from 'solid-js/web'
 import { expect, it, vi } from 'vitest'
 import type { AgentTurn } from '../../contract/wire.ts'
 
-vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: undefined }) }))
+const labels = vi.hoisted(() => ({ singular: 'project' }))
+vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
+  ...await importOriginal<typeof import('@acorn/plugin-api/client')>(),
+  createWorkspaceWords: () => () => ({ singular: labels.singular }),
+}))
+vi.mock('@tanstack/solid-query', () => ({ createQuery: () => ({ data: { provider: 2, workspace: 3 } }) }))
 
 vi.mock('../sessions/managedClient', () => ({
   managedAgentApi: {
@@ -27,13 +32,13 @@ const turn = (input: AgentTurn['input']): AgentTurn => ({
   attempt: 0, createdAt: 0, startedAt: null, completedAt: null,
 })
 
-const mount = (queued: AgentTurn) => {
+const mount = (queued: AgentTurn, runtimeState: 'working' | 'ready' = 'working') => {
   const host = document.createElement('div')
   document.body.append(host)
   const unmount = render(() => (
     <QueuedAgentTurns
       sessionId="session"
-      runtimeState="working"
+      runtimeState={runtimeState}
       turns={[queued]}
       onChanged={() => {}}
       onError={() => {}}
@@ -42,6 +47,14 @@ const mount = (queued: AgentTurn) => {
   const dispose = () => { unmount(); host.remove() }
   return { host, dispose }
 }
+
+it.each(['project', 'workspace'])('names a blocked queue limit per %s', (singular) => {
+  labels.singular = singular
+  const { host, dispose } = mount(turn([{ type: 'text', text: 'Next step' }]), 'ready')
+  try {
+    expect(host.textContent).toContain(`2 turns at once per provider and 3 per ${singular}.`)
+  } finally { dispose() }
+})
 
 it('shows image and file attachments beside a queued prompt, including while editing', async () => {
   const { host, dispose } = mount(turn([

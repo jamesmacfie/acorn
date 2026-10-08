@@ -125,8 +125,11 @@ client: TopbarProps
 client: UiSlotContribution
 client: VersionedDataValue
 client: VisibleElementRect
+client: WORKSPACES_PREF_KEY
 client: WorkflowNotice
 client: Workspace
+client: WorkspaceWords
+client: WorkspacesMode
 client: activateTaskSignals
 client: activeNodeId
 client: activeTaskId
@@ -137,6 +140,7 @@ client: brandMarkRegistry
 client: brandStyle
 client: bytesOf
 client: cachedTaskScripts
+client: canAddProjectFromFolder
 client: canPickFolder
 client: canonicalDataEncoding
 client: canonicalDataProjection
@@ -167,6 +171,7 @@ client: createSettingSave
 client: createTask
 client: createTextSetting
 client: createWorkspace
+client: createWorkspaceWords
 client: dataBindingSchema
 client: dataFieldSchema
 client: dataFieldsSchema
@@ -219,6 +224,7 @@ client: openPane
 client: openRefPanel
 client: openRepoConfigTrust
 client: openTarget
+client: ownOnboardingVisibility
 client: paneContribution
 client: paneModel
 client: parseDataPointer
@@ -311,6 +317,7 @@ client: watchAppearance
 client: workspaceExternalProjectsKey
 client: workspaceExternalProjectsOptions
 client: workspaceForProject
+client: workspaceWords
 client: workspacesKey
 client: workspacesOptions
 client: writeDraft

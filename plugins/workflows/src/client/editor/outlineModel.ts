@@ -28,7 +28,7 @@ const bindingLabel = (binding: DataBinding | undefined, def: WorkflowDef): strin
   if (address.from === 'input') return field ?? address.name
   if (address.from === 'item') return field ?? 'current record'
   if (address.from === 'context') return address.name === 'viewer' ? field ?? 'you'
-    : address.name === 'workspaceLinks' ? 'workspace links' : address.name === 'now' ? 'now' : 'calendar time'
+    : address.name === 'workspaceLinks' ? 'linked projects' : address.name === 'now' ? 'now' : 'calendar time'
   return field ?? def.steps.find(step => stepIdentity(step) === address.stepId)?.name ?? 'step result'
 }
 

@@ -57,7 +57,7 @@ export function selectExamples(args: {
 export function renderWorkspaceExamples(selected: { include: readonly PromptWorkflowExample[]; omit: readonly WorkflowExample[] }): string {
   if (!selected.include.length) return ''
   const lines = [
-    '## 9. Worked examples from this workspace',
+    '## 9. Worked examples from this project scope',
     '',
     'Definitions somebody here wrote and this node runs. Follow how they name steps and how much they',
     'say in a prompt. They are house style, not templates: write what the description asks for.',

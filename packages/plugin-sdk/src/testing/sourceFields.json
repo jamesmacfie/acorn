@@ -648,7 +648,7 @@
     ]
   },
   "core:tasks": {
-    "name": "Workspace tasks",
+    "name": "Tasks",
     "schema": {
       "type": "object",
       "additionalProperties": false,
@@ -760,7 +760,7 @@
       },
       {
         "pointer": "/workspace",
-        "label": "Workspace",
+        "label": "Scope",
         "origin": "declared",
         "query": {
           "operators": [

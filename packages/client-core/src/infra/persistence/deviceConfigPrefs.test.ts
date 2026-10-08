@@ -8,13 +8,15 @@ describe('device config projection', () => {
       theme: 'dark', style: 'modern', themeFollowSystem: false,
       keybindings: { 'core.settings.open': 'meta+,' },
       railOrder: { pinned: ['t1'], order: ['t2'] },
-      leftCollapsed: true,
+      leftCollapsed: true, workspaceRail: true,
       exclusiveSlots: { 'pane.switcher': 'board' },
     }
     const prefs = deviceConfigPrefs(config)
     expect(prefs[PrefKeys.style]).toBe('modern')
     expect(prefs[PrefKeys.themeFollowSystem]).toBe('false')
     expect(prefs[PrefKeys.leftCollapsed]).toBe('true')
+    expect(prefs[PrefKeys.workspaceRail]).toBe('true')
+    expect(configPatchForPref(PrefKeys.workspaceRail, 'false')).toEqual({ workspaceRail: false })
     expect(configPatchForPref(PrefKeys.railOrder, prefs[PrefKeys.railOrder]!)).toEqual({ railOrder: config.railOrder })
   })
 

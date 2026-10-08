@@ -4,6 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Project, ProjectConfigResponse, Task, Workspace } from '@acorn/protocol/api.ts'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { createProjectRef } from '../../projects'
 import { eq } from 'drizzle-orm'
 import { getDb, schema } from '../../db'
@@ -49,6 +50,7 @@ describe('project rows own workspace membership and visibility', () => {
 
   beforeEach(() => {
     t = makeTestDb()
+    t.db.insert(schema.prefs).values({ userId: 'james', key: WORKSPACES_PREF_KEY, value: 'on' }).run()
     broadcasts.length = 0
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()

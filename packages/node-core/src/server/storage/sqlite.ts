@@ -183,7 +183,16 @@ export function openSqlite(path: string, options: {
     // SQLite's online-backup API, which is a module-level function here rather than a method.
     backup: async (destination) => {
       if (options.allowBackup === false) throw new Error('Loaded plugin storage cannot export database files.')
-      await sqliteBackup(db, destination)
+      // Node 26 can finish an online backup without waking the event loop to settle its promise.
+      // Three sequential copies in one backup then waited for Vitest's 20-second test timer;
+      // a short live timer let each copy settle in milliseconds. Keep that wake-up scoped to an
+      // active backup, so an idle node has no polling work and failures still clear the timer.
+      const wake = setInterval(() => {}, 50)
+      try {
+        await sqliteBackup(db, destination)
+      } finally {
+        clearInterval(wake)
+      }
     },
     close: () => db.close(),
   }

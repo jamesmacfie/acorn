@@ -48,13 +48,13 @@ export type SubscribableChannel = (typeof SUBSCRIBABLE_CHANNELS)[number]
 // being reconstructed from the sentence downstream (plugins/permissions.ts).
 const CHANNEL_DESCRIPTIONS = {
   'runtime:task-archived': { text: 'Receive task archive events', icon: 'radio' },
-  'runtime:workspace-removed': { text: 'Receive workspace removal events', icon: 'radio' },
+  'runtime:workspace-removed': { text: 'Receive scope removal events', icon: 'radio' },
   'runtime:node-removed': { text: 'Receive node removal events', icon: 'radio' },
   'runtime:node-switched': { text: 'Receive active-node change events', icon: 'radio' },
   'runtime:focus-changed': { text: 'See which pane and region of this window has keyboard focus', icon: 'radio' },
   'tasks:changed': { text: 'Receive notice when this node’s tasks change', icon: 'radio' },
-  'workspace:changed': { text: 'Receive notice when this node’s workspaces change', icon: 'radio' },
-  'workspace-projects:changed': { text: 'See when external projects mapped to this node’s workspaces change', icon: 'radio' },
+  'workspace:changed': { text: 'Receive notice when this node’s scopes change', icon: 'radio' },
+  'workspace-projects:changed': { text: 'See when external project links on this node change', icon: 'radio' },
   // Named for what the owner is consenting to rather than for the frame: the payload carries a provider
   // id and a status, so a plugin granted this learns which of their accounts stopped working and when
   // one is reconnected. That is worth a sentence of its own, because it is more than the other four

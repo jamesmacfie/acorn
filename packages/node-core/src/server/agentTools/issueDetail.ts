@@ -71,7 +71,7 @@ export function issueDetailTool(deps: IssueDetailDeps): AgentToolContribution {
       }
       throw new ToolError(
         'not_found',
-        refused ?? `No connected ${providers.map((provider) => provider.label).join(' or ')} workspace has '${args.identifier}'.`,
+        refused ?? `No connected ${providers.map((provider) => provider.label).join(' or ')} account has '${args.identifier}'.`,
       )
     },
   }

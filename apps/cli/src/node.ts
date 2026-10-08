@@ -24,6 +24,22 @@ export function probeFailure(error: unknown): CliError {
   return new CliError('node_unreachable', message, 3)
 }
 
+/** Decode the Node's error envelope at the transport boundary, including CLI exit semantics. */
+export function decodeNodeResponse(response: Pick<NodeFetchResponse, 'status' | 'body'>, method: string, path: string, key?: string): unknown {
+  let result: unknown
+  try { result = JSON.parse(new TextDecoder().decode(response.body)) }
+  catch { throw new CliError('invalid_response', `Node returned invalid JSON for ${path}.`, method === 'GET' ? 1 : 7, key) }
+  if (response.status >= 400) {
+    const api = result as { error?: { code?: string; message?: string; requestId?: string; retryable?: boolean } }
+    const error = api.error
+    const exitCode = error?.code === 'workspaces_off' ? 2
+      : response.status === 401 || error?.code === 'protocol_mismatch' ? 3
+      : response.status < 500 || error?.code === 'bridge-unavailable' ? 4 : method === 'GET' ? 1 : 7
+    throw new CliError(error?.code ?? 'node_error', error?.message ?? `Node returned HTTP ${response.status}.`, exitCode, error?.requestId ?? key, error?.retryable)
+  }
+  return result
+}
+
 export function matchingNode(fleet: FleetStore, target: string): FleetNode | undefined {
   try { return rememberedNode(fleet, target) }
   catch (error) {
@@ -120,17 +136,7 @@ export async function openCliNode(target?: string): Promise<CliNode> {
           method === 'GET' ? 3 : 7, key)
       }
       finally { signal?.removeEventListener('abort', abort) }
-      let result: unknown
-      try { result = JSON.parse(new TextDecoder().decode(response.body)) }
-      catch { throw new CliError('invalid_response', `Node returned invalid JSON for ${path}.`, method === 'GET' ? 1 : 7, key) }
-      if (response.status >= 400) {
-        const api = result as { error?: { code?: string; message?: string; requestId?: string; retryable?: boolean } }
-        const error = api.error
-        const exitCode = response.status === 401 || error?.code === 'protocol_mismatch' ? 3
-          : response.status < 500 || error?.code === 'bridge-unavailable' ? 4 : method === 'GET' ? 1 : 7
-        throw new CliError(error?.code ?? 'node_error', error?.message ?? `Node returned HTTP ${response.status}.`, exitCode, error?.requestId ?? key, error?.retryable)
-      }
-      return result
+      return decodeNodeResponse(response, method, path, key)
   }
   return {
     nodeId: selected.nodeId,

@@ -98,7 +98,7 @@ The eleven Node events each say that something the Node owns has moved:
 | --- | --- | --- |
 | `plugins:changed` | A plugin is installed, updated, removed, reloaded, or toggled | None |
 | `tasks:changed` | Any task write, including worktree changes and a project delete | `taskId`, or `null` for a batch |
-| `workspace:changed` | A workspace is created, renamed, or deleted | `workspaceId` |
+| `workspace:changed` | A workspace is created, renamed, given an appearance, or deleted | `workspaceId` |
 | `workspace-projects:changed` | A provider's project mapping is replaced or removed | `providerId` and every affected `workspaceIds` |
 | `connection:changed` | A connection's status changes, including a demotion to `needs-auth`, or it's deleted | `integrationId`, `providerId`, and `status` or `deleted: true` |
 | `head:changed` | A task worktree's tip moves | The project, task, branch, `head`, and `dirty` |

@@ -1,5 +1,6 @@
 import type { QueryClient } from '@tanstack/solid-query'
 import type { CommandSettingOption } from '@acorn/protocol/commands.ts'
+import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { readDevicePrefs } from '../../../infra/persistence/devicePrefs'
 import { canSetBadge } from '../../../infra/platform'
 import { activeTaskId } from '../../../features/tasks/tasks'
@@ -24,7 +25,9 @@ import {
   themeChoices,
   themeFollowsSystem,
 } from '../../../features/settings/appearancePrefs'
-import { isStandaloneSettingsPage, SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
+import { settingsCategoryLabel, settingsPageForMode } from '../../../features/settings/settingsPresentation'
+import type { WorkspaceWords } from '../../../features/workspaces/words'
+import { isStandaloneSettingsPage, settingsCategoryOf, settingsPagesInOrder } from '../shell/settings'
 import { sectionSearchWords, settingsSectionEntries } from '../shell/settingsSearch'
 import type { ContributedCommand } from './commands'
 
@@ -71,11 +74,11 @@ export const CORE_NOTIFICATIONS_GROUP = 'core.notifications'
 
 /** Where the navigation searches live. Registered by each host, because what it can navigate to
  *  differs; the group is shared so the breadcrumb reads the same in both. */
-export const goToGroup = (): ContributedCommand => ({
+export const goToGroup = (words?: () => WorkspaceWords): ContributedCommand => ({
   id: CORE_GO_TO_GROUP,
   kind: 'group',
   title: 'Go to',
-  hint: 'tasks, workspaces, and projects',
+  hint: words ? () => words().singular === 'project' ? 'tasks and projects' : 'tasks, workspaces, and projects' : 'tasks, workspaces, and projects',
   category: 'navigation',
   palette: true,
   scope: 'none',
@@ -102,8 +105,9 @@ export const goToGroup = (): ContributedCommand => ({
  *
  * The registry is a signal, so the caller re-registers when it changes.
  */
-export function settingsPageCommands(open: (target: string) => void): ContributedCommand[] {
-  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage)
+export function settingsPageCommands(open: (target: string) => void, mode?: WorkspacesMode): ContributedCommand[] {
+  const pages = settingsPagesInOrder().filter(isStandaloneSettingsPage).map((page) => settingsPageForMode(page, mode))
+  const groupLabel = (category: Parameters<typeof settingsCategoryLabel>[0]) => settingsCategoryLabel(category, mode)
   return [
     {
       id: CORE_SETTINGS_GROUP,
@@ -119,7 +123,7 @@ export function settingsPageCommands(open: (target: string) => void): Contribute
       id: `${CORE_SETTINGS_GROUP}.${page.id}`,
       parentId: CORE_SETTINGS_GROUP,
       title: page.title ?? page.label,
-      hint: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)],
+      hint: groupLabel(settingsCategoryOf(page)),
       category: 'navigation',
       palette: true,
       scope: 'none',
@@ -127,14 +131,14 @@ export function settingsPageCommands(open: (target: string) => void): Contribute
       ...(page.requires ? { requires: page.requires } : {}),
       run: () => open(page.id),
     })),
-    ...settingsSectionEntries(pages).map((entry, index): ContributedCommand => {
+    ...settingsSectionEntries(pages, groupLabel).map((entry, index): ContributedCommand => {
       const page = pages.find((candidate) => candidate.id === entry.page)!
       const words = sectionSearchWords(page, entry.section!)
       return {
         id: `${CORE_SETTINGS_GROUP}.${entry.page}#${entry.section}`,
         parentId: CORE_SETTINGS_GROUP,
         title: `${entry.pageLabel} › ${entry.sectionLabel}`,
-        hint: entry.group,
+        hint: groupLabel(settingsCategoryOf(page)),
         ...(words.length ? { keywords: words } : {}),
         category: 'navigation',
         palette: true,

@@ -4,7 +4,61 @@ This plan makes a fresh install project-first. Each project gets its own workspa
 a project, and the Default workspace is never created. Read this page before you build a phase. It
 holds the research and the decisions the phase files depend on.
 
-Date: October 7, 2026. Status: planned; implementation not started.
+Date: October 8, 2026. Status: all six phases implemented and integrated with main; validation complete.
+
+The phase completion notes record the implementation and review decisions. Shipped behavior is
+documented in [projects](../../workspaces-and-tasks/projects.md),
+[Settings](../../frontend/settings.md), and [terminal chrome](../../tui/chrome.md).
+The research below describes the code as it stood when the plan was written on October 7, 2026.
+
+## Combined validation
+
+### Before main integration
+
+October 8, 2026: full lint passed all 37 tasks. The full test gate completed with 28 of 36 tasks
+passing. Focused reruns resolved the missed wording consumers, the architecture scan's test rename,
+and the following integration drift:
+
+- The project-order endpoint has an explicit frame permission rule that denies plugin access.
+- Reorder indicators use the border-width token without literal shadow geometry.
+- The Node route and desktop contribution goldens include the terminal setup endpoint and command,
+  agent loop coverage, and Changes rail marker already present in their registration code.
+- The scaffolder task-source label matches the Node and SDK label. Error assertions and the workflow
+  example prompt digest match the reviewed wording changes.
+
+All failed checks passed their focused reruns, including all 87 architecture checks. The complete
+desktop package rerun passed 188 client tests, 10 boot tests, and 65 Rust tests.
+
+The three storage backup timeouts reproduced on Node 26.8.1 even in isolation. A native SQLite
+backup promise needed an event-loop wake-up to settle. The SQLite wrapper keeps a timer only while
+a backup is pending and clears it on success or failure. The merged backup suite passed all 12
+tests; process broker checks passed 18 tests, and storage policy checks passed nine tests.
+
+Affected typechecks and lint passed after the fixes. Final builds passed the stock budgets:
+3,149,652 of 3,150,000 bytes for the Node service, and 718,210 of 720,000 bytes for terminal startup.
+The full gate ran once; the checks that failed were rerun after their fixes. No failures remain
+open. Phase notes record the isolated desktop and terminal checks and the native-dialog driver limit.
+
+### Main integration
+
+October 8, 2026: integrated main's workspace icons, optional rail, and subsequent sizing and picker
+refinement. Conflict resolutions preserve project-mode labels, empty-screen behavior, appearance
+metadata, remote chrome data, and the single keybinding dispatcher. Shared workspace removal prunes
+unreferenced image bytes inside the deletion transaction. Appearance-only writes remain available
+for paired workspaces; direct renames remain refused in separate mode.
+
+Full lint passed all 37 tasks. The full test run passed 27 of 36 tasks before the merge fixes.
+Sequential reruns passed every failed check without changing deadlines. These include all 87
+architecture checks, 20 workspace route tests, 695 terminal tests, and the desktop package gate:
+189 client tests, 11 packaged boot tests, and 65 Rust tests. The packaged icon fixture explicitly
+selects grouped mode before requesting Default. Final chrome and token checks passed 44 tests.
+
+Build budgets from main remain unchanged: the Node service uses 3,152,094 of 3,153,000 bytes, and
+terminal startup uses 719,593 of 720,000 bytes. Git reports no unresolved merge entries.
+
+An isolated desktop session in separate mode showed the Project picker and Show project rail
+control. Enabling the rail showed Projects navigation and hid the duplicate picker. Its screenshot
+was inspected, and the session was stopped.
 
 ## Goal
 

@@ -5,6 +5,9 @@ import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from '../db'
 import { makeTestDb, type TestDb } from '../../testkit/db'
 import { createProjectService } from './projectRefs'
+import { memoryIdentityStore } from '../activeIdentity'
+
+const projectService = (db: TestDb['db']) => createProjectService(db, memoryIdentityStore('owner'))
 
 describe('CoreServices.projects', () => {
   let testDb: TestDb
@@ -57,7 +60,7 @@ describe('CoreServices.projects', () => {
   })
 
   it('exposes a narrow projection and oldest GitHub clone lookup', async () => {
-    const projects = createProjectService(testDb.db)
+    const projects = projectService(testDb.db)
     const ref = await projects.byId('project-old')
     expect(ref).toEqual({ id: 'project-old', name: 'widget', path: join(dir, 'old'), workspaceId: 'workspace-1', github: { owner: 'acme', name: 'widget', repoId: 7 } })
     expect(ref).not.toHaveProperty('setupScript')
@@ -67,7 +70,7 @@ describe('CoreServices.projects', () => {
   })
 
   it('returns only mapped project checkouts in deterministic order', async () => {
-    const projects = createProjectService(testDb.db)
+    const projects = projectService(testDb.db)
     expect(await projects.checkouts()).toEqual([
       { id: 'project-plain', path: join(dir, 'plain') },
       { id: 'project-old', path: join(dir, 'old') },
@@ -76,7 +79,7 @@ describe('CoreServices.projects', () => {
   })
 
   it('returns opaque external-project mappings in deterministic order, each with its project scope', async () => {
-    const projects = createProjectService(testDb.db)
+    const projects = projectService(testDb.db)
     expect(await projects.externalProjects('workspace-1')).toEqual([
       { connectionId: 'linear-a', externalId: 'team-a', projectId: '' },
       { connectionId: 'linear-a', externalId: 'team-b', projectId: 'project-plain' },
@@ -87,7 +90,7 @@ describe('CoreServices.projects', () => {
   })
 
   it('filters external-project mappings at the database boundary by provider', async () => {
-    const projects = createProjectService(testDb.db)
+    const projects = projectService(testDb.db)
     expect(await projects.externalProjects('workspace-1', ['rollbar'])).toEqual([
       { connectionId: 'rollbar-a', externalId: 'project-a', projectId: '' },
       { connectionId: 'rollbar-b', externalId: 'project-b', projectId: '' },
@@ -100,7 +103,7 @@ describe('CoreServices.projects', () => {
   })
 
   it('supports controlled deferred creation and mapping updates', async () => {
-    const projects = createProjectService(testDb.db)
+    const projects = projectService(testDb.db)
     const deferred = await projects.create({ name: 'remote widget', path: null, github: { owner: 'acme', name: 'remote', repoId: 99 } })
     expect(deferred).toMatchObject({ name: 'remote widget', path: null, github: { owner: 'acme', name: 'remote', repoId: 99 } })
 

@@ -64,7 +64,7 @@ function acpPrompt(
       case 'file':
         return {
           type: 'text',
-          text: `Please use the workspace file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
+          text: `Please use the file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
         }
       case 'attachment':
       case 'image': {

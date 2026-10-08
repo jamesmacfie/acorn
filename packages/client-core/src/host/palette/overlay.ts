@@ -97,7 +97,7 @@ export function createOverlayFocus(close: () => void): OverlayFocus {
 export function createOverlayPalette(opts: {
   /** Stable command/keybinding id for the overlay toggle. Omit for programmatic-only overlays. */
   id?: string
-  title?: string
+  title?: string | (() => string)
   toggleChord?: string
   active?: () => boolean
   /** Current result-list length; ↑/↓ clamp to it. */
@@ -148,23 +148,27 @@ export function createOverlayPalette(opts: {
 
   onMount(() => {
     if (!opts.id || !opts.toggleChord) return
-    const command = commandRegistry.register({
-      id: `overlay.${opts.id}.toggle`,
-      title: opts.title ?? `Toggle ${opts.id}`,
-      category: 'navigation',
-      when: opts.active,
-      run: () => open() ? close() : show(),
+    const chord = opts.toggleChord
+    createEffect(() => {
+      const title = typeof opts.title === 'function' ? opts.title() : (opts.title ?? `Toggle ${opts.id}`)
+      const command = commandRegistry.register({
+        id: `overlay.${opts.id}.toggle`,
+        title,
+        category: 'navigation',
+        when: opts.active,
+        run: () => open() ? close() : show(),
+      })
+      const binding = keybindingRegistry.register({
+        id: `overlay.${opts.id}.toggle`,
+        command: `overlay.${opts.id}.toggle`,
+        description: title,
+        category: 'Global',
+        defaultChord: chord,
+        when: 'global',
+        active: opts.active,
+      })
+      onCleanup(() => { binding.dispose(); command.dispose() })
     })
-    const binding = keybindingRegistry.register({
-      id: `overlay.${opts.id}.toggle`,
-      command: `overlay.${opts.id}.toggle`,
-      description: opts.title ?? `Toggle ${opts.id}`,
-      category: 'Global',
-      defaultChord: opts.toggleChord,
-      when: 'global',
-      active: opts.active,
-    })
-    onCleanup(() => { binding.dispose(); command.dispose() })
   })
 
   // Keep the selection in range when the list shrinks under it (data refetch narrows results).

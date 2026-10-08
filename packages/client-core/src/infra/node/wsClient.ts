@@ -33,8 +33,9 @@ type StepChangedCb = (event: { runId: string; stepId: string; status: string }) 
 
 const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
-// Plugin lifecycle is fleet control data. Keep its source before the ordinary active-node stream
+// Plugin and workspace identity are fleet control data. Keep their source before the active-node stream
 // filter, without widening task, terminal, or other application subscriptions.
+const fleetWorkspaceSubs = new Set<(nodeId: string, event: WorkspaceChangedEvent) => void>()
 const fleetPluginsSubs = new Set<(nodeId: string) => void>()
 const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
@@ -113,6 +114,9 @@ function connect(): void {
   transport.onFrame((nodeId, raw) => {
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
       for (const cb of fleetPluginsSubs) cb(nodeId)
+    }
+    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspace:changed' && typeof (raw as WorkspaceChangedEvent).workspaceId === 'string') {
+      for (const cb of fleetWorkspaceSubs) cb(nodeId, raw as WorkspaceChangedEvent)
     }
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
@@ -263,6 +267,13 @@ export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()
   return () => void pluginsSubs.delete(cb)
+}
+
+/** Workspace identity changes from any paired Node, carrying the authenticated source id. */
+export function wsOnFleetWorkspaceChanged(cb: (nodeId: string, event: WorkspaceChangedEvent) => void): () => void {
+  fleetWorkspaceSubs.add(cb)
+  connect()
+  return () => void fleetWorkspaceSubs.delete(cb)
 }
 
 /** A content-free plugin change from any paired node, carrying the broker's authenticated source id. */

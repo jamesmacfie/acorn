@@ -4,8 +4,10 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { schema } from './db'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { makeTestDb, type TestDb } from '../testkit/db'
-import { createProject, createProjectRef, deleteProject, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import { createProject, createProjectRef, detectProject, parseGithubRemote, patchProject, projectByGithub } from './projects'
+import { deleteProject } from './projectDeletion'
 
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, stdio: 'pipe' })
 
@@ -32,6 +34,7 @@ describe('createProject / detectProject', () => {
 
   beforeEach(() => {
     testDb = makeTestDb()
+    testDb.db.insert(schema.prefs).values({ userId: '', key: WORKSPACES_PREF_KEY, value: 'on' }).run()
     dir = mkdtempSync(join(tmpdir(), 'acorn-projects-'))
   })
 

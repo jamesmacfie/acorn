@@ -27,6 +27,7 @@ export const deviceConfigPrefs = (config: DeviceConfig): Record<string, string> 
   }
   if (typeof config.themeFollowSystem === 'boolean') prefs[PrefKeys.themeFollowSystem] = String(config.themeFollowSystem)
   if (typeof config.leftCollapsed === 'boolean') prefs[PrefKeys.leftCollapsed] = String(config.leftCollapsed)
+  if (typeof config.workspaceRail === 'boolean') prefs[PrefKeys.workspaceRail] = String(config.workspaceRail)
   return prefs
 }
 
@@ -41,6 +42,7 @@ export const configPatchForPref = (key: string, value: string): Partial<DeviceCo
   }
   if (key === PrefKeys.themeFollowSystem) return { themeFollowSystem: value === 'true' }
   if (key === PrefKeys.leftCollapsed) return { leftCollapsed: value === 'true' }
+  if (key === PrefKeys.workspaceRail) return { workspaceRail: value === 'true' }
   return null
 }
 

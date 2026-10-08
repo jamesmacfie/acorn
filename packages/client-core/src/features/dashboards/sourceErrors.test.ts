@@ -20,7 +20,7 @@ describe('describeSourceFailure', () => {
     [{ code: 'input-unavailable', input: 'pulls', reason: 'Source not installed' }, names, "Pull requests can't be read, because its source isn't installed.", undefined],
     [{ code: 'unavailable' }, { ...names, pluginOff: true }, 'Release readiness comes from Northwind, which is off.', 'turn-on'],
     [{ code: 'unavailable' }, names, "Release readiness couldn't answer.", 'retry'],
-    [{ code: 'forbidden' }, names, "This account isn't available in this workspace.", 'choose-account'],
+    [{ code: 'forbidden' }, names, "This account isn't available in this scope.", 'choose-account'],
     [{ code: 'rate-limited' }, names, 'GitHub asked us to slow down. Trying again shortly.', undefined],
     [{ code: 'timeout' }, names, 'Release readiness took longer than the panel allows.', undefined],
     [{ code: 'incomplete', reason: 'invalid-records', count: 3 }, names, "Release readiness returned 3 records that didn't match what it declared.", undefined],

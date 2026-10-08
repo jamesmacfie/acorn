@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   attention: [] as unknown[],
   // An accessor for the same reason: a test flips it to stand in for the roster arriving.
   rosterKnown: (() => true) as () => boolean,
+  mode: 'on' as 'on' | 'off',
 }))
 vi.mock('@tanstack/solid-query', () => ({
   createQuery: (options: () => { key: string }) => ({
@@ -33,6 +34,7 @@ vi.mock('../../infra/queries', () => ({
   integrationsOptions: () => ({ key: 'integrations' }),
   prefsOptions: () => ({ key: 'prefs' }),
 }))
+vi.mock('../workspaces/workspacesMode', () => ({ createWorkspacesMode: () => () => mocks.mode }))
 vi.mock('../../infra/node/fleet', () => ({
   nodes: () => mocks.nodes,
   homeNode: () => mocks.nodes[0],
@@ -56,6 +58,7 @@ import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { takePluginRequest } from './plugins/installed'
 import { takeConnectionRequest } from './connections/connections'
+import { CORE_SETTINGS_PAGES } from './corePages'
 
 const page = (id: string, extra: Partial<SettingsContribution> = {}): SettingsContribution => ({
   id, label: id, order: 10, component: () => <p data-page={id}>{id} body</p>, ...extra,
@@ -90,6 +93,7 @@ const railItem = (label: string) =>
 const groupOf = (label: string) => railItem(label)?.closest('[role="group"]')?.getAttribute('aria-label')
 
 beforeEach(() => {
+  mocks.mode = 'on'
   closed = 0
   localStorage.clear()
   mocks.integrations = undefined
@@ -257,6 +261,35 @@ describe('SettingsView', () => {
     expect(title()).toBe('Overview')
     mocks.workspaces = () => []
     mocks.projects = []
+  })
+
+  it('lists project pages directly and omits workspace navigation while off', () => {
+    mocks.mode = 'off'
+    mocks.workspaces = () => [{ id: 'ws-1', name: 'Runn', projects: [] }]
+    mocks.projects = [{ id: 'p-1', name: 'acorn', workspaceId: 'ws-1' }]
+    held.push(
+      settingsRegistry.register(page('workspaces', { label: 'Overview', category: 'workspaces' })),
+      settingsRegistry.register(page('workspace.detail', { label: 'Workspace', category: 'workspaces', scope: 'workspace' })),
+      settingsRegistry.register(page('project.detail', { label: 'Project', category: 'workspaces', scope: 'project' })),
+    )
+    open({ target: 'workspaces' })
+    const rows = [...host.querySelectorAll('[aria-label="Projects"] .settings-rail-item')].map((item) => item.textContent)
+    expect(rows).toEqual(['Overview', 'acorn'])
+    railItem('acorn')!.click()
+    expect(host.querySelector('.settings-breadcrumb')?.textContent).not.toContain('Runn')
+    mocks.workspaces = () => []
+    mocks.projects = []
+  })
+
+  it.each(['off', 'on'] as const)('searches only available Overview terms with %s mode', (mode) => {
+    mocks.mode = mode
+    const declaration = CORE_SETTINGS_PAGES.find((candidate) => candidate.id === 'workspaces')!
+    held.push(settingsRegistry.register(page('workspaces', declaration)))
+    open({ target: 'workspaces' })
+    expect(groupOf('Overview')).toBe(mode === 'off' ? 'Projects' : 'Workspaces and projects')
+    search('new workspace')
+    expect(results().includes('Overview')).toBe(mode === 'on')
+    if (mode === 'off') expect(host.querySelector('.settings-rail-empty')?.textContent).toContain('No settings match')
   })
 
   it('ranks page names, then section names, then row labels, then keywords, and lands on the section', async () => {

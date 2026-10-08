@@ -382,7 +382,7 @@ export async function workspaceIdFor(db: AppDatabase, taskId: string): Promise<s
   const t = await loadTask(db, taskId)
   if (!t) throw new Error('Task not found.')
   const workspaceId = await workspaceIdForProject(db, t.projectId)
-  if (!workspaceId) throw new Error('Task has no workspace.')
+  if (!workspaceId) throw new Error('Task has no project scope.')
   return workspaceId
 }
 

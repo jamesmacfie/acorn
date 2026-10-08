@@ -55,6 +55,7 @@ export type SettingsSearchObject = {
 export function buildSettingsIndex(
   pages: readonly SettingsContribution[],
   objects: readonly SettingsSearchObject[] = [],
+  categoryLabel: (category: keyof typeof SETTINGS_CATEGORY_LABELS) => string = (category) => SETTINGS_CATEGORY_LABELS[category],
 ): SettingsSearchEntry[] {
   const entries: SettingsSearchEntry[] = []
   const addSections = (base: Omit<SettingsSearchEntry, 'text' | 'tier'>, sections: readonly SettingsSectionDeclaration[]) => {
@@ -70,7 +71,7 @@ export function buildSettingsIndex(
     const base = {
       page: page.id,
       pageLabel: page.title ?? page.label,
-      group: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)],
+      group: categoryLabel(settingsCategoryOf(page)),
       scope: settingsScopeOf(page),
     }
     entries.push({ ...base, text: base.pageLabel, tier: 0 })
@@ -127,8 +128,11 @@ export function searchSettings(index: readonly SettingsSearchEntry[], query: str
 }
 
 /** Every declared section, as the palette lists them: one row per section, after the page rows. */
-export function settingsSectionEntries(pages: readonly SettingsContribution[]): SettingsSearchEntry[] {
-  return buildSettingsIndex(pages).filter((entry) => entry.tier === 1 && entry.section)
+export function settingsSectionEntries(
+  pages: readonly SettingsContribution[],
+  categoryLabel?: (category: keyof typeof SETTINGS_CATEGORY_LABELS) => string,
+): SettingsSearchEntry[] {
+  return buildSettingsIndex(pages, [], categoryLabel).filter((entry) => entry.tier === 1 && entry.section)
 }
 
 /** The keywords and row labels a section's palette row matches beside its title. */

@@ -1,6 +1,7 @@
 import type { ExternalRef } from '../../integrations/providers.ts'
 import type { McpServerSummary } from '../../integrations/mcp.ts'
 import { z } from 'zod'
+import type { WorkspaceAppearance } from '../../appearance/workspaceAppearance.ts'
 
 // Workspaces group projects and are the top-level unit (docs/workspaces-and-tasks.md).
 // When the worktree setup script runs: 'off' never, 'created' when the task is created, 'terminal'
@@ -24,6 +25,7 @@ export type BrowserRule = {
   action: BrowserRuleAction
 }
 export type Workspace = {
+  appearance?: WorkspaceAppearance | null
   id: string
   name: string
   isDefault: boolean

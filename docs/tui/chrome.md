@@ -18,6 +18,30 @@ The three panels are Menu, Browse, and Tasks. Menu lists the browse sources this
 the desktop draws under its task list. Browse shows what's under the chosen source: the source's own
 `list` region, drawn here instead of inside its view. Tasks lists the workspace's tasks.
 
+The top bar follows the active Node's `core.workspaces` preference. With workspaces on, it shows the
+workspace name and the routed project name. With workspaces off, it shows **Project** and the paired
+project name once. The `w` picker and the palette's workspace commands say **Project** while off.
+The `p` shortcut opens the same picker in that mode. Settings uses the same projected category label
+as the desktop. Command IDs, shortcut IDs, and preference keys keep their workspace spelling.
+
+Setup reads the preference and the project list from the active Node. If the preference is unset and
+the Node has no projects, it asks whether to keep each project separate or group them into
+workspaces. Separate projects is selected by default. Setup waits for the Node to save the answer
+before it opens project creation. A failed save stays on the question and shows the error for retry.
+With workspaces off, setup omits workspace selection and creates a project without a workspace ID.
+With workspaces on, setup keeps the workspace step and passes its chosen ID.
+
+A successful empty project list opens setup at its first step, including after the last project is
+deleted. A pending or failed project or preference read does not count as empty, even if its query
+retains cached data. Setup keeps that data visible while the read settles. Setup belongs to the active
+Node; responses from a Node that was switched away from do not change setup or navigation.
+The top bar keeps its last confirmed wording during a refetch.
+Switching Nodes remounts the shell under that Node's query cache and restores its saved workspace
+choice. The terminal clears the previous Node's open task and transient dialogs during the switch.
+
+A generic task route stays on its task after creation. The project fallback applies to project
+routes; a task route has no project segment to validate against the workspace roster.
+
 With no explicit task or source, the screen opens on the first available Menu source once its
 provider and workspace-link gates have loaded, with focus on that row. Switching workspace clears the
 old task and source. A workspace this session hasn't visited repeats that default, and one it has

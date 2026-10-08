@@ -332,7 +332,7 @@ export const linearProvider = publicProvider({
         label: 'Personal API key',
         type: 'password',
         placeholder: 'lin_api_…',
-        hint: 'Linear → Settings → Security & access → Personal API keys. You can connect more than one workspace.',
+        hint: 'Linear → Settings → Security & access → Personal API keys. You can connect more than one Linear workspace.',
         required: true,
       },
     ],

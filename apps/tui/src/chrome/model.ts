@@ -12,7 +12,7 @@
 
 import { batch, createEffect, createMemo, type Accessor } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { integrationsOptions, tasksOptions, workspacesOptions, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
+import { integrationsOptions, projectsOptions, tasksOptions, workspacesOptions, type Project, type Task, type Workspace } from '@acorn/client-core/infra/queries.ts'
 import {
   activeTaskId, rememberWorkspaceView, selectedSource, setActiveTaskId, setSelectedSource, workspaceView,
 } from '@acorn/client-core/features/tasks/tasks.ts'
@@ -44,11 +44,14 @@ export type ShellModel = {
    *  a guess asks this instead (./restore.ts). */
   ready: Accessor<boolean>
   sourcesReady: Accessor<boolean>
+  /** A successful project roster, distinct from a pending or failed read. */
+  projects: Accessor<readonly Project[] | undefined>
 }
 
 export function createShellModel(): ShellModel {
   const workspacesQuery = createQuery(() => workspacesOptions(true))
   const tasksQuery = createQuery(() => tasksOptions(true))
+  const projectsQuery = createQuery(() => projectsOptions(true))
 
   const integrationsQuery = createQuery(() => integrationsOptions(true))
 
@@ -175,5 +178,8 @@ export function createShellModel(): ShellModel {
     scheduleSettle()
   }
 
-  return { workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady }
+  return {
+    workspaces, allTasks, workspace, tasks, task, sources, chooseWorkspace, ready, sourcesReady,
+    projects: () => projectsQuery.isSuccess && !projectsQuery.isFetching ? projectsQuery.data : undefined,
+  }
 }

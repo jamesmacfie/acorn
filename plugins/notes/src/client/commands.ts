@@ -43,7 +43,7 @@ const notSeed = (note: NoteSummary): boolean => !(note.author === 'workflow' && 
 const noteItem = (scope: NoteScope, note: NoteSummary): CommandSearchItem => ({
   id: `${scope}:${note.slug}`,
   title: note.title,
-  subtitle: note.kind === 'scratch' ? scope : `${scope} · ${note.kind}`,
+  subtitle: note.kind === 'scratch' ? (scope === 'workspace' ? 'shared' : scope) : `${scope === 'workspace' ? 'shared' : scope} · ${note.kind}`,
   ref: note.slug,
 })
 
@@ -53,7 +53,7 @@ type ScopeList = { scope: NoteScope; rows: NoteSummary[] } | { scope: NoteScope;
 
 const problemItem = (scope: NoteScope, message: string): CommandSearchItem => ({
   id: `problem:${scope}`,
-  title: `${scope} notes: ${message}`,
+  title: `${scope === 'workspace' ? 'shared' : scope} notes: ${message}`,
   badge: 'error',
 })
 
@@ -62,7 +62,7 @@ export const notesCommands: readonly ContributedCommand[] = [
     id: 'notes.find',
     kind: 'search',
     title: 'Find a note',
-    hint: 'notes for this task, this workspace, or everywhere',
+    hint: 'notes for this task, its shared scope, or everywhere',
     keywords: ['note', 'scratchpad'],
     category: 'navigation',
     palette: true,

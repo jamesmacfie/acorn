@@ -23,7 +23,7 @@ async function noteLocationFor(core: NotesToolCoreServices, taskId: string, scop
   try {
     return { scope, workspaceId: await core.tasks.workspaceId(taskId) }
   } catch {
-    throw new ToolError('not_found', 'this task has no workspace')
+    throw new ToolError('not_found', 'this task has no note scope')
   }
 }
 
@@ -31,7 +31,7 @@ export function notesAgentTools(notes: NotesStoreCapability, core: NotesToolCore
   return [
     {
       name: 'notes_list',
-      description: 'Workspace notes for the current task (slug, title, kind, author).',
+      description: 'Shared notes for the current task (slug, title, kind, author).',
       input: z.object({ scope: scopeArg }),
       scope: 'task',
       risk: 'read',
@@ -39,7 +39,7 @@ export function notesAgentTools(notes: NotesStoreCapability, core: NotesToolCore
     },
     {
       name: 'notes_read',
-      description: 'Read one workspace note.',
+      description: 'Read one shared note.',
       input: z.object({ slug: z.string(), scope: scopeArg }),
       scope: 'task',
       risk: 'read',

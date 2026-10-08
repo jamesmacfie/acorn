@@ -29,7 +29,7 @@ export const createTask = async (seed: TaskSeed, nodeId?: string | null) => {
 }
 
 export async function patchTask(id: string, body: { title?: string; icon?: string | null; status?: 'active' | 'archived'; pullNumber?: number | null }, nodeId?: string | null) {
-  return writeJson<unknown>(taskRoute(id), {
+  return writeJson<{ id: string; archivedTaskIds?: string[] }>(taskRoute(id), {
     method: 'PATCH',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),

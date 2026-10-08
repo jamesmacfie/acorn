@@ -60,16 +60,16 @@ export async function authorWorkflowConversation(args: {
     if (request.operation === 'list-sources') return args.sources.list({ ...args.request.scope, parameters: {} }, invocation)
     if (request.operation === 'list-accounts') return { unavailable: true, reason: 'Workflow authoring has no account catalogue.' }
     if (request.operation === 'discover-sources') {
-      if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected workspace or project.')
+      if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected scope.')
       return args.sources.discoverAvailable(request, invocation)
     }
     if (request.operation === 'preview-sample') {
       if (!args.request.samplesEnabled) return { unavailable: true, reason: 'Preview samples are disabled for this conversation.' }
-      if (!sameScope(args.request, request.query.scope)) throw new Error('The sample request is outside the selected workspace or project.')
+      if (!sameScope(args.request, request.query.scope)) throw new Error('The sample request is outside the selected scope.')
       const result = await args.sources.invoke({ operation: 'query', query: request.query, mode: 'preview', evaluationTime: Date.now(), pageSize: AUTHORING_LIMITS.sampleRecords }, invocation)
       return boundedAuthoringSample(request.query, request.fields, result.records)
     }
-    if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected workspace or project.')
+    if (!sameScope(args.request, request.scope)) throw new Error('The metadata request is outside the selected scope.')
     if (request.operation === 'describe-source') return args.sources.invoke({ operation: 'describe', source: request.source, scope: request.scope }, invocation)
     return args.sources.invoke(request, invocation)
   }

@@ -9,7 +9,7 @@ It's part of the [data layer](../data-layer.md).
 `POST /v1/core/backup` snapshots core and plugin SQLite databases with SQLite's online-backup API, and
 `GET` on the same route suggests a destination path. Both are device-only. The archive holds
 `core.sqlite` and every `plugins/*.sqlite`: the workspace and task model, repository configuration,
-agent transcripts, saved queries, and the HTTP client's saved requests. It carries
+workspace icon thumbnails, agent transcripts, saved queries, and the HTTP client's saved requests. It carries
 `baseline: "acorn-1"` beside its format version.
 
 - **Secrets are blanked, not removed.** An `integrations` row survives with empty
@@ -46,6 +46,7 @@ prune nothing ([schedules](../schedules.md#what-is-registered)). Times are Node-
 | Terminal replay | Bounded per session | The terminal plugin |
 | Logs | The runtime's size and age policy | The Node runtime |
 | Plugin databases | While the plugin is disabled | Explicit deletion only |
+| Workspace icon thumbnails | While referenced by a workspace | Replacement, reset, or workspace deletion removes unreferenced bytes |
 | Provider mirrors and blobs | Their cache policies | Refetchable. Nothing prunes the blob cache ([caching](../caching.md#immutable-blob-cache)) |
 
 Agent tool calls and file changes keep two rows each: a newer update replaces the rows before it in the

@@ -30,6 +30,7 @@
       "notes.create",
       "preview.open",
       "terminal.run",
+      "terminal.run.setup",
       "terminal.run.targets",
       "terminal.run.layouts",
       "terminal.run.sessions",
@@ -79,6 +80,7 @@
     ],
     "extensions": [
       "agents.storage",
+      "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",
       "memory.tool-card"
@@ -99,6 +101,7 @@
     "railMarkers": [
       "core:task",
       "agents",
+      "changes",
       "docker",
       "workflows.task-groups"
     ],
@@ -148,6 +151,9 @@
       ],
       "extensions": [
         "changes.tool-card"
+      ],
+      "railMarkers": [
+        "changes"
       ],
       "persistedStateSlices": [
         "changes.view"

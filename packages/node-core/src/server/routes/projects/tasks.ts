@@ -1,5 +1,6 @@
 import { recordSetupDecision } from '../../taskScripts/setup'
 import { taskScripts } from '../../taskScripts/service'
+import { taskArchiveTree } from '../../storage/archive'
 import { randomUUID } from 'node:crypto'
 import { z } from 'zod'
 import { and, desc, eq, inArray, max } from 'drizzle-orm'
@@ -278,20 +279,33 @@ export const tasks = new Hono<AppEnv>()
     // Accept a positive number to set, or null to unlink.
     if (typeof body.pullNumber === 'number') patch.pullNumber = body.pullNumber
     else if (body.pullNumber === null) patch.pullNumber = null
-    await db.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id))
+    const archiveTree = patch.status === 'archived' ? taskArchiveTree(db, id) : []
+    if (archiveTree.some((task) => !mayActOnTask(c, task.id))) return respondError(c, 404, 'not_found')
+    const archivedTasks = archiveTree.filter((task) => task.status !== 'archived')
+    db.transaction((tx) => {
+      tx.update(schema.tasks).set(patch).where(eq(schema.tasks.id, id)).run()
+      for (const task of archivedTasks) {
+        if (task.id !== id) tx.update(schema.tasks)
+          .set({ status: 'archived', archivedAt: patch.archivedAt, updatedAt: patch.updatedAt })
+          .where(eq(schema.tasks.id, task.id)).run()
+      }
+    })
     // The client archives this way when it has no terminal plugin to run the full archive route. The
     // worktree stays, but the task's plugin work still stops (server/pluginHost/hooks.ts §
     // core:task-archiving). After the write, so nothing can start new work on the task in between.
     if (patch.status === 'active' && existing.status === 'archived') taskScripts(db).newGeneration(id)
-    if (patch.status === 'archived' && existing.status !== 'archived') taskScripts(db).admit(id, 'teardown', 'not_applicable')
-    if (patch.status === 'archived' && existing.status !== 'archived') await runHook('core:task-archiving', { taskId: id })
+    for (const task of archivedTasks) {
+      taskScripts(db).admit(task.id, 'teardown', 'not_applicable')
+      await runHook('core:task-archiving', { taskId: task.id })
+      if (task.id !== id) broadcastTasksChanged({ taskId: task.id })
+    }
     const publicStateChanged =
       (patch.title !== undefined && patch.title !== existing.title)
       || (patch.icon !== undefined && patch.icon !== existing.icon)
       || (patch.status !== undefined && patch.status !== existing.status)
       || (patch.pullNumber !== undefined && patch.pullNumber !== existing.pullNumber)
     if (publicStateChanged) broadcastTasksChanged({ taskId: id })
-    return c.json({ id, ...patch })
+    return c.json({ id, ...patch, ...(archiveTree.length ? { archivedTaskIds: archivedTasks.map((task) => task.id) } : {}) })
   })
   // Links grow/shrink after creation (docs/workspaces-and-tasks.md): the write path that turns "a task frozen
   // with its birth links" into "a task that accumulates context as work unfolds". Mirrors the

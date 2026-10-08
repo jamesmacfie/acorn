@@ -174,7 +174,7 @@ export const agentsClientPlugin: ClientPlugin = {
       aliases: ['agent-concurrency#limits', 'agent-pricing#claude'],
       keywords: ['concurrency', 'parallel', 'queue', 'limit', 'turns', 'cost', 'pricing', 'price', 'tokens', 'usd', 'estimate', 'cache'],
       sections: [
-        { id: 'limits', label: 'Turns at once', rows: ['Turns at once per provider', 'Turns at once per workspace'] },
+        { id: 'limits', label: 'Turns at once', rows: ['Turns at once per provider', 'Turns at once per scope'] },
         { id: 'claude', label: 'Claude prices', rows: ['Built-in models', 'Other models'], keywords: ['anthropic'] },
         { id: 'codex', label: 'Codex prices', rows: ['Built-in models', 'Other models'], keywords: ['openai'] },
       ],

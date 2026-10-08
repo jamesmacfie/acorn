@@ -11,6 +11,7 @@ import { integrations } from '../integrations'
 import { workspaces } from './workspaces'
 import { makeTestDb, type TestDb } from '../../../testkit/db'
 import type { Env } from '../../bindings'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 
 // The end-to-end shape of the host-owned mapping surface, over the real routes and a real database:
 // enumerate a connection's projects, write the mapping, and, the invariant the whole design turns on,
@@ -79,6 +80,7 @@ describe('workspace external projects, end to end', () => {
 
   beforeEach(async () => {
     t = makeTestDb()
+    t.db.insert(schema.prefs).values({ userId: USER, key: WORKSPACES_PREF_KEY, value: 'on' }).run()
     broadcasts.length = 0
     vi.mocked(getDb).mockReturnValue(t.db)
     app = makeApp()

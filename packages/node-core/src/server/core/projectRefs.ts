@@ -6,6 +6,7 @@ import type { ProjectConfigResponse } from '@acorn/protocol/api.ts'
 import { getProjectConfig } from '../projectConfig'
 import { assertProjectRepoConfigTrusted, assertRepoConfigTrusted } from '../repoConfigTrust'
 import { projectSetup, type SetupTrigger } from '../worktrees/taskWorktree'
+import type { ActiveIdentityStore } from '../activeIdentity'
 
 // The project seam available to plugins. Identity and write methods accept or return narrow ProjectRef
 // projections, so they never expose core's config columns or its SQLite handle. config() and setup()
@@ -42,7 +43,7 @@ export type CompiledProjectService = ProjectService & {
   assertProjectConfigTrusted(projectId: string): Promise<void>
 }
 
-export function createProjectService(db: AppDatabase): CompiledProjectService {
+export function createProjectService(db: AppDatabase, activeIdentity: ActiveIdentityStore): CompiledProjectService {
   return {
     byId: async (id) => {
       const row = await getProject(db, id)
@@ -85,7 +86,7 @@ export function createProjectService(db: AppDatabase): CompiledProjectService {
           asc(schema.workspaceExternalProjects.externalId),
         )
     },
-    create: (input) => createProjectRef(db, input),
+    create: (input) => createProjectRef(db, input, activeIdentity.get() ?? ''),
     update: (id, patch) => updateProjectRef(db, id, patch),
     config: (id) => getProjectConfig(db, id),
     assertConfigTrusted: (taskId, expectedHash) => assertRepoConfigTrusted(db, taskId, expectedHash),

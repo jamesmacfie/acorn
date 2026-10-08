@@ -4,16 +4,16 @@
 // leaking a connection id into the public contract.
 import { activeCacheId } from '../../infra/node/activeNode'
 import { clientFor } from '../../infra/node/fleet'
-import { wsOnNodeEvent } from '../../infra/node/wsClient'
+import { wsOnNodeEvent, wsOnFleetWorkspaceChanged } from '../../infra/node/wsClient'
 import { integrationMappingsRootKey, workspaceExternalProjectsKey, workspacesKey } from '../../infra/queries'
 import { clientEvents } from '../../host/registries/commands/clientEvents'
 
 /** Subscribe for the life of the shell. Both desktop and TUI install this during bootstrap. */
 export function watchWorkspaceChanges(): () => void {
   const offs = [
-    wsOnNodeEvent('workspace:changed', (event) => {
-      void clientFor(activeCacheId()).client.invalidateQueries({ queryKey: workspacesKey })
-      clientEvents.emit('workspace:changed', event)
+    wsOnFleetWorkspaceChanged((nodeId, event) => {
+      void clientFor(nodeId).client.invalidateQueries({ queryKey: workspacesKey })
+      if (nodeId === activeCacheId()) clientEvents.emit('workspace:changed', event)
     }),
     wsOnNodeEvent('workspace-projects:changed', (event) => {
       const client = clientFor(activeCacheId()).client

@@ -14,7 +14,7 @@ export const confirmTaskArchive = (task: Pick<Task, 'id' | 'title' | 'branch' | 
   subject: task.title,
   actionLabel: 'Archive task',
   message: task.branch && task.worktreePath
-    ? 'acorn stops this task\'s sessions and deletes its worktree. You can restore the task from Archive.'
-    : 'acorn stops this task\'s sessions and leaves the project folder as it is. You can restore the task from Archive.',
+    ? 'acorn stops this task\'s sessions and deletes its worktree. All subtasks, including nested subtasks, will also be archived. You can restore tasks from Archive.'
+    : 'acorn stops this task\'s sessions and leaves the project folder as it is. All subtasks, including nested subtasks, will also be archived. You can restore tasks from Archive.',
   alwaysConfirm: true,
 })

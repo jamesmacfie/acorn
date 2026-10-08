@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { describe, expect, it } from 'vitest'
 import { SETTINGS_CATEGORY_LABELS } from '@acorn/client-core/host/registries/shell'
+import { prefsKey } from '@acorn/protocol/api.ts'
 import { renderFixture } from '../harness'
 
 async function command(screen: Awaited<ReturnType<typeof renderFixture>>, query: string) {
@@ -12,6 +13,15 @@ async function command(screen: Awaited<ReturnType<typeof renderFixture>>, query:
 const fits = (frame: string, width: number) => frame.split('\n').every((line) => line.length <= width)
 
 describe('terminal settings route', () => {
+  it('labels the scope category from the active Node mode', async () => {
+    const screen = await renderFixture({ cache: (client) => client.setQueryData(prefsKey, { 'core.workspaces': 'off' }) })
+    try {
+      await command(screen, 'settings')
+      const frame = await screen.until('Projects')
+      expect(frame).not.toContain('Workspaces and projects')
+    } finally { screen.done() }
+  }, 30_000)
+
   it('opens from the palette on every one of the desktop\'s nine groups', async () => {
     const screen = await renderFixture({ width: 80, height: 24 })
     try {

@@ -47,7 +47,7 @@ export function describeSourceFailure(failure: SourceFailure, names: SourceFailu
     case 'unavailable':
       if (names.pluginOff && names.plugin) return { message: `${names.source} comes from ${names.plugin}, which is off.`, fix: 'turn-on' }
       break
-    case 'forbidden': return { message: "This account isn't available in this workspace.", fix: 'choose-account' }
+    case 'forbidden': return { message: "This account isn't available in this scope.", fix: 'choose-account' }
     case 'rate-limited': return { message: `${names.provider ?? names.source} asked us to slow down. Trying again shortly.` }
     case 'timeout': return { message: `${names.source} took longer than the panel allows.` }
     case 'incomplete': {

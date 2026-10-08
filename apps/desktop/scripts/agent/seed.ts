@@ -3,8 +3,11 @@ import { randomUUID } from 'node:crypto'
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs'
 import { dirname, isAbsolute, join } from 'node:path'
 import { max } from 'drizzle-orm'
+import { WORKSPACES_PREF_KEY } from '@acorn/protocol/workspacesMode.ts'
 import { largeDiffFiles, largeDiffSummary, type LargeDiffFile, type LargeSurfaceProfile } from '@acorn/client-core/testkit/large-diff'
+import { activeIdentityStore } from '@acorn/node-core/server/activeIdentity.ts'
 import { openDb } from '@acorn/node-core/server/bindings.ts'
+import { writePreference } from '@acorn/node-core/server/core/prefs.ts'
 import { schema } from '@acorn/node-core/server/db/index.ts'
 import { createProject } from '@acorn/node-core/server/projects.ts'
 import { openDataRoot } from '@acorn/node-core/server/storage'
@@ -26,12 +29,14 @@ const args = Object.fromEntries(process.argv.slice(2).reduce<string[][]>((pairs,
 const dataDir = args['--data-dir']
 const projectPath = args['--project']
 const fixture = args['--fixture']
+const workspaces = args['--workspaces']
 const profile = (args['--profile'] || 'small') as LargeSurfaceProfile
 const seed = Number(args['--seed'] || 1)
 if (!dataDir || !projectPath || !isAbsolute(dataDir) || !isAbsolute(projectPath)) {
   throw new Error('Usage: seed.ts --data-dir ABSOLUTE_PATH --project ABSOLUTE_PATH [--fixture large-surfaces|tui-navigation --profile small|scale|canonical --seed N]')
 }
 if (fixture && fixture !== 'large-surfaces' && fixture !== 'tui-navigation') throw new Error(`Unknown fixture: ${fixture}`)
+if (workspaces !== undefined && workspaces !== 'on' && workspaces !== 'off') throw new Error('--workspaces must be on or off.')
 if (!['small', 'scale', 'canonical'].includes(profile) || !Number.isInteger(seed)) throw new Error('Profile must be small, scale or canonical, and seed an integer.')
 
 const git = (cwd: string, ...command: string[]) => execFileSync('git', command, {
@@ -74,7 +79,9 @@ try {
   if (fixture) writeRepository(projectPath)
   const db = openDb(join(dataDir, 'core.sqlite'))
   try {
-    const result = await createProject(db, { path: projectPath })
+    const ownerId = activeIdentityStore(dataDir).get() ?? ''
+    if (workspaces) writePreference(db, ownerId, WORKSPACES_PREF_KEY, workspaces)
+    const result = await createProject(db, { path: projectPath }, ownerId)
     if (!result.ok) throw new Error(result.reason)
     if (!fixture) {
       process.stdout.write(`${result.project.id}\n`)
@@ -104,15 +111,18 @@ try {
 
         // This project belongs to a separate workspace. The folder stays beside the generated repo,
         // inside the fixture directory, so a session never adds or changes a personal checkout.
-        const otherWorkspaceId = randomUUID()
-        await db.insert(schema.workspaces).values({
-          id: otherWorkspaceId, name: 'Side project', isDefault: false, sort: 1,
-          createdAt: now, updatedAt: now,
-        })
+        let otherWorkspaceId: string | undefined
+        if (workspaces === 'on') {
+          otherWorkspaceId = randomUUID()
+          await db.insert(schema.workspaces).values({
+            id: otherWorkspaceId, name: 'Side project', isDefault: false, sort: 1,
+            createdAt: now, updatedAt: now,
+          })
+        }
         const otherPath = join(dirname(projectPath), 'side-project')
         mkdirSync(otherPath, { recursive: true })
         writeFileSync(join(otherPath, 'README.md'), '# Side project\n')
-        const otherProject = await createProject(db, { path: otherPath, workspaceId: otherWorkspaceId })
+        const otherProject = await createProject(db, { path: otherPath, ...(otherWorkspaceId ? { workspaceId: otherWorkspaceId } : {}) }, ownerId)
         if (!otherProject.ok) throw new Error(otherProject.reason)
         otherWorkspaceTaskId = randomUUID()
         await db.insert(schema.tasks).values({

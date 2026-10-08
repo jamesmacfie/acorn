@@ -1,9 +1,11 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
+import { createEffect, createMemo, createSignal, Match, on, onCleanup, onMount, Show, Switch, untrack, type Accessor, type JSX } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import type { Renderable } from '../tree/compat'
 import type { KeyEvent } from '../keyEvent'
 import { prefsOptions } from '@acorn/client-core/infra/queries.ts'
+import { WORKSPACES_PREF_KEY, workspacesMode } from '@acorn/protocol/workspacesMode.ts'
+import { workspaceWords } from '@acorn/client-core/features/workspaces'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createLogger } from '@acorn/client-core/infra/telemetry'
@@ -94,6 +96,15 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     { defer: true },
   ))
   const prefs = createQuery(() => prefsOptions(true))
+  // Keep the last confirmed wording on screen during a refetch. The empty-node decision below still
+  // requires fresh successful reads, so retained labels cannot turn cached zero into an empty Node.
+  const mode = createMemo((previous: ReturnType<typeof workspacesMode> | undefined) => {
+    const projects = model.projects()
+    return prefs.isSuccess && !prefs.isFetching && projects
+      ? workspacesMode(prefs.data[WORKSPACES_PREF_KEY], projects.length)
+      : previous
+  })
+  const words = () => workspaceWords(mode())
   let root: Renderable | undefined
   const [strip, setStrip] = createSignal<Renderable | undefined>()
   // The shell's own width, so the left column can take a share of it rather than a fixed number of
@@ -105,16 +116,24 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
   // of marks below 100 columns — and it went with the icons: the strip only ever said anything
   // because each row had a glyph in it, and many of those glyphs drew nothing.
   const [hidden, setHidden] = createSignal(false)
-  const [setupStep, setSetupStep] = createSignal<SetupStep>('workspace')
-  const openSetup = (step: SetupStep = 'workspace') => { setSetupStep(step); openOverlay('setup') }
+  const firstSetupStep = (): SetupStep => {
+    if (!prefs.data?.[WORKSPACES_PREF_KEY] && !model.projects()?.length) return 'mode'
+    return mode() === 'on' ? 'workspace' : 'project'
+  }
+  const [setupStep, setSetupStep] = createSignal<SetupStep>('mode')
+  const openSetup = (step?: SetupStep) => { setSetupStep(step ?? firstSetupStep()); openOverlay('setup') }
 
   // An empty node has no project or task that the rail can create. Wait for the Node's real roster
   // before offering setup: the cached startup path may briefly look empty while the Node boots.
-  let offeredSetup = false
+  let emptyNode: string | null = null
   createEffect(() => {
-    if (!model.ready() || offeredSetup) return
-    offeredSetup = true
-    if (model.workspaces().every((workspace) => workspace.projects.length === 0)) openSetup()
+    const node = activeNodeId()
+    const projects = model.projects()
+    if (!node || !projects || !prefs.isSuccess || prefs.isFetching) return
+    if (projects.length) { emptyNode = null; return }
+    if (emptyNode === node) return
+    emptyNode = node
+    openSetup()
   })
   // Agent handoff and terminal commands both set the shared per-task drawer flag. On this host the
   // flag opens a full screen session view instead of a desktop drawer; closing it returns to the
@@ -277,8 +296,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       { id: 'core.palette.open', title: 'Commands', category: 'navigation', run: () => palette.openRoot() },
       { id: 'core.shortcuts.cheat-sheet', title: 'Help', hint: 'what the keyboard does right here', category: 'navigation', palette: true, run: () => openOverlay('help') },
       { id: 'core.settings.open', title: 'Open settings', hint: 'every settings page, grouped as on the desktop', category: 'navigation', palette: true, run: () => openSettings() },
-      { id: 'core.setup.open', title: 'Set up acorn', hint: 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
-      { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup('task') },
+      { id: 'core.setup.open', title: 'Set up acorn', hint: () => mode() === 'off' ? 'projects, tasks, and providers' : 'workspaces, projects, tasks, and providers', category: 'workspace', palette: true, run: () => openSetup() },
+      { id: 'core.task.create', title: 'New task', hint: 'create a task in a project', category: 'task', palette: true, run: () => openSetup(model.projects()?.length ? 'task' : undefined) },
       { id: 'core.terminal.sessions', title: 'Open terminal sessions', hint: 'start or resume a task terminal', category: 'task', palette: true, requires: { plugin: 'terminal' }, when: () => !!model.task(), run: () => {
         const task = model.task()
         if (task) setTerminalOpen(task.id, true)
@@ -286,8 +305,8 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
       // Chord-only. The overlay pickers stay — `w` and `p` are how a reader switches without opening
       // the palette at all — but the palette's own row for each is the search under Go to, and two rows
       // saying "Switch workspace" is one too many (./navigationCommands.ts).
-      { id: 'core.workspace.switch', title: 'Switch workspace', category: 'workspace', palette: false, run: () => openOverlay('workspace') },
-      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: false, run: () => openOverlay('project') },
+      { id: 'core.workspace.switch', title: () => `Switch ${words().singular}`, category: 'workspace', palette: false, run: () => openOverlay('workspace') },
+      { id: 'core.project.switch', title: 'Switch project', category: 'workspace', palette: false, run: () => openOverlay(mode() === 'off' ? 'workspace' : 'project') },
       { id: 'core.rail.toggle', title: 'Rail', category: 'navigation', palette: true, run: () => { setHidden((value) => !value) } },
       { id: 'core.notifications.open', title: 'Notifications', hint: 'what needs you, and what happened', category: 'navigation', palette: true, run: () => openOverlay('notifications') },
       { id: 'core.quit', title: 'Quit', category: 'action', palette: true, run: quit },
@@ -295,24 +314,28 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
     // Ctrl and not `meta`, which is acorn's spelling for the platform command key: a terminal
     // emulator keeps Cmd for itself and never delivers it, so a `meta` chord here would be one
     // nobody can press. Same reason the intent table is installed at Ctrl (../keys/install.ts).
-    const bindings = registerKeybindings([
-      { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
-      { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
-      { id: 'core.workspace.switch', command: 'core.workspace.switch', description: 'Workspace', category: 'Global', defaultChord: 'w', when: 'global' },
-      { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
-      // Beside `w`, because it is the other half of switching workspace, and bare for the same
-      // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
-      // dropped from this layer while there is nowhere to go back to.
-      { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: 'Last workspace', category: 'Global', defaultChord: ';', when: 'global' },
-      { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
-      { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
-      { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
-      { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
-    ])
+    createEffect(() => {
+      const label = words().capitalized
+      const bindings = registerKeybindings([
+        { id: 'core.palette.open', command: 'core.palette.open', description: 'Commands', category: 'Global', defaultChord: 'ctrl+k', when: 'global' },
+        { id: 'core.shortcuts.cheat-sheet', command: 'core.shortcuts.cheat-sheet', description: 'Help', category: 'Global', defaultChord: '?', when: 'global' },
+        { id: 'core.workspace.switch', command: 'core.workspace.switch', description: label, category: 'Global', defaultChord: 'w', when: 'global' },
+        { id: 'core.project.switch', command: 'core.project.switch', description: 'Project', category: 'Global', defaultChord: 'p', when: 'global' },
+        // Beside `w`, because it is the other half of switching workspace, and bare for the same
+        // reason. The command is the palette's Last workspace row (./navigationCommands.ts), and it is
+        // dropped from this layer while there is nowhere to go back to.
+        { id: 'core.goto.workspace-last', command: 'core.goto.workspace-last', description: `Last ${words().singular}`, category: 'Global', defaultChord: ';', when: 'global' },
+        { id: 'core.rail.toggle', command: 'core.rail.toggle', description: 'Rail', category: 'Global', defaultChord: 'ctrl+b', when: 'global' },
+        { id: 'core.notifications.open', command: 'core.notifications.open', description: 'Notifications', category: 'Global', defaultChord: 'n', when: 'global' },
+        { id: 'core.terminal.sessions', command: 'core.terminal.sessions', description: 'Terminal sessions', category: 'Task', defaultChord: 't', when: 'task' },
+        { id: 'core.quit', command: 'core.quit', description: 'Quit', category: 'Global', defaultChord: 'q', when: 'global' },
+      ])
+      onCleanup(() => bindings.dispose())
+    })
     // Go to task, switch workspace, go to project and switch node, as one group of searches. Switching
     // node was one command per paired node until 2026-09-03, which put the whole roster in the root.
-    const navigation = registerNavigationCommands(model)
-    onCleanup(() => { navigation.dispose(); bindings.dispose(); commands.dispose() })
+    const navigation = registerNavigationCommands(model, words)
+    onCleanup(() => { navigation.dispose(); commands.dispose() })
   })
 
   // Settings: core's pages from the table the desktop draws from, beside the pages the roster's plugins
@@ -405,12 +428,12 @@ export function Shell(props: { nodeId: string; supervised: boolean; onQuit: () =
             <Switch>
               <Match when={name() === 'palette'}><Palette session={palette} /></Match>
               <Match when={name() === 'help'}><CheatSheet /></Match>
-              <Match when={name() === 'workspace'}><WorkspacePicker model={model} /></Match>
+              <Match when={name() === 'workspace'}><WorkspacePicker model={model} words={words} /></Match>
               <Match when={name() === 'project'}><ProjectPicker model={model} /></Match>
               <Match when={name() === 'quit'}><QuitConfirm onQuit={props.onQuit} /></Match>
               <Match when={name() === 'trust'}><Dynamic component={trustPromptComponent() ?? undefined} /></Match>
               <Match when={name() === 'notifications'}><Inbox model={model} /></Match>
-              <Match when={name() === 'setup'}><SetupHost model={model} nodeId={props.nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} /></Match>
+              <Match when={name() === 'setup'}><Show when={activeNodeId()} keyed>{(nodeId) => <SetupHost model={model} nodeId={nodeId} initialStep={setupStep()} onClose={() => closeOverlay('setup')} />}</Show></Match>
               <Match when={name() === 'settings'}><SettingsHost nodeId={props.nodeId} onClose={closeSettings} onSetup={() => openSetup()} /></Match>
               <Match when={name() === 'promotion'}><Show when={promotionRequest()}>{(request) => <PromotionHost request={request()} />}</Show></Match>
               <Match when={name() === 'sessions'}><Show when={model.task()}>{(task) => <SessionsHost task={task()} onClose={() => closeOverlay('sessions')} />}</Show></Match>
@@ -491,7 +514,7 @@ function ProjectPicker(props: { model: ShellModel }) {
     <Modal onDismiss={close} title="Project" size="sm">
       <ModalBody>
         <box flexDirection="column">
-          <Show when={projects().length} fallback={<Line role="muted">This workspace has no projects.</Line>}>
+          <Show when={projects().length} fallback={<Line role="muted">No projects available.</Line>}>
             <Rows
               id="chrome.projects"
               ariaLabel="Projects"
@@ -513,16 +536,16 @@ function ProjectPicker(props: { model: ShellModel }) {
  *  that opens it, the whole screen changes when a row is chosen, and a list drawn under the topbar
  *  left the keys wherever they already were — so the reader saw a list they could not drive. An
  *  overlay is the shape that takes the keys and gives them back (./state.ts, ../keys/regions.ts). */
-function WorkspacePicker(props: { model: ShellModel }) {
+function WorkspacePicker(props: { model: ShellModel; words: () => ReturnType<typeof workspaceWords> }) {
   const close = () => closeOverlay('workspace')
   const rows = keyedRows(() => props.model.workspaces(), (workspace) => ({ key: workspace.id, ...workspace }))
   return (
-    <Modal onDismiss={close} title="Workspace" size="sm">
+    <Modal onDismiss={close} title={props.words().capitalized} size="sm">
       <ModalBody>
         <box flexDirection="column">
           <Rows
             id="chrome.workspaces"
-            ariaLabel="Workspaces"
+            ariaLabel={props.words().capitalizedPlural}
             items={rows()}
             onActivate={(id) => { props.model.chooseWorkspace(id); close() }}
           >

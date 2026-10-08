@@ -103,10 +103,10 @@ export async function runCoreWrite(node: CliNode, args: ParsedArgs): Promise<unk
   if (subject === 'project') {
     if (verb === 'add') {
       rejectDoubleStdin([o.workspace])
-      const workspaceId = await typedId(o.workspace, 'Workspace', node, 'workspace')
+      const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace') : undefined
       const path = requireOption(o, 'path')
       if (!isAbsolute(path)) throw new CliError('usage', '--path must be absolute on the selected Node host.', 2)
-      const response = await mutation<{ project: Project }>(node, 'POST', '/v1/core/projects', { path, workspaceId, ...(o.name ? { name: o.name } : {}) }, key)
+      const response = await mutation<{ project: Project }>(node, 'POST', '/v1/core/projects', { path, ...(workspaceId ? { workspaceId } : {}), ...(o.name ? { name: o.name } : {}) }, key)
       return projectResource(node.nodeId, response.project)
     }
     if (verb === 'config') {

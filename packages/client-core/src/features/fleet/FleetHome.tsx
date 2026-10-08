@@ -12,6 +12,7 @@ import NodeChip from './NodeChip'
 import './nodes.css'
 import { Alert, Badge, Button } from '../../kit/components/primitives'
 import { pluginLabel } from '../../host/plugins/pluginLabel'
+import { createWorkspaceWords } from '../workspaces/words'
 
 // Fleet home: the landing view once more than one node is paired, a card per node with connection
 // state, counts, last-refresh, and the two actions that matter from here.
@@ -29,6 +30,7 @@ import { pluginLabel } from '../../host/plugins/pluginLabel'
 // in Settings → Nodes, which already does all four properly; duplicating them here would mean two
 // places to keep in step on a screen whose job is an overview.
 export default function FleetHome() {
+  const words = createWorkspaceWords()
   // The task list under `tasksKey`, counted in the component, not a count fetched under that key.
   // `fetchQuery` writes through the node's own cache, so this fetch returns the task list itself and
   // the component derives the count (docs/caching.md § Fan-out cache safety).
@@ -60,7 +62,7 @@ export default function FleetHome() {
       <header class="fleet-home-head">
         <h1>Fleet</h1>
         <p class="muted">
-          {nodes().length} node{nodes().length === 1 ? '' : 's'} paired. A workspace belongs to exactly one node.
+          {nodes().length} node{nodes().length === 1 ? '' : 's'} paired. A {words().singular} belongs to exactly one node.
         </p>
       </header>
 

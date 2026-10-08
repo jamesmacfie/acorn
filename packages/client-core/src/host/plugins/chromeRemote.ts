@@ -44,17 +44,17 @@ export function railRemote(value: RailProps): { data: RailData; actions: OwnerAc
 }
 
 export function topbarRemote(value: TopbarProps): { data: TopbarData; actions: OwnerActions } {
-  const { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
+  const { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
     breadcrumb, node, nodes, account, canAddProject, slots } = value
   return {
-    data: { workspace, workspaces, project, projects, projectPickerVisible, projectPickerDisabled,
+    data: { workspacesMode, workspace, workspaces, workspacePickerVisible, project, projects, projectPickerVisible, projectPickerDisabled,
       breadcrumb, node, nodes, account, canAddProject, slots },
     actions: {
       pickWorkspace: (selection) => {
         const selected = selection as { id?: unknown; nodeId?: unknown } | null
-        if (!selected || typeof selected.nodeId !== 'string') throw new Error('Workspace selection is unavailable')
+      if (!selected || typeof selected.nodeId !== 'string') throw new Error('Selection is unavailable')
         const entry = workspaces.find((item) => item.id === selected.id && item.nodeId === selected.nodeId)
-        if (!entry) throw new Error('Workspace selection is unavailable')
+      if (!entry) throw new Error('Selection is unavailable')
         value.pickWorkspace(entry.id, entry.nodeId)
       },
       pickProject: (id) => value.pickProject(known(id, projects)),

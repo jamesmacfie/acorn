@@ -1,0 +1,12 @@
+.no-projects {
+  display: grid;
+  min-height: 0;
+  place-items: center;
+  padding: var(--space-6);
+}
+.no-projects-content {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  width: min(100%, 540px);
+}

@@ -20,6 +20,7 @@ vi.mock('@tanstack/solid-query', () => ({
   useQueryClient: () => ({ invalidateQueries: calls.invalidate }),
 }))
 vi.mock('@acorn/plugin-api/client', () => ({
+  createWorkspaceWords: () => () => ({ singular: 'workspace' }),
   activeNodeId: () => null,
   activateTaskSignals: calls.activate,
   pathForTask: (task: Task) => `/t/${task.id}`,

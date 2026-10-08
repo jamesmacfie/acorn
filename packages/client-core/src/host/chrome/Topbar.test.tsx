@@ -1,4 +1,5 @@
 import { render } from 'solid-js/web'
+import { createSignal } from 'solid-js'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { SlotRef, TopbarProps } from '@acorn/protocol/chrome.ts'
 import Topbar from './Topbar'
@@ -14,7 +15,9 @@ describe('core topbar', () => {
   it('draws its shell chrome from the shared contract and places status items', () => {
     const right = 'minted-right' as SlotRef
     const navigate = vi.fn()
+    const [workspacePickerVisible, setWorkspacePickerVisible] = createSignal<boolean>()
     const props: TopbarProps = {
+      workspacesMode: 'on',
       workspace: { id: 'w1', label: 'Work' },
       workspaces: [{ id: 'w1', label: 'Work', nodeId: 'n1', nodeLabel: 'Local', projectCount: 1 }],
       project: { id: 'p1', label: 'Project' }, projects: [{ id: 'p1', label: 'Project' }],
@@ -30,13 +33,19 @@ describe('core topbar', () => {
     document.body.append(host)
     dispose = render(() => (
       <WithNestedChromeSlots slots={[{ ref: right, render: () => <span data-status>Ready</span> }]}>
-        <Topbar value={props} />
+        <Topbar value={{ ...props, workspacePickerVisible: workspacePickerVisible() }} />
       </WithNestedChromeSlots>
     ), host!)
     expect(host.querySelector('.topbar')).not.toBeNull()
     expect(host.querySelector('[data-node="n1"]')).not.toBeNull()
     expect(host.querySelector('[data-status]')?.textContent).toBe('Ready')
     expect(host.textContent).toContain('#4')
+    expect(host.querySelector('[aria-label="Workspace"]')).not.toBeNull()
+    setWorkspacePickerVisible(false)
+    expect(host.querySelector('[aria-label="Workspace"]')).toBeNull()
+    expect(host.querySelector('[aria-label="Project"]')).not.toBeNull()
+    setWorkspacePickerVisible(true)
+    expect(host.querySelector('[aria-label="Workspace"]')).not.toBeNull()
     host.querySelector<HTMLButtonElement>('.breadcrumb button')?.click()
     expect(navigate).toHaveBeenCalledWith('/p/p1')
   })
@@ -44,6 +53,7 @@ describe('core topbar', () => {
   it('offers Add project in the workspace switcher only when the host can pick a folder', () => {
     const addProject = vi.fn()
     const base: TopbarProps = {
+      workspacesMode: 'on',
       workspace: { id: 'w1', label: 'Work' },
       workspaces: [{ id: 'w1', label: 'Work', nodeId: 'n1', nodeLabel: 'Local', projectCount: 0 }],
       project: null, projects: [], projectPickerVisible: false, projectPickerDisabled: false,
@@ -67,5 +77,26 @@ describe('core topbar', () => {
     host.querySelector<HTMLButtonElement>('.repo-picker button')?.click()
     expect(document.querySelector('.repo-picker-popover')).not.toBeNull()
     expect(addButton()).toBeUndefined()
+  })
+
+  it('labels the primary picker as Project and hides the second picker while off', () => {
+    const value: TopbarProps = {
+      workspacesMode: 'off', workspace: { id: 'w1', label: 'Repo' },
+      workspaces: [{ id: 'w1', label: 'Repo', nodeId: 'n1', nodeLabel: 'Local', projectCount: 1 }],
+      project: { id: 'p1', label: 'Repo' }, projects: [{ id: 'p1', label: 'Repo' }],
+      projectPickerVisible: true, projectPickerDisabled: false,
+      breadcrumb: [], node: null, nodes: [], account: null, canAddProject: true,
+      slots: { right: 'right' as SlotRef },
+      pickWorkspace: vi.fn(), pickProject: vi.fn(), pickNode: vi.fn(), openSettings: vi.fn(),
+      navigate: vi.fn(), clearCache: vi.fn(), addProject: vi.fn(),
+    }
+    host = document.createElement('div')
+    document.body.append(host)
+    dispose = render(() => <WithNestedChromeSlots slots={[]}><Topbar value={value} /></WithNestedChromeSlots>, host!)
+    expect(host.querySelectorAll('.repo-picker')).toHaveLength(1)
+    expect(host.querySelector('[aria-label="Project"]')).not.toBeNull()
+    host.querySelector<HTMLButtonElement>('.repo-picker button')!.click()
+    expect(document.querySelector('.repo-picker-popover')?.textContent).toContain('Add project…')
+    expect(document.querySelector('.repo-picker-popover')?.textContent).not.toContain('1 project')
   })
 })

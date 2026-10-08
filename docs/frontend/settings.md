@@ -21,7 +21,8 @@ opens on the last page used, which is kept in local storage and never sent to a 
 
 The rail holds **Back to acorn**, a search field, which `/` focuses, and nine groups: General,
 Workspaces and projects, Agents, Connections, Features, Automation, Machines, Plugins, and Advanced
-(`packages/protocol/src/chrome/settingsPages.ts`). A page declares its group as `category` and what a
+(`packages/protocol/src/chrome/settingsPages.ts`). The second group reads **Projects** when the
+active Node keeps projects separate. A page declares its group as `category` and what a
 change affects as `scope`, `device`, `node`, `workspace`, or `project`, on its `SettingsContribution`
 (`packages/client-core/src/host/registries/shell/settings.ts`). A missing `category` is `features`, a
 missing `scope` is `node`, and the older `group: 'workspace'` still means `scope: 'workspace'`.
@@ -77,6 +78,11 @@ findable before its chunk loads. A loaded plugin's settings frame declares `keyw
 without `rows` ([the manifest](../plugin-authoring/the-manifest.md)). The index adds the names of
 workspaces, projects, connections, Nodes, and plugins. The registry refuses a compiled page over the
 limits, or whose section IDs repeat or can't be carried in a link.
+
+The desktop projects core search declarations for the active Node's grouping mode before indexing
+or registering palette rows. Separate mode removes workspace creation and movement terms, hides the
+project page's workspace row, and calls the last-scope shortcut a project shortcut. Grouped mode
+retains the declared workspace terms. Page IDs and deep links stay the same.
 
 Results rank page names first, then section names, row labels, and keywords. Within a rank, a match at
 the start of the text beats one at the start of a word, which beats one anywhere. Each result names its

@@ -24,6 +24,7 @@ The launcher adds the current checkout as a local project. These flags change th
 | --- | --- |
 | `--project /absolute/path` | Adds a different folder as the project. |
 | `--onboarding` | Starts with an empty profile, to test the first-run wizard. |
+| `--workspaces on\|off` | Sets the Node's workspace mode before seeding a project. |
 | `--reuse` | Reopens a stopped session's data. A stopped name isn't reused without it. |
 | `--vite` | Serves the live Vite renderer instead of the staged one, to check hot reload. |
 | `--fixture NAME` | Seeds a generated fixture. See [the large-surface flow](#large-surface-flow). |

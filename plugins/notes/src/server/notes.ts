@@ -90,7 +90,7 @@ export class NotesStore {
 
   private dirFor(location: NoteLocation): string {
     const key = location.scope === 'global' ? 'global' : location.scope === 'workspace' ? location.workspaceId : location.taskId
-    if (!isValidDirKey(key)) throw new Error(`Invalid ${location.scope} id.`)
+    if (!isValidDirKey(key)) throw new Error('Invalid note location id.')
     const dir = location.scope === 'task' ? join(this.root, 'task', key) : join(this.root, key)
     mkdirSync(dir, { recursive: true })
     return dir

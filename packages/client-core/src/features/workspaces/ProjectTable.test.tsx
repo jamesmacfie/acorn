@@ -50,6 +50,20 @@ function pointAt(id: string) {
 }
 
 describe('project ordering in the shared settings table', () => {
+  it('focuses the new workspace name after choosing it from the grouped selection bar', async () => {
+    mount()
+    host.querySelector<HTMLInputElement>('input[aria-label="Select a"]')!.click()
+    const move = host.querySelector<HTMLButtonElement>('button[aria-label="Move to workspace"]')!
+    move.focus()
+    move.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }))
+    const option = document.querySelector<HTMLButtonElement>('[role="option"][data-value="__new__"]')!
+    option.click()
+    const input = host.querySelector<HTMLInputElement>('input[aria-label="New workspace name"]')!
+    await vi.waitFor(() => expect(document.activeElement).toBe(input))
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))
+    expect(host.querySelector<HTMLInputElement>('input[aria-label="New workspace name"]')).toBeNull()
+  })
+
   it('drags into the indicated position, saves the workspace order, and keeps selection and navigation separate', async () => {
     let saved!: () => void
     vi.mocked(setWorkspaceProjectOrder).mockImplementation(() => new Promise((resolve) => { saved = () => resolve({ ok: true }) }))

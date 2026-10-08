@@ -5,6 +5,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { integrationsKey, prefsKey, projectsKey, tasksKey, workspacesKey, type Task } from '@acorn/protocol/api.ts'
 import { paneRegistry, type PaneContribution } from '../../host/registries/panes/panes'
 import { railMarkerRegistry } from '../../host/registries/rail/railMarkerFeed'
+import { clientEvents } from '../../host/registries/commands/clientEvents'
 import type { Disposable } from '../../kit/lib/state/registry'
 import { activeTaskId, setActiveTaskId, setSelectedSource } from '../tasks/tasks'
 
@@ -134,6 +135,30 @@ const pointAt = (element: Element) => {
 }
 
 describe('workspace scope after archiving a project-folder task', () => {
+  it('leaves an archived subtask selected during teardown and evicts every archived task', async () => {
+    const parent = task('parent', 'Parent task')
+    const child = task('child', 'Child task', parent.id)
+    setActiveTaskId(parent.id)
+    mount([parent, child, task('remaining', 'Remaining task')], true)
+    const evicted: string[] = []
+    const off = clientEvents.on('runtime:task-archived', ({ taskId }) => { evicted.push(taskId) })
+    let finishArchive!: () => void
+    archiveTaskMock.mockImplementation(() => new Promise((resolve) => {
+      finishArchive = () => resolve({ id: parent.id, archivedTaskIds: [child.id, parent.id] })
+    }))
+    try {
+      host.querySelector<HTMLElement>('[data-task-id="parent"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
+      const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')].find((item) => item.textContent?.includes('Archive'))!
+      archiveButton.click()
+      await vi.waitFor(() => expect(archiveTaskMock).toHaveBeenCalledWith(parent.id))
+      setActiveTaskId(child.id)
+      finishArchive()
+      await vi.waitFor(() => expect(activeTaskId()).toBeNull())
+      expect(navigateMock).toHaveBeenLastCalledWith('/p/p1')
+      expect(evicted).toEqual([child.id, parent.id])
+    } finally { off() }
+  })
+
   it.each([false, true])('returns to the project and retains the roster when refresh precedes the response: %s', async (refreshFirst) => {
     const current = { ...task('current', 'Project folder'), branch: null, worktreePath: null }
     const remaining = task('remaining', 'Same workspace')
@@ -147,7 +172,7 @@ describe('workspace scope after archiving a project-folder task', () => {
     await vi.waitFor(() => expect(taskLabels()).toEqual(['Project folder', 'Same workspace']))
 
     let finishArchive!: () => void
-    archiveTaskMock.mockImplementation(() => new Promise<void>((resolve) => { finishArchive = resolve }))
+    archiveTaskMock.mockImplementation(() => new Promise<{ id: string }>((resolve) => { finishArchive = () => resolve({ id: current.id }) }))
     host.querySelector<HTMLElement>('[data-task-id="current"]')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true }))
     const archiveButton = [...document.querySelectorAll<HTMLElement>('[role="menuitem"]')]
       .find((item) => item.textContent?.includes('Archive'))!

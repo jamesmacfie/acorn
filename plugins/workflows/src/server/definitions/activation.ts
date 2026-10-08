@@ -69,7 +69,7 @@ export const workflowDefinitions = (
         catalog: () => runner.validationCatalog(),
         scope: async (workspaceId, projectId) => {
           const project = projectId ? await core.projects.byId(projectId) : null
-          if (projectId && (!project || project.workspaceId !== workspaceId)) throw new Error('Project is outside this workspace')
+          if (projectId && (!project || project.workspaceId !== workspaceId)) throw new Error('Project is outside this scope')
           return { workspaceId, projectId: projectId ?? '', repoDir: project?.path ?? null, userDir: homedir() }
         },
         query: request => ctx.dataSources.queryPublication(request, invocation()),
@@ -145,7 +145,7 @@ export const workflowDefinitions = (
     generate: async ({ userId, ...request }) => {
       const project = request.projectId ? await core.projects.byId(request.projectId) : null
       if (request.projectId && (!project || project.workspaceId !== request.workspaceId)) {
-        return { error: 'The selected project is not in this workspace.' }
+        return { error: 'The selected project is outside this scope.' }
       }
       const catalog = await starts.generationCatalog(request.projectId, request.defId)
       const { generateWorkflowRequest } = await import('../authoring/generationRequest')
@@ -163,7 +163,7 @@ export const workflowDefinitions = (
       const projectId = request.scope.projectId
       const project = projectId ? await core.projects.byId(projectId) : null
       if (projectId && (!project || project.workspaceId !== request.scope.workspaceId)) {
-        throw new Error('The selected project is not in this workspace.')
+        throw new Error('The selected project is outside this scope.')
       }
       const catalog = await starts.generationCatalog(projectId, request.targetId)
       const { authorWorkflowConversation } = await import('../authoring/conversation')

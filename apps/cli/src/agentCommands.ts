@@ -3,6 +3,7 @@ import { CliError } from './error'
 import { operationKey, readBounded, rejectDoubleStdin, requestKey, requireOption, typedId } from './input'
 import type { CliNode } from './node'
 import { agentEventResource, agentSessionResource, agentTurnAck, type AgentSessionRow } from './projection'
+import { workspaceForProject } from './projectWorkspace'
 
 type Provider = { id: string; profileId: string; label: string; installed: boolean; authenticated: boolean | null; driverKind: string; diagnostics: string[] }
 type Turn = { id: string; sessionId: string; ordinal: number; status: string }
@@ -121,9 +122,10 @@ export async function runAgentCommand(node: CliNode, args: ParsedArgs): Promise<
       authenticated: provider.authenticated, driverKind: provider.driverKind, diagnostics: provider.diagnostics }))
   }
   if (verb === 'list') {
-    rejectDoubleStdin([o.task, o.workspace])
+    rejectDoubleStdin([o.task, o.workspace, o.project])
     const taskId = o.task ? await typedId(o.task, 'Task', node, 'task') : undefined
-    const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace') : undefined
+    const workspaceId = o.workspace ? await typedId(o.workspace, 'Workspace', node, 'workspace')
+      : o.project ? await workspaceForProject(node, o.project) : undefined
     const query = new URLSearchParams({ ...(taskId ? { taskId } : {}), ...(workspaceId ? { workspaceId } : {}), limit: String(numberOption(o.limit, 'limit', 100, 1, 100)) })
     const rows = await node.get(`${base}/sessions?${query}`) as { sessions: AgentSessionRow[]; nextCursor: string | null }
     if (!Array.isArray(rows?.sessions)) throw new CliError('invalid_response', 'The Agents plugin returned an invalid session list.', 1)

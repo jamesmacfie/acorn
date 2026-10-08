@@ -91,7 +91,7 @@ it('keeps generation, edit, and repair prompt bytes stable', () => {
     problems: ['Step A has no predecessor.'],
   })
   expect([digest(system), digest(user), digest(repair)]).toEqual([
-    '02e1fb65e2d3670c73d6aea52b878271bdc0134a49617fcdb603264ac18e56b3',
+    'd5ba3dbdf480b3e40582677dacb582fd69e226a6ebbe1101a6891a2db4d17ce1',
     '7c05d99245a0227ce0871974a643edd54542ede256f4b4d76eb6a24a402d45bd',
     'd56c93453b6719c4f1ee299d50d01ad01cfc928c1e305cc263411b60199b003a',
   ])

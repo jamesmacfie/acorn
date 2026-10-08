@@ -7,9 +7,10 @@ export type WorktreeResult = { ok: true; path: string } | { ok: false; reason: s
 // skipTeardown) or abort; `output` is the script's tail for display.
 // `cleanupFailed` names the plugins whose opted-in cleanup threw. `ok` is still true: the task is archived, and
 // reporting a failure would have the caller offering to retry something already done.
+// `archivedTaskIds` includes descendants that finished, even when a later task refused archive.
 export type ArchiveResult =
-  | { ok: true; cleanupFailed?: string[] }
-  | { ok: false; reason: string; teardownFailed?: boolean; output?: string }
+  | { ok: true; cleanupFailed?: string[]; archivedTaskIds?: string[] }
+  | { ok: false; reason: string; teardownFailed?: boolean; output?: string; archivedTaskIds?: string[] }
 
 export type ArchiveOpts = {
   deleteWorktree?: boolean

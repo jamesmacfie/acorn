@@ -17,16 +17,23 @@ resource with its ID to stdout. Retry with the same request ID to finish the sec
 
 ## Workspaces and projects
 
-`workspace list` includes each workspace's project membership. Removing a workspace moves its projects
-to Default and removes its provider mappings, and Default can't be removed.
+`workspace list` includes each workspace's project membership. With workspaces on, removing a
+workspace moves its projects to Default and removes its provider mappings; Default can't be removed.
+With workspaces off, `workspace create`, `workspace remove`, and `project move` return 409
+`workspaces_off` with a usage exit code. Add a project instead.
 
-`project add` needs an explicit workspace ID and an absolute path on the selected Node's host. The Node
+`project add` needs an absolute path on the selected Node's host. `--workspace` is optional: the
+Node uses Default while workspaces are on or creates a workspace for the project while off. The Node
 reuses a project registered through another spelling of the same folder, including a symlink. Names can
 repeat, so scripts select by ID. Moving a project changes membership, never its folder. `project list`
 filters a complete `GET /v1/core/projects` answer by workspace. JSON includes hidden rows, and text
 leaves them out unless `--include-hidden` is set. Paths belong to the Node's host, including when the
 CLI is remote. Removing a project deletes its task rows and links and leaves the folder and worktrees on
-disk.
+disk. With workspaces off, removal also deletes the project's workspace, links, and datasets.
+
+`agent list --project ID` and `run list --project ID` resolve the project's workspace and use the
+workspace-filtered routes. Each conflicts with `--workspace`; the agent filter also conflicts with
+`--task`.
 
 `project config set` takes a JSON object of exact project configuration fields. Unknown fields and
 malformed browser rules fail before a write. Script fields may run later under the Node's configuration
