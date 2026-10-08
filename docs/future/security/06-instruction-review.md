@@ -61,6 +61,10 @@ render all input as escaped text. Findings identify commands, external domains, 
 permission changes, and instruction override phrases. Keep ambiguous language advisory. A security
 guide mentioning credential theft is not proof that it instructs theft.
 
+Approval does not require the owner to open every file. Decided October 8, 2026: findings appear
+first and each file starts collapsed, so approving without reading the rest is an informed choice.
+Forcing a scroll through every file teaches the owner to scroll past them.
+
 Keep analyzers deterministic and bounded. Start with text rules and reviewable shell patterns;
 do not build a general malware detector or spend model tokens automatically. Supporting scripts in
 skills belong in the review. Unknown executable formats report unsupported analysis rather than clean.
