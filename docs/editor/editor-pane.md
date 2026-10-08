@@ -49,7 +49,10 @@ evicts view state only for its own Node, so equal IDs on two Nodes keep separate
 
 Duplicate basenames gain the shortest parent suffix that distinguishes the open paths. Each desktop
 tab has its own menu, including inactive tabs. In the terminal strip, arrows move a separate tab
-caret without activating it, and Shift+F10 opens that caret tab's menu below the strip.
+caret without activating it, and Shift+F10 opens that caret tab's menu below the strip. A normal
+terminal click activates the file; the adjacent `⋯` targets its menu without activation. The menu
+scrolls its focused action when the narrow detail column cannot show every item. Its write hold
+starts before focus leaves the document and ends before a selected guarded close begins.
 Close others, to the right, and all capture their ordered targets and ask the pane's guarded close
 for each one. A save failure, conflict, or intervening edit stops the run and reports how many closed.
 Only successful explicit closes enter the 20-entry session reopen stack. Reopen checks the Node file

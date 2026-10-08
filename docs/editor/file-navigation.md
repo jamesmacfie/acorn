@@ -40,7 +40,10 @@ drawer keeps `⌘⇧T` whenever another pane owns focus. Reopen checks the Node 
 a kept tab at its recorded tab-order index; the 20-entry stack contains only path and index.
 
 History records at most 100 deliberate file switches and position jumps per Node and task for the
-session. Replay checks that a file still exists, skips unavailable entries with a notice, and does
+session. Replay checks that a file still exists, skips confirmed missing entries with a notice, and does
 not add a new history entry. A new jump after back removes the forward tail. Ordinary typing does
-not add entries. The terminal client draws the same palette session, so it gets **Go to file** too.
+not add entries. Pending replay and reopen reads yield to a newer navigation and cannot reveal a
+path whose history or closed-tab reference changed during rename or trash. A transient read error
+leaves the destination available for retry. The terminal client draws the same palette session, so
+it gets **Go to file** too.
 Editing, autosave, `⌘S`, and the terminal-editor switch stay in the pane.

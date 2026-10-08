@@ -4,7 +4,7 @@ import type { Renderable } from '../../tree/compat'
 import { COLLECTION_INTENTS, createCollectionIntents, type Intent } from '@acorn/client-core/kit/keys'
 import { Line, slot } from '../cells'
 import { bindKeys } from '../../keys/install'
-import { enterParent, markParent, moveRegion, walkStops } from '../../keys/regions'
+import { enterParent, markEntry, markParent, moveRegion, scheduleSettle, walkStops } from '../../keys/regions'
 import { stop } from '../../keys/stops'
 import { PARENT } from '../../keys/tiers'
 import { ScrollViewport } from '../scrolling'
@@ -154,15 +154,17 @@ export function DocumentTabs(props: {
     } as Partial<Record<Intent, () => boolean>>,
   })
   return (
-    <box flexDirection="column" ref={control.ref}>
+    <box flexDirection="column" ref={(element: Renderable) => { control.ref(element); markEntry(element) }}>
     <box flexDirection="row" gap={2}>
       {/* The caret every collection draws, for the reason the pane strip gives: the current tab is
           already marked, and a mark that means two things means neither (../chrome/PaneRow.tsx). */}
       <Line tone="accent">{control.focused() ? '\u203a' : ' '}</Line>
       <For each={props.tabs}>
-        {(tab) => (
+        {(tab) => (<>
           <box height={1} flexShrink={0} ref={(element: Renderable) => {
-            element.onMouseDown = () => { if (props.menu) keys.goTo(tab.id); else props.onActivate(tab.id) }
+            // A normal click still opens the document. The separate action mark below targets an
+            // inactive tab without opening it, matching the desktop's per-tab menu button.
+            element.onMouseDown = () => { if (props.menu) keys.goTo(tab.id); props.onActivate(tab.id) }
             onCleanup(() => { element.onMouseDown = undefined })
           }}>
             <Line
@@ -172,13 +174,25 @@ export function DocumentTabs(props: {
               {props.menu && keys.active() === tab.id ? '›' : ''}{tab.label}{tab.fileStatus ? ` [${tab.fileStatus.letter}]` : ''}{tab.dirty ? ' ●' : ''}{props.active === tab.id && props.onClose ? ' ×' : ''}
             </Line>
           </box>
-        )}
+          {props.menu && <box height={1} flexShrink={0} ref={(element: Renderable) => {
+            element.onMouseDown = () => { keys.goTo(tab.id); setMenuOpen(true) }
+            onCleanup(() => { element.onMouseDown = undefined })
+          }}><Line tone="muted"> ⋯ </Line></box>}
+        </>)}
       </For>
       <Line role="muted">{props.tabs.find((tab) => tab.id === props.active)?.fileStatus?.label ?? ''}</Line>
       <box flexGrow={1} />
       {slot(props.actions)}
     </box>
-      {props.menu && keys.active() ? <box flexDirection="row">{slot(props.menu(keys.active()!, { open: menuOpen, onOpenChange: setMenuOpen }))}</box> : null}
+      {/* A closed Menu has its own focus stop. Mount it only when invoked so region entry lands on
+          this strip and its Left/Right/Shift+F10 keys can target inactive tabs. */}
+      {props.menu && menuOpen() && keys.active() ? <box flexDirection="row">{slot(props.menu(keys.active()!, {
+        open: menuOpen,
+        onOpenChange: (open) => {
+          setMenuOpen(open)
+          if (!open) scheduleSettle()
+        },
+      }))}</box> : null}
     </box>
   )
 }

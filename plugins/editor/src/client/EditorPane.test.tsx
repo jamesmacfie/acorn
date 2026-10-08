@@ -148,6 +148,12 @@ const editor = async (host: HTMLElement): Promise<EditorView> =>
 const showing = async (view: () => EditorView, text: string) =>
   vi.waitFor(() => expect(view().state.doc.toString()).toContain(text))
 
+const runEditorCommand = (id: string) => {
+  const command = commandRegistry.entries().find((entry) => entry.id === id)
+  if (!command || !('run' in command)) throw new Error(`Missing action command: ${id}`)
+  command.run({ nodeId: null, workspaceId: null, projectId: null, taskId: null, paneId: null, surfaceId: null })
+}
+
 describe('the editor pane', () => {
   const saveChord = (view: EditorView) => view.contentDOM.dispatchEvent(new KeyboardEvent('keydown', {
     key: 's', code: 'KeyS', keyCode: 83, ctrlKey: true, bubbles: true,
@@ -170,6 +176,20 @@ describe('the editor pane', () => {
     host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
     await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
     expect(disk.get('a.ts')).toContain('// unsent')
+  })
+
+  it('releases menu custody before guarding a dirty tab close', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    view.dispatch({ changes: { from: 0, insert: '// menu draft\n' } })
+    host.querySelector<HTMLButtonElement>('[aria-label="Actions for a.ts"]')!.click()
+    const close = await vi.waitFor(() => [...document.querySelectorAll<HTMLButtonElement>('[role="menuitem"]')]
+      .find((item) => item.textContent === 'Close')!)
+    close.click()
+    await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
+    expect(disk.get('a.ts')).toContain('// menu draft')
   })
 
   it('keeps a later edit and its tab when close waits on an earlier revision', async () => {
@@ -258,22 +278,106 @@ describe('the editor pane', () => {
     await showing(() => view, 'const b = 2')
     requestEditorReveal(taskId, 'a.ts', 1, 4)
     await showing(() => view, 'const a = 1')
-    const run = (id: string) => {
-      const command = commandRegistry.entries().find((entry) => entry.id === id)
-      if (!command || !('run' in command)) throw new Error(`Missing action command: ${id}`)
-      command.run({ nodeId: null, workspaceId: null, projectId: null, taskId: null, paneId: null, surfaceId: null })
-    }
-    run('editor.navigation.back')
+    runEditorCommand('editor.navigation.back')
     await vi.waitFor(() => expect(activeFile(taskId)).toBe('b.ts'))
-    run('editor.navigation.forward')
+    runEditorCommand('editor.navigation.forward')
     await vi.waitFor(() => expect(activeFile(taskId)).toBe('a.ts'))
-    run('editor.navigation.back')
+    runEditorCommand('editor.navigation.back')
     await vi.waitFor(() => expect(activeFile(taskId)).toBe('b.ts'))
     requestEditorReveal(taskId, 'b.ts', 1, 6)
     await vi.waitFor(() => expect(view.state.selection.main.head).toBe(5))
-    run('editor.navigation.forward')
+    runEditorCommand('editor.navigation.forward')
     await Promise.resolve()
     expect(activeFile(taskId)).toBe('b.ts')
+  })
+
+  it('does not let a delayed back read replace a newer deliberate position', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    requestEditorReveal(taskId, 'b.ts', 1, 3)
+    await showing(() => view, 'const b = 2')
+    requestEditorReveal(taskId, 'a.ts', 1, 4)
+    await showing(() => view, 'const a = 1')
+    let finishBack!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((resolve) => { finishBack = resolve }))
+    runEditorCommand('editor.navigation.back')
+    await vi.waitFor(() => expect(finishBack).toBeTypeOf('function'))
+    requestEditorReveal(taskId, 'a.ts', 1, 7)
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(6))
+    finishBack('const b = 2\n')
+    await Promise.resolve()
+    expect(activeFile(taskId)).toBe('a.ts')
+    expect(view.state.selection.main.head).toBe(6)
+  })
+
+  it('lets the latest history invocation win while an earlier back read waits', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    requestEditorReveal(taskId, 'b.ts', 1, 3)
+    await showing(() => view, 'const b = 2')
+    requestEditorReveal(taskId, 'a.ts', 1, 4)
+    await showing(() => view, 'const a = 1')
+    let finishBack!: (text: string) => void
+    let finishForward!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((resolve) => { finishBack = resolve }))
+      .mockImplementationOnce(() => new Promise((resolve) => { finishForward = resolve }))
+    runEditorCommand('editor.navigation.back')
+    await vi.waitFor(() => expect(finishBack).toBeTypeOf('function'))
+    runEditorCommand('editor.navigation.forward')
+    await vi.waitFor(() => expect(finishForward).toBeTypeOf('function'))
+    finishBack('const b = 2\n')
+    await Promise.resolve()
+    expect(activeFile(taskId)).toBe('a.ts')
+    finishForward('const a = 1\n')
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(3))
+    expect(activeFile(taskId)).toBe('a.ts')
+  })
+
+  it('keeps a history destination retryable after a transient read error', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    requestEditorReveal(taskId, 'b.ts', 1, 3)
+    await showing(() => view, 'const b = 2')
+    requestEditorReveal(taskId, 'a.ts', 1, 4)
+    await showing(() => view, 'const a = 1')
+    const readsBefore = read.mock.calls.length
+    read.mockRejectedValueOnce(new Error('temporary read failure'))
+    runEditorCommand('editor.navigation.back')
+    await vi.waitFor(() => expect(read).toHaveBeenCalledTimes(readsBefore + 1))
+    await Promise.resolve()
+    await Promise.resolve()
+    expect(activeFile(taskId)).toBe('a.ts')
+    runEditorCommand('editor.navigation.back')
+    await vi.waitFor(() => expect(activeFile(taskId)).toBe('b.ts'))
+  })
+
+  it('keeps a closed entry when an older reopen read loses to new navigation', async () => {
+    const { host } = mount()
+    const view = await editor(host)
+    editorOpen(taskId, 'a.ts', false)
+    await showing(() => view, 'const a = 1')
+    host.querySelector<HTMLButtonElement>('[aria-label="Close a.ts"]')!.click()
+    await vi.waitFor(() => expect(openFiles(taskId)).toHaveLength(0))
+    editorOpen(taskId, 'b.ts', false)
+    await showing(() => view, 'const b = 2')
+    let finishReopen!: (text: string) => void
+    read.mockImplementationOnce(() => new Promise((resolve) => { finishReopen = resolve }))
+    runEditorCommand('editor.tabs.reopen-closed')
+    await vi.waitFor(() => expect(finishReopen).toBeTypeOf('function'))
+    requestEditorReveal(taskId, 'b.ts', 1, 5)
+    await vi.waitFor(() => expect(view.state.selection.main.head).toBe(4))
+    finishReopen('const a = 1\n')
+    await Promise.resolve()
+    expect(openFiles(taskId).map((file) => file.path)).toEqual(['b.ts'])
+    runEditorCommand('editor.tabs.reopen-closed')
+    await vi.waitFor(() => expect(openFiles(taskId).map((file) => file.path)).toEqual(['a.ts', 'b.ts']))
+    expect(openFiles(taskId)[0]?.ephemeral).toBe(false)
   })
 
   it('places a new file reveal at its clamped line and column', async () => {

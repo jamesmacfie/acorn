@@ -21,7 +21,7 @@ import { imageTypeForPath } from '../contract/imagePreview'
 import { markerRevision } from './markerRevision'
 import type { EditorReadResult } from '../contract/api'
 import { createFileStatusReader } from './fileStatusReader'
-import { historyStep, navigate, noteActivated, noteClosed, takeClosed, type EditorLocation } from './editorNavigation'
+import { historyIsCurrent, historyStep, navigate, nextClosed, noteActivated, noteClosed, takeClosedIfCurrent, type EditorLocation } from './editorNavigation'
 import { tabLabels } from './tabLabels'
 
 // Only ever mounted in terminal mode, and it drags xterm in with it.
@@ -69,6 +69,7 @@ export default function EditorPane(props: { task: Task }) {
   let treeRevealRevision = 0
   let replayScroll: number | null = null
   let replayPath: string | null = null
+  let navigationGeneration = 0
 
   let view: EditorView | undefined
   let stopTheme: (() => void) | undefined
@@ -177,12 +178,22 @@ export default function EditorPane(props: { task: Task }) {
   }
 
   const replay = async (direction: -1 | 1) => {
-    while (live()) {
+    const invocation = ++navigationGeneration
+    while (live() && invocation === navigationGeneration) {
       const place = historyStep(nodeId, taskId, direction, location(active()))
       if (!place) return
       try { await api.read(taskId, place.path) }
-      catch { toast(`Skipped unavailable file: ${place.path}`); continue }
-      if (!live()) return
+      catch (cause) {
+        if (!live() || invocation !== navigationGeneration || !historyIsCurrent(nodeId, taskId, place)) return
+        if ((cause as { status?: number })?.status === 404) {
+          toast(`Skipped unavailable file: ${place.path}`)
+          continue
+        }
+        historyStep(nodeId, taskId, direction === 1 ? -1 : 1)
+        toast(`Could not navigate to ${place.path}: ${cause instanceof Error ? cause.message : 'read failed'}`)
+        return
+      }
+      if (!live() || invocation !== navigationGeneration || !historyIsCurrent(nodeId, taskId, place)) return
       replayPath = place.path
       replayScroll = place.scroll
       requestEditorReveal(taskId, place.path, place.line, place.column)
@@ -191,17 +202,18 @@ export default function EditorPane(props: { task: Task }) {
   }
   const reopen = async () => {
     if (!live()) return
-    const closed = takeClosed(nodeId, taskId)
+    const invocation = ++navigationGeneration
+    const closed = nextClosed(nodeId, taskId)
     if (!closed) return
     try { await api.read(taskId, closed.path) }
     catch (cause) {
-      if (live()) {
-        if ((cause as { status?: number }).status !== 404) noteClosed(nodeId, taskId, closed)
+      if (live() && invocation === navigationGeneration && nextClosed(nodeId, taskId) === closed) {
+        if ((cause as { status?: number })?.status === 404) takeClosedIfCurrent(nodeId, taskId, closed)
         toast(`Could not reopen ${closed.path}: ${cause instanceof Error ? cause.message : 'file unavailable'}`)
       }
       return
     }
-    if (!live()) return
+    if (!live() || invocation !== navigationGeneration || !takeClosedIfCurrent(nodeId, taskId, closed)) return
     recordNavigation(closed.path)
     editorReopen(taskId, closed.path, closed.index)
   }
@@ -283,6 +295,7 @@ export default function EditorPane(props: { task: Task }) {
     return { path, line: line?.number ?? 1, column: line ? head - line.from + 1 : 1, scroll: place?.scrollTop ?? 0 }
   }
   const recordNavigation = (path: string, line?: number, column?: number) => {
+    navigationGeneration++
     const from = location(active())
     const to = location(path) ?? { path, line: 1, column: 1, scroll: 0 }
     if (line) { to.line = line; to.column = column ?? 1 }
@@ -863,7 +876,7 @@ export default function EditorPane(props: { task: Task }) {
     if (control) {
       createEffect(() => { if (control.open()) prepareTabMenu(path, owner) })
     }
-    return <Menu ariaLabel={`Actions for ${path}`} open={control?.open} onBeforeOpen={() => prepareTabMenu(path, owner)}
+    return <Menu ariaLabel={`Actions for ${path}`} maxVisibleRows={9} open={control?.open} onBeforeOpen={() => prepareTabMenu(path, owner)}
       onOpenChange={(open) => { control?.onOpenChange(open); if (open) prepareTabMenu(path, owner); else releaseTabMenu(path, owner) }} trigger={({ toggle }) =>
       <IconButton icon="ellipsis" label={`Actions for ${path}`} onPress={toggle} />}
     >{(menu) => <>
@@ -886,6 +899,10 @@ export default function EditorPane(props: { task: Task }) {
     const identity = menuTargets.get(path)?.identity
     menuTargets.delete(path)
     if (!identity || editorTabIdentity(taskId, path) !== identity || !live()) return
+    // The menu held this document before focus left CodeMirror. Release that hold before a
+    // selected Close can enter the existing save guard; otherwise flush sees a suspended writer.
+    const held = menuHolds.get(path)
+    if (held) releaseTabMenu(path, held.owner)
     action(identity)
   }
   const prepareTabMenu = (path: string, owner: object) => {

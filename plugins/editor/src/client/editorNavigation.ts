@@ -19,8 +19,14 @@ export function noteClosed(nodeId: string | null, taskId: string, tab: ClosedTab
   value.closed.unshift(tab)
   value.closed.length = Math.min(value.closed.length, 20)
 }
-export function takeClosed(nodeId: string | null, taskId: string): ClosedTab | undefined {
-  return session(nodeId, taskId).closed.shift()
+export function nextClosed(nodeId: string | null, taskId: string): ClosedTab | undefined {
+  return session(nodeId, taskId).closed[0]
+}
+export function takeClosedIfCurrent(nodeId: string | null, taskId: string, tab: ClosedTab): boolean {
+  const value = session(nodeId, taskId)
+  if (value.closed[0] !== tab) return false
+  value.closed.shift()
+  return true
 }
 
 const same = (a: EditorLocation, b: EditorLocation) => a.path === b.path && a.line === b.line && a.column === b.column && a.scroll === b.scroll
@@ -40,6 +46,10 @@ export function historyStep(nodeId: string | null, taskId: string, direction: -1
   if (next < 0 || next >= value.history.length) return undefined
   value.at = next
   return value.history[next]
+}
+export function historyIsCurrent(nodeId: string | null, taskId: string, place: EditorLocation): boolean {
+  const value = session(nodeId, taskId)
+  return value.history[value.at] === place
 }
 
 const recentKey = (nodeId: string | null, taskId: string) => `acorn:editor:recent:v1:${encodeURIComponent(nodeId ?? '')}:${encodeURIComponent(taskId)}`

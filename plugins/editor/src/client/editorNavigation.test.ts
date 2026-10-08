@@ -1,8 +1,13 @@
 import { expect, it, vi } from 'vitest'
 import { clientEvents } from '@acorn/plugin-api/client'
-import { historyStep, navigate, noteActivated, noteClosed, recentFiles, reconcileEditorMetadata, takeClosed } from './editorNavigation'
+import { historyIsCurrent, historyStep, navigate, nextClosed, noteActivated, noteClosed, recentFiles, reconcileEditorMetadata, takeClosedIfCurrent } from './editorNavigation'
 
 const place = (path: string, line = 1) => ({ path, line, column: 1, scroll: 0 })
+const takeClosed = (node: string, task: string) => {
+  const tab = nextClosed(node, task)
+  if (tab) takeClosedIfCurrent(node, task, tab)
+  return tab
+}
 
 it('branches navigation after back and reconciles closed references through a folder rename', () => {
   const node = 'navigation-test-node'; const task = 'navigation-test-task'
@@ -32,6 +37,18 @@ it('bounds recency and close metadata independently by Node and task', () => {
   expect(recentFiles(node, 'another-task')).toEqual([])
   for (let index = 59; index >= 40; index--) expect(takeClosed(node, task)?.path).toBe(`file-${index}`)
   expect(takeClosed(node, task)).toBeUndefined()
+})
+
+it('invalidates pending replay and reopen references when their paths move', () => {
+  const node = 'pending-mutation-node'; const task = 'pending-mutation-task'
+  navigate(node, task, place('src/a.ts'), place('src/b.ts'))
+  const oldPlace = historyStep(node, task, -1)!
+  noteClosed(node, task, { path: 'src/a.ts', index: 0 })
+  const oldClosed = nextClosed(node, task)!
+  reconcileEditorMetadata(node, task, 'src', 'renamed')
+  expect(historyIsCurrent(node, task, oldPlace)).toBe(false)
+  expect(takeClosedIfCurrent(node, task, oldClosed)).toBe(false)
+  expect(nextClosed(node, task)?.path).toBe('renamed/a.ts')
 })
 
 it('writes device recency under the Node/task address and prunes it on archive', () => {

@@ -69,9 +69,13 @@ A strip's panels are discovered from what's drawn. A `TabPanel` registers its bo
 `idPrefix`, and a `Tabs` reads the set under the same prefix, so a plugin that draws the two halves in
 sibling components gets this behavior for free. The DOM kit already requires `idPrefix` on both for
 `aria-controls`. The `tabs` layout frames its panel with `Panel` and registers it under its
-`stateKey`. `DocumentTabs` isn't a parent stop: the document a tab opens is a layout region, so it's a
-horizontal collection where `←` and `→` open documents, Enter reopens the current one, and Delete
-closes it.
+`stateKey`. `DocumentTabs` isn't a parent stop: the document a tab opens is a layout region. The
+strip marks itself as the detail region's entry stop, so its action buttons cannot take that place.
+Terminal-session tabs use `←` and `→` to open documents. Editor tabs have a separate action caret:
+those keys move the menu target without activating it, Enter activates the target, and Shift+F10
+opens its menu. A normal click activates a tab; its adjacent `⋯` opens that tab's menu without
+activation. Long inline menus scroll their focused action at narrow widths. Delete closes the active
+document, and closing a menu returns the keys to the strip.
 
 ### Arrows between stops
 

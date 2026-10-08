@@ -1691,6 +1691,21 @@ it('keeps terminal Git status text and the unsaved dot distinct in document tabs
   } finally { screen.done() }
 })
 
+it('keeps terminal-session tab clicks and arrows activating once', async () => {
+  const activated: string[] = []
+  const [active, setActive] = createSignal('a')
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="terminal-tabs" label="Terminal"
+    regions={{ body: () => <DocumentTabs idPrefix="terminal-tabs" ariaLabel="Sessions" active={active()}
+      onActivate={(id) => { activated.push(id); setActive(id) }} tabs={[{ id: 'a', label: 'one' }, { id: 'b', label: 'two' }]} /> }} />,
+  { width: 80, height: 8 })
+  try {
+    await screen.click(...cellOf(screen, 'two'))
+    expect(activated).toEqual(['b'])
+    await screen.press('ARROW_LEFT')
+    expect(activated).toEqual(['b', 'a'])
+  } finally { screen.done() }
+})
+
 it('targets an inactive editor tab menu without activating that document', async () => {
   const opened: string[] = []
   const targeted: string[] = []
@@ -1704,19 +1719,48 @@ it('targets an inactive editor tab menu without activating that document', async
       tabs={[{ id: 'a', label: 'a.ts' }, { id: 'b', label: 'b.ts' }]} /> }} />,
   { width: 80, height: 24 })
   try {
-    expect(screen.text).toContain('Actions for a')
-    const clicked = await screen.click(...cellOf(screen, 'b.ts'))
-    expect(clicked.text).toContain('Actions for b')
-    expect(opened).toEqual([])
-    const reset = await clicked.click(...cellOf(clicked, 'a.ts'))
-    const moved = await reset.press('ARROW_RIGHT')
-    expect(moved.text).toContain('Actions for b')
+    expect(screen.text).not.toContain('Actions for a')
+    const moved = await screen.press('ARROW_RIGHT')
+    expect(moved.text).toContain('›b.ts')
     expect(opened).toEqual([])
     const menu = await moved.press('F10', { shift: true })
     expect(menu.text).toContain('Reveal b')
-    await menu.press('RETURN')
+    const dismissed = await menu.press('ESCAPE')
+    expect(dismissed.text).not.toContain('Reveal b')
+    const reopened = await dismissed.press('F10', { shift: true })
+    const selected = await reopened.press('RETURN')
     expect(targeted).toEqual(['b'])
     expect(opened).toEqual([])
+    const afterAction = await selected.press('F10', { shift: true })
+    expect(afterAction.text).toContain('Reveal b')
+    await afterAction.press('ESCAPE')
+    const clicked = await screen.click(...cellOf(screen, 'b.ts'))
+    expect(opened).toEqual(['b'])
+    const row = clicked.lines.findIndex((line) => line.includes('a.ts'))
+    const action = await clicked.click(clicked.lines[row]!.indexOf('⋯') + 1, row)
+    expect(action.text).toContain('Reveal a')
+    expect(opened).toEqual(['b'])
+  } finally { screen.done() }
+})
+
+it('reveals late tab-menu actions when the detail has only a few rows', async () => {
+  const chosen: string[] = []
+  const screen = await renderCells(() => <HeaderBodyFooter stateKey="short-tab-menu" label="Editor"
+    regions={{ body: () => <DocumentTabs idPrefix="short-tab-menu" ariaLabel="Open files" active="a"
+      onActivate={() => {}} menu={(id, control) => <Menu ariaLabel={`Actions for ${id}`}
+        maxVisibleRows={9} open={control?.open} onOpenChange={control?.onOpenChange}
+        trigger={({ toggle }) => <IconButton icon="ellipsis" label={`Actions for ${id}`} onPress={toggle} />}>
+        {(menu) => <>{Array.from({ length: 7 }, (_, index) =>
+          <Menu.Item context={menu} onSelect={() => chosen.push(`early ${index}`)}>Early {index}</Menu.Item>)}
+          <Menu.Item context={menu} onSelect={() => chosen.push(id)}>Reveal {id}</Menu.Item></>}
+      </Menu>} tabs={[{ id: 'a', label: 'a.ts' }]} /> }} />,
+  { width: 80, height: 8 })
+  try {
+    let frame = await screen.press('F10', { shift: true })
+    for (let index = 0; index < 7; index++) frame = await frame.press('ARROW_DOWN')
+    expect(frame.text).toContain('Reveal a')
+    await frame.press('RETURN')
+    expect(chosen).toEqual(['a'])
   } finally { screen.done() }
 })
 

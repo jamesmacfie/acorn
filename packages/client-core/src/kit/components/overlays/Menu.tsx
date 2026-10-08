@@ -64,6 +64,8 @@ export function Menu(props: {
   onOpenChange?: (open: boolean) => void
   /** Prepare a captured action before trigger focus can blur an editor. Does not open the menu. */
   onBeforeOpen?: () => void
+  /** Terminal host bounds inline menus; DOM menus use the anchored popover's available space. */
+  maxVisibleRows?: number
   children: (context: MenuContext) => JSX.Element
 }) {
   let anchorRef: HTMLSpanElement | undefined
