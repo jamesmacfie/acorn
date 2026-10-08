@@ -37,7 +37,7 @@ export function railStatusMarkers({ checks, unread, status, archiving, settingUp
   // Teardown owns the slot under the task's glyph on its own. It used to blank every other marker
   // while it ran; now anything it outranks stays in the tooltip rather than vanishing.
   if (archiving)
-    markers.push({ id: 'archiving', label: 'Archiving — removing the worktree', icon: 'loader-circle', tone: 'accent', busy: true, placements: ['bottom-center'], priority: 300 })
+    markers.push({ id: 'archiving', label: 'Archiving — removing the worktree', icon: 'loader-circle', tone: 'danger', busy: true, placements: ['bottom-center'], priority: 300 })
   // The other end of the same life cycle, in the same slot: a worktree being prepared rather than
   // removed. A pulsing dot rather than a spinner, because setup is the task's own first job and not
   // something being done to it. Ranked under teardown, which is the allocator's job to settle if the
