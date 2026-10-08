@@ -43,11 +43,13 @@ export async function canonicalPath(path: string): Promise<string> {
 const message = (stderr: string, fallback: string) => stderr.trim().split('\n')[0] || fallback
 const observation = (repository: string, entry: Entry): string =>
   createHash('sha256').update(JSON.stringify([repository, entry.path, entry.head, entry.branch, entry.main, entry.locked, entry.prunable])).digest('hex')
+const worktreeId = (repository: string, path: string): string =>
+  createHash('sha256').update(JSON.stringify([repository, path])).digest('hex')
 
 async function describe(core: Core, repository: string, entry: Entry, ownersByPath: ReadonlyMap<string, TaskRef[]>): Promise<Worktree> {
   const identity = await canonicalPath(entry.path)
   const matches = (ownersByPath.get(identity) ?? []).map((task) => ({ id: task.id, title: task.title, projectId: task.projectId }))
-  const base: Worktree = { ...entry, missing: entry.prunable, dirty: null, changedFiles: [], filesTruncated: false,
+  const base: Worktree = { ...entry, id: worktreeId(repository, identity), missing: entry.prunable, dirty: null, changedFiles: [], filesTruncated: false,
     lastCommit: null, owners: matches, error: null, observation: observation(repository, entry) }
   if (entry.prunable) return base
   try {

@@ -9,7 +9,7 @@ export const gitSourceContribution: SourceContribution<never> = {
   projectScoped: true, requiresGitProject: true,
   routes: [
     { id: 'git.worktrees', path: '/p/:projectId/x/git/worktrees', order: 40 },
-    { id: 'git.worktree', path: '/p/:projectId/x/git/worktrees/:observation', order: 41 },
+    { id: 'git.worktree', path: '/p/:projectId/x/git/worktrees/:worktreeId', order: 41 },
   ],
   regions: { list: WorktreeList, detail: WorktreeDetail, scroll: true },
 }

@@ -66,6 +66,7 @@ it('reads NUL-delimited branch, detached, locked, missing, dirty and aliased wor
   const first = await inventory(service, 'project')
   const alias = await inventory(service, 'alias')
   expect(first.repository).toBe(alias.repository)
+  expect(first.worktrees.map((entry) => entry.id)).toEqual(alias.worktrees.map((entry) => entry.id))
   expect(first.worktrees.map((entry) => entry.observation)).toEqual(alias.worktrees.map((entry) => entry.observation))
   expect(first.worktrees).toHaveLength(4)
   expect(first.worktrees.find((item) => item.main)).toMatchObject({ path: root, owners: [{ id: 'folder-task' }] })
@@ -107,6 +108,33 @@ it('blocks repository-wide prune while any missing registration belongs to a tas
   expect(cleanId).toBeTruthy()
   expect((await cleanup(service, 'project', cleanId!)).error).toMatch(/protected worktree registration/)
   expect((await inventory(service, 'project')).worktrees).toHaveLength(3)
+})
+
+it('prunes a fresh missing registration after checking every affected entry', async () => {
+  const { root, clean } = fixture()
+  rmSync(clean, { recursive: true })
+  const service = core(root)
+  const before = await inventory(service, 'project')
+  const target = before.worktrees.find((entry) => entry.path === clean)!
+  expect(target).toMatchObject({ missing: true, prunable: true })
+  const result = await cleanup(service, 'project', target.observation)
+  expect(result).toMatchObject({ ok: true })
+  expect(result.inventory.worktrees.some((entry) => entry.id === target.id)).toBe(false)
+  expect((await inventory(service, 'project')).worktrees.some((entry) => entry.id === target.id)).toBe(false)
+})
+
+it('keeps a stable worktree id but refuses a stale observation after HEAD moves', async () => {
+  const { root, clean } = fixture()
+  const service = core(root)
+  const before = (await inventory(service, 'project')).worktrees.find((entry) => entry.path === clean)!
+  writeFileSync(join(clean, 'next.txt'), 'next\n')
+  git(clean, 'add', 'next.txt')
+  git(clean, 'commit', '-qm', 'Move HEAD')
+  const after = (await inventory(service, 'project')).worktrees.find((entry) => entry.path === clean)!
+  expect(after.id).toBe(before.id)
+  expect(after.observation).not.toBe(before.observation)
+  expect((await cleanup(service, 'project', before.observation)).error).toMatch(/changed/)
+  expect((await inventory(service, 'project')).worktrees.some((entry) => entry.id === before.id)).toBe(true)
 })
 
 it('gates inventory and cleanup to paired devices and rejects arbitrary observations', async () => {

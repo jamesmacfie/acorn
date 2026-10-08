@@ -30,10 +30,14 @@ export async function cleanup(core: Core, projectId: string, expected: string): 
         return { ok: false, error: 'Prune would affect a protected worktree registration.', inventory: fresh }
       }
     }
-    const args = target.prunable ? ['worktree', 'prune'] : ['worktree', 'remove', '--', target.path]
+    const args = target.prunable ? ['worktree', 'prune', '--expire=now'] : ['worktree', 'remove', '--', target.path]
     const result = await core.git.git(args, { cwd: fresh.repository })
     const after = await inventory(core, projectId)
     if (result.code !== 0) return { ok: false, error: result.stderr.trim().split('\n')[0] || 'Git refused the removal.', inventory: after }
+    if (after.error) return { ok: false, error: after.error, inventory: after }
+    if (after.worktrees.some((worktree) => worktree.id === target.id)) {
+      return { ok: false, error: 'Git kept this worktree registration. Refresh and try again.', inventory: after }
+    }
     return { ok: true, inventory: after }
   } finally {
     pending.delete(current.repository)

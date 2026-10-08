@@ -1,5 +1,34 @@
 > Completion note, October 9, 2026: Implemented on `phase-1-plugin-and-worktrees`.
 >
+> Follow-up correction, October 9: Worktree rows now select by a stable SHA-256 identity of the
+> canonical repository and checkout paths; cleanup still accepts only the mutable observation
+> token. Source and task pane selections survive HEAD/status refresh, and clear when their entry
+> or Node/project scope leaves. Both regions subscribe for their lifetime to selected-Node
+> reconnect, worktree status, and local or forwarded Node task changes. Inventory read failures
+> retain cached rows with a stale alert, while the first read shows loading and then an error.
+> The task pane marks its own checkout and labels a selected different row “Other worktree.”
+> Prune uses `--expire=now` after checking all affected registrations and verifies the selected
+> registration is absent before reporting success.
+>
+> Follow-up checks: real Git fixtures 7/7, including fresh missing prune and stale observation
+> refusal after HEAD moves; Solid pane model tests 2/2 for stable selection, Node switch, event
+> invalidation, and subscription disposal; cache refresh test 1/1; plugin, Node, desktop, and
+> terminal type checks passed; architecture boundary, doc path, and source field checks 60/60;
+> terminal build/startup check passed at 729,573/730,000 B. Desktop `git-phase01-nav` reused the
+> generated `tui-navigation` fixture: selected `fixture/terminal-failure`, committed its README
+> edit as `a2968de`, refreshed, and observed the same selected URL with the new HEAD. Its task
+> Git pane showed the main checkout badge and a separate “Other worktree” detail; inspected
+> screenshot: `.acorn/agent-dev/git-phase01-nav/screenshots/phase01-other-worktree.png`.
+> Terminal `git-phase01-tui` reused that fixture data at 80×24, with the checkout advanced by an
+> empty fixture commit `51c8913`; refresh kept its selected detail and showed the new HEAD.
+> At 80×24 the task Git pane's list marked `main` as the task checkout and its detail labelled
+> `terminal-failure` “Other worktree.” Both isolated sessions were stopped. Reproduce by starting
+> the desktop fixture with `--session git-phase01-nav --reuse --fixture tui-navigation --workspaces on`,
+> then the terminal session with `--session git-phase01-tui --reuse --no-build --data-dir
+> <desktop-session>/data --cols 80 --rows 24`; advance only the disposable linked checkout and
+> use each host's Refresh action. The unchanged `docCitations.test.ts` 201-line failure and local
+> dependency-link/test:focus prerequisites described below still apply.
+>
 > The compiled Git plugin is registered in Node, desktop, and terminal. Its project-scoped source
 > lists Git's NUL-delimited worktree roster, bounded status and commit summaries, missing and locked
 > registrations, and Acorn task owners. The task pane shows the recorded branch and checkout identity.

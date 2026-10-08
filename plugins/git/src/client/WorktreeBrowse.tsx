@@ -1,26 +1,24 @@
-import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { activateTaskSignals, activeNodeId, clientEvents, nodeReady, pathForTask, projectsOptions, tasksOptions, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { activateTaskSignals, activeNodeId, nodeReady, pathForTask, projectsOptions, tasksOptions } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, ConfirmButton, EmptyState, Facts, IconButton, Menu, Row, RowActions, Rows, SectionHeader, Stack, Text } from '@acorn/plugin-api/ui'
 import type { Worktree } from '../shared/api'
 import { removeWorktree, worktreesKey, worktreesOptions } from './worktreeClient'
+import { watchWorktreeInventory } from './worktreeInvalidation'
 
 const basePath = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/worktrees`
-const worktreePath = (projectId: string, observation: string) => `${basePath(projectId)}/${observation}`
+const worktreePath = (projectId: string, id: string) => `${basePath(projectId)}/${id}`
 
 function useWorktrees() {
-  const params = useParams<{ projectId?: string; observation?: string }>()
+  const params = useParams<{ projectId?: string; worktreeId?: string }>()
   const queryClient = useQueryClient()
   const projects = createQuery(() => projectsOptions(true))
   const projectId = () => params.projectId ?? ''
   const project = () => projects.data?.find((item) => item.id === projectId())
   const inventory = createQuery(() => worktreesOptions(projectId()))
   const refresh = () => void queryClient.invalidateQueries({ queryKey: worktreesKey(projectId()) })
-  const offWorktree = wsOnNodeEvent('worktree:status-changed', refresh)
-  const offTasks = clientEvents.on('tasks:changed', refresh)
-  const offReconnect = wsOnReconnect(refresh)
-  onCleanup(() => { offWorktree(); offTasks(); offReconnect() })
+  watchWorktreeInventory(refresh)
   return { params, projectId, project, inventory, refresh }
 }
 
@@ -29,22 +27,22 @@ export function WorktreeList() {
   const navigate = useNavigate()
   const tasks = createQuery(() => tasksOptions(true))
   const entries = createMemo(() => scope.inventory.data?.worktrees ?? [])
-  const items = createMemo(() => entries().map((entry) => ({ key: entry.observation, label: `${entry.branch ?? 'Detached HEAD'} ${entry.path}` })))
+  const items = createMemo(() => entries().map((entry) => ({ key: entry.id, label: `${entry.branch ?? 'Detached HEAD'} ${entry.path}` })))
   return <Stack gap="section">
     <SectionHeader count={entries().length} actions={<IconButton icon="refresh-cw" label="Refresh worktrees" onPress={scope.refresh} />}>
       Worktrees
     </SectionHeader>
     <Show when={scope.project()?.vcs === 'git'} fallback={<EmptyState title="Choose a Git project" />}>
       <Show when={!nodeReady()}><EmptyState title="Node unavailable">Reconnect to inspect worktrees.</EmptyState></Show>
-      <Show when={scope.inventory.error}><Alert>{String(scope.inventory.error)}</Alert></Show>
-      <Show when={scope.inventory.data?.error}><Alert>{scope.inventory.data?.error}</Alert></Show>
+      <Show when={scope.inventory.isLoading}><EmptyState title="Loading worktrees" /></Show>
+      <Show when={scope.inventory.error}><Alert tone="warn">{String(scope.inventory.error)}{scope.inventory.data ? ' Showing the last available roster.' : ''}</Alert></Show>
       <Show when={scope.inventory.isFetching && scope.inventory.data}><Alert tone="muted">Refreshing worktrees…</Alert></Show>
-      <Show when={nodeReady() && !scope.inventory.isLoading && !entries().length && !scope.inventory.error && !scope.inventory.data?.error}><EmptyState title="No worktrees" /></Show>
+      <Show when={nodeReady() && !scope.inventory.isLoading && !entries().length && !scope.inventory.error}><EmptyState title="No worktrees" /></Show>
       <Rows id={`git-worktrees:${activeNodeId()}:${scope.projectId()}`} ariaLabel="Git worktrees" items={items()}
-        selected={scope.params.observation ?? null} onSelect={(key) => navigate(worktreePath(scope.projectId(), key))}
+        selected={scope.params.worktreeId ?? null} onSelect={(key) => navigate(worktreePath(scope.projectId(), key))}
         onActivate={(key) => navigate(worktreePath(scope.projectId(), key))}>
         {(item, itemProps, selected) => {
-          const entry = () => entries().find((row) => row.observation === item.key)
+          const entry = () => entries().find((row) => row.id === item.key)
           return <Show when={entry()}>{(row) =>
             <Row item={itemProps} selected={selected()} href={worktreePath(scope.projectId(), item.key)}
               onPress={() => navigate(worktreePath(scope.projectId(), item.key))}
@@ -81,9 +79,14 @@ export function WorktreeDetail() {
   const scopeKey = createMemo(() => `${activeNodeId() ?? ''}:${scope.projectId()}`)
   createEffect(on(scopeKey, () => {
     setFailure('')
-    if (scope.params.observation) navigate(basePath(scope.projectId()))
+    if (scope.params.worktreeId) navigate(basePath(scope.projectId()))
   }, { defer: true }))
-  const entry = () => scope.inventory.data?.worktrees.find((item) => item.observation === scope.params.observation)
+  createEffect(() => {
+    const id = scope.params.worktreeId
+    const rows = scope.inventory.data?.worktrees
+    if (id && rows && !rows.some((item) => item.id === id)) navigate(basePath(scope.projectId()))
+  })
+  const entry = () => scope.inventory.data?.worktrees.find((item) => item.id === scope.params.worktreeId)
   const task = (ownerId: string) => tasks.data?.find((candidate) => candidate.id === ownerId)
   const openTask = (ownerId: string) => {
     const target = task(ownerId)
@@ -98,22 +101,23 @@ export function WorktreeDetail() {
     try {
       const result = await removeWorktree(projectId, target.observation)
       if (activeNodeId() !== nodeId || scope.projectId() !== projectId) return
-      queryClient.setQueryData(worktreesKey(projectId), result.inventory)
-      if (scope.params.observation !== target.observation) return
+      if (!result.inventory.error) queryClient.setQueryData(worktreesKey(projectId), result.inventory)
+      if (scope.params.worktreeId !== target.id) return
       if (!result.ok) setFailure(result.error ?? 'Git refused the removal.')
       else navigate(basePath(projectId))
     } catch (error) {
-      if (activeNodeId() === nodeId && scope.projectId() === projectId && scope.params.observation === target.observation) {
+      if (activeNodeId() === nodeId && scope.projectId() === projectId && scope.params.worktreeId === target.id) {
         setFailure(error instanceof Error ? error.message : String(error))
       }
     }
     finally { setBusy(false) }
   }
-  return <Stack gap="section"><Show when={entry()} fallback={<EmptyState title={scope.params.observation ? 'Worktree changed' : 'Choose a worktree'}>
-    {scope.params.observation ? 'Refresh the list and select a current worktree.' : 'Select a row to inspect its checkout.'}
+  return <Stack gap="section"><Show when={entry()} fallback={<EmptyState title={scope.params.worktreeId ? 'Worktree changed' : 'Choose a worktree'}>
+    {scope.params.worktreeId ? 'Refresh the list and select a current worktree.' : 'Select a row to inspect its checkout.'}
   </EmptyState>}>
     {(row) => <>
       <SectionHeader actions={<Button size="sm" variant="ghost" onPress={scope.refresh}>Refresh</Button>}>Worktree</SectionHeader>
+      <Show when={scope.inventory.error}><Alert tone="warn">{String(scope.inventory.error)} Showing the last available roster.</Alert></Show>
       <Facts grouping="rows" items={[
         { label: 'Path', value: row().path, mono: true },
         { label: 'Branch', value: row().branch ?? 'Detached HEAD' },

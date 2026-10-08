@@ -1,6 +1,8 @@
 export type WorktreeOwner = { id: string; title: string; projectId: string }
 
 export type Worktree = {
+  /** Stable repository-qualified canonical path identity for client selection. */
+  id: string
   path: string
   head: string | null
   branch: string | null
@@ -14,6 +16,7 @@ export type Worktree = {
   lastCommit: { subject: string; at: number } | null
   owners: WorktreeOwner[]
   error: string | null
+  /** Mutable roster snapshot token required for cleanup. */
   observation: string
 }
 

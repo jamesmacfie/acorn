@@ -5,7 +5,12 @@ export const worktreesKey = (projectId: string) => ['git-worktrees', activeNodeI
 
 export const worktreesOptions = (projectId: string) => ({
   queryKey: worktreesKey(projectId),
-  queryFn: ({ signal }: { signal: AbortSignal }) => readJson<WorktreeInventory>(inventoryRoute(projectId), { signal }),
+  queryFn: async ({ signal }: { signal: AbortSignal }) => {
+    const result = await readJson<WorktreeInventory>(inventoryRoute(projectId), { signal })
+    // A failed refresh must leave the last useful roster in the query cache.
+    if (result.error) throw new Error(result.error)
+    return result
+  },
   enabled: nodeReady() && !!projectId,
   staleTime: 10_000,
 })
