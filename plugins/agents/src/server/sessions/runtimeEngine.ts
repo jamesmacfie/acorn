@@ -44,6 +44,8 @@ import {
   SUBAGENT_QUIET_MS,
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
+import type { RepeatedToolCallWarnings } from './repeatedToolCalls'
+import type { PluginNotice } from '@acorn/protocol/notices.ts'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
 import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
@@ -162,6 +164,9 @@ export type AgentRuntimeOptions = {
   usageLimitResetAt?(providerId: string): Promise<number | null>
   /** Test seam for the small delay after the provider's advertised reset boundary. */
   usageContinuationGraceMs?: number
+  /** `ctx.events.notice`, for a bell row when an agent repeats a tool call. Optional so a test can build
+   *  an engine with no host around it. */
+  notice?(notice: PluginNotice): void
 }
 
 export type WaitCondition = import('../../contract/wire').AgentWaitCondition
@@ -214,6 +219,9 @@ export class ManagedAgentEngine {
   protected readonly telemetry?: PluginTelemetry
   protected readonly usageLimitResetAt?: (providerId: string) => Promise<number | null>
   protected readonly usageContinuationGraceMs: number
+  protected readonly notice?: (notice: PluginNotice) => void
+  // Loaded on the first tool call that has input (./repeatedToolCalls.ts).
+  private repeatedToolCalls: Promise<RepeatedToolCallWarnings> | null = null
   // The span of every turn this process dispatched and has not seen settle, by turn id. In memory
   // for the reason `live` is: a turn only runs inside the node that started it, and a turn the
   // process died in the middle of reports nothing, which is the honest answer.
@@ -267,6 +275,7 @@ export class ManagedAgentEngine {
     this.telemetry = options.telemetry
     this.usageLimitResetAt = options.usageLimitResetAt
     this.usageContinuationGraceMs = options.usageContinuationGraceMs ?? USAGE_CONTINUATION_GRACE_MS
+    this.notice = options.notice
     this.subagentQuietMs = options.subagentQuietMs ?? SUBAGENT_QUIET_MS
     this.idleSweepMs = options.idleSweepMs ?? IDLE_SWEEP_MS
     this.skillFolders = join(options.dataDir, 'agent-skills')
@@ -760,15 +769,36 @@ export class ManagedAgentEngine {
       }
     }
     await this.record(sessionId, turnId, event)
+    // Advisory, so a failure is logged and never holds up the event behind it.
+    if (event.type === 'tool' && turnId && event.tool.input) {
+      await this.repeatedToolCallWarnings()
+        .then((warnings) => warnings.observe(sessionId, turnId, event.tool))
+        .catch((error: unknown) => log.warn(`repeated tool call check failed: ${describeError(error).message}`))
+    }
     // The two things that change what the roster knows: a roster update, which is also how a child
     // first appears, and a child's own traffic. Each pushes the quiet sweep back, so a child that
     // keeps streaming keeps its row and a child that stops loses it a window later. Turn boundaries
     // are deliberately not on this list, and a session with no children never holds a timer.
     if (event.type === 'subagent' || eventSubagentId(event)) this.processes.armQuiet(sessionId)
     if (settlesTurn) {
+      if (this.repeatedToolCalls) (await this.repeatedToolCalls).forget(sessionId)
       if (turnId) void this.goals().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
     }
+  }
+
+  private repeatedToolCallWarnings(): Promise<RepeatedToolCallWarnings> {
+    return this.repeatedToolCalls ??= import('./repeatedToolCalls').then(({ RepeatedToolCallWarnings }) =>
+      new RepeatedToolCallWarnings({
+        limit: async () => {
+          const userId = this.currentUserId()
+          return (userId ? await readAgentSessionDefaults(this.core.prefs, userId) : defaultAgentSessionDefaults())
+            .warnRepeatedToolCallsAfter
+        },
+        record: (sessionId, turnId, event) => this.stopped ? Promise.resolve() : this.record(sessionId, turnId, event),
+        session: (sessionId) => this.store.requireSession(sessionId),
+        notice: (notice) => { if (!this.stopped) this.notice?.(notice) },
+      }))
   }
 
   // A backgrounded child never reports that it finished. Its spawning `Agent` call returns a launch

@@ -186,6 +186,7 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         // Read per call, never captured. Agent records and credentials remain scoped to the active
         // account, and an account switch must not be served from a cached value.
         currentUserId: () => core.identity.active(),
+        notice: (notice) => ctx.events.notice(notice),
         usageLimitResetAt: async (providerId) => {
           const userId = core.identity.active()
           if (!userId) return null
