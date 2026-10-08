@@ -69,8 +69,9 @@ characters. The answer is `PluginRailSearchResult`: rows in the `PluginRailItem`
 does a list row, draws at most 100 (`MAX_RAIL_SEARCH_ITEMS`), and treats a longer answer as
 incomplete. A search row keeps the source's `onSelect`, so navigation and **Create task** work.
 
-Until the plugin answers, the loaded matches stay with a **Searching…** line. Its answer then replaces
-them, because the provider's matching and a substring match differ. If it fails, the loaded matches
+Until the plugin answers, the loaded matches stay with a **Searching…** line. Its rows are then added
+after them, never in their place, because the provider's matching and a substring match differ. A
+loaded row that matches stays even when the provider doesn't return it. If it fails, the loaded matches
 stay and a line says the wider search failed. An incomplete answer asks the reader to narrow the
 search. With no rows, the list says which of these happened instead of showing the source's
 `emptyState`, which describes an empty list.

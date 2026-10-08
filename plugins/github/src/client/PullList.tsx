@@ -115,9 +115,10 @@ export default function PullList() {
   ))
 
   // Search: the loaded tab narrows as the reader types (title / author / #number), and once the text
-  // settles GitHub is asked for matches past the loaded pages, in this repository and tab. Its answer
-  // replaces the local matches, which stay on screen until it arrives or if it fails. Collapsed, the
-  // field is out of sight, so nothing is filtered or searched.
+  // settles GitHub is asked for matches past the loaded pages, in this repository and tab. Its hits
+  // are added after the local matches, never swapped in: GitHub matches whole words and not authors,
+  // so a loaded pull that plainly matches would vanish. Collapsed, the field is out of sight, so
+  // nothing is filtered or searched.
   const searchText = () => (collapsed() ? '' : filter().trim())
   const outbound = () => {
     const query = searchText().slice(0, MAX_COMMAND_SEARCH_QUERY)
@@ -142,12 +143,17 @@ export default function PullList() {
     if (settled() !== outbound() || search.isPending) return 'searching'
     return search.isError ? 'failed' : 'done'
   }
-  const shown = createMemo(() => (searchStatus() === 'done' ? search.data?.pulls ?? [] : filterPulls(list(), searchText())))
+  const shown = createMemo(() => {
+    const local = filterPulls(list(), searchText())
+    if (searchStatus() !== 'done') return local
+    const seen = new Set(local.map((pull) => pull.number))
+    return [...local, ...(search.data?.pulls ?? []).filter((pull) => !seen.has(pull.number))]
+  })
   const searchNotice = () => {
     if (searchStatus() === 'searching') return 'Searching GitHub…'
     if (searchStatus() === 'failed') return "Couldn't search GitHub. Showing loaded matches."
     if (searchStatus() === 'done' && search.data?.incomplete) {
-      return `Showing ${search.data.pulls.length} of ${search.data.total} matches. Add to the search to narrow it.`
+      return `GitHub has ${search.data.total} matches. Add to the search to narrow it.`
     }
     return undefined
   }
