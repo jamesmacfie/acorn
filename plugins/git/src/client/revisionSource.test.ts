@@ -1,4 +1,5 @@
 import { expect, it, vi } from 'vitest'
+import { diffScopeKey } from '@acorn/plugin-api/ui/diff'
 import type { RevisionDetail } from '../shared/api'
 
 function pending<T>() {
@@ -21,6 +22,11 @@ it('discards delayed patch, search, and gap results after the revision target ch
   const oldLifetime = new AbortController()
   const old = revisionSource({ nodeId: 'node-a', taskId: 'task-a', projectId: 'project', id: 'commit', base: null },
     detail, () => '', () => {}, oldLifetime.signal)
+  const browse = revisionSource({ nodeId: 'node-a', projectId: 'project', id: 'commit', base: null },
+    detail, () => '', () => {}, new AbortController().signal)
+  expect(diffScopeKey(old.scope)).toMatch(/^task:task-a:/)
+  expect(diffScopeKey(browse.scope)).toMatch(/^browse:/)
+  expect(diffScopeKey(old.scope)).not.toBe(diffScopeKey(browse.scope))
   const segmentRead = old.loadSegments([], new AbortController().signal)
   const searchRead = old.search({ query: 'word', caseSensitive: false, cursor: null }, new AbortController().signal)
   const gapRead = old.fileText!({ path: 'file.txt', sha: 'blob' })
@@ -31,6 +37,11 @@ it('discards delayed patch, search, and gap results after the revision target ch
   await expect(segmentRead).rejects.toMatchObject({ name: 'AbortError' })
   await expect(searchRead).rejects.toMatchObject({ name: 'AbortError' })
   await expect(gapRead).rejects.toMatchObject({ name: 'AbortError' })
+  const callsAfterAbort = [reads.segments.mock.calls.length, reads.search.mock.calls.length, reads.file.mock.calls.length]
+  await expect(old.loadSegments([], new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' })
+  await expect(old.search({ query: 'word', caseSensitive: false, cursor: null }, new AbortController().signal)).rejects.toMatchObject({ name: 'AbortError' })
+  await expect(old.fileText!({ path: 'file.txt', sha: 'blob' })).rejects.toMatchObject({ name: 'AbortError' })
+  expect([reads.segments.mock.calls.length, reads.search.mock.calls.length, reads.file.mock.calls.length]).toEqual(callsAfterAbort)
 
   const selected = revisionSource({ nodeId: 'node-b', taskId: 'task-b', projectId: 'project', id: 'commit', base: null },
     detail, () => '', () => {}, new AbortController().signal)

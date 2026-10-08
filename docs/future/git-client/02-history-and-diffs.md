@@ -1,5 +1,24 @@
 # Phase 02: history and diffs
 
+## Final review closure, October 9, 2026
+
+**Status:** Complete on `phase-2-history-and-diffs`. Historical diff scopes now pass the
+actual optional task ID to the shared viewer. Its public scope key uses the
+`task:<id>:` prefix, so archiving evicts task view position while repository browsing
+remains separate. A source whose target lifetime or viewport has ended rejects patch,
+search, and gap operations before starting transport. Explicit or event-driven history
+refresh clears pending pagination and its error after aborting the old request; a late
+page cannot enter the refreshed window, and Load more works again.
+
+**Focused verification:** Git history model, revision source, and task pane model tests
+passed (three files, six tests), including the existing Node/filter cancellation checks,
+a controlled late continuation, and public task/browse scope keys. The shared diff
+view-state eviction tests passed (three tests).
+Git plugin type check, touched-source oxlint, and diff whitespace check passed. The
+desktop/terminal screenshots, architecture checks, and measured bounds in the prior
+note remain applicable; no host or broad build gate was rerun. The unrelated unchanged
+`docs/api-reference/plugin-routes.md` doc-citation length failure remains.
+
 ## Review follow-up, October 9, 2026
 
 **Status:** Corrected and verified on `phase-2-history-and-diffs`. The first desktop

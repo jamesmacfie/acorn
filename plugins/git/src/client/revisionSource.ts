@@ -11,24 +11,27 @@ export function revisionSource(target: RevisionTarget, detail: RevisionDetail, s
   const identity = JSON.stringify([target.nodeId, target.taskId ?? null, target.projectId, target.id, target.base])
   const combined = (signal: AbortSignal) => AbortSignal.any([signal, lifetime])
   return {
-    scope: { routeKey: `git-revision:${identity}` },
+    scope: { routeKey: `git-revision:${identity}`, taskId: target.taskId },
     topology: () => detail.topology,
     loading: () => false,
     signature: () => `${identity}:${detail.topology.revision}`,
     selectedPath,
     loadSegments: async (requests, signal) => {
       const request = combined(signal)
+      request.throwIfAborted()
       const result = await revisionApi.segments(target.projectId, target.id, target.base, requests, request)
       request.throwIfAborted()
       return result
     },
     search: async (request, signal) => {
       const read = combined(signal)
+      read.throwIfAborted()
       const result = await revisionApi.search(target.projectId, target.id, target.base, request, read)
       read.throwIfAborted()
       return result
     },
     fileText: async ({ path, sha }) => {
+      lifetime.throwIfAborted()
       const result = await revisionApi.file(target.projectId, target.id, target.base, path, sha, lifetime)
       lifetime.throwIfAborted()
       return result.text

@@ -28,7 +28,12 @@ export function createHistoryModel(projectId: Accessor<string>, initialRef: Acce
     request?.abort()
     setExtra([]); setDropped(false); setMoreError(''); setLoadingMore(false)
   }))
-  const refresh = () => { generation++; request?.abort(); setExtra([]); setDropped(false); void client.invalidateQueries({ queryKey: historyKey(projectId(), filter()) }) }
+  const refresh = () => {
+    generation++
+    request?.abort()
+    setExtra([]); setDropped(false); setMoreError(''); setLoadingMore(false)
+    void client.invalidateQueries({ queryKey: historyKey(projectId(), filter()) })
+  }
   const off = [wsOnNodeEvent('worktree:status-changed', refresh), wsOnReconnect(refresh), clientEvents.on('tasks:changed', refresh)]
   onCleanup(() => { generation++; request?.abort(); off.forEach((dispose) => dispose()) })
   const loadMore = async () => {

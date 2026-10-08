@@ -50,7 +50,9 @@ files have no stage, discard, edit, or comment action. Use **Changes** for worki
 The Node keeps at most 16 revision topologies and 32 MiB of parsed rows. The client scopes queries
 to Node, project, optional task, revision, and comparison base; the shared diff viewer bounds its resident segment
 cache. Changing Node, task, filter, or selection aborts or discards obsolete reads. Reconnect and
-worktree or task events invalidate history without fetching from a remote.
+worktree or task events invalidate history without fetching from a remote. Refresh also clears a
+pending continuation and its error, allowing the next Load more request. Task revision view state
+uses the shared viewer's task scope and is evicted when that task is archived.
 
 ## Routes
 
