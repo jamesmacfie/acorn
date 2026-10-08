@@ -34,7 +34,8 @@ import {
 // settle (docs/tui/keys.md § The adapter) — but the wait stays armed either way, because a byte that
 // arrives late is a byte we have to do something with.
 
-/** How long a lone ESC waits for the rest of its sequence. OpenTUI's number, above. */
+/** How long a lone ESC waits for the rest of its sequence. OpenTUI's number, above. Shorter turns a
+ *  slow Down arrow into an Escape, and longer makes leaving a modal feel stuck. */
 export const ESC_TIMEOUT_MS = 20
 
 const ESC = 0x1b

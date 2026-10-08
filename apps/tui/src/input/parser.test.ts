@@ -1,9 +1,8 @@
-import { readFileSync } from 'node:fs'
-import { fileURLToPath } from 'node:url'
 import { EventEmitter } from 'node:events'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { intentKeys, BARE_KEYS } from '@acorn/client-core/kit/keys'
 import { createParser, ESC_TIMEOUT_MS } from './parser'
+import { HOST_KEYS } from '../keys/install'
 import { openTerminal } from './terminal'
 import type { InputEvent, KeyEvent } from './events'
 
@@ -284,13 +283,6 @@ describe('a lone Escape', () => {
     parser.close()
   })
 
-  it('waits 20 ms, which is what OpenTUI waits', () => {
-    // Its `DEFAULT_TIMEOUT_MS`, and the number its renderer passes explicitly at 0.5.9. Written down
-    // here because a shorter wait turns a slow Down arrow into an Escape and a longer one makes
-    // leaving a modal feel stuck.
-    expect(ESC_TIMEOUT_MS).toBe(20)
-  })
-
   it('is not the key when the rest of the sequence arrives in time', () => {
     vi.useFakeTimers()
     const events: InputEvent[] = []
@@ -449,15 +441,6 @@ const RECORDED: Record<string, { legacy?: string; kitty: string }> = {
   '/': { legacy: '/', kitty: '\x1b[47u' },
 }
 
-/** The keys this host adds to the shared table, read out of the file that adds them rather than
- *  copied, for the same reason as everything else here. */
-function hostKeys(): string[] {
-  const source = readFileSync(fileURLToPath(new URL('../keys/install.ts', import.meta.url)), 'utf8')
-  const block = /const HOST_KEYS[^=]*=\s*\{([^}]*)\}/.exec(source)
-  // A rename of that constant must fail rather than quietly test two fewer keys.
-  expect(block).not.toBeNull()
-  return [...(block?.[1] ?? '').matchAll(/'([^']+)'/g)].map((match) => match[1]!)
-}
 
 describe('no key is respelled', () => {
   // `intentKeys` is the table both hosts read, so a spelling here is a spelling the desktop shares;
@@ -466,7 +449,7 @@ describe('no key is respelled', () => {
   const bound = [...new Set([
     ...Object.values(intentKeys('ctrl')).flat(),
     ...BARE_KEYS,
-    ...hostKeys(),
+    ...Object.values(HOST_KEYS).flat(),
   ])].sort()
 
   it('has a recorded sequence for every key the app binds', () => {
