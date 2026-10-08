@@ -4,6 +4,11 @@ The agents plugin contributes five execute-tier tools that let an agent delegate
 session. They work through `ManagedAgentRuntime`, and don't create workflow runs or change workflow
 definitions. [Managed delegation](../managed-agents/delegation.md) covers the ledger and reports.
 
+The plugin also contributes two read-tier tools for a managed agent's own history:
+`session_history_search` finds events and `session_history_read` pages one event's text. See
+[transcript search](../managed-agents/transcript-search.md#search-from-a-managed-session) for scope,
+limits, and trust treatment.
+
 ## Managed-session orchestration
 
 | Tool | Input | Result |

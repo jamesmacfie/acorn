@@ -41,6 +41,26 @@ Before the first projection read or event write, the Node reinstalls missing der
 the index, and marks sessions for reconciliation. A missing or corrupt index is rebuilt from canonical
 message JSON.
 
+## Search from a managed session
+
+`session_history_search` and `session_history_read` let a managed agent recover text from its own
+ledger after harness compaction. Both tools require a signed task and session claim. The agents plugin
+checks that the claimed session belongs to the task and accepts no session ID in either input. The
+read tier admits the tools by default, including in delegated and workflow sessions unless a session's
+tool ceiling narrows access.
+
+Search uses quoted FTS5 words and returns eight ranked events by default, with a maximum of 20. Its
+optional `user`, `assistant`, or `tool` role filter runs before the limit. Each result has an event
+sequence, role, timestamp, and an excerpt capped at 600 characters. `session_history_read` accepts that
+sequence and a character offset, then returns up to 4,000 characters and `nextOffset` when more remain.
+The read uses the materialized head of a streamed message, so a page can reach text from later deltas.
+An offset beyond the end returns an empty page.
+
+These tools expose user messages, assistant messages, and tool text. They omit artifact and attachment
+payloads. Returned text uses the pasted-content wrapper: an old message is evidence of what appeared
+in the session, not a fresh instruction or proof that an action succeeded. Search is lexical, so a
+paraphrase can miss.
+
 ## Tool rows
 
 A tool call is indexed once, on its latest row, and the opener gives up its search text. A file change

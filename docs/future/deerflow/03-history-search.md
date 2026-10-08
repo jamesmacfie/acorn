@@ -1,6 +1,18 @@
 # Agent history search
 
-Status: proposed, October 6, 2026. Not started. Part of the [DeerFlow review](./README.md).
+Completion note, October 8, 2026: Managed sessions have read-tier `session_history_search` and
+`session_history_read` tools. Both use the signed session claim, verify its task owner, and query the
+canonical ledger through the caught-up FTS projection. Search filters user, assistant, and tool roles
+before limiting; read pages the complete materialized text of a streamed message. Results wrap copied
+text as pasted content and exclude artifact and attachment payloads. The shipped contract is in
+[transcript search](../../managed-agents/transcript-search.md#search-from-a-managed-session). Focused
+history tests, the agents package typecheck, targeted oxlint, and doc citation checks passed. The doc
+path check passed its link and retired-path cases but could not find three generated Tauri schema files
+in this fresh worktree. A real managed-harness call after compaction remains for the coordinator's
+integration run; this phase changes no UI. Later phases can use the tools without changing the ledger
+or the signed claim contract.
+
+Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome
 

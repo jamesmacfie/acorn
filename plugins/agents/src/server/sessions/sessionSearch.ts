@@ -7,7 +7,7 @@ import { mapAgentSession } from './rowMapping'
 type Transaction = Parameters<Parameters<PluginDatabase['transaction']>[0]>[0]
 export type SessionSearchFilter = { taskId?: string; workspaceId?: string; limit?: number }
 
-const ftsTerms = (query: string): string => query.split(/\s+/)
+export const ftsTerms = (query: string): string => query.split(/\s+/)
 .map((term) => term.replace(/"/g, '')).filter(Boolean).map((term) => `"${term}"`).join(' ')
 
 export function searchSessions(db: Transaction, query: string, filter: SessionSearchFilter, taskIds: string[] | null): AgentSession[] {
