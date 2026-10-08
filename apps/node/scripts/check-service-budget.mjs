@@ -62,7 +62,12 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: 3,176,006 B after combining the instruction check, goal admission callbacks, and
 // reconnect Stop handling. The measured graph adds no dependency; the feature operations remain
 // lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
-const limits = { ceiling: 3_177_000, floor: 1_000_000 }
+// 2026-10-09: 3,183,160 B with internal token confinement, 7,154 B above the previous measured
+// graph. The renewal manager is reached through service.ts -> composition/runtime.ts -> auth/public.ts
+// -> renewingEnv.ts. It restores session credential files and starts their refresh timer before
+// plugin initialization can launch children, so it belongs at boot. Keep 840 B of margin; the lazy
+// authoring, sampler, and renderer imports above remain outside this graph.
+const limits = { ceiling: 3_184_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

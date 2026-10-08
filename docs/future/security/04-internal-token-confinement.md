@@ -1,5 +1,17 @@
 # Phase 04: confine and time-bound internal tokens
 
+## Build integration follow-up: October 9, 2026
+
+`measure:service-graph --why renewingEnv` measured 3,183,160 B in the Phase 04 static service
+graph, 7,154 B above the previously recorded 3,176,006 B and 6,160 B over its ceiling. The import
+chain is `service.ts` → `composition/runtime.ts` → `auth/public.ts` → `renewingEnv.ts`. The renewal
+manager restores session credential files and starts their refresh timer during boot, before plugins
+can launch children. Loading it after boot would leave still-live children with expired credentials.
+The service ceiling is now 3,184,000 B, leaving 840 B of margin to protect the existing lazy-load
+cuts. The build check still counts the same static graph and retains its floor. A focused Node build
+and budget check passed at 3,183,160 B. The budget script tests passed 3/3, and architecture doc
+path and citation tests passed 6/6. No Phase 05 source or renderer budget was changed.
+
 ## Completion note: October 9, 2026
 
 Status: implemented. HTTP principal resolution and both WebSocket upgrade paths accept an internal
