@@ -54,7 +54,7 @@ export default function SessionGoal(props: { session: AgentSession; openToken: n
 
   return <>
     <Show when={eligible()}>
-      <Show when={props.session.goal} fallback={<Inline><Button size="sm" variant="bare" onPress={showEditor}>Set goal</Button></Inline>}>
+      <Show when={props.session.goal}>
         {(goal) => <Stack gap="row">
           <Inline>
             <Text wrap>Goal: {goal().objective}</Text>

@@ -453,4 +453,129 @@ describe('agents.sessionExecute config options', () => {
     })
   })
 
+
+  // A step with a completion condition (docs/workflows/agent-steps.md § Completion conditions). The
+  // judge is faked; each test scripts its verdicts in order.
+  describe('a step with a completion condition', () => {
+    const verdictText = (blocker: string, reason = 'Reason.') => JSON.stringify({
+      satisfied: blocker === 'none', blocker, reason, evidence_summary: 'Evidence.', relied_on_assumption: false,
+    })
+    let verdicts: Array<string | Error>
+    let judgeCalls: number
+    let judge: { models: { generateText: ReturnType<typeof vi.fn> }; currentUserId: () => string | null }
+    const tool: AgentNormalizedEvent = { type: 'tool', tool: { id: 'tool', title: 'Edit', status: 'completed', output: 'ok' } }
+    const promptOf = (turn: AgentDriverTurnOptions) => turn.input.flatMap((part) => part.type === 'text' ? [part.text] : []).join('\n')
+
+    beforeEach(() => {
+      verdicts = []
+      judgeCalls = 0
+      judge = {
+        currentUserId: () => 'user-1',
+        models: { generateText: vi.fn(async () => {
+          judgeCalls += 1
+          const next = verdicts.shift() ?? verdictText('none')
+          if (next instanceof Error) throw next
+          return { text: next, providerId: 'p', backendId: 'b', modelId: 'haiku', usage: { inputTokens: 10, outputTokens: 2 } }
+        }) },
+      }
+    })
+
+    const run = (extra: Partial<Parameters<ReturnType<typeof createSessionExecute>>[0]> = {}) =>
+      createSessionExecute(runtime, undefined, judge as never)({
+        taskId, profileId: 'claude-code', title: 'Workflow: fix', prompt: 'Fix the login regression.',
+        goal: 'The login tests pass.', runId: 'run-1', stepId: `step-${randomUUID()}`, timeoutMs: 10_000, ...extra,
+      })
+
+    it('continues in the same session until the condition is met, then publishes once', async () => {
+      verdicts = [verdictText('goal_not_met_yet', 'The tests were not run.'), verdictText('none')]
+      driver.replies = [
+        { text: 'I changed the handler.', stopReason: 'end_turn', events: [tool] },
+        { text: 'Tests pass.', stopReason: 'end_turn', events: [tool] },
+      ]
+      const goals: string[] = []
+      const result = await run({ onGoal: (summary) => goals.push(summary.status) })
+      expect(result?.status).toBe('ok')
+      expect(result?.capture.result).toBe('Tests pass.')
+      expect(driver.turns).toHaveLength(2)
+      expect(promptOf(driver.turns[0]!)).toContain('Completion condition: The login tests pass.')
+      expect(promptOf(driver.turns[1]!)).toContain('The tests were not run.')
+      expect(driver.turns[1]!.turn.effectivePolicy.continuationOf).toBe(driver.turns[0]!.turn.id)
+      expect(result?.goal).toMatchObject({ status: 'satisfied', continuations: 1, repairs: 0,
+        automaticTurns: [{ turnId: driver.turns[1]!.turn.id, reason: 'goal' }] })
+      expect(goals).toEqual(['checking', 'continuing', 'checking', 'satisfied'])
+      // Judge usage joins the step's usage once.
+      expect(result?.capture.usage).toMatchObject({ inputTokens: 20, outputTokens: 4 })
+    })
+
+    it('fails on a blocker without continuing', async () => {
+      verdicts = [verdictText('needs_user_input', 'The deployment target is unknown.')]
+      const result = await run({ posture: 'autonomous' })
+      expect(result?.status).toBe('error')
+      expect(result?.stderrTail).toBe('Completion condition not met: The deployment target is unknown.')
+      expect(result?.goal?.status).toBe('blocked')
+      expect(driver.turns).toHaveLength(1)
+    })
+
+    it('fails with the diagnostic when the check cannot run', async () => {
+      verdicts = ['not JSON']
+      const result = await run()
+      expect(result?.status).toBe('error')
+      expect(result?.stderrTail).toMatch(/^Unable to check completion: /)
+      expect(result?.goal?.status).toBe('unavailable')
+    })
+
+    it('stops after two continuations that make no tool call or file change', async () => {
+      verdicts = [1, 2, 3].map(() => verdictText('goal_not_met_yet', 'Still not done.'))
+      driver.replies = [{ text: 'Started.', stopReason: 'end_turn', events: [tool] }, { text: 'Thinking.', stopReason: 'end_turn' }, { text: 'Thinking.', stopReason: 'end_turn' }]
+      const result = await run()
+      expect(result?.status).toBe('error')
+      expect(result?.stderrTail).toContain('Goal limit reached')
+      expect(result?.goal).toMatchObject({ status: 'exhausted', continuations: 2 })
+      expect(driver.turns).toHaveLength(3)
+    })
+
+    it('asks the caller before each check and each automatic turn, and stops when refused', async () => {
+      verdicts = [verdictText('goal_not_met_yet')]
+      const asked: string[] = []
+      const result = await run({ admitAutomatic: async ({ kind }) => {
+        asked.push(kind)
+        return kind === 'turn' ? 'turn budget exhausted' : null
+      } })
+      expect(asked).toEqual(['check', 'turn'])
+      expect(result?.status).toBe('error')
+      expect(result?.stderrTail).toBe('turn budget exhausted')
+      expect(driver.turns).toHaveLength(1)
+    })
+
+    it('repairs a malformed result after the condition is met, then checks again', async () => {
+      const schema = { type: 'object', properties: { answer: { type: 'string' } }, required: ['answer'] }
+      driver.replies = [{ text: 'Done, tests pass.', stopReason: 'end_turn' }, { text: '```json\n{"answer":"fixed"}\n```', stopReason: 'end_turn' }]
+      const result = await run({ schema })
+      expect(result?.status).toBe('ok')
+      expect(result?.capture.structuredOutput).toEqual({ answer: 'fixed' })
+      expect(judgeCalls).toBe(2)
+      expect(result?.goal).toMatchObject({ status: 'satisfied', continuations: 0, repairs: 1 })
+    })
+
+    it('refuses before any work when the harness has no one-shot mode or nobody is signed in', async () => {
+      judge.currentUserId = () => null
+      await expect(run()).rejects.toThrow('No one is signed in')
+      await expect(run({ goal: '   ' })).rejects.toThrow('completion condition must be 1 to 2000 characters')
+      expect(driver.turns).toHaveLength(0)
+    })
+
+    it('cancels without saving a satisfied result when the run stops during a check', async () => {
+      const controller = new AbortController()
+      judge.models.generateText.mockImplementation(async (request: { input: { signal: AbortSignal } }) =>
+        new Promise((_resolve, reject) => {
+          request.input.signal.addEventListener('abort', () => reject(new Error('aborted')), { once: true })
+          controller.abort()
+        }))
+      const result = await run({ signal: controller.signal })
+      expect(result?.status).toBe('cancelled')
+      expect(result?.goal?.status).toBe('stopped')
+      expect(driver.turns).toHaveLength(1)
+    })
+  })
+
 })

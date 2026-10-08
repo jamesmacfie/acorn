@@ -73,6 +73,7 @@ export type ManagedAgentsBridge = {
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
   patchQueuedTurn(sessionId: string, turnId: string, patch: { input?: AgentTurn['input']; ordinal?: number }): Promise<AgentTurn>
   cancelTurn(sessionId: string, turnId?: string): Promise<void>
+  cancelSubagent(sessionId: string, subagentId: string): Promise<void>
   resolveRequest(sessionId: string, requestId: string, resolution: unknown, idempotencyKey: string): Promise<AgentRequest>
   patchSession(sessionId: string, patch: { title?: string; archived?: boolean; lastReadSeq?: number; config?: Record<string, unknown> }): Promise<AgentSession>
   fork(sessionId: string, title?: string): Promise<AgentSession>
@@ -368,6 +369,11 @@ export const managedAgents = new Hono<AppEnv>()
       return { ok: true }
     })
   })
+  .post('/sessions/:sessionId/subagents/:subagentId/cancel', (c) =>
+    viaBridge(c, MANAGED_AGENTS, async (bridge) => {
+      await bridge.cancelSubagent(c.req.param('sessionId'), c.req.param('subagentId'))
+      return { ok: true }
+    }))
   .post('/sessions/:sessionId/requests/:requestId/resolve', async (c) => {
     const key = idempotencyKey(c.req.raw.headers)
     if (!key) return respondError(c, 400, 'idempotency_key_required')

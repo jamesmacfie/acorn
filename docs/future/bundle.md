@@ -1,255 +1,123 @@
-# Packaging and installing a node on another machine
+# Finish Node release packaging
 
-Design notes from the remote-node session (2026-08-10). The DX half shipped, and
-`scripts/pack-node.mjs` now stages the headless CLI, terminal client, and shared `bin/acorn.mjs`
-launcher in the Node tarball. The CI matrix, platform binaries, installer, container image, and
-desktop app embedding described below remain proposed. [Node distribution](../node-distribution.md)
-owns the current artifact shape and commands; § Shipping `acorn` below is historical design context,
-including paths and `--version` examples that were superseded by the shipped launcher. Nothing below
-the "What shipped" section is scheduled.
+Date: October 8, 2026. Status: standalone staging implemented; release delivery and terminal embedding remain proposed.
 
-The goal being worked towards: a node you download onto another computer, extract, run, and connect
-to. Two artifacts carry it. The desktop app ships Tauri, the helper, the node, and the `acorn` terminal
-client. The headless tarball ships the same node and the same `acorn` and nothing else. The node inside
-each is one build, and so is `acorn`. [docs/tui.md](../tui.md) owns what `acorn` is and how it runs
-from a checkout; this file is what it takes to ship it, and § Shipping `acorn` below is the manifest.
+Use this plan to turn the standalone Node archive into platform downloads and add the terminal client
+to desktop installations. [Node distribution](../node-distribution.md) owns the artifact and operator commands.
 
-## What shipped
+## Starting point
 
-Enough that a hand-installed node on the LAN is pleasant to set up:
+`scripts/pack-node.mjs` stages the Node, migrations, CLI, TUI, and shared `apps/cli/bin/acorn.mjs`
+launcher. It checks runtime imports, carries dependency security overrides, and generates an npm
+lockfile. Operators install dependencies with `npm ci`; the archive does not bundle a Node runtime.
 
-- **`advertiseHost` in `node.json`.** Binding beyond loopback is a recorded decision, not a lookup.
-  On first boot at a real terminal the node lists this machine's IPv4 addresses and asks which to
-  advertise; Enter means none. `ACORN_ADVERTISE_HOST` is the non-interactive path for launchd,
-  systemd, Docker and the e2e harness, and it overrides the recorded answer.
-  (`packages/node-core/src/server/transport/advertise.ts`)
-- **The Host allowlist widened to a set.** Loopback plus whatever was advertised. The listener binds
-  `0.0.0.0` only when something is advertised, and the endpoint it *reports* stays loopback —
-  children of the node validate its certificate fully against an `IP:127.0.0.1` SAN, so that origin
-  cannot move. (`packages/node-core/src/server/transport/listener.ts`)
-- **A pairing banner at boot.** Endpoint, identity words, and a live pairing code. The terminal the
-  node was started from is the out-of-band channel pairing already depends on; printing there turns
-  pairing from "read a device token out of a JSON blob and curl the code route" into copy, compare,
-  paste. A code opens automatically only while nothing is paired yet; `SIGUSR1` opens another
-  without a restart that would kill live agent and terminal sessions.
-- **`fingerprintWords` moved to `packages/protocol`.** The node prints the phrase and the desktop
-  shows it; two copies of the word list would be two things that can drift into a comparison that
-  always passes.
-- **`SESSION_ENC_KEY` generated into the data root** when unset, at 0600, beside the TLS private key
-  that already has the same blast radius. It was a required env var that refused to boot without a
-  hand-invented 64-hex secret, which bought nothing on a machine where the key lands next to the
-  database anyway.
-- **`better-sqlite3` replaced by `node:sqlite`.** See below — this is the load-bearing one for
-  distribution.
+`apps/desktop/scripts/stage.mjs` stages the headless CLI and the desktop's pinned Node runtime.
+It does not stage the TUI. The desktop has an installed command path; extending that path must preserve
+headless commands. Read [CLI](../cli.md) before changing dispatch.
 
-## Native dependencies: down to one
+SQLite uses the runtime's `node:sqlite`. `node-pty` is the native dependency to package.
+Certificate generation runs inside Node and does not require an OpenSSL executable.
+Do not repeat the completed staging, dependency scanner, or certificate work.
 
-This is what decides how hard a downloadable artifact is, and it is in better shape than expected.
+## Build the container image
 
-**SQLite is no longer native.** `node:sqlite` is part of the runtime, so there is no ABI to match and
-no compiler to have installed. The desktop helper runs the node under the Node it bundles
-(`docs/shell.md § Node child`), so the desktop-supervised and standalone hosts share one story. The
-terminal client is a third supervisor of the same child: `acorn` attaches to a running node for its
-data root or starts one under the same bundled runtime
-([docs/tui.md](../tui/process.md) § Attach or start).
-(When this was written the desktop was Electron 42 with Node 24.17; the Tauri migration replaced the
-supervisor and kept the property.) Drizzle publishes no `node:sqlite` driver
-(0.45.2 ships better-sqlite3, bun, expo, op and proxy), so `server/storage/sqlite.ts` presents the small
-surface Drizzle's better-sqlite3 session actually calls — `prepare`, `transaction`, and
-`run`/`all`/`get`/`raw` — over a `DatabaseSync`. Two behaviour differences are pinned there
-explicitly: `node:sqlite` enforces foreign keys by default where better-sqlite3 does not, and it
-returns null-prototype rows.
+<a id="docker-2026-08-22"></a>
 
-One wrinkle worth remembering: `drizzle-orm/better-sqlite3/driver.js` opens with a static
-`import Client from 'better-sqlite3'` that it needs only for the convenience form
-`drizzle('/path/to.db')`. Importing it would put the native package back on the dependency list to
-satisfy a binding nothing uses, so `drizzleOverSqlite` assembles the session from published export
-subpaths instead. `@types/better-sqlite3` stays a devDependency — Drizzle's declarations import from
-it, and types do not need a compiler.
+[Cloud phase one](./cloud/phases/01-node-image.md) owns the image, local pairing, hosted deployment,
+measurements, and image publication. Implement that phase once and update this page when it ships.
+A container build can compile `node-pty` without waiting for downloadable Linux prebuilds.
 
-**node-pty is the only native module the node needs**, and it builds against node-addon-api (N-API), so
-its binaries are ABI-stable across Node versions. It ships prebuilds for `darwin-arm64`,
-`darwin-x64`, `win32-arm64` and `win32-x64` — **not Linux**, which compiles from source today. So
-Linux is the one platform needing a prebuild produced in CI, once. **The terminal client adds
-none**: it draws in cells through its own TypeScript and reaches Yoga as WebAssembly, so a tarball
-that carries `acorn` carries no binary the node tarball did not already have. The node-pty prebuild
-carries a libc decision: build against glibc and it loads on Debian, Ubuntu, Fedora and a `-slim`
-Docker base, but not Alpine (musl). Producing a second musl build doubles the Linux matrix for a
-distribution nobody has asked for — pick glibc, let the Docker image use a Debian base, and revisit
-only if an Alpine request actually arrives.
+Preserve these container decisions:
 
-`scripts/rebuild-node-abi.mjs` now probes node-pty rather than asserting anything: on a platform
-where the prebuilt binary loads, it exits immediately. It is the only module it has to probe.
+- Use a Debian-compatible base and the repository's runtime policy. An Alpine build needs separate
+  native-module support and is outside the initial release.
+- Choose and document task tooling and pinned agent CLIs. Repositories and data need persistent volumes.
+- Publish the listening port without remapping it, because the Node's Host guard compares the port.
+- Make a host Docker socket an explicit opt-in. Document its authority and the unavailable behavior
+  without it.
+- Decide whether the image carries the TUI before publication. Cloud phase one must record this choice.
 
-## The build pipeline
+## Produce platform archives
 
-A CI matrix, not new architecture. `scripts/pack-node.mjs` already assembles the artifact —
-`dist/`, migrations, a generated `package.json` with only real runtime dependencies — and its own
-header says the reason it stops short of shipping binaries is that prebuilt binaries per platform
-triple are "a release pipeline rather than a script". That is a deliberate deferral.
+Start with `scripts/pack-node.mjs`, `scripts/rebuild-node-abi.mjs`, `scripts/nodeRuntimePackages.ts`,
+`node-runtime.json`, and the dependency policy in `package.json`.
 
-Shape: GitHub Actions across macOS arm64/x64, Linux x64/arm64 and Windows; five tarballs on a
-release. Linux and Windows first — see Gatekeeper below. The eventual front door is a release page
-plus a `curl | sh` installer that picks the right tarball, and a container image on ghcr with a
-compose example; service-manager units stay documentation, not an installer product
-(settled during the Tauri migration).
+Implement these steps:
 
-The terminal client and headless CLI ride inside the node tarball rather than being separate
-artifacts: `pack-node.mjs` stages `dist/tui/`, `dist/cli/`, and `bin/acorn.mjs`. The proposed
-installer would link the package's `acorn` bin. Five platform tarballs remains the target.
+1. Build native dependencies on runners matching each supported operating system and architecture.
+   Produce Linux glibc binaries for x64 and arm64. Verify the module loads before packaging it.
+2. Assemble archives for macOS arm64 and x64, Linux arm64 and x64, and Windows x64.
+   Add Windows arm64 only after its runtime and native dependency path passes the same checks.
+3. Include the runtime pinned by `node-runtime.json`. Reuse checksum verification from desktop staging;
+   preserve the shared supported-runtime policy.
+4. Retain the generated dependency manifest and lockfile. Verify bundled native binaries and installed
+   dependencies in an extracted archive outside the workspace dependency tree.
+5. Publish versioned archives and checksums from a tag whose tests and artifact checks pass.
+   Keep credentials out of artifacts and logs.
 
-## Docker (2026-08-22)
+Acceptance: a clean supported host can extract the archive, run a headless command, open the terminal
+client, start a Node, pair a second client, and drain the supervised Node. A client that only attaches
+must leave the Node running. Verify restart with the same data root preserves identity and data.
 
-A container image is the easiest of the four shapes and should ship first, because it needs none of
-the snags solved. A two-stage Dockerfile from `node:24-bookworm-slim` compiles node-pty at image
-build, so the Linux prebuild is not a prerequisite; there is no Gatekeeper; `openssl` is in the base
-image. Everything the no-TTY path needs already exists: `ACORN_ADVERTISE_HOST` and `ACORN_DATA_DIR`
-are env vars, the first-boot advertise prompt skips itself without a terminal, and the SIGTERM
-bounded drain is exactly what `docker stop` and `compose down` send.
+## Finish Windows operation support
 
-Three container-specific decisions, none of them code:
+Windows has no `SIGUSR1`. Add an operator-controlled way to reopen pairing without stopping active
+agents or terminal sessions. Reuse the pairing owner and its authorization rules; do not expose an
+unauthenticated remote trigger.
 
-- **The image is opinionated where the tarball is not.** Agents and PTY sessions run inside the
-  container, so every tool they need — git, the agent CLIs, ripgrep — must be baked into the image,
-  and the repos the node works on must be volume-mounted in. A tarball inherits the host's tools; an
-  image has to choose them.
-- **The node's own Docker features need the host socket mounted**, with the trust implications that
-  carries. Document it as opt-in; the features already report an explicit unavailable state without
-  it.
-- **Publish the same port the node listens on.** The Host guard compares the port, so a compose
-  remap (`8080:4317`) fails as a bare 403. Same rule as the SSH-tunnel note in
-  docs/node-distribution.md.
-- **The image does not carry the terminal client.** A container is the no-TTY shape. Whether
-  `docker exec -it <container> acorn` attaching from inside is worth the image size is decided after
-  the tarball ships (step 7 below), not promised here.
+Document and verify access control lists for the Node data root and client token directory.
+POSIX `0600` and `0700` modes do not establish the same access restrictions on Windows.
+[Node distribution](../node-distribution.md#operations) owns the operator instructions.
 
-## The snags
+Acceptance: reopen pairing on a running Windows Node, pair another client, and confirm that a
+running task continues. Record how the installer establishes and checks directory access.
 
-**Certificate generation, resolved.** The Node mints its certificate in-process using Node's native
-RSA key generation and a packaged certificate library. It no longer needs an OpenSSL executable
-on PATH. For the implementation and persisted identity contract, see
-[Node distribution](../node-distribution.md).
+## Add the installer
 
-**macOS Gatekeeper.** A downloaded tarball containing `.node` binaries is quarantined, and clearing
-that properly means Developer ID signing and notarization — the same purchase already blocking
-desktop auto-update (see the auto-update constraint notes). Linux and Windows have no equivalent.
-This is why macOS is last, not first.
+Select an archive from the host's operating system and architecture, verify its checksum, and install
+into a user-selected location. Provide a separate Windows path. Expose the shared `acorn` command
+and document removal and upgrades. Keep systemd and launchd setup as documented recipes.
 
-**Windows is POSIX-shaped in two places.** `SIGUSR1` is how a running node reopens its pairing
-window (`apps/node/src/entries/standalone.ts`), and that signal does not exist on Windows — pairing a
-second device there means a restart until some other trigger exists (a stdin command, or a
-device-authenticated route). The terminal client is such a trigger: a TUI attached to the local node
-is an out-of-band channel of its own and can offer "open a pairing window" as a command, which is
-noted in [docs/tui.md](../tui.md) § Doors left open and designed nowhere. And the 0600/0700 file modes on the data root, `session.key`, the TLS key and now
-the terminal client's own device-token file are advisory at best on NTFS; the guarantee those modes
-state needs restating as an ACL, or at least an honest doc note that Windows does not get it. That
-last one matters more than it did: the TUI writes its device token in plain bytes and leans on the
-mode alone (`docs/tui.md` § Where the TUI keeps things).
+Acceptance: install and upgrade from a clean profile without a checkout, compiler, or separately
+installed Node. Failed download or verification must leave the working installation usable.
 
-## Whether to bundle a Node runtime
+## Embed the terminal client in the desktop
 
-Eventually yes, so the install stops being "first install Node 24". Costs roughly 50MB in the
-tarball. Not for a first node-only release: requiring a modern Node is a reasonable ask of someone
-deliberately installing a headless service, and it keeps the artifact small enough to iterate on.
+<a id="shipping-acorn"></a>
+<a id="shipping-acorn-historical-design"></a>
 
-It is not a reasonable ask of someone who typed `acorn`. The terminal client inverts the argument, so
-bundling the runtime moves from the last step of the order below to before the tarball carries the
-TUI. It is a floor rather than a flag now — `acorn` runs on the range `node-runtime.json` declares,
-the same one every other package here runs on ([tui.md](../tui/process.md) § The runtime floor) — so this is
-about not asking a reader to install a Node at all rather than about asking them for an unusual one.
-The desktop already bundles it (`apps/desktop/src-tauri/tauri.conf.json`, `externalBin`), and both
-artifacts read the same pin, so the cost is size, not a second decision.
+Extend `apps/desktop/scripts/stage.mjs` and `apps/desktop/src-tauri/tauri.conf.json` to include the
+built TUI and shared command dispatch. Reuse the desktop's runtime and command installation flow.
+Keep Node resources and client chunks at the paths their launchers resolve.
 
-Node SEA (single executable) is *not* the path — combining it with native modules is painful, and
-node-pty means there is still one.
+Acceptance: an installed desktop's command runs headless subcommands and opens the TUI with no
+subcommand. Test attaching to a desktop-supervised Node and starting a Node when the desktop is
+closed. Verify commands from a directory outside the checkout and after an app upgrade.
 
-## One node, three supervisors
+## Sign macOS artifacts
 
-`apps/node/src/composition/composition.ts` already builds the same plugin graph for every host; the
-difference is supervision and native capability injection, not a second assembly. The desktop helper
-supervises it in the app, a service manager or a shell supervises it on a server, and the terminal
-client supervises it when nothing else is (`docs/tui.md`). The remaining
-thing that made them different *artifacts* was ABI: the desktop used to run the node inside
-Electron, standalone under plain Node. With the desktop helper spawning the bundled Node, SQLite no
-longer native, and node-pty ABI-stable, that difference stops existing — which is what makes "the
-client ships a node, and you can also download one" a packaging decision rather than a fork.
+Apple Developer ID signing and notarization gate public macOS downloads.
+[Shell signing](../shell.md#signing-gates-and-the-updater) owns the desktop release gate.
+The updater signature and plugin-package attestation are separate contracts.
 
-A related trap, found the hard way and worth keeping as a rule even though the module that caused it
-is gone: **a barrel reachable from a node composition root must not re-export a desktop-only
-module.** A barrel evaluates every module on it, so a folder-picker helper that statically imported
-the desktop shell made `@acorn/plugin-terminal/node/index.ts` unloadable in a plain-Node process, and
-the standalone node died at boot. Desktop-only exports import from their module directly; anything
-reachable from a node composition root stays loadable in bare Node. `boundaries.test.ts` enforces the
-shell-binding half of this today. The terminal client has the mirror rule: **a barrel reachable from
-the TUI composition root must not re-export a DOM-only module.** Client-core's `kit/` is DOM-out by
-design and that is fine, because the TUI imports the kit's contract (`kit/tokens/`) and its own
-components, never `kit/components/primitives.tsx`. Nothing holds that half as a rule. What found the
-two barrels that broke it was the pane sweep importing them and watching the process fall over, and
-the fix in both cases was an alias rather than a smaller barrel
-([docs/tui.md](../tui/host-switch.md) § The host switch).
+Sign the bundled executables and native modules, notarize the distributable artifacts, and verify
+an installation with quarantine applied. Check the configured signing credentials before treating
+membership or setup as an external blocker.
 
-## Shipping `acorn` (historical design)
+## Verify and hand off
 
-The terminal client runs from a checkout today. This is what putting it in the two artifacts costs,
-and it is step 7 of the order below. What `acorn` draws is [docs/tui.md](../tui.md)'s; the pieces here
-are all pipeline.
+Run lint, changed package suites, architecture checks, and artifact-specific smoke tests.
+Do not infer an unpacked archive's dependency completeness from workspace tests.
+Record runner, architecture, runtime, artifact checksum, pairing result, and shutdown result.
+Update [Node distribution](../node-distribution.md) with tested installation commands.
 
-**One build, two homes.** `dist/tui.js` is built once by `apps/tui`'s Vite config and staged into both
-artifacts by the scripts that already stage `dist/helper/`: `apps/desktop/scripts/stage.mjs` for the
-app, `scripts/pack-node.mjs` for the tarball. Neither grows a second opinion about the runtime; both
-read `node-runtime.json`.
+The container can ship independently. Archive installation follows runtime and native packaging;
+Windows delivery follows its operation checks. Public macOS delivery follows signing and notarization.
+Desktop TUI embedding can proceed separately from standalone release publication.
 
-**`bin/acorn`.** A shell script, and a `.cmd` beside it on Windows, that resolves its own directory,
-finds the runtime at `../runtime/bin/node` if one is bundled or `node` on `PATH` if not, and runs
-`../dist/tui.js` with the caller's arguments. Nothing else, and no flag. Node SEA stays refused.
+## Verify before building
 
-**The desktop's `acorn`.** A resource inside the app bundle beside `helper/`, sharing the runtime. On
-first run the app offers to symlink it into `/usr/local/bin` or `~/.local/bin`, the way Visual Studio
-Code offers `code`: off by default, behind a setting, never offered by a sandboxed build.
-
-**What the tarball's generated `package.json` has to list.** This was an open question worth about
-30 MB and it is answered: the terminal rewrite went through `apps/tui/package.json` group by group
-with the built output as the judge, took twenty packages out — nineteen CodeMirror grammars and
-themes, `shiki`, `lucide-static` and the three browser `@xterm` packages — and answered their
-specifiers with three local stubs that throw and name the host
-([tui.md](../tui/host-switch.md) § The host switch). What went back in is what the build proves this host
-reaches: `codemirror` and three of its packages, because the `editor` pane imports `basicSetup`
-directly, `@xterm/headless`, because it is the `pty` rectangle's emulator, and `idb-keyval`, because
-client-core imports it before the first frame. So the tarball lists what `apps/tui/package.json`
-lists, and the way to check that is the built output rather than the suite: a green suite proves
-nothing here, because vitest resolves a specifier from client-core's own `node_modules` where the
-built bundle would not.
-
-**How it is checked.** Extract the packed tarball on a clean runner: `bin/acorn --version` prints, and
-`bin/acorn` with `ACORN_DATA_DIR` set starts a node that the boot test in `apps/tui/src/node/boot.test.ts`
-passes against. Every bare specifier in the built `dist/` has to resolve against what the generated
-`package.json` declares, which is the check the rewrite ran by hand and which belongs in `scripts/`
-the day somebody wants it enforced. The Tauri packaging properties gain one assertion, that the
-`acorn` resource is present and executable. And `scripts/rebuild-node-abi.mjs` loads node-pty on
-every matrix runner.
-
-**Signing is the same gate as everything else.** A downloaded `acorn` is quarantined on macOS
-exactly as the node tarball is, node-pty's binary included. Linux and Windows first, macOS when the
-Developer ID exists.
-
-## Ordering
-
-1. `better-sqlite3` → `node:sqlite` — **done**, and it halves the problem.
-2. The Docker image — no snags block it, and it exercises the no-TTY path end to end.
-3. A Linux node-pty prebuild produced in CI (glibc; see above).
-4. The CI matrix and release upload: Linux and Windows.
-5. Replace or bundle `openssl`, and decide the Windows answers for `SIGUSR1` and file modes.
-6. Bundle a Node runtime. Moved up from last: the terminal client's user typed `acorn`, not "install
-   a service", and both artifacts already read one pin.
-7. `acorn` in the tarball and in the app bundle. Simpler than it was: there is no second runtime
-   and no second binary to prebuild. See § Shipping `acorn` above.
-8. macOS, once there is a Developer ID. It gates the node tarball and `acorn` alike.
-
-## Not in scope here
-
-Reaching a node across the internet rather than a LAN, browser clients, and the relay service are a
-different problem with a different trust model — see [remote.md](./remote.md). The terminal client
-itself, what it draws and how it runs, is [docs/tui.md](../tui.md); this file only packages it. Nothing in this
-document assumes anything beyond a network the operator already trusts, and exposing a node that
-runs PTYs, spawns agents and executes repo-configured commands is a decision that should stay
-explicit at every layer.
+- Inspect the packer, desktop staging, command installation, runtime pin, and generated dependency policy.
+- Check supported platform triples and native-module loading on matching runners.
+- Recheck the pairing API and Windows token storage before adding an operator command.
+- Keep browser access and relay work in [remote access](./remote.md) and [cloud](./cloud/README.md).

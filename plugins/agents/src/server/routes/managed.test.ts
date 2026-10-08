@@ -40,7 +40,7 @@ const METHODS = [
   'runs', 'providers', 'uploadAttachment', 'attachment', 'removeAttachment', 'attachmentContent',
   'artifacts', 'artifact',
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
-  'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
+  'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'cancelSubagent', 'resolveRequest',
   'referenceContext',
   'setGoal', 'resumeGoal',
   'implementCodexPlan',
@@ -156,6 +156,18 @@ describe('managed execution requires device authority', () => {
     expect((await app.fetch(req('/api/sessions/s1/turns/t1', 'DELETE'), {} as Env)).status).toBe(200)
     expect((await app.fetch(req('/api/sessions/s2/cancel', 'POST', {}), {} as Env)).status).toBe(404)
     expect(cancel).toHaveBeenCalledTimes(2)
+  })
+
+  it('confines child cancellation to the parent session task', async () => {
+    const cancelSubagent = vi.fn(async () => {})
+    setManagedAgentsBridge(fake({ cancelSubagent }))
+    for (const app of [authed(), asTask1()]) {
+      expect((await app.fetch(req('/api/sessions/s1/subagents/child-1/cancel', 'POST', {}), {} as Env)).status).toBe(200)
+    }
+    for (const sessionId of ['s2', 'missing']) {
+      expect((await asTask1().fetch(req(`/api/sessions/${sessionId}/subagents/child-1/cancel`, 'POST', {}), {} as Env)).status).toBe(404)
+    }
+    expect(cancelSubagent.mock.calls).toEqual([['s1', 'child-1'], ['s1', 'child-1']])
   })
 })
 

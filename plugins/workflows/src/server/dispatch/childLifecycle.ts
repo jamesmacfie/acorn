@@ -6,6 +6,7 @@ import { slugifyBranch } from '@acorn/protocol/branch.ts'
 import type { PluginDatabase } from '@acorn/plugin-api/node'
 import * as schema from '../../node/schema'
 import type { WorkflowChildRunSummary } from '../../shared/api'
+import type { AgentExecuteGoalSummary } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import type {
   ResolvedWorkflowGraph,
   StepHandler,
@@ -53,6 +54,14 @@ const bounded = (value: string | null | undefined): string | null => {
 }
 
 /** Coordinates a dispatch step without occupying an agent execution slot. */
+/** An agent item's goal in brief, for the parent's summary. Absent when the item had none. */
+function itemGoal(steps: readonly WorkflowStepRow[]): Pick<WorkflowChildRunSummary, 'goal'> {
+  const raw = steps.find((step) => step.goalJson)?.goalJson
+  if (!raw) return {}
+  const goal = JSON.parse(raw) as AgentExecuteGoalSummary
+  return { goal: { status: goal.status, continuations: goal.continuations, reason: goal.reason ?? goal.verdict?.reason ?? null } }
+}
+
 export class WorkflowChildLifecycle {
   readonly #waiters = new Map<string, Set<() => void>>()
 
@@ -351,7 +360,7 @@ export class WorkflowChildLifecycle {
       taskId: dispatch.taskId,
       runId: dispatch.runId,
       ...(dispatch.taskMode === 'parent' ? { taskMode: 'parent', agentSessionId: result?.agentSessionId ?? steps.find(step => step.agentSessionId)?.agentSessionId ?? null,
-        result: result ? JSON.parse(result.structuredJson ?? result.resultJson!) : null } : {}),
+        result: result ? JSON.parse(result.structuredJson ?? result.resultJson!) : null, ...itemGoal(steps) } : {}),
       name: run?.name ?? null,
       dispatchState: dispatch.state as WorkflowChildRunSummary['dispatchState'],
       runStatus: asRunStatus(run?.status),

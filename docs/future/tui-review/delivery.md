@@ -1,89 +1,85 @@
-# Delivery and acceptance
+# Complete terminal journeys and release checks
 
-Date: 2026-09-27. Status: proposed implementation order and open gates.
+Date: October 8, 2026. Status: remaining implementation and acceptance handoff.
 
-The work closes only when a person can use `acorn` from an empty terminal profile through setup,
-task work, review, and recovery without the desktop. Each phase leaves the TUI buildable and has a
-visible result. Keep behavior in the owning feature and project text into cells at the host boundary.
+Start from [the review entry page](./README.md). Startup, reconnect repair, setup, Settings routing,
+local-path file transfers, promotion, and PTY navigation are implemented. Confirm those paths rather
+than repeating their original implementation phases.
 
-## Phase 1: establish a truthful terminal contract
+## Complete applicable settings
 
-1. Finish the icon sweep. Audit all `Icon` and `IconButton` call sites for state that lost its only
-   label. Keep semantic text beside status, selection, and destructive actions. Inspect 80 by 24
-   screens after each affected pane change.
-2. Gate every action on the capability it uses. Replace missing file and dialog seams with typed path
-   flows or hide their controls. Make an unavailable operation show a reason before Enter, not after
-   a silent no-op.
-3. Repair startup recovery. Re-fetch queries that failed while the Node was booting, reset failed
-   pane boundaries after the refetch, and provide a Retry control for a persistent error.
-4. Give selected rows a full identity and put large action sets into an Actions list. Prioritize
-   Changes, GitHub, agent sessions, and Docker, where the live fixture clips names and verbs.
+Start with `apps/tui/src/chrome/settingsPages.tsx` and the shared settings registry.
+Use [Terminal Settings](../../tui/sources-and-settings.md#settings) to identify implemented forms
+and pages that display **desktop app**.
 
-Acceptance: a repository search finds no Lucide name-to-glyph TUI mapping, no visible terminal
-control calls a missing platform seam without feedback, and the selected object's full name is
-readable at 80 by 24. A reused fixture must recover its Agent pane after a transient refused
-connection. The icon and startup dependency repairs made during this review are the first part of
-this phase, not its completion.
+For each applicable page, provide a terminal form or a documented working command/configuration path.
+Keep Node and device scope explicit. Reuse validation, defaults, save guards, and permissions.
+Do not introduce a second settings store.
 
-## Phase 2: make terminal-only setup possible
+Acceptance: a clean terminal profile can configure a provider or installed CLI, Node access,
+necessary task defaults, and schedules without desktop interaction. Failed validation retains input;
+Escape honors unsaved changes; restarting preserves settings at their documented scope.
 
-1. Add a first-run screen for an empty profile. It creates or selects a workspace, adds a project,
-   identifies the local Node, and offers agent/provider setup without requiring it.
-2. Add a Settings command group and terminal pages for the settings needed by the feature inventory.
-   Use existing Node and device config APIs; expose editable paths where the desktop uses pickers.
-   The route and its listing shipped on 2026-09-30 ([tui.md](../../tui/sources-and-settings.md#settings)); the terminal
-   forms for the pages it lists as **desktop app** remain.
-3. Add clear help for absent external integrations, offline Nodes, and missing CLIs. Return to setup
-   from the palette after onboarding.
+## Verify the feature inventory
 
-Acceptance: a fresh `ACORN_DATA_DIR` and `ACORN_TUI_CONFIG_DIR` can reach a usable task, configure a
-provider or installed CLI, and recover from a failed setup using only the terminal. Search for
-`settings` and `new task` returns an actionable route.
+Use [the journey table](./features.md) as the acceptance checklist. Reproduce a gap before changing code.
+For each applicable feature, record discovery, navigation, principal action, visible result, failure,
+and recovery at 80 by 24 and 120 by 40.
 
-## Phase 3: complete the working journeys
+Prioritize these unclosed paths:
 
-1. Provide a terminal-native raw session surface and a safe managed-agent handoff. Keep the session
-   list, PTY, resume, and return to managed mode reachable from a task and the palette.
-2. Add typed path or byte-stream alternatives for agent attachments, artifacts, and transcript
-   export. Add a terminal task picker for source-item promotion.
-3. Complete the feature journeys in [the inventory](./features.md), including real writes against
-   disposable Git, HTTP, and database fixtures and real agent CLIs where installed.
+1. Provider connection and authentication, then source browse and task promotion.
+2. Disposable Git stage, commit, push, and review writes, with post-action refresh.
+3. Real installed agent CLIs, permissions, questions, queueing, export, artifacts, and managed/PTY
+   handoff. Verify return to the managed transcript and retained task identity.
+4. HTTP requests and PostgreSQL execution against disposable local fixtures.
+5. Workflow edit, publish, run, gate, retry, and schedule configuration.
+6. Offline/revoked Nodes, loaded-plugin trust and updates, and recovery of a reused session.
 
-Acceptance: each applicable feature has a recorded keyboard journey through action, result, and
-error recovery. Desktop-only capabilities have a visible explanation and no dead controls.
+Editor implementation and local evidence are in [Editor acceptance](../editor/README.md).
+Reuse its contract and completion records. Finish any terminal-specific journey that the feature
+inventory needs; do not rebuild its completed menus, navigation, or scoped search.
 
-## Phase 4: prove the app at terminal sizes and package boundaries
+## Fix presentation failures
 
-1. Run `pnpm lint`, relevant package tests, `pnpm test`, and the architecture and documentation path
-   checks. Verify a fresh install resolves every external module in the TUI bundle, including `pg`.
-2. Run `pnpm dev:tui:agent -- --session NAME --fixture tui-navigation`, then the navigation flow and
-   targeted live paths. Inspect snapshots after each transition at 80 by 24 and 120 by 40. Repeat
-   critical keyboard actions with `--keyboard legacy` and resize while a PTY is entered.
-3. Run the same seed in the desktop agent window and compare task counts, pane content, action
-   results, and error states. Host layout may differ; lost data or unreachable operations fail.
-4. Test a clean profile, local attach, remote pairing, missing provider, revoked Node, plugin trust
-   and update, and a long task with many files and turns. Run packaged artifacts, not only checkout
-   builds, before release.
+Inspect a selected object's full identity, status words, primary action, and keyboard help at both
+sizes. Move large action sets into an accessible menu when they consume the row's identity.
+Use [host projections](./host-projections.md) to preserve each fact formerly conveyed by an icon.
 
-Acceptance: no startup error, uncaught pane failure, clipped primary label, unreachable control,
-silent no-op, or focus trap appears in the recorded journeys. Every exception is an intentional host
-limit with a clear alternative or explanation. Save a dated report with commands, environment,
-screens, failed and passed criteria, and open risks.
+Treat dashboard table/list projection as a separate scoped task when a decision depends on data
+otherwise absent from the terminal. Keep preview webviews unavailable and provide an external URL
+or another documented path when applicable. A placeholder is a host limit, not feature acceptance.
+
+Acceptance: controls report an unavailable capability before invoking it, errors offer recovery,
+and menu dismissal restores focus to a surviving target. Check legacy keyboard mode, resize while
+inside a PTY, and return to the task after the PTY exits.
+
+## Verify package boundaries
+
+After fixes and focused checks pass, run these gates:
+
+1. `pnpm lint`, affected owner and consumer suites, and the architecture suite.
+2. The unfiltered `pnpm test` with the repository's supported runtime and bounded concurrency.
+3. The isolated terminal navigation flow and targeted journeys from a fresh profile at both sizes.
+4. A desktop session with the same seed. Compare counts, data, action results, and error states.
+5. Extracted standalone artifacts outside the checkout. Verify every required runtime module resolves,
+   local start and attach, remote pairing, shutdown ownership, and installed-plugin loading.
+
+[Node packaging](../bundle.md) owns artifact publication. Record an unavailable platform artifact
+as an open release check, not as a successful checkout test.
 
 ## Definition of done
 
-- The [feature inventory](./features.md) has a passing outcome or a justified host limit for every
-  row. An unverified code path cannot be marked complete.
-- The full terminal-only setup and daily-work journey succeeds in a real PTY at both sizes.
-- The keyboard help names the current place and accurately describes keys the user's terminal sends.
-- The app provides text for every action and state formerly conveyed only by an icon.
-- The owning docs under `docs/` describe shipped behavior. This folder retains the dated evidence
-  and decisions until the acceptance report closes.
+Each journey has dated evidence or an accepted host limit with a working alternative.
+A terminal-only user can set up a project, start and supervise work, inspect results, recover,
+and exit safely. Packaged artifacts pass the startup and ownership checks.
+
+Record tested commit, runtime, terminal, sizes, fixtures, commands, results, and open platform limits.
+Update the owning reference pages with changed behavior and remove this review folder after its
+acceptance records and remaining proposals have an owning home.
 
 ## Verify before building
 
-- Check this order against the current dependency graph and feature registrations.
-- Confirm the fixture uses isolated data and ports; do not run destructive feature writes against a
-  developer's real Node or repository.
-- Treat a green unit suite as necessary but insufficient. Inspect the real cell frames and action
-  results before claiming terminal UX acceptance.
+- Recheck registrations, Settings support, platform capabilities, and fixture isolation.
+- Consult dated evidence before counting a journey as untested or failed.
+- Verify real action results; rendering a form or passing a mocked handler does not prove the journey.

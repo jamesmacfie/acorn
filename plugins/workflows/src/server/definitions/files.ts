@@ -36,6 +36,9 @@ const defaultCatalog = (): WorkflowValidationCatalog => ({
 })
 
 const str = (v: unknown): string | undefined => (typeof v === 'string' && v.trim() ? v.trim() : undefined)
+// Kept even when blank or mistyped, unlike `str`, so validation can name the bad field rather than
+// the step silently running without its completion condition.
+const rawGoal = (v: unknown): string | undefined => (typeof v === 'string' ? v.trim() : v as string | undefined)
 
 // A raw parsed step: WorkflowStepDef plus the unexpanded sub-workflow reference.
 type RawStep = WorkflowStepDef & { workflowRef?: string }
@@ -210,14 +213,15 @@ function parseStep(v: unknown, id: string, i: number, errors: WorkflowFileError[
     profileId: str(o.profile),
     model: str(o.model),
     prompt: str(o.prompt),
+    goal: rawGoal(o.goal),
     schema,
     policy: str(o.policy),
     maxIterations: typeof o.max_iterations === 'number' ? o.max_iterations : undefined,
     requiresRun: str(o.requires_run),
     agent: o.agent && typeof o.agent === 'object' ? (() => {
       const a = o.agent as Record<string, unknown>
-      const unknown = Object.fromEntries(Object.entries(a).filter(([key]) => !['prompt', 'profile', 'model', 'config_options', 'schema_json', 'on_failure'].includes(key)))
-      return { ...unknown, prompt: a.prompt as string, profileId: str(a.profile), model: str(a.model),
+      const unknown = Object.fromEntries(Object.entries(a).filter(([key]) => !['prompt', 'goal', 'profile', 'model', 'config_options', 'schema_json', 'on_failure'].includes(key)))
+      return { ...unknown, prompt: a.prompt as string, goal: rawGoal(a.goal), profileId: str(a.profile), model: str(a.model),
         configOptions: parseStringTable(a.config_options), schema: typeof a.schema_json === 'string' ? JSON.parse(a.schema_json) : undefined,
         onFailure: a.on_failure as 'continue' | 'stop' | undefined }
     })() : undefined,

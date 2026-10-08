@@ -97,7 +97,7 @@ export async function openNode(target: string | undefined, at: Custody = custody
   }
   const starting = node.handshake.then(remember)
   // Who this root's node is, without opening it. Written once per root and never rewritten, so it is
-  // known before the child has bound anything (./attach.ts § knownNodeId).
+  // known before the child has bound anything (@acorn/custody/local § knownNodeId).
   const known = knownNodeId(dataDir)
   if (!known) {
     // A first-ever start. There is no id to name a cache partition with and no cache under it either,

@@ -109,6 +109,8 @@ from the snapshot without opening folders. The terminal draws the same letters a
 the active tab's status. Git deletion does not decide whether a document can save: the
 disk revision read still owns **Deleted on disk** and recovery.
 
+The tree controls share one row of labeled icon buttons. Creation dialogs label each field.
+
 The file tree uses the kit's virtual `Rows` and passes measured placement to `TreeRow`. Rows follow
 stable keys when expanding moves them. Before viewport geometry arrives, the tree admits at most 12
 rows. A reveal waits for usable geometry, including in a restored hidden pane. The terminal client

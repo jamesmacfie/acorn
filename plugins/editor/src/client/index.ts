@@ -2,6 +2,7 @@
 //
 // One pane: find-in-files is a panel in its sidebar rather than a pane of its own
 // (docs/panes/contributions.md § Contributions).
+import { lazy } from 'solid-js'
 import { activeTaskId, type ClientPlugin } from '@acorn/plugin-api/client'
 import { editorOpenFilesSlice } from './openFilesSlice'
 // Imported for the side effect: claiming the `editor` WS prefix at boot rather than when the first
@@ -11,10 +12,19 @@ import './wsChannel'
 import { editorCommands } from './commands'
 import { editorPaneContribution } from './paneContribution'
 
+const EditorSettings = lazy(() => import('./EditorSettings'))
+
 export const editorClientPlugin: ClientPlugin = {
   name: 'editor',
   init: (ctx) => {
     ctx.panes.register(editorPaneContribution)
+    ctx.settingsPages.register({
+      id: 'editor', label: 'Editor', category: 'features', scope: 'device', icon: 'file-code', order: 20,
+      requires: { plugin: 'editor' },
+      keywords: ['word wrap', 'indentation', 'spaces', 'tabs'],
+      sections: [{ id: 'defaults', label: 'Editing defaults', rows: ['Word wrap', 'Indentation'] }],
+      component: EditorSettings,
+    })
     // ⌘P quick-open and find-in-files (./commands.ts). Quick-open was an overlay slot of its own
     // until 2026-09-03; it is a search command on the shared session now, so the chord opens the
     // palette at its frame instead of a second dialog with its own query and cursor.

@@ -22,8 +22,8 @@ import {
 } from '@acorn/protocol/api.ts'
 import type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 
-// Replace a workspace's combined external-project set. Provider-specific callers merge their slice
-// first via integrations/workspaceProjects.ts so sibling-provider mappings survive.
+// Replace a workspace's combined external-project set. Provider-specific callers must preserve
+// sibling-provider mappings when assembling the replacement.
 export const setWorkspaceExternalProjects = async (workspaceId: string, projects: WorkspaceExternalProject[]) =>
   writeJson<{ ok: true }>(workspaceExternalProjectsRoute(workspaceId), {
     method: 'PUT',

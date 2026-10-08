@@ -1,7 +1,8 @@
 # Agent steps
 
-This page covers what an agent step is given, and what happens when its turn ends without the result
-the step asked for. [Workflow execution](./execution.md) covers the rest of the runner.
+This page covers what an agent step is given, what happens when its turn ends without the result the
+step asked for, and how a completion condition keeps it working. [Workflow execution](./execution.md)
+covers the rest of the runner.
 
 ## What an agent step sees
 
@@ -90,8 +91,71 @@ on a progress report instead of the finished work, so acorn guards the step thre
 2. If the turn ends without the result the step needs, meaning no message at all or no `json` block
    that matches the step's schema, acorn sends one more turn telling the agent to finish or say what
    blocks it. It does that twice at most, then the step is `malformed` as before. The transcript
-   labels these turns **Acorn**, and the step's own prompt **Workflow**. The step's events cover
-   every turn, but its usage and cost are the last turn's alone.
+   labels these turns **Acorn**, and the step's own prompt **Workflow**. The step's events, usage,
+   and cost cover every turn, with Codex's cumulative totals taken from the last.
 3. A turn the model declined, with the stop reason `refusal`, fails the step with that reason and is
    never sent again. A final message starting with `BLOCKED:` also fails the step with that line as
    its reason, without a continuation.
+
+## Completion conditions
+
+A valid final message doesn't mean the work is done. A plain `agent` step, and the agent in a
+**For each**, can take a `goal`: what must be true before the step is finished. The editor calls it
+**Completion condition** and shows it after **Prompt**. A step without one runs as before.
+
+```toml
+[[steps]]
+id = "fix-login"
+name = "Fix login"
+prompt = "Investigate and fix the supplied login regression."
+goal = "The regression is fixed, the login tests pass, and the fix is committed."
+```
+
+On an agent step the goal takes the same `${inputs.x}` and `${steps.x.output}` references as the
+prompt. On a For each agent it's plain text, like that agent's prompt. The runner renders it once,
+checks it's 1 to 2,000 characters, and saves it as `goal` in the step's `inputs_json`. A retry keeps
+that saved condition, even when the retry edits the prompt. Other kinds refuse the field. The step's
+harness must run managed sessions and have a one-shot mode, because the check runs through it.
+Validation refuses any other harness. At run time, a step with a goal never falls back to a headless
+process: it fails with an error that says why.
+
+The agents plugin runs the loop in `agents.sessionExecute`
+(`plugins/agents/src/server/sessions/sessionExecute.ts` and `stepGoal.ts`):
+
+1. The opening prompt carries the condition after the work request and before the result contract.
+2. Once the step's turns and any joined notes settle, a judge reads the evidence from this attempt's
+   turns only. It's the same judge, evidence builder, verdict format, and model choice as
+   [session goals](../managed-agents/operations.md#session-goals). Each check gets at most 30
+   seconds, and never more than the time left in the step.
+3. The verdict is saved against the exact turns it read. If a turn or note joined while the judge
+   ran, the verdict is dropped and the loop looks again.
+4. If useful work remains, acorn queues a goal continuation in the same session, with the condition,
+   the judge's reason, and the result contract. Any other verdict fails the step with the judge's
+   reason. A check that can't run, times out, or answers in the wrong shape fails the step with
+   "Unable to check completion" and its diagnostic.
+5. After the condition is met, the final message must still match the schema. A repair turn can fix
+   that, and then the condition is checked again.
+6. The review window opens once, after the condition is met. A correction it sends is checked again.
+   It doesn't open a second window.
+
+A refusal, a `BLOCKED:` line, a failed turn, a timeout, or a cancellation ends the step for its own
+reason, with no goal continuation. A cancelled step with a goal never publishes a result, even if its
+turn had already finished. Goal continuations and result repairs share a limit of eight automatic
+turns per attempt, and repairs keep their own limit of two. The step also stops after two goal
+continuations in a row with no tool call or file change.
+
+The run pane shows the condition, where its checks stand (**Checking completion** and **Continuing
+toward goal** while it works), the number of goal continuations and repairs, the last check's
+reason, and its evidence summary. The state is in the step row's `goal_json`, apart from the step's
+output, so no binding can read it. A For each puts each item's goal status, continuation count, and
+reason in its `children` summary.
+
+### Budgets
+
+Every turn the session queues by itself, a goal continuation or a result repair, first reserves a
+turn against the same budgets as the step's opening turn. A step with `max_turns = 1` can't take a second turn. A completion check takes no
+turn, but it must fit the cost and token budgets. Each check's reported tokens are added to the
+step's usage. The opening admission row holds the step's usage so far. Each update replaces it rather
+than adding to it, so settling the step charges every turn and check once. A refused reservation ends
+the step at the safety rail. One deadline covers the whole step, including checks and the review
+window.

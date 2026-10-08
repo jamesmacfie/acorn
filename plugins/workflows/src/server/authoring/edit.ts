@@ -53,7 +53,7 @@ export function definitionForPrompt(def: WorkflowDef): PromptWorkflowDef {
         : undefined
       return {
         ...safe,
-        ...(hiddenAgent ? { agent: { prompt: hiddenAgent.prompt, profileId: hiddenAgent.profileId, schema: hiddenAgent.schema, onFailure: hiddenAgent.onFailure } } : {}),
+        ...(hiddenAgent ? { agent: { prompt: hiddenAgent.prompt, goal: hiddenAgent.goal, profileId: hiddenAgent.profileId, schema: hiddenAgent.schema, onFailure: hiddenAgent.onFailure } } : {}),
         ...(stepTools ? { tools: stepTools } : {}),
         ...(hiddenWorkflow ? {
           childWorkflow: { inputs: hiddenWorkflow.inputs },

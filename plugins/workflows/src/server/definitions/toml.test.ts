@@ -24,6 +24,39 @@ it('rejects a numeric-1 workflow without the baseline marker', () => {
 })
 
 describe('writing a definition back as TOML', () => {
+  it('round trips a completion condition on an agent step and on a For each agent', () => {
+    const { parsed, again, written } = roundTrip(`
+format_version = 1
+baseline = "acorn-1"
+name = "goals"
+
+[[steps]]
+id = "fix"
+name = "fix"
+prompt = "Fix the login regression."
+goal = "The login tests pass and the fix is committed."
+
+[[steps]]
+id = "each"
+name = "each"
+kind = "workflow-map"
+items = { step = "fix", pointer = "/issues" }
+[steps.agent]
+prompt = "Fix this issue."
+goal = "Its tests pass."
+`)
+    expect(parsed.steps[0]?.goal).toBe('The login tests pass and the fix is committed.')
+    expect(parsed.steps[1]?.agent?.goal).toBe('Its tests pass.')
+    expect(again.steps.map((step) => [step.goal, step.agent?.goal])).toEqual(parsed.steps.map((step) => [step.goal, step.agent?.goal]))
+    expect(written).toContain('goal = "Its tests pass."')
+  })
+
+  it('keeps a blank goal so validation can name it', () => {
+    const errors: { source: string; message: string }[] = []
+    const parsed = parseWorkflowToml('format_version = 1\nbaseline = "acorn-1"\nname = "w"\n[[steps]]\nid = "fix"\nname = "fix"\ngoal = "  "\n', 'w', 'repo', errors)
+    expect(parsed?.steps[0]?.goal).toBe('')
+  })
+
   it('round trips the version-1 graph, typed inputs, branches, ceilings and budgets', () => {
     const { parsed, again } = roundTrip(`
 format_version = 1

@@ -6,8 +6,8 @@ subagents acorn creates as sessions, see [managed delegation](./delegation.md).
 
 ## A projection, not a session
 
-A provider-native subagent isn't a session. You can't address it, send it a turn, fork it, or hand it
-to a terminal, so a session row would be wrong in every table that reads one. Instead each session
+A provider-native subagent isn't a session. You can't send it a turn, fork it, or hand it
+to a terminal. Codex children have a stop action, addressed through their parent. Each session
 row carries a `subagents` roster, folded from the session's own `subagent` events by `recordEvent` in
 the same transaction as the event insert. The runtime broadcasts the row when an event changes it,
 and every client gets agent frames, so the sidebar's sub-rows update live for every session in the
@@ -21,6 +21,23 @@ itself, because no event would.
 
 A subagent's progress doesn't change its session's runtime state. Turn boundaries own that, and Codex
 lets a child settle after its parent's turn completed.
+
+## Stop a Codex child
+
+Select a Codex child in the sidebar, then click **Stop** in the header. The header shows the child's
+state, and Stop stays available while that child is running, including when its parent is ready.
+Selecting the parent restores its state and turn cancellation control. Claude Code children have
+no individual stop control through its driver.
+
+`POST /v1/p/agents/sessions/:sessionId/subagents/:subagentId/cancel` uses the parent's task scope.
+The runtime checks that the child belongs to the session's roster and that Acorn controls the
+session. It requires a live driver connection and a driver that implements `cancelSubagent`.
+It doesn't start a stopped harness or change the parent's turn, goal, requests, or state.
+
+The Codex driver retains each child's active turn ID from its notifications. If a resumed connection
+missed the turn start, it reads that child's thread to find the active turn. It sends `turn/interrupt`
+with the child thread and turn IDs. Provider events settle the child's roster entry to idle.
+Provider cancellation errors reach the pane, so a rejected stop doesn't appear successful.
 
 ## What each harness reports
 
