@@ -62,6 +62,10 @@ acorn doesn't defend a Node host against root, other users, or a compromised Nod
 sandbox first-party compiled plugin code. A client still treats a paired Node as an untrusted source of
 replies, events, content, and plugin offers until an owner authorizes code.
 
+The shell's application ACL grants its own Tauri commands only to the `main` webview, and dispatch
+checks that webview's top-level renderer URL. [Host-owned webviews](./security/webviews.md) describes
+the plugin iframe's separate cross-origin boundary and the ACL's subframe limit.
+
 The shell's Rust dependency patch and remaining upstream advisories are in
 [Rust dependency security](./shell/packaging.md#rust-dependency-security). The dated review of October 1, 2026
 is [review-2026-10-01.md](./security/review-2026-10-01.md).

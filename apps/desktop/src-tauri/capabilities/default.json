@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "What the renderer may call. `core:default` covers invoke and event listening, which is how the bridge reaches the commands in src/commands.rs. The dialog and opener plugins are deliberately absent: their capabilities belong to our own commands, which enforce the scheme allowlist and the data root, never to the process that renders third-party content. Scoped by webview label rather than by window, and that is load-bearing: naming a window grants every webview inside it, which since phase 3 includes the preview pane and plugin webview surfaces — pages this app does not write. Those get no capability at all, so `invoke` reaches nothing from them.",
+  "description": "What the renderer may call. `core:default` covers Tauri core commands and events; `renderer-commands` is the application manifest permission for Acorn's own commands. Both are scoped to the `main` webview label, not its window: preview and plugin child webviews have different labels and cannot invoke them. The command handler also checks the receiving webview's top-level renderer URL. The plugin interface iframe shares main's receiving label, so preserve its cross-origin isolation and main-frame-only invoke-key injection: Tauri's ACL does not distinguish subframes. Dialog and opener plugin commands are deliberately not granted: the renderer uses Acorn's own commands for those operations.",
   "webviews": ["main"],
-  "permissions": ["core:default"]
+  "permissions": ["core:default", "renderer-commands"]
 }

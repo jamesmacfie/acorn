@@ -49,6 +49,10 @@ tauri-plugin-notification = "2"
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
+[dev-dependencies]
+# Exercise the generated application ACL with Tauri's own resolver.
+tauri-utils = "2"
+
 [target.'cfg(target_os = "macos")'.dependencies]
 # Native banner responses and dev-build identity (src/notifications.rs). The crate is also
 # pulled in by tauri-plugin-notification through notify-rust.

@@ -144,40 +144,53 @@ pub fn run() {
             Some(frames) => plugin_scheme::serve(frames, &request),
             None => tauri::http::Response::builder().status(503).body(Vec::new()).expect("a bodyless response always builds"),
         })
-        .invoke_handler(tauri::generate_handler![
-            commands::helper_endpoint,
-            commands::pick_folder,
-            commands::pick_files,
-            commands::save_file,
-            external_urls::open_external_url,
-            links::take_pending_links,
-            commands::reveal_data_folder,
-            commands::open_config_file,
-            commands::force_quit,
-            commands::quit_approved,
-            commands::show_notification,
-            commands::set_badge,
-            commands::set_window_background,
-            cli_install::cli_install_status,
-            cli_install::cli_install,
-            reset_stage::reset_export,
-            reset_stage::reset_complete,
-            #[cfg(feature = "agent-automation")]
-            webview_diagnostics::webview_diagnostics,
-            #[cfg(feature = "agent-automation")]
-            webview_diagnostics::webview_trial_delay,
-            overlays::overlay_debug_focus,
-            overlays::overlay_begin,
-            overlays::overlay_update,
-            webviews::webview_ensure,
-            webviews::webview_bounds,
-            webviews::webview_show,
-            webviews::webview_hide,
-            webviews::webview_load,
-            webviews::webview_command,
-            webviews::webview_evict,
-            webviews::webview_evict_previews,
-        ])
+        .invoke_handler(|invoke: tauri::ipc::Invoke<tauri::Wry>| {
+            // Tauri's application ACL grants this list only to the main webview. Check the
+            // webview's own top-level URL too before dispatching a native operation, so a
+            // future navigation or capability change cannot turn another page into the shell.
+            let webview = invoke.message.webview_ref();
+            let trusted = webview.label() == "main"
+                && webview.url().is_ok_and(|url| is_renderer_url(&url));
+            if !trusted {
+                invoke.resolver.reject("Desktop commands require the Acorn renderer");
+                return true;
+            }
+            let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
+                commands::helper_endpoint,
+                commands::pick_folder,
+                commands::pick_files,
+                commands::save_file,
+                external_urls::open_external_url,
+                links::take_pending_links,
+                commands::reveal_data_folder,
+                commands::open_config_file,
+                commands::force_quit,
+                commands::quit_approved,
+                commands::show_notification,
+                commands::set_badge,
+                commands::set_window_background,
+                cli_install::cli_install_status,
+                cli_install::cli_install,
+                reset_stage::reset_export,
+                reset_stage::reset_complete,
+                #[cfg(feature = "agent-automation")]
+                webview_diagnostics::webview_diagnostics,
+                #[cfg(feature = "agent-automation")]
+                webview_diagnostics::webview_trial_delay,
+                overlays::overlay_debug_focus,
+                overlays::overlay_begin,
+                overlays::overlay_update,
+                webviews::webview_ensure,
+                webviews::webview_bounds,
+                webviews::webview_show,
+                webviews::webview_hide,
+                webviews::webview_load,
+                webviews::webview_command,
+                webviews::webview_evict,
+                webviews::webview_evict_previews,
+            ];
+            handler(invoke)
+        })
         .menu(menu::build)
         .on_menu_event(|app, event| menu::on_menu_event(app.app_handle(), event.id().as_ref()))
         .setup(move |app| {
@@ -628,6 +641,37 @@ mod tests {
         let capability: serde_json::Value = serde_json::from_str(include_str!("../capabilities/default.json")).expect("the capability file is JSON");
         assert!(capability.get("windows").is_none(), "capabilities must be scoped by webview label, not by window");
         assert_eq!(capability["webviews"], serde_json::json!(["main"]));
+    }
+
+    #[test]
+    fn desktop_commands_resolve_only_for_the_main_webview() {
+        use std::collections::{BTreeMap, BTreeSet};
+        use tauri::ipc::{Origin, RuntimeAuthority};
+        use tauri_utils::acl::{capability::Capability, manifest::Manifest, resolved::Resolved};
+
+        let manifests: BTreeMap<String, Manifest> = serde_json::from_str(include_str!("../gen/schemas/acl-manifests.json")).unwrap();
+        let capabilities: BTreeMap<String, Capability> = serde_json::from_str(include_str!("../gen/schemas/capabilities.json")).unwrap();
+        assert!(manifests.contains_key("__app-acl__"), "custom commands must have an application ACL");
+        let granted: BTreeSet<_> = manifests["__app-acl__"].permissions["renderer-commands"].commands.allow.iter().cloned().collect();
+        let registered: BTreeSet<_> = include_str!("lib.rs")
+            .split("tauri::generate_handler![").nth(1).unwrap()
+            .split("];").next().unwrap()
+            .lines()
+            .filter_map(|line| line.trim().split("::").nth(1))
+            .map(|name| name.trim_end_matches(',').to_string())
+            .collect();
+        assert_eq!(granted, registered, "the application ACL must cover every registered command");
+
+        let resolved = Resolved::resolve(&manifests, capabilities, tauri_utils::platform::Target::current()).unwrap();
+        assert!(resolved.has_app_acl, "Tauri must enforce ACL checks on local custom commands");
+        let authority = RuntimeAuthority::new(manifests, resolved);
+        for command in &registered {
+            assert!(authority.resolve_access(command, "main", "main", &Origin::Local).is_some(), "main cannot call {command}");
+            assert!(authority.resolve_access(command, "main", "acorn-preview-task", &Origin::Local).is_none(), "preview can call {command}");
+            // Registered custom schemes, including app-plugin://, resolve as local in Tauri.
+            assert!(authority.resolve_access(command, "main", "acorn-plugin-page", &Origin::Local).is_none(), "plugin page can call {command}");
+            assert!(authority.resolve_access(command, "main", "main", &Origin::Remote { url: "https://example.com".parse().unwrap() }).is_none(), "remote origin can call {command}");
+        }
     }
 
     /// The three packaging properties that only show up when somebody installs the artifact. See

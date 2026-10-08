@@ -10,6 +10,19 @@ lifecycle.
 The desktop view service owns every child webview. Each gets an ephemeral session, no preload,
 navigation checks, denied permission requests, and browser chrome outside the guest page.
 
+Acorn's own Tauri commands are listed in the application ACL permission at
+`apps/desktop/src-tauri/permissions/renderer-commands.toml`. The `default` capability grants that
+permission only to the `main` webview. Tauri checks application commands even for local origins when
+the application ACL exists, so plugin and preview child webviews cannot call them. Before dispatch,
+the shell also checks the receiving webview's label and top-level renderer URL. The plugin interface
+frame is an `app-plugin://` iframe within `main`, not a separate webview; its cross-origin isolation
+and lack of an invoke key keep it from sending an invocation. Tauri's webview-label ACL cannot
+distinguish that iframe from its parent if a future change were to expose the key to it.
+
+When you register a desktop command, add it to `renderer-commands.toml`. The generated-ACL Rust test
+checks that the grant matches the handler list and exercises Tauri's authorization resolver for each
+command. Keep `main` as the renderer label and grant by webview, because child pages share its window.
+
 A loaded plugin may declare a host-owned webview. Unlike its sandboxed interface frame, the remote
 page has live network access and its own cookies and login state for the life of the process. The
 trust prompt names the declared hosts as a separate grant. The shell enforces that allowlist across
