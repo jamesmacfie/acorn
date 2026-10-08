@@ -260,6 +260,7 @@ function registerChrome(pluginId: string, hash: string, row: NodePluginRow, refr
     }
     add('source', descriptor.id, () => own(sourceRegistry, {
       id: descriptor.id,
+      ...(descriptor.onSelect?.verb === 'navigate' ? { projectSurfaceId: descriptor.onSelect.surface } : {}),
       label: descriptor.label,
       glyph: descriptor.glyph,
       order: descriptor.order,

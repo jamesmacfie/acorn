@@ -57,11 +57,13 @@ beforeEach(async () => {
   await db.insert(schema.workspaces).values({
     id: 'ws-1',
     name: 'Runn',
+    appearance: { version: 1, kind: 'image', imageId: 'a'.repeat(64) },
     isDefault: true,
     sort: 0,
     createdAt: now,
     updatedAt: now,
   })
+  await db.insert(schema.workspaceIconImages).values({ id: 'a'.repeat(64), bytes: Buffer.from('durable-thumbnail-bytes') })
   db.close()
 
   // Two plugin databases, discovered rather than named: pluginStorage's header says the directory
@@ -106,6 +108,9 @@ describe('createBackup', () => {
       agents.close()
       const core = openSqlite(join(dir, 'core.sqlite'), { readonly: true })
       expect(core.prepare('SELECT name FROM workspaces').all()).toEqual([{ name: 'Runn' }])
+      expect(core.prepare('SELECT appearance FROM workspaces').get()).toEqual({ appearance: JSON.stringify({ version: 1, kind: 'image', imageId: 'a'.repeat(64) }) })
+      const image = core.prepare('SELECT bytes FROM workspace_icon_images').get() as { bytes: Uint8Array }
+      expect(Buffer.from(image.bytes).toString()).toBe('durable-thumbnail-bytes')
       core.close()
     } finally {
       rmSync(dir, { recursive: true, force: true })

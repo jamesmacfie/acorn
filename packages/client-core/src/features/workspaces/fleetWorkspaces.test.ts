@@ -3,7 +3,8 @@ import type { NodeRecord } from '@acorn/protocol/broker.ts'
 import type { Workspace } from '@acorn/protocol/api.ts'
 import { activeNodeId, setActiveNode } from '../../infra/node/activeNode'
 import { refreshFleet, _resetFleet } from '../../infra/node/fleet'
-import { selectFleetWorkspace, type FleetWorkspace } from './fleetWorkspaces'
+import { pickerWorkspaces, selectFleetWorkspace, type FleetWorkspace } from './fleetWorkspaces'
+import type { Project } from '@acorn/protocol/api.ts'
 
 const node = (nodeId: string, label: string): NodeRecord => ({
   nodeId, label, endpoint: `https://127.0.0.1:9${nodeId.length}00`, local: nodeId === 'a',
@@ -67,5 +68,15 @@ describe('selectFleetWorkspace', () => {
     selectFleetWorkspace(entry('b', 'Node B', workspace('ws-3', 'Empty')), (path) => observed.push(path))
     expect(observed).toEqual([])
     expect(activeNodeId()).toBe('a')
+  })
+})
+
+describe('fleet picker membership', () => {
+  it('drops a paired workspace when its only project is hidden while off', () => {
+    const hidden = { id: 'hidden', name: 'Hidden', hidden: true } as Project
+    const visible = { id: 'visible', name: 'Visible', hidden: false } as Project
+    const spaces = [workspace('one', 'One', [hidden]), workspace('two', 'Two', [visible])]
+    expect(pickerWorkspaces(spaces, [hidden, visible], 'off').map((entry) => entry.id)).toEqual(['two'])
+    expect(pickerWorkspaces(spaces, [hidden, visible], 'on').map((entry) => entry.id)).toEqual(['one', 'two'])
   })
 })

@@ -32,6 +32,7 @@ vi.mock('../workspaces/workspaceMutations', () => ({
   createProject: vi.fn(),
   patchProject: vi.fn(),
 }))
+vi.mock('../workspaces/workspacesMode', () => ({ createWorkspacesMode: () => () => 'on' }))
 
 import WorkspaceSettings from './WorkspaceSettings'
 import WorkspaceProjectAssignments from '../workspaces/WorkspaceProjectAssignments'

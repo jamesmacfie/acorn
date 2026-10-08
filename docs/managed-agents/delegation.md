@@ -68,8 +68,25 @@ prompt treats as text the owner's user didn't write. A child that read a hostile
 and unmarked, it would reach the owner as a request. The transcript hides the tags. A refused turn
 reports as refused. The report queues behind the owner's work and doesn't steer an active turn.
 
+When the owner declares `checks`, the host records their verdicts and observation time on the child
+turn's effective policy when the delegated operation settles. Plugin follow-up notes join that
+operation, so the checks use the last note's outcome after all notes finish. The stored results name
+that outcome and turn ID. The report puts these host facts after the child's
+`<pasted_content>` block. `agent_read` returns the same verdicts, and the transcript draws them in
+the report card. Terminal-owned children are checked at settlement too, without an owner report.
+Startup reconciliation checks settled turns missed by the broadcast and reuses saved verdicts
+instead of inspecting changed files. File reads use core's worktree confinement. An absent file
+fails; an escaping path, deleted task, or unavailable worktree is unverified. Failed, cancelled,
+and interrupted final turns leave every check unverified.
+For `commits-ahead`, the host compares the child branch's HEAD with the commit recorded before its
+first turn. A shared child has no separate branch, so the input rejects that check.
+
 The key `delegation-report:<child turn id>` makes delivery exactly-once. The trigger is the
 `turn-changed` broadcast, which isn't durable, so startup reconciliation queues any missing reports.
+
+A delegated turn is supervised: requests still wait for a person, and the child receives the
+turn-ending instruction. The Node saves this attendance on each turn, including a plugin note that
+joins the delegated operation.
 
 When a delegated turn pauses on a permission, question, or elicitation, the `request-changed` event
 queues an informational report keyed `delegation-request:<request id>`. It names the child, the kind,

@@ -61,6 +61,7 @@ export default function AgentComposer(props: {
   viewControls?: JSX.Element
   /** Opens the session's MCP panel. Present, `/mcp` on its own is acorn's command and is never sent. */
   onMcp?: () => void
+  onGoal?: () => void
   onSent: () => void
   onSessionUpdated: (session: AgentSession) => void
 }) {
@@ -475,6 +476,9 @@ export default function AgentComposer(props: {
       />
 
       <Toolbar variant="actions" size="sm">
+        <Show when={props.onGoal && props.session.kind === 'interactive'}>
+          <Button size="sm" title="Set session goal" disabled={props.disabled} onPress={props.onGoal}>Goal</Button>
+        </Show>
         <Button
           size="sm"
           title="Attach files"
@@ -579,6 +583,7 @@ export default function AgentComposer(props: {
           <AgentContextPickerModal
             contribution={contribution()}
             taskId={props.session.taskId}
+            sessionId={props.session.id}
             initialSelectedIds={selectedContextOptionIds(contribution())}
             attaching={capturingContext() === contribution().id}
             onAttach={(optionIds) => void captureSelectedContext(contribution().id, optionIds)}

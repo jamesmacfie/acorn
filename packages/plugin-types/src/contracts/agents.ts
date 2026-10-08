@@ -93,7 +93,7 @@ export type TurnFollowUpContribution = {
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────────────────────
 
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
 
 /** `agents.sessionControl` (docs/managed-agents/session-control.md § Calls). */
 export type AgentSessionControl = {
@@ -115,7 +115,7 @@ export type AgentRequestState = {
   expiresAt: number | null
   createdAt: number
   resolvedAt: number | null
-  /** Present when a policy plugin refused the request at `agents:before-permission`. */
+  /** Present when unattended policy or a permission policy plugin resolved the request before attention. */
   blocked?: { by: string; reason: string }
 }
 

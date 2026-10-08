@@ -33,8 +33,8 @@ export const githubClientPlugin: ClientPlugin = {
     // The PR rail is provider-owned and appears only once GitHub is connected. Core home stays the
     // default landing source, so a disconnected provider never becomes the startup view.
     //
-    // Its list still creates a task inline, seeding provider links as it goes; the `promotion` below
-    // is the thinner path the shared modal needs (./pullTasks.ts). The client host enforces
+    // Its list still creates a task inline. The `promotion` below seeds the same provider links
+    // when a content link opens the shared modal (./pullTasks.ts). The client host enforces
     // `providerId` and gates the source on the GitHub integration.
     ctx.sources.register({
       id: 'github', order: 10, glyph: 'brand:github', label: 'GitHub', providerId: 'github', defaultPane: 'pr',

@@ -361,6 +361,10 @@ export const AGENT_TOOL_CARD_POINT = 'agents:tool-card'
  *  A contributor gets `nodeId`, the node the page is showing. */
 export const CORE_STORAGE_POINT = 'core:storage'
 
+/** A section on Settings > Security and backup, shaped like `core:storage`: a plugin draws the switch
+ *  for a check it runs on the node. Agents draws its instruction file check. A contributor gets `nodeId`. */
+export const CORE_SECURITY_POINT = 'core:security'
+
 /** A section on one plugin's page in Settings > Plugins, a core-owned `remote` point in `stack` mode, so
  *  a plugin that another plugin's contributions reach into can say what they reach. Agents uses it to show
  *  which harnesses a plugin's tool hooks cover. A contributor gets `pluginId`, the plugin the page shows,

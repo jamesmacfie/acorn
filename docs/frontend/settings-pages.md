@@ -6,6 +6,10 @@ and the shape of forms and flows. Read it before you write a settings page. It's
 
 ## Pages and the save model
 
+The host's Settings header has **Copy link** for its current page and section. It uses the Node shown
+by that page's Node switcher, which can differ from the Node behind the Settings layer. Plugin pages
+receive the action from the host.
+
 A page is `SettingsSection`s of `SettingRow`s, two kit nodes on `@acorn/plugin-api/ui`
 ([the closed kit](../ui-design/closed-kit.md#special-nodes)). A row is the label and one line of
 description on the left and the control on the right, or under them at full width with

@@ -64,6 +64,13 @@
       "when": 1790971200000,
       "tag": "0012_agent_search_progress",
       "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1791421200000,
+      "tag": "0013_session_goals",
+      "breakpoints": true
     }
   ]
 }

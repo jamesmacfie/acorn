@@ -68,15 +68,62 @@ async function teardownScriptFor(db: AppDatabase, projectId: string): Promise<st
 }
 
 export async function archiveTask(db: AppDatabase, id: string, opts: ArchiveOpts, deps: ArchiveDeps): Promise<ArchiveResult> {
-  if (!beginTaskArchive(id)) return { ok: false, reason: 'Task archive is already in progress.' }
+  const tree = taskArchiveTree(db, id)
+  if (!tree.length) return { ok: false, reason: 'Task not found.' }
+  const claimed: string[] = []
+  const archivedTaskIds: string[] = []
+  const cleanupFailed = new Set<string>()
   try {
-    // A root request that began before the claim may still be creating the worktree. Let it finish,
-    // then load the authoritative path that archive must remove. Later root requests stop at the gate.
-    await waitForTaskWorktreeCreation(id)
-    return await archiveClaimedTask(db, id, opts, deps)
+    // Claim the whole tree before awaiting anything, so concurrent archives cannot overlap.
+    for (const task of tree) {
+      if (!beginTaskArchive(task.id)) return { ok: false, reason: 'Task archive is already in progress.' }
+      claimed.push(task.id)
+    }
+    for (const task of tree) {
+      if (task.status === 'archived') continue
+      await waitForTaskWorktreeCreation(task.id)
+      const result = await archiveClaimedTask(db, task.id, {
+        ...opts,
+        // Concern ids belong to the selected task, not to its descendants.
+        applyChecks: task.id === id ? opts.applyChecks : undefined,
+      }, deps)
+      if (!result.ok) return {
+        ...result,
+        reason: task.id === id ? result.reason : `Could not archive subtask "${task.title}": ${result.reason}`,
+        ...(archivedTaskIds.length ? { archivedTaskIds } : {}),
+      }
+      archivedTaskIds.push(task.id)
+      for (const pluginId of result.cleanupFailed ?? []) cleanupFailed.add(pluginId)
+    }
+    return {
+      ok: true,
+      ...(tree.length > 1 ? { archivedTaskIds } : {}),
+      ...(cleanupFailed.size ? { cleanupFailed: [...cleanupFailed] } : {}),
+    }
   } finally {
-    finishTaskArchive(id)
+    for (const taskId of claimed) finishTaskArchive(taskId)
   }
+}
+
+/** Descendants before their parent, including active descendants of an archived subtask. */
+export function taskArchiveTree(db: AppDatabase, id: string): (typeof schema.tasks.$inferSelect)[] {
+  const root = db.select().from(schema.tasks).where(eq(schema.tasks.id, id)).get()
+  if (!root) return []
+  const tasks = db.select().from(schema.tasks).where(eq(schema.tasks.projectId, root.projectId)).all()
+  const children = new Map<string, typeof tasks>()
+  for (const task of tasks) {
+    if (task.parentId) children.set(task.parentId, [...children.get(task.parentId) ?? [], task])
+  }
+  const tree: typeof tasks = []
+  const seen = new Set<string>()
+  const append = (task: typeof root): void => {
+    if (seen.has(task.id)) return
+    seen.add(task.id)
+    for (const child of children.get(task.id) ?? []) append(child)
+    tree.push(task)
+  }
+  append(root)
+  return tree
 }
 
 async function archiveClaimedTask(db: AppDatabase, id: string, opts: ArchiveOpts, deps: ArchiveDeps): Promise<ArchiveResult> {

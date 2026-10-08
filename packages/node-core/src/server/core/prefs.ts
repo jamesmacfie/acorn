@@ -14,8 +14,42 @@
 // Never a home for anything secret: credentials go through CoreServices.secrets, which encrypts at rest
 // and scopes the plaintext to one use.
 import { and, eq } from 'drizzle-orm'
+import { WORKSPACES_PREF_KEY, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import type { AppDatabase } from '../db'
 import { schema } from '../db'
+import { projectCount, storedWorkspacesMode } from '../workspacesMode'
+import { broadcastWorkspacesModeChanged } from '../notify'
+
+export class PreferenceWriteError extends Error {
+  constructor(readonly status: 400 | 409, readonly code: 'bad_request' | 'workspaces_fixed', message: string) {
+    super(message)
+  }
+}
+
+/** Validate and write in one synchronous transaction so no project can settle the mode between them. */
+export function writePreference(db: AppDatabase, userId: string, key: string, value: string): void {
+  const changedMode = db.transaction((tx) => {
+    let changedMode: WorkspacesMode | undefined
+    if (key === WORKSPACES_PREF_KEY) {
+      if (value !== 'on' && value !== 'off') {
+        throw new PreferenceWriteError(400, 'bad_request', 'core.workspaces must be on or off.')
+      }
+      const stored = storedWorkspacesMode(tx, userId)
+      if (stored !== null && stored !== value && !(stored === 'off' && value === 'on')) {
+        throw new PreferenceWriteError(409, 'workspaces_fixed', "Grouped workspaces can't be switched back to separate projects.")
+      }
+      if (stored === null && projectCount(tx) > 0 && value !== 'on') {
+        throw new PreferenceWriteError(409, 'workspaces_fixed', 'Existing projects use grouped workspaces.')
+      }
+      if (stored !== value) changedMode = value
+    }
+    tx.insert(schema.prefs).values({ userId, key, value })
+      .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } }).run()
+    return changedMode
+  })
+  // Both the route and the plugin service write here. Publish only after the transaction commits.
+  if (changedMode) broadcastWorkspacesModeChanged({ mode: changedMode })
+}
 
 export type PrefService = {
   // null when the owner has never set this key, which differs from '', a value a caller may have written.
@@ -35,10 +69,7 @@ export function createPrefService(db: AppDatabase): PrefService {
       return row?.value ?? null
     },
     write: async (userId, key, value) => {
-      await db
-        .insert(schema.prefs)
-        .values({ userId, key, value })
-        .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } })
+      writePreference(db, userId, key, value)
     },
   }
 }

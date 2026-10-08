@@ -22,6 +22,7 @@ import { eventTime } from './eventTime'
 import { patchFiles } from './patchFiles'
 import { managedAgentApi } from './managedClient'
 import type { CodexPlanHandoffState } from '../../shared/codexPlanHandoff'
+import type { CheckResults } from '../../shared/delegationSchemas'
 
 // One event of a session, as a card in the transcript's `Timeline`. Thirteen kinds, and the tool call
 // is the fourteenth: it is a `Slot`, so another plugin may draw it (./toolRendererRegistry.tsx).
@@ -171,7 +172,7 @@ export default function AgentEventCard(props: {
               <Stack gap="row">
                 <Inline>
                   <Text emphasis="eyebrow">
-                    {message().subagentId ? 'Subagent' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
+                    {message().subagentId ? 'Subagent' : props.turn?.source === 'goal' ? 'Goal' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
                   </Text>
                   <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
                 </Inline>
@@ -179,6 +180,16 @@ export default function AgentEventCard(props: {
                   text={withoutPastedMarkers(attachments().length ? withoutAttachmentPlaceholders(message().text) : message().text)}
                   taskId={props.taskId}
                 />
+                <Show when={props.turn?.source === 'delegation_report' ? props.turn.effectivePolicy.checkResults as CheckResults | undefined : undefined}>
+                  {(results) => (
+                    <Stack gap="row">
+                      <Text emphasis="strong">Host checks · {new Date(results().checkedAt).toLocaleString()}</Text>
+                      <For each={results().verdicts}>
+                        {(verdict) => <Text>{verdict.status}: {verdict.check.kind}{'path' in verdict.check ? ` · ${verdict.check.path}` : ''} · {verdict.reason}</Text>}
+                      </For>
+                    </Stack>
+                  )}
+                </Show>
                 <Show when={attachments().length}>
                   <Inline wrap>
                     {/* Index, not For: the projection hands out a fresh input array on every snapshot,

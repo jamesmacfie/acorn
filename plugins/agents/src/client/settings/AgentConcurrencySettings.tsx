@@ -1,6 +1,6 @@
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
 import { Show } from 'solid-js'
-import { createTextSetting } from '@acorn/plugin-api/client'
+import { createTextSetting, createWorkspaceWords } from '@acorn/plugin-api/client'
 import { Alert, Input, SettingRow, SettingsSection } from '@acorn/plugin-api/ui'
 import {
   defaultAgentConcurrency,
@@ -19,6 +19,7 @@ import {
 // Enter, with the other ceiling as stored. The section matches the one `../index.ts` declares for
 // search; ./AgentLimitsSettings.tsx puts it on the page.
 export default function AgentConcurrencySettings() {
+  const words = createWorkspaceWords()
   const queryClient = useQueryClient()
   const limits = createQuery(() => agentConcurrencyOptions())
 
@@ -73,8 +74,8 @@ export default function AgentConcurrencySettings() {
           />
         </SettingRow>
         <SettingRow
-          label="Turns at once per workspace"
-          description="For each workspace, across all agent CLIs."
+          label={`Turns at once per ${words().singular}`}
+          description={`For each ${words().singular}, across all agent CLIs.`}
           savedAt={workspace.savedAt()}
           error={workspace.error()}
           onReset={reset('workspace', workspace)}
@@ -84,7 +85,7 @@ export default function AgentConcurrencySettings() {
             min="1"
             max={MAX_AGENT_CONCURRENCY}
             width="narrow"
-            label="Turns at once per workspace"
+            label={`Turns at once per ${words().singular}`}
             disabled={!limits.data}
             value={workspace.value()}
             onInput={workspace.input}

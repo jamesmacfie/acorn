@@ -66,7 +66,7 @@ describe('Codex plan handoff', () => {
     expect(after.turns).toHaveLength(2)
     expect(after.turns[1]).toMatchObject({
       source: 'interactive', status: 'queued',
-      effectivePolicy: { mode: 'default', model: 'gpt-6', effort: 'high', acceptedPlanItemId: 'plan-1' },
+      effectivePolicy: { attendance: 'attended', mode: 'default', model: 'gpt-6', effort: 'high', acceptedPlanItemId: 'plan-1' },
     })
     expect(after.session.config).toMatchObject({ draftSetting: 'keep', configOptions: [
       { id: 'mode', currentValue: 'default' }, { id: 'model', currentValue: 'gpt-6' },

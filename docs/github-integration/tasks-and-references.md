@@ -60,3 +60,9 @@ different places: a URL, and the plugin's own PR mirror, carry GitHub's canonica
 example `Runn-Fast`), while `projects.github_owner` is stored folded to lower case (`runn-fast`). An
 `===` comparison here matched neither a dashboard row nor a PR link inside a rendered body, and it
 failed silently, because an unresolved repo simply opens the real `github.com` URL instead of erroring.
+
+An Acorn `new-task` address for a recognised pull request loads its title and head branch through
+GitHub's promotion contract. If an active task already tracks that pull request, the address opens
+the task. Otherwise the confirmation dialog prepares the same Linear references as the PR list's
+task action and writes the task only when you confirm. An untracked repository offers **Add project**,
+which opens **Settings > Workspaces and projects > Overview > Projects**.

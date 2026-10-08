@@ -39,6 +39,7 @@ import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profile
 import { AgentDelegationStore } from '../server/delegation/store'
 import { AgentDelegationService } from '../server/delegation/service'
 import { delegationTools } from '../server/delegation/tools'
+import { sessionHistoryTools } from '../server/sessions/sessionHistoryTools'
 import { createSessionSourceHandler } from '../server/data/sessionSourceHandler'
 import { sessionSource } from '../shared/sessionSource'
 import { usageSource } from '../shared/usageRegistration'
@@ -154,6 +155,13 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         label: 'send a prompt',
         payload: { sessionId: 'string', taskId: 'string', text: 'string' },
         allows: ['observe', 'transform', 'veto'],
+      })
+      // This plugin's own handler on it: the instruction file check, off until the owner turns it on in
+      // Settings > Security and backup. Loaded on first use, to stay inside the service boot budget.
+      ctx.hooks.handle('agents:before-send', {
+        id: 'instruction-check',
+        mode: 'veto',
+        run: async (payload) => (await import('../server/sessions/instructionCheck')).checkBeforeSend(core, dataDir, payload.taskId as string),
       })
       // The second: a harness permission request, before anyone sees it. Observe and veto only
       // (../server/sessions/permissionPolicy.ts).
@@ -284,8 +292,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         core.tasks,
         deps.reconciled,
         followUpRegistry,
+        core,
       )
       for (const tool of delegationTools(delegation)) ctx.tools.register(tool)
+      for (const tool of sessionHistoryTools(runtime.store)) ctx.tools.register(tool)
 
       managedRoute = ctx.capabilities.provide(MANAGED_AGENTS, managedAgentsBridge(runtime, delegation))
       lifecycleCapabilities = [

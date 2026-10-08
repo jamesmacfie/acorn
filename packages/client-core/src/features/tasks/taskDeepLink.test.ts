@@ -24,9 +24,9 @@ describe('parseTaskDeepLink', () => {
     expect(parseTaskDeepLink({ pane: 'test.absent', item: 'ENG-404' })).toBeNull()
   })
 
-  it('needs both halves', () => {
+  it('accepts a pane without a selected item but rejects an item alone', () => {
     registered = pane('test.notes')
-    expect(parseTaskDeepLink({ pane: 'test.notes' })).toBeNull()
+    expect(parseTaskDeepLink({ pane: 'test.notes' })).toEqual({ pane: 'test.notes' })
     expect(parseTaskDeepLink({ item: 'ENG-404' })).toBeNull()
     expect(parseTaskDeepLink({})).toBeNull()
   })

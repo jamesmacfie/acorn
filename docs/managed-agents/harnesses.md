@@ -59,10 +59,20 @@ writes only the artifact reference to the ledger. Codex opts in with `generated_
 
 A built-in spec's `acpSessionMeta` is a function of the session, sent on create and on every resume,
 so it returns the same value each time. Claude's turns off Claude Code's own continue-after-usage-limit
-([operations](./operations.md#plan-usage-limits)). For a workflow or delegated session it appends the
-turn-ending instruction to the system prompt
-([workflow execution](../workflows/agent-steps.md#a-turn-that-ends-early)). The instruction goes in at
-creation, because a system prompt that changes mid-session invalidates the model's earlier thinking.
+([operations](./operations.md#plan-usage-limits)). The Node resolves `attendance` when it accepts
+each turn and saves it in the effective policy. Supervised and autonomous turns receive the same
+turn-ending instruction; autonomous turns also say to make reversible assumptions, list material
+ones, and start the final message with `BLOCKED:` when a decision requires a person.
+
+Host admission saves `config.initialAttendance` for instructions that a provider fixes at session
+creation. Claude receives these through `systemPrompt.append`, and Codex through developer
+instructions on thread start and resume. A workflow session keeps the posture it was created with:
+changing posture requires another session. Claude retains its original appended prompt on resume,
+and Codex modes can supply their own instructions, so the runtime also prepends the policy to every
+unattended turn's prompt. Contributed ACP harnesses receive it through this per-turn prompt. Legacy
+sessions receive that prompt even when their original provider instructions lacked the policy.
+Request handling reads the saved turn policy after a restart
+([workflow execution](../workflows/agent-steps.md#a-turn-that-ends-early)).
 
 Both drivers send a context part as an `<acorn-context>` block (`contextBlock.ts`). The label and
 source are escaped, and a closing tag inside the content is broken, so a plugin label or a pull

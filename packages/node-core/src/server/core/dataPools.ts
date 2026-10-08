@@ -60,7 +60,7 @@ export function taskDataPools(resolveUrl: (taskId: string) => Promise<string | n
       if (!openingValid()) throw retired()
       const url = await resolveUrl(taskId)
       if (!openingValid()) throw retired()
-      if (!url) throw new Error('No database found. Set a connection script in Workspace Settings, or add DATABASE_URL to the worktree .env.')
+      if (!url) throw new Error('No database found. Set a connection script in Settings, or add DATABASE_URL to the worktree .env.')
       const pool = new pg.Pool({ connectionString: url, max: 4, connectionTimeoutMillis: 8_000 })
       pool.on('error', () => {})
       const entry: DataPoolEntry = { pool, database: '', retired: false, readers: 0, schemaVersion: 0 }

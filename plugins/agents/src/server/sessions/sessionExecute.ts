@@ -13,6 +13,7 @@ import { assistantResult, parseStructuredResult, promptWithResultContract } from
 import { contextBlock } from '../drivers/contextBlock'
 import { ExecutionEvents } from './executionEvents'
 import type { TurnFollowUps } from './turnFollowUps'
+import { persistedAttendance, resolveAttendance, sessionAttendance } from './attendance'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
@@ -132,6 +133,9 @@ function resultFromSnapshot(
       agentSessionId: snapshot.session.id,
     }
   }
+  if (result?.trimStart().startsWith('BLOCKED:')) {
+    return { status: 'error', exitCode: null, capture, stderrTail: result.trim().split('\n')[0]!, agentSessionId: snapshot.session.id }
+  }
   if (!result || (schema && structuredOutput == null)) {
     return {
       status: 'malformed',
@@ -150,6 +154,12 @@ async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExe
     if (session.taskId !== request.taskId || session.providerId !== providerId || session.kind !== 'workflow') {
       throw new Error('The persisted managed workflow session does not match this step.')
     }
+    const attendance = request.posture === undefined
+      ? sessionAttendance(session) : resolveAttendance(session, 'workflow', request.posture)
+    if (session.config.initialAttendance === undefined) {
+      return runtime.store.patchSession(session.id, { config: { ...session.config, initialAttendance: attendance } })
+    }
+    if (sessionAttendance(session) !== attendance) throw new Error('The workflow session posture does not match this run.')
     return session
   }
   return runtime.createSession(
@@ -166,6 +176,7 @@ async function sessionFor(runtime: ManagedAgentRuntime, request: AgentSessionExe
       },
     },
     `workflow-session:${request.stepId ?? randomUUID()}`,
+    request.posture,
   )
 }
 
@@ -216,7 +227,8 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
           toolCeiling: request.tools ?? {},
         },
         idempotencyKey: `workflow-turn:${request.stepId ?? randomUUID()}:${beforeSeq}`,
-      })
+      }, { posture: request.posture })
+      persistedAttendance(first.effectivePolicy)
       // Every turn the step owns, in the order they were queued. Notes join through the operation.
       const turnIds = [first.id]
       forwarding.acceptTurn(first.id)
@@ -300,7 +312,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
               source: 'workflow',
               effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
               idempotencyKey: `workflow-continue:${first.id}:${continuations}`,
-            })
+            }, { originTurnId: first.id })
             turnIds.push(next.id)
             forwarding.acceptTurn(next.id)
             continue

@@ -1,8 +1,9 @@
 # Shared projects, cloud tasks, and attempts
 
-Status: proposed, 2026-09-29. This file covers how a local project becomes a shared one, how a cloud
-task is created and run, the state machine for a worker attempt, and how history reaches the team
-Node. Archive and restore have their own file, [archive](./archive.md).
+Status: proposed, 2026-09-29; agent continuity, pausing, and one live attempt added 2026-10-08. This
+file covers how a local project becomes a shared one, how a cloud task is created and run, the state
+machine for a worker attempt, and how history reaches the team Node. Archive and restore have their
+own file, [archive](./archive.md).
 
 ## Shared projects
 
@@ -96,6 +97,12 @@ Rules that hold in every state:
   assumed.
 - A later run of the same logical task is a new attempt with a new worker. A deleted worker's Node
   ID is never reused.
+- A logical task has at most one live attempt. When a new attempt replaces one, for example through
+  **Recover**, the team Node marks the old attempt replaced before provisioning. From then on it
+  refuses that attempt's history batches, artifact references, and requests for Git or other cloud
+  connection credentials. A replaced worker that reconnects learns it was replaced and stops without
+  archiving over the new attempt's work. This covers a worker that is cut off rather than dead,
+  which looks the same from the team Node until it reconnects.
 
 ### What idle means
 
@@ -103,6 +110,27 @@ A worker is idle when no agent turn is running, no process started by a task is 
 terminal has had input or output, and no client has made a mutating request, for five minutes. An
 agent waiting for a human answer is not idle until the runtime can checkpoint and resume that
 question safely. Until then it stays running, and spend continues. The client says so.
+
+### Pause before archiving
+
+Coming back to a local task after lunch finds the dev server, the terminals, and the installed
+packages where they were. Archiving after five idle minutes loses all three, and the next message
+waits for a fresh worker and its setup. Where the provider can pause a machine with its memory, pause
+first and archive later:
+
+1. After the idle window, the team Node asks the provisioner to pause the worker instead of
+   archiving it. History is checkpointed first, as for `stopping`.
+2. Any activity on the task, such as a message to an agent, opening a terminal, or a mutating
+   request, resumes the paused worker. Clients see a short resume, not a new attempt.
+3. After a longer window, such as a day, the worker resumes briefly, drains, and takes the normal
+   archive path.
+
+A paused machine costs disk storage only. On Fly that's $0.15 per GB per month
+([hosting and cost](./hosting-and-cost.md#a-task-hour-on-fly-estimated-october-8-2026)). A failed
+resume falls back to a new attempt that continues from the last checkpoint, as
+[continuing a finished task](#continuing-a-finished-task) describes. [Phase 6](./phases/06-archive.md)
+decides whether `paused` becomes a state in the diagram above, after measuring resume time and
+reliability on the chosen provider.
 
 ### Boot sequence for a worker
 
@@ -117,14 +145,28 @@ question safely. Until then it stays running, and spend continues. The client sa
 6. The worker fetches the snapshot or revision, runs the project's setup script inside the task
    sandbox, and reports `ready`. An agent that needs missing files waits and says why.
 
+### What the agent is told
+
+A cloud agent starts on Linux, without the person's macOS tools, and possibly without Docker or a
+browser display. Without being told, it spends turns discovering that. Each managed session on a
+worker gets a short note in its standing context: the operating system, the tools and plugins
+unavailable on this worker, and that results leave through a branch, pull request, or patch. When a
+session continues on a new attempt, the note is refreshed so the agent knows its machine changed and
+that running processes from before are gone.
+
 ## History transfer
 
 The team Node keeps a durable copy of each cloud task's core and agent history. It must be readable
 immediately after the worker is gone, without a restore.
 
 - **What moves.** Task metadata changes, agent sessions and their normalized events, delegation
-  reports, workflow run records the task owns, and artifacts that cannot be fetched again. Not
-  plugin databases in general.
+  reports, workflow run records the task owns, artifacts that cannot be fetched again, and each
+  harness's own session files. Not plugin databases in general.
+- **Harness session files.** The normalized events let a person read a transcript, but a harness
+  can't resume from them. Claude Code keeps a session in `~/.claude/projects/`, keyed by the
+  working folder's path, and Codex keeps its own under `~/.codex/sessions/`. Both sit in the
+  worker's home folder, outside the data root. The worker sends a session's files as an artifact
+  when its turn settles, so a later attempt can resume it.
 - **How.** The worker pushes batches to the team Node over its attempt token. Each event carries its
   per-session sequence number, which the agents plugin already persists. The team Node stores each
   batch and acknowledges the highest sequence it holds. The worker resends anything unacknowledged
@@ -146,6 +188,21 @@ Continuing work creates a new attempt from the saved branch, a new snapshot, or 
 worktree. The new attempt's history appends to the same logical task. The client shows attempts in
 order.
 
+Locally, a person can reply in a session days later and the agent remembers the whole conversation.
+A cloud task must behave the same way, so replying in a session whose worker is gone continues that
+session rather than starting a fresh one:
+
+1. The client shows the message as queued and the task as starting a worker.
+2. The new attempt puts the worktree at the same absolute path as before, because Claude Code finds
+   a session by its working folder.
+3. The worker restores the harness session files from the last attempt and resumes the session
+   through the harness, the way `plugins/agents/src/server/sessions/transcriptCommands.ts` verifies
+   an imported session's resume reference.
+4. The queued message runs as the next turn. If resume fails, the session says so in its transcript
+   and offers a fresh session with the old transcript attached as context.
+
+A worker that is paused, not archived, skips all of this: it resumes with the session still running.
+
 ## Getting results out
 
 A cloud task finishes with one or more of:
@@ -162,6 +219,7 @@ acorn does not apply cloud changes to a local worktree automatically.
 | --- | --- |
 | Client disconnects mid-turn | Nothing breaks. The agent continues. On reconnect, the client refetches. |
 | Worker crashes | The attempt is `failed`, with the last acknowledged history and a **Recover** action that starts a new attempt from the last pushed state. |
+| Worker cut off but still running, then **Recover** | The old attempt is marked replaced. Its later history and credential requests are refused, and it stops when it reconnects. The person sees one live attempt. |
 | Team Node restarts | Workers keep running and buffer history. Clients show the team Node offline briefly. |
 | Relay restarts | Everything reconnects. Unacknowledged history is resent. |
 | Provider create times out | The reservation stays. The retry finds the existing machine or creates it once. |

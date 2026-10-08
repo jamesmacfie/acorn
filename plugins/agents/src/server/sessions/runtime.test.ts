@@ -1741,7 +1741,7 @@ describe('managed agent runtime conformance', () => {
       profileId: driver.profileId,
       kind: 'workflow',
       config: {},
-    })
+    }, randomUUID(), 'autonomous')
     const originalInput = [{ type: 'text' as const, text: 'Complete the whole task.' }]
     const turn = await runtime.enqueueTurn(session.id, {
       input: originalInput,
@@ -1755,9 +1755,10 @@ describe('managed agent runtime conformance', () => {
       record.event.type === 'user_message' ? [record.event] : [])
 
     expect(driver.attempts).toHaveLength(2)
-    expect(driver.attempts[0]?.input).toEqual(originalInput)
-    expect(driver.attempts[1]?.input[0]).toMatchObject({ type: 'text', text: expect.stringContaining('Continue the task') })
-    expect(completed).toMatchObject({ status: 'completed', attempt: 2, input: originalInput })
+    expect(driver.attempts[0]?.input.slice(1)).toEqual(originalInput)
+    expect(driver.attempts[0]?.input[0]).toMatchObject({ text: expect.stringContaining('Nobody is waiting') })
+    expect(driver.attempts[1]?.input[1]).toMatchObject({ type: 'text', text: expect.stringContaining('Continue the task') })
+    expect(completed).toMatchObject({ status: 'completed', attempt: 2, input: originalInput, effectivePolicy: expect.objectContaining({ attendance: 'autonomous' }) })
     expect(completed?.continuationInput).toBeNull()
     expect(completed?.notBefore).toBeNull()
     expect(messages).toEqual([

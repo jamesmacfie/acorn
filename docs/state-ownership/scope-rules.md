@@ -40,6 +40,8 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Appearance, notification settings ([notifications](../notifications/channels.md#settings)), shortcuts, rail order, notices, trust, and tokens | Device |
 | How a list is drawn: the diff view, and the Changes pane's list or tree, sort, and grouping | Device |
 | Where a workflow's nodes sit in the graph view | Device |
+| Workspace appearance and uploaded icon thumbnails | Owning Node |
+| Workspace rail visibility | Device |
 | Which workflow task roots are expanded in the rail | Device |
 | Which backend and model every Generate control spends (`models.generatePick`) | Device |
 | The query cache | Node |

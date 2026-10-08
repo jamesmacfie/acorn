@@ -4,14 +4,19 @@ The agents plugin contributes five execute-tier tools that let an agent delegate
 session. They work through `ManagedAgentRuntime`, and don't create workflow runs or change workflow
 definitions. [Managed delegation](../managed-agents/delegation.md) covers the ledger and reports.
 
+The plugin also contributes two read-tier tools for a managed agent's own history:
+`session_history_search` finds events and `session_history_read` pages one event's text. See
+[transcript search](../managed-agents/transcript-search.md#search-from-a-managed-session) for scope,
+limits, and trust treatment.
+
 ## Managed-session orchestration
 
 | Tool | Input | Result |
 | --- | --- | --- |
-| `agent_spawn` | `title`, `prompt`, and optional `profileId` or `agent`, `isolation`, `baseBranch`, `resultSchema`, `configOptions`, and `toolCeiling` | Spawn, task, session, and first-turn IDs, depth, provisioning state, and a cursor |
-| `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema` and `configOptions` | Turn ID, queue state and position, session state, and a cursor |
+| `agent_spawn` | `title`, `prompt`, and optional `profileId` or `agent`, `isolation`, `baseBranch`, `resultSchema`, `checks`, `configOptions`, and `toolCeiling` | Spawn, task, session, and first-turn IDs, depth, provisioning state, and a cursor |
+| `agent_prompt` | `sessionId`, `prompt`, and optional `resultSchema`, `checks`, and `configOptions` | Turn ID, queue state and position, session state, and a cursor |
 | `agent_wait` | `sessionId`, `afterSeq`, one of `ready`, `attention`, `turn_completed`, or `stopped`, and `timeoutMs` | Whether it matched or timed out, with state, attention, and the latest sequence |
-| `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, and validated structured output |
+| `agent_read` | `sessionId`, `afterSeq`, and `limit` | A bounded page of folded assistant messages, diagnostics, errors, validated structured output, and host check verdicts |
 | `agent_cancel` | `sessionId` and an optional `turnId` | The cancelled turn and the session state |
 
 An agent learns these tools only from their descriptions and the `describe()` text on each field in
@@ -61,6 +66,13 @@ root can have 12 live descendants, and the runtime's concurrency limits still ap
 
 When a turn declares `resultSchema`, the agents plugin adds the result contract to the prompt and
 validates the returned JSON. `agent_read` reports a diagnostic instead of returning malformed output.
+`checks` accepts up to eight entries: `file-exists`, `file-nonempty`, and `json-valid` take a path
+relative to the child's task worktree; `commits-ahead` requires worktree isolation. The host checks
+them when the delegated operation settles, after any plugin follow-up. A failed, cancelled, or
+interrupted final turn yields `unverified` verdicts. The JSON check reads at
+most 1 MiB plus one byte and rejects invalid UTF-8. A check establishes an observed fact, not the
+correctness of the child's work. See [managed delegation](../managed-agents/delegation.md#reports-back-to-the-owner)
+for persistence and reporting.
 Reads page the event sequence, fold assistant deltas, leave out tool and attachment payloads, cap each
 text item at 16 KiB, and cap a response at 64 KiB. A wait lasts at most 30 seconds, and a timeout
 doesn't cancel the child.

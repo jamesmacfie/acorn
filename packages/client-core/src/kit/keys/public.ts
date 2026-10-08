@@ -2,6 +2,6 @@ export { focusedCollectionTarget, registerCollectionReveal, revealCollectionItem
 export { activeCollectionItem } from './collectionState.ts'
 export { COLLECTION_INTENTS, createCollectionIntents } from './collectionIntents.ts'
 export type { CollectionIntentOptions, CollectionItem } from './collectionIntents.ts'
-export { _resetCollectionState } from './collectionState.ts'
+export { _resetCollectionState, setActiveItem } from './collectionState.ts'
 export type { Intent } from './intents.ts'
 export { BARE_KEYS, intentKeys, toKeymapKey } from './keymap.ts'

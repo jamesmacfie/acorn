@@ -103,7 +103,11 @@ export const importAgentTranscriptSchema = z.object({
 export const enqueueAgentTurnSchema = z.object({
   input: z.array(agentInputPartSchema).min(1).max(32),
   source: z.enum(['interactive', 'workflow', 'delegation', 'delegation_report', 'automation', 'import']).default('interactive'),
-  effectivePolicy: z.record(z.string(), z.unknown()).default({}),
+  effectivePolicy: z.record(z.string(), z.unknown()).default({}).superRefine((policy, context) => {
+    for (const key of ['attendance', 'initialAttendance', 'followUpOf', 'continuationOf', 'posture']) {
+      if (Object.hasOwn(policy, key)) context.addIssue({ code: 'custom', message: `${key} is resolved by the host.` })
+    }
+  }),
   idempotencyKey: z.string().min(8).max(200),
 })
 
@@ -118,6 +122,8 @@ export const patchAgentSessionSchema = z.object({
   lastReadSeq: z.number().int().nonnegative().optional(),
   config: z.record(z.string(), z.unknown()).optional(),
 })
+
+export const sessionGoalSchema = z.object({ objective: z.string().trim().min(1).max(2_000).nullable() })
 
 export const patchQueuedTurnSchema = z.object({
   input: z.array(agentInputPartSchema).min(1).max(32).optional(),

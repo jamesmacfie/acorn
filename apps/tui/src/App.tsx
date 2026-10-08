@@ -1,12 +1,16 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, lazy, type JSX } from 'solid-js'
+import { createEffect, lazy, Show, type Accessor, type JSX } from 'solid-js'
 import { QueryClientProvider, createQuery, type QueryClient } from '@tanstack/solid-query'
 import { prefsOptions, tasksOptions } from '@acorn/client-core/infra/queries.ts'
 import { setTelemetryEnabled } from '@acorn/client-core/infra/telemetry/emitter.ts'
 import { telemetryOn } from '@acorn/client-core/features/settings'
+import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { clientFor } from '@acorn/client-core/infra/node/fleet.ts'
+import { hydrateWorkspaceHistory } from '@acorn/client-core/features/workspaces'
+import { evictScope } from '@acorn/client-core/host/registries/shell'
 import { emitBootSpans } from './boot'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
+import { setActiveTaskId, setSelectedSource } from '@acorn/client-core/features/tasks/tasks.ts'
 import { setLayouts } from '@acorn/client-core/host/layouts/table.ts'
 import { setSourcePanel } from '@acorn/client-core/host/chrome'
 import { sourcePanel } from './plugins/SourcePanel'
@@ -17,6 +21,11 @@ import { setDocumentSurface } from '@acorn/client-core/host/frames/documentSurfa
 import { LAYOUTS } from './layouts'
 import { RemoteTree } from './plugins/remoteTreeLoader'
 import { Shell } from './chrome/Shell'
+import type { Address } from '@acorn/client-core/host/registries/commands/addresses'
+import { resetChromeForNodeSwitch } from './chrome/state'
+import { resetSettings } from './chrome/settingsStore'
+import { resetConfirmations } from './chrome/confirmStore'
+import { resetFilePrompts } from './chrome/filePrompt'
 
 // The composition root's client half: the host seams and the shell under the one query client
 // this node has. What is on screen is `chrome/Shell.tsx`; this is what has to be true before it draws.
@@ -119,15 +128,38 @@ export function App(props: {
   nodeId: string
   supervised: boolean
   task?: string
+  link?: Address
+  linkReady?: Accessor<boolean>
   onNoTask?: (id: string) => void
   onQuit: () => void
 }) {
+  let shownNode: string | undefined
+  const forNode = (nodeId: string) => {
+    if (shownNode && shownNode !== nodeId) {
+      // The shell owns these Node-local choices. Reopen the destination Node from its own
+      // preference cache instead of carrying a task or workspace from the previous Node.
+      resetChromeForNodeSwitch()
+      resetSettings()
+      resetConfirmations()
+      resetFilePrompts()
+      hydrateWorkspaceHistory({ recent: [] })
+      evictScope({ scope: 'node-switched', from: shownNode, to: nodeId })
+      setActiveTaskId(null)
+      setSelectedSource(null)
+    }
+    shownNode = nodeId
+    const client = nodeId === props.nodeId ? props.client : clientFor(nodeId).client
+    return (
+      <QueryClientProvider client={client}>
+        <Telemetry />
+        <TaskArg id={nodeId === props.nodeId ? props.task : undefined} onMissing={props.onNoTask}>
+          <Shell nodeId={nodeId} supervised={props.supervised && nodeId === props.nodeId} onQuit={props.onQuit}
+            link={nodeId === props.nodeId ? props.link : undefined} linkReady={props.linkReady} />
+        </TaskArg>
+      </QueryClientProvider>
+    )
+  }
   return (
-    <QueryClientProvider client={props.client}>
-      <Telemetry />
-      <TaskArg id={props.task} onMissing={props.onNoTask}>
-        <Shell nodeId={props.nodeId} supervised={props.supervised} onQuit={props.onQuit} />
-      </TaskArg>
-    </QueryClientProvider>
+    <Show when={activeNodeId() ?? props.nodeId} keyed>{forNode}</Show>
   )
 }

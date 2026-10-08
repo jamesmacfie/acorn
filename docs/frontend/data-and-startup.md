@@ -65,6 +65,12 @@ a Node that disables nothing costs no second registration. A plugin whose startu
 Node, such as the agent list or the terminal session list, waits for that Node to report itself
 reachable.
 
+An `acorn://` link waits for the selected Node's shell restore and a distribution reconciliation for
+that Node before checking a loaded project route. Distribution commits register loaded frame and chrome
+contributions; compiled plugin readiness alone does not cover them. This check runs again after a
+link switches to another paired Node. If the roster read fails, the dispatcher can still open core
+places and reports a missing loaded place through its normal notice.
+
 The cache partition can't wait for the fleet, because it decides which cache provider mounts. The
 device remembers the last Node it talked to, and `activeNodeId()` answers from that on the first tick
 (`packages/client-core/src/infra/node/activeNode.ts`). The fleet answer corrects it, and a Node that's

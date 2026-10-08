@@ -17,10 +17,16 @@ which matters on a Node nobody is using. The event must be one core publishes, l
 name it in `permissions.events`, the same grant list its frames subscribe with, so there's one trust
 sentence per grant. Disposal follows unload, as a route registration does.
 
-Core publishes 11 events: `plugins:changed`, `tasks:changed`, `workspace:changed`,
+Core publishes 12 events: `plugins:changed`, `tasks:changed`, `workspace:changed`, `workspaces-mode:changed`,
 `workspace-projects:changed`, `connection:changed`, `head:changed`, `run:changed`,
 `agent-session:changed`, `project:changed`, `terminal:sessions-changed`, and
 `worktree:status-changed`.
+
+`workspaces-mode:changed` carries `{ mode: 'on' | 'off' }` after a preference write commits a changed
+grouping mode, including the first-run answer. Repeated values and refused writes publish nothing.
+Both Node halves and frames can subscribe. Desktop and terminal clients refetch the source Node's
+preferences, so chrome data and wording update while mounted. Grouped mode can't switch back to
+separate projects. [Workspaces and tasks](../workspaces-and-tasks.md#workspace-and-project) owns that rule.
 
 Two of them are worth knowing:
 

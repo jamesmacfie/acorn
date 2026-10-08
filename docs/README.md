@@ -70,6 +70,7 @@ the whole plugin system in one page.
 | Document | What it holds |
 | --- | --- |
 | [frontend.md](./frontend.md) | Renderer composition, the package layout, and how the shell is put together. |
+| [frontend/acorn-links.md](./frontend/acorn-links.md) | External Acorn addresses, Copy link, desktop and terminal behavior, safety, and test recipes. |
 | [ui-design.md](./ui-design.md) | The closed component kit, the appearance axes, and the design tokens. |
 | [panes.md](./panes.md) | The layout model and the pane vocabulary. |
 | [native-overlays.md](./native-overlays.md) | Native composition, input routing, presentation authority, supported platforms, and degraded behavior. |
@@ -229,7 +230,8 @@ Each feature landing page above has topic pages in a folder of the same name:
   workspaces](./workspaces-and-tasks/projects.md), [Task creation and
   navigation](./workspaces-and-tasks/task-creation.md), [Task script
   results](./workspaces-and-tasks/task-scripts.md), [Worktrees and
-  setup](./workspaces-and-tasks/worktrees.md).
+  setup](./workspaces-and-tasks/worktrees.md), [Workspace
+  icons](./workspaces-and-tasks/workspace-icons.md).
 - [managed-agents.md](./managed-agents.md): [Web activity and file
   changes](./managed-agents/activity.md), [App-access approval](./managed-agents/app-access.md),
   [Context, files, and attachments](./managed-agents/attachments.md), [Client
@@ -297,15 +299,10 @@ Each feature landing page above has topic pages in a folder of the same name:
 ## Subfolders
 
 - [future/](./future/README.md): designs, analyses, and plans for work that hasn't shipped, plus
-  delivery records kept while acceptance is open. Its README indexes every programme and single file,
-  including the [maintainability and dependency programme](./future/trim/README.md). Shipped behavior belongs
-  in an owning doc above.
-- [DeerFlow review](./future/deerflow/README.md): five proposals taken from DeerFlow,
-  [session references](./future/deerflow/01-session-references.md),
-  [session goals](./future/deerflow/02-session-goals.md),
-  [agent history search](./future/deerflow/03-history-search.md),
-  [checks on delegated work](./future/deerflow/04-delegation-checks.md), and an
-  [unattended turn policy](./future/deerflow/05-unattended-policy.md), with
+  delivery records kept while acceptance is open. Its README indexes every programme and single file.
+  Shipped behavior belongs in an owning doc above.
+- [DeerFlow review](./future/deerflow/README.md): references for the five shipped features,
+  review reasoning, deferred smaller ideas, and
   [what it refused](./future/deerflow/refused.md).
 - [Multiple subscriptions](./future/multi-account.md): how other tools run several Claude Code or
   Codex accounts on one computer, and a proposal for per-account config folders pinned to sessions.
@@ -323,6 +320,26 @@ Each feature landing page above has topic pages in a folder of the same name:
 Keep one owning page for each contract, and add every new page to this index in the same commit.
 [Write and maintain docs](./writing-docs.md) covers where a doc goes, the house style, how to split a
 long page, how to cite a doc from code, and the checks that enforce it.
+
+## Future security handoff
+
+These requirements preserve the five trust-boundary phases and add five agent-tooling phases.
+Restricted agent execution is outside scope. The programme index defines dependencies and combined acceptance.
+
+| Document | What it holds |
+| --- | --- |
+| [Security programme](./future/security/README.md) | Goals, source baselines, phase order, ownership, and combined verification. |
+| [Scope boundaries](./future/security/refused.md) | Excluded execution isolation, format limits, and authority and coverage constraints. |
+| [Phase 01](./future/security/01-desktop-command-authorization.md) | Explicit caller authorization for Acorn's Tauri commands. |
+| [Phase 02](./future/security/02-plugin-realm-intrinsics.md) | Plugin policies that survive shared-intrinsic tampering. |
+| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | A runtime backstop for loaded-plugin network and filesystem grants. |
+| [Phase 04](./future/security/04-internal-token-confinement.md) | Loopback confinement, expiry, and renewal for internal tokens. |
+| [Phase 05](./future/security/05-automation-driver-release-fence.md) | Release exclusion and caller checks for the development automation driver. |
+| [Phase 06](./future/security/06-instruction-review.md) | Instruction changes, bounded discovery, digest-bound review, and incomplete-check refusals. |
+| [Phase 07](./future/security/07-security-diagnostics.md) | Passive evidence, unknown states, harness policy coverage, and repair actions. |
+| [Phase 08](./future/security/08-dependency-review.md) | npm and pnpm resolution and install-policy reviews tied to Changes revisions. |
+| [Phase 09](./future/security/09-managed-mcp-review.md) | Exact MCP packages, disabled install scripts, and actual-connection tool review. |
+| [Phase 10](./future/security/10-secret-publication-checks.md) | Local secret detection, publication gates, exact-operation exceptions, and redacted exports. |
 
 ## Future editor improvements
 
@@ -364,21 +381,6 @@ These planned handoffs follow Editor file viewers. They do not describe shipped 
 | [Phase 12](./future/ui-extension/12-rail-status.md) | Consenting source and task-pane status annotations. |
 | [Phase 13](./future/ui-extension/13-acceptance.md) | Combined gates, packed examples, host checks, and lifetime measurements. |
 | [Phase 14](./future/ui-extension/14-documentation.md) | Final reference, authoring, example, and index updates. |
-
-## Future Acorn links
-
-These pages describe planned work, not shipped behavior.
-
-| Document | What it holds |
-| --- | --- |
-| [Acorn links plan](./future/url/README.md) | The `acorn://` address format, decisions, safety rules, and how existing addresses map in. |
-| [Refused alternatives](./future/url/refused.md) | What the plan decided not to do, and deferred work. |
-| [Phase 01](./future/url/01-addresses.md) | A pure link parser and builder, and a dispatcher that opens an address in the app. |
-| [Phase 02](./future/url/02-desktop-registration.md) | macOS scheme registration, cold-start delivery, and the dev session `link` verb. |
-| [Phase 03](./future/url/03-copy-link.md) | **Copy link** on tasks, project pages, plugin pages, settings pages, and rail sources. |
-| [Phase 04](./future/url/04-new-task-action.md) | `new-task?url=` through the promote dialog. |
-| [Phase 05](./future/url/05-terminal-link.md) | `acorn --link` for the terminal client. |
-| [Phase 06](./future/url/06-documentation.md) | The reference page and index updates. |
 
 ## Future Git client handoff
 

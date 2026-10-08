@@ -98,6 +98,12 @@ leave line numbers blank, and oversized or missing patches say so. The standalon
 hides only once its tool can show it. The patch describes the edit when it ran; the changes pane reads
 the working tree ([file changes](./activity.md#file-changes)).
 
+## Goal turns
+
+An automatic continuation from a session goal is labeled **Goal**. Its prompt and the judge's reason
+remain in the transcript, while the goal row above the composer shows the latest verdict and count.
+The goal check uses the Node event ledger and does not write its evidence into the transcript.
+
 ## Usage lines
 
 Usage folds to one line per turn, on the Node and in the client, by the rule in

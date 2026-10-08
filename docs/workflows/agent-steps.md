@@ -83,14 +83,15 @@ A managed step is a turn, and the step's result is that turn's final message. A 
 on a progress report instead of the finished work, so acorn guards the step three ways
 (`plugins/agents/src/server/sessions/sessionExecute.ts`):
 
-1. A Claude session for a workflow step or a delegated agent gets an extra instruction appended to
-   Claude Code's system prompt. It names the ways of ending a turn early that Anthropic has seen and
-   asks the model to carry on instead (`plugins/agents/src/server/drivers/claudeHarness.ts`). An
-   interactive chat doesn't get it, because a person is there to answer.
+1. The Node saves attendance on each turn. Gated workflow steps are supervised; autonomous steps
+   are autonomous. Both receive the turn-ending instruction before their prompt on Claude, Codex,
+   and contributed ACP harnesses. Autonomous turns must make reversible assumptions or end with a
+   `BLOCKED:` line naming the decision needed. Interactive turns receive neither instruction.
 2. If the turn ends without the result the step needs, meaning no message at all or no `json` block
    that matches the step's schema, acorn sends one more turn telling the agent to finish or say what
    blocks it. It does that twice at most, then the step is `malformed` as before. The transcript
    labels these turns **Acorn**, and the step's own prompt **Workflow**. The step's events cover
    every turn, but its usage and cost are the last turn's alone.
 3. A turn the model declined, with the stop reason `refusal`, fails the step with that reason and is
-   never sent again. Asking again in the same words gets the same answer.
+   never sent again. A final message starting with `BLOCKED:` also fails the step with that line as
+   its reason, without a continuation.

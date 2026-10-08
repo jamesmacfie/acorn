@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import * as api from '@acorn/protocol/api.ts'
+import * as workspaceAppearance from '@acorn/protocol/workspaceAppearance.ts'
 import { allowApi, classifyPath, describeScope, GRANTABLE_SCOPES } from './scopes'
 
 // The exhaustive sweep is the point of this file. Everything else here is a spot check on a case the
@@ -12,7 +13,7 @@ const ID = 'x'
 // Every route constant @acorn/protocol exports, driven with placeholder ids. Discovered by walking the
 // module rather than listed, so a route added tomorrow is included without anyone remembering to.
 const routePaths = (): { name: string; path: string }[] =>
-  Object.entries(api)
+  Object.entries({ ...api, ...workspaceAppearance })
     .filter(([name]) => name.endsWith('Route'))
     .map(([name, value]) => {
       if (typeof value === 'string') return { name, path: value }
@@ -59,7 +60,7 @@ describe('the route table covers every core route', () => {
       ['core.projects:write', 'Create and update projects, including their on-disk locations'],
       ['core.tasks:read', 'Read tasks'],
       ['core.tasks:write', 'Create and update tasks'],
-      ['core.workspaces:read', 'Read workspaces'],
+      ['core.workspaces:read', 'Read project collections'],
     ])
     expect(GRANTABLE_SCOPES.every((scope) => (describeScope(scope)?.icon.length ?? 0) > 0)).toBe(true)
     expect(GRANTABLE_SCOPES.filter((scope) => describeScope(scope)?.high)).toEqual([

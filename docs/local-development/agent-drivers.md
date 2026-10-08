@@ -24,9 +24,20 @@ The launcher adds the current checkout as a local project. These flags change th
 | --- | --- |
 | `--project /absolute/path` | Adds a different folder as the project. |
 | `--onboarding` | Starts with an empty profile, to test the first-run wizard. |
+| `--workspaces on\|off` | Sets the Node's workspace mode before seeding a project. |
 | `--reuse` | Reopens a stopped session's data. A stopped name isn't reused without it. |
 | `--vite` | Serves the live Vite renderer instead of the staged one, to check hot reload. |
 | `--fixture NAME` | Seeds a generated fixture. See [the large-surface flow](#large-surface-flow). |
+
+Use `--fixture delegation-checks` to open a settled delegated report with one holding and one
+failing host check. It seeds an imported session in the isolated data root, so the report card can
+be inspected without changing execute-tool permissions.
+
+Use `--fixture unattended-policy` to execute a fake managed harness through the real runtime before
+opening the window. It raises a permission, question, and form under autonomous posture and asserts
+that they resolve without waiting. Its final `BLOCKED:` reply must end the workflow execution with
+one turn. Inspect the saved transcript in the task's Agent pane. This checks runtime policy and
+rendering, without relying on a commercial harness to ask or changing personal permission settings.
 
 By default the window serves the staged renderer through the app scheme, as a packaged build does.
 That avoids Vite's burst of cold module loads during startup. `pnpm dev` stays the normal live loop.
@@ -39,12 +50,15 @@ pnpm dev:agent:ui -- --session my-change click e2
 pnpm dev:agent:ui -- --session my-change fill e4 "new value"
 pnpm dev:agent:ui -- --session my-change scroll -400
 pnpm dev:agent:ui -- --session my-change screenshot after-change.png
+pnpm dev:agent:ui -- --session my-change link acorn://local/settings/connections
 pnpm dev:agent:ui -- --session my-change stop
 ```
 
 Take a `snapshot` before an element action and again after the UI changes. Its element references
 belong to that snapshot. Leave out `--session` when exactly one session is running. For a disposable
 check of the launcher and the first-run UI, run `pnpm dev:agent:smoke`.
+The `link` verb sends a URL to the renderer's normal link handler and waits for dispatch, without
+asking macOS to open a registered app.
 
 `scroll` moves the largest scrolling region and reports where the reader is: the offset, and the turn
 at the top of the viewport where the content publishes one. With no delta it only reports. To check a

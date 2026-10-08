@@ -201,6 +201,17 @@ describe('a row with a tip', () => {
   })
 })
 
+describe('a stacked row', () => {
+  it('drops its variant in a rail, which would pin the mark to the top', () => {
+    const [rail, setRail] = createSignal(false)
+    render(() => <Row variant="stacked" collapsed={rail() ? <span>●</span> : undefined}>Fix the parser</Row>, host)
+    const row = host.querySelector<HTMLElement>('.ui-row')!
+    expect(row.dataset.variant).toBe('stacked')
+    setRail(true)
+    expect(row.dataset.variant).toBe('default')
+  })
+})
+
 describe('a rail form sent as data', () => {
   it('collapses a row from an icon name alone and keeps the label as its tip', () => {
     render(() => <Row collapsedIcon="git-branch" label="feature/login" onPress={() => {}}>the full row</Row>, host)

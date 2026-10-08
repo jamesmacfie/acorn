@@ -12,6 +12,7 @@ import { broadcastTasksChanged, broadcastWorktreeStatusChanged } from '../notify
 import { loadTask, projectForTask, requireTaskRoot, resolveTaskCwd, TASK_REF_COLUMNS, taskRoot, taskRunConfig, toTaskRef, workspaceIdFor, type TaskRef } from '../worktrees/taskWorktree'
 import { getProject, normalizeGithubPart } from '../projects'
 import { saveTaskBranch, withBranchReservation } from '../worktrees/taskBranch'
+import { isTaskArchiving } from '../worktrees/archiveGate'
 
 // What `taskRunConfig` answers: the merged run-target config plus the cwd to run it in. Named,
 // because it is a CoreServices return value rather than an internal helper's.
@@ -351,6 +352,8 @@ export function createTaskService(db: AppDatabase): CompiledTaskService {
           return false
         }
         return saveTaskBranch(db, project, { branch: project.vcs === 'git' ? stem : null, branchSource: 'derived', baseBranch: seed.baseBranch }, (branch) => {
+          const currentParent = db.select().from(schema.tasks).where(eq(schema.tasks.id, parentTaskId)).get()
+          if (currentParent?.status !== 'active' || isTaskArchiving(parentTaskId)) throw new Error('Parent task is not active or is being archived.')
           const value = db.select({ value: max(schema.tasks.sort) }).from(schema.tasks).get()?.value
           const at = Date.now()
           db.insert(schema.tasks).values({

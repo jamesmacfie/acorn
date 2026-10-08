@@ -32,6 +32,14 @@ reorder, edit, or deferred continuation can't dispatch a stale head. The earlies
 blocks later turns in its session. Workflow work gets a dispatch slot after five interactive or
 automation turns.
 
+The store captures provider settings and host attendance at the same acceptance boundary, including
+goal turns. Goal turns use the same admission hooks as person turns. Interactive and imported sessions resolve to `attended`,
+delegated sessions to `supervised`, and workflow sessions to `supervised` under `gated` or
+`autonomous` under the host's autonomous posture. Plugin follow-ups inherit their admitted origin's
+attendance. Usage-limit continuations retain the original row and policy. Unknown persisted values
+fail before dispatch. Legacy turns without attendance are backfilled durably from the host session
+snapshot; older sessions without that snapshot use their original attended or supervised behavior.
+
 The coordinator runs on events. It scans when a turn is queued, a provider starts, or a turn settles. A
 scan that started nothing runs again if a call arrived during it, and reconciliation runs one scan at
 boot. One plugin-database statement selects queue heads and their sessions through the partial
@@ -40,6 +48,29 @@ queued-head index. Text frames don't trigger scans.
 Only a turn moves a session into `working`. An event with no turn records into the transcript and
 marks the session unread without claiming work. **Stop** settles a session that reports work with no
 turn to cancel.
+
+## Session goals
+
+An interactive session can hold one goal of up to 2,000 characters. Set it from the conversation or
+the **Set session goal** palette command. If the session is idle, acorn queues the goal as its first
+turn. Goal turns use the normal queue and count against the same concurrency and usage limits.
+
+After a turn settles and its queue drains, acorn checks the goal against the event ledger. The check
+reads recent messages and shortened tool input and output, with a 12,000-character evidence limit.
+It uses a one-shot call on the session's harness. Claude Code uses its `haiku` alias; other harnesses
+use their configured default. A failed or invalid check blocks the goal and does not queue more work.
+
+Only a verdict that says useful work remains queues another **Goal** turn. A goal stops after eight
+continuations or two consecutive goal turns without a tool call or file change. **Stop** pauses an
+active goal. **Resume** queues a turn to carry on. A restart interrupts an active provider turn and
+pauses its goal, as does a provider disconnect during a turn. A dispatch failure blocks the goal.
+An admission refusal also blocks the goal and queues no turn.
+A completed turn whose check was interrupted is checked after startup. The session
+row stores the objective, counters, status, and last verdict, so every client sees the same state.
+
+The goal route is device-only: `PUT /v1/p/agents/sessions/:id/goal` accepts an objective or `null`
+to clear it, and `POST /v1/p/agents/sessions/:id/goal/resume` resumes a paused goal. Workflow,
+delegated, imported, terminal-controlled, and archived sessions cannot accept a goal.
 
 ## Plan usage limits
 

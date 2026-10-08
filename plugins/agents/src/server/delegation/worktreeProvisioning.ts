@@ -1,5 +1,6 @@
 import type { CreateAgentSessionInput } from '../../shared/schemas'
 import type { ManagedAgentRuntime } from '../sessions/runtime'
+import type { CoreServices } from '@acorn/plugin-api/node'
 import { delegatedTurn } from './reports'
 import type { AgentDelegationStore, AgentSpawn, AgentSpawnProvisioning } from './store'
 
@@ -13,6 +14,7 @@ export class WorktreeProvisioning {
     private readonly runtime: ManagedAgentRuntime,
     private readonly store: AgentDelegationStore,
     private readonly tasks?: WorktreeTaskService,
+    private readonly core?: Pick<CoreServices, 'tasks' | 'git'>,
   ) {}
 
   async reconcile(): Promise<void> {
@@ -36,7 +38,6 @@ export class WorktreeProvisioning {
       spawn.childTaskId,
     )
     if (taskId !== spawn.childTaskId) throw new Error('Core returned a different child task during replay.')
-
     let session = await this.runtime.store.delegatedSessionForSpawn(spawn.id)
     if (session && session.taskId !== spawn.childTaskId) {
       throw new Error('The recovered delegated session belongs to another task.')
@@ -47,6 +48,9 @@ export class WorktreeProvisioning {
     const turnKey = `delegation:${spawn.id}:turn`
     let turn = await this.runtime.store.turnForIdempotency(session.id, turnKey)
     if (!turn) {
+      const root = await this.core?.tasks.root(taskId)
+      if (this.core && !root) throw new Error('Child worktree is unavailable when recording the spawn base commit.')
+      const baseCommit = root ? await this.core?.git.gitText(['rev-parse', '--verify', 'HEAD^{commit}'], { cwd: root, maxOutputBytes: 100 }) : undefined
       const parent = plan.parentSessionId ? await this.runtime.store.getSession(plan.parentSessionId) : null
       turn = await this.runtime.enqueueTurn(session.id, {
         ...delegatedTurn(
@@ -55,7 +59,9 @@ export class WorktreeProvisioning {
           plan.resultSchema,
           {
             delegationSpawnId: spawn.id,
+            ...(baseCommit ? { baseCommit } : {}),
             toolCeiling: plan.toolCeiling,
+            ...(plan.checks ? { checks: plan.checks } : {}),
             ...(plan.resultSchema ? { resultSchema: plan.resultSchema } : {}),
             ...(plan.configOptions ? { configOptions: plan.configOptions } : {}),
           },

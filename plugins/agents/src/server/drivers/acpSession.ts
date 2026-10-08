@@ -64,7 +64,7 @@ function acpPrompt(
       case 'file':
         return {
           type: 'text',
-          text: `Please use the workspace file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
+          text: `Please use the file @${part.path}${part.lineStart ? `:${part.lineStart}${part.lineEnd ? `-${part.lineEnd}` : ''}` : ''}.`,
         }
       case 'attachment':
       case 'image': {
@@ -160,7 +160,11 @@ export function clientFor(
         // run on with an empty answer.
         drain: () => resolve({ action: 'cancel' }),
       }))
-      await announce(pending, requestId, options, event)
+      await announce(pending, requestId, options, {
+        type: 'input_request', request: event,
+        open: () => pending.has(requestId),
+        respond: (resolution) => resolvePending(pending, requestId, resolution, label),
+      })
       return response
     },
     async sessionUpdate(params) {
@@ -311,7 +315,7 @@ export async function startAcpSession(
       message: `${label} does not take HTTP MCP servers, so this session runs without ${declared.unsupported.join(', ')}.`,
     })
   }
-  const sessionMeta = spec.acpSessionMeta?.(options.session, { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] }, options.loopHooks)
+  const sessionMeta = spec.acpSessionMeta?.(options.session, { folders: options.skillFolders ?? [], plugins: options.skillPlugins ?? [] }, options.loopHooks, options.attendanceInstructions)
   // A custom agent's instructions, for a harness with no system prompt acorn can reach. Owed to each
   // provider session this driver creates, and never to one it picks back up, which already has them.
   const customAgent = sessionCustomAgent(options.session.config)

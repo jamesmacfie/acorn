@@ -144,7 +144,9 @@ describe('the active-task list route', () => {
   })
 
   it('runs the archiving hook once when a status change archives the task', async () => {
-    await seed(1, 1)
+    await seed(1, 4)
+    await t.db.update(schema.tasks).set({ parentId: 'task-0-0' }).where(eq(schema.tasks.id, 'task-0-1'))
+    await t.db.update(schema.tasks).set({ parentId: 'task-0-1' }).where(eq(schema.tasks.id, 'task-0-2'))
     const archiving: string[] = []
     registerHookHandler({
       id: 'probe:archiving',
@@ -164,14 +166,35 @@ describe('the active-task list route', () => {
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ status }),
       })
-      expect((await patch('archived')).status).toBe(200)
+      const result = await patch('archived')
+      expect(result.status).toBe(200)
+      expect(await result.json()).toMatchObject({ archivedTaskIds: ['task-0-2', 'task-0-1', 'task-0-0'] })
       expect((await patch('archived')).status).toBe(200)
       expect((await patch('active')).status).toBe(200)
       // After the write, so nothing can start new work on the task while its plugins stop theirs.
-      expect(archiving).toEqual(['task-0-0:archived'])
+      expect(archiving).toEqual(['task-0-2:archived', 'task-0-1:archived', 'task-0-0:archived'])
+      const rows = await t.db.select().from(schema.tasks)
+      expect(rows.filter((row) => row.status === 'archived').map((row) => row.id)).toEqual(['task-0-1', 'task-0-2'])
+      expect(rows.find((row) => row.id === 'task-0-3')?.status).toBe('active')
     } finally {
       clearHooks('probe')
     }
+  })
+
+  it('refuses a cascading status archive by a caller confined to the parent task', async () => {
+    await seed(1, 2)
+    await t.db.update(schema.tasks).set({ parentId: 'task-0-0' }).where(eq(schema.tasks.id, 'task-0-1'))
+    const confined = new Hono<AppEnv>()
+      .use('/api/*', async (c, next) => {
+        c.set('principal', { kind: 'internal', userId: 'james', scope: 'task', taskId: 'task-0-0' })
+        await next()
+      })
+      .route('/api/tasks', tasks)
+    const response = await confined.request('http://acorn.test/api/tasks/task-0-0', {
+      method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ status: 'archived' }),
+    })
+    expect(response.status).toBe(404)
+    expect((await t.db.select().from(schema.tasks)).every((row) => row.status === 'active')).toBe(true)
   })
 
   it('stores setup opt-out per task and defaults other task seeds to setup enabled', async () => {

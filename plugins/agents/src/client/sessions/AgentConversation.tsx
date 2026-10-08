@@ -13,6 +13,7 @@ import { managedAgentStore } from './managedStore'
 import { clearFocusedManagedRequest, clearManagedSubagent, focusedManagedRequest, managedChatsOnly, selectedManagedSubagent, toggleManagedChatsOnly } from './managedSelection'
 import type { AgentConversationProps } from '../../contract/conversation'
 import TerminalConversationShortcuts from './TerminalConversationShortcuts'
+import SessionGoal from './SessionGoal'
 
 // One session's conversation: its transcript, its queue, and the box you answer it in.
 //
@@ -56,6 +57,7 @@ function SessionConversation(input: {
   const [error, setError] = createSignal('')
   // Opened by `/mcp` in the composer. Per conversation, which is per session: this owner is keyed by it.
   const [mcpOpen, setMcpOpen] = createSignal(false)
+  const [goalEditorTick, setGoalEditorTick] = createSignal(0)
   // The transcript actions reach into a sibling: scroll jumps come up from the kit Timeline through
   // `onControls`, while the filter and collapse-all push down as a signal and a counter. The filter is
   // kept per session in ./managedSelection.ts, so it survives leaving the session and coming back. The
@@ -181,12 +183,14 @@ function SessionConversation(input: {
           <>
             <Show when={props.note}>{(line) => <Text emphasis="muted" wrap>{line()}</Text>}</Show>
             <ManagedChildRows parentSessionId={current().id} parentTaskId={current().taskId} />
+            <SessionGoal session={current()} openToken={goalEditorTick()} onUpdate={managedAgentStore.upsertSession} />
             <Show when={mcpOpen()}>
               <AgentMcpPanel sessionId={current().id} onClose={() => setMcpOpen(false)} />
             </Show>
             <AgentComposer
               session={current()}
               onMcp={() => setMcpOpen(true)}
+              onGoal={() => setGoalEditorTick((tick) => tick + 1)}
               disabled={props.composerDisabled || current().controller !== 'acorn'
                 || current().runtimeState === 'archived'}
               submitDisabled={agentSessionIsStarting(current())}

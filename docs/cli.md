@@ -39,7 +39,7 @@ acorn [--node NODE] node info|start --background|status|stop [--force]
 acorn [--node NODE] workspace list|show ID|create --name NAME|rename ID --name NAME|remove ID
 acorn [--node NODE] workspace external-projects list ID|replace ID --file FILE|-
 acorn [--node NODE] project list [--workspace ID] [--include-hidden]|show ID
-acorn [--node NODE] project add --workspace ID --path ABSOLUTE [--name NAME]
+acorn [--node NODE] project add --path ABSOLUTE [--workspace ID] [--name NAME]
 acorn [--node NODE] project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID
 acorn [--node NODE] project config show ID|set ID --patch-file FILE|-
 acorn [--node NODE] task list [--project ID] [--status active|archived|all]
@@ -47,7 +47,7 @@ acorn [--node NODE] task show ID|create --project ID --title TEXT [--branch NAME
 acorn [--node NODE] task scripts status [TASK_ID]
 acorn [--node NODE] task scripts wait [TASK_ID] --phase setup|teardown [--attempt ID] [--timeout 5m] [--check]
 acorn [--node NODE] task scripts logs [TASK_ID] --phase setup|teardown [--attempt ID] [--tail 100] [--max-bytes 32768]
-acorn [--node NODE] agent providers|list [--task ID|--workspace ID]|show ID
+acorn [--node NODE] agent providers|list [--task ID|--workspace ID|--project ID]|show ID
 acorn [--node NODE] agent start --task ID --profile ID [--provider ID] --prompt TEXT|--prompt-file FILE|-
 acorn [--node NODE] agent send ID --prompt TEXT|--prompt-file FILE|-
 acorn [--node NODE] agent events ID [--after-seq N] [--limit N] [--follow] [--output jsonl]
@@ -56,7 +56,7 @@ acorn [--node NODE] workflow list --task ID
 acorn [--node NODE] workflow start --task ID --definition ID [--inputs-file FILE|-] [--request-id UUID]
 acorn [--node NODE] workflow run list --task ID
 acorn [--node NODE] workflow run show ID|steps ID|wait ID [--until finished|attention] [--timeout SECONDS|30m] [--check]
-acorn [--node NODE] run list [--workspace ID]
+acorn [--node NODE] run list [--workspace ID|--project ID]
 acorn [--node NODE] plugin list
 acorn [--node NODE] plugin ID commands
 acorn [--node NODE] plugin ID COMMAND --help
@@ -105,6 +105,6 @@ inspectable resource to stdout. In JSON mode the error is one object with its co
   caller set it. Open a new terminal afterwards. The action won't replace a command it didn't install.
   If no writable directory is on `PATH`, create `~/.local/bin`, add it to `PATH`, and try again. Moving
   the app or checkout means clicking the action again. This command is headless.
-- **From a standalone Node archive**, run `node bin/acorn.mjs --help` after `npm install --omit=dev`.
+- **From a standalone Node archive**, run `node bin/acorn.mjs --help` after `npm ci --omit=dev`.
   The archive's launcher includes both the CLI and the terminal client, and a package manager exposes
   its `acorn` bin when the archive is installed as a package ([node distribution](./node-distribution.md)).

@@ -135,6 +135,9 @@ const security: SearchDeclaration = {
   sections: [
     { id: 'encryption', label: 'Disk encryption', rows: ['Full-disk encryption'] },
     { id: 'backup', label: 'Backup', rows: ['Save to'], keywords: ['archive path'] },
+    // The agents plugin's section, drawn through CORE_SECURITY_POINT and declared here for search, as
+    // Storage and memory declares its agents section.
+    { id: 'agent-instructions', label: 'Agent instruction files', rows: ['Check instruction files before each agent turn'], keywords: ['hidden characters', 'unicode', 'prompt injection', 'CLAUDE.md', 'AGENTS.md', 'skills'] },
   ],
 }
 const audit: SearchDeclaration = {
@@ -224,7 +227,8 @@ export const CORE_SETTINGS_PAGES = [
 
   // Connections. Services keeps the id `integrations`, which plugins and notices deep-link to. A model
   // key is a connection too, but it is listed on AI models, beside the agent CLIs it competes with.
-  { id: 'integrations', ...services, label: 'Services', category: 'connections', scope: 'node', icon: 'plug', order: 10 },
+  { id: 'integrations', ...services, label: 'Services', category: 'connections', scope: 'node', icon: 'plug', order: 10,
+    aliases: ['connections'] },
   { id: 'ai-models', ...aiModels, label: 'AI models', category: 'connections', scope: 'node', icon: 'sparkles', order: 20 },
 
   // Automation. A schedule is a promise one machine makes (docs/schedules.md), and a run happens on one

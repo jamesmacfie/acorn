@@ -8,6 +8,7 @@ import { makeTestDb, type TestDb } from '../../testkit/db'
 import { schema } from '../db'
 import * as coreFs from './fs'
 import { createProjectService } from './projectRefs'
+import { memoryIdentityStore } from '../activeIdentity'
 import * as coreProc from './proc'
 import { createTaskService } from './tasks'
 import { RepoConfigTrustError } from '../repoConfigTrust'
@@ -35,7 +36,7 @@ describe('resolveTaskDataUrl: repo-authored url_script trust gate', () => {
 
   beforeEach(async () => {
     testDb = makeTestDb()
-    core = { tasks: createTaskService(testDb.db), projects: createProjectService(testDb.db), fs: coreFs, proc: coreProc }
+    core = { tasks: createTaskService(testDb.db), projects: createProjectService(testDb.db, memoryIdentityStore('owner')), fs: coreFs, proc: coreProc }
     dir = mkdtempSync(join(tmpdir(), 'acorn-data-trust-'))
     repo = join(dir, 'repo')
     marker = join(dir, 'EXECUTED')

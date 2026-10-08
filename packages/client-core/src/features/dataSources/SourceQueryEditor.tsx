@@ -27,6 +27,7 @@ import {
 } from './sourceEntries'
 import InputAccountField from './InputAccountField'
 import { describeSourceFailure, failureFromError } from '../dashboards/sourceErrors'
+import { createWorkspaceWords, type WorkspaceWords } from '../workspaces/words'
 
 const plainContent = (content: QueryContent): QueryContent => queryContentSchema.parse(JSON.parse(JSON.stringify(content)))
 type InputBinding = NonNullable<DataSourceScope['inputs']>[string]
@@ -73,6 +74,7 @@ function TypedOperand(props: {
 }
 
 function DynamicOptions(props: {
+  words: WorkspaceWords
   nodeId: string
   query: DataSourceQuery
   field: DataField
@@ -103,7 +105,7 @@ function DynamicOptions(props: {
     label={selected().length ? selected().map(option => option.label).join(', ') : props.value === MISSING ? props.multiple ? 'Every available scope' : 'Choose…' : props.only ? 'Choose…' : String(props.value)}
     ariaLabel={props.field.label}
     placeholder={`Search ${props.field.label.toLowerCase()}`}
-    emptyText={props.only ? props.onlyPending ? 'Loading options…' : props.only.length ? 'No matching options.' : 'None are linked to this workspace.'
+    emptyText={props.only ? props.onlyPending ? 'Loading options…' : props.only.length ? 'No matching options.' : `None are linked to this ${props.words.singular}.`
       : options.isPending ? 'Loading options…' : options.isError ? 'Options unavailable.' : 'No matching options.'}
     disabled={props.disabled}
     onSearch={setSearch}
@@ -254,6 +256,7 @@ export default function SourceQueryEditor(props: {
    * observational only: display changes never flow back into query semantics. */
   onStateChange?(state: SourceQueryEditorState): void
 }) {
+  const words = createWorkspaceWords()
   const nodeId = () => activeCacheId()
   const scope = createMemo<QueryScope>(() => ({ workspaceId: props.workspaceId, ...(props.projectId ? { projectId: props.projectId } : {}) }))
   const baseScope = createMemo<DataSourceScope>(() => ({ ...scope(), parameters: {} }))
@@ -611,24 +614,24 @@ export default function SourceQueryEditor(props: {
         <Show when={source()?.inputs && described().parameterFields.length}><Text emphasis="strong">Its own settings</Text></Show>
         <For each={described().parameterFields}>{field => <Show when={!isReachChoice(described(), field)} fallback={<Field label="Reach" group><Stack gap="row">
           <Select size="sm" label="Reach" value={reachMode(field)} onChange={mode => mode === 'chosen' ? updateParameter(field, []) : setListReach(field)}
-            options={[{ value: 'workspace', label: `This workspace's ${described().reach!.itemPlural}` },
+            options={[{ value: 'workspace', label: `This ${words().singular}'s ${described().reach!.itemPlural}` },
               { value: 'chosen', label: `Only the ${described().reach!.itemPlural} I choose` }]} />
           {/* What "this workspace's" covers, so the choice isn't a guess. */}
           <Show when={reachMode(field) === 'workspace' && workspaceItems.data}>{items => <Text emphasis="muted" wrap>
-            {items().length ? items().join(', ') : `This workspace has ${described().reach!.empty}.`}
+            {items().length ? items().join(', ') : `This ${words().singular} has ${described().reach!.empty}.`}
           </Text>}</Show>
           <Show when={reachMode(field) === 'chosen'}>
-            <Show when={workspaceItems.isError}><Alert tone="danger">Could not load this workspace's links.</Alert></Show>
-            <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple
+            <Show when={workspaceItems.isError}><Alert tone="danger">Could not load this {words().singular}'s links.</Alert></Show>
+            <DynamicOptions words={words()} nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple
               {...onlyItems()}
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           </Show>
         </Stack></Field>}><Field label={field.label} hint={field.description} group>
           <Show when={!props.inputBinding && parameterSchema(field)?.type === 'array' && field.choices?.kind === 'dynamic'}><Inline gap="inline" wrap>
-            <Button size="sm" variant="bare" onPress={() => setListReach(field)}>Workspace links</Button>
+            <Button size="sm" variant="bare" onPress={() => setListReach(field)}>{words().capitalized} links</Button>
           </Inline></Show>
           <Show when={parameterSchema(field)}>{schema => field.choices?.kind === 'dynamic' ? (
-            <DynamicOptions nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple={schema().type === 'array'}
+            <DynamicOptions words={words()} nodeId={nodeId()} query={current()} field={field} target="parameter" value={currentParameter(field)} multiple={schema().type === 'array'}
               disabled={props.disabled || !!(props.value?.kind === 'saved' && !editingShared())} onChange={value => updateParameter(field, value)} />
           ) : (
             <TypedOperand label={field.label} schema={schema()} field={field} value={currentParameter(field) === MISSING ? '' : currentParameter(field) as DataValue}

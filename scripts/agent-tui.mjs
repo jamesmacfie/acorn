@@ -37,7 +37,8 @@ async function seedSession(options, directory, dataDir) {
   if (options.reuse && await exists(fixturePath)) {
     const previous = JSON.parse(await readFile(fixturePath, 'utf8'))
     const project = options.fixture ? join(directory, 'fixture', 'repo') : options.project ?? repoRoot
-    if (previous.fixture !== options.fixture || previous.profile !== options.profile || previous.seed !== options.seed || previous.project !== project) {
+    if (previous.fixture !== options.fixture || previous.profile !== options.profile || previous.seed !== options.seed || previous.project !== project ||
+      (options.workspaces && previous.workspaces !== options.workspaces)) {
       throw new Error('The saved fixture differs from these options. Choose a new session name.')
     }
     return previous
@@ -51,9 +52,10 @@ async function seedSession(options, directory, dataDir) {
   const args = ['--filter', '@acorn/desktop', 'exec', 'node', '--import', 'tsx', 'scripts/agent/seed.ts',
     '--data-dir', dataDir, '--project', project]
   if (options.fixture) args.push('--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed))
+  if (options.workspaces) args.push('--workspaces', options.workspaces)
   const output = await run(args, true)
   const result = options.fixture ? JSON.parse(output.trim().split('\n').at(-1)) : { projectId: output.trim().split('\n').at(-1) }
-  const record = { fixture: options.fixture, profile: options.profile, seed: options.seed, project, ...result }
+  const record = { fixture: options.fixture, profile: options.profile, seed: options.seed, project, workspaces: options.workspaces, ...result }
   await writeFile(fixturePath, `${JSON.stringify(record, null, 2)}\n`, { mode: 0o600 })
   await chmod(fixturePath, 0o600)
   return record
@@ -71,6 +73,8 @@ async function main() {
     '--session', options.session, '--data-dir', dataDir,
     '--cols', String(options.cols), '--rows', String(options.rows), '--keyboard', options.keyboard,
     ...(options.reuse ? ['--reuse'] : []),
+    ...(options.link ? ['--link', options.link] : []),
+    ...(!options.build ? ['--no-build'] : []),
   ])
 }
 

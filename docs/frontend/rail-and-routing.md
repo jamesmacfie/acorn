@@ -106,5 +106,21 @@ pull request's URL, and `pathForTask` falls back to `/t/:taskId`. Two more claim
 - `defaultPane` is the pane a task opens on the first time. `defaultPaneForTask` asks the owner of the
   task's URL first and a link's provider second. A task no source claims keeps the layout default.
 
-Task panes use query parameters: `/t/:taskId?pane=…&item=…` becomes a `PaneIntent` once and is then
-stripped ([addressing a pane](../panes.md#addressing-a-pane)).
+Task panes use query parameters: `/t/:taskId?pane=…` opens a pane, and `&item=…` adds a selection
+intent. Both forms are stripped after they open ([addressing a pane](../panes.md#addressing-a-pane)).
+
+The `acorn://` address parser and builder live in `client-core` beside `corePaths.ts`. Parsing is pure,
+so the terminal client can read a link before it connects. The address dispatcher waits for the
+selected Node's shell to finish remounting before it navigates. A project address uses the project
+path to enter its workspace. Loaded plugin project surfaces also name their owning source; selecting
+that source is necessary because the route alone does not choose what the shell renders. If no source
+owns a project subpath, the dispatcher opens the project and reports the missing page.
+An explicit project address keeps its route and selected source when it enters another workspace;
+that workspace's remembered task or source does not replace the linked destination. Ordinary
+workspace-picker navigation continues to restore the remembered view.
+**Copy link** uses the exact encoded project route when the visible source owns it, including loaded
+plugin paths whose source does not declare `projectScoped`. Selecting another source leaves a stale
+route behind, so that route alone is not enough to decide what the reader sees.
+The task row and rail source menus use their clicked target, even when a different task or source is
+active. The project page action lives in the topbar menu.
+For the external address contract, see [Acorn links](./acorn-links.md).

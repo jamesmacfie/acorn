@@ -12,15 +12,15 @@ import {
   type AgentPermissionSubject,
 } from '../../contract/permissionHook.ts'
 import type { AgentDriverPermissionRequest } from '../drivers/types'
+import type { Attendance } from './attendance'
 
 const log = createLogger('agents', 'agents')
-
-const UNATTENDED_KINDS: ReadonlySet<AgentSession['kind']> = new Set(['workflow', 'delegated'])
 
 /** What the step needs from the engine, bound to one session, its generation, and the asking turn. */
 export type PermissionRequestPorts = {
   hooks?: Pick<PluginHookRegistry, 'run'>
   session(): Promise<AgentSession>
+  attendance: Attendance
   taskRoot(taskId: string): Promise<string>
   /** The materializer's bounding, which also drops everything driver-only. */
   materialize(event: AgentNormalizedEvent): Promise<AgentNormalizedEvent[]>
@@ -72,7 +72,7 @@ async function askPolicy(ports: PermissionRequestPorts, event: AgentDriverPermis
       taskId: session.taskId,
       requestId: event.request.requestId,
       providerId: session.providerId,
-      unattended: UNATTENDED_KINDS.has(session.kind),
+      unattended: ports.attendance !== 'attended',
       title: event.request.title,
       root: await ports.taskRoot(session.taskId).catch(() => ''),
       ...boundedSubject(event.subject),

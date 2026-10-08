@@ -151,7 +151,7 @@ paint containment would clip a card's focus ring.
 | `Textarea` | stop | A boxed multi-line field. Owns keys. `rows` is a floor rather than a fixed height, so an empty field still stands its ground and a full one grows past it. The frame lights in the accent tone while the keys are inside. A caller drawing its own frame, such as `Composer`, turns this one off |
 | `Select` | stop | `[ value ▾ ]`, or `value▾` for a bare control, opening a `Menu` |
 | `Checkbox` | stop | `[x] label`; Space toggles |
-| `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets |
+| `SegmentedControl` | collection | `( a \| [b] \| c )`, the selected one in brackets. An option's `detail` picture is desktop-only, so the labels carry the choice |
 | `ToggleButton` | stop | `[x] label` |
 | `Picker` | stop | A field that opens a `Menu` filtered by typing. It draws no remove control, so it ignores `removable` and `removeLabel`, which name a row's remove button and arm it on the first press in the window |
 | `PickerRow` | item | One line in that menu: label and grey hint. A leading icon is omitted |

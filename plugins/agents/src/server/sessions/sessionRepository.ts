@@ -21,6 +21,7 @@ import { LedgerFold } from './ledgerFold'
 import { normalizeStoredSessionTitle } from './sessionTitle'
 import type { AgentSearchProjection } from './searchProjection'
 import type { SessionSearchFilter } from './sessionSearch'
+import type { HistoryHit, HistoryPage, HistoryRole } from './sessionHistory'
 
 const now = (): number => Date.now()
 
@@ -689,6 +690,22 @@ export class AgentSessionRepository {
     return this.db.transaction((tx) => {
       projection.catchUp(tx)
       return searchTaskSessions(tx, query, taskIds, limit)
+    })
+  }
+
+  async searchSessionHistory(sessionId: string, query: string, role?: HistoryRole, limit = 8): Promise<HistoryHit[]> {
+    const [projection, history] = await Promise.all([this.ensureSearchProjection(), import('./sessionHistory')])
+    return this.db.transaction((tx) => {
+      projection.catchUp(tx, sessionId)
+      return history.searchSessionHistory(tx, sessionId, query, role, limit)
+    })
+  }
+
+  async readSessionHistory(sessionId: string, seq: number, offset = 0): Promise<HistoryPage | null> {
+    const [projection, history] = await Promise.all([this.ensureSearchProjection(), import('./sessionHistory')])
+    return this.db.transaction((tx) => {
+      projection.catchUp(tx, sessionId)
+      return history.readSessionHistory(tx, sessionId, seq, offset)
     })
   }
 

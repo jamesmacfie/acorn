@@ -37,6 +37,7 @@ import { registerContextMenuItems, type TaskRowTarget, type RailSourceTarget } f
 import { ContextMenuHost, ContextMenuItems, type ContextMenuOpening } from '../../host/registries/panes/contextMenuHost'
 import { menuPoint } from '../../host/registries/panes/menuPoint'
 import { activeNodeId } from '../../infra/node/activeNode'
+import { copyLink } from '../../host/registries/commands/copyLink'
 import { sourceRegistry } from '../../host/registries/sources/sources'
 import { loadIconNodes } from '../../kit/tokens/iconNodes'
 import './tabrail.css'
@@ -50,10 +51,12 @@ import { TaskDraftDialog } from './TaskDraftDialog'
 import type { TaskDraft } from './taskDraftStore'
 import type { RailProps } from '@acorn/protocol/chrome.ts'
 import { mintSlotRef, NestedChromeSlot } from '../../host/plugins/NestedChromeSlot'
+import { createWorkspaceWords } from '../workspaces/words'
 
 const originIcon = (origin: string) => taskOriginAppearance(origin).glyph
 
 export default function TabRail() {
+  const words = createWorkspaceWords()
   const navigate = useNavigate()
   const params = useParams()
   const queryClient = useQueryClient()
@@ -159,10 +162,16 @@ export default function TabRail() {
     openedSource = sourceRegistry.get(id)
     setSourceMenu({ at, target })
   }
-  const sourceAction = registerContextMenuItems< 'rail.source'>([{
-    id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
-    run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
-  }])
+  const sourceAction = registerContextMenuItems<'rail.source'>([
+    {
+      id: 'core:rail-source-open', location: 'rail.source', label: 'Open', order: 100,
+      run: (target) => { if (target.nodeId === activeNodeId() && sources().some((source) => source.id === target.id)) selectSource(target.id) },
+    },
+    {
+      id: 'core:rail-source-copy-link', location: 'rail.source', label: 'Copy link', icon: 'copy', order: 110,
+      run: (target) => { if (target.nodeId === activeNodeId()) void copyLink(target.nodeId, { kind: 'source', sourceId: target.id }) },
+    },
+  ])
   onCleanup(() => sourceAction.dispose())
   createEffect(() => {
     const opened = sourceMenu()?.target
@@ -205,6 +214,10 @@ export default function TabRail() {
     // Core's own row actions, registered rather than written inline (docs/plugins/menus-and-markers.md § Context
     // menus).
     const rowActions = registerContextMenuItems([
+      {
+        id: 'task.copy-link', location: 'task.row', label: 'Copy link', icon: 'copy', order: 5,
+        run: (target) => void copyLink(activeNodeId(), { kind: 'task', taskId: target.id }),
+      },
       {
         id: 'task.pin', location: 'task.row', label: 'Pin to top', icon: 'pin', order: 10,
         when: (target) => !target.pinned,
@@ -261,7 +274,7 @@ export default function TabRail() {
     setMenuId(null)
     const options = (projects.data ?? []).filter((project) => !project.hidden && project.workspaceId === activeWorkspace()?.id)
     if (!options.length) {
-      toast('This workspace has no visible projects yet. Add one in Projects settings first.')
+        toast(words().singular === 'project' ? 'This project is hidden. Show it in Projects settings first.' : 'This workspace has no visible projects yet. Add one in Projects settings first.')
       return
     }
     const current = params.projectId
@@ -295,27 +308,38 @@ export default function TabRail() {
   }
 
   async function archiveInner(w: Task, applyChecks: string[]) {
+    let archivedTaskIds = [w.id]
     if (hasHostCapability({ plugin: 'terminal' })) {
       // `force`, matching the task pane's own archive. With no options, a dirty worktree came back
       // "uncommitted changes, confirm to discard" after the owner had already confirmed that on the
       // danger row.
       const res = await taskBridge().task.archive(w.id, { deleteWorktree: true, force: true, applyChecks })
-      if (!res.ok) return toast(res.output ? `${res.reason}\n${res.output}` : res.reason, { tone: 'danger' })
+      archivedTaskIds = res.archivedTaskIds ?? (res.ok ? [w.id] : [])
+      if (!res.ok) {
+        finishArchive(w, archivedTaskIds)
+        await invalidate()
+        return toast(res.output ? `${res.reason}\n${res.output}` : res.reason, { tone: 'danger' })
+      }
       const warnings: string[] = []
       if (res.cleanupFailed?.length) warnings.push(`cleanup failed for: ${res.cleanupFailed.join(', ')}`)
       if (warnings.length) toast(`Archived, but ${warnings.join('; ')}.`, { tone: 'danger' })
     } else {
-      await archiveTask(w.id)
+      const res = await archiveTask(w.id)
+      archivedTaskIds = res.archivedTaskIds ?? [w.id]
     }
+    finishArchive(w, archivedTaskIds)
+    await invalidate()
+  }
+
+  function finishArchive(w: Task, archivedTaskIds: string[]) {
     completeTaskArchive(w.id, () => {
-      if (activeTaskId() === w.id) {
+      if (archivedTaskIds.includes(activeTaskId() ?? '')) {
         setActiveTaskId(null)
         const source = defaultSourceId()
         if (source) setSelectedSource(source) // archived the active task → fall back to the default browse
         navigate(projectPath(w.projectId))
       }
-    })
-    await invalidate()
+    }, archivedTaskIds)
   }
 
   const CoreTaskList = () => (

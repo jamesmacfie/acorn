@@ -6,6 +6,8 @@ import type { TurnFollowUps } from '../sessions/turnFollowUps'
 import { TURN_FOLLOW_UP_DEADLINE_MS } from '../../contract/turnFollowUp.ts'
 import type { AgentDelegationStore } from './store'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from '../sessions/resultContract'
+import type { CoreServices } from '@acorn/plugin-api/node'
+import type { CheckResults } from '../../shared/delegationSchemas'
 
 const log = createLogger('agents:delegation', 'agents')
 
@@ -83,6 +85,8 @@ export function delegatedTurn(
 export class DelegationReports {
   // One delivery per child turn at a time: the broadcast and the startup pass can both ask for it.
   private readonly delivering = new Map<string, Promise<void>>()
+  // Reports, reads, and startup recovery share the same logical settlement and host inspection.
+  private readonly settling = new Map<string, Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null>>()
 
   constructor(
     private readonly runtime: ManagedAgentRuntime,
@@ -90,7 +94,48 @@ export class DelegationReports {
     // The unattended operations a plugin's note joins (../sessions/turnFollowUps.ts). Absent, a turn
     // reports as soon as it settles.
     private readonly followUps?: () => Promise<TurnFollowUps>,
+    private readonly core?: Pick<CoreServices, 'tasks' | 'fs' | 'git'>,
   ) {}
+
+  async checkResults(turn: AgentTurn): Promise<CheckResults | null> {
+    return (await this.settle(turn.id))?.checks ?? null
+  }
+
+  private settle(turnId: string): Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null> {
+    let running = this.settling.get(turnId)
+    if (!running) {
+      running = this.settleOnce(turnId).finally(() => this.settling.delete(turnId))
+      this.settling.set(turnId, running)
+    }
+    return running
+  }
+
+  private async settleOnce(turnId: string): Promise<{ turn: AgentTurn; last: AgentTurn; checks: CheckResults | null } | null> {
+    // Reload before any decision. A caller may hold the turn object from before another caller saved
+    // verdicts, and a later read must not inspect a changed worktree again.
+    const turn = await this.runtime.store.turn(turnId)
+    if (!turn || turn.source !== 'delegation' || !SETTLED.has(turn.status)) return null
+    const { DelegationChecks, savedCheckResults, turnChecks } = await import('./checks')
+    const saved = savedCheckResults(turn)
+    let last = turn
+    if (saved) {
+      last = (await this.runtime.store.followUpTurns(turn.sessionId, turn.id)).at(-1) ?? turn
+    } else if (typeof turn.effectivePolicy.reportTo === 'string') {
+      if (await this.operationLive(turn)) last = await this.settleFollowUps(turn)
+      else {
+        await this.cancelFollowUps(turn)
+        last = (await this.runtime.store.followUpTurns(turn.sessionId, turn.id)).at(-1) ?? turn
+      }
+    }
+    if (saved || !turnChecks(turn).length || !this.core) return { turn, last, checks: saved }
+    const child = await this.runtime.store.getSession(turn.sessionId)
+    // A removed task or failed core lookup is an unknown observation, not a report failure.
+    const root = child ? await this.core.tasks.root(child.taskId).catch(() => null) : null
+    const baseCommit = typeof turn.effectivePolicy.baseCommit === 'string' ? turn.effectivePolicy.baseCommit : undefined
+    const result = await new DelegationChecks(this.core).runInRoot(turn, root, baseCommit, last)
+    const persisted = await this.runtime.store.saveCheckResultsOnce(turn.id, result)
+    return { turn, last, checks: persisted ? savedCheckResults(persisted) : result }
+  }
 
   /** A pending request is a pause, not a settled turn. The request row is read after commit. */
   async deliverRequest(sessionId: string, providerRequestId: string): Promise<void> {
@@ -166,12 +211,11 @@ export class DelegationReports {
 
   private async deliverOnce(childTurnId: string): Promise<void> {
     const store = this.runtime.store
-    const turn = await store.turn(childTurnId)
-    const ownerId = turn?.effectivePolicy.reportTo
-    if (!turn || typeof ownerId !== 'string' || !SETTLED.has(turn.status)) return
-    if (!await this.operationLive(turn)) return this.cancelFollowUps(turn)
-    // The report waits for the plugin notes that joined this turn, and says what the last one ended on.
-    const last = await this.settleFollowUps(turn)
+    const settled = await this.settle(childTurnId)
+    if (!settled) return
+    const { turn, last, checks } = settled
+    const ownerId = turn.effectivePolicy.reportTo
+    if (typeof ownerId !== 'string') return
     if (!await this.operationLive(turn)) return
     const child = await store.getSession(turn.sessionId)
     if (!child) return
@@ -191,6 +235,8 @@ export class DelegationReports {
       `Outcome: ${last.stopReason === 'refusal' ? 'refused. The model declined the request, so asking again in the same words will not help.' : last.status}`,
       ...(last.error ? [`Error: ${last.error.message}`] : []),
       ...(text ? ['Final message:', pastedContent(text.length > MAX_REPORT_TEXT ? `…${text.slice(-MAX_REPORT_TEXT)}` : text)] : ['The turn ended with no message.']),
+      ...(checks ? ['Host checks:', `Checked at: ${new Date(checks.checkedAt).toISOString()}`, ...checks.verdicts.map(({ check, status, reason }) =>
+        `- ${check.kind}${'path' in check ? ` ${check.path}` : ''}: ${status} (${reason})`)] : []),
       ...(structured != null ? ['Structured result:', '```json', JSON.stringify(structured, null, 2), '```'] : []),
     ].join('\n\n')
     await this.runtime.enqueueTurn(ownerId, {
@@ -207,7 +253,7 @@ export class DelegationReports {
         ),
       ],
       source: 'delegation_report',
-      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id } },
+      effectivePolicy: { reportFrom: { sessionId: child.id, turnId: turn.id }, ...(checks ? { checkResults: checks } : {}) },
       idempotencyKey: reportKey(turn.id),
     })
   }
@@ -259,10 +305,13 @@ export class DelegationReports {
 
   /** Boot waits for this, so a report that waits on a plugin's note carries on after it returns. */
   async reconcile(): Promise<void> {
-    for (const turn of await this.runtime.store.settledReportingTurns()) {
-      if (!await this.operationLive(turn)) continue
-      void this.deliver(turn.id).catch((error: unknown) =>
-        log.warn(`report for turn ${turn.id} failed at startup: ${describeError(error).message}`))
+    const [reporting, unchecked] = await Promise.all([
+      this.runtime.store.settledReportingTurns(),
+      this.runtime.store.settledUncheckedDelegationTurns(),
+    ])
+    for (const id of new Set([...reporting, ...unchecked].map((turn) => turn.id))) {
+      void this.deliver(id).catch((error: unknown) =>
+        log.warn(`settlement for turn ${id} failed at startup: ${describeError(error).message}`))
     }
   }
 }

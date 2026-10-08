@@ -25,6 +25,11 @@ remote-tree region, because these surfaces get changing host data and verbs an i
 tree receives data only. It invokes named host actions to change panes, choose a source, switch a
 workspace or Node, or navigate. A device plugin can offer these surfaces without a Node half.
 
+`TopbarProps.workspacesMode` is `on`, `off`, or `null` while the active Node's preference and projects
+load. Replacement topbars label the first picker **Workspace** in on mode and **Project** in off mode.
+They hide membership-writing controls until the mode is known. Fleet entries retain their Node IDs;
+the label follows the active Node's mode.
+
 ## Nested slots
 
 The rail receives sources after the host's capability, integration, workspace-link, and contribution

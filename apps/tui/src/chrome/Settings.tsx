@@ -4,11 +4,14 @@ import type { Renderable } from '../tree/compat'
 import { Dynamic } from '../tree/renderer'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { SETTINGS_CATEGORIES } from '@acorn/protocol/settingsPages.ts'
+import type { WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
+import { createWorkspacesMode } from '@acorn/client-core/features/workspaces'
+import { settingsCategoryLabel } from '@acorn/client-core/features/settings'
 import {
   createSettingsDetails, createUnsavedChanges, SettingsDetailContext, UnsavedChangesContext,
 } from '@acorn/client-core/features/settings'
 import {
-  SETTINGS_CATEGORY_LABELS, settingsCategoryOf, settingsScopeOf, type SettingsCategory, type SettingsContribution,
+  settingsCategoryOf, settingsScopeOf, type SettingsCategory, type SettingsContribution,
   type SettingsPageContext,
 } from '@acorn/client-core/host/registries/shell'
 import { Line } from '../kit/cells'
@@ -41,7 +44,9 @@ function scopeText(page: SettingsContribution, nodeId: string): string {
 
 export function Settings(props: { nodeId: string; onClose: () => void; onSetup: () => void }) {
   let root: Renderable | undefined
-  const pages = createMemo(() => listedSettingsPages())
+  const mode = createWorkspacesMode()
+  const label = (category: SettingsCategory) => settingsCategoryLabel(category, mode())
+  const pages = createMemo(() => listedSettingsPages(mode()))
   const page = () => pages().find((candidate) => candidate.id === settingsPlace().pageId)
   const category = () => settingsPlace().category
   const inGroup = (id: SettingsCategory) => pages().filter((candidate) => settingsCategoryOf(candidate) === id)
@@ -99,7 +104,7 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
     const at = category()
     const open = page()
     const title = details.current()?.title()
-    return ['Settings', ...(at ? [SETTINGS_CATEGORY_LABELS[at]] : []), ...(open ? [open.title ?? open.label] : []), ...(title ? [title] : [])]
+    return ['Settings', ...(at ? [label(at)] : []), ...(open ? [open.title ?? open.label] : []), ...(title ? [title] : [])]
       .join(' > ')
   }
 
@@ -116,10 +121,10 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
     >
       <Line role="muted">{crumbs()}</Line>
       <Show when={settingsMissing()}><Alert tone="warn">{settingsMissing()}</Alert></Show>
-      <Switch fallback={<Groups count={(id) => inGroup(id).length} />}>
+      <Switch fallback={<Groups count={(id) => inGroup(id).length} label={label} />}>
         <Match when={page()} keyed>
           {(open) => (
-            <PageView page={open} nodeId={props.nodeId} onSetup={props.onSetup}>
+            <PageView page={open} nodeId={props.nodeId} onSetup={props.onSetup} mode={mode()}>
               <SettingsDetailContext.Provider value={details}>
                 <UnsavedChangesContext.Provider value={unsaved}>
                   <Dynamic component={open.component} context={context} />
@@ -129,7 +134,7 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
           )}
         </Match>
         <Match when={category()} keyed>
-          {(at) => <Pages category={at} pages={inGroup(at)} nodeId={props.nodeId} />}
+          {(at) => <Pages category={at} pages={inGroup(at)} nodeId={props.nodeId} label={label(at)} mode={mode()} />}
         </Match>
       </Switch>
     </box>
@@ -137,8 +142,8 @@ export function Settings(props: { nodeId: string; onClose: () => void; onSetup: 
 }
 
 /** The nine groups, every one of them, with how many pages each holds on this node. */
-function Groups(props: { count: (id: SettingsCategory) => number }) {
-  const items = () => SETTINGS_CATEGORIES.map((id) => ({ key: id, label: SETTINGS_CATEGORY_LABELS[id] }))
+function Groups(props: { count: (id: SettingsCategory) => number; label: (id: SettingsCategory) => string }) {
+  const items = () => SETTINGS_CATEGORIES.map((id) => ({ key: id, label: props.label(id) }))
   return (
     <Rows id="settings.groups" ariaLabel="Settings groups" items={items()}
       onActivate={(key) => setSettingsPlace({ category: key as SettingsCategory })}>
@@ -152,14 +157,14 @@ function Groups(props: { count: (id: SettingsCategory) => number }) {
 
 /** One group's pages, each marked with what it affects and, when this host does not draw it, that it
  *  opens in the desktop app. Listed either way, so the route is the whole map of settings. */
-function Pages(props: { category: SettingsCategory; pages: readonly SettingsContribution[]; nodeId: string }) {
+function Pages(props: { category: SettingsCategory; pages: readonly SettingsContribution[]; nodeId: string; label: string; mode?: WorkspacesMode }) {
   const items = () => props.pages.map((page) => ({ key: page.id, label: page.title ?? page.label, page }))
   return (
     <Show when={items().length} fallback={<Line role="muted">No pages in this group on this node.</Line>}>
-      <Rows id={`settings.pages.${props.category}`} ariaLabel={SETTINGS_CATEGORY_LABELS[props.category]} items={items()}
+      <Rows id={`settings.pages.${props.category}`} ariaLabel={props.label} items={items()}
         onActivate={(key) => setSettingsPlace({ category: props.category, pageId: key })}>
         {(entry, item) => (
-          <Row item={item} meta={drawnElsewhere(entry.page) ? `${scopeText(entry.page, props.nodeId)} · desktop app` : scopeText(entry.page, props.nodeId)}>
+          <Row item={item} meta={drawnElsewhere(entry.page, props.mode) ? `${scopeText(entry.page, props.nodeId)} · desktop app` : scopeText(entry.page, props.nodeId)}>
             {entry.label}
           </Row>
         )}
@@ -174,9 +179,10 @@ function PageView(props: {
   page: SettingsContribution
   nodeId: string
   onSetup: () => void
+  mode?: WorkspacesMode
   children: JSX.Element
 }) {
-  const elsewhere = drawnElsewhere(props.page)
+  const elsewhere = () => drawnElsewhere(props.page, props.mode)
   return (
     <box flexDirection="column" flexGrow={1} minHeight={0}>
       <box flexDirection="row" gap={2} flexShrink={0}>
@@ -185,14 +191,14 @@ function PageView(props: {
       </box>
       <ScrollViewport>
         <PanelBody name={props.page.label} nodeId={props.nodeId}>
-          {elsewhere ? <Elsewhere info={elsewhere} onSetup={props.onSetup} /> : props.children}
+          {elsewhere() ? <Elsewhere info={elsewhere()!} mode={props.mode} onSetup={props.onSetup} /> : props.children}
         </PanelBody>
       </ScrollViewport>
     </box>
   )
 }
 
-function Elsewhere(props: { info: DrawnElsewhere; onSetup: () => void }) {
+function Elsewhere(props: { info: DrawnElsewhere; mode?: WorkspacesMode; onSetup: () => void }) {
   return (
     <box flexDirection="column" rowGap={1} flexShrink={0}>
       <Line role="strong" wrap>This page opens in the desktop app.</Line>
@@ -200,7 +206,7 @@ function Elsewhere(props: { info: DrawnElsewhere; onSetup: () => void }) {
       <Line wrap>{props.info.where}</Line>
       <Show when={props.info.file}>{(file) => <Line role="muted" wrap>{`This terminal reads the same settings from ${file()}.`}</Line>}</Show>
       <Show when={props.info.setup}>
-        <Line wrap>Set up acorn adds a workspace, a project, or a task from this terminal.</Line>
+        <Line wrap>Set up acorn adds {props.mode === 'off' ? 'a project or task' : 'a workspace, project, or task'} from this terminal.</Line>
         <Button onPress={props.onSetup}>Set up acorn</Button>
       </Show>
     </box>

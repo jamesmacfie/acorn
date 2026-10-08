@@ -18,7 +18,7 @@ function dimension(value, label) {
 }
 
 function parseArgs(argv) {
-  const options = { session: null, reuse: false, cols: 80, rows: 24, dataDir: null, keyboard: 'kitty', build: true }
+  const options = { session: null, reuse: false, cols: 80, rows: 24, dataDir: null, keyboard: 'kitty', build: true, link: null }
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index]
     if (arg === '--') continue
@@ -28,6 +28,7 @@ function parseArgs(argv) {
     else if (arg === '--rows') options.rows = dimension(argv[++index], 'Rows')
     else if (arg === '--data-dir') options.dataDir = argv[++index] ?? ''
     else if (arg === '--keyboard') options.keyboard = argv[++index] ?? ''
+    else if (arg === '--link') options.link = argv[++index] ?? ''
     else if (arg === '--no-build') options.build = false
     else throw new Error(`Unknown option: ${arg}`)
   }
@@ -121,7 +122,7 @@ async function main() {
     screen = createScreen(options.cols, options.rows)
     log = createWriteStream(join(directory, 'logs', 'tui.ansi'), { flags: 'a', mode: 0o600 })
     trace = createWriteStream(join(directory, 'logs', 'input.jsonl'), { flags: 'a', mode: 0o600 })
-    app = pty.spawn(process.execPath, [join(tuiRoot, 'dist', 'main.js')], {
+    app = pty.spawn(process.execPath, [join(tuiRoot, 'dist', 'main.js'), ...(options.link ? ['--link', options.link] : [])], {
       name: 'xterm-256color', cols: options.cols, rows: options.rows, cwd: tuiRoot,
       env: {
         ...process.env,

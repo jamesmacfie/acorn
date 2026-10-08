@@ -6,6 +6,7 @@ import type { AgentDriverRegistry } from '../drivers/registry'
 import type { PluginTelemetry } from '@acorn/plugin-api/node'
 import type { AgentStartupPhase, MeasureAgentStartup } from '../drivers/startupTelemetry'
 import type { SkillReport, SkillStart } from '../drivers/skillIndex'
+import { sessionAttendance } from './attendance'
 
 export type ProviderGeneration = Readonly<{ sessionId: string; number: number }>
 
@@ -259,11 +260,14 @@ export class ProviderSessionLifecycle {
       live.skills = skills
       live.skillsOwed = true
       const loopHooks = live.driver.loopHooks ? await read(() => this.ports.loopHooks(session)) : null
+      const { attendanceInstructions } = await import('./attendanceInstructions')
+      const instructions = attendanceInstructions(sessionAttendance(session))
       signal.throwIfAborted()
       const launch = (measureStartup?: MeasureAgentStartup) => live.driver.start({
         cwd, env, mcpServers: mcp.servers, skillFolders: skills.folders, skillPlugins: skills.plugins,
         ...(loopHooks ? { loopHooks } : {}),
         noProviderExecutionHistory, signal, session, measureStartup,
+        ...(instructions ? { attendanceInstructions: instructions } : {}),
         onEvent: (event) => this.callback(live, () => {
           if (event.type === 'session_metadata') {
             for (const item of [...event.commands ?? [], ...event.skills ?? []]) live.advertised.add(item.name)

@@ -42,7 +42,10 @@ const modulesPath = resolve(clientDir, '../renderer-modules.json')
 // `floor` is a lower bound, not a target. A startup set that small means the check is reading the
 // wrong graph, which is how it went blind in September, so it fails the build rather than passes it.
 const limits = {
-  scripts: 760_000,
+  // 2026-10-07: 768,478 B with workspace identity in the topbar and dropdown. Their shared
+  // validation, tile, and authenticated image resource are core chrome; editing and the optional
+  // rail stay lazy. Allow 775 KB for this feature, keeping the existing denylist and style limit.
+  scripts: 775_000,
   styles: 200_000,
   floor: 100_000,
 }

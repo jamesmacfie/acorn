@@ -37,7 +37,7 @@ export function validateQueryTemplate(content: QueryContent, description: DataSo
       if (address.name === 'viewer') {
         if (!description.operations.identity || !description.fields.some(field => field.viewerMatch === address.pointer)) throw new Error('Source does not declare this viewer identity field')
       } else if (address.name === 'workspaceLinks') {
-        if (expected.type !== 'array' || expected.items?.type !== 'string') throw new Error('Workspace links require a string-list parameter')
+        if (expected.type !== 'array' || expected.items?.type !== 'string') throw new Error('Linked projects require a string-list parameter')
       } else if (expected.type !== 'number' && expected.type !== 'string') throw new Error('Time context requires a datetime field')
       return
     }

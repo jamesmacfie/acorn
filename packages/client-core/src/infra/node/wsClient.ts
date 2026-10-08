@@ -7,7 +7,7 @@
 //
 // Dispatch is a prefix registry (wsChannels.ts). Core handles the generic `term:status` chrome
 // invalidation and workflow notices; Terminal registers the PTY `term:` payload handler.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame } from '@acorn/protocol/notices.ts'
 import { type WsClientFrame, type WsServerFrame, type WsSendOptions } from '@acorn/protocol/ws.ts'
 import { nodeTransport } from '../platform'
@@ -33,8 +33,10 @@ type StepChangedCb = (event: { runId: string; stepId: string; status: string }) 
 
 const statusSubs = new Set<StatusCb>()
 const pluginsSubs = new Set<() => void>()
-// Plugin lifecycle is fleet control data. Keep its source before the ordinary active-node stream
+// Plugin and workspace identity are fleet control data. Keep their source before the active-node stream
 // filter, without widening task, terminal, or other application subscriptions.
+const fleetWorkspaceSubs = new Set<(nodeId: string, event: WorkspaceChangedEvent) => void>()
+const fleetWorkspacesModeSubs = new Set<(nodeId: string, event: WorkspacesModeChangedEvent) => void>()
 const fleetPluginsSubs = new Set<(nodeId: string) => void>()
 const tasksSubs = new Set<(event: TaskChangedEvent) => void>()
 const connectionSubs = new Set<(event: ConnectionChangedEvent) => void>()
@@ -47,6 +49,7 @@ type NodeEventMap = {
   'agent-session:changed': AgentSessionChangedEvent
   'project:changed': ProjectChangedEvent
   'workspace:changed': WorkspaceChangedEvent
+  'workspaces-mode:changed': WorkspacesModeChangedEvent
   'workspace-projects:changed': WorkspaceProjectsChangedEvent
   'worktree:status-changed': WorktreeStatusChangedEvent
 }
@@ -113,6 +116,14 @@ function connect(): void {
   transport.onFrame((nodeId, raw) => {
     if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'plugins:changed') {
       for (const cb of fleetPluginsSubs) cb(nodeId)
+    }
+    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspace:changed' && typeof (raw as WorkspaceChangedEvent).workspaceId === 'string') {
+      for (const cb of fleetWorkspaceSubs) cb(nodeId, raw as WorkspaceChangedEvent)
+    }
+    if (raw && typeof raw === 'object' && (raw as { channel?: unknown }).channel === 'workspaces-mode:changed') {
+      const { mode } = raw as WorkspacesModeChangedEvent
+      if (mode !== 'on' && mode !== 'off') return
+      for (const cb of fleetWorkspacesModeSubs) cb(nodeId, { mode })
     }
     if (nodeId !== activeNodeId()) return
     dispatch(raw)
@@ -203,7 +214,7 @@ registerWsChannel('connection', (frame) => {
 // colon, and the frame minus `channel` is the payload. Not narrowed field by field
 // like `connection` above: the frame came from this node over the authenticated socket, and a
 // subscriber that needs a field checked does it once at the point of use.
-for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'worktree']) {
+for (const prefix of ['head', 'run', 'agent-session', 'project', 'workspace', 'workspace-projects', 'workspaces-mode', 'worktree']) {
   registerWsChannel(prefix, (frame) => {
     const { channel, ...event } = frame
     nodeEventSubs.get(channel as keyof NodeEventMap)?.forEach((cb) => cb(event as never))
@@ -240,6 +251,8 @@ export function _resetWsClient(): void {
   statusSubs.clear()
   pluginsSubs.clear()
   fleetPluginsSubs.clear()
+  fleetWorkspaceSubs.clear()
+  fleetWorkspacesModeSubs.clear()
   tasksSubs.clear()
   connectionSubs.clear()
   nodeEventSubs.clear()
@@ -263,6 +276,20 @@ export function wsOnPluginsChanged(cb: () => void): () => void {
   pluginsSubs.add(cb)
   connect()
   return () => void pluginsSubs.delete(cb)
+}
+
+/** Workspace identity changes from any paired Node, carrying the authenticated source id. */
+export function wsOnFleetWorkspaceChanged(cb: (nodeId: string, event: WorkspaceChangedEvent) => void): () => void {
+  fleetWorkspaceSubs.add(cb)
+  connect()
+  return () => void fleetWorkspaceSubs.delete(cb)
+}
+
+/** Grouping changes from any paired Node, including one whose fleet picker is still mounted. */
+export function wsOnFleetWorkspacesModeChanged(cb: (nodeId: string, event: WorkspacesModeChangedEvent) => void): () => void {
+  fleetWorkspacesModeSubs.add(cb)
+  connect()
+  return () => void fleetWorkspacesModeSubs.delete(cb)
 }
 
 /** A content-free plugin change from any paired node, carrying the broker's authenticated source id. */

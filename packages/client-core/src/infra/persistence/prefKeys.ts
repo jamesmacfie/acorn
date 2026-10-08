@@ -36,6 +36,7 @@ export const PrefKeys = {
   // (features/tabs/railVisibility.ts). Apart from `rail_order` so a drag and a switch never overwrite
   // each other's write, and the device's for the same reason `rail_order` is.
   railVisibility: 'rail_visibility',
+  workspaceRail: 'workspace_rail',
   leftCollapsed: 'left_collapsed',
   terminalRailDefault: 'term_rail_default',
   terminalHeight: 'term_height',

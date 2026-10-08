@@ -3,7 +3,7 @@ import { makeTestDb, makeTestPluginDb, schema, validatePluginConfig, type TestDb
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { createTaskService } from '@acorn/plugin-api/testkit'
-import { createProjectService } from '@acorn/plugin-api/testkit'
+import { createProjectService, memoryIdentityStore } from '@acorn/plugin-api/testkit'
 import type { GenerateTextRequest, ModelService } from '@acorn/plugin-api/testkit'
 import { ProviderOperationError } from '@acorn/plugin-api/testkit'
 import type { Principal } from '@acorn/plugin-api/testkit'
@@ -70,7 +70,7 @@ const fixture = (): Fixture => {
         items: () => { throw new Error('database has no provider') },
       },
     }
-    const services = { tasks: createTaskService(core.db), projects: createProjectService(core.db), models: { generateText, available } }
+    const services = { tasks: createTaskService(core.db), projects: createProjectService(core.db, memoryIdentityStore(caller.userId)), models: { generateText, available } }
     return createDatabaseFetch(plugin.db, services, bridge)(new Request(`http://acorn.test${path}`, init), context)
   }
   return {

@@ -1,5 +1,5 @@
 import { Portal } from 'solid-js/web'
-import { createResource, createSignal, onMount, Show, type JSX } from 'solid-js'
+import { createResource, createSignal, onCleanup, onMount, Show, type JSX } from 'solid-js'
 import { useParams } from '@solidjs/router'
 import { createQuery } from '@tanstack/solid-query'
 import type { Task, TaskSeed } from '@acorn/protocol/api.ts'
@@ -12,6 +12,7 @@ import { Alert, Button, Checkbox, Field, Input, Select, ToolbarSpacer } from '..
 import { Inline } from '../../kit/components/layout/Inline'
 import { taskBridge } from '../tasks/taskBridge'
 import { defaultBranchForTask } from '../tasks/defaultBranch'
+import { activeNodeId } from '../../infra/node/activeNode'
 
 /** A feature-owned action rendered and run after the source has made or attached a task. */
 export type PromoteTaskAction = {
@@ -39,6 +40,10 @@ export function PromoteToTaskModal(props: {
   onCreated: (task: Task) => void
   onAttached: (task: Task) => void
 }) {
+  const nodeId = activeNodeId()
+  let live = true
+  onCleanup(() => { live = false })
+  const ownsPromotion = () => live && activeNodeId() === nodeId
   const params = useParams()
   const projects = createQuery(() => projectsOptions(true))
   const project = () => projects.data?.find((candidate) => candidate.id === params.projectId)
@@ -59,6 +64,7 @@ export function PromoteToTaskModal(props: {
 
   const [mode, setMode] = createSignal<'new' | 'attach'>('new')
   const [title, setTitle] = createSignal('')
+  const [titleTouched, setTitleTouched] = createSignal(false)
   const [branch, setBranch] = createSignal('')
   const [branchTouched, setBranchTouched] = createSignal(false)
   const [skipSetup, setSkipSetup] = createSignal(false)
@@ -70,25 +76,28 @@ export function PromoteToTaskModal(props: {
   const [prepared, setPrepared] = createSignal<{ mode: 'new' | 'attach'; task: Task; linked: boolean } | null>(null)
 
   const finish = async (task: Task, done: (task: Task) => void): Promise<void> => {
+    if (!ownsPromotion()) return
     try {
       await props.action?.onTaskReady(task)
     } catch (err) {
+      if (!ownsPromotion()) return
       setError(err instanceof Error ? err.message : 'The task is ready, but the action failed.')
       setBusy(false)
       return
     }
-    done(task)
+    if (ownsPromotion()) done(task)
   }
 
   // Prefill title/branch from the provider's own seed derivation (branch omitted so it derives a
-  // default). Both current providers are synchronous; resolve defensively in case one isn't.
+  // default). A source may need read-only metadata before it can return that seed.
   onMount(() => {
     const projectId = params.projectId
     if (!projectId) return
     void Promise.resolve(promotion().prepare(props.item, { projectId, owner: github()?.owner ?? '', repo: github()?.name ?? '', branch: '', existingBranches: props.existingBranches }))
       .then((seed) => {
-        setTitle(seed.title ?? '')
-        setBranch(seed.branch ?? '')
+        if (!ownsPromotion()) return
+        if (!titleTouched()) setTitle(seed.title ?? '')
+        if (!branchTouched()) setBranch(seed.branch ?? '')
       })
       .catch(() => {})
   })
@@ -113,7 +122,7 @@ export function PromoteToTaskModal(props: {
     const projectId = params.projectId
     const isGitProject = project()?.vcs === 'git'
     const b = effectiveBranch()
-    if (!projectId || (props.action && !props.action.ready())) return
+    if (!ownsPromotion() || !projectId || (props.action && !props.action.ready())) return
     const retry = prepared()
     if ((!retry && (!title().trim() || (isGitProject && !b))) || (retry && retry.mode !== 'new')) return
     setBusy(true)
@@ -123,20 +132,24 @@ export function PromoteToTaskModal(props: {
       let current = retry
       if (!current) {
         const base = await Promise.resolve(promotion().prepare(props.item, context))
+        if (!ownsPromotion()) return
         const seed: TaskSeed = isGitProject
           ? { ...base, title: title().trim(), branch: b, skipSetup: skipSetup() }
           : { ...base, title: title().trim(), branch: undefined }
         const task = await promotion().create(seed)
+        if (!ownsPromotion()) return
         current = { mode: 'new', task, linked: false }
         setPrepared(current)
       }
       if (!current.linked) {
         await promotion().afterCreate?.(current.task, props.item, context)
+        if (!ownsPromotion()) return
         current = { ...current, linked: true }
         setPrepared(current)
       }
       await finish(current.task, props.onCreated)
     } catch (err) {
+      if (!ownsPromotion()) return
       setError(err instanceof Error ? err.message : 'Could not create the task.')
       setBusy(false)
     }
@@ -146,7 +159,7 @@ export function PromoteToTaskModal(props: {
     e.preventDefault()
     const attach = promotion().attachToCurrentTask
     const task = props.attachTasks.find((t) => t.id === attachId())
-    if (props.action && !props.action.ready()) return
+    if (!ownsPromotion() || (props.action && !props.action.ready())) return
     const retry = prepared()
     if ((!retry && (!attach || !task)) || (retry && retry.mode !== 'attach')) return
     setBusy(true)
@@ -154,10 +167,12 @@ export function PromoteToTaskModal(props: {
     try {
       if (!retry) {
         await attach!(task!.id, props.item)
+        if (!ownsPromotion()) return
         setPrepared({ mode: 'attach', task: task!, linked: true })
       }
       await finish((retry?.task ?? task)!, props.onAttached)
     } catch (err) {
+      if (!ownsPromotion()) return
       setError(err instanceof Error ? err.message : 'Could not attach to the task.')
       setBusy(false)
     }
@@ -191,7 +206,10 @@ export function PromoteToTaskModal(props: {
             <form id="promote-panel-new" role="tabpanel" class="integration-key-row" style={formStyle} onSubmit={submitNew}>
               <p class="muted">New task in {project()?.name ?? 'this project'}.</p>
               <Field label="Title">
-                <Input value={title()} disabled={!!prepared()} onInput={(value) => setTitle(value)} />
+                <Input value={title()} disabled={!!prepared()} onInput={(value) => {
+                  setTitleTouched(true)
+                  setTitle(value)
+                }} />
               </Field>
               <Show when={project()?.vcs === 'git'}>
                 <Field label="Branch">

@@ -69,6 +69,28 @@ for both worker compute and stored data. Fly Machines is the first provider to t
 VMs and other hosts kept as comparison candidates. Reconsider Sprites if placement support changes.
 [Fly Sprites regional answer](https://community.fly.io/t/wheres-my-sprite-in-the-world/28621).
 
+## No customer-owned compute in the first release
+
+A team could keep Acorn's control plane but run its workers in its own cloud account, with its own
+provider credentials. That brings two real benefits. Workers can reach the team's VPN and internal
+services the way a laptop can, and data residency follows the customer's own account. It is still
+out of the first release, because it multiplies the provider matrix that pause, snapshots, egress,
+Docker, and isolation must be tested against, and because Acorn cannot meter compute it does not pay
+for.
+
+When a team needs it, prefer a provisioner agent the customer runs in its own account. The agent
+connects out to the account service and creates machines when asked, like a self-hosted CI runner.
+Acorn never holds the customer's cloud credential. Holding that credential in Acorn's provisioner
+instead is simpler, but it puts a key that can create and destroy machines in the customer's account
+inside Acorn's control plane, and many security reviews refuse that. Daytona's custom regions and
+E2B's bring-your-own-cloud offering already work the agent way.
+
+Each customer provider must declare its capabilities, as
+[the provider interface](./hosting-and-cost.md#the-provider-interface) describes. A provider that
+cannot isolate task processes fails closed under [team policy](./isolation.md#team-policy). Billing
+becomes a platform fee, and budgets need the provider's own usage reporting. Revisit after phase 11,
+or earlier if a paying team requires it.
+
 ## No automatic account merge by email
 
 GitHub is the first sign-in provider, but the Acorn user ID is independent of GitHub. A person

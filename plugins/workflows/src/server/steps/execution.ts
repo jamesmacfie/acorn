@@ -6,7 +6,7 @@ import { parseDataValue } from '@acorn/protocol/dataValues.ts'
 import { declaredOutputSchema } from '../../shared/gateForm'
 import { stepKindPluginId, unavailableStepKindMessage } from '../../shared/stepKindAvailability'
 import * as schema from '../../node/schema'
-import type { StepHandlerContext, StepHandlerOutcome, WorkflowDef, WorkflowRunRow, WorkflowStepDef, WorkflowStepRow, StepKindContribution } from '../../shared/workflowContracts'
+import type { StepHandlerContext, StepHandlerOutcome, WorkflowDef, WorkflowPosture, WorkflowRunRow, WorkflowStepDef, WorkflowStepRow, StepKindContribution } from '../../shared/workflowContracts'
 import { rowIdentity, stepIdentity } from '../../shared/workflowIdentity'
 import { predecessorValues, WORKFLOW_VALUE_BYTES } from '../validation/values'
 import { frozenWorkflowInputs, renderWith, renderWorkflowPrompt, stepOutput } from '../validation/definition'
@@ -19,6 +19,10 @@ import type { WorkflowRunState } from '../runs/state'
 
 export const MAX_CONCURRENT_HEADLESS = 4
 const now = () => Date.now()
+const workflowPosture = (value: string): WorkflowPosture => {
+  if (value === 'gated' || value === 'autonomous') return value
+  throw new Error(`Unknown workflow posture: ${value}`)
+}
 const minDefined = (...values: Array<number | undefined>): number | undefined => {
   const defined = values.filter((value): value is number => value != null)
   return defined.length ? Math.min(...defined) : undefined
@@ -345,6 +349,7 @@ export class WorkflowStepExecution {
           profileId: def.profileId ?? DEFAULT_PROFILE_ID,
           workflowRunId: ctx.run.id,
           workflowStepId: ctx.step.id,
+          posture: workflowPosture(ctx.run.posture),
           managedSessionId: ctx.step.agentSessionId ?? undefined,
           ...(sessionTitle ? { sessionTitle } : {}),
           requireManagedSession: ctx.run.trigger === 'agent-map',

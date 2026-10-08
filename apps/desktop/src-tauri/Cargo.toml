@@ -30,7 +30,8 @@ tauri-build = { version = "2", features = [] }
 tauri = { version = "2", features = ["unstable", "macos-private-api"] }
 tauri-plugin-dialog = "2"
 tauri-plugin-opener = "2"
-tauri-plugin-single-instance = "2"
+tauri-plugin-single-instance = { version = "2", features = ["deep-link"] }
+tauri-plugin-deep-link = "2"
 tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 # The file dialogs base64 their bytes across the Tauri channel (src/commands.rs).
 base64 = "0.22"

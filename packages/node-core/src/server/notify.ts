@@ -1,6 +1,6 @@
 // Renderer broadcasts shared by the main-process surfaces. They go over the authenticated WebSocket
 // hub and do nothing when no socket is connected.
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent, WorktreeStatusChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { NoticeFrame, PluginNotice } from '@acorn/protocol/notices.ts'
 import { wsBroadcast } from './transport/wsHub'
 import { clearDashboardReadCache } from './dashboards/readCache'
@@ -113,6 +113,11 @@ export function broadcastTasksChanged(event: TaskChangedEvent): void {
 // the event. Keeping them separate avoids making a rename invalidate every provider mapping.
 export function broadcastWorkspaceChanged(event: WorkspaceChangedEvent): void {
   wsBroadcast({ channel: 'workspace:changed', ...event })
+}
+
+// Grouping changes the rules and wording for every workspace without changing a workspace row.
+export function broadcastWorkspacesModeChanged(event: WorkspacesModeChangedEvent): void {
+  wsBroadcast({ channel: 'workspaces-mode:changed', ...event })
 }
 
 export function broadcastWorkspaceProjectsChanged(event: WorkspaceProjectsChangedEvent): void {

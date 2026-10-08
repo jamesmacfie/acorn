@@ -79,7 +79,7 @@ describe('notes agent tools', () => {
   })
 
   it('turns a task with no workspace into a tool error rather than a 500', async () => {
-    await expect(byName('notes_list').handler({ scope: 'workspace' }, { ...ctx, taskId: 'task-orphan' })).rejects.toThrow(/no workspace/)
+    await expect(byName('notes_list').handler({ scope: 'workspace' }, { ...ctx, taskId: 'task-orphan' })).rejects.toThrow(/no note scope/)
   })
 
   it('reports a missing note as not_found', async () => {

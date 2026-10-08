@@ -13,14 +13,28 @@ pick a folder and add it to the active workspace (`addProjectFromFolder`). The t
 through the `addProject` verb, gated by `canAddProject`, so a replacement topbar can offer the same
 thing. If the folder belongs to a project in another workspace, the action names that workspace
 and directs you to Settings → Overview to move it. Changing Nodes while the picker is open cancels
-the add. The `Default` workspace doesn't exist until the first project needs it:
-`createProject` and `createProjectRef` fall back to it when no workspace is named.
+the add. With workspaces on, `createProject` and `createProjectRef` use `Default` when no workspace
+is named. With workspaces off, the Node creates a workspace named after each project in the same
+transaction and publishes `workspace:changed` after commit. An explicit workspace returns 409
+`workspaces_off`.
+
+When a Node has no projects and the first-run wizard is closed, the desktop shows **Add a project**
+under the topbar. Settings remains available. This screen and Settings → Overview share the same
+folder and importer controls. They omit `workspaceId` in both modes, so the Node applies its mode
+rule. After an add from the empty screen, the desktop opens the returned project ID. An importer
+reports its project IDs to the host; the host selects a reported ID present in the refreshed list.
+The desktop keeps the pending navigation alive if that refresh removes the empty screen, and drops
+it if the active Node or route changes before completion.
+For a remote Node, enter an absolute folder path on that Node. The native folder picker selects a
+path on the desktop machine and is unavailable for remote project creation. Importer contributions
+remain listed; the GitHub importer refuses its picker action for a remote Node, because that action
+would send a desktop path to the Node.
 
 The Node detects a checkout's GitHub identity from its `origin` remote. It accepts HTTPS, SSH,
 and scp forms, including `git@github.com:Owner/repo` and `git@github.com:/Owner/repo`, with an
 optional `.git` suffix. HTTPS and SSH URLs require a single slash after the host.
 
-The CLI registers a local folder only with an explicit workspace and an absolute path on the Node's
+The CLI registers a local folder with an absolute path on the Node's
 machine. Core compares the resolved path with registered project paths, so a symlink or `..` alias
 reuses the project ID it finds. The row keeps the path as first registered.
 [Command-line client](../cli.md) has the commands.
@@ -35,10 +49,18 @@ bar that moves them to a workspace, hides or shows them, or sets their color. Th
 option creates a workspace. A row opens its project's settings page, which holds the name, folder,
 color, workspace, visibility, and [project configuration](./project-config.md).
 
-A workspace's own page renames and deletes it. The default workspace can't be renamed or deleted,
+A workspace's own page edits its [icon](./workspace-icons.md), renames it, and deletes it. The default workspace can't be renamed or deleted,
 because a deleted workspace's projects move there. A project whose workspace has vanished shows under
 `Unassigned`, so you can rescue it. [Frontend](../frontend/settings-groups.md) § Workspaces and
 projects has the pages.
+
+With workspaces off, the Node refuses workspace create, rename, and delete, and project moves to
+another workspace with 409 `workspaces_off`. Renaming a project renames its workspace. Bootstrap
+lists workspaces without creating `Default`.
+
+Appearance-only updates to a paired workspace remain available in separate mode. They preserve its
+name and project membership. Deleting the project also removes image bytes that no other workspace
+references.
 
 Drag a project's grip in Settings → Overview or a workspace's Projects table to reorder it within
 that workspace. The insertion line shows where it will land. You can also open the grip's menu and
@@ -65,23 +87,43 @@ the left of its rail tab. With no color there's no strip, and an active tab uses
 Deleting a project deletes its tasks and task links, because `tasks.project_id` has no foreign key,
 and leftover rows would be invisible in every rail and impossible to remove. The confirmation names
 the task count first. acorn doesn't touch the disk: the folder and any task worktrees stay. Moving or
-hiding a project changes only its core row.
+hiding a project changes only its core row. With workspaces off, deletion also removes the project's
+workspace, its external project links, and its datasets. Other workspace-scoped records remain,
+as with workspace deletion while workspaces are on.
 
 ## The first-run wizard
 
-A Node with no projects opens the first-run wizard in `plugins/onboarding`. Its steps are welcome,
-add projects by folder or from GitHub, name them and pick their workspaces, pick a model for text
-generation, and done. Everything it offers is also in Settings → Overview.
+A Node with no projects opens the first-run wizard in `plugins/onboarding`. After the welcome step,
+the **Layout** step asks whether to keep projects separate or group them into workspaces when
+`core.workspaces` is unset. Each choice shows a small picture of example projects arranged that
+way. Separate projects is the default choice. **Continue** saves the answer before the wizard adds a
+project. The step says, "Pick how acorn organizes your projects. You can group projects into
+workspaces later, but you can't separate them again." If the mode is already set when the wizard
+opens, it leaves the **Layout** step out. Going back to the step after answering shows the saved
+answer without offering another choice. The following steps add projects by folder or from GitHub,
+name them, pick a model for text generation, and finish.
+
+The saved separate answer says, "Your projects stay separate. You can group them into workspaces
+later in Settings." The grouped answer says, "Your projects are grouped into workspaces. You can't
+switch back to separate projects."
+
+On a separate-projects Node, open desktop **Settings** → **Projects** → **Overview**, then press
+**Group projects** twice to confirm. The control states that grouping can't be undone, disables
+while saving, and shows the Node's message if it fails. After success, the page and every open
+client use workspace wording. The section is absent on grouped Nodes. No project or workspace data
+moves. The terminal client follows the change but offers no grouping control.
 
 `shouldShowOnboarding` opens it when there are no projects and no `onboarded` preference. Finishing
-and skipping both write the preference, so the wizard opens once. Once open, `onboardingVisible`
+and skipping both write the preference, so the wizard opens once. Skipping before answering leaves
+`core.workspaces` unset; the Node chooses the mode when the first project is created. Once open, `onboardingVisible`
 keeps it open until it closes itself. The wizard's first step creates a project, so re-checking "no
 projects yet" on every render would unmount it mid-flow.
 
 The GitHub step takes a batch. The repository list stays put with a running tally of what you added,
-until you press **Done adding**. The naming step then shows a name field and a workspace picker for
-each project. The picker's last option creates a workspace, and a workspace you create appears in the
-next row's list.
+until you press **Done adding**. The naming step shows a name field for each project. With
+workspaces on, it also shows a workspace picker. The picker's last option creates a workspace, and
+a workspace you create appears in the next row's list. With workspaces off, the Node pairs each
+project with its own workspace and keeps its name in sync.
 
 The batch is the list of project IDs that `ProjectImporterProps.onImported` reports. An import can
 repair a path-less project instead of creating one, so diffing the project list would miss it.

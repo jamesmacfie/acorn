@@ -42,7 +42,15 @@ export type AgentDriverPermissionRequest = {
   respond(resolution: unknown): void
 }
 
-export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest
+/** A parked question or form. The callback remains available during provider startup too. */
+export type AgentDriverInputRequest = {
+  type: 'input_request'
+  request: Extract<AgentNormalizedEvent, { type: 'request' }>
+  open(): boolean
+  respond(resolution: unknown): void
+}
+
+export type AgentDriverEvent = AgentNormalizedEvent | AgentDriverGeneratedArtifact | AgentDriverPermissionRequest | AgentDriverInputRequest
 
 /**
  * An MCP server acorn asks the agent to connect to, for the session it is starting.
@@ -68,6 +76,8 @@ export type AgentDriverStartOptions = {
   /** Local startup timing only. This callback never crosses plugin RPC. */
   measureStartup?: MeasureAgentStartup
   session: AgentSession
+  /** Host-resolved bootstrap text for the provider's system or developer instruction channel. */
+  attendanceInstructions?: string
   cwd: string
   env: Record<string, string>
   /** acorn's own tool server for managed Codex or a harness without CLI registration (docs/mcp.md

@@ -2,7 +2,7 @@ import { dispatchLayout } from '../../../features/tasks/tasks'
 import type { NoteScope } from '@acorn/protocol/notes.ts'
 import type { ExternalRef } from '@acorn/protocol/integrations.ts'
 import { onScopeEvicted } from '../shell/scopeEviction'
-import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent } from '@acorn/protocol/nodeEvents.ts'
+import type { AgentSessionChangedEvent, ConnectionChangedEvent, HeadChangedEvent, ProjectChangedEvent, RunTargetChangedEvent, TaskChangedEvent, WorkspaceChangedEvent, WorkspaceProjectsChangedEvent, WorkspacesModeChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import { createLogger } from '../../../infra/telemetry/logger'
 
 const log = createLogger('client-event')
@@ -37,6 +37,7 @@ export type ClientEventMap = {
   // UiSlotContext's `openSettings`, so the request is an event rather than a prop threaded through
   // every pane that might ever need one.
   'presentation:open-settings': { tab: string }
+  'presentation:open-link': { href: string }
   // A surface-scoped plugin command, on its way to the frame region of a composed pane
   // (docs/editor/composed-panes.md § Communication between regions). Not retained like a pane intent:
   // an intent describes a destination the reader is being taken to, so it waits for the pane to
@@ -89,6 +90,7 @@ export type ClientEventMap = {
   'agent-session:changed': AgentSessionChangedEvent
   'project:changed': ProjectChangedEvent
   'workspace:changed': WorkspaceChangedEvent
+  'workspaces-mode:changed': WorkspacesModeChangedEvent
   'workspace-projects:changed': WorkspaceProjectsChangedEvent
 }
 

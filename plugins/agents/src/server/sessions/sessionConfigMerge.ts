@@ -5,7 +5,7 @@ const owns = (value: Record<string, unknown>, key: string): boolean =>
 
 // Written by admission or a dedicated authority operation, not generic provider configuration.
 const serverOwnedKeys = [
-  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent', 'standingContext',
+  'toolCeiling', 'mcpServers', 'workflowRunId', 'workflowStepId', 'delegationSpawnId', 'customAgent', 'standingContext', 'initialAttendance',
   // The skill names the agent was last told about, natively or in the index (../drivers/skillIndex.ts).
   'skillIndex',
 ] as const

@@ -55,10 +55,10 @@ describe('harness bridge calls', () => {
   })
   afterEach(async () => { await runtime.stop(); policy.cleanup(); agents.cleanup(); vi.restoreAllMocks() })
 
-  const start = async () => {
+  const start = async (posture?: 'autonomous') => {
     const session = await runtime.store.createSession({
-      taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {},
-    }, await new FakeAgentDriver().probe())
+      taskId: randomUUID(), providerId: 'fake', profileId: 'fake', kind: posture ? 'workflow' : 'interactive', config: {},
+    }, await new FakeAgentDriver().probe(), posture)
     await runtime.enqueueTurn(session.id, {
       input: [{ type: 'text', text: 'Push it.' }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
     })
@@ -127,6 +127,16 @@ describe('harness bridge calls', () => {
     await expect(allowed).resolves.toEqual({ version: LOOP_HOOK_VERSION, output: '' })
     expect(await runtime.store.request(session.id, second.providerRequestId)).toMatchObject({ status: 'resolved' })
   })
+
+  it('denies an autonomous plugin ask immediately without publishing a request', async () => {
+    handle(BEFORE_TOOL_HOOK.id, 'ask', async () => ({ ask: true, reason: 'Confirm this push.' }));
+    const { session, caller } = await start('autonomous');
+    const response = await runtime.loopHook(caller, pre());
+    expect(decision(response.output)).toMatchObject({ permissionDecision: 'deny', permissionDecisionReason: expect.stringContaining('This run is unattended') });
+    const snapshot = await runtime.store.snapshot(session.id);
+    expect(snapshot.requests).toEqual([]);
+    expect(snapshot.session.attention).not.toBe('permission');
+  });
 
   it('leaves the call to the harness when a handler throws or stalls', async () => {
     handle(BEFORE_TOOL_HOOK.id, 'veto', async () => { throw new Error('broken') })

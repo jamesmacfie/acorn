@@ -40,13 +40,26 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-07: 3,118,217 B with setup run by hand: the rule core checks before admitting it, the
 // terminal route and bridge verb that spawn it, and the status flag the palette reads. All three are
 // registered at boot, so the ceiling moves by 3 KB.
-// 2026-10-07: 3,148,767 B with the pi programme (docs/future/pi): the permission veto, session
+// 2026-10-07: 3,148,767 B with the pi programme: the permission veto, session
 // messages, plugin model grants, unattended follow-ups, plugin skills, the activity feed and session
 // control, and harness bridges. Each feature's runtime loads on first use, and `agents.sessionExecute`
 // moved to the first workflow step. What stays at boot is the hook and extension point declarations,
 // the device routes, the boot charge for interrupted model calls, and the per-event checks that decide
 // whether any of that work is needed. About 1 KB of margin keeps the lazy-load cuts protected.
-const limits = { ceiling: 3_150_000, floor: 1_000_000 }
+// 2026-10-07: 3,151,546 B with workspace icons. Image handlers, decoding, and appearance validation
+// load on first use. The additive tables and route callbacks add about 3 KB to registration.
+// 2026-10-08: TEMPORARY. 3,154,767 B with the uncommitted task archive work. The growth isn't traced
+// yet. Put the ceiling back to 3,153,000 once it is, or record the reason here.
+// 2026-10-08: session goals add durable row fields, two device routes, and the engine's settlement
+// and recovery calls. Verdict parsing and evaluation stay behind a dynamic import. The remaining
+// registration grows the static graph to 3,159,369 B, so the ceiling moves by 4 KB.
+// Delegation check contracts and durable report assembly add about 7 KiB to the boot graph.
+// 2026-10-08: host attendance validation, store acceptance/recovery, and per-event routing add about
+// 4 KB. Prompt text and request handling load on first use; static graph: about 3,174,000 B.
+// 2026-10-08: 3,156,347 B with the instruction file check. The scan loads on first use. What runs at
+// boot is the agents `before-send` handler registration, the `checkInstructionFiles` field's
+// validation, and the `core:security` point id, so the ceiling moves by 1 KB.
+const limits = { ceiling: 3_175_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

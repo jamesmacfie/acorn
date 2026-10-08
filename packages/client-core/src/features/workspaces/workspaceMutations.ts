@@ -1,6 +1,9 @@
 // Workspace and Project writes (docs/workspaces-and-tasks.md). Core owns these, and callers invalidate
 // the core workspace/project keys after mutations.
-import { postJson, writeJson } from '../../infra/node/apiClient'
+import { postJson, writeJson, sendForm } from '../../infra/node/apiClient'
+import type { PickedFile } from '../../infra/platform'
+import { clientFor } from '../../infra/node/fleet'
+import { workspaceIconUploadRoute, type WorkspaceAppearance, type WorkspaceImageCrop } from '@acorn/protocol/workspaceAppearance.ts'
 import {
   integrationMappingsRoute,
   type IntegrationMapping,
@@ -15,6 +18,7 @@ import {
   type WorkspaceProjectOrder,
   workspacesRoute,
   workspaceBootstrapRoute,
+  workspacesKey,
 } from '@acorn/protocol/api.ts'
 import type { Project, ProjectPatch, ProjectSeed } from '@acorn/protocol/api.ts'
 
@@ -50,7 +54,7 @@ export const createProject = (seed: ProjectSeed) => postJson<{ project: Project 
 export const patchProject = (id: string, patch: ProjectPatch) =>
   writeJson<{ project: Project }>(projectRoute(id), { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(patch) }, (res) => `project ${res.status}`)
 export const detectProject = (id: string) => postJson<{ project: Project }>(projectDetectRoute(id))
-// Takes the project's tasks with it (server/projects.ts). Folders and worktrees on disk are untouched.
+// Takes the project's tasks with it (server/projectDeletion.ts). Folders and worktrees on disk are untouched.
 export const deleteProject = (id: string) =>
   writeJson<{ ok: true }>(projectRoute(id), { method: 'DELETE' }, (res) => `project ${res.status}`)
 export const setProjectWorkspace = (id: string, workspaceId: string) => patchProject(id, { workspaceId })
@@ -62,6 +66,23 @@ export const setWorkspaceProjectOrder = (id: string, projectIds: string[]) => {
   }, (res) => `Could not save project order (${res.status}).`)
 }
 export const renameWorkspace = async (id: string, name: string) => patchWorkspace(id, { name })
+// The workspace event may already have started a shared fleet read. Join that read rather than
+// cancelling it: the fan-out otherwise settles on its previous cache while the mounted reader
+// gets the replacement response.
+async function appearanceWrite<T>(nodeId: string, write: Promise<T>): Promise<T> {
+  const result = await write
+  await clientFor(nodeId).client.invalidateQueries({ queryKey: workspacesKey }, { cancelRefetch: false })
+  return result
+}
+export const setWorkspaceAppearance = (id: string, appearance: WorkspaceAppearance | null, nodeId: string) =>
+  appearanceWrite(nodeId, writeJson<{ ok: true }>(workspaceRoute(id), {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ appearance }), nodeId,
+  }, 'Could not save the workspace icon. Try again.'))
+export const uploadWorkspaceImage = (id: string, file: PickedFile, crop: WorkspaceImageCrop, nodeId: string) =>
+  appearanceWrite(nodeId, sendForm<{ appearance: WorkspaceAppearance }>(workspaceIconUploadRoute(id), [
+    { name: 'image', filename: file.name, type: file.type, bytes: file.bytes.slice() },
+    { name: 'crop', value: JSON.stringify(crop) },
+  ], 'Could not save the workspace image. Try again.', { nodeId }))
 // Build/run/db/preview config and project colour are Project-scoped; edit them via the Project API.
 export const deleteWorkspace = async (id: string) =>
   writeJson<{ ok: true }>(workspaceRoute(id), { method: 'DELETE' }, (res) => `workspace ${res.status}`)

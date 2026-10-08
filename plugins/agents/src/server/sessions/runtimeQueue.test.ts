@@ -62,6 +62,39 @@ describe('durable queue admission', () => {
     input: [{ type: 'text', text }], source: 'interactive', effectivePolicy: {}, idempotencyKey: randomUUID(),
   })
 
+  it('pauses a goal when its active provider disconnects', async () => {
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(() => expect(sends).toHaveLength(1))
+    await starts[0]!.onClosed(new Error('Provider closed'))
+    expect((await runtime.store.turn(sends[0]!))?.status).toBe('interrupted')
+    expect((await runtime.store.requireSession(item.id)).goal?.status).toBe('paused')
+  })
+
+  it('blocks a goal when dispatch fails', async () => {
+    launch = async (options) => {
+      await options.onEvent({ type: 'session_state', state: 'ready' })
+      return { providerSessionRef: options.session.id, ready: true,
+        sendTurn: async () => { throw new Error('Dispatch failed') },
+        cancel: async () => {}, resolveRequest: async () => {}, stop: async () => {} }
+    }
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(async () => {
+      const goal = (await runtime.store.requireSession(item.id)).goal
+      expect(goal).toMatchObject({ status: 'blocked', verdict: { blocker: 'run_failed' } })
+    })
+  })
+
+  it('pauses a goal when the person cancels its active turn', async () => {
+    const item = await session()
+    await runtime.setGoal(item.id, 'Finish the task')
+    await vi.waitFor(() => expect(sends).toHaveLength(1))
+    await runtime.cancelTurn(item.id)
+    expect((await runtime.store.turn(sends[0]!))?.status).toBe('cancelled')
+    expect((await runtime.store.requireSession(item.id)).goal?.status).toBe('paused')
+  })
+
   it('acknowledges 20 public enqueues during startup and starts only admitted providers', async () => {
     const held = deferred<void>(), start = launch
     launch = async (options) => { await held.promise; return start(options) }

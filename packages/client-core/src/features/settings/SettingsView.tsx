@@ -14,7 +14,7 @@ import { pluginRosterKnown } from '../../infra/node/hostCapabilities'
 import { confirmAction } from '../../host/registries/shell/willPhase'
 import { buildSettingsIndex, searchSettings, type SettingsSearchObject, type SettingsSearchResult } from '../../host/registries/shell/settingsSearch'
 import {
-  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, projectSettingsTarget, resolveSettingsAlias, SETTINGS_CATEGORY_LABELS,
+  isStandaloneSettingsPage, parseSettingsTarget, PROJECT_SETTINGS_PREFIX, projectSettingsTarget, resolveSettingsAlias,
   settingsCategoryOf, settingsDetailPage, settingsPagesInOrder, settingsRegistry, settingsScopeOf, WORKSPACE_SETTINGS_PREFIX,
   workspaceSettingsTarget, type SettingsContribution, type SettingsNavigate, type SettingsPageContext,
 } from '../../host/registries/shell/settings'
@@ -28,6 +28,8 @@ import { IconButton } from '../../kit/components/inputs/IconButton'
 import Icon from '../../kit/components/content/Icon'
 import { Text } from '../../kit/components/content/Text'
 import { createAttentionInbox } from '../notifications/attentionInbox'
+import { createWorkspacesMode } from '../workspaces/workspacesMode'
+import { settingsCategoryLabel, settingsPageForMode } from './settingsPresentation'
 import { createUnsavedChanges, UnsavedChangesContext } from './unsavedChanges'
 import { createSettingsDetails, SettingsDetailContext } from './settingsDetail'
 import { PluginStrip } from './plugins/PluginStrip'
@@ -127,12 +129,19 @@ function landOnSection(page: () => HTMLElement | undefined, section: string): ()
   }
 }
 
-export default function SettingsView(props: { request: SettingsRequest; onClose: () => void }) {
+export default function SettingsView(props: {
+  request: SettingsRequest
+  onClose: () => void
+  onLinkPlace?: (link: { nodeId: string; place: { kind: 'settings'; pageId?: string; sectionId?: string } } | null) => void
+  onCopyLink?: () => void
+}) {
   const workspaces = createQuery(() => workspacesOptions(true))
   // Read for search only: their names are what someone types to find the page that holds them.
   const projects = createQuery(() => projectsOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
-  const pages = createMemo(() => settingsPagesInOrder())
+  const workspaceMode = createWorkspacesMode()
+  const categoryLabel = (category: SettingsCategory) => settingsCategoryLabel(category, workspaceMode())
+  const pages = createMemo(() => settingsPagesInOrder().map((page) => settingsPageForMode(page, workspaceMode())))
   const railPages = createMemo(() => pages().filter(isStandaloneSettingsPage))
   // The pages drawn for a workspace row and a project row (settingsDetailPage).
   const workspacePage = createMemo(() => settingsDetailPage(pages(), 'workspace'))
@@ -174,7 +183,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     if (selected.startsWith(WORKSPACE_SETTINGS_PREFIX)) {
       const page = workspacePage()
       const workspace = workspaceById(selected.slice(WORKSPACE_SETTINGS_PREFIX.length))
-      return page && workspace ? { page, category: 'workspaces', name: workspace.name, workspace } : undefined
+      return workspaceMode() === 'on' && page && workspace ? { page, category: 'workspaces', name: workspace.name, workspace } : undefined
     }
     if (selected.startsWith(PROJECT_SETTINGS_PREFIX)) {
       const page = projectPage()
@@ -195,7 +204,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     if (current()) return
     const first = railPages()[0]
     if (!first || !pluginRosterKnown()) return
-    if (selected.page.startsWith(WORKSPACE_SETTINGS_PREFIX) && workspaces.isLoading) return
+    if (selected.page.startsWith(WORKSPACE_SETTINGS_PREFIX) && (workspaces.isLoading || !workspaceMode())) return
     if (selected.page.startsWith(PROJECT_SETTINGS_PREFIX) && (projects.isLoading || workspaces.isLoading)) return
     setSelection({ page: first.id })
     if (selected.page) setStatus("This page isn't available any more.")
@@ -275,6 +284,9 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     // Workspaces follow Overview, the one page core files ahead of them, and each open workspace is
     // followed by its projects.
     if (category !== 'workspaces' || !workspacePage()) return [row]
+    if (workspaceMode() !== 'on') return [row, ...(workspaceMode() === 'off' && projectPage()
+      ? (projects.data ?? []).map((project): RailRow => ({ key: projectSettingsTarget(project.id), label: project.name, category, depth: 1 }))
+      : [])]
     return [row, ...(workspaces.data ?? []).flatMap((workspace): RailRow[] => {
       const members = projectPage() ? (projects.data ?? []).filter((project) => project.workspaceId === workspace.id) : []
       const open = members.length > 0 && expanded().has(workspace.id)
@@ -294,20 +306,21 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     const on = (id: string, names: readonly (string | { name: string; keywords: readonly string[] })[]): SettingsSearchObject[] => {
       const page = pageFor(id)
       if (!page) return []
-      const at = { page: id, pageLabel: page.title ?? page.label, group: SETTINGS_CATEGORY_LABELS[settingsCategoryOf(page)], scope: settingsScopeOf(page) }
+      const at = { page: id, pageLabel: page.title ?? page.label, group: categoryLabel(settingsCategoryOf(page)), scope: settingsScopeOf(page) }
       return names.map((name) => ({ ...at, ...(typeof name === 'string' ? { name } : name) }))
     }
-    const group = SETTINGS_CATEGORY_LABELS.workspaces
+    const group = categoryLabel('workspaces')
     // Every workspace and every project is a page of its own, whether or not the rail has it expanded,
     // so search finds a project's name and its sections inside a collapsed workspace too.
     return [
-      ...(workspacePage() ? (workspaces.data ?? []) : []).map((workspace): SettingsSearchObject => ({
+      ...(workspaceMode() === 'on' && workspacePage() ? (workspaces.data ?? []) : []).map((workspace): SettingsSearchObject => ({
         name: workspace.name, page: workspaceSettingsTarget(workspace.id), pageLabel: workspace.name,
         group, scope: 'workspace', isPage: true, sections: workspacePage()?.sections ?? [],
       })),
       ...(projectPage() ? (projects.data ?? []) : []).map((project): SettingsSearchObject => ({
         name: project.name, page: projectSettingsTarget(project.id), pageLabel: project.name,
-        group, scope: 'project', isPage: true, sections: projectPage()?.sections ?? [],
+        group, scope: 'project', isPage: true,
+        sections: projectPage()?.sections ?? [],
       })),
       // A connection's name opens its own page, on Services or AI models, whichever lists it.
       ...(integrations.data?.integrations ?? []).flatMap((connection) => {
@@ -320,7 +333,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
       ...on('plugins', (nodePlugins()?.plugins ?? []).map((plugin) => ({ name: pluginLabel(plugin), keywords: [plugin.name] }))),
     ]
   })
-  const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects()))
+  const index = createMemo(() => buildSettingsIndex(railPages(), searchObjects(), categoryLabel))
   // A section named like its page reads as the page, so the page's own result would be a second line
   // with the same words. The section's lands deeper, so it is the one kept.
   const matches = createMemo(() => {
@@ -343,6 +356,13 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
   // The node a page's body reads. The switcher's on a page that follows it, and the active node on every
   // other one, because a body bound to the ambient API client can read nothing else.
   const pageNode = () => (current()?.page.followsNodeSwitcher ? switchedNode() : activeNodeId())
+  createEffect(() => {
+    const nodeId = pageNode()
+    const selected = selection()
+    props.onLinkPlace?.(nodeId && current() ? {
+      nodeId, place: { kind: 'settings', pageId: selected.page, ...(selected.section ? { sectionId: selected.section } : {}) },
+    } : null)
+  })
 
   const context: SettingsPageContext = {
     get scope() {
@@ -378,7 +398,7 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     if (!resolved.project && !resolved.workspace) return undefined
     const toOverview = overview ? { label: overview.label, run: () => go({ page: overview.id }) } : undefined
     if (!resolved.project) return toOverview
-    if (cameFrom() === overview?.id || !resolved.workspace) return toOverview
+    if (workspaceMode() !== 'on' || cameFrom() === overview?.id || !resolved.workspace) return toOverview
     const workspace = resolved.workspace
     return { label: workspace.name, run: () => go({ page: workspaceSettingsTarget(workspace.id) }) }
   })
@@ -391,11 +411,11 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
     const resolved = current()
     if (!resolved) return []
     const overview = overviewPage()
-    const group: Crumb = { label: SETTINGS_CATEGORY_LABELS[resolved.category] }
+    const group: Crumb = { label: categoryLabel(resolved.category) }
     if (overview && (resolved.workspace || resolved.project)) Object.assign(group, { to: overview.label, run: () => go({ page: overview.id }) })
     const steps = [group]
     const workspace = resolved.workspace
-    if (resolved.project && workspace) {
+    if (workspaceMode() === 'on' && resolved.project && workspace) {
       steps.push({ label: workspace.name, to: workspace.name, run: () => go({ page: workspaceSettingsTarget(workspace.id) }) })
     }
     const open = detail()
@@ -582,8 +602,8 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
             fallback={
               <Index each={groups()}>
                 {(group) => (
-                  <div class="settings-rail-group" role="group" aria-label={SETTINGS_CATEGORY_LABELS[group().category]}>
-                    <div class="settings-rail-heading" aria-hidden="true">{SETTINGS_CATEGORY_LABELS[group().category]}</div>
+                  <div class="settings-rail-group" role="group" aria-label={categoryLabel(group().category)}>
+                    <div class="settings-rail-heading" aria-hidden="true">{categoryLabel(group().category)}</div>
                     <Index each={group().rows}>{railItem}</Index>
                   </div>
                 )}
@@ -657,6 +677,9 @@ export default function SettingsView(props: { request: SettingsRequest; onClose:
                   <div class="settings-title-line">
                     <h1 class="settings-title">{detail()?.title() ?? resolved().name}</h1>
                     <span class="settings-scopes">{scopeChip(resolved())}</span>
+                    <Show when={props.onCopyLink}>
+                      <IconButton icon="copy" label="Copy link" onPress={() => props.onCopyLink?.()} />
+                    </Show>
                     <span class="settings-close">
                       <IconButton icon="x" label="Close settings" tipKey="Esc" onPress={close} />
                     </span>

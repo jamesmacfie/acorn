@@ -48,7 +48,7 @@ export function helpFor(positionals: string[]): string {
     ]
     : section === 'project' ? [
       'project list [--workspace ID] [--include-hidden]|show ID',
-      'project add --workspace ID --path ABSOLUTE [--name NAME]',
+      'project add --path ABSOLUTE [--workspace ID] [--name NAME]',
       'project rename ID --name NAME|move ID --workspace ID|hide ID|unhide ID|detect ID|remove ID',
       'project config show ID|set ID --patch-file FILE|- (scripts follow Node trust rules)',
       'project remove deletes related tasks, but leaves folders and worktrees on disk',
@@ -63,7 +63,7 @@ export function helpFor(positionals: string[]): string {
       'a branch and created-trigger setup may prepare a worktree and execute project configuration',
     ]
     : section === 'agent' ? [
-      'agent providers|list [--task ID|--workspace ID]|show ID',
+      'agent providers|list [--task ID|--workspace ID|--project ID]|show ID',
       'agent start --task ID --profile ID [--provider ID] --prompt TEXT|--prompt-file FILE|- [--request-id UUID]',
       'agent send ID --prompt TEXT|--prompt-file FILE|- [--request-id UUID]',
       'agent events ID [--after-seq N] [--limit N] [--follow] [--output jsonl]',
@@ -74,7 +74,7 @@ export function helpFor(positionals: string[]): string {
       'workflow start --task ID --definition ID [--inputs-file FILE|-] [--request-id UUID]',
       'workflow run list --task ID|show ID|steps ID|wait ID [--until finished|attention] [--timeout SECONDS|30m] [--check]',
     ]
-    : section === 'run' ? ['run list [--workspace ID] (bounded recent summaries; use owner lists for history)']
+    : section === 'run' ? ['run list [--workspace ID|--project ID] (bounded recent summaries; use owner lists for history)']
     : section === 'plugin' ? ['plugin list|ID commands|ID COMMAND --input-file FILE|- [--request-id UUID]', 'plugin ID COMMAND --help']
     : section === 'node' ? ['node info', 'node start --background', 'node status', 'node stop [--force]']
     : ['node info|start|status|stop', 'workspace list|show|create|rename|remove|external-projects', 'project list|show|add|rename|move|hide|unhide|detect|remove|config', 'task list|show|create|scripts status|scripts wait|scripts logs', 'agent providers|list|show|start|send|events|wait', 'workflow list|start|run list|run show|run steps|run wait', 'run list', 'plugin list|ID commands|ID COMMAND']

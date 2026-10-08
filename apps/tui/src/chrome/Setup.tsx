@@ -1,10 +1,14 @@
 /** @jsxImportSource @acorn/tui/jsx */
-import { createEffect, createResource, createSignal, For, Show } from 'solid-js'
+import { createEffect, createResource, createSignal, For, onCleanup, Show } from 'solid-js'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
-import { integrationsKey, integrationsOptions, projectsKey, projectsOptions, tasksKey, workspacesKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
+import { integrationsKey, integrationsOptions, prefsOptions, projectsKey, projectsOptions, tasksKey, workspacesKey, type Project, type Task } from '@acorn/client-core/infra/queries.ts'
 import { createCredentialForm, createDeviceFlow } from '@acorn/client-core/features/integrations'
 import { createProject, createWorkspace } from '@acorn/client-core/features/workspaces'
+import { savePref } from '@acorn/client-core/features/settings/savePref.ts'
+import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
+import { WORKSPACES_PREF_KEY, workspacesMode, type WorkspacesMode } from '@acorn/protocol/workspacesMode.ts'
 import { createTask, taskBridge } from '@acorn/client-core/features/tasks'
+import { projectPath } from '@acorn/client-core/host/registries/commands'
 import { activateTaskSignals, pathForTask } from '@acorn/client-core/features/tasks/activate.ts'
 import { defaultBranchForTask } from '@acorn/client-core/features/tasks'
 import { isValidBranch, slugifyBranch } from '@acorn/protocol/branch.ts'
@@ -17,7 +21,7 @@ import { useNavigate } from '../kit/router'
 import { focusRegion } from '../keys/regions'
 import { PANES, TASKS } from './topology'
 
-export type SetupStep = 'workspace' | 'project' | 'task' | 'provider' | 'done'
+export type SetupStep = 'mode' | 'workspace' | 'project' | 'task' | 'provider' | 'done'
 
 /** The first-run and return-to-setup route. All writes go through the same client mutations as the
  * desktop. The only host choice here is asking for an absolute path instead of an OS folder picker. */
@@ -25,8 +29,24 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const client = useQueryClient()
   const navigate = useNavigate()
   const projects = createQuery(() => projectsOptions(true))
+  const prefs = createQuery(() => prefsOptions(true))
   const integrations = createQuery(() => integrationsOptions(true))
-  const [step, setStep] = createSignal<SetupStep>(props.initialStep ?? 'workspace')
+  const [step, setStep] = createSignal<SetupStep>(props.initialStep ?? 'mode')
+  const [choice, setChoice] = createSignal<WorkspacesMode>('off')
+  const [savedMode, setSavedMode] = createSignal<WorkspacesMode | undefined>()
+  const loadedProjects = () => projects.isSuccess && !projects.isFetching ? projects.data : undefined
+  const loadedPrefs = () => prefs.isSuccess && !prefs.isFetching ? prefs.data : undefined
+  const mode = () => {
+    const preferences = loadedPrefs()
+    const roster = loadedProjects()
+    return preferences && roster
+      ? workspacesMode(preferences[WORKSPACES_PREF_KEY] ?? savedMode(), roster.length)
+      : savedMode()
+  }
+  const nodeId = activeNodeId()
+  let disposed = false
+  onCleanup(() => { disposed = true })
+  const stillHere = () => !disposed && activeNodeId() === nodeId
   const [workspaceId, setWorkspaceId] = createSignal(props.model.workspace()?.id ?? '')
   const [projectId, setProjectId] = createSignal('')
   const [workspaceName, setWorkspaceName] = createSignal('')
@@ -40,6 +60,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const [error, setError] = createSignal('')
   const [result, setResult] = createSignal('')
   const [createdTask, setCreatedTask] = createSignal<Task | null>(null)
+  const [createdProjectId, setCreatedProjectId] = createSignal('')
   const [providerId, setProviderId] = createSignal('')
   const connectable = () => (integrations.data?.providers ?? []).filter((provider) =>
     provider.connection.connectable &&
@@ -49,14 +70,24 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const selectedProvider = () => connectable().find((provider) => provider.id === providerId()) ?? connectable()[0]
   const connected = async () => {
     await client.invalidateQueries({ queryKey: integrationsKey })
+    if (!stillHere()) return
     setResult(`${selectedProvider()?.label ?? 'Provider'} connected.`)
     setStep('done')
   }
   const credential = createCredentialForm(selectedProvider, connected)
   const deviceFlow = createDeviceFlow(() => selectedProvider()?.id, connected)
 
-  const inWorkspace = () => (projects.data ?? []).filter((project) => project.workspaceId === workspaceId())
+  const inWorkspace = () => mode() === 'off' ? projects.data ?? [] : (projects.data ?? []).filter((project) => project.workspaceId === workspaceId())
   const project = () => (projects.data ?? []).find((row) => row.id === projectId())
+  createEffect(() => {
+    const preferences = loadedPrefs()
+    const roster = loadedProjects()
+    if (busy() || !preferences || !roster) return
+    const needsAnswer = !preferences[WORKSPACES_PREF_KEY] && !roster.length && !savedMode()
+    if (needsAnswer && (step() === 'workspace' || step() === 'project')) setStep('mode')
+    else if (!needsAnswer && step() === 'mode') setStep(mode() === 'on' ? 'workspace' : 'project')
+    else if (step() === 'workspace' && mode() === 'off') setStep('project')
+  })
   createEffect(() => {
     if (!workspaceId() && props.model.workspaces().length) setWorkspaceId(props.model.workspace()?.id ?? props.model.workspaces()[0]!.id)
   })
@@ -64,8 +95,11 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     if (!inWorkspace().some((row) => row.id === projectId())) setProjectId(inWorkspace()[0]?.id ?? '')
   })
   createEffect(() => {
-    if (!projects.data) return
-    if (step() === 'task' && !inWorkspace().length) setStep(workspaceId() ? 'project' : 'workspace')
+    const roster = loadedProjects()
+    const preferences = loadedPrefs()
+    if (!roster || !preferences) return
+    if (step() === 'task' && !inWorkspace().length) setStep(!preferences[WORKSPACES_PREF_KEY] && !savedMode() && !roster.length
+      ? 'mode' : mode() === 'on' && !workspaceId() ? 'workspace' : 'project')
   })
 
   const [config] = createResource(() => projectId(), async (id) => id ? taskBridge().project.get(id).catch(() => null) : null)
@@ -78,15 +112,26 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     setBusy(true)
     setError('')
     try { await action() }
-    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)) }
-    finally { setBusy(false) }
+    catch (cause) { if (stillHere()) setError(cause instanceof Error ? cause.message : String(cause)) }
+    finally { if (stillHere()) setBusy(false) }
   }
+
+  const acceptMode = () => void run(async () => {
+    if (!loadedPrefs() || !loadedProjects()) throw new Error('Wait for this node to load, then try again.')
+    const selected = choice()
+    if (!await savePref(client, WORKSPACES_PREF_KEY, selected, { throwOnFailure: true })) return
+    if (!stillHere()) return
+    setSavedMode(selected)
+    setStep(selected === 'on' ? 'workspace' : 'project')
+  })
 
   const addWorkspace = () => void run(async () => {
     const name = workspaceName().trim()
     if (!name) throw new Error('Enter a workspace name.')
     const created = await createWorkspace(name)
+    if (!stillHere()) return
     await client.invalidateQueries({ queryKey: workspacesKey })
+    if (!stillHere()) return
     setWorkspaceId(created.id)
     props.model.chooseWorkspace(created.id)
     setWorkspaceName('')
@@ -97,12 +142,18 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const addProject = () => void run(async () => {
     const folder = path().trim()
     if (!folder) throw new Error('Enter an absolute folder path on this node.')
-    if (!workspaceId()) throw new Error('Choose or create a workspace first.')
-    const { project: created } = await createProject({ path: folder, workspaceId: workspaceId() })
+    if (!mode()) throw new Error('Wait for this node to load, then try again.')
+    if (!loadedPrefs()?.[WORKSPACES_PREF_KEY] && !savedMode() && !loadedProjects()?.length) throw new Error('Choose how to organize projects first.')
+    if (mode() === 'on' && !workspaceId()) throw new Error('Choose or create a workspace first.')
+    const { project: created } = await createProject({ path: folder, ...(mode() === 'on' ? { workspaceId: workspaceId() } : {}) })
+    if (!stillHere()) return
     await Promise.all([
       client.invalidateQueries({ queryKey: projectsKey }),
       client.invalidateQueries({ queryKey: workspacesKey }),
     ])
+    if (!stillHere()) return
+    props.model.chooseWorkspace(created.workspaceId)
+    setCreatedProjectId(created.id)
     setProjectId(created.id)
     setPath('')
     setResult(`Project ${created.name} added.`)
@@ -121,8 +172,10 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
     const task: Task = await createTask({
       origin: 'local', projectId: selected.id, title: name,
       ...(selected.vcs === 'git' && !useCurrentBranch() ? { branch: candidate, skipSetup: skipSetup() } : {}),
-    })
+    }, nodeId)
+    if (!stillHere()) return
     await client.invalidateQueries({ queryKey: tasksKey })
+    if (!stillHere()) return
     activateTaskSignals(task)
     navigate(pathForTask(task))
     setCreatedTask(task)
@@ -133,16 +186,18 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
   const selectedWorkspace = () => props.model.workspaces().find((row) => row.id === workspaceId())
   const projectOptions = () => inWorkspace().map((row: Project) => ({ value: row.id, label: `${row.name} · ${row.path ?? 'No folder'}` }))
   const close = () => {
+    if (!stillHere()) return
+    const task = createdTask()
+    const addedProject = createdProjectId()
     props.onClose()
     // Project and roster effects may still settle while setup is open. Make the newly created task
     // the final selection when the reader returns to the shell, through the same activation route as
     // the rail rather than leaving the prior browse source on screen.
-    const task = createdTask()
-    if (task) queueMicrotask(() => {
+    if (task) {
       activateTaskSignals(task)
       navigate(pathForTask(task))
-      queueMicrotask(() => { if (!focusRegion(PANES)) focusRegion(TASKS) })
-    })
+      queueMicrotask(() => { if (activeNodeId() === nodeId && !focusRegion(PANES)) focusRegion(TASKS) })
+    } else if (addedProject) navigate(projectPath(addedProject))
   }
 
   return (
@@ -152,6 +207,14 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
           <Line role="muted">Node: {props.nodeId}</Line>
           <Show when={error()}><Alert tone="danger">{error()}</Alert></Show>
           <Show when={result()}><Line tone="ok">{result()}</Line></Show>
+          <Show when={step() === 'mode'}>
+            <Line role="strong">Keep each project separate or group projects into workspaces?</Line>
+            <Select value={choice()} options={[
+              { value: 'off', label: 'Keep each project separate' },
+              { value: 'on', label: 'Group projects into workspaces' },
+            ]} onChange={(value) => setChoice(value as WorkspacesMode)} />
+            <Button disabled={busy() || !loadedPrefs() || !loadedProjects()} onPress={acceptMode}>Continue</Button>
+          </Show>
           <Show when={step() === 'workspace'}>
             <Line role="strong">1. Choose a workspace</Line>
             <Show when={props.model.workspaces().length}>
@@ -164,7 +227,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
             <Button variant="bare" onPress={() => setStep('provider')}>Set up a provider</Button>
           </Show>
           <Show when={step() === 'project'}>
-            <Line role="strong">2. Choose a project in {selectedWorkspace()?.name ?? 'this workspace'}</Line>
+            <Line role="strong">{mode() === 'on' ? `2. Choose a project in ${selectedWorkspace()?.name ?? 'this workspace'}` : '1. Choose a project'}</Line>
             <Show when={projectOptions().length}>
               <Select value={projectId()} options={projectOptions()} onChange={setProjectId} />
               <Button onPress={() => { setStep('task'); setResult('') }}>Continue with {project()?.name ?? 'project'}</Button>
@@ -172,10 +235,11 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
             <Line role="muted">Add a folder by its absolute path on the node:</Line>
             <Input placeholder="/absolute/path/to/project" value={path()} onInput={setPath} onSubmit={addProject} />
             <Button disabled={busy() || !path().trim()} onPress={addProject}>Add folder</Button>
-            <Button variant="bare" onPress={() => setStep('workspace')}>Back to workspaces</Button>
+            <Show when={mode() === 'on'}><Button variant="bare" onPress={() => setStep('workspace')}>Back to workspaces</Button></Show>
+            <Show when={mode() === 'off'}><Button variant="bare" onPress={() => setStep('provider')}>Set up a provider</Button></Show>
           </Show>
           <Show when={step() === 'task'}>
-            <Line role="strong">3. Start a task in {project()?.name ?? 'the project'}</Line>
+            <Line role="strong">{mode() === 'on' ? '3.' : '2.'} Start a task in {project()?.name ?? 'the project'}</Line>
             <Input placeholder="Task title" value={title()} onInput={setTitle} onSubmit={addTask} />
             <Show when={project()?.vcs === 'git'}>
               <Checkbox label="Use the project folder and its current branch" checked={useCurrentBranch()} onChange={setUseCurrentBranch} />
@@ -229,7 +293,7 @@ export function Setup(props: { model: ShellModel; nodeId: string; initialStep?: 
                 <Show when={deviceFlow.error()}><Alert tone="danger">{deviceFlow.error()}</Alert></Show>
               </Show>
             </Show>
-            <Button variant="bare" onPress={() => setStep('workspace')}>Back to setup</Button>
+            <Button variant="bare" onPress={() => setStep(prefs.data?.[WORKSPACES_PREF_KEY] || savedMode() ? mode() === 'on' ? 'workspace' : 'project' : 'mode')}>Back to setup</Button>
             <Button variant="bare" onPress={close}>Close setup</Button>
           </Show>
         </box>

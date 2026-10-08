@@ -5,6 +5,7 @@ import { getDb, schema } from '../db'
 import type { AppEnv } from '../middleware/auth'
 import { ownerId } from '../middleware/requireUser'
 import { respondError } from '../respond'
+import { PreferenceWriteError, writePreference } from '../core/prefs'
 
 // A preference row is one key and one string. `value` is a string even when the client is storing
 // JSON, because the column is a string and the reader parses it; a schema that accepted `unknown`
@@ -24,9 +25,11 @@ export const prefs = new Hono<AppEnv>()
     const parsed = prefBody.safeParse(await c.req.json().catch(() => null))
     if (!parsed.success) return respondError(c, 400, 'bad_request')
     const { key, value } = parsed.data
-    await getDb(c.env)
-      .insert(schema.prefs)
-      .values({ userId: uid, key, value })
-      .onConflictDoUpdate({ target: [schema.prefs.userId, schema.prefs.key], set: { value } })
+    try {
+      writePreference(getDb(c.env), uid, key, value)
+    } catch (error) {
+      if (error instanceof PreferenceWriteError) return respondError(c, error.status, error.code, [error.message])
+      throw error
+    }
     return c.json({ key, value })
   })

@@ -51,6 +51,7 @@ The first-party remote points hand over the owner's own data in the owner's own 
 | `docker:stats-beside` | `stack`, up to two | `{ container }` |
 | `github:summary-badges` | `stack`, up to four | `{ owner, repo, number }` |
 | `core:storage` | `stack`, up to four | `{ nodeId }` |
+| `core:security` | `stack`, up to four | `{ nodeId }`. A section on **Settings > Security and backup**. Agents draws its instruction file check |
 | `core:plugin-page` | `stack`, up to four | `{ pluginId, nodeId }`. A section on one plugin's **Permissions** tab in Settings > Plugins. Agents draws which harnesses the plugin's tool hooks reach |
 
 Read `changes:push-actions` before you open a point of your own. It sits under the Changes pane's
@@ -67,8 +68,8 @@ own worker.
 `agents:request-card` draws inside a request card while it waits on the person, below the card's own
 buttons. It decorates the card and never replaces it, so no contributor draws or presses an answer.
 The `requestId` is the one `agents:before-permission` and `agents.requests` name, so a policy plugin
-can draw why it let a risky request through. The permission policy package in
-`docs/future/pi/packages/permission-policy/` does. A flow that needs the person to type a code
+can draw why it let a risky request through. The `acorn-permission-policy`
+plugin does. A flow that needs the person to type a code
 isn't a note: it waits on a hook verdict that asks.
 
 The host gives the contributor's tree the owner's `taskId` and `projectId` as its scope, read-only.

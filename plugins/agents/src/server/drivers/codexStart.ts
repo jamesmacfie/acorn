@@ -156,7 +156,11 @@ export async function startCodexSession(
         open: () => pendingRequests.has(requestId) && !rpc.closed,
         respond: (resolution) => answer(requestId, resolution),
       }
-      : { ...event, requestId })
+      : {
+        type: 'input_request', request: { ...event, requestId },
+        open: () => pendingRequests.has(requestId) && !rpc.closed,
+        respond: (resolution) => answer(requestId, resolution),
+      })
   }
 
   // The one way a parked request is answered, whether by the person through the session handle or by a
@@ -265,6 +269,7 @@ export async function startCodexSession(
   // A custom agent's instructions, from the snapshot the session was created with. Sent on resume as
   // well as start, and unchanged, for the reason Claude's appended system prompt is.
   const instructions = [sessionCustomAgent(options.session.config)?.instructions,
+    options.attendanceInstructions,
     typeof options.session.config.standingContext === 'string' ? options.session.config.standingContext : undefined,
   ].filter(Boolean).join('\n\n')
   const developerInstructions = instructions ? { developerInstructions: instructions } : {}

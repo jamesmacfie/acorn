@@ -7,7 +7,7 @@
 // `apps/node` is `private`, every `@acorn/*` dependency is `workspace:*`, and the dependency that
 // matters most, node-pty, is native. An `npx`-able package would need prebuilt binaries for every
 // (platform, arch, Node ABI) triple, which is a release pipeline rather than a script. A tarball the
-// operator unpacks and runs `npm install --omit=dev` in compiles node-pty against their own Node,
+// operator unpacks and runs `npm ci --omit=dev` in compiles node-pty against their own Node,
 // the same dance a developer already does here (`pnpm rebuild:node`).
 //
 // ## What goes in
@@ -16,6 +16,7 @@
 //   bin/acorn.mjs  thin command-versus-terminal launcher
 //   migrations/    every Drizzle chain: core's at the root, each plugin's under its own name
 //   package.json   generated, listing only the real runtime dependencies (see RUNTIME below)
+//   package-lock.json  resolved at pack time, so every operator installs the same versions
 //   README.md      pointing at docs/node-distribution.md
 //
 // The desktop renderer, the shell and every `@acorn/*` package are absent by construction: the
@@ -169,7 +170,8 @@ console.log(`[pack-node] staged ${chains} migration chains`)
 // each other's instanceof checks, which is why they are pinned there in the first place).
 const desktop = read(join(ROOT, 'apps/desktop/package.json'))
 const tui = read(join(TUI_APP, 'package.json'))
-const workspaceLines = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8').split(/\r?\n/)
+const workspaceText = readFileSync(join(ROOT, 'pnpm-workspace.yaml'), 'utf8')
+const workspaceLines = workspaceText.split(/\r?\n/)
 const catalogStart = workspaceLines.indexOf('catalog:') + 1
 if (catalogStart === 0) throw new Error('pnpm-workspace.yaml has no catalog section.')
 const catalogEnd = workspaceLines.findIndex((line, index) => index >= catalogStart && /^[^\s#]/.test(line))
@@ -236,6 +238,18 @@ writeFileSync(
   )}\n`,
 )
 
+// Resolve the tree once, here, so every operator installs the same versions and npm checks each
+// download against the hash recorded now. `--before` applies pnpm's minimumReleaseAge, so a version
+// published within that window can't enter the lockfile.
+const minimumReleaseAge = Number(/^minimumReleaseAge: (\d+)$/m.exec(workspaceText)?.[1])
+if (!minimumReleaseAge) throw new Error('pnpm-workspace.yaml has no minimumReleaseAge.')
+const before = new Date(Date.now() - minimumReleaseAge * 60_000).toISOString()
+execFileSync('npm', ['install', '--package-lock-only', '--ignore-scripts', '--no-audit', '--no-fund', `--before=${before}`], {
+  cwd: staging,
+  stdio: 'inherit',
+})
+console.log(`[pack-node] locked the runtime dependencies to releases before ${before}`)
+
 writeFileSync(
   join(staging, 'README.md'),
   [
@@ -245,7 +259,7 @@ writeFileSync(
     'bundled node.',
     '',
     '```sh',
-    'npm install --omit=dev   # builds node-pty against THIS Node, if no prebuilt binary fits',
+    'npm ci --omit=dev   # installs the locked versions; builds node-pty against THIS Node if no prebuilt fits',
     'SESSION_ENC_KEY=$(openssl rand -hex 32) GITHUB_CLIENT_ID=<your oauth app> node dist/standalone.js',
     'node bin/acorn.mjs --help   # headless commands; no arguments open the terminal client',
     '```',

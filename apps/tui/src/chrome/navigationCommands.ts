@@ -7,7 +7,7 @@ import { localSearch } from '@acorn/client-core/host/registries/commands'
 import { activeNodeId, setActiveNode } from '@acorn/client-core/infra/node/activeNode.ts'
 import { nodes } from '@acorn/client-core/infra/node/fleet.ts'
 import { activateTaskSignals } from '@acorn/client-core/features/tasks/activate.ts'
-import { previousWorkspaceId } from '@acorn/client-core/features/workspaces'
+import { previousWorkspaceId, type WorkspaceWords } from '@acorn/client-core/features/workspaces'
 import type { Disposable } from '@acorn/client-core/kit/lib'
 import { chooseProject } from './routing'
 import type { ShellModel } from './model'
@@ -27,11 +27,11 @@ import type { ShellModel } from './model'
 // These rosters can arrive after the palette opens, so the shell retries the current search when
 // they change. Each query still filters locally (client-core/host/registries/commands/localSearch.ts).
 
-export function registerNavigationCommands(model: ShellModel): Disposable {
+export function registerNavigationCommands(model: ShellModel, words: () => WorkspaceWords): Disposable {
   // A task's project by name, never its id, from the workspaces that list it.
   const projectName = (id: string) => model.workspaces().flatMap((workspace) => workspace.projects).find((project) => project.id === id)?.name
   return registerCommands([
-    goToGroup(),
+    goToGroup(words),
     {
       id: 'core.goto.task',
       parentId: CORE_GO_TO_GROUP,
@@ -60,17 +60,17 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       id: 'core.goto.workspace',
       parentId: CORE_GO_TO_GROUP,
       kind: 'search',
-      title: 'Switch workspace',
+      title: () => `Switch ${words().singular}`,
       category: 'workspace',
       palette: true,
       order: 200,
-      placeholder: 'Find a workspace…',
+      placeholder: () => `Find a ${words().singular}…`,
       ...localSearch((context) => model.workspaces()
         .filter((workspace) => workspace.id !== context.workspaceId)
         .map((workspace): CommandSearchItem => ({
           id: workspace.id,
           title: workspace.name,
-          subtitle: `${workspace.projects.length} project${workspace.projects.length === 1 ? '' : 's'}`,
+          subtitle: words().singular === 'project' ? undefined : `${workspace.projects.length} project${workspace.projects.length === 1 ? '' : 's'}`,
           workspaceId: workspace.id,
         })), { cache: false }),
       select: (item): CommandOutcome => {
@@ -84,8 +84,8 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
     {
       id: 'core.goto.workspace-last',
       parentId: CORE_GO_TO_GROUP,
-      title: 'Last workspace',
-      hint: 'back to the workspace you came from',
+      title: () => `Last ${words().singular}`,
+      hint: () => `back to the ${words().singular} you came from`,
       category: 'workspace',
       palette: true,
       order: 250,
@@ -93,7 +93,7 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       when: () => !!previousWorkspaceId(),
       run: (): CommandOutcome => {
         const id = previousWorkspaceId()
-        if (!id) throw new Error('there is no workspace to go back to')
+        if (!id) throw new Error(`there is no ${words().singular} to go back to`)
         // Nothing to do to the rail, same as the search above.
         model.chooseWorkspace(id)
         return COMMAND_CLOSED
@@ -111,9 +111,13 @@ export function registerNavigationCommands(model: ShellModel): Disposable {
       placeholder: 'Find a project…',
       // The open workspace's projects, which is the same list the shell's own project overlay draws:
       // a project outside it belongs to a workspace this shell is not showing.
-      ...localSearch(() => (model.workspace()?.projects ?? [])
+      ...localSearch(() => (words().singular === 'project' ? model.workspaces().flatMap((workspace) => workspace.projects) : model.workspace()?.projects ?? [])
         .map((project): CommandSearchItem => ({ id: project.id, title: project.name, projectId: project.id })), { cache: false }),
       select: (item): CommandOutcome => {
+        if (words().singular === 'project') {
+          const workspace = model.workspaces().find((row) => row.projects.some((project) => project.id === item.id))
+          if (workspace) model.chooseWorkspace(workspace.id)
+        }
         chooseProject(item.id)
         return COMMAND_CLOSED
       },

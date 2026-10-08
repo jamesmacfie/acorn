@@ -32,6 +32,7 @@ import { CODEX_PLAN_IMPLEMENTATION_PROMPT } from '../../shared/codexPlanHandoff'
 import { mergeSearchIndex } from './ledgerCompaction'
 import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
+import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
 // synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
@@ -95,7 +96,11 @@ export class ManagedAgentRuntime {
   private readonly terminalHandoffRunning: AgentRuntimeOptions['terminalHandoffRunning']
 
   constructor(options: AgentRuntimeOptions) {
-    this.engine = new ManagedAgentEngine(options)
+    this.engine = new ManagedAgentEngine(options, async (sessionId, prompt, key, signal) => {
+      await this.enqueueTurn(sessionId, {
+        source: 'goal', input: [{ type: 'text', text: prompt }], effectivePolicy: {}, idempotencyKey: key,
+      }, {}, signal)
+    })
     this.store = this.engine.store
     this.attachments = this.engine.attachments
     this.artifacts = this.engine.artifacts
@@ -167,8 +172,9 @@ export class ManagedAgentRuntime {
   async createSession(
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
+    posture?: WorkflowPosture,
   ): Promise<AgentSession> {
-    const reserved = await this.reserveSession(input, idempotencyKey)
+    const reserved = await this.reserveSession(input, idempotencyKey, posture)
     return reserved.created
       ? this.startCreatedSession(reserved.session)
       : reserved.session
@@ -194,8 +200,9 @@ export class ManagedAgentRuntime {
   private reserveSession(
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
+    posture?: WorkflowPosture,
   ): Promise<{ session: AgentSession; created: boolean }> {
-    const reservation = Promise.resolve().then(() => this.reserveSessionWave(input, idempotencyKey))
+    const reservation = Promise.resolve().then(() => this.reserveSessionWave(input, idempotencyKey, posture))
     this.reservations.add(reservation)
     const settled = () => this.reservations.delete(reservation)
     void reservation.then(settled, settled)
@@ -205,6 +212,7 @@ export class ManagedAgentRuntime {
   private async reserveSessionWave(
     input: CreateAgentSessionInput,
     idempotencyKey?: string,
+    posture?: WorkflowPosture,
   ): Promise<{ session: AgentSession; created: boolean }> {
     this.engine.shutdownSignal.throwIfAborted()
     assertBoundedJson('Agent session configuration', input.config, MAX_AGENT_CONFIG_BYTES)
@@ -228,7 +236,7 @@ export class ManagedAgentRuntime {
     const mcpServers = await this.engine.readWhileRunning(() => this.mcpServers.enabledNames())
     const standingContext = await this.engine.readWhileRunning(() => this.standingContext?.(input.taskId) ?? Promise.resolve(null))
     this.engine.shutdownSignal.throwIfAborted()
-    const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers, standingContext } }, provider)
+    const session = await this.store.createSession({ ...withAgent, config: { ...withAgent.config, mcpServers, standingContext } }, provider, posture)
     if (idempotencyKey) await this.store.saveOperation(idempotencyKey, 'session.create', session, session.id)
     return { session, created: true }
   }
@@ -356,7 +364,7 @@ export class ManagedAgentRuntime {
     return (await this.transcriptCommands()).verifyResume(sessionId)
   }
 
-  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn> {
+  async enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput, context: TurnAttendanceContext = {}, signal?: AbortSignal): Promise<AgentTurn> {
     const session = await this.store.requireSession(sessionId)
     if (session.controller !== 'acorn') throw new Error(`Session input is controlled by ${session.controller}.`)
     if (session.archivedAt) throw new Error('Archived sessions cannot accept turns.')
@@ -373,34 +381,8 @@ export class ManagedAgentRuntime {
     const enqueued = prompt && prompt.payload.text !== undefined
       ? { ...input, input: withPromptText(input.input, prompt.payload.text) }
       : input
-    const advertisedOptions = Array.isArray(session.config.configOptions)
-      ? session.config.configOptions as Array<{
-          id?: unknown
-          label?: unknown
-          category?: unknown
-          currentValue?: unknown
-        }>
-      : []
-    const providerPolicy = advertisedOptions.flatMap((option) =>
-      typeof option.id === 'string'
-        && typeof option.category === 'string'
-        && ['permission', 'mode', 'model', 'reasoning'].includes(option.category)
-        ? [{
-            id: option.id,
-            label: typeof option.label === 'string' ? option.label : option.id,
-            category: option.category,
-            value: typeof option.currentValue === 'string' ? option.currentValue : null,
-          }]
-        : [])
-    const outcome = await this.store.enqueueTurn(sessionId, {
-      ...enqueued,
-      effectivePolicy: {
-        ...enqueued.effectivePolicy,
-        providerAdvertisedPolicy: providerPolicy,
-        providerStatusAuthority: session.statusAuthority,
-        capturedAt: Date.now(),
-      },
-    })
+    signal?.throwIfAborted()
+    const outcome = await this.store.enqueueTurn(sessionId, enqueued, context)
     const { turn } = outcome
     // An idle session behind the concurrency limit emits no provider event, so publish its queue count.
     this.engine.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
@@ -447,12 +429,21 @@ export class ManagedAgentRuntime {
     return this.titleGeneration.regenerate(sessionId)
   }
 
+  setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {
+    return this.engine.setGoal(sessionId, objective)
+  }
+
+  resumeGoal(sessionId: string): Promise<AgentSession> {
+    return this.engine.resumeGoal(sessionId)
+  }
+
   // A raised concurrency limit must wake the pump without waiting for another turn or completion.
   drainQueue(): void {
     void this.engine.pump()
   }
 
   async cancelTurn(sessionId: string, turnId?: string): Promise<void> {
+    await this.engine.pauseGoal(sessionId)
     const live = this.engine.currentSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id

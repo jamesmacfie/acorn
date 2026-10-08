@@ -1,6 +1,6 @@
-import { createEffect, createSignal, lazy, Show } from 'solid-js'
+import { createEffect, createSignal, lazy, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
-import { nodeReady, PrefKeys, prefsOptions, projectsOptions } from '@acorn/plugin-api/client'
+import { activeNodeId, nodeReady, ownOnboardingVisibility, PrefKeys, prefsOptions, projectsOptions, WORKSPACES_PREF_KEY } from '@acorn/plugin-api/client'
 import { onboardingVisible, shouldShowOnboarding } from './gate'
 
 const OnboardingWizard = lazy(() => import('./OnboardingWizard'))
@@ -21,6 +21,8 @@ const [dismissed, setDismissed] = createSignal(false)
 const [opened, setOpened] = createSignal(false)
 
 export default function OnboardingOverlay() {
+  const visibility = ownOnboardingVisibility()
+  onCleanup(visibility.dispose)
   const prefs = createQuery(() => prefsOptions(nodeReady()))
   const projects = createQuery(() => projectsOptions(nodeReady()))
   const gate = () => ({
@@ -31,13 +33,23 @@ export default function OnboardingOverlay() {
     projectCount: projects.data?.length,
   })
 
+  // A wizard opened on one Node must not stay open when the window changes Nodes.
+  let currentNode = activeNodeId()
   createEffect(() => {
+    const nextNode = activeNodeId()
+    if (nextNode !== currentNode) {
+      currentNode = nextNode
+      setOpened(false)
+      setDismissed(false)
+    }
     if (shouldShowOnboarding(gate())) setOpened(true)
   })
+  createEffect(() => visibility.update(onboardingVisible({ ...gate(), open: opened() })))
 
   return (
     <Show when={onboardingVisible({ ...gate(), open: opened() })}>
       <OnboardingWizard
+        workspacesPreference={prefs.data?.[WORKSPACES_PREF_KEY]}
         onClose={() => {
           setOpened(false)
           setDismissed(true)

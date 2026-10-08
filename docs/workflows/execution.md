@@ -51,6 +51,14 @@ step declared before it, and `after = []` makes it a root. Edges are derived fro
 stored, so a file written as a plain list still runs as the chain it always was.
 
 The runner starts a step when every predecessor is `done`, `completed-with-failures`, or `skipped`.
+The workflow runner passes its persisted `posture` through the internal managed-session execute
+capability. The agents plugin resolves `gated` to supervised attendance and `autonomous` to autonomous
+attendance when it accepts a turn. Workflow continuations and plugin follow-ups inherit the saved
+value. Under autonomous attendance, a harness question or form is cancelled and a permission is
+rejected once, with a recorded reason and no attention row. The Node does not approve permissions.
+A final message starting with `BLOCKED:` fails the agent step without another turn. Headless profiles have no managed
+session or request channel and keep their existing headless execution behavior.
+
 Agent execution uses the Node's four-slot semaphore and the root's optional lower concurrency limit. A step that
 ended `skipped` counts as done for readiness, because a skip is how a branch is not taken and the
 step after the decision still has to run. `idx` maps a persisted row to the same position in its frozen

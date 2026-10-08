@@ -141,7 +141,7 @@ export type SessionFrame = {
   readonly status: string
   /** What this frame's own field asks for. Empty on the root and a group, where the host's own
    *  placeholder still describes the list. */
-  readonly placeholder: string
+  readonly placeholder: string | (() => string)
   /** Present exactly on a search frame. */
   readonly search?: SessionSearchState
   /** Present exactly on a setting frame. */
@@ -707,7 +707,10 @@ export function createCommandSession(options: CommandSessionOptions): CommandSes
     },
     kind: () => frame()?.kind ?? 'root',
     query: () => frame()?.query ?? '',
-    placeholder: () => frame()?.placeholder ?? '',
+    placeholder: () => {
+      const value = frame()?.placeholder
+      return typeof value === 'function' ? value() : value ?? ''
+    },
     status: () => frame()?.status ?? '',
     // A search waiting on its provider is busy too, and the loading row says so where a spinner cannot.
     busy: () => pending() || frame()?.search?.phase === 'loading' || frame()?.setting?.phase === 'loading',

@@ -2,7 +2,7 @@
 
 Date: October 7, 2026
 
-Status: Agreed product requirements. Implementation has not started.
+Status: Implemented October 7, 2026. See the [workspace icon reference](../workspaces-and-tasks/workspace-icons.md).
 
 This product requirements document defines workspace icons, their appearance in the desktop
 workspace switcher, and an optional workspace rail. Use it to implement and verify the feature.
@@ -22,8 +22,8 @@ The agreed behavior is:
 
 - Support Acorn's normal icons on a solid background colour or a gradient, and uploaded images.
 - Use initials when a workspace has no configured icon.
-- Show the icon beside the selected workspace name and beside each dropdown entry, independent
-  of whether the workspace rail is enabled.
+- Show the icon beside the selected workspace name and beside each dropdown entry when the workspace
+  rail is hidden. Showing the rail hides the top-bar workspace dropdown.
 - Offer **Show workspace rail** in **Settings > Appearance**, off by default.
 - Edit a workspace's icon on its workspace settings page. Store it on the owning Node.
 - Store rail visibility as a device preference.
@@ -57,7 +57,9 @@ Let the person choose a local image, preview a square crop, and save it as the w
 Support PNG, JPEG, and WebP inputs. Provide replacement and removal through the same setting.
 Use a static raster thumbnail so every desktop draws the same saved crop.
 
-Define and document upload byte, decoded pixel, and stored thumbnail limits before implementation.
+Upload limits: 5 MiB of PNG, JPEG, or WebP input; 16 million decoded pixels; a 128×128 static
+PNG thumbnail capped at 128 KiB. The Node permits two concurrent normalizations, with a five-second
+processing timeout. Crop coordinates refer to the oriented image and stay within its bounds.
 Reject unsupported, corrupt, or oversized inputs with an error beside the control. Validate image
 content on the Node rather than trusting the filename or the desktop's checks.
 
@@ -121,7 +123,8 @@ reachable and reveal it when selection changes through another navigation contro
 rail keyboard and focus conventions, with names and selected state exposed to assistive technology.
 
 Turning the setting on or off changes layout without resetting the workspace, task, panes, or
-terminal. The dropdown remains available with the rail enabled. This feature adds no drag ordering,
+terminal. Hide the dropdown while the rail is enabled and restore it when the rail is hidden.
+This feature adds no drag ordering,
 workspace badges, creation button, or replacement plugin slot.
 
 ### Layout and terminal client
@@ -232,7 +235,8 @@ The implementation is complete when these observable behaviors pass:
 - A workspace can save an icon with a solid background, an icon with a gradient, or an uploaded
   image. Replacement, reset, crop cancellation, and failed-save recovery work.
 - The selected switcher label and each dropdown entry show the same workspace appearance with the
-  rail off and on. Names, filtering, active indication, and Node identification remain usable.
+  rail off. Enabling the rail hides the dropdown. Names, filtering, active indication, and Node
+  identification remain usable.
 - The rail is off by default, follows the device after relaunch, and does not follow Node switches.
   Enabling or disabling it preserves the active task and mounted pane state.
 - Both left rails use the same width across style packs. Tiles remain distinguishable in light and
@@ -282,3 +286,26 @@ Confirm these assumptions against the implementation checkout:
   replacement top-bar compatibility.
 
 Paths in this proposal are starting points. Preserve these requirements if the owning modules move.
+
+## Implementation evidence — October 7, 2026
+
+Implemented behavior is documented in [Workspace icons](../workspaces-and-tasks/workspace-icons.md).
+
+- Route tests cover solid and gradient metadata, normalized PNG/JPEG/WebP crops, invalid inputs,
+  failed replacement, shared image retention, reset, deletion, and durable backup bytes.
+- Client tests cover inactive-Node workspace events, image sharing and disposal, late reads,
+  fallback, device configuration, and the shared fleet refresh race found in desktop verification.
+- The packaged startup test saves a catalogue glyph and uploads and reads a normalized image
+  through the staged helper, including its native image decoder.
+- Desktop driver checks cover icon saves, crop cancellation, failed upload and retry, reset,
+  switcher and rail agreement, relaunch, keyboard activation, remembered-task restoration, and a
+  33-workspace scroller. Toggling the rail preserves the task, pane, and running terminal DOM.
+  All four style packs keep equal rail widths; normal and maximized drawers respect both rails,
+  including an 800-pixel window. Light and dark screenshots were inspected.
+- The terminal driver retains named workspace switching and offers no desktop icon or rail controls.
+  Cross-Node identity and switching use automated coverage; a second live Node and native child
+  webview interaction were not exercised by the drivers.
+
+The full test run encounters existing fixture failures in the Node route inventory, frame route
+inventory, CSS shadow ratchet, and desktop plugin registry expectations. The added feature tests
+pass. Architecture, lint, migration checks, packaged startup, and Rust tests pass independently.

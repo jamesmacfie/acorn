@@ -1,4 +1,5 @@
 import type { IntegrationConnectionStatus } from '../integrations/providers'
+import type { WorkspacesMode } from '../projects/workspacesMode'
 
 // Core events a plugin's node half may subscribe to with `ctx.events.on`
 // (node-core/server/pluginHost/types.ts, docs/plugins/events.md § Hearing another plugin).
@@ -29,6 +30,7 @@ export const NODE_EVENT_CHANNELS = [
   'plugins:changed',
   'tasks:changed',
   'workspace:changed',
+  'workspaces-mode:changed',
   'workspace-projects:changed',
   'connection:changed',
   'head:changed',
@@ -50,6 +52,8 @@ export const isNodeEventChannel = (channel: string): channel is NodeEventChannel
 export type TaskChangedEvent = { taskId: string | null }
 
 export type WorkspaceChangedEvent = { workspaceId: string }
+
+export type WorkspacesModeChangedEvent = { mode: WorkspacesMode }
 
 export type WorkspaceProjectsChangedEvent = { providerId: string; workspaceIds: string[] }
 

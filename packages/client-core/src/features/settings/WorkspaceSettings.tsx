@@ -19,6 +19,8 @@ import { Stack } from '../../kit/components/layout/Stack'
 import { TabPanel, Tabs } from '../../kit/components/layout/Tabs'
 import { createSettingSave, createTextSetting } from './settingSave'
 import { WorkspaceConnections } from './ProjectConnections'
+import { activeNodeId } from '../../infra/node/activeNode'
+import { WorkspaceIconEditor } from '../workspaces/WorkspaceIconEditor'
 
 // Settings → a workspace's own page: its name, its projects, and deleting it. Each project's config is
 // on the project's page, one click from the table (./ProjectSettings.tsx), because it describes one
@@ -126,6 +128,7 @@ function General(props: { workspace: Workspace; context: SettingsPageContext }) 
   return (
     <>
       <SettingsSection id="general" label="General">
+        <Show when={`${activeNodeId()}:${props.workspace.id}`} keyed>{(_id) => <WorkspaceIconEditor workspace={props.workspace} />}</Show>
         <SettingRow
           label="Name"
           description={props.workspace.isDefault ? "The Default workspace can't be renamed." : undefined}

@@ -41,11 +41,11 @@ export type OpenedNode = {
 /** Open the node this run talks to. With no target that is the node for this machine's data root,
  *  attached if one is running and started if not; with one it is a remembered node or a new endpoint
  *  to pair with. */
-export async function openNode(target: string | undefined, at: Custody = custody()): Promise<OpenedNode> {
+export async function openNode(target: string | undefined, at: Custody = custody(), allowPair = true): Promise<OpenedNode> {
   const { tokens, fleet } = at
   const done = (nodeId: string, supervised = false, stop: () => Promise<void> = async () => {}): OpenedNode => ({ nodeId, fleet, supervised, stop })
 
-  if (target) return done((await remoteNode(target, fleet)).nodeId)
+  if (target) return done((await remoteNode(target, fleet, allowPair)).nodeId)
 
   const dataDir = dataRootDir()
   // The label survives a rename, the same way the desktop's local adoption keeps the owner's.
@@ -55,6 +55,7 @@ export async function openNode(target: string | undefined, at: Custody = custody
   if (running) {
     const token = tokens.read(LOCAL_TOKEN_SCOPE)
     if (!token) {
+      if (!allowPair) throw new Error('acorn has no token for the local node. Pair the terminal client before opening this link.')
       // A node this TUI has never met, running under a launcher that is not us — the desktop app,
       // usually. Its token is that launcher's, so the way in is the same one a stranger gets: a
       // pairing code the owner asks the node for. A desktop-supervised service has no SIGUSR1
@@ -114,10 +115,10 @@ export async function openNode(target: string | undefined, at: Custody = custody
 
 // `--node` names either a node this device has already paired with, by label or by id, or an endpoint
 // to pair with now. Remembered first, so the second time is `acorn --node <name>` and never a code.
-async function remoteNode(target: string, fleet: FleetStore): Promise<FleetNode> {
-  const known = rememberedNode(fleet, target)
+async function remoteNode(target: string, fleet: FleetStore, allowPair: boolean): Promise<FleetNode> {
+  const known = allowPair ? rememberedNode(fleet, target) : fleet.get(target)
   if (known) return known
-  if (!target.startsWith('https://')) {
+  if (!allowPair || !target.startsWith('https://')) {
     const names = fleet.list().map((node) => node.label)
     throw new Error(`acorn knows no node called "${target}". Pair one with an https:// endpoint${names.length ? `, or name one of: ${names.join(', ')}` : ''}.`)
   }

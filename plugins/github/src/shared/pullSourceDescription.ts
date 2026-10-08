@@ -113,6 +113,6 @@ export const pullSourceDescription: DataSourceDescription = {
   coverage: { kind: 'snapshot' },
   starterPlans: pullStarterPlans,
   reach: { parameter: '/repositories', itemPlural: 'repositories',
-    default: 'repositories linked to this workspace', empty: 'no linked repositories' },
-  consistency: 'Workspace reads are restricted to linked repositories. An explicit list selects a subset. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
+    default: 'linked repositories', empty: 'no linked repositories' },
+  consistency: 'Reads are restricted to linked repositories. An explicit list selects a subset. Search is eventually consistent, with no snapshot isolation during pagination. Up to 250 matches are fully read. A larger search returns no rows and says it is incomplete, so narrow it with repositories or conditions.',
 }

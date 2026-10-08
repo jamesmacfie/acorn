@@ -12,6 +12,7 @@ import {
 } from '../../../features/settings/appearancePrefs'
 import { parseNotificationSettings, readNotificationSettings } from '../../../features/notifications/settings'
 import { settingsRegistry } from '../shell/settings'
+import { CORE_SETTINGS_PAGES } from '../../../features/settings/corePages'
 import { buildCommandGraph } from './graph'
 import {
   appearanceCommands,
@@ -135,6 +136,30 @@ describe('the notification settings', () => {
 })
 
 describe('the Settings pages', () => {
+  it('rebuilds registered labels and search words for the active Node mode', () => {
+    for (const id of ['workspaces', 'shortcuts']) {
+      const page = CORE_SETTINGS_PAGES.find((candidate) => candidate.id === id)!
+      held.push(settingsRegistry.register({ ...page, component: () => null }))
+    }
+    const install = (mode: 'off' | 'on') => {
+      const registrations = settingsPageCommands(() => {}, mode).map((command) => commandRegistry.register(command))
+      const rows = buildCommandGraph(commandRegistry.entries()).children('core.settings.pages')
+      return { registrations, rows }
+    }
+    const off = install('off')
+    expect(off.rows.find((row) => row.id === 'core.settings.pages.workspaces')?.command.hint).toBe('Projects')
+    expect(off.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords)
+      .toContain('Switch to the last project')
+    expect(off.rows.some((row) => row.command.keywords?.includes('new workspace'))).toBe(false)
+    for (const registration of off.registrations.reverse()) registration.dispose()
+
+    const on = install('on')
+    expect(on.rows.find((row) => row.id === 'core.settings.pages.workspaces')?.command.hint).toBe('Workspaces and projects')
+    expect(on.rows.find((row) => row.id === 'core.settings.pages.shortcuts#global')?.command.keywords)
+      .toContain('Switch to the last workspace')
+    for (const registration of on.registrations.reverse()) registration.dispose()
+  })
+
   it('generates one row per page in the rail\'s order, whatever group the page is in', () => {
     const opened: string[] = []
     held.push(settingsRegistry.register({

@@ -28,7 +28,7 @@ export async function sourceBindingContext(env: Env, content: QueryContent, invo
     context.viewer = await invokeDataSource(env, { operation: 'identity', source: content.query.source, scope }, invocation)
   }
   if (usesLinks) {
-    if (!scope.workspaceId || !scope.connectionId) throw new Error('Workspace links require a workspace and account')
+    if (!scope.workspaceId || !scope.connectionId) throw new Error('Linked items require a selected scope and account')
     const db = getDb(env)
     const rows = await db.select({ externalId: schema.workspaceExternalProjects.externalId })
       .from(schema.workspaceExternalProjects)

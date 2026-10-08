@@ -47,6 +47,13 @@ request created. **Existing worktree** uses its own ownership check.
 Provider promotions keep a seeded branch, resolve or create the project and the task link, and reuse
 a task that already has that exact link.
 
+An `acorn://<node>/new-task?url=...` address resolves through the content-link registry. A source
+can expose `fromContentLink` to load the item and `existingTask` to find an active task before the
+desktop opens `PromoteToTaskModal`. The address opens an active task directly. Otherwise the desktop
+selects the project's workspace and source, then shows the dialog. `prepare` may read provider data,
+but `create` and `attachToCurrentTask` run only after confirmation. Sources without these link
+methods keep their ordinary promotion behavior.
+
 ## Child tasks
 
 Core creates workflow and delegated-agent child tasks through `CoreServices.tasks.createChild()`.

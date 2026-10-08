@@ -36,3 +36,12 @@ it('does not replace explicit null with the fleet Node after bytes resolve', asy
   await expect(managedAgentApi.uploadAttachment('task', new File(['x'], 'x.txt'), { nodeId: null })).rejects.toMatchObject({ code: 'no_active_node' })
   expect(requests).toEqual([])
 })
+
+it('sends a goal write to its captured Node after selection changes', async () => {
+  await setup()
+  setActiveNode('upload-B')
+  await managedAgentApi.setGoal('session', 'Finish the task', { nodeId: 'upload-A' })
+  expect(requests.map((request) => request.node)).toEqual(['upload-A'])
+  expect(new TextDecoder().decode((requests[0]!.body as { bytes: Uint8Array }).bytes))
+    .toBe(JSON.stringify({ objective: 'Finish the task' }))
+})

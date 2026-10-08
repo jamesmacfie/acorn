@@ -91,8 +91,8 @@ frame.
 
 ## Review input
 
-`agents.reviewInput.v1` reads one completed turn for a reviewer, such as the advisor package in
-`docs/future/pi/packages/advisor/`. The contract is in `plugins/agents/src/contract/lifecycle.ts`,
+`agents.reviewInput.v1` reads one completed turn for a reviewer, such as the `acorn-advisor`
+plugin. The contract is in `plugins/agents/src/contract/lifecycle.ts`,
 and a plugin outside this repository imports `AgentReviewInputCapability` from `acorn-plugin-types`.
 `read({ taskId, sessionId, turnId })` checks that the turn belongs to that session and the session
 to that task. A turn outside them, or a missing one, answers `{ available: false, reason:

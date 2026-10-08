@@ -1,6 +1,7 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { Show } from 'solid-js'
 import { nodeState } from '@acorn/client-core/infra/node/fleet.ts'
+import { createWorkspaceWords } from '@acorn/client-core/features/workspaces'
 import { StatusDot } from '../kit/showing'
 import { Line } from '../kit/cells'
 import { terminalBadge } from '../kit/notify'
@@ -25,9 +26,15 @@ import type { ShellModel } from './model'
 // breadcrumb; a terminal has neither, so a reader whose browse list is empty has no way to tell a
 // missing integration from the wrong project.
 export function Topbar(props: { model: ShellModel; nodeId: string }) {
+  const words = createWorkspaceWords()
   const count = () => props.model.tasks().length
   const state = () => nodeState(props.nodeId)
   const project = () => props.model.workspace()?.projects.find((entry) => entry.id === routedProjectId())
+  const scopeLabel = () => {
+    const workspace = props.model.workspace()
+    if (!workspace) return 'acorn'
+    return words().singular === 'project' ? `Project: ${workspace.name}` : workspace.name
+  }
   const shownTask = () => !topOverlay()
     ? props.model.tasks().find((task) => task.id === highlightedTaskId()) ?? props.model.task()
     : null
@@ -44,8 +51,8 @@ export function Topbar(props: { model: ShellModel; nodeId: string }) {
     // (docs/tui.md).
     <box flexDirection="column" flexShrink={0}>
       <box flexDirection="row" gap={1}>
-        <Line role="strong">{props.model.workspace()?.name ?? 'acorn'}</Line>
-        <Show when={project()}>
+        <Line role="strong">{scopeLabel()}</Line>
+        <Show when={words().singular === 'workspace' && project()}>
           {(named) => (
             <>
               <Line role="muted">{'>'}</Line>

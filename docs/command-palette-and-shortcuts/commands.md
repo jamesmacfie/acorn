@@ -21,6 +21,10 @@ Core's own commands form a small tree:
   (`packages/client-core/src/host/registries/shell/settingsSearch.ts`), so the palette and the rail
   name sections the same way.
 - **Appearance** and **Notifications** hold the settings core owns.
+- **Copy link** names the place currently on screen. On the desktop, an open Settings layer wins over
+  the task, project route, or rail source beneath it. Task links include the focused pane and an item
+  only when that pane reports one. The terminal offers the same row; when its emulator has no clipboard
+  support, the palette shows the link for manual copying.
 
 The terminal client registers one **Open settings** row instead of the Settings rows. Each of those
 rows matches the Settings breadcrumb, so on that host they outranked the shell's own

@@ -2,6 +2,7 @@ import { createMemo, Show } from 'solid-js'
 import { useNavigate } from '@solidjs/router'
 import { createFleetWorkspaces, selectFleetWorkspace, type FleetWorkspace } from '../../features/workspaces/fleetWorkspaces'
 import { byRecentVisit } from '../../features/workspaces/lastWorkspace'
+import { createWorkspaceWords } from '../../features/workspaces/words'
 import { fuzzyScore } from '../../kit/lib/controls/fuzzy'
 import { createOverlayPalette } from './overlay'
 import { PaletteSurface } from './PaletteSurface'
@@ -11,10 +12,11 @@ import './palette.css'
 export default function WorkspacePalette() {
   const navigate = useNavigate()
   const fleet = createFleetWorkspaces()
+  const words = createWorkspaceWords()
 
   const palette = createOverlayPalette({
     id: 'workspaces',
-    title: 'Switch workspace',
+    title: () => `Switch ${words().singular}`,
     toggleChord: 'meta+l',
     count: () => matches().length,
     onPick: (index) => {
@@ -47,9 +49,9 @@ export default function WorkspacePalette() {
     <PaletteSurface
       palette={palette}
       items={matches()}
-      ariaLabel="Switch workspace"
-      placeholder="Find a workspace…"
-      emptyText="No workspaces."
+      ariaLabel={`Switch ${words().singular}`}
+      placeholder={`Find a ${words().singular}…`}
+      emptyText={`No ${words().plural}.`}
       onPick={(entry) => pick(entry)}
       row={(entry) => {
         const w = entry.workspace
@@ -59,7 +61,7 @@ export default function WorkspacePalette() {
             <Show when={fleet().grouped}>
               <span class="palette-hint muted">{entry.node.label}</span>
             </Show>
-            <Show when={w.projects.length}>
+            <Show when={words().singular === 'workspace' && w.projects.length}>
               <span class="palette-hint muted">{projectCount(w.projects.length)}</span>
             </Show>
           </>

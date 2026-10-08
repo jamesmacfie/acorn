@@ -3,10 +3,11 @@ import { spawn } from 'node:child_process'
 import { createWriteStream } from 'node:fs'
 import { mkdir, stat } from 'node:fs/promises'
 import { createServer as createNetServer } from 'node:net'
-import { join, resolve } from 'node:path'
+import { join } from 'node:path'
 import { createServer as createViteServer } from 'vite'
 import { WebDriverClient } from './webdriver.mjs'
 import { stageTestApp } from './nativeApp.mjs'
+import { parseAgentSessionOptions } from './options.mjs'
 import {
   desktopRoot,
   manifestPath,
@@ -14,44 +15,11 @@ import {
   readJson,
   repoRoot,
   sessionDirectory,
-  validateSessionName,
   writePrivateJson,
 } from './state.mjs'
 
 const pnpm = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm'
 const cargo = process.platform === 'win32' ? 'cargo.exe' : 'cargo'
-
-const FIXTURES = ['large-surfaces', 'tui-navigation']
-const PROFILES = ['small', 'scale', 'canonical']
-
-function parseArgs(argv) {
-  const options = { session: null, project: repoRoot, onboarding: false, reuse: false, smoke: false, vite: false, fixture: null, profile: 'small', seed: 1 }
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index]
-    if (arg === '--') continue
-    if (arg === '--session') options.session = validateSessionName(argv[++index] ?? '')
-    else if (arg === '--project') options.project = resolve(argv[++index] ?? '')
-    else if (arg === '--onboarding') options.onboarding = true
-    else if (arg === '--reuse') options.reuse = true
-    else if (arg === '--smoke') options.smoke = true
-    else if (arg === '--vite') options.vite = true
-    else if (arg === '--fixture') options.fixture = argv[++index] ?? ''
-    else if (arg === '--profile') options.profile = argv[++index] ?? ''
-    else if (arg === '--seed') options.seed = Number(argv[++index])
-    else throw new Error(`Unknown option: ${arg}`)
-  }
-  if (options.onboarding && argv.includes('--project')) throw new Error('Use either --onboarding or --project, not both.')
-  if (options.fixture !== null) {
-    if (!FIXTURES.includes(options.fixture)) throw new Error(`Unknown fixture: ${options.fixture}. Known: ${FIXTURES.join(', ')}.`)
-    if (options.onboarding || argv.includes('--project') || argv.includes('--smoke')) throw new Error('A fixture brings its own project; drop --onboarding, --project and --smoke.')
-    if (!PROFILES.includes(options.profile)) throw new Error(`Unknown profile: ${options.profile}. Known: ${PROFILES.join(', ')}.`)
-    if (!Number.isInteger(options.seed)) throw new Error('The seed must be a whole number.')
-  } else if (argv.includes('--profile') || argv.includes('--seed')) {
-    throw new Error('--profile and --seed only mean something with --fixture.')
-  }
-  if (options.smoke) options.onboarding = true
-  return options
-}
 
 function run(command, args, cwd) {
   return new Promise((resolveRun, reject) => {
@@ -141,7 +109,7 @@ async function runSmoke(client, directory) {
 }
 
 async function main() {
-  const options = parseArgs(process.argv.slice(2))
+  const options = parseAgentSessionOptions(process.argv.slice(2))
   const name = options.session ?? `agent-${randomUUID().slice(0, 8)}`
   const directory = sessionDirectory(name)
   const manifestFile = manifestPath(name)
@@ -159,6 +127,7 @@ async function main() {
     try { previous = await readJson(manifestFile) } catch {}
     if (previous && processIsAlive(previous.launcherPid)) throw new Error(`Agent session ${name} is already running.`)
     if (!options.reuse) throw new Error(`Agent session ${name} already exists. Choose another name or pass --reuse to keep its data.`)
+    if (options.workspaces && previous?.workspaces !== options.workspaces) throw new Error('This session was seeded with different --workspaces options. Choose a new session name.')
   }
 
   await mkdir(logDir, { recursive: true, mode: 0o700 })
@@ -186,14 +155,16 @@ async function main() {
       const project = join(directory, 'fixture', 'repo')
       console.log(`[agent-dev:${name}] generating the ${options.fixture} fixture (${options.profile}, seed ${options.seed})`)
       const out = await capture(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', project,
-        '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed)], desktopRoot)
+        '--fixture', options.fixture, '--profile', options.profile, '--seed', String(options.seed),
+        ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
       const seeded = JSON.parse(out.trim().split('\n').at(-1))
       fixture = { name: options.fixture, project, ...seeded }
       delete fixture.fixture
       options.project = project
     } else if (!options.onboarding) {
       console.log(`[agent-dev:${name}] adding ${options.project}`)
-      await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project], desktopRoot)
+      await run(pnpm, ['exec', 'tsx', 'scripts/agent/seed.ts', '--data-dir', dataDir, '--project', options.project,
+        ...(options.workspaces ? ['--workspaces', options.workspaces] : [])], desktopRoot)
     }
 
     let viteUrl = null
@@ -242,6 +213,7 @@ async function main() {
       dataDir,
       project: options.onboarding ? null : options.project,
       fixture,
+      workspaces: options.workspaces,
       viteUrl,
       webdriverEndpoint: endpoint,
       webdriverSessionId: driver.sessionId,
@@ -273,6 +245,7 @@ async function main() {
       directory,
       dataDir,
       fixture,
+      workspaces: options.workspaces,
       stoppedAt: new Date().toISOString(),
     })
   }
