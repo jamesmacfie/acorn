@@ -68,7 +68,9 @@ export default {
       order: 30,
       providerId: 'rollbar',
       items: '/v1/p/rollbar/rail-items',
-      // The rail route reads `?project=` (src/server/routes/rollbar.ts), so the shell offers a project
+      // The Search field asks Rollbar's items search for active items past the mirrored 300.
+      search: '/v1/p/rollbar/rail-search',
+      // Both routes read `?project=` (src/server/routes/rollbar.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
       // `navigate`, not `openPane`: the detail belongs to the project, so a row click changes the URL

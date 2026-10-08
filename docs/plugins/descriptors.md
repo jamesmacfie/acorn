@@ -34,6 +34,9 @@ can declare:
   partial-failure reporting.
 - `projectScoped`: the items route reads the shell's project. The host appends `?project=`, keys the
   cache by it, and offers the topbar project picker while the source is on screen.
+- `search`: a route that searches the provider beyond the loaded rows. It needs an `items` route,
+  and the Node confines it to the plugin's namespace like every other route. See
+  [searching a source](#searching-a-source).
 - `showInRailByDefault: false`: the source starts with no desktop rail icon. It still registers, the
   palette offers **Open <label>**, and the person's **Show in left rail** choice wins.
 - `requiresGitProject: true`: the source draws only while the active workspace has a Git project.
@@ -52,10 +55,31 @@ as a ticket key or an HTTP verb. A row with neither `short` nor `icon` gets a do
 places in `client-core/host/chrome/chromeData.ts` rebuild a rail row field by field from an
 allowlist, so a field added to `PluginRailItem` must be added to both, or it's dropped silently.
 
-Desktop and terminal list filters match the title, `short`, and the linked item's identifier or
-`ref.displayId`, ignoring case. A bare number or `#` followed by a number matches identifiers too.
-Filters narrow the loaded rows and keep their order. The host doesn't search opaque row IDs,
-occurrence counts, or task descriptions.
+### Searching a source
+
+Every source's list has a **Search** field. Typing narrows the loaded rows at once. It matches the
+title, `short`, and the linked item's identifier or `ref.displayId`, ignoring case, and a bare number
+or `#` followed by a number matches identifiers too. It doesn't match opaque row IDs, occurrence
+counts, or task descriptions. An empty field shows the ordinary list and asks nothing.
+
+A source with a `search` route also asks the plugin. After a 250 ms pause, and once the text has two
+characters, the host sends `GET <search>?project=<routed project>&q=<text>`, with the text cut to 200
+characters. The answer is `PluginRailSearchResult`: rows in the `PluginRailItem` shape, plus
+`incomplete` when the provider holds more matches than it sent. The host sanitizes each row as it
+does a list row, draws at most 100 (`MAX_RAIL_SEARCH_ITEMS`), and treats a longer answer as
+incomplete. A search row keeps the source's `onSelect`, so navigation and **Create task** work.
+
+Until the plugin answers, the loaded matches stay with a **Searching…** line. Its answer then replaces
+them, because the provider's matching and a substring match differ. If it fails, the loaded matches
+stay and a line says the wider search failed. An incomplete answer asks the reader to narrow the
+search. With no rows, the list says which of these happened instead of showing the source's
+`emptyState`, which describes an empty list.
+
+Answers are cached apart from the list, keyed by the plugin, source, project, and text, and never
+persisted ([renderer query cache](../caching.md#renderer-query-cache)). A changed project or text
+abandons the earlier request, and its answer is never drawn for the new one. A collapsed rail keeps
+the text but doesn't search. Both hosts share this behavior through
+`client-core/host/chrome/sourceSearch.ts`.
 
 A source can offer a panel area beside its list instead of a detail pane: a dashboard the person
 composes, under constraints the source declares in `panels`

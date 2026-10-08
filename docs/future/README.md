@@ -41,7 +41,6 @@ decided not to do and why, so a later session argues with the reasoning rather t
 | [kimi.md](./kimi.md) | Kimi Code CLI as a contributed tier 1 harness: the manifest, the four declarations to get right, and the Kimi usage API research behind the optional probes. | Proposal, 2026-09-18. Not started. |
 | [lazy-plugin-code.md](./lazy-plugin-code.md) | An opt-in `lazyFetch` helper that loads a plugin route's code on its first request, so heavy, rarely used routes stay out of the node's boot graph. | Proposal, October 6, 2026. Not started. |
 | [multi-account.md](./multi-account.md) | Running more than one Claude Code or Codex subscription: how other tools do it, the terms risk, and a per-account config folder pinned to each session. | Research and proposal, October 6, 2026. Not started. |
-| [pluginsearch.md](./pluginsearch.md) | Search within Linear, Rollbar, and GitHub lists beyond the loaded rows while retaining project mappings and state. | Proposal, 2026-09-24. Not started. |
 | [remote.md](./remote.md) | Web client, mobile PWA, and a relay service. | Preparation items shipped; the rest waits on a web client. |
 | [split.md](./split.md) | Moving the loaded plugins and the authoring toolkit to their own repos. | Proposal, revised for the closed kit. |
 | [test-feedback.md](./test-feedback.md) | Focused agent test runs, cache invalidation, TUI settlement, and acceptance measurements. | Implemented on isolated branch, 2026-10-03; integration review open. |

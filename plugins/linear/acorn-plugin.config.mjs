@@ -103,7 +103,9 @@ export default {
       order: 20,
       providerId: 'linear',
       items: '/v1/p/linear/rail-items',
-      // The rail route reads `?project=` (src/server/routes/linear.ts), so the shell offers a project
+      // The Search field asks Linear for matches past the list's first 250, in the same mapped scope.
+      search: '/v1/p/linear/rail-search',
+      // Both routes read `?project=` (src/server/routes/linear.ts), so the shell offers a project
       // picker on this source and re-fetches the list when the project changes.
       projectScoped: true,
       // A task with a Linear link and no pull request opens on the ticket. Core used to make that

@@ -118,6 +118,10 @@ export const sourceDescriptor = z.object({
   // A Node-backed source reads the plugin's route. A client-only source supplies both browse
   // regions from its remote-tree worker instead, so no Node handler is needed.
   items: pluginRoute.optional(),
+  // A provider search over the same list, answering `PluginRailSearchResult`. The host sends the
+  // reader's `q` and the routed `?project=` the items route gets, and keeps the list's `onSelect` for
+  // every answered row (docs/plugins/descriptors.md § Searching a source).
+  search: pluginRoute.optional(),
   tree: z.object({
     list: z.string().min(1).max(64),
     detail: z.string().min(1).max(64),
@@ -152,6 +156,9 @@ export const sourceDescriptor = z.object({
 }).superRefine((source, ctx) => {
   if (Number(source.items !== undefined) + Number(source.tree !== undefined) !== 1) {
     ctx.addIssue({ code: 'custom', message: 'a source needs either an items route or a remote tree' })
+  }
+  if (source.search !== undefined && source.items === undefined) {
+    ctx.addIssue({ code: 'custom', message: 'a search route searches an items list, so it needs an items route' })
   }
   if (source.tree && (source.onSelect || source.emptyState || source.panels)) {
     ctx.addIssue({ code: 'custom', message: 'a remote-tree source owns its selection, empty state, and detail region' })

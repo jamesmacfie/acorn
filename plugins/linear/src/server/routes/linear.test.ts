@@ -39,7 +39,7 @@ const contextFor = (connections: StoredConnection[]) => makeTestRequestContext({
 })
 
 /** Linear's answer per credential, and a record of what each one was asked. */
-function stubLinear(answer: (key: string) => { status?: number; nodes?: ReturnType<typeof node>[] }): Sent[] {
+function stubLinear(answer: (key: string) => { status?: number; nodes?: ReturnType<typeof node>[]; more?: boolean }): Sent[] {
   const sent: Sent[] = []
   vi.stubGlobal('fetch', vi.fn(async (_url: string, init: { body: string; headers: Record<string, string> }) => {
     const key = init.headers.Authorization
@@ -47,7 +47,7 @@ function stubLinear(answer: (key: string) => { status?: number; nodes?: ReturnTy
     sent.push({ key, variables: body.variables })
     const reply = answer(key)
     if (reply.status) return new Response('{}', { status: reply.status })
-    return new Response(JSON.stringify({ data: { issues: { nodes: reply.nodes ?? [] } } }))
+    return new Response(JSON.stringify({ data: { issues: { nodes: reply.nodes ?? [], pageInfo: { hasNextPage: reply.more === true } } } }))
   }))
   return sent
 }
@@ -193,5 +193,76 @@ describe('Linear palette search', () => {
     expect(body.items[0].badge).toBe('Urgent')
     expect(JSON.stringify(body)).not.toContain('key-for-linear-a')
     expect(JSON.stringify(body)).not.toContain('secret plan')
+  })
+})
+
+// The rail's Search field (docs/integrations/linear.md § Rail search): the same mapped scope as the
+// palette, answered as rail rows, with `incomplete` whenever the answer may not hold every match.
+describe('Linear rail search', () => {
+  const railSearch = (query: string, projectId = 'project-1') =>
+    new Request(`http://linear.test/rail-search?project=${projectId}&q=${encodeURIComponent(query)}`)
+
+  it('finds an issue the 250-row list never loads, as a rail row that keeps its connection', async () => {
+    const fetchRoutes = createLinearFetch(mappingFor([
+      { connectionId: 'linear-a', externalId: 'proj-a', projectId: 'project-1' },
+      { connectionId: 'linear-b', externalId: 'proj-b', projectId: 'project-2' },
+    ]))
+    const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Other')])
+    const sent = stubLinear(() => ({ nodes: [node('ENG-900', { branchName: 'eng-900-fix' })] }))
+
+    const response = await fetchRoutes(railSearch('login'), context)
+    expect(response.status).toBe(200)
+    // Asked of the mapped connection only, with the reader's word inside the mapped scope.
+    expect(sent.map((entry) => entry.key)).toEqual(['key-for-linear-a'])
+    expect(sent[0].variables.filter).toEqual({
+      and: [
+        { project: { id: { in: ['proj-a'] } }, state: { type: { nin: ['completed', 'canceled'] } } },
+        { or: [{ title: { containsIgnoreCase: 'login' } }] },
+      ],
+    })
+    const body = await response.json() as { items: { id: string; task?: { branch?: string } }[]; incomplete: boolean }
+    expect(body.items.map((row) => row.id)).toEqual(['linear-a:ENG-900'])
+    // The promotion seed rides along, so Create task works on a search result.
+    expect(body.items[0].task?.branch).toBe('eng-900-fix')
+    expect(body.incomplete).toBe(false)
+  })
+
+  it('says the answer is incomplete when a page was full', async () => {
+    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const context = await contextFor([connection('linear-a', 'Acme')])
+    stubLinear(() => ({ nodes: [node('ENG-1')], more: true }))
+
+    expect(await (await fetchRoutes(railSearch('eng'), context)).json()).toMatchObject({ incomplete: true })
+  })
+
+  it('keeps the connection that answered when another fails, and calls the answer incomplete', async () => {
+    const fetchRoutes = createLinearFetch(mappingFor([
+      { connectionId: 'linear-a', externalId: 'proj-a', projectId: '' },
+      { connectionId: 'linear-b', externalId: 'proj-b', projectId: '' },
+    ]))
+    const context = await contextFor([connection('linear-a', 'Acme'), connection('linear-b', 'Globex')])
+    stubLinear((key) => key === 'key-for-linear-a' ? { status: 500 } : { nodes: [node('OPS-1')] })
+
+    const response = await fetchRoutes(railSearch('ops'), context)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ items: [{ id: 'linear-b:OPS-1' }], incomplete: true })
+  })
+
+  it('reports a total failure', async () => {
+    const fetchRoutes = createLinearFetch(mappingFor([{ connectionId: 'linear-a', externalId: 'proj-a', projectId: '' }]))
+    const context = await contextFor([connection('linear-a', 'Acme')])
+    stubLinear(() => ({ status: 500 }))
+
+    const response = await fetchRoutes(railSearch('login'), context)
+    expect(response.status).toBe(502)
+  })
+
+  it('answers no rows, and asks Linear nothing, where the project maps nothing', async () => {
+    const fetchRoutes = createLinearFetch({ byId: async () => null, externalProjects: async () => [] })
+    const context = await contextFor([connection('linear-a', 'Acme')])
+    const sent = stubLinear(() => ({ nodes: [node('ENG-1')] }))
+
+    expect(await (await fetchRoutes(railSearch('login'), context)).json()).toEqual({ items: [], incomplete: false })
+    expect(sent).toHaveLength(0)
   })
 })

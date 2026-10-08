@@ -1,4 +1,4 @@
-import { createMemo, createSignal, For, onCleanup, onMount, Show } from 'solid-js'
+import { createSignal, For, onCleanup, onMount, Show } from 'solid-js'
 import { Dynamic } from 'solid-js/web'
 import { useNavigate, useParams } from '@solidjs/router'
 import { createQuery, useQueryClient } from '@tanstack/solid-query'
@@ -24,7 +24,7 @@ import { PromoteToTaskModal } from '../../features/integrations/PromoteToTaskMod
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '../registries/panes/projectSurfaces'
 import { taskTracksRef } from '../registries/sources/sources'
 import { activateTaskSignals, pathForTask } from '../../features/tasks/activate'
-import { filterSourceItems } from './sourceFilter'
+import { createSourceSearch, sourceSearchEmpty, sourceSearchNotice } from './sourceSearch'
 
 const iconTone = (severity: PluginRailItem['severity']): 'accent' | 'warn' | 'danger' | undefined =>
   severity === 'info' ? 'accent' : severity
@@ -97,10 +97,8 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   // project, so carrying the project would split one cache entry into one per project and refetch the
   // identical list on every project switch. The `navigate` verb below still gets the project, because
   // that addresses a surface at `/p/:projectId/x/…` whether or not the rail cares.
-  const scope = () => ({
-    revision: chromeDeps(props.pluginId),
-    projectId: props.descriptor.projectScoped ? params.projectId : undefined,
-  })
+  const projectId = () => props.descriptor.projectScoped ? params.projectId : undefined
+  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
   const [result, { refetch }] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
@@ -117,12 +115,19 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
   const allItems = () => row()?.data ?? []
   const unavailable = () => result().unavailable[0]
 
-  // Client-side filter over the loaded list, the same bargain github's PR filter strikes
-  // (plugins/github pullList/model.ts). It narrows what the source returned rather than asking the
-  // plugin to search, so no descriptor field and no plugin route is involved.
+  // The loaded rows narrow as the reader types, and a source with a `search` route then asks the
+  // provider for matches beyond them (./sourceSearch.ts). Collapsed, the field is out of sight, so the
+  // text stays here but nothing is filtered or searched.
   const [filter, setFilter] = createSignal('')
-  const query = () => collapsed() ? '' : filter().trim().toLowerCase()
-  const items = createMemo(() => filterSourceItems(allItems(), query()))
+  const search = createSourceSearch({
+    pluginId: props.pluginId,
+    nodeId,
+    descriptor: () => props.descriptor,
+    projectId,
+    text: () => collapsed() ? '' : filter(),
+    loaded: allItems,
+  })
+  const items = search.items
 
   const [refreshing, setRefreshing] = createSignal(false)
   const refresh = async (): Promise<void> => {
@@ -270,16 +275,20 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
           {props.descriptor.label}
         </SectionHeader>
 
-        <Toolbar size="sm" ariaLabel={`${props.descriptor.label} filter`}>
+        <Toolbar size="sm" ariaLabel={`Search ${props.descriptor.label}`}>
           <Input
             kind="filter"
             size="sm"
-            placeholder={`Filter ${props.descriptor.label}…`}
-            label={`Filter ${props.descriptor.label} by title or number`}
+            placeholder={`Search ${props.descriptor.label}…`}
+            label={`Search ${props.descriptor.label} by title or number`}
             value={filter()}
             onInput={(value) => setFilter(value)}
           />
         </Toolbar>
+        {/* Only beside rows. With none, the empty state below says the same thing in its place. */}
+        <Show when={items().length ? sourceSearchNotice(search) : undefined}>
+          {(notice) => <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>{notice()}</EmptyState>}
+        </Show>
       </Show>
 
       {/* A node that did not answer and had nothing cached is a banner, never a failed pane. Collapsed,
@@ -316,17 +325,17 @@ export function ChromeSourceList(props: ChromeSourcePanelProps) {
             {/* The authored empty state, or the fixed string for a source that declares none. Renders
                 only under `row()`, meaning the plugin's route answered with nothing. An unreachable node
                 is the banner above, because "nothing is assigned to you" is a claim the host cannot make
-                on a failed fetch. A filter that hides every row says so instead, because the source's
-                sentence would claim there is nothing at all. */}
+                on a failed fetch. A search with no rows says where it stands instead, because the
+                source's sentence would claim there is nothing at all. */}
             <For
               each={items()}
               fallback={(
                 <Show when={!collapsed()}>
                   <Show
-                    when={query() && allItems().length}
+                    when={search.status() !== 'idle'}
                     fallback={<SourceEmpty pluginId={props.pluginId} nodeId={nodeId} empty={props.descriptor.emptyState} />}
                   >
-                    <EmptyState align="start" size="sm">Nothing matches that filter.</EmptyState>
+                    <EmptyState align="start" size="sm" busy={search.status() === 'searching'}>{sourceSearchEmpty(search.status())}</EmptyState>
                   </Show>
                 </Show>
               )}

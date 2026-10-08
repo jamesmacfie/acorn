@@ -114,6 +114,9 @@ The persisted cache gives fast last-known reads, not mutation confirmation. Whil
 or offline, cached answers stay visible with freshness badges. A reconnect or sequence gap marks data
 stale and fetches again. There's no history cursor and no offline mutation queue.
 
+A query whose options set `meta: { persist: false }` stays in memory only. Provider search answers do,
+so a relaunch never shows an old answer as though it had just arrived.
+
 Two ages bound it (`packages/client-core/src/infra/persistence/queryPersistence.ts`). A snapshot is
 restored if it was written in the last seven days, so the first launch after a weekend draws last-known
 rows. An entry goes into the next snapshot only if it was fetched in the last day, matching `gcTime`.

@@ -60,6 +60,12 @@ export type TaskPullRelationsResponse = { pulls: TaskPullRelation[] }
 // Closed PRs are paginated on demand (one GitHub page per fetch); nextPage is null at the end.
 export type ClosedPullsPage = { pulls: Pull[]; nextPage: number | null }
 
+// One page of GitHub's search within a repository and state. A search hit carries no branches, so
+// `headRef` and `baseRef` are null and a row action that needs them reads the pull's detail first.
+// `total` is GitHub's count, and `incomplete` says the page holds fewer than all of them or GitHub
+// reported a partial search.
+export type PullSearchPage = { pulls: Pull[]; total: number; incomplete: boolean }
+
 // Whether a mirrored resource holds everything GitHub has. The only way to be incomplete is an
 // upstream ceiling: the pull files endpoint stops at 3,000 files and compare at 300. A failed refresh
 // is not incomplete; it keeps the previous mirror and serves it stale.
@@ -164,6 +170,8 @@ export const githubImportRoute = '/v1/p/github/import'
 
 export const pullsRoute = (owner: string, repo: string, state: 'open' | 'closed') => `${repoRoute(owner, repo)}/pulls?state=${state}`
 export const closedPullsRoute = (owner: string, repo: string, page: number) => `${pullsRoute(owner, repo, 'closed')}&page=${page}`
+export const pullSearchRoute = (owner: string, repo: string, state: 'open' | 'closed', query: string) =>
+  `${repoRoute(owner, repo)}/pulls/search?state=${state}&q=${encodeURIComponent(query)}`
 export const pullsBatchRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls/batch`
 export const createPullRoute = (owner: string, repo: string) => `${repoRoute(owner, repo)}/pulls`
 export const taskPullsRoute = (taskId: string) => `/v1/p/github/tasks/${encodeURIComponent(taskId)}/pulls`
@@ -195,6 +203,9 @@ export const pullsKey = (owner: string, repo: string, state: 'open' | 'closed') 
 // The closed list is an infinite query, so its key includes the `pages` shape marker.
 export const closedPullsKey = (owner: string, repo: string) => ['pulls', owner, repo, 'closed', 'pages'] as const
 export const pullsPrefixKey = (owner: string, repo: string) => ['pulls', owner, repo] as const
+// Its own prefix, so a list refresh never refetches a search and a search never stands in for a list.
+export const pullSearchKey = (owner: string, repo: string, state: 'open' | 'closed', query: string) =>
+  ['pull-search', owner, repo, state, query] as const
 export const taskPullsKey = (taskId: string) => ['task-pulls', taskId] as const
 export const pullKey = (owner: string, repo: string, number: string) => ['pull', owner, repo, number] as const
 export const pullPrefixKey = (owner: string, repo: string) => ['pull', owner, repo] as const
