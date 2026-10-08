@@ -42,6 +42,28 @@ export const localDocumentRoute = (taskId: string) => `/v1/p/changes/tasks/${tas
 export const localSegmentsRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document/segments`
 export const localSearchRoute = (taskId: string) => `/v1/p/changes/tasks/${taskId}/local/document/search`
 export type LocalScope = 'unstaged' | 'staged'
+export const dependencyReviewRoute = (taskId: string, scope: LocalScope) =>
+  `/v1/p/changes/tasks/${taskId}/local/dependencies?scope=${scope}`
+export type DependencyFinding = {
+  path: string
+  kind: 'direct' | 'transitive' | 'integrity' | 'source' | 'script' | 'policy' | 'coverage'
+  name: string
+  before: string | null
+  after: string | null
+  detail?: string
+  warning?: boolean
+}
+export type DependencyReview = {
+  scope: LocalScope
+  revision: string
+  analyzerVersion: number
+  manager: 'npm' | 'pnpm' | 'unsupported' | 'unknown'
+  managerVersion: string | null
+  coverage: 'complete' | 'partial' | 'unsupported'
+  packageCount: number
+  findings: DependencyFinding[]
+  limits: string[]
+}
 export type LocalDocumentRequest = { scope: LocalScope; files: { path: string; key: string }[] }
 /** Per file: the patch's digest, null for no diff, and how it cuts. The pane holds the rest. */
 export type LocalDocumentResponse = { files: { path: string; patchKey: string | null; segments: DiffSegmentDescriptor[] }[] }

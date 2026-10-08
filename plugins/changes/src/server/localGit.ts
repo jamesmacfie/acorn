@@ -70,6 +70,7 @@ export function localGitBridge(
     return res
   }
   return {
+    dependencies: async (taskId, scope) => (await import('./dependencyReview')).dependencyReview(await rootOf(taskId), scope, taskId),
     status: async (taskId) => {
       const root = await core.tasks.root(taskId)
       if (!root) return emptyLocalStatus()

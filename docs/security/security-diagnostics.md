@@ -26,11 +26,12 @@ configuration code, package managers, MCP servers,
 hooks, harness probes, models, or credential validation. It returns no raw argument, header,
 environment entry, credential value, or provider output.
 
-Project policy inspection recognizes `package.json`, `.npmrc`, and `pnpm-workspace.yaml`. It reports
-package-manager identity, declared scripts, Git or URL dependency sources, recognized policy setting
-names, exact `ignore-scripts` booleans, and a simple numeric `minimumReleaseAge`. It does not parse
-YAML collections or prove that every install follows those files. It cannot apply pnpm policy to npm,
-npx, Python, or arbitrary scripts. Detailed dependency parsing belongs to phase 08.
+Project policy inspection calls Changes' typed, passive static policy capability when it is
+available. It reports npm or pnpm identity, version, policy setting names, and any incomplete read.
+The capability reads bounded fixed files after the selected project's canonical root is resolved.
+If Changes is unavailable, the diagnostic uses its smaller fixed-file summary. Neither path proves
+that every install follows those files. Pnpm policy cannot cover npm, npx, Python, or arbitrary scripts.
+Revision-specific dependency changes appear in [Changes](../diff-rendering/changes-pane.md#the-file-list).
 
 The plugin host reports counts of active executable grants, enabled development modes, enabled
 approved and unapproved skills, and pending changed packages. It does not expose package names or

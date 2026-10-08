@@ -6,9 +6,11 @@ import { reviewNotesRoutes } from '../server/routes/reviewNotes'
 import { EDITOR_LINE_MARKERS } from '@acorn/plugin-editor/contract/lineMarkers.ts'
 import { EDITOR_FILE_STATUS } from '@acorn/plugin-editor/contract/fileStatus.ts'
 import { changesEditorFileStatus } from '../server/editorFileStatus'
+import { STATIC_DEPENDENCY_POLICY } from '@acorn/protocol/dependencyPolicy.ts'
 
 export const changesPlugin = (): NodePlugin => {
   let capability: { dispose(): void } | null = null
+  let policyCapability: { dispose(): void } | null = null
   return {
   name: 'changes',
   label: 'Changes',
@@ -31,6 +33,9 @@ export const changesPlugin = (): NodePlugin => {
     for (const point of CHANGES_HOOKS) ctx.hooks.declare({ ...point, allows: [...point.allows] })
     const bridge = localGitBridge(ctx.core, ctx.events.worktreeStatus, ctx.hooks)
     capability = ctx.capabilities.provide(LOCAL_GIT, bridge)
+    policyCapability = ctx.capabilities.provide(STATIC_DEPENDENCY_POLICY, {
+      read: async (root) => (await import('../server/dependencyReview')).staticDependencyPolicy(root),
+    })
     ctx.extensionPoints.handle(EDITOR_LINE_MARKERS, {
       id: 'uncommitted',
       value: { kind: 'uncommitted', read: async (taskId, path, source) =>
@@ -53,6 +58,7 @@ export const changesPlugin = (): NodePlugin => {
   // (docs/data-layer/migrations.md § Migrations).
   dispose: () => {
     capability?.dispose()
+    policyCapability?.dispose()
   },
   }
 }

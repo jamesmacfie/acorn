@@ -15,8 +15,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@acorn/plugin-agents": "workspace:*",
     "@acorn/diff-document": "workspace:*",
+    "@acorn/plugin-agents": "workspace:*",
     "@acorn/plugin-api": "workspace:*",
     "@acorn/plugin-editor": "workspace:*",
     "@acorn/protocol": "workspace:*",
@@ -25,6 +25,7 @@
     "gitdiff-parser": "^0.3.1",
     "hono": "catalog:",
     "solid-js": "catalog:",
+    "yaml": "^2.9.1",
     "zod": "catalog:"
   },
   "devDependencies": {

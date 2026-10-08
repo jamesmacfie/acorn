@@ -93,6 +93,14 @@ describe('local-git routes over a real worktree', () => {
     expect((await statusOf(app)).changes.find((c) => c.path === 'new.txt')?.staged).toBe(true)
   })
 
+  it('requires an explicit dependency review scope and returns bounded partial coverage', async () => {
+    const app = authed()
+    expect((await app.fetch(req('/api/tasks/task1/local/dependencies'), {} as Env)).status).toBe(400)
+    const response = await app.fetch(req('/api/tasks/task1/local/dependencies?scope=unstaged'), {} as Env)
+    expect(response.status).toBe(200)
+    expect(await response.json()).toMatchObject({ scope: 'unstaged', coverage: 'partial', analyzerVersion: 1 })
+  })
+
   it('400s an empty path list, the old single-path body, and a document with no scope', async () => {
     const app = authed()
     expect((await app.fetch(req('/api/tasks/task1/local/stage', 'POST', { paths: [] }), {} as Env)).status).toBe(400)

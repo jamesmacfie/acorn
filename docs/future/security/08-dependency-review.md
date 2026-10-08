@@ -1,5 +1,44 @@
 # Phase 08: explain dependency and install-policy changes
 
+## Completion note: October 9, 2026
+
+Status: implemented as an advisory Changes review. The Node compares HEAD with the index for staged
+review and the index with bounded disk reads for unstaged review. Relevant untracked files join the
+unstaged side. Reports carry a task-bound digest of both inputs, scope, format, and analyzer version.
+The Changes list refreshes the report with its status, hides the previous result while a replacement
+loads, and links findings to files in the selected scope. Stage, diff, commit, and push paths retain
+their established behavior.
+
+The analyzer supports npm lockfile versions 2 and 3, npm shrinkwrap, pnpm lockfile version 9,
+manifests, workspace settings, and repository registry configuration. It reports manifest requests,
+lockfile importer resolutions, peer variants, aliases, optional and workspace identity, source and
+integrity changes, project lifecycle-script names, manager versions, and policy edits. It treats
+catalog and override specifier differences as expected resolution behavior. Missing, malformed,
+oversized, mixed, and unsupported inputs produce partial or unsupported coverage. It does not run
+package managers, JavaScript configuration, project scripts, or hooks. Executable configuration is
+labelled uninterpreted. There is no network metadata action: registry destination and redirect
+policy cannot be verified safely from repository files alone. Installed dependency scripts, release
+dates, publisher identity, provenance, and malware status remain unknown. Integrity never implies
+provenance.
+
+Changes publishes `STATIC_DEPENDENCY_POLICY` through the protocol contract for Phase 07. The
+diagnostic calls this read-only, lazy capability for a selected project's canonical root, and keeps
+its previous fixed-file summary when Changes is unavailable. Later phases can consume the typed
+facts without importing Changes implementation or causing executable work. No approval gate or
+terminal-install enforcement was added.
+
+Evidence: the Changes suite passed 278 tests with one skipped; the client-core suite passed 2,599;
+focused dependency review passed six, and Phase 07 diagnostics passed 13. Architecture tests passed
+87. TypeScript checks passed for Changes, agents, protocol, Node, client-core, and desktop. The Node
+service built at 3,190,861 B with a measured 3 KB ceiling increase for route and capability wiring;
+`dependencyReview.ts` and YAML remain outside its static graph. The desktop renderer build passed.
+The isolated desktop displayed staged and unstaged lockfile/manifest selections. An edit while the
+unstaged report was open changed its count from one to two after refresh, and restoring the file
+returned it to one. The fixture was stopped. The route golden passed 35 of 36 checks; its sole
+failure is the pre-existing GitHub pulls search entry. The full agents suite had three unrelated
+sandbox-sensitive process/worktree failures; its changed diagnostic tests passed. No private-registry
+metadata fetch was attempted.
+
 Date: October 8, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: none of phases 01 to 07; share static policy facts with phase 07 when available.

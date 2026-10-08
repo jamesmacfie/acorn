@@ -5,6 +5,7 @@ import { TOOL_TIER_DEFAULTS, toolPermissionsSchema } from '@acorn/protocol/toolP
 import { AGENT_TOOLS_PERMS_PREF_KEY } from '@acorn/protocol/api.ts'
 import { isToolWithinCeiling, parseToolCeiling } from '@acorn/protocol/toolPolicy.ts'
 import type { CoreServices } from '@acorn/plugin-api/node'
+import type { StaticDependencyPolicy } from '@acorn/protocol/dependencyPolicy.ts'
 import type { AgentSession } from '../contract/wire.ts'
 import type { AgentProviderDescriptor } from '../contract/wire.ts'
 import type { InstructionAdmissionObservation } from './sessions/instructionAdmission'
@@ -25,6 +26,7 @@ export type SecurityDiagnosticPorts = {
   managedMcp(): Promise<AgentMcpServer[]>
   instructionObservation?(projectId: string | null, taskId: string | null): Promise<InstructionAdmissionObservation | null>
   observedProvider?(id: string): AgentProviderDescriptor | null
+  staticDependencyPolicy?(root: string): Promise<StaticDependencyPolicy | undefined>
 }
 
 export async function securityScopeChoices(
@@ -265,6 +267,14 @@ export async function collectSecurityDiagnostics(
       const project = await bounded(() => ports.core.projects.byId(projectId))
       if (!project?.path) throw new Error('no project checkout')
       const root = await realpath(project.path)
+      const typedPolicy = await ports.staticDependencyPolicy?.(root)
+      if (typedPolicy) {
+        add('project.package-policy', 'project', typedPolicy.limits.length ? 'unsupported' : 'configured_only', 'attention',
+          'Changes static dependency policy capability',
+          `Package manager ${typedPolicy.manager}${typedPolicy.managerVersion ? ` ${typedPolicy.managerVersion}` : ''}; policy settings: ${typedPolicy.policyKeys.join(', ') || 'none'}.`,
+          `Static configuration only. ${typedPolicy.limits.join(' ').slice(0, 500) || 'Install commands and project code were not run.'}`,
+          'Open Changes for revision-specific dependency review.')
+      } else {
       const [packageJson, npmrc, workspace] = await bounded(() => Promise.all([
         fixedFile(ports, root, 'package.json', signal), fixedFile(ports, root, '.npmrc', signal), fixedFile(ports, root, 'pnpm-workspace.yaml', signal),
       ]))
@@ -295,6 +305,7 @@ export async function collectSecurityDiagnostics(
         `Package manager ${manager}; ${scripts}; ${manifestPolicy}; ${scriptPolicy}; .npmrc setting names: ${known.join(', ') || 'none'}; pnpm release-age ${age ? `${age} minutes` : 'unreported'}; workspace policy keys: ${workspaceKeys.join(', ') || 'none'}.`,
         'Presence of a policy is configured intent only. This pass does not interpret YAML collections, exceptions, registry values, JS configuration, or other package runners. Phase 08 owns detailed dependency parsing.',
         'Inspect project package policy and Settings > Project configuration.')
+      }
     } catch {
       add('project.package-policy', 'project', 'failed', 'attention', 'selected project files',
         'Static package policy could not be read from the selected project.',

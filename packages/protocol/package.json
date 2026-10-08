@@ -6,6 +6,7 @@
   "type": "module",
   "//exports": "Enumerated, not a wildcard. Two things that buys over `\"./*\": \"./src/*\"`: a test file is not importable from another package, and a new module here is public only when someone adds it to this list. Adding the line is the decision.",
   "exports": {
+    "./dependencyPolicy.ts": "./src/dependencyPolicy.ts",
     "./agentContext.ts": "./src/agents/agentContext.ts",
     "./api.ts": "./src/transport/api.ts",
     "./attention.ts": "./src/agents/attention.ts",

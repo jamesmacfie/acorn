@@ -117,6 +117,16 @@ it('does not inspect encrypted approval bodies during a passive project check', 
   expect(report.findings.find((finding) => finding.id === 'instructions.approval')).toMatchObject({ state: 'unknown' })
 })
 
+it('uses Changes static policy facts through the typed project capability', async () => {
+  root = await mkdtemp(join(tmpdir(), 'acorn-diagnostics-'))
+  const report = await collectSecurityDiagnostics(ports({
+    staticDependencyPolicy: async () => ({ manager: 'pnpm', managerVersion: '11.0.0', policyKeys: ['pnpm-workspace.yaml:minimumReleaseAgeExclude', 'pnpm-workspace.yaml:allowBuilds'], limits: [] }),
+  }), 'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
+  const finding = report.findings.find((item) => item.id === 'project.package-policy')
+  expect(finding?.summary).toContain('minimumReleaseAgeExclude')
+  expect(finding?.source).toContain('Changes static dependency policy capability')
+})
+
 it('rejects a FIFO promptly and never emits configured policy evidence', async () => {
   root = await mkdtemp(join(tmpdir(), 'acorn-diagnostics-'))
   execFileSync('mkfifo', [join(root, 'package.json')])

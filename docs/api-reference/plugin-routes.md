@@ -127,9 +127,9 @@ The Changes pane reads its diff as a document, one staging area at a time, with 
 | `POST …/local/document` | `{ scope, files: { path, key }[] }`, at most 5,000 files | `{ files: { path, patchKey, segments }[] }`, in request order |
 | `POST …/local/document/segments` | `{ scope, requests }`, one to 32 | `DiffSegmentPayload[]` |
 | `POST …/local/document/search` | `{ scope, query, caseSensitive, cursor, files }` | `DiffSearchPage` |
-
-`scope` is `staged` or `unstaged`. `key` is the pane's status key for the file, and the Node diffs
-again only the files whose key moved. A null `patchKey` means the file has no diff in that scope, or
+| `GET …/local/dependencies?scope=staged\|unstaged` | No body | `DependencyReview` with revision digest, format, coverage, findings, and limits |
+`scope` is `staged` or `unstaged`. `key` is the pane's status key; the Node diffs
+again only files whose key moved. A null `patchKey` means the file has no diff in that scope, or
 Git can't read it. A segment or search request naming a digest that isn't the one the last document
 gave that file answers `409 revision_conflict`, and the pane reads the document again. A task with no
 worktree answers `404 not_found`.

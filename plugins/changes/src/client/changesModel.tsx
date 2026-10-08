@@ -137,6 +137,12 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   // The stacked file set: one staging area at a time (./model.ts § stackFor).
   const stack = createMemo(() => stackFor(groups(), selected()))
   const scope = (): LocalScope => (selected()?.staged ? 'staged' : 'unstaged')
+  const [dependencies] = createResource(
+    () => pane.shown() && project()?.vcs === 'git' && !isArchiving(task.id)
+      && status().changes.some((change) => change.staged === (scope() === 'staged') && /(^|\/)(package\.json|pnpm-lock\.yaml|pnpm-workspace\.yaml|package-lock\.json|npm-shrinkwrap\.json|\.npmrc|\.pnpmrc|\.yarnrc(?:\.yml)?|yarn\.lock|bun\.lockb?)$/.test(change.path))
+      ? { scope: scope(), revision: statusRevision() } : undefined,
+    async ({ scope }) => localGitApi.dependencies(task.id, scope).catch(() => undefined),
+  )
 
   // The stack as a document (docs/diff-rendering/document.md § The document). The node diffs, cuts and keys
   // every file's patch; it is asked again whenever the stack or any file's status key moves, and diffs
@@ -414,6 +420,7 @@ export function createChangesModel(task: Task, pane: PaneModelContext) {
   }
 
   return {
+    dependencies,
     task,
     project,
     isGit: () => project()?.vcs === 'git',

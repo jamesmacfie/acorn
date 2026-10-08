@@ -35,6 +35,7 @@ import { agentMcpServers, AGENT_MCP_SERVERS } from '../server/routes/mcpServers'
 import { agentLoopHooks, AGENT_LOOP_HOOKS } from '../server/routes/loopHook'
 import { agentInstructionReview, AGENT_INSTRUCTION_REVIEW } from '../server/routes/instructionReview'
 import { agentSecurityDiagnostics, AGENT_SECURITY_DIAGNOSTICS } from '../server/routes/securityDiagnostics'
+import { STATIC_DEPENDENCY_POLICY } from '@acorn/protocol/dependencyPolicy.ts'
 import { claudeHandoffMcp, codexHandoffMcp } from '../server/profiles/mcpCommands'
 import { sessionMcpSelection } from '../shared/mcpServers'
 import { aiderProfile, claudeCodeProfile, codexProfile } from '../server/profiles/index'
@@ -355,6 +356,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
             managedMcp: () => runtime!.mcpServers.list(),
             instructionObservation: async (projectId, taskId) => (await runtime!.observedInstructionAdmission())?.latest(projectId, taskId) ?? null,
             observedProvider: (id) => runtime!.observedProvider(id),
+            staticDependencyPolicy: async (root) => {
+              const policy = ctx.capabilities.get(STATIC_DEPENDENCY_POLICY)
+              return policy?.read(root)
+            },
           }, nodeId, userId, scope, signal)
         },
         scopes: async () => {

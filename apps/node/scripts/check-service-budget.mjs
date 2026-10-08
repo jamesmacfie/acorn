@@ -77,7 +77,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // Phase 07 follow-up: the passive provider-cache and admission readers plus boot-time wiring for
 // the lazy plugin projection add 1,080 B. measure:service-graph confirms pluginSecurity.ts is not
 // statically reachable. Add 1 KB to the ceiling; the final measured graph leaves 298 B.
-const limits = { ceiling: 3_189_000, floor: 1_000_000 }
+// 2026-10-09: 3,190,861 B after Changes' dependency route and passive policy capability join
+// the boot registrations. measure:service-graph confirms dependencyReview.ts and YAML stay lazy.
+// The 3 KB ceiling increase covers 2,159 B of route and capability wiring; leave 1,139 B of margin.
+const limits = { ceiling: 3_192_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

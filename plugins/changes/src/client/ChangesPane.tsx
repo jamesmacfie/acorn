@@ -1,4 +1,4 @@
-import { createSignal, Show } from 'solid-js'
+import { createSignal, For, Show } from 'solid-js'
 import { fileStatusMeta, type Task } from '@acorn/plugin-api/client'
 import {
   Alert, Badge, Button, Checkbox, DiffPane, EmptyState, Fold, Icon, IconButton, Inline, Menu,
@@ -187,6 +187,28 @@ function NotesBanner(props: { model: ChangesModel }) {
   )
 }
 
+function DependencySummary(props: { model: ChangesModel }) {
+  const [open, setOpen] = createSignal(false)
+  const review = () => !props.model.dependencies || props.model.dependencies.loading ? undefined : props.model.dependencies()
+  return <Show when={review()}>
+    {(answer) => <Stack gap="none">
+      <Button variant="ghost" size="sm" onPress={() => setOpen(!open())}>
+        Dependencies: {answer().packageCount} package{answer().packageCount === 1 ? '' : 's'}, {answer().findings.length} finding{answer().findings.length === 1 ? '' : 's'} · {answer().coverage} · {answer().scope}
+      </Button>
+      <Show when={open()}>
+        <Text>{answer().manager}{answer().managerVersion ? ` ${answer().managerVersion}` : ''}. Advisory review; integrity is not provenance.</Text>
+        <For each={answer().findings}>{(finding) =>
+          <Stack gap="none">
+            <Text>{finding.warning ? 'Warning · ' : ''}{finding.kind}: {finding.name} {finding.before ?? 'absent'} → {finding.after ?? 'absent'}</Text>
+            <Button variant="ghost" size="sm" onPress={() => props.model.select({ path: finding.path, staged: answer().scope === 'staged' })}>{finding.path}</Button>
+          </Stack>
+        }</For>
+        <For each={answer().limits}>{(limit) => <Text>{limit}</Text>}</For>
+      </Show>
+    </Stack>}
+  </Show>
+}
+
 /** What `Rows` hands a row of its collection: the roving tabindex, the id, and the focus callback. */
 type RowItem = Parameters<Parameters<typeof Rows>[0]['children']>[1]
 
@@ -342,6 +364,7 @@ export function ChangesList(props: { task: Task; model: ChangesModel }) {
     <Show when={model().isGit()}>
       <Stack gap="none">
         <NotesBanner model={model()} />
+        <DependencySummary model={model()} />
         {SECTIONS.map(({ key, title }) => (
           <Show when={sectionOf(key)}>
             {(section) => {

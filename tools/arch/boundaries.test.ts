@@ -604,7 +604,7 @@ describe('architecture boundaries', () => {
 
   it('libraries publish only enumerated, existing source entrypoints', () => {
     const limits: Record<string, number> = {
-      '@acorn/protocol': 81, // Includes both workspace appearance and the Node workspace mode contract.
+      '@acorn/protocol': 82, // Includes the narrow static dependency policy capability contract.
       // Model-provider error guidance needs a pure path for logic tests and remote trees. Importing
       // the kit/lib barrel here would pull renderer-only modules into those consumers. Three more on
       // 2026-09-29 for the settings pages split out of Security, Appearance and Plugins, each its own
