@@ -12,9 +12,8 @@ real desktop snapshot and inspected screenshot show both verdicts on the report 
 child's pasted markers hidden. The fixture proves rendering from saved report data; it does not
 exercise a live checked child under the managed harness. The earlier Phase 3 live
 `session_history_search` and `session_history_read` verification remains valid. No later phase
-depends on a new check contract. Node typecheck passed. The architecture package typecheck still
-fails at its existing `agentContract.test.ts` activity-frame mutual type assertion; the targeted
-architecture tests pass.
+depends on a new check contract. Node typecheck passed. The coordinator traced the architecture
+typecheck failure to Phase 2's missing `goal` source in the published plugin contract and aligned it.
 
 
 Completion note, October 8, 2026: `agent_spawn` and `agent_prompt` accept up to eight host checks.

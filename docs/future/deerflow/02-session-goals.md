@@ -20,6 +20,9 @@ disconnect pauses an active goal; dispatch failure blocks it, and Stop pauses it
 cancellation, and terminal-path tests, affected typechecks, and targeted oxlint cover these changes.
 The coordinator owns the next full suite after all phases are integrated.
 
+Integration review, October 8, 2026: The published plugin contract includes the `goal` turn source,
+so the review-input capability remains aligned with the agents plugin.
+
 Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome

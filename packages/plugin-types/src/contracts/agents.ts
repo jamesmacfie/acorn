@@ -93,7 +93,7 @@ export type TurnFollowUpContribution = {
 
 // ── Capabilities ──────────────────────────────────────────────────────────────────────────────────
 
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
 
 /** `agents.sessionControl` (docs/managed-agents/session-control.md § Calls). */
 export type AgentSessionControl = {
