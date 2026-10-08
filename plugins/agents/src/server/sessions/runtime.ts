@@ -33,6 +33,7 @@ import { mergeSearchIndex } from './ledgerCompaction'
 import { defaultSpawnedAgentDefaults, type SpawnedAgentDefaults } from '../../shared/sessionDefaults'
 import { readAgentSessionDefaults } from '../sessionDefaultsStore'
 import type { TurnAttendanceContext, WorkflowPosture } from './attendance'
+import type { SessionSummaryInput } from '../../shared/sessionSummary'
 
 // Events deleted per step by removeArchivedHistory. Each is a row and its search row. On 20,000
 // synthetic tool rows of about 2 KB, a step of 200 held the node for a median of 7 ms and 18 ms at the
@@ -427,6 +428,14 @@ export class ManagedAgentRuntime {
   /** Regenerate the title from the first durable text prompt. */
   async regenerateTitle(sessionId: string): Promise<AgentSession> {
     return this.titleGeneration.regenerate(sessionId)
+  }
+
+  async summarizeSession(sessionId: string, userId: string, request: SessionSummaryInput, signal: AbortSignal) {
+    const { generateSessionSummary } = await import('./sessionSummary')
+    await this.engine.flushProviderEvents(sessionId)
+    const snapshot = await this.store.exportSnapshot(sessionId)
+    return generateSessionSummary(this.core.models, userId, snapshot, request,
+      AbortSignal.any([signal, this.engine.shutdownSignal]))
   }
 
   setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {

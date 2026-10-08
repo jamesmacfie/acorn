@@ -89,6 +89,10 @@ footer button that isn't `solid`, which is **Cancel**, so Enter doesn't confirm 
 with neither takes focus itself. A child that took focus first, such as the wizard's step body, keeps
 it.
 
+Changing `Modal.size` animates the dialog's width and height over 220 milliseconds. The same dialog
+stays mounted, so its fields and focus survive expansion. Reduced motion disables the animation.
+Generation dialogs can start compact and expand when they reveal a result field.
+
 A `Popover` that holds content heads itself with `SectionHeader level="group"`. There's no `Popover
 title` prop, because the notification bell has two headings.
 

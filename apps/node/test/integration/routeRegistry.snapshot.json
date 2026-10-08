@@ -175,6 +175,8 @@
   "POST /v1/p/agents/sessions/:sessionId/resume-managed",
   "POST /v1/p/agents/sessions/:sessionId/resume-managed",
   "POST /v1/p/agents/sessions/:sessionId/subagents/:subagentId/cancel",
+  "POST /v1/p/agents/sessions/:sessionId/summarize",
+  "POST /v1/p/agents/sessions/:sessionId/summarize",
   "POST /v1/p/agents/sessions/:sessionId/turns",
   "POST /v1/p/agents/sessions/:sessionId/turns",
   "POST /v1/p/agents/sessions/:sessionId/verify-imported-resume",

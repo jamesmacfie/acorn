@@ -230,7 +230,7 @@ export { saveJsonPref, savePref } from '@acorn/client-core/features/settings/sav
 // a plugin's Generate dialog reads the pick, resolves it against the backends it was given, and writes
 // the reader's next choice back for every other dialog to open on.
 export {
-  effectiveModelPick, readGeneratePick, saveGeneratePick,
+  effectiveModelPick, modelPickLabel, readGeneratePick, saveGeneratePick,
 } from '@acorn/client-core/features/settings'
 export type { ModelPick } from '@acorn/client-core/features/settings'
 export { openRepoConfigTrust } from '@acorn/client-core/features/settings'
