@@ -2,7 +2,7 @@
 
 Date: October 7, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `823db58295b84ac9f9fb52f3f85b7a6550bd8761`.
-Relationship: pairs with [phase 03](./03-runtime-network-and-fs-backstop.md).
+Relationship: build before [phase 03](./03-runtime-network-and-fs-backstop.md).
 
 This PRD stops a loaded plugin from defeating its own network and builtin allowlists by rewriting the
 shared JavaScript intrinsics the policy checks depend on. The checks run as ordinary code in the same
@@ -31,12 +31,13 @@ This is consistent with the stated model, where
 [the node realm](../../security/plugin-node-realm.md) is a resource boundary rather than a hostile-code
 sandbox. The gap worth closing is narrower. The network allowlist is presented to plugin authors and
 owners as a real control, "fetch to declared hostnames only," and on the bundled runtime it has no
-enforcement a plugin cannot reach. See [phase 03](./03-runtime-network-and-fs-backstop.md) for the
-operating-system backstop that makes the control hold even when the JavaScript layer is defeated.
+enforcement a plugin cannot reach. [Phase 03](./03-runtime-network-and-fs-backstop.md) moves to Node 26,
+whose runtime refuses sockets to a plugin with no network grant. Node 26 does not scope network access
+by host or confine SQLite, so this phase stays the only guard for declared hostnames and databases.
 
 The outcome: the JavaScript policy layer is not trivially bypassable from inside the realm. A plugin
 that tampers with shared intrinsics finds them frozen, so defeating the allowlist takes more than a
-one-line prototype rewrite, and the backstop in phase 03 catches what remains.
+one-line prototype rewrite. Phase 03's runtime refusal covers only plugins with no network grant.
 
 ## Starting points and owners
 

@@ -329,7 +329,7 @@ Restricted agent execution is outside scope. The programme index defines depende
 | [Scope boundaries](./future/security/refused.md) | Excluded execution isolation, format limits, and authority and coverage constraints. |
 | [Phase 01](./future/security/01-desktop-command-authorization.md) | Explicit caller authorization for Acorn's Tauri commands. |
 | [Phase 02](./future/security/02-plugin-realm-intrinsics.md) | Plugin policies that survive shared-intrinsic tampering. |
-| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | A runtime backstop for loaded-plugin network and filesystem grants. |
+| [Phase 03](./future/security/03-runtime-network-and-fs-backstop.md) | Node 26 in the bundle, so plugins with no network grant get no sockets. |
 | [Phase 04](./future/security/04-internal-token-confinement.md) | Loopback confinement, expiry, and renewal for internal tokens. |
 | [Phase 05](./future/security/05-automation-driver-release-fence.md) | Release exclusion and caller checks for the development automation driver. |
 | [Phase 06](./future/security/06-instruction-review.md) | Instruction changes, bounded discovery, digest-bound review, and incomplete-check refusals. |

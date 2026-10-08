@@ -15,8 +15,8 @@ Docker, databases, browser checks, native tooling, and the normal Runn developme
 
 An agent-process sandbox would also require policy on Acorn's own terminal and run-target execution
 and on delegated agents. Leaving those unrestricted would leave another route to host execution.
-This programme does not undertake that execution-policy redesign. Phase 03's loaded-plugin runtime
-backstop retains its original scope and is not an agent execution sandbox.
+This programme does not undertake that execution-policy redesign. Phase 03's runtime upgrade
+covers loaded plugin workers only and is not an agent execution sandbox.
 
 ## Do not claim input review contains arbitrary code
 
