@@ -3,12 +3,12 @@ import { activeNodeId } from '@acorn/plugin-api/client'
 import { Alert, Button, EmptyState, HistoryMark, Input, Menu, Row, RowActions, Rows, SectionHeader, Select, Stack, Text, historyLayout } from '@acorn/plugin-api/ui'
 import type { HistoryModel } from './historyModel'
 
-export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void }) {
+export function HistoryRows(props: { projectId: string; model: HistoryModel; selected: string | null; onSelect: (id: string) => void; onChanges?: () => void; onRefresh?: () => void }) {
   const commits = () => props.model.commits()
-  const slots = createMemo(() => historyLayout(commits(), !props.model.filter().query, !!props.model.next()))
+  const slots = createMemo(() => historyLayout(commits(), !props.model.filter().query, !!props.model.next(), props.model.dropped()))
   const items = createMemo(() => commits().map((commit) => ({ key: commit.id, label: `${commit.subject} ${commit.id}` })))
   return <Stack gap="section">
-    <SectionHeader count={commits().length} actions={<Button size="sm" variant="ghost" onPress={props.model.refresh}>Refresh</Button>}>History</SectionHeader>
+    <SectionHeader count={commits().length} actions={<Button size="sm" variant="ghost" onPress={props.onRefresh ?? props.model.refresh}>Refresh</Button>}>History</SectionHeader>
     <Select label="Ref" value={props.model.ref() ?? ''} options={[{ value: '', label: 'All refs and HEAD' }, ...(props.model.first.data?.refs ?? []).map((ref) => ({ value: ref, label: ref }))]}
       onChange={(value) => props.model.setRef(value || null)} />
     <Select label="Search in" value={props.model.field()} options={[
@@ -39,9 +39,8 @@ export function HistoryRows(props: { projectId: string; model: HistoryModel; sel
             </>}
           </RowActions>}>
           <Text>{commit().subject}</Text>
-          <Text emphasis="muted">{commit().id.slice(0, 8)} · {commit().author.name}</Text>
+          <Text emphasis="muted">{commit().id.slice(0, 8)} · {commit().parents.length ? `Parents ${commit().parents.map((id) => id.slice(0, 8)).join(', ')}` : 'Root commit'}</Text>
           <Show when={commit().refs.length}><Text emphasis="muted">Refs {commit().refs.join(', ')}</Text></Show>
-          <Text emphasis="muted">{commit().parents.length ? `Parents ${commit().parents.map((id) => id.slice(0, 8)).join(', ')}` : 'Root commit'}</Text>
         </Row>
       }}
     </Rows>

@@ -19,7 +19,7 @@ export function GitPaneList(props: Props) {
       <Show when={props.model.missingBranch()}><Alert tone="warn">Task branch {props.task.branch} is unavailable. Showing repository history and HEAD.</Alert></Show>
       <Button variant="ghost" onPress={() => { setSelectedSource('git'); navigate(`/p/${encodeURIComponent(props.task.projectId)}/x/git/history`) }}>Open repository history</Button>
       <HistoryRows projectId={props.task.projectId} model={props.model.history} selected={props.model.commitId()}
-        onSelect={props.model.setCommitId} onChanges={() => activateChanges(props.task)} />
+        onSelect={props.model.setCommitId} onChanges={() => activateChanges(props.task)} onRefresh={props.model.refreshHistory} />
     </Show>
     <Show when={props.model.section() === 'worktrees'}>
     <SectionHeader count={entries().length} actions={<Button size="sm" variant="ghost" onPress={() => void props.model.inventory.refetch()}>Refresh</Button>}>Worktrees</SectionHeader>
@@ -46,7 +46,7 @@ export function GitPaneDetail(props: Props) {
   const selectedIsOwn = () => !selected() || selected()?.id === own()?.id
   const repoPath = () => `/p/${encodeURIComponent(props.task.projectId)}/x/git/worktrees`
   return <>
-    <Show when={props.model.section() === 'history'}><RevisionView projectId={props.task.projectId} id={props.model.commitId()} onCommit={props.model.setCommitId} /></Show>
+    <Show when={props.model.section() === 'history'}><RevisionView projectId={props.task.projectId} taskId={props.task.id} id={props.model.commitId()} onCommit={props.model.setCommitId} /></Show>
     <Show when={props.model.section() === 'worktrees'}>
     <Stack gap="section">
     <SectionHeader>{selectedIsOwn() ? 'Task checkout' : 'Other worktree'}</SectionHeader>

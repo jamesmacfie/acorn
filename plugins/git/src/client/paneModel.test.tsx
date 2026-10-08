@@ -3,6 +3,7 @@ import { afterEach, expect, it, vi } from 'vitest'
 
 const [nodeId, setNodeId] = createSignal<string | null>('node-a')
 const [rows, setRows] = createSignal<{ id: string; observation: string }[]>([])
+const [historyError, setHistoryError] = createSignal<{ code: string } | null>(null)
 const subscriptions = {
   worktree: new Set<() => void>(),
   tasks: new Set<() => void>(),
@@ -10,7 +11,11 @@ const subscriptions = {
 }
 const invalidateQueries = vi.fn()
 vi.mock('@tanstack/solid-query', () => ({
-  createQuery: () => ({ get data() { return { worktrees: rows() } } }),
+  createQuery: (options: () => { queryKey: readonly unknown[] }) => ({
+    get data() { return options().queryKey[0] === 'git-history' ? { commits: [], refs: [], nextCursor: null } : { worktrees: rows() } },
+    get error() { return options().queryKey[0] === 'git-history' ? historyError() : null },
+    isFetching: false,
+  }),
   useQueryClient: () => ({ invalidateQueries }),
 }))
 vi.mock('@acorn/plugin-api/client', () => ({
@@ -28,7 +33,28 @@ afterEach(() => {
   dispose()
   setNodeId('node-a')
   setRows([])
+  setHistoryError(null)
   invalidateQueries.mockClear()
+})
+
+it('retries a missing task branch on refresh and restores the task filter on Node change', async () => {
+  const model = createRoot((stop) => { dispose = stop; return createGitPaneModel({ id: 'task', projectId: 'project', branch: 'topic' } as never) })
+  expect(model.history.ref()).toBe('refs/heads/topic')
+  setHistoryError({ code: 'bad_ref' })
+  await flush()
+  expect(model.missingBranch()).toBe(true)
+  expect(model.history.ref()).toBeNull()
+
+  setHistoryError(null)
+  model.refreshHistory()
+  expect(model.missingBranch()).toBe(false)
+  expect(model.history.ref()).toBe('refs/heads/topic')
+
+  model.history.setRef(null)
+  setNodeId('node-b')
+  await flush()
+  expect(model.history.ref()).toBe('refs/heads/topic')
+  expect(model.missingBranch()).toBe(false)
 })
 
 it('keeps selection through observation changes and clears it only when its entry or Node leaves', async () => {

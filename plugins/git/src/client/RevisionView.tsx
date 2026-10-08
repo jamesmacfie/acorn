@@ -1,37 +1,42 @@
-import { createEffect, createMemo, createSignal, For, on, Show } from 'solid-js'
+import { createEffect, createMemo, createSignal, For, on, onCleanup, Show } from 'solid-js'
 import { createQuery } from '@tanstack/solid-query'
 import { activeNodeId, nodeReady } from '@acorn/plugin-api/client'
 import { Alert, Badge, Button, CopyButton, DiffPane, EmptyState, Facts, Fold, ListColumn, ListDetail, Row, Rows, SectionHeader, Select, Stack, Text } from '@acorn/plugin-api/ui'
 import type { DiffSource } from '@acorn/plugin-api/ui/diff'
-import { revisionApi, revisionOptions } from './historyClient'
+import type { RevisionDetail } from '../shared/api'
+import { revisionOptions } from './historyClient'
+import { revisionSource } from './revisionSource'
 
-export function RevisionView(props: { projectId: string; id: string | null; onCommit: (id: string) => void }) {
+export function RevisionView(props: { projectId: string; taskId?: string; id: string | null; onCommit: (id: string) => void }) {
   const [base, setBase] = createSignal<string | null | undefined>(undefined)
   const [file, setFile] = createSignal('')
-  const scope = createMemo(() => `${activeNodeId()}:${props.projectId}:${props.id ?? ''}`)
+  const scope = createMemo(() => JSON.stringify([activeNodeId(), props.projectId, props.taskId, props.id]))
   createEffect(on(scope, () => { setBase(undefined); setFile('') }, { defer: true }))
   const detail = createQuery(() => revisionOptions(props.projectId, props.id ?? '', base()))
-  const data = () => detail.data
-  const source = createMemo<DiffSource>(() => ({
-    scope: { routeKey: `git-revision:${props.projectId}:${props.id ?? ''}:${base() ?? ''}` },
-    topology: () => data()?.topology,
-    loading: () => detail.isLoading,
-    signature: () => `${props.id ?? ''}:${base() ?? ''}:${data()?.topology.revision ?? ''}`,
-    selectedPath: file,
-    loadSegments: (requests, signal) => revisionApi.segments(props.projectId, props.id!, data()!.base, requests, signal),
-    search: (request, signal) => revisionApi.search(props.projectId, props.id!, data()!.base, request, signal),
-    fileText: async ({ path, sha }) => (await revisionApi.file(props.projectId, props.id!, data()!.base, path, sha)).text,
-    canComment: () => false,
-    invalidate: () => void detail.refetch(),
-    draftPrefix: `git-revision:${props.projectId}:${props.id ?? ''}`,
-    find: { commandId: 'git.revision.find', description: 'Find in revision', category: 'Git' },
-  }))
+  const current = createMemo(() => {
+    const response = detail.data
+    const nodeId = activeNodeId()
+    if (!nodeId || !nodeReady() || !props.id || !response || response.nodeId !== nodeId ||
+      response.projectId !== props.projectId || response.id !== props.id || response.requestedBase !== base()) return null
+    return { detail: response.detail, target: { nodeId, projectId: props.projectId, taskId: props.taskId, id: props.id, base: response.detail.base } }
+  })
+  const [state, setState] = createSignal<{ detail: RevisionDetail; source: DiffSource } | null>(null)
+  createEffect(() => {
+    const selected = current()
+    if (!selected) { setState(null); return }
+    const controller = new AbortController()
+    setState({ detail: selected.detail, source: revisionSource(selected.target, selected.detail, file,
+      () => { if (!controller.signal.aborted) void detail.refetch() }, controller.signal) })
+    onCleanup(() => controller.abort())
+  })
   return <>
     <Show when={props.id}>
       <Show when={!nodeReady()}><EmptyState title="Node unavailable">Reconnect to inspect this revision.</EmptyState></Show>
       <Show when={detail.isLoading}><EmptyState title="Loading revision topology" /></Show>
       <Show when={detail.error}><Alert tone="warn">{String(detail.error)}</Alert></Show>
-      <Show when={data()}>{(revision) => <ListDetail list={<ListColumn scroll><Stack gap="section">
+      <Show when={state()}>{(resolved) => {
+        const revision = () => resolved().detail
+        return <ListDetail list={<ListColumn scroll><Stack gap="section">
         <SectionHeader actions={<CopyButton text={() => revision().commit.id} always title="Copy full commit ID" />}>Revision · {revision().commit.id.slice(0, 12)}</SectionHeader>
         <Text>{revision().commit.message}</Text>
         <Fold label="Commit details"><Stack gap="row">
@@ -66,7 +71,8 @@ export function RevisionView(props: { projectId: string; id: string | null; onCo
               }}
             </Rows>
         </Fold>
-      </Stack></ListColumn>}><DiffPane source={source()} /></ListDetail>}</Show>
+      </Stack></ListColumn>}><DiffPane source={resolved().source} /></ListDetail>
+      }}</Show>
     </Show>
   </>
 }

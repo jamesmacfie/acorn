@@ -14,11 +14,11 @@ let folder = ''
 afterEach(() => { if (folder) rmSync(folder, { recursive: true, force: true }); folder = '' })
 const git = (cwd: string, ...args: string[]) => execFileSync('git', args, { cwd, encoding: 'utf8' }).trim()
 const write = (root: string, path: string, content: string) => writeFileSync(join(root, path), content)
-function fixture() {
+function fixture(objectFormat?: 'sha256') {
   folder = mkdtempSync(join(tmpdir(), 'acorn-history-'))
   const root = join(folder, 'repo')
   mkdirSync(root)
-  git(root, 'init', '-q')
+  git(root, 'init', '-q', ...(objectFormat ? [`--object-format=${objectFormat}`] : []))
   git(root, 'config', 'user.name', 'Acorn Test')
   git(root, 'config', 'user.email', 'test@acorn.dev')
   return root
@@ -26,13 +26,15 @@ function fixture() {
 function core(root: string, count?: (args: readonly string[]) => void) {
   return {
     projects: { byId: async (id: string) => id === 'project' ? { id, path: root } : null },
-    git: { git: async (args: readonly string[], opts: { cwd: string }) => {
+    git: { git: async (args: readonly string[], opts: { cwd: string; signal?: AbortSignal; stdin?: string }) => {
       count?.(args)
-      return await new Promise<{ code: number; stdout: string; stderr: string }>((done) => {
-        const child = spawn('git', [...args], { cwd: opts.cwd })
+      return await new Promise<{ code: number; stdout: string; stderr: string }>((done, fail) => {
+        const child = spawn('git', [...args], { cwd: opts.cwd, signal: opts.signal })
         const stdout: Buffer[] = [], stderr: Buffer[] = []
+        child.stdin.end(opts.stdin ?? '')
         child.stdout.on('data', (chunk: Buffer) => stdout.push(chunk))
         child.stderr.on('data', (chunk: Buffer) => stderr.push(chunk))
+        child.on('error', fail)
         child.on('close', (code) => done({ code: code ?? 1, stdout: Buffer.concat(stdout).toString(), stderr: Buffer.concat(stderr).toString() }))
       })
     } },
@@ -61,12 +63,55 @@ it('pins pages when a branch moves, keeps all merge parents, and searches bounde
   const page = await history(service, 'project', filter, null)
   expect(page.commits).toHaveLength(100)
   expect(page.nextCursor).toBeTruthy()
+  const beyondSearchLimit = JSON.parse(Buffer.from(page.nextCursor!, 'base64url').toString()) as { offset: number }
+  beyondSearchLimit.offset = 5_100
+  expect((await history(service, 'project', filter, Buffer.from(JSON.stringify(beyondSearchLimit)).toString('base64url'))).commits).toEqual([])
+  await expect(history(service, 'project', { ...filter, query: 'Extra' }, Buffer.from(JSON.stringify({ ...beyondSearchLimit, filter: { ...filter, query: 'Extra' } })).toString('base64url')))
+    .rejects.toMatchObject({ code: 'bad_cursor' })
   git(root, 'commit', '--allow-empty', '-qm', 'Moved ref')
   const next = await history(service, 'project', filter, page.nextCursor)
   expect(new Set([...page.commits, ...next.commits].map((commit) => commit.id)).size).toBe(page.commits.length + next.commits.length)
   expect(next.commits.some((commit) => commit.id === rootId), next.commits.map((commit) => commit.subject).join(', ')).toBe(true)
   _clearHistorySnapshots()
   await expect(history(service, 'project', filter, page.nextCursor)).rejects.toMatchObject({ code: 'history_expired' })
+})
+
+it('compares a SHA-256 root against its repository empty tree', async () => {
+  const root = fixture('sha256')
+  write(root, 'one.txt', 'one\n'); git(root, 'add', '.'); git(root, 'commit', '-qm', 'Root')
+  const id = git(root, 'rev-parse', 'HEAD')
+  expect(id).toHaveLength(64)
+  const detail = await revision(core(root), 'project', id)
+  expect(detail.base).toBeNull()
+  expect(detail.files.map((file) => file.path)).toEqual(['one.txt'])
+  expect(detail.topology.files[0]?.segments.length).toBeGreaterThan(0)
+})
+
+it('does not cache a patch read cancelled after topology', async () => {
+  const root = fixture()
+  write(root, 'one.txt', 'one\n'); git(root, 'add', '.'); git(root, 'commit', '-qm', 'Root')
+  const id = git(root, 'rev-parse', 'HEAD')
+  const controller = new AbortController()
+  const aborted = core(root, (args) => { if (args.includes('--patch')) controller.abort() })
+  await expect(revision(aborted, 'project', id, undefined, controller.signal)).rejects.toMatchObject({ name: 'AbortError' })
+  const calls: string[] = []
+  const complete = await revision(core(root, (args) => calls.push(args[0]!)), 'project', id)
+  expect(complete.files).toHaveLength(1)
+  expect(calls).toContain('-c')
+})
+
+it('aborts gap reads at the blob-size and blob-content steps', async () => {
+  const root = fixture()
+  write(root, 'one.txt', 'one\n'); git(root, 'add', '.'); git(root, 'commit', '-qm', 'Root')
+  const id = git(root, 'rev-parse', 'HEAD')
+  const file = (await revision(core(root), 'project', id)).topology.files[0]!
+  for (const step of ['-s', 'blob']) {
+    const controller = new AbortController()
+    const service = core(root, (args) => { if (args[0] === 'cat-file' && args[1] === step) controller.abort() })
+    await expect(fileText(service, 'project', id, null, file.path, file.sha!, controller.signal))
+      .rejects.toMatchObject({ name: 'AbortError' })
+  }
+  expect((await fileText(core(root), 'project', id, null, file.path, file.sha!)).text).toBe('one\n')
 })
 
 it('includes detached HEAD and names an unborn repository without inventing history', async () => {

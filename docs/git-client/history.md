@@ -21,15 +21,21 @@ empty state. The Node uses topological ordering, so ancestors follow their desce
 The ref filter accepts a named local branch, remote-tracking branch, or tag from the returned ref
 list. Search is a case-insensitive substring of the full message, author name plus email, or full
 object ID. It examines at most the newest 5,000 reachable commits and says when that bound cuts
-the search short. Queries have a 128-character limit. The client retains a window of 10 pages
+the search short. Unfiltered history can page beyond that search window. Queries have a
+128-character limit. The client retains a window of 10 pages
 (1,000 rows) and replaces older rows as browsing continues. Filtering names parent IDs but draws
 no connection through omitted commits. The kit's `HistoryMark` owns the desktop lanes and terminal
-relationship mark; the collection owns selection and keyboard actions.
+relationship mark; the collection owns selection and keyboard actions. Desktop lanes join at row
+boundaries, terminate at roots, and show a dashed continuation at a retained-window boundary. They
+show a count when more than eight lanes are active. A task
+pane retries its recorded branch on refresh and on Node or task changes after a missing-branch
+fallback.
 
 ## Inspect a revision
 
 `plugins/git/src/server/revision.ts` validates the selected commit ID. A normal commit compares
-against its first parent. A root compares with the empty tree. A merge lists every parent and lets
+against its first parent. A root compares with the repository's object-format empty tree (SHA-1 or
+SHA-256). A merge lists every parent and lets
 you choose one explicitly. The Node reads NUL-delimited topology for renames, deletions, modes,
 binary files, and unusual path names. It returns at most 500 changed files and names an omission.
 The patch read is capped at 8 MiB. If the patch is unavailable or exceeds that limit, files retain
@@ -42,7 +48,7 @@ find pages and gap expansion. Gap reads allow a selected revision's blob up to 2
 files have no stage, discard, edit, or comment action. Use **Changes** for working files and commits.
 
 The Node keeps at most 16 revision topologies and 32 MiB of parsed rows. The client scopes queries
-to Node, project, revision, and comparison base; the shared diff viewer bounds its resident segment
+to Node, project, optional task, revision, and comparison base; the shared diff viewer bounds its resident segment
 cache. Changing Node, task, filter, or selection aborts or discards obsolete reads. Reconnect and
 worktree or task events invalidate history without fetching from a remote.
 

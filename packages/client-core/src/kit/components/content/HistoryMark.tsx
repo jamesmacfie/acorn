@@ -1,12 +1,19 @@
-import type { HistorySlot } from '../../lib/layout/historyLayout'
+import { HISTORY_VISIBLE_LANES, type HistorySlot } from '../../lib/layout/historyLayout'
 
 /** One compact row of the history drawing. Text outside this aria-hidden mark names the parents. */
 export function HistoryMark(props: { slot: HistorySlot }) {
-  const width = () => Math.min(8, Math.max(props.slot.lane + 1, ...props.slot.lanes.map((lane) => lane + 1), ...props.slot.parentLanes.map((lane) => lane + 1))) * 12
-  const x = (lane: number) => Math.min(lane, 7) * 12 + 6
-  return <svg aria-hidden="true" width={width()} height="28" viewBox={`0 0 ${width()} 28`} style={{ 'flex-shrink': '0' }}>
-    {props.slot.lanes.map((lane) => <line x1={x(lane)} y1="0" x2={x(lane)} y2="28" stroke="currentColor" opacity="0.35" />)}
-    {props.slot.parentLanes.map((lane) => <line x1={x(props.slot.lane)} y1="14" x2={x(lane)} y2="28" stroke="currentColor" stroke-dasharray={props.slot.continuation ? '2 2' : undefined} />)}
-    <circle cx={x(props.slot.lane)} cy="14" r="4" fill="currentColor" />
-  </svg>
+  const shown = () => Math.min(props.slot.lanes, HISTORY_VISIBLE_LANES)
+  const hidden = () => Math.max(0, props.slot.lanes - HISTORY_VISIBLE_LANES)
+  const width = () => shown() * 12 + (hidden() ? 30 : 0)
+  const x = (lane: number) => lane * 12 + 6
+  return <span class="ui-history-mark" aria-hidden="true" style={{ width: `${width()}px` }}>
+    <svg width="100%" height="100%" viewBox={`0 0 ${width()} 100`} preserveAspectRatio="none">
+      {props.slot.edges.filter((edge) => edge.from < HISTORY_VISIBLE_LANES && edge.to < HISTORY_VISIBLE_LANES)
+        .map((edge) => <line x1={x(edge.from)} y1={edge.start === 'top' ? 0 : 50} x2={x(edge.to)}
+          y2={edge.end === 'center' ? 50 : 100} stroke="currentColor" stroke-dasharray={edge.continuation ? '3 3' : undefined}
+          vector-effect="non-scaling-stroke" />)}
+      {props.slot.lane < HISTORY_VISIBLE_LANES && <circle cx={x(props.slot.lane)} cy="50" r="4" fill="currentColor" />}
+      {hidden() > 0 && <text x={HISTORY_VISIBLE_LANES * 12 + 2} y="53" fill="currentColor" font-size="10">+{hidden()}</text>}
+    </svg>
+  </span>
 }

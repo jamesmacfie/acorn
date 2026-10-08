@@ -546,7 +546,7 @@ const CASES: Case[] = [
   {
     node: 'HistoryMark',
     draws: 'reduced: a commit dot, optional lane number, and continuation mark',
-    render: () => <HistoryMark slot={{ id: 'commit', lane: 1, lanes: [0, 1], parentLanes: [1], continuation: true, disconnected: false }} />,
+    render: () => <HistoryMark slot={{ id: 'commit', lane: 1, lanes: 2, edges: [], continuation: true, disconnected: false }} />,
     size: { width: 12, height: 2 },
     check: (frame) => has(frame, '●⋯ 2'),
   },

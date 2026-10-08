@@ -1,19 +1,42 @@
-/** Neutral commit rows. The kit knows only immutable IDs and parent relationships. */
+/** History geometry uses only immutable commit IDs and parent relationships. */
 export type HistoryNode = { id: string; parents: readonly string[] }
-export type HistorySlot = { id: string; lane: number; lanes: number[]; parentLanes: number[]; continuation: boolean; disconnected: boolean }
+export type HistoryEdge = { from: number; to: number; start: 'top' | 'center'; end: 'center' | 'bottom'; continuation: boolean }
+export type HistorySlot = {
+  id: string
+  lane: number
+  edges: HistoryEdge[]
+  lanes: number
+  continuation: boolean
+  disconnected: boolean
+}
 
-/** Walk newest first. A parent keeps its child's lane; extra parents open adjacent lanes. */
-export function historyLayout(nodes: readonly HistoryNode[], connected: boolean, hasMore: boolean): HistorySlot[] {
+/** The drawing shows eight lanes; further lanes are counted, never folded onto another line. */
+export const HISTORY_VISIBLE_LANES = 8
+
+/** Each row joins the lanes arriving from above to the lanes leaving below. */
+export function historyLayout(nodes: readonly HistoryNode[], connected: boolean, hasMore: boolean, hasPrevious = false): HistorySlot[] {
+  if (!connected) return nodes.map((node) => ({ id: node.id, lane: 0, edges: [], lanes: 1,
+    continuation: false, disconnected: node.parents.length > 0 }))
+
   const visible = new Set(nodes.map((node) => node.id))
-  const active: string[] = []
-  return nodes.map((node) => {
-    let lane = active.indexOf(node.id)
-    if (lane < 0) { active.unshift(node.id); lane = 0 }
-    const lanes = active.map((_, index) => index)
-    const parents = connected ? node.parents.filter((id) => visible.has(id) || hasMore) : []
-    active.splice(lane, 1, ...parents.filter((id) => !active.includes(id) || id === node.id))
-    for (let index = active.length - 1; index >= 0; index--) if (active.indexOf(active[index]!) !== index) active.splice(index, 1)
-    return { id: node.id, lane, lanes, parentLanes: parents.map((id) => active.indexOf(id)).filter((index) => index >= 0),
-      continuation: parents.some((id) => !visible.has(id)), disconnected: !connected && node.parents.length > 0 }
+  let active: string[] = []
+  return nodes.map((node, index) => {
+    const hadIncoming = active.includes(node.id)
+    if (!hadIncoming) active = [...active, node.id]
+    const incoming = active
+    const lane = incoming.indexOf(node.id)
+    const parents = node.parents.filter((id) => visible.has(id) || hasMore)
+    const outgoing = incoming.filter((id) => id !== node.id)
+    outgoing.splice(lane, 0, ...parents.filter((id) => !outgoing.includes(id)))
+    const edges: HistoryEdge[] = incoming.flatMap((id, from) => id === node.id ? [] : [{
+      from, to: outgoing.indexOf(id), start: 'top' as const, end: 'bottom' as const, continuation: false,
+    }])
+    if (hadIncoming) edges.push({ from: lane, to: lane, start: 'top', end: 'center', continuation: false })
+    else if (index === 0 && hasPrevious) edges.push({ from: lane, to: lane, start: 'top', end: 'center', continuation: true })
+    for (const parent of parents) edges.push({ from: lane, to: outgoing.indexOf(parent), start: 'center', end: 'bottom',
+      continuation: !visible.has(parent) })
+    active = outgoing
+    return { id: node.id, lane, edges, lanes: Math.max(incoming.length, outgoing.length),
+      continuation: edges.some((edge) => edge.continuation), disconnected: false }
   })
 }

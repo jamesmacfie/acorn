@@ -15,16 +15,20 @@ export const historyOptions = (projectId: string, filter: HistoryFilter, cursor:
     return readJson<HistoryPage>(`${historyRoute(projectId)}?${search}`, { signal })
   }, enabled: nodeReady() && !!projectId, staleTime: 10_000, gcTime: 30_000,
 })
-export const revisionOptions = (projectId: string, id: string, base?: string | null) => ({
-  queryKey: revisionKey(projectId, id, base),
-  queryFn: ({ signal }: { signal: AbortSignal }) => readJson<RevisionDetail>(`${revisionRoute(projectId, id)}${base === undefined ? '' : `?base=${base ?? ''}`}`, { signal }),
-  enabled: nodeReady() && !!projectId && !!id, staleTime: 60_000, gcTime: 30_000,
-})
+export const revisionOptions = (projectId: string, id: string, base?: string | null) => {
+  const nodeId = activeNodeId()
+  return {
+    queryKey: revisionKey(projectId, id, base),
+    queryFn: async ({ signal }: { signal: AbortSignal }) => ({ nodeId, projectId, id, requestedBase: base,
+      detail: await readJson<RevisionDetail>(`${revisionRoute(projectId, id)}${base === undefined ? '' : `?base=${base ?? ''}`}`, { signal }) }),
+    enabled: nodeReady() && !!projectId && !!id, staleTime: 60_000, gcTime: 30_000,
+  }
+}
 export const revisionApi = {
   segments: (projectId: string, id: string, base: string | null, requests: DiffSegmentRequest[], signal: AbortSignal) =>
     post<DiffSegmentPayload[]>(`${revisionRoute(projectId, id)}/segments`, { base, requests }, signal),
   search: (projectId: string, id: string, base: string | null, request: DiffSearchRequest, signal: AbortSignal) =>
     post<DiffSearchPage>(`${revisionRoute(projectId, id)}/search`, { base, ...request }, signal),
-  file: (projectId: string, id: string, base: string | null, path: string, sha: string) =>
-    post<{ text: string }>(`${revisionRoute(projectId, id)}/file`, { base, path, sha }),
+  file: (projectId: string, id: string, base: string | null, path: string, sha: string, signal: AbortSignal) =>
+    post<{ text: string }>(`${revisionRoute(projectId, id)}/file`, { base, path, sha }, signal),
 }

@@ -1797,6 +1797,13 @@ a.ui-row:hover { background: var(--bg-hover); }
    `trailing`: a 420px agent session row drew its title 520px wide and ran it under the state mark.
    The cap is what lets `.ui-text`'s own ellipsis fire. */
 .ui-row[data-variant='stacked'] .ui-row-body > * { max-width: 100%; }
+/* History lines meet at row boundaries. Keep the mark as tall as the row while the text retains
+   its compact padding; a fixed-height SVG leaves a break between multi-line rows. */
+.ui-row:has(.ui-history-mark) { padding-block: 0; }
+.ui-row:has(.ui-history-mark) .ui-row-body { padding-block: var(--space-3); }
+.ui-row:has(.ui-history-mark) .ui-row-leading { align-self: stretch; align-items: stretch; }
+.ui-history-mark { display: block; flex: none; position: relative; min-height: 100%; }
+.ui-history-mark svg { position: absolute; inset: 0; }
 
 /* ── The kit's grouping and showing nodes ───────────────────────────────────────────────────
    The ten nodes added when the kit closed (docs/ui-design/closed-kit.md § The closed kit). Each one replaces

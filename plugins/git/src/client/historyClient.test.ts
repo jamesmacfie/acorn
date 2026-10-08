@@ -1,9 +1,11 @@
+import { createSignal } from 'solid-js'
 import { expect, it, vi } from 'vitest'
 
+const [nodeId, setNodeId] = createSignal('node-a')
 const readJson = vi.fn(async () => ({ topology: { files: [] } }))
 const writeJson = vi.fn(async () => [])
 vi.mock('@acorn/plugin-api/client', () => ({
-  activeNodeId: () => 'node-a', nodeReady: () => true, readJson, writeJson,
+  activeNodeId: nodeId, nodeReady: () => true, readJson, writeJson,
 }))
 
 const { revisionApi, revisionOptions } = await import('./historyClient')
@@ -11,7 +13,9 @@ const { revisionApi, revisionOptions } = await import('./historyClient')
 it('loads revision topology before any patch and requests segments only for visible paths', async () => {
   const controller = new AbortController()
   const selected = revisionOptions('project', 'commit', 'parent')
-  await selected.queryFn({ signal: controller.signal })
+  setNodeId('node-b')
+  expect((await selected.queryFn({ signal: controller.signal })).nodeId).toBe('node-a')
+  setNodeId('node-a')
   expect(readJson).toHaveBeenCalledWith(expect.stringContaining('/commit?base=parent'), { signal: controller.signal })
   expect(writeJson).not.toHaveBeenCalled()
 

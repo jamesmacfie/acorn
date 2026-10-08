@@ -41,6 +41,6 @@ export function historyRoutes(core: Core) {
     })
     .post('/projects/:projectId/revisions/:id/file', async (c) => {
       const value = await body(() => c.req.json(), fileBody)
-      return c.json(await limited(c.req.raw.signal, () => fileText(core, c.req.param('projectId'), c.req.param('id'), value.base, value.path, value.sha)))
+      return c.json(await limited(c.req.raw.signal, () => fileText(core, c.req.param('projectId'), c.req.param('id'), value.base, value.path, value.sha, c.req.raw.signal)))
     })
 }

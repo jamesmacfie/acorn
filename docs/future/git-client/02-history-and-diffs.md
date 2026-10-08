@@ -1,5 +1,60 @@
 # Phase 02: history and diffs
 
+## Review follow-up, October 9, 2026
+
+**Status:** Corrected and verified on `phase-2-history-and-diffs`. The first desktop
+capture showed separate history marks. The shared kit now projects per-row incoming,
+outgoing, pass-through, and continuation edges into the host row's actual height. A
+disposable branch/merge fixture shows a connected divergence and convergence, and the
+root ends at its dot. Filtered results show marks without inferred edges. More than
+eight active lanes display a `+N` count instead of folding unrelated paths onto one
+coordinate. A dashed incoming edge marks a client window after earlier pages are
+evicted. The Git rows use a subject and one parent/ID line, with a refs line only
+where needed; terminal rows retain every parent in text.
+
+Unfiltered cursors can advance beyond the 5,000-commit search window. Search still
+examines at most 5,000 reachable commits, and both modes keep 100-commit pages, a
+1,000-row client window, and 32 ten-minute Node snapshots. Revision diff identity now
+includes Node, project, optional task, commit, and base. The viewer's viewport signal
+and the captured target lifetime abort late segments, search, and gap reads. The Node
+propagates cancellation through repository resolution, ref reads, parent resolution,
+cache-miss re-reads, patch reads, and blob reads; cancelled patches cannot become a
+normal omission or a cached revision. Root comparisons ask Git for the repository's
+empty tree, supporting SHA-1 and SHA-256. A task pane retries its recorded branch on
+refresh and reinitializes that scope on Node or task changes.
+
+**Focused checks:** Seven Git test files passed (21 tests), including a forged cursor
+past offset 5,000, a real SHA-256 repository, cache-miss and gap aborts, and delayed
+client segment/search/gap responses. Shared history geometry and mark tests passed
+(five tests); terminal kit passed (135 tests, two skipped). Type checks passed in the
+Git plugin, client core, Node, desktop, and terminal packages. Touched-source oxlint,
+Git diff whitespace, and five relevant architecture files passed (65 tests). The
+unchanged `docs/api-reference/plugin-routes.md` one-line doc-citation failure remains
+outside this phase; root lint and full test were not run.
+
+**Both-host evidence:** The reproducible fixture is `/private/tmp/acorn-phase02-branch-fixture`:
+three main commits, two topic commits, a main divergence, a `--no-ff` merge, and one
+post-merge commit. Desktop session `git-phase02-review` showed connected lanes and
+root termination in `.acorn/agent-dev/git-phase02-review/screenshots/screenshot-1791490921798.png`.
+A search for `Topic` showed three disconnected marks in
+`screenshot-1791490934195.png`. Terminal session `git-phase02-review-tui` selected
+the merge with `j` at 80×24, then at 120×40 showed both parent IDs, both parent buttons,
+comparison selection, and the patch. Both sessions were stopped.
+
+**Measured bounds:** On the existing 2,401-commit disposable repository, a cold first
+page took 53.57 ms/four Git subprocesses for 100 rows; the next took 57.97 ms/four.
+Revision topology took 39.02 ms/four for one file and the first segment took
+17.75 ms/two for four rows. The parsed cache held one document, one entry, 183 bytes.
+The neutral connected geometry serialized to 22,052 bytes for 100 linear slots and
+222,752 bytes for 1,000; both stayed at one lane. The production Node service held at
+3,186,368/3,187,000 bytes, and terminal startup at 729,585/730,000 bytes. The
+measurement harness is `.acorn/agent-dev/phase02-review-measure.mjs` (ignored test
+artifact). The eight-lane display cap does not cap neutral relationships or parent
+actions; the visible mark names the hidden lane count.
+
+**Next phase:** Use the Node/task-qualified revision source identity and immutable
+comparison base. Keep the task branch retry and the separate worktree navigation IDs.
+
 ## Completion note, October 9, 2026
 
 **Status:** Implemented on `phase-2-history-and-diffs`. The Git source opens on
@@ -41,8 +96,9 @@ bytes. The root lint and full test gates were intentionally left to the coordina
 
 **Both-host acceptance, October 9, 2026:** A disposable `tui-navigation` repository was extended
 to 2,401 commits, with 22 files in its root. The desktop production bundle displayed 100 connected
-history rows, full parent actions, ref labels, file topology, and an on-demand patch. The final
-screenshot is `.acorn/agent-dev/git-phase02fresh/screenshots/history-final.png`. Earlier desktop
+history rows, full parent actions, ref labels, file topology, and an on-demand patch. The first
+screenshot, `.acorn/agent-dev/git-phase02fresh/screenshots/history-final.png`, exposed
+disconnected marks; the review follow-up above records the corrected rendering. Earlier desktop
 driver checks selected the root, moved a ref during pagination, refreshed while retaining a valid
 selection, searched `HISTORY 2300` to one result, and navigated to a parent. The terminal driver used
 `git-phase02final` at 80×24 and 120×40. Both sizes showed parent IDs, refs, keyboard-selected
