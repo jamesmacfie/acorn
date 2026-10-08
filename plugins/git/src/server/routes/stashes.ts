@@ -21,7 +21,7 @@ export function stashRoutes(core: Pick<CoreServices, 'git' | 'projects' | 'tasks
   return new Hono<AppEnv>()
     .use('/projects/:projectId/stashes', requireDevice)
     .use('/projects/:projectId/stashes/*', requireDevice)
-    .get('/projects/:projectId/stashes', async (c) => c.json(await stashRoster(core, c.req.param('projectId'))))
+    .get('/projects/:projectId/stashes', async (c) => c.json(await stashRoster(core, c.req.param('projectId'), c.req.raw.signal)))
     .post('/projects/:projectId/stashes', async (c) => { const input = await body(() => c.req.json(), create); return c.json(await attempted(input.taskId, () => createStash(core, c.req.param('projectId'), input))) })
     .post('/projects/:projectId/stashes/apply', async (c) => { const input = await body(() => c.req.json(), apply); return c.json(await attempted(input.taskId, () => applyStash(core, c.req.param('projectId'), input, false))) })
     .post('/projects/:projectId/stashes/pop', async (c) => { const input = await body(() => c.req.json(), apply); return c.json(await attempted(input.taskId, () => applyStash(core, c.req.param('projectId'), input, true))) })

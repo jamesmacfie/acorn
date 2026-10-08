@@ -13,9 +13,7 @@ import { workflowScheduleService, workflowScheduleTarget, workflowScheduleBridge
 import { WORKFLOW_ROUTE, workflow } from '../server/routes/workflow'
 import { WORKFLOW_DEFS_ROUTE, workflowDefsRoutes } from '../server/routes/defs'
 import { WORKFLOW_SCHEDULES_ROUTE, workflowScheduleRoutes } from '../server/routes/schedules'
-import { inArray } from 'drizzle-orm'
-import { workflowRuns } from './schema'
-import { workflowCheckoutActivity } from '../server/runs/checkoutActivity'
+import { readWorkflowCheckoutActivity } from '../server/runs/checkoutActivity'
 
 export type WorkflowsPluginDeps = {
   internalEnv: InternalEnvFactory
@@ -63,12 +61,7 @@ export const workflowsPlugin = (deps: WorkflowsPluginDeps): NodePlugin => {
       // close over the handle, so no request can reach an unmigrated database.
       const store = ctx.storage.open()
       const core = ctx.core
-      stopCheckoutActivity = core.checkoutAdmission.registerOwner('workflows', async (taskIds) => {
-        if (!taskIds.length) return []
-        const rows = await store.select({ taskId: workflowRuns.taskId, status: workflowRuns.status })
-          .from(workflowRuns).where(inArray(workflowRuns.taskId, [...taskIds]))
-        return rows.flatMap(workflowCheckoutActivity)
-      })
+      stopCheckoutActivity = core.checkoutAdmission.registerOwner('runs', (taskIds) => readWorkflowCheckoutActivity(store, taskIds))
       const notices = buildNotices(ctx)
       // The three seams another plugin adds work through (../contract/extensions.ts). Opened before the
       // runner is built so a contribution filed during someone else's init is visible on the first

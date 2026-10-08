@@ -54,5 +54,5 @@ export type StashSelection = Pick<Stash, 'objectId' | 'selector' | 'fingerprint'
 export type StashCreate = { taskId: string; expectedPath: string; message: string; includeUntracked: boolean; keepIndex: boolean }
 export type StashApply = { taskId: string; expectedPath: string; selection: StashSelection; restoreIndex: boolean }
 export type StashDrop = { selection: StashSelection; confirm: true }
-export type StashResult = { ok: boolean; error: string | null; conflicts: string[]; roster: StashRoster | null; changed: boolean }
+export type StashResult = { ok: boolean; error: string | null; conflicts: string[] | null; roster: StashRoster | null; changed: boolean }
 export const stashesRoute = (projectId: string) => `/v1/p/git/projects/${encodeURIComponent(projectId)}/stashes`

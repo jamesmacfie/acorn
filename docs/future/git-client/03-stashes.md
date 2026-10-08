@@ -1,5 +1,52 @@
 # Phase 03: stashes and checkout admission
 
+## Review follow-up, October 9, 2026
+
+**Status:** Correctness fixes after review on `phase-3-stashes-and-checkout-admission`. Core's
+authoritative script ledger now blocks stash writes from automatic or manual setup admission until
+the attempt settles. Manual setup admission enters the same repository guard before persisting its
+attempt, then releases it before terminal worktree resolution. The guard requires the named Agents,
+Workflows, and setup readers and rechecks checkout and repository lock identity after waiting.
+Agents and Workflows readers are exercised against durable plugin rows for queued, waiting,
+cancelling, gated, and settled states. Workflow-to-Agent nested dispatch remains outside a held
+admission guard.
+
+**Stash corrections:** The Node checks the target checkout's actual Git common directory and
+current registered worktree against the selected repository. It refuses a recorded path replaced
+by an independent repository. Duplicate stash navigation IDs include the roster fingerprint, so
+a moved selector clears selection on refresh. A roster accepts at most 100 entries and reads detail
+sequentially; GET cancellation reaches each Git subprocess. The parent-read bound is 512 bytes,
+enough for a SHA-256 stash with three parents. Sequencer markers join the operation check, and
+unexpected marker access errors refuse mutation. Once a Git command is attempted, a command throw
+or failed conflict/roster probe returns a partial result with possible checkout change. Unknown
+conflicts are `null`, never an empty observed list. The client invalidates only the submitted Node
+and project's query keys and ignores late responses after a scope or dialog change.
+
+**Scoped verification:** Git stash/submission tests passed (14); real Git cases cover a replaced independent repository, SHA-256 captured
+untracked content, cancellation, ambiguous duplicate navigation, marker inspection, and partial
+post-command failures. Core admission, script, archive, and worktree tests passed (60), including
+setup in both admission orders, its settlement, named readers, and a moved mapping. Terminal's
+manual setup lifetime tests passed (two); durable Agents and Workflows activity reader tests passed
+(three each). Git, Core, and terminal type checks pass. Agents and Workflows type checks retain only
+the unchanged fixture errors listed below. Touched-source oxlint and relevant architecture/facade
+checks passed (65). Node production build measures 3,196,542/3,200,000 bytes. Root lint and full
+test remain for the coordinator.
+
+**Real-host follow-up:** Desktop `git-phase03-review` used `pnpm dev:agent -- --session
+git-phase03-review --reuse --fixture tui-navigation --workspaces on`. Its disposable repository
+created a stash through the target dialog, then an apply refused the dirty checkout while retaining
+the selected restore-index option, target, and error. Inspected screenshot:
+`.acorn/agent-dev/git-phase03-review/screenshots/screenshot-1791496703197.png`. The first sandbox
+fixture launch failed with local `tsx` IPC `EPERM`; the authorized retry started the isolated host.
+Terminal `git-phase03-review-tui` used the stopped desktop fixture data with
+`node apps/tui/scripts/agent/session.mjs --session git-phase03-review-tui --data-dir
+.acorn/agent-dev/git-phase03-review/data --no-build --link
+acorn://local/p/a95721fb-65bc-41a4-999c-caf4b6b5e09f/x/git/stashes/0da1bbb7d5422a0caee4108336f38fe0fcf0bb61
+--cols 120 --rows 40`. Its snapshot showed the same target and a checked restore-index option
+beside the dirty-checkout refusal. The driver used `snapshot` and `type` with SGR mouse input to
+open and submit Apply. Resizing to 80×24 dismissed the active modal; the underlying stash detail
+remained visible. Both isolated sessions were stopped.
+
 ## Completion note, October 9, 2026
 
 **Status:** Implemented on `phase-3-stashes-and-checkout-admission`. Git now has a Stashes source

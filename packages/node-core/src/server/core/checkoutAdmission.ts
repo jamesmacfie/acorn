@@ -82,18 +82,27 @@ export function createCheckoutAdmission(
     },
     async admitWork<T>(taskId: string, action: () => Promise<T>): Promise<T> {
       const key = await lockKey(taskId)
-      return withKey(key, action)
+      return withKey(key, async () => {
+        if (await lockKey(taskId) !== key) throw new BridgeError(409, 'checkout_moved', 'Task checkout moved during admission. Retry from its current location.')
+        return action()
+      })
     },
     async write<T>(taskId: string, action: (checkout: string) => Promise<T>): Promise<T> {
       const checkoutKey = await identity(taskId)
-      return withKey(await lockKey(taskId), async () => {
-        if (readers.size < 2) throw new BridgeError(503, 'checkout_activity_unavailable', 'Checkout activity is unavailable. Reconnect the work owners before writing.')
+      const repositoryKey = await lockKey(taskId)
+      return withKey(repositoryKey, async () => {
+        if (await lockKey(taskId) !== repositoryKey || await identity(taskId) !== checkoutKey) {
+          throw new BridgeError(409, 'checkout_moved', 'Target checkout or repository moved. Refresh and try again.')
+        }
+        if (!['turns', 'runs', 'setup'].every((owner) => readers.has(owner))) {
+          throw new BridgeError(503, 'checkout_activity_unavailable', 'Checkout activity is unavailable. Reconnect the work owners before writing.')
+        }
         const taskIds = await owners(checkoutKey)
         if (!taskIds.includes(taskId) || !(await tasks.active()).some((task) => task.id === taskId)) {
           throw new BridgeError(409, 'task_inactive', 'Target task is no longer active.')
         }
         if (taskIds.some(isTaskArchiving)) throw new BridgeError(409, 'task_archiving', 'Task archive is in progress for this checkout.')
-        const activity = await Promise.all([...readers.values()].map((read) => read(taskIds)))
+        const activity = await Promise.all(['turns', 'runs', 'setup'].map((owner) => readers.get(owner)!(taskIds)))
           .then((rows) => rows.flat(), () => { throw new BridgeError(503, 'checkout_activity_unavailable', 'Cannot verify owner activity for this checkout.') })
         if (activity.length) throw new BridgeError(409, 'checkout_busy', `Checkout is busy: ${activity.map((item) => `${item.taskId} ${item.description}`).join(', ')}.`)
         const task = await tasks.load(taskId)

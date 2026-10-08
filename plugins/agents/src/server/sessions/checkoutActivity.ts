@@ -8,3 +8,16 @@ export function agentCheckoutActivity(row: { taskId: string; runtimeState: strin
   }
   return []
 }
+
+export async function readAgentCheckoutActivity(store: PluginDatabase, taskIds: readonly string[]) {
+  if (!taskIds.length) return []
+  const rows = await store.select({ taskId: schema.agentSessions.taskId,
+    runtimeState: schema.agentSessions.runtimeState, status: schema.agentTurns.status })
+    .from(schema.agentSessions)
+    .leftJoin(schema.agentTurns, eq(schema.agentSessions.id, schema.agentTurns.sessionId))
+    .where(inArray(schema.agentSessions.taskId, [...taskIds]))
+  return rows.flatMap(agentCheckoutActivity)
+}
+import { eq, inArray } from 'drizzle-orm'
+import type { PluginDatabase } from '@acorn/plugin-api/node'
+import * as schema from '../../node/schema'

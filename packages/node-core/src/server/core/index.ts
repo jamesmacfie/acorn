@@ -1,4 +1,4 @@
-import { taskScriptEvidence, type TaskScriptEvidenceService } from '../taskScripts/service'
+import { setupCheckoutActivity, taskScriptEvidence, type TaskScriptEvidenceService } from '../taskScripts/service'
 import { schema, type AppDatabase } from '../db'
 import { TASK_REF_COLUMNS } from '../worktrees/taskWorktree'
 import type { ActiveIdentityStore } from '../activeIdentity'
@@ -107,6 +107,7 @@ export function createCoreServices(options: {
   const projects = createProjectService(options.db, options.activeIdentity)
   const checkoutAdmission = createCheckoutAdmission(rawTasks, projects, git,
     async () => options.db.select(TASK_REF_COLUMNS).from(schema.tasks).all())
+  checkoutAdmission.registerOwner('setup', async (taskIds) => setupCheckoutActivity(options.db, taskIds))
   registerCheckoutAdmission(options.db, checkoutAdmission)
   const tasks: CompiledTaskService = {
     ...rawTasks,
@@ -129,7 +130,7 @@ export function createCoreServices(options: {
     proc: proc satisfies CoreProcService,
     secrets: options.secrets,
     tasks,
-    taskScripts: taskScriptEvidence(options.db),
+    taskScripts: taskScriptEvidence(options.db, (taskId, action) => checkoutAdmission.admitWork(taskId, action)),
     context: createContextService(options.db),
     models: {
       ...models,

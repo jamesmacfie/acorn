@@ -8,6 +8,7 @@ import { stashActions, stashesKey, stashesOptions } from './stashClient'
 import { worktreesKey } from './worktreeClient'
 import { RevisionView } from './RevisionView'
 import { watchWorktreeInventory } from './worktreeInvalidation'
+import { createStashSubmission } from './stashSubmission'
 
 const base = (projectId: string) => `/p/${encodeURIComponent(projectId)}/x/git/stashes`
 type Action = 'create' | 'apply' | 'pop' | 'drop'
@@ -61,21 +62,20 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
   const [error, setError] = createSignal('')
   const [result, setResult] = createSignal<StashResult | null>(null)
   const [captured, setCaptured] = createSignal<{ nodeId: string | null; projectId: string; selection: Stash | null } | null>(null)
+  const submission = createStashSubmission()
   const stash = createMemo(() => state.roster.data?.stashes.find((item) => item.id === props.selected) ?? null)
   const availableTasks = () => (tasks.data ?? []).filter((task) => task.status === 'active')
   const pathOf = (task: Task | undefined) => task?.worktreePath ?? projects.data?.find((project) => project.id === task?.projectId)?.path ?? ''
   const selectTask = (id: string) => { setTaskId(id); setTargetPath(pathOf((tasks.data ?? []).find((item) => item.id === id))) }
   const open = (next: Action) => {
+    submission.invalidate()
     if (next === 'create') { setMessage(''); setIncludeUntracked(false); setKeepIndex(false) }
     if (next === 'apply' || next === 'pop') setRestoreIndex(false)
-    setAction(next); setError(''); setResult(null)
+    setAction(next); setError(''); setResult(null); setBusy(false)
     setCaptured({ nodeId: activeNodeId(), projectId: props.projectId, selection: stash() })
     selectTask(props.task?.id ?? availableTasks()[0]?.id ?? '')
   }
-  const refresh = () => {
-    void queryClient.invalidateQueries({ queryKey: stashesKey(props.projectId) })
-    void queryClient.invalidateQueries({ queryKey: worktreesKey(props.projectId) })
-  }
+  const close = () => { submission.invalidate(); setAction(null) }
   const run = async () => {
     const snapshot = captured(), operation = action()
     if (!snapshot || !operation) return
@@ -88,6 +88,8 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     }
     if (operation !== 'create' && !snapshot.selection) { setError('Stash selection is unavailable. Refresh and reopen.'); return }
     const expectedPath = targetPath()
+    const stashKey = stashesKey(snapshot.projectId)
+    const worktreeKey = worktreesKey(snapshot.projectId)
     const selection = snapshot.selection && {
       objectId: snapshot.selection.objectId,
       selector: snapshot.selection.selector,
@@ -95,33 +97,38 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
     }
     if (operation !== 'drop' && (!expectedPath || pathOf(task) !== expectedPath)) { setError('Target checkout moved or is unavailable. Close and reopen this action.'); return }
     setBusy(true); setError('')
-    try {
-      const response = operation === 'create'
-        ? await stashActions.create(snapshot.projectId, { taskId: taskId(), expectedPath, message: message(), includeUntracked: includeUntracked(), keepIndex: keepIndex() })
+    await submission.run({
+      request: () => operation === 'create'
+        ? stashActions.create(snapshot.projectId, { taskId: taskId(), expectedPath, message: message(), includeUntracked: includeUntracked(), keepIndex: keepIndex() })
         : operation === 'drop'
-          ? await stashActions.drop(snapshot.projectId, { selection: selection!, confirm: true })
-          : await stashActions[operation](snapshot.projectId, { taskId: taskId(), expectedPath, selection: selection!, restoreIndex: restoreIndex() })
-      setResult(response)
-      refresh()
-      if (response.ok) setAction(null)
-      else setError(response.error ?? 'Git refused the stash operation.')
-    } catch (cause) {
-      setError(cause instanceof Error ? cause.message : String(cause))
-      refresh()
-    } finally { setBusy(false) }
+          ? stashActions.drop(snapshot.projectId, { selection: selection!, confirm: true })
+          : stashActions[operation](snapshot.projectId, { taskId: taskId(), expectedPath, selection: selection!, restoreIndex: restoreIndex() }),
+      refreshCaptured: () => {
+        void queryClient.invalidateQueries({ queryKey: stashKey })
+        void queryClient.invalidateQueries({ queryKey: worktreeKey })
+      },
+      currentScope: () => snapshot.nodeId === activeNodeId() && snapshot.projectId === props.projectId && action() === operation,
+      success: (response) => {
+        setResult(response)
+        if (response.ok) close()
+        else setError(response.error ?? 'Git refused the stash operation.')
+      },
+      failure: (cause) => setError(cause instanceof Error ? cause.message : String(cause)),
+      settled: () => setBusy(false),
+    })
   }
   const openChanges = (targetId: string) => {
     const target = (tasks.data ?? []).find((item) => item.id === targetId)
     if (target) { activateTaskSignals(target, { pane: 'changes' }); navigate(pathForTask(target)) }
   }
-  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { setAction(null); setResult(null); setError('') }, { defer: true }))
+  createEffect(on(() => `${activeNodeId()}:${props.projectId}`, () => { close(); setResult(null); setError('') }, { defer: true }))
   createEffect(on(() => props.selected, () => setContentView('tracked'), { defer: true }))
   return <Stack gap="section">
     <SectionHeader>Repository stashes</SectionHeader>
     <Button onPress={() => open('create')}>Create stash</Button>
     <Show when={state.roster.error}><Alert tone="warn">{String(state.roster.error)}</Alert></Show>
     <Show when={!action() ? result() : null}>{(feedback) => <Alert tone={feedback().ok ? 'ok' : 'warn'}>{feedback().ok ? 'Stash operation completed.' : feedback().error}</Alert>}</Show>
-    <Show when={result()?.conflicts.length}><Alert tone="warn">Conflicts: {result()!.conflicts.join(', ')}. Resolve them in Changes or Editor.</Alert>
+    <Show when={result()?.conflicts?.length}><Alert tone="warn">Conflicts: {result()!.conflicts!.join(', ')}. Resolve them in Changes or Editor.</Alert>
       <Button onPress={() => openChanges(taskId())}>Open Changes</Button></Show>
     <Show when={stash()} fallback={<EmptyState title="Select a stash">Select a stash to inspect or apply it.</EmptyState>}>
       {(selected) => <>
@@ -149,7 +156,7 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
         </Show>
       </>}
     </Show>
-    <Show when={action()}>{(kind) => <Modal title={`${kind().charAt(0).toUpperCase()}${kind().slice(1)} stash`} size="md" onDismiss={() => setAction(null)}>
+    <Show when={action()}>{(kind) => <Modal title={`${kind().charAt(0).toUpperCase()}${kind().slice(1)} stash`} size="md" onDismiss={close}>
       <Modal.Body><Stack gap="section">
         <Text>Node {captured()?.nodeId ?? 'unavailable'} · Project {captured()?.projectId}</Text>
         <Show when={captured()?.selection}>{(item) => <Text>Stash {item().selector} · {item().objectId.slice(0, 12)}</Text>}</Show>
@@ -164,11 +171,11 @@ export function StashDetail(props: { projectId: string; task?: Task; selected: s
           </Show>
         </Show>
         <Show when={error()}><Alert tone="warn">{error()}</Alert></Show>
-        <Show when={result()?.conflicts.length}><Alert tone="warn">Conflicted files: {result()!.conflicts.join(', ')}. The stash was retained.</Alert>
-          <Button onPress={() => { setAction(null); openChanges(taskId()) }}>Open Changes</Button></Show>
+        <Show when={result()?.conflicts?.length}><Alert tone="warn">Conflicted files: {result()!.conflicts!.join(', ')}. The stash was retained.</Alert>
+          <Button onPress={() => { close(); openChanges(taskId()) }}>Open Changes</Button></Show>
       </Stack></Modal.Body>
       <Modal.Actions>
-        <Button variant="ghost" onPress={() => setAction(null)}>Cancel</Button>
+        <Button variant="ghost" onPress={close}>Cancel</Button>
         <Show when={kind() === 'drop'} fallback={<Button busy={busy()} disabled={busy() || kind() === 'create' && !message().trim() || !taskId()} onPress={() => void run()}>{kind() === 'create' ? 'Create stash' : kind() === 'pop' ? 'Pop stash' : 'Apply stash'}</Button>}>
           <ConfirmButton tone="danger" confirmLabel="Drop this stash?" disabled={busy()} onConfirm={() => void run()}>Drop stash</ConfirmButton>
         </Show>
