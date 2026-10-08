@@ -59,7 +59,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-08: 3,156,347 B with the instruction file check. The scan loads on first use. What runs at
 // boot is the agents `before-send` handler registration, the `checkInstructionFiles` field's
 // validation, and the `core:security` point id, so the ceiling moves by 1 KB.
-const limits = { ceiling: 3_175_000, floor: 1_000_000 }
+// 2026-10-08: 3,176,006 B after combining the instruction check, goal admission callbacks, and
+// reconnect Stop handling. The measured graph adds no dependency; the feature operations remain
+// lazy. Add 2 KB for these acceptance and lifecycle paths, keeping less than 1 KB of margin.
+const limits = { ceiling: 3_177_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

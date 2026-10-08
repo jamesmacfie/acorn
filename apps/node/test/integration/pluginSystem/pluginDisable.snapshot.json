@@ -72,7 +72,9 @@
       "run_start",
       "run_status",
       "run_stop",
-      "run_targets"
+      "run_targets",
+      "session_history_read",
+      "session_history_search"
     ],
     "sections": [
       "task-scripts",
