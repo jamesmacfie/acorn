@@ -7,7 +7,7 @@ import type { AgentMcpServer } from '../../shared/mcpServers'
 // from its danger zone asks first and names what stays.
 
 const servers: AgentMcpServer[] = [
-  { name: 'linear', transport: 'stdio', command: 'npx', args: ['-y', 'linear-mcp'], url: null, values: [], enabled: true, updatedAt: 1 },
+  { name: 'linear', transport: 'stdio', command: 'npx', args: ['-y', 'linear-mcp'], url: null, values: [], enabled: true, updatedAt: 1, revision: 'a'.repeat(64), consented: true, reviewTools: false, approvedCatalogueDigest: null },
 ]
 const mocks = vi.hoisted(() => ({
   confirm: vi.fn(async (_question: { title: string; stays?: string }) => false),

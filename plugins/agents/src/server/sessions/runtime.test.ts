@@ -2466,14 +2466,16 @@ describe('managed agent runtime conformance', () => {
       currentUserId: () => null,
       registry,
     })
-    await runtime.mcpServers.save('linear', {
+    const linear = await runtime.mcpServers.save('linear', {
       transport: 'stdio',
       command: 'npx',
       args: ['linear-mcp'],
       values: [{ name: 'LINEAR_API_KEY', value: 'lin_api_0123456789', secret: true }],
       enabled: true,
     })
-    await runtime.mcpServers.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: false })
+    const docs = await runtime.mcpServers.save('docs', { transport: 'http', url: 'https://docs.example/mcp', values: [], enabled: false })
+    await runtime.mcpServers.consent('linear', linear.revision)
+    await runtime.mcpServers.consent('docs', docs.revision)
 
     // The request body names `docs`, and is ignored.
     const session = await runtime.createSession({

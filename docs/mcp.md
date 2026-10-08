@@ -130,7 +130,8 @@ executable label, and flags common unpinned package runners and shell or downloa
 response excludes arguments, environment entries, headers, credentials, and URL paths and query
 strings. A running session's MCP panel can report harness state, but there is no passive cached
 contract for global or harness-owned servers. The diagnostic calls those unknown rather than treating
-the managed list as complete. This check does not replace the explicit **Test** action below.
+the managed list as complete. This check does not replace the explicit **Test** action below. It also
+reads stored package, consent, and review facts without installing, probing, or opening credentials.
 
 Settings → MCP servers holds the servers acorn declares to agent sessions: a list, then one server's
 editor with **Save**, **Cancel**, and **Remove server**. It links to MCP config files, and that page
@@ -139,6 +140,9 @@ its database (`plugins/agents/src/server/mcpServerStore.ts`). A server is a comm
 an environment, or a URL with headers. A value marked secret is sealed by the Node's secret service,
 read back as a name with no value, and kept when an edit leaves it empty. The routes accept only an
 interactive device, reads included, because a stdio server is a command the next session runs.
+
+Exact npm installation, device consent, and tool catalogue review are described in
+[managed MCP servers](./mcp/managed-servers.md).
 
 acorn never writes these into a CLI's config file. Each harness receives them on every start, because
 none keeps declared servers between processes:

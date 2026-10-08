@@ -103,6 +103,7 @@ the whole plugin system in one page.
 | [docker.md](./docker.md) | The Docker pane and the archive-time teardown. |
 | [database.md](./database.md) | The database plugin: the Postgres browser and SQL editor. |
 | [mcp.md](./mcp.md) | The MCP server: a stdio child that calls the node over loopback. |
+| [mcp/managed-servers.md](./mcp/managed-servers.md) | Exact npm MCP installation, consent, and live tool catalogue review. |
 
 ## Plugins
 

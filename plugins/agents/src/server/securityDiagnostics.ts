@@ -248,10 +248,16 @@ export async function collectSecurityDiagnostics(
       const knownCommand = ['npx', 'pnpx', 'yarn', 'bunx', 'uvx', 'node', 'python', 'python3', 'sh', 'bash', 'zsh', 'curl', 'wget'].includes(command)
         ? command : 'custom executable'
       const stableId = createHash('sha256').update(server.name).digest('hex').slice(0, 12)
+      const management = server.managed
+        ? `exact npm ${server.managed.package}@${server.managed.version}; ${server.managed.graph.length} locked packages; scripts disabled by installer`
+        : server.transport === 'stdio' ? 'owner command' : 'owner HTTP endpoint'
+      const review = server.reviewTools
+        ? server.approvedCatalogueDigest ? 'catalogue approved for saved revision; live connection rechecks remain unknown here' : 'catalogue review enabled; no approval for saved revision'
+        : 'catalogue review off'
       add(`mcp.managed.${stableId}`, 'agents', 'configured_only', unpinned || shellDownload ? 'warning' : 'info',
         'Acorn managed MCP store',
-        `Managed server ${index + 1}: ${server.enabled ? 'enabled' : 'disabled'} ${server.transport === 'stdio' ? `command ${knownCommand}` : endpoint}${unpinned ? '; package runner has no detected version pin' : ''}${shellDownload ? '; shell or download command requires review' : ''}.`,
-        'Arguments, headers, environment entries, credentials, and URL paths are excluded. This does not inspect what a command downloads.',
+        `Server ${index + 1}: ${server.enabled ? 'enabled' : 'disabled'}; ${management}; ${server.consented ? 'device consent recorded' : 'consent pending'}; ${review}; ${server.transport === 'stdio' ? `command ${knownCommand}` : endpoint}${unpinned ? '; package runner has no detected version pin' : ''}${shellDownload ? '; shell or download command requires review' : ''}.`,
+        'Passive saved-state check. No installation, secret reveal, server start, or catalogue probe ran. Arguments, headers, credentials, and URL paths are excluded.',
         'Settings > MCP servers.')
     }
     add('mcp.unmanaged', 'agents', 'unknown', 'attention', 'harness configuration',

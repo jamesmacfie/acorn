@@ -15,6 +15,7 @@ import type {
 import type { AgentDriverEvent, AgentDriverMcpServer } from '../drivers/types'
 import type { SkillReport } from '../drivers/skillIndex'
 import { AgentMcpServerStore } from '../mcpServerStore'
+import type { McpReviewManager } from '../mcpReviewManager'
 import { sessionMcpSelection } from '../../shared/mcpServers'
 import type { AgentSessionChangedEvent } from '@acorn/protocol/nodeEvents.ts'
 import type { AgentLifecycleFrame } from '../../contract/lifecycle'
@@ -205,6 +206,14 @@ export class ManagedAgentEngine {
   protected readonly mintedSecrets: string[] = []
   /** The user's MCP servers (docs/mcp.md § Your own servers). Settings edits them through here too. */
   readonly mcpServers: AgentMcpServerStore
+  private mcpReviewsPromise: Promise<McpReviewManager> | null = null
+  private mcpReviews(): Promise<McpReviewManager> {
+    return this.mcpReviewsPromise ??= import('../mcpReviewManager').then(({ McpReviewManager }) => new McpReviewManager(this.mcpServers, () => this.mintedSecrets))
+  }
+  async pendingMcpReviews() { return (await this.mcpReviews()).pending() }
+  async approveMcpCatalogue(name: string, sessionId: string, revision: string, digest: string) {
+    return (await this.mcpReviews()).approve(name, sessionId, revision, digest)
+  }
   protected readonly standingContext?: (taskId: string) => Promise<string | null>
   protected readonly currentUserId: () => string | null
   protected readonly registry: AgentDriverRegistry
@@ -302,7 +311,7 @@ export class ManagedAgentEngine {
       },
       mcpUnavailable: (sessionId, names) => this.record(sessionId, null, {
         type: 'diagnostic', level: 'warning',
-        message: `This session runs without ${names.join(', ')}: a stored secret could not be opened. Enter it again in Settings → MCP servers.`,
+        message: `This session runs without ${names.join(', ')}. Check consent, stored credentials, and review availability in Settings → MCP servers.`,
       }).then(() => undefined),
       event: (sessionId, generation, event) => this.onProviderEvent(sessionId, generation, event),
       closed: (sessionId, generation, attempt, error) => this.onProviderClosed(sessionId, generation, attempt, error),
@@ -353,7 +362,7 @@ export class ManagedAgentEngine {
     // accumulates them and the materializer holds a live reference to the same array.
     this.eventMaterializer = new ProviderEventMaterializer(this.artifacts, this.mintedSecrets)
     this.webhooks = new AgentWebhookService(options.db, options.secrets, options.core)
-    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets)
+    this.mcpServers = new AgentMcpServerStore(options.db, options.secrets, join(options.dataDir, 'managed-mcp'))
     this.providerEvents = new DurableAgentEventBuffer((entry) => this.commitProviderEvent(entry))
     this.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
   }
@@ -555,6 +564,7 @@ export class ManagedAgentEngine {
     } catch (error) {
       retirementFailure = error
     }
+    if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).close()
     await queueDrain
     await this.processes.joinCallbacks()
     await this.providerEvents.flushAll()
@@ -669,13 +679,37 @@ export class ManagedAgentEngine {
     session: AgentSession,
     env: Record<string, string>,
     signal: AbortSignal,
-  ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[] }> {
+  ): Promise<{ servers: AgentDriverMcpServer[]; unavailable: string[]; retire?: () => Promise<void> }> {
     const userMcp = await this.mcpServers.resolve(sessionMcpSelection(session.config), 'agent MCP server: start a session', signal)
     signal.throwIfAborted()
     for (const secret of userMcp.secrets) if (!this.mintedSecrets.includes(secret)) this.mintedSecrets.push(secret)
+    const servers: AgentDriverMcpServer[] = []
+    const unavailable = [...userMcp.unavailable]
+    try {
+      for (const server of userMcp.servers) {
+        signal.throwIfAborted()
+        const identity = userMcp.revisions[server.name]
+        if (!identity?.reviewTools) { servers.push(server); continue }
+        try {
+          const reviewed = await (await this.mcpReviews()).prepare(server, session.id, identity.revision)
+          if (reviewed.transport === 'http') {
+            const bearer = reviewed.headers.Authorization
+            if (bearer && !this.mintedSecrets.includes(bearer)) this.mintedSecrets.push(bearer)
+          }
+          servers.push(reviewed)
+        } catch {
+          unavailable.push(`${server.name} (review proxy unavailable)`)
+        }
+      }
+      signal.throwIfAborted()
+    } catch (error) {
+      if (this.mcpReviewsPromise) await (await this.mcpReviewsPromise).closeSession(session.id)
+      throw error
+    }
     return {
-      servers: [...acornMcpServers(this.mcp(), session, env), ...userMcp.servers],
-      unavailable: userMcp.unavailable,
+      servers: [...acornMcpServers(this.mcp(), session, env), ...servers],
+      unavailable,
+      retire: () => this.mcpReviewsPromise ? this.mcpReviewsPromise.then((manager) => manager.closeSession(session.id)) : Promise.resolve(),
     }
   }
 

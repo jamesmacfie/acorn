@@ -80,7 +80,11 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // 2026-10-09: 3,190,861 B after Changes' dependency route and passive policy capability join
 // the boot registrations. measure:service-graph confirms dependencyReview.ts and YAML stay lazy.
 // The 3 KB ceiling increase covers 2,159 B of route and capability wiring; leave 1,139 B of margin.
-const limits = { ceiling: 3_192_000, floor: 1_000_000 }
+// 2026-10-09: 3,207,886 B with managed MCP device route schemas, consent and revision checks,
+// and session review dispatch. measure:service-graph confirms mcpCatalogue.ts, the npm installer,
+// probe, and review transport are outside the static service graph. These registration and admission
+// paths are needed at boot. Leave 1,114 B of margin.
+const limits = { ceiling: 3_209_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

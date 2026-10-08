@@ -1,5 +1,37 @@
 # Phase 09: pin MCP packages and review tool changes
 
+> Implementation note — 2026-10-09. The agents plugin now offers optional exact npm MCP installation,
+> with private bounded staging, scripts disabled during resolution and frozen installation, a checked
+> seven-day date for every locked package, exact owner exceptions recorded in the audit log, archive
+> integrity and installed tree/entry/runtime identities, a staged executable test, and atomic selection.
+> Existing command and HTTP rows remain editable; each exact configuration needs device consent before
+> testing or launch. Tool review remains off by default. When enabled, a session-owned Node proxy
+> observes the actual harness connection, withholds tools pending separate device approval, pins the
+> full canonical catalogue to configuration and secret revision, and quarantines list changes and
+> drift. The proxy retires with the provider session. Phase 07 reads only stored management, consent,
+> and review facts. Global harness config remains outside the proxy. The Node service graph measured
+> 3,207,886 B; installer, probe, catalogue, and proxy load lazily. The ceiling is 3,209,000 B.
+>
+> Evidence: `pnpm lint` passed; agents plugin host-access suite passed (180 files, 1,315 tests,
+> one skip); architecture tests passed (12 files, 87 tests); `@acorn/node build` passed. Focused
+> catalogue, installer, store, probe, route, runtime, and loopback proxy checks passed. In an isolated
+> desktop session, Settings planned the exact public `@modelcontextprotocol/server-everything@2025.9.25`
+> graph (127 locked packages, no exception) and executed the staged binary to display ten tools.
+> A separate disposable installer run activated and relaunched those recorded bytes without a runner.
+> A script-bearing `vite@5.0.0` graph was refused before frozen installation. The sandboxed agents
+> suite initially failed only on the loopback proxy, process table, and a fixture requiring new consent;
+> the first two passed with host access and the fixture was updated. The Node core/client core run
+> encountered unrelated sandbox socket failures and stalled; it was stopped. The route golden test
+> still differs only by the pre-existing GitHub `pulls/search` route, which this phase leaves alone.
+>
+> Limits: The isolated desktop Settings detail page reset during the long package flow, so activation,
+> update, and restart were not verified through that UI. The installed Claude ACP adapter advertises
+> HTTP MCP and Codex's driver maps HTTP headers into `config.mcp_servers`, but a fixture was not run
+> through both installed model harnesses. Elicitation, cancellation, and resume have a generic relay
+> path but lack real-harness acceptance evidence. The proxy refuses tool calls after a detected
+> catalogue change; it cannot undo an in-flight call. Later work must preserve the config-revision,
+> consent, managed-tree, and catalogue-approval contracts and complete those acceptance checks.
+
 Date: October 8, 2026. Status: proposed product requirements; implementation not started.
 Source baseline: `079f5c948161ea8213bcdb25fe2fbefccab7d6f1`.
 Dependency: can start independently; phase 07 displays its management and coverage state.

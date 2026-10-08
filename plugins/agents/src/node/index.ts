@@ -3,6 +3,7 @@ import { pluginChannel } from '@acorn/protocol/plugin/state.ts'
 import { acornMcp, agentProfileRegistry, AGENTS_CUSTOM_AGENT_REGISTRY, AGENTS_HARNESS_REGISTRY, getProfile, type InternalEnvFactory, type NodePlugin, resolveCommand } from '@acorn/plugin-api/node'
 import { TERMINAL_SESSIONS } from '@acorn/plugin-terminal/contract/sessions.ts'
 import { join } from 'node:path'
+import type { McpPackageManager } from '../server/mcpPackageManager'
 import { AGENTS_SESSION_CONTROL, AGENTS_SESSION_EXECUTE } from '../contract/sessionExecute'
 import { claudeHarness } from '../server/drivers/claudeHarness'
 import { CodexAgentDriver } from '../server/drivers/codexDriver'
@@ -107,6 +108,11 @@ export type AgentsPluginDeps = {
 // and the usage probe under the data root, so this plugin needs the path for more than its database.
 export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugin => {
   let runtime: ManagedAgentRuntime | null = null
+  let packageManager: Promise<McpPackageManager> | null = null
+  const managedPackages = (): Promise<McpPackageManager> => packageManager ??= Promise.all([
+    import('../server/mcpPackageManager'), import('../server/mcpPackageInstall'),
+  ]).then(async ([{ McpPackageManager }, { trustedNpmCli }]) =>
+    new McpPackageManager(join(dataDir, 'managed-mcp'), await trustedNpmCli(), runtime!.mcpServers))
   let delegation: AgentDelegationService | null = null
   let messages: Promise<SessionMessages> | null = null
   let followUps: Promise<TurnFollowUps> | null = null
@@ -137,6 +143,9 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
     // docs/data-layer/migrations.md § Migrations: this plugin's migration chain, opened and closed by the host.
     migrationsModule: import.meta.url,
     init: (ctx) => {
+      ctx.audit.declare({ id: 'mcp-publication-exception', label: 'Reviewed MCP package publication exception' })
+      ctx.audit.declare({ id: 'mcp-package-activation', label: 'Activated managed MCP package' })
+      ctx.audit.declare({ id: 'mcp-catalogue-approval', label: 'Approved MCP tool catalogue' })
       registerBuiltInProfiles()
       registerBuiltInDrivers()
       // Migrated before init returns, so no request or provider spawn reaches an unmigrated database.
@@ -405,7 +414,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
         list: () => runtime!.mcpServers.list(),
         save: (name, input) => runtime!.mcpServers.save(name, input),
         remove: (name) => runtime!.mcpServers.remove(name),
+        consent: (name, revision) => runtime!.mcpServers.consent(name, revision),
         test: async (name) => {
+          const configured = await runtime!.mcpServers.get(name)
+          if (configured && !configured.consented) return { ok: false, error: 'Review and consent to this exact server configuration before testing it.' }
           const resolved = await runtime!.mcpServers.resolve([name], 'agent MCP server: test the connection')
           if (resolved.unavailable.length) return { ok: false, error: 'A stored secret could not be opened. Enter it again and save.' }
           const [server] = resolved.servers
@@ -414,6 +426,26 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
           // only this button needs (apps/node/scripts/check-service-budget.mjs).
           const { probeMcpServer } = await import('../server/mcpProbe')
           return probeMcpServer(server, resolved.secrets)
+        },
+        planPackage: async (coordinate, targetName, expectedRevision, exceptions, signal) => {
+          const plan = await (await managedPackages()).plan(coordinate, targetName, expectedRevision, exceptions, signal)
+          for (const exception of plan.exceptions) ctx.audit.record('mcp-publication-exception', {
+            subject: exception.coordinate,
+            details: { reason: exception.reason, reviewedAt: exception.reviewedAt },
+          })
+          return plan
+        },
+        testPackagePlan: (name, planId, bin, signal) => managedPackages().then((manager) => manager.testPlan(name, planId, bin, signal)),
+        activatePackage: async (name, planId, bin, enabled, signal) => {
+          const server = await (await managedPackages()).activate(name, planId, bin, enabled, signal)
+          ctx.audit.record('mcp-package-activation', { subject: name, details: { package: server.managed?.package ?? '', version: server.managed?.version ?? '', bin } })
+          return server
+        },
+        pendingReviews: () => runtime!.pendingMcpReviews(),
+        approveReview: async (name, sessionId, revision, digest) => {
+          const server = await runtime!.approveMcpCatalogue(name, sessionId, revision, digest)
+          ctx.audit.record('mcp-catalogue-approval', { subject: name, details: { sessionId, digest } })
+          return server
         },
       })
       ctx.routes.register(agentMcpServers, { prefix: '', note: '/mcp-servers — the MCP servers acorn declares to agent sessions' })
@@ -496,6 +528,8 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       pluginsChanged?.dispose()
       pluginsChanged = null
       await runtime?.stop()
+      if (packageManager) await packageManager.then((manager) => manager.close()).catch(() => undefined)
+      packageManager = null
       runtime = null
       delegation = null
       managedRoute?.dispose()

@@ -295,6 +295,7 @@ describe('architecture boundaries', () => {
       'plugins/agents/src/server/processes/ownedProcess.ts', // duplex provider and read-only usage groups
       'plugins/agents/src/server/drivers/codexDriver.ts',
       'plugins/agents/src/server/drivers/authProbe.ts',
+      'plugins/agents/src/server/mcpPackageInstall.ts', // bounded, device-only npm staging; broker cannot express package-manager argv
       'plugins/docker/src/server/cli.ts',
       'plugins/docker/src/server/dockerService.ts', // `docker logs -f` / `stats` streams
       'plugins/editor/src/server/searchProcess.ts', // ripgrep, streamed

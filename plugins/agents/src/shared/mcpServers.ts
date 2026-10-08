@@ -10,6 +10,12 @@ import { z } from 'zod'
 export const agentMcpServersRoute = '/v1/p/agents/mcp-servers'
 export const agentMcpServerRoute = (name: string) => `${agentMcpServersRoute}/${encodeURIComponent(name)}`
 export const agentMcpServerTestRoute = (name: string) => `${agentMcpServerRoute(name)}/test`
+export const agentMcpPackagePlanRoute = `${agentMcpServersRoute}/package-plan`
+export const agentMcpPackageActivateRoute = (name: string) => `${agentMcpServerRoute(name)}/package-activate`
+export const agentMcpPackageTestRoute = (planId: string) => `${agentMcpPackagePlanRoute}/${encodeURIComponent(planId)}/test`
+export const agentMcpServerConsentRoute = (name: string) => `${agentMcpServerRoute(name)}/consent`
+export const agentMcpReviewsRoute = `${agentMcpServersRoute}/reviews`
+export const agentMcpReviewRoute = (name: string) => `${agentMcpServerRoute(name)}/review`
 
 // acorn's own server registers under one of these two (node-core/server/mcpRegister.ts). A user server
 // with the same name would shadow it in whichever harness reads names last.
@@ -50,6 +56,62 @@ export type AgentMcpServer = {
   /** Switched on for a session when it is created. Each session keeps its own list after that. */
   enabled: boolean
   updatedAt: number
+  /** Absent on command and HTTP rows created before managed installation existed. */
+  managed?: AgentMcpManagedPackage | null
+  /** Digest of the exact saved configuration, including sealed secret revisions and enabled state. */
+  revision: string
+  consented: boolean
+  reviewTools: boolean
+  approvedCatalogueDigest: string | null
+}
+
+export type AgentMcpManagedPackage = {
+  package: string
+  version: string
+  bin: string
+  lockDigest: string
+  treeDigest: string
+  installationId: string
+  entryDigest: string
+  registry: string
+  graph: Array<{ name: string; version: string; integrity: string; resolved: string; publishedAt: string }>
+  runtime: string
+  policyVersion: number
+  installer: string
+  exceptions: Array<{ coordinate: string; reason: string; reviewedAt: number }>
+}
+
+export type AgentMcpPackagePlan = {
+  id: string
+  package: string
+  version: string
+  bins: string[]
+  graph: AgentMcpManagedPackage['graph']
+  lockDigest: string
+  treeDigest: string
+  registry: string
+  runtime: string
+  installer: string
+  exceptions: AgentMcpManagedPackage['exceptions']
+}
+
+export type AgentMcpPackageTest = {
+  digest: string
+  version: number
+  tools: Record<string, unknown>[]
+  previousTools: Record<string, unknown>[]
+  findings: AgentMcpPendingReview['findings']
+}
+
+export type AgentMcpPendingReview = {
+  name: string
+  sessionId: string
+  revision: string
+  digest: string
+  version: number
+  tools: Record<string, unknown>[]
+  previousTools: Record<string, unknown>[]
+  findings: Array<{ tool: string; category: 'hidden-character' | 'instruction' | 'sensitive-path'; detail: string }>
 }
 
 const pairInput = z.object({
@@ -65,6 +127,7 @@ export const agentMcpServerInputSchema = z.object({
   url: z.string().trim().max(MAX_TEXT).optional(),
   values: z.array(pairInput).max(MAX_PAIRS).optional(),
   enabled: z.boolean(),
+  reviewTools: z.boolean().optional(),
 }).superRefine((input, ctx) => {
   if (input.transport === 'stdio' && !input.command) {
     ctx.addIssue({ code: 'custom', path: ['command'], message: 'A stdio server needs a command.' })
@@ -85,6 +148,18 @@ export const agentMcpServerInputSchema = z.object({
       ctx.addIssue({ code: 'custom', path: ['values'], message: `${pair.name} needs a value.` })
     }
   }
+})
+
+export const agentMcpPackagePlanInputSchema = z.object({
+  coordinate: z.string().min(1).max(256),
+  targetName: z.string().regex(MCP_SERVER_NAME),
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).nullable(),
+  exceptions: z.array(z.object({ coordinate: z.string().min(1).max(256), reason: z.string().min(1).max(500) })).max(8).optional(),
+})
+export const agentMcpPackageActivateInputSchema = z.object({
+  planId: z.string().uuid(),
+  bin: z.string().min(1).max(256),
+  enabled: z.boolean(),
 })
 
 export type AgentMcpServerInput = z.infer<typeof agentMcpServerInputSchema>

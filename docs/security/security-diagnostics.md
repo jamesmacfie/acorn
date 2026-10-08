@@ -24,7 +24,9 @@ core agent-tool preferences, the verified tool catalog, and fixed project files.
 32 KiB from each named project file after resolving the project's canonical root. It does not execute
 configuration code, package managers, MCP servers,
 hooks, harness probes, models, or credential validation. It returns no raw argument, header,
-environment entry, credential value, or provider output.
+environment entry, credential value, or provider output. For managed MCP servers it reports recorded
+package source, consent, and catalogue-review coverage from stored facts only. It does not verify
+installed bytes or a live catalogue; a passed diagnostic is not permission to trust a server.
 
 Project policy inspection calls Changes' typed, passive static policy capability when it is
 available. It reports npm or pnpm identity and version, policy setting names, numeric release age,

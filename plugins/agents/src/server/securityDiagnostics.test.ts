@@ -48,10 +48,10 @@ it('statically flags an unpinned runner and never returns credential-shaped inpu
   await writeFile(join(root, 'package.json'), JSON.stringify({ packageManager: `pnpm@${secret}`, scripts: { test: secret }, dependencies: { x: `https://example.test/?key=${secret}` } }))
   await writeFile(join(root, '.npmrc'), `registry=https://user:${secret}@example.test/?key=${secret}\n`)
   const server: AgentMcpServer = { name: secret, transport: 'stdio', command: 'npx', args: [secret], url: null,
-    values: [{ name: 'TOKEN', value: secret, secret: false }], enabled: true, updatedAt: 0 }
+    values: [{ name: 'TOKEN', value: secret, secret: false }], enabled: true, updatedAt: 0, revision: 'a'.repeat(64), consented: true, reviewTools: false, approvedCatalogueDigest: null }
   const http: AgentMcpServer = { name: 'remote', transport: 'http', command: null, args: [],
     url: `https://user:${secret}@example.test/path?token=${secret}`,
-    values: [{ name: 'Authorization', value: secret, secret: false }], enabled: true, updatedAt: 0 }
+    values: [{ name: 'Authorization', value: secret, secret: false }], enabled: true, updatedAt: 0, revision: 'b'.repeat(64), consented: true, reviewTools: false, approvedCatalogueDigest: null }
   const report = await collectSecurityDiagnostics(ports({ managedMcp: async () => [server, http] }),
     'node-1', 'owner', { projectId: 'project-1' }, new AbortController().signal)
   expect(report.findings.find((finding) => finding.id.startsWith('mcp.managed.'))).toMatchObject({ severity: 'warning' })
