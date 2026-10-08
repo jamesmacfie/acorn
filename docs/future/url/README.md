@@ -4,11 +4,13 @@ This plan adds an `acorn://` link scheme that opens the desktop app on a task, a
 plugin page, a settings page, or a rail source. Read it before you build a phase. It holds the
 decisions the phase files depend on.
 
-Date: October 8, 2026. Status: six phases implemented; installed-release acceptance remains
-unverified. [Acorn links](../../frontend/acorn-links.md) owns the shipped contract. A browser
+Date: October 8, 2026. Status: six phases implemented and merged into main; installed-release
+acceptance remains unverified. [Acorn links](../../frontend/acorn-links.md) owns the shipped contract. A browser
 extension that builds these links is out of scope and has its own plan.
 
 ## Combined verification, October 8, 2026
+
+The completed programme was merged into main by fast-forward at `a1975fae9` on October 8, 2026.
 
 The task branch integrates main at `64c4e51f3`, including project-first navigation and Node shell
 remounts. Final review preserved edits made during promotion preparation and tied preparation,
