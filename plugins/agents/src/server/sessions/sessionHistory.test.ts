@@ -20,6 +20,13 @@ describe('own-session history tools', () => {
   })
   afterEach(() => { fixture.cleanup(); context.cleanup() })
 
+  it('contributes both history tools as session-required reads', () => {
+    expect(sessionHistoryTools(store).map(({ name, scope, risk, requiresSession }) => ({ name, scope, risk, requiresSession }))).toEqual([
+      { name: 'session_history_search', scope: 'task', risk: 'read', requiresSession: true },
+      { name: 'session_history_read', scope: 'task', risk: 'read', requiresSession: true },
+    ])
+  })
+
   it('filters roles before the limit, scopes to the claimed session, and quotes query terms', async () => {
     const own = await store.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, provider)
     const other = await store.createSession({ taskId: 'task', providerId: 'fake', profileId: 'fake', kind: 'interactive', config: {} }, provider)

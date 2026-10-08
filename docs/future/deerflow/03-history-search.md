@@ -13,10 +13,10 @@ integration run; this phase changes no UI. Later phases can use the tools withou
 or the signed claim contract.
 
 Review follow-up, October 8, 2026: Search projection catch-up is scoped to the claimed session, as
-read already was. Focused tests cover the raw 600-character snippet cap and check the actual tool
-contributions through the registry route: a task token without a session claim cannot list or invoke
-either tool. The coordinator can combine live managed-harness verification with Phase 4's real-app
-report-card check.
+read already was. Focused tests cover the raw 600-character snippet cap and both tools' read-tier,
+session-required metadata. The Node route's focused test checks that task tokens without a session
+claim cannot list or invoke read-tier history tools. The coordinator can combine live managed-harness
+verification with Phase 4's real-app report-card check.
 
 Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
