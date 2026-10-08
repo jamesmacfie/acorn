@@ -49,7 +49,6 @@ export function FindBar(props: {
         <Input
           ref={props.ref}
           kind="filter"
-          size="sm"
           label="Find"
           invalid={!!props.error}
           assist={false}

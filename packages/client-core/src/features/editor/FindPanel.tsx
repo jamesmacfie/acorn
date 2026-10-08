@@ -80,7 +80,6 @@ function FindPanel(props: FindPanelProps) {
           <Input
             ref={props.replaceField}
             kind="filter"
-            size="sm"
             label="Replace"
             placeholder="Replace…"
             assist={false}
