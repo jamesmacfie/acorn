@@ -1,7 +1,7 @@
 import type { NodePlugin } from '@acorn/plugin-api/node'
 import { lazyEditorBridge } from '../server/lazyEditorBridge'
 import { registerEditorWsChannel } from '../server/wsChannel'
-import { searchBridge } from '../server/search'
+import { lazySearchBridge } from '../server/lazySearchBridge'
 import { editor, EDITOR } from '../server/routes/editor'
 import { search, SEARCH } from '../server/routes/search'
 import { EDITOR_LINE_MARKERS } from '../contract/lineMarkers'
@@ -34,7 +34,7 @@ export const editorPlugin = (): NodePlugin => {
           () => ctx.extensionPoints.handlers(EDITOR_LINE_MARKERS).map((entry) => entry.value),
           () => ctx.extensionPoints.handlers(EDITOR_FILE_STATUS).map((entry) => entry.value),
         )),
-        ctx.capabilities.provide(SEARCH, searchBridge(ctx.core)),
+        ctx.capabilities.provide(SEARCH, lazySearchBridge(ctx.core)),
       ]
       // `$EDITOR` in a throwaway PTY, for a reader who edits in terminal mode. It rides the one
       // authenticated WebSocket, so it is part of this plugin's surface: drop it and the routes keep

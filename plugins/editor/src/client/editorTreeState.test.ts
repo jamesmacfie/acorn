@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
+  collapseEditorTreeDirectories,
   editorTreeDirectoryOpen,
   evictEditorTreeState,
   moveEditorTreeDirectories,
@@ -17,6 +18,9 @@ describe('editor tree state', () => {
 
     setEditorTreeDirectoryOpen('tree-nested', 'src', true)
     expect(editorTreeDirectoryOpen('tree-nested', 'src/core')).toBe(true)
+    collapseEditorTreeDirectories('tree-nested')
+    expect(editorTreeDirectoryOpen('tree-nested', 'src')).toBe(false)
+    expect(editorTreeDirectoryOpen('tree-nested', 'src/core')).toBe(false)
   })
 
   it('scopes expansion by task and evicts only the archived task', () => {

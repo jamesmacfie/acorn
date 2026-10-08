@@ -74,6 +74,19 @@ describe('search route (POST /api/tasks/:id/search)', () => {
     expect((await app.fetch(jsonReq('/api/tasks/task1/search', 'POST'), {} as Env)).status).toBe(400)
   })
 
+  it('rejects oversized and negative include filters before invoking the bridge', async () => {
+    let calls = 0
+    setSearchBridge({ findInFiles: async () => { calls++; return { files: [], truncated: false } } })
+    const app = authed()
+    for (const opts of [
+      { include: Array.from({ length: 21 }, () => '*.ts') },
+      { include: ['x'.repeat(257)] },
+      { include: ['!*.ts'] },
+      { exclude: Array.from({ length: 20 }, () => 'x'.repeat(256)), include: ['x'.repeat(256)] },
+    ]) expect((await app.fetch(jsonReq('/api/tasks/task/search', 'POST', { query: 'needle', opts }), {} as Env)).status).toBe(400)
+    expect(calls).toBe(0)
+  })
+
   it('503s when the bridge is unavailable (dev:node / pre-wire)', async () => {
     const res = await authed().fetch(jsonReq('/api/tasks/task1/search', 'POST', { query: 'foo' }), {} as Env)
     expect(res.status).toBe(503)
@@ -84,7 +97,7 @@ describe('search route (POST /api/tasks/:id/search)', () => {
 describe('search error responses', () => {
   afterEach(() => setSearchBridge(null))
   it.each([
-    ['invalid_query', 400], ['unavailable_root', 404], ['cancelled', 409],
+    ['invalid_query', 400], ['invalid_filter', 400], ['invalid_scope', 404], ['unavailable_root', 404], ['cancelled', 409],
     ['timeout', 504], ['launch_failed', 500], ['overflow', 500], ['invalid_output', 500],
   ])('preserves %s across the bridge as HTTP %i', async (code, status) => {
     // A worker reconstructs a plain Error with its machine code.

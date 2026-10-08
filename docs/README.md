@@ -139,6 +139,7 @@ Start with the plugin map, then follow the authoring guide or API reference.
 | [testing/native-overlays.md](./testing/native-overlays.md) | Native overlay acceptance scenarios, test evidence, performance targets, and outstanding graphical checks. |
 | [testing/terminal-and-palette.md](./testing/terminal-and-palette.md) | Terminal keyboard and shared command palette checks. |
 | [testing/changes-and-large-surfaces.md](./testing/changes-and-large-surfaces.md) | Changes pane, large diff, transcript, and task restoration checks. |
+| [testing/editor-phase06-2026-10-08.md](./testing/editor-phase06-2026-10-08.md) | Dated Editor phase 06 fixture and acceptance evidence. |
 | [testing/workflows.md](./testing/workflows.md) | Workflow authoring, execution, child runs, schedules, and data-source checks. |
 | [testing/agents-and-providers.md](./testing/agents-and-providers.md) | Onboarding, model generation, delegation, and harness checks. |
 | [testing/rail-and-annotations.md](./testing/rail-and-annotations.md) | Rail layout, task marker, and appearance checks with dated results. |

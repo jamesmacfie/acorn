@@ -7,6 +7,7 @@ import { movedPath, pathContains } from './editorState'
 // losing the user's place. Collapsing a parent retains its descendants, so reopening it restores
 // the nested expansion exactly as it was.
 const [expandedByTask, setExpandedByTask] = createSignal<ReadonlyMap<string, ReadonlySet<string>>>(new Map())
+export const EDITOR_TREE_COLLECTION = 'editor.file-tree'
 const ownerKey = (taskId: string, nodeId: string | null): string => JSON.stringify([nodeId, taskId])
 
 export const editorTreeDirectoryOpen = (taskId: string, path: string, nodeId = activeNodeId()): boolean =>
@@ -22,6 +23,14 @@ export function setEditorTreeDirectoryOpen(taskId: string, path: string, open: b
     const next = new Map(current)
     if (expanded.size) next.set(key, expanded)
     else next.delete(key)
+    return next
+  })
+}
+
+export function collapseEditorTreeDirectories(taskId: string, nodeId = activeNodeId()): void {
+  setExpandedByTask((current) => {
+    const next = new Map(current)
+    next.delete(ownerKey(taskId, nodeId))
     return next
   })
 }

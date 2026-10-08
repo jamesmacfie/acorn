@@ -1,6 +1,6 @@
 # Improve everyday editor use
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+Date: October 7, 2026. Status: phases 01–06 implemented on October 8, 2026; combined release acceptance and the integrated full test gate remain pending. See [phase 06 evidence](../../testing/editor-phase06-2026-10-08.md).
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 
 This programme adds everyday file management, change visibility, navigation, and editing controls
@@ -85,7 +85,7 @@ Follow [conventions](../../conventions.md) for file placement and typed public c
 
 Use focused tests while implementing. At each handoff, run `pnpm lint`, full tests for touched packages
 and their consumers, and `pnpm --filter @acorn/arch-tests test`. Every phase lists its minimum package
-scope. Run `pnpm test` once at phase 06 after package checks pass.
+scope. Run `pnpm test` once after phase 06 is integrated and package checks pass.
 
 Verify UI changes with the [isolated app drivers](../../local-development/agent-drivers.md). Use a
 disposable repository, snapshot after each screen change, inspect screenshots, and stop both sessions.

@@ -4,6 +4,7 @@
 // returns null now that the surface is server-backed.
 import {
   editorFilesRoute,
+  editorIgnoredRoute,
   editorFileStatusRoute,
   editorImageRoute,
   editorListRoute,
@@ -14,6 +15,7 @@ import {
   editorEntryRoute, editorCreateRoute, editorRenameRoute, editorRenameAvailabilityRoute, editorTrashRoute, editorTrashAvailabilityRoute,
   type FileTarget, type FileActionResult, type TrashAvailability,
   type EditorEntry,
+  type IgnoreEntries,
   type EditorReadResult,
   type EditorLineMarkerSnapshot,
   type EditorWriteResult,
@@ -28,6 +30,7 @@ export type { EditorEntry } from '../contract/api'
 export type EditorApi = {
   root(taskId: string): Promise<string | null>
   list(taskId: string, relPath: string): Promise<EditorEntry[]>
+  ignored(taskId: string, relPath: string, names: string[]): Promise<IgnoreEntries>
   files(taskId: string): Promise<string[]>
   fileStatus(taskId: string): Promise<EditorFileStatusSnapshot>
   read(taskId: string, relPath: string): Promise<EditorReadResult>
@@ -48,6 +51,9 @@ export const editorApi = (queryClient?: QueryClient): EditorApi => {
   return {
   root: (taskId) => readJson<{ root: string | null }>(editorRootRoute(taskId), { nodeId }).then((r) => r.root),
   list: (taskId, relPath) => readJson<EditorEntry[]>(editorListRoute(taskId, relPath), { nodeId }),
+  ignored: (taskId, relPath, names) => writeJson<IgnoreEntries>(editorIgnoredRoute(taskId), {
+    method: 'POST', nodeId, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ path: relPath, names }),
+  }),
   files: (taskId) => readJson<string[]>(editorFilesRoute(taskId), { nodeId }),
   fileStatus: (taskId) => readJson<EditorFileStatusSnapshot>(editorFileStatusRoute(taskId), { nodeId }),
   read: (taskId, relPath) => readJson<EditorReadResult>(editorReadRoute(taskId, relPath), { nodeId }).then((r) => {

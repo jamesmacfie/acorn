@@ -1,6 +1,29 @@
 # Phase 06: scope search and finish acceptance
 
-Date: October 7, 2026. Status: proposed product requirements; implementation not started.
+> **Implementation note — October 8, 2026.** Editor search accepts a task-confined folder and
+> validated include/exclude globs, retains task-scoped search state through hiding and remount, and
+> fences stale requests and result navigation. A bounded ripgrep file-list pass applies glob
+> precedence before the ordinary text search, preserving default hidden and Git-ignore behavior.
+> This requires two ripgrep processes when filters are present. The Node owns both processes and
+> terminates them on cancellation. Scope rename/trash requires an explicit reset.
+>
+> The tree shows Git-ignored entries by default, labels them accessibly, and can hide or temporarily
+> reveal them without closing open documents. Git metadata is requested in bounded batches for
+> listed directories through the public Git owner API. Collapse all clears descendant expansion.
+> Search and tree commands use captured task context and shared typed kit targets. The Editor search
+> bridge loads lazily; the Node static bundle is 3,145,174 bytes against a 3,150,000-byte ceiling.
+>
+> **Verification and limits.** See [dated phase 06 evidence](../../testing/editor-phase06-2026-10-08.md).
+> Editor passed 194 tests (one skipped), Node app 273, Node core 1,636, plugin API 14, TUI 684
+> (two skipped), desktop built suites 182 JS, 10 boot, and 65 Rust, architecture 87, and lint 37
+> tasks. Client core passed 2,468 with two workspace-route/CSS-token failures also reproduced on
+> untouched older parent `bf1143d08`. The desktop driver exercised scoped filtering, result
+> navigation, ignored visibility/reveal, and collapse on a 10,000-path disposable fixture. Terminal
+> Editor navigation, remote/platform/native-dialog checks, quantitative runtime bounds, and the
+> connected six-phase restart flow remain unverified. The full unfiltered `pnpm test` gate is
+> pending with the coordinator after integration.
+
+Date: October 7, 2026. Status: implemented October 8, 2026; combined release acceptance pending.
 Source baseline: `47f7431e72c9f239736ce63fb6774aed4f61180c`.
 Dependency: [phase 05](./05-editing-controls.md).
 

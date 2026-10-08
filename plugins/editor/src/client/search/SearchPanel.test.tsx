@@ -10,6 +10,7 @@ vi.mock('./searchClient', () => ({
     new Promise<SearchResult>((resolve) => { requests.push({ task, query, signal: options.signal, resolve }) }),
 }))
 const { default: SearchPanel } = await import('./SearchPanel')
+const { updateTaskSearchState } = await import('./searchState')
 let dispose: (() => void) | undefined
 let host: HTMLElement
 const result = (path: string): SearchResult => ({ files: [{ path, hits: [{ line: 1, col: 1, endCol: 2, preview: 'x' }] }], truncated: false })
@@ -38,6 +39,8 @@ it('aborts replacement searches, fences stale completion, and retains a hidden r
   await Promise.resolve()
   expect(host.textContent).not.toContain('stale.ts')
   setTask('next-task')
+  expect(host.querySelector<HTMLInputElement>('input')?.value).toBe('')
+  input('next')
   await vi.waitFor(() => expect(requests).toHaveLength(3))
   expect(requests[2].task).toBe('next-task')
   dispose(); dispose = undefined
@@ -51,4 +54,49 @@ it('cancels a pending debounce on disposal', async () => {
   dispose(); dispose = undefined
   await new Promise((resolve) => setTimeout(resolve, 250))
   expect(requests).toHaveLength(0)
+})
+
+it('retains the task query, folder, filters, and results after remount', async () => {
+  const task = 'retained-search-test'
+  updateTaskSearchState(task, (state) => ({ ...state, opts: { folder: 'src', include: ['*.tsx'] }, includeText: '*.tsx' }))
+  host = document.createElement('div'); document.body.append(host)
+  const mount = () => render(() => <QueryClientProvider client={new QueryClient()}><SearchPanel taskId={task} active /></QueryClientProvider>, host)
+  dispose = mount()
+  input('needle')
+  await vi.waitFor(() => expect(requests).toHaveLength(1))
+  requests[0].resolve(result('src/good.tsx'))
+  await vi.waitFor(() => expect(host.textContent).toContain('src/good.tsx'))
+  dispose(); host.replaceChildren()
+  dispose = mount()
+  expect(host.querySelector<HTMLInputElement>('input')?.value).toBe('needle')
+  expect(host.textContent).toContain('src')
+  expect(host.textContent).toContain('src/good.tsx')
+})
+
+it('aborts work when scope or filters change and ignores late results', async () => {
+  const task = 'scoped-search-test'
+  host = document.createElement('div'); document.body.append(host)
+  dispose = render(() => <QueryClientProvider client={new QueryClient()}><SearchPanel taskId={task} active /></QueryClientProvider>, host)
+  input('needle')
+  await vi.waitFor(() => expect(requests).toHaveLength(1))
+  updateTaskSearchState(task, (state) => ({ ...state, opts: { ...state.opts, folder: 'src' }, results: undefined }))
+  await vi.waitFor(() => expect(requests).toHaveLength(2))
+  expect(requests[0].signal.aborted).toBe(true)
+  const details = [...host.querySelectorAll('button')].find((button) => button.textContent === 'Search details')!
+  details.click()
+  const include = host.querySelectorAll<HTMLInputElement>('input')[1]
+  include.value = '*.tsx'
+  include.dispatchEvent(new Event('input', { bubbles: true }))
+  expect(requests[1].signal.aborted).toBe(true)
+  await vi.waitFor(() => expect(requests).toHaveLength(3))
+  requests[0].resolve(result('wrong.ts'))
+  requests[1].resolve(result('also-wrong.ts'))
+  requests[2].resolve(result('src/right.ts'))
+  await vi.waitFor(() => expect(host.textContent).toContain('src/right.ts'))
+  expect(host.textContent).not.toContain('wrong.ts')
+  include.value = 'x'.repeat(257)
+  include.dispatchEvent(new Event('input', { bubbles: true }))
+  await vi.waitFor(() => expect(host.textContent).toContain('Each pattern must be at most 256 characters.'))
+  await new Promise((resolve) => setTimeout(resolve, 250))
+  expect(requests).toHaveLength(3)
 })

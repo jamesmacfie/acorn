@@ -1,4 +1,5 @@
 import { spawn } from 'node:child_process'
+import { execFile } from 'node:child_process'
 import { rgPath } from '@vscode/ripgrep'
 import { SearchFailure } from '../shared/search'
 import type { SearchResult } from '../shared/search'
@@ -14,10 +15,11 @@ export function runRipgrep(root: string, args: string[], options: {
   executable?: string
   timeoutMs?: number
   maxRecordBytes?: number
+  allowedPaths?: ReadonlySet<string>
 } = {}): Promise<SearchResult> {
   if (options.signal?.aborted) return Promise.reject(new SearchFailure('cancelled', 'Search was cancelled.'))
   return new Promise((resolve, reject) => {
-    const results = new RgResults()
+    const results = new RgResults(options.allowedPaths)
     const maxRecord = options.maxRecordBytes ?? MAX_RECORD_BYTES
     const child = spawn(options.executable ?? rgPath, args, { cwd: root, stdio: ['ignore', 'pipe', 'pipe'] })
     let failure: SearchFailure | undefined
@@ -92,8 +94,32 @@ export function runRipgrep(root: string, args: string[], options: {
       if (failure) reject(failure)
       else if (results.truncated) resolve(results.result())
       else if (code === 0 || code === 1) resolve(results.result())
-      else reject(new SearchFailure(code === 2 && stderr.includes('regex parse error:') ? 'invalid_query' : 'execution_failed',
+      else reject(new SearchFailure(code === 2 && stderr.includes('regex parse error:') ? 'invalid_query'
+        : code === 2 && stderr.includes('error parsing glob') ? 'invalid_filter' : 'execution_failed',
         stderr.trim() || `Ripgrep exited with ${code ?? signal}.`))
+    })
+  })
+}
+
+// Ripgrep owns glob matching. The text search itself runs with ordinary ignore/hidden defaults;
+// this file list only narrows which of those results may count toward the 2,000-hit limit.
+export function listFilteredPaths(root: string, folder: string, include: readonly string[], exclude: readonly string[], signal?: AbortSignal): Promise<ReadonlySet<string>> {
+  const args = ['--files', '--null', '--no-config']
+  for (const pattern of include) args.push('--glob', pattern)
+  for (const pattern of exclude) args.push('--glob', pattern.startsWith('!') ? pattern : `!${pattern}`)
+  args.push('--', folder)
+  return new Promise((resolve, reject) => {
+    execFile(rgPath, args, { cwd: root, encoding: 'buffer', maxBuffer: 4 * 1024 * 1024, timeout: 10_000, signal }, (error, stdout, stderr) => {
+      if (signal?.aborted) { reject(new SearchFailure('cancelled', 'Search was cancelled.')); return }
+      const message = stderr.toString('utf8')
+      if (error && (error as NodeJS.ErrnoException).code !== '1' && (error as { code?: number }).code !== 1) {
+        const code = message.includes('error parsing glob') ? 'invalid_filter'
+          : (error as { killed?: boolean }).killed ? 'timeout'
+          : (error as NodeJS.ErrnoException).code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER' ? 'overflow' : 'execution_failed'
+        reject(new SearchFailure(code, message.trim() || 'Unable to list filtered search paths.'))
+        return
+      }
+      resolve(new Set(stdout.toString('utf8').split('\0').filter(Boolean).map((path) => path.startsWith('./') ? path.slice(2) : path)))
     })
   })
 }

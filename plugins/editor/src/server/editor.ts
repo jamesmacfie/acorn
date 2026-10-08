@@ -58,6 +58,7 @@ export const editorBridge = (
 ): EditorBridge => ({
   ...createFileActions(core, changed),
   root: (taskId) => core.tasks.root(taskId),
+  ignored: async (taskId, relPath, names) => (await import('./ignoredEntries')).ignoredEntries(core, taskId, relPath, names),
 
   list: async (taskId, relPath) => {
     const root = await core.tasks.root(taskId)

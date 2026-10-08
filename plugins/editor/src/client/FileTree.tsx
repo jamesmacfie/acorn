@@ -1,21 +1,25 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, onMount } from 'solid-js'
-import { activeNodeId, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
-import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, TreeRow } from '@acorn/plugin-api/ui'
+import { createQuery } from '@tanstack/solid-query'
+import { activeNodeId, prefsOptions, queryOwner, revealCollectionItem, wsOnNodeEvent, wsOnReconnect } from '@acorn/plugin-api/client'
+import { Alert, Badge, Button, copyText, Input, Menu, Modal, Only, RowActions, Rows, Stack, Text, ToggleButton, Toolbar, TreeRow } from '@acorn/plugin-api/ui'
 import { HOST } from '@acorn/plugin-api/ui/tokens'
 import { editorApi, type EditorEntry } from './editorClient'
 import type { FileTarget, TrashAvailability } from '../contract/api'
 import type { ArmedFileAction } from './fileActionModel'
 import { createFileActionModel } from './fileActionModel'
-import { editorTreeDirectoryOpen, setEditorTreeDirectoryOpen } from './editorTreeState'
+import { collapseEditorTreeDirectories, editorTreeDirectoryOpen, EDITOR_TREE_COLLECTION, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { type FileTreeRevealRequest } from './fileTreeReveal'
+import { findInFolder, searchScopePathChanged } from './search/searchState'
+import { pathContains } from './editorState'
+import { readEditorShowIgnored, saveEditorShowIgnored } from './editorPrefs'
 import type { FileStatusProjection } from './fileStatusModel'
 
 const badgeTone = (tone: 'muted' | 'ok' | 'accent' | 'danger'): 'neutral' | 'ok' | 'accent' | 'danger' =>
   tone === 'muted' ? 'neutral' : tone
 
 /** The collection id, so the reveal below and the host's stored place agree on one name. */
-const TREE = 'editor.file-tree'
+const TREE = EDITOR_TREE_COLLECTION
 
 export default function FileTree(props: {
   taskId: string
@@ -26,12 +30,17 @@ export default function FileTree(props: {
   openPath: string | null
   reveal: FileTreeRevealRequest | null
   onRevealed: (revision: number) => void
+  onRevealActive: () => void
   actions: ReturnType<typeof createFileActionModel>
 }) {
   const queryClient = useQueryClient()
   const registeredNode = queryOwner(queryClient)
   const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
   const api = editorApi(queryClient)
+  const prefs = createQuery(() => prefsOptions(true))
+  const showIgnored = () => readEditorShowIgnored(prefs.data)
+  const [ignoreByDir, setIgnoreByDir] = createSignal<ReadonlyMap<string, { ignored: ReadonlySet<string>; error?: string }>>(new Map())
+  const [temporaryReveal, setTemporaryReveal] = createSignal<string | null>(null)
   const [listings, setListings] = createSignal<ReadonlyMap<string, EditorEntry[]>>(new Map())
   const [errors, setErrors] = createSignal<ReadonlyMap<string, string>>(new Map())
   const [rootEntry, setRootEntry] = createSignal<FileTarget | null>(null)
@@ -62,6 +71,15 @@ export default function FileTree(props: {
       if (!live(revision, task)) return false
       setErrors((current) => { const next = new Map(current); next.delete(dir); return next })
       setListings((current) => new Map(current).set(dir, entries))
+      void Promise.resolve().then(() => api.ignored(task, dir, entries.map((entry) => entry.name))).then((result) => {
+        if (!live(revision, task)) return
+        setIgnoreByDir((current) => new Map(current).set(dir, result.available
+          ? { ignored: new Set(result.ignored) } : { ignored: new Set(), error: result.reason }))
+      }).catch((cause: unknown) => {
+        if (live(revision, task)) setIgnoreByDir((current) => new Map(current).set(dir, {
+          ignored: new Set(), error: cause instanceof Error ? cause.message : 'Git ignore rules are unavailable.',
+        }))
+      })
       return true
     }).catch((cause: unknown) => {
       if (live(revision, task)) setErrors((current) => new Map(current).set(dir,
@@ -106,6 +124,8 @@ export default function FileTree(props: {
     loading.clear()
     setErrors(new Map())
     setListings(new Map())
+    setIgnoreByDir(new Map())
+    setTemporaryReveal(null)
     setRootEntry(null)
     void load('')
     void api.entry(next, '').then((entry) => { if (taskId === next) setRootEntry(entry) }).catch(() => {})
@@ -132,6 +152,9 @@ export default function FileTree(props: {
   })
 
   const isOpen = (path: string) => editorTreeDirectoryOpen(props.taskId, path, nodeId)
+  createEffect(on(() => props.openPath, (path) => {
+    if (temporaryReveal() && temporaryReveal() !== path) setTemporaryReveal(null)
+  }))
 
   const targetOf = (item: TreeItem): FileTarget | null => {
     const entry = listings().get(item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : '')
@@ -198,9 +221,11 @@ export default function FileTree(props: {
       } else if (operation === 'rename') reveal = await actions.rename(current, suppliedName ?? name())
       else await actions.trash(current, saveDrafts)
       if (disposed || taskId !== operationTask || activeNodeId() !== nodeId) return
+      if (operation === 'rename' || operation === 'trash') searchScopePathChanged(taskId, current.target.path, nodeId)
       await refresh()
       props.onStatusChanged()
       if (reveal) {
+        setTemporaryReveal(reveal)
         const segments = reveal.split('/').slice(0, -1)
         let parent = ''
         for (const segment of segments) { parent = parent ? `${parent}/${segment}` : segment; setEditorTreeDirectoryOpen(operationTask, parent, true, nodeId); await load(parent) }
@@ -222,6 +247,7 @@ export default function FileTree(props: {
     if (!target) return null
     return <>
       {target.kind === 'folder' && <>
+        <Menu.Item context={menu} onSelect={() => findInFolder(taskId, target.path, nodeId)}>Find in folder</Menu.Item>
         <Menu.Item context={menu} onSelect={() => begin('create-file')}>New file…</Menu.Item>
         <Menu.Item context={menu} onSelect={() => begin('create-folder')}>New folder…</Menu.Item>
       </>}
@@ -239,6 +265,15 @@ export default function FileTree(props: {
     setEditorTreeDirectoryOpen(props.taskId, path, open, nodeId)
     if (open) void load(path)
   }
+  const collapseAll = () => {
+    generation++
+    loading.clear()
+    collapseEditorTreeDirectories(taskId, nodeId)
+    setListings((current) => new Map([['', current.get('') ?? []]]))
+    setIgnoreByDir((current) => new Map(current.has('') ? [['', current.get('')!]] : []))
+    setErrors(new Map())
+    setTemporaryReveal(null)
+  }
 
   // The visible rows, flat. A tree is a flat collection with a depth on each row, which is what lets
   // the host own arrow keys, type-ahead, `aria-activedescendant` and the roving stop: the recursive
@@ -251,6 +286,7 @@ export default function FileTree(props: {
     const walk = (dir: string, depth: number): void => {
       for (const entry of listings().get(dir) ?? []) {
         const path = dir ? `${dir}/${entry.name}` : entry.name
+        if (!showIgnored() && ignoreByDir().get(dir)?.ignored.has(entry.name) && !pathContains(path, temporaryReveal() ?? '')) continue
         const previous = previousItems.get(path)
         const item = previous?.label === entry.name && previous.depth === depth && previous.dir === entry.dir
           ? previous : { key: path, label: entry.name, depth, dir: entry.dir }
@@ -282,6 +318,7 @@ export default function FileTree(props: {
   // listing has arrived, and `revealCollectionItem` is a no-op for a key the collection does not hold.
   createEffect(on(() => [props.taskId, props.reveal] as const, ([, request]) => {
     if (!request) return
+    setTemporaryReveal(request.path)
     const task = taskId
     const current = () => !disposed && task === taskId && props.reveal?.revision === request.revision
     void (async () => {
@@ -302,8 +339,16 @@ export default function FileTree(props: {
 
   return (
     <Stack grow>
+      <Toolbar size="sm" ariaLabel="Tree controls">
+        <Button onPress={collapseAll}>Collapse all folders</Button>
+        <Button disabled={!props.openPath} onPress={props.onRevealActive}>Reveal active file</Button>
+      </Toolbar>
       {actionError() && <Alert tone="danger">{actionError()}</Alert>}
       {props.statusStale() && <Alert tone="warn">Git status may be stale. Files remain available.</Alert>}
+      <ToggleButton variant="bare" size="sm" tip="Show ignored files. .git and node_modules remain excluded." pressed={showIgnored()}
+        onPressedChange={(enabled) => { void saveEditorShowIgnored(queryClient, enabled) }}>Show ignored files</ToggleButton>
+      {Array.from(ignoreByDir()).filter(([, info]) => info.error).map(([dir, info]) =>
+        <Alert tone="warn">Ignore filtering unavailable for {dir || 'worktree'}: {info.error}. All entries remain visible.</Alert>)}
       {rootEntry() && (HOST !== 'tui' || !dialog() && (menuPath() === null || menuPath() === '')) && <Menu ariaLabel="Worktree actions" open={() => menuPath() === ''}
         onBeforeOpen={() => prepareMenu(rootEntry()!)} onOpenChange={(open) => {
         if (open) openMenu(rootEntry()!)
@@ -372,6 +417,8 @@ export default function FileTree(props: {
         const folderMark = () => item.dir ? props.fileStatus().folders.get(item.key) : undefined
         const fileMark = () => item.dir ? undefined : props.fileStatus().files.get(item.key)
         const statusLabel = () => folderMark()?.label ?? fileMark()?.label
+        const parent = item.key.includes('/') ? item.key.slice(0, item.key.lastIndexOf('/')) : ''
+        const ignored = () => ignoreByDir().get(parent)?.ignored.has(item.label) ?? false
         return <TreeRow
           item={itemProps}
           offset={place.offset}
@@ -394,8 +441,8 @@ export default function FileTree(props: {
               else dismissMenu()
             }}>{menuItems}</RowActions></Only>
             <Only hosts={['tui']}><Button onPress={() => { const target = targetOf(item); if (target) openMenu(target) }}>Actions</Button></Only></>}
-          title={`${item.key}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
-          label={`${item.key}${statusLabel() ? `, ${statusLabel()}` : ''}`}
+          title={`${item.key}${ignored() ? ' — ignored by Git' : ''}${statusLabel() ? ` — ${statusLabel()}` : ''}`}
+          label={`${item.key}${ignored() ? ', ignored by Git' : ''}${statusLabel() ? `, ${statusLabel()}` : ''}`}
           meta={item.dir
             ? folderMark() && <><Badge size="xs" tone={folderMark()!.tone === 'danger' ? 'danger' : 'neutral'}
                 tip={folderMark()!.label}>{folderMark()!.count}</Badge>
@@ -404,7 +451,7 @@ export default function FileTree(props: {
                 tip={fileMark()!.label}>{fileMark()!.letter}</Badge>
                 <Only hosts={['tui']}><Text emphasis="muted">{` ${fileMark()!.label}`}</Text></Only></>}
         >
-          <Text tone={folderMark()?.tone ?? fileMark()?.tone}>{item.label}</Text>
+          <Text tone={folderMark()?.tone ?? fileMark()?.tone} emphasis={ignored() ? 'muted' : undefined}>{item.label}</Text>
           {inlinePath() === item.key && <Input label={dialog() === 'rename' ? 'Rename entry' : 'New name'}
             value={name()} onInput={setName} onSubmit={(value) => void act(false, value)}
             onKeyDown={(event) => { if (event.key === 'Escape') { event.preventDefault(); finish() } }}

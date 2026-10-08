@@ -50,6 +50,8 @@ Node preferences, plugin state, credentials, commands, or executable paths.
 | Workspace and task selection | Node and workspace or task |
 | Draft editor and comment text, and a Changes commit message | Client and current task |
 | Editor recent files | Device `localStorage`, keyed by Node and task; at most 50 paths |
+| Editor search query, filters, folder, results, and reading place | Node/task session state, evicted with the task |
+| Show ignored files | Device preference; on unless explicitly disabled |
 | Editor close and navigation history | Session memory keyed by Node and task; at most 20 closes and 100 locations |
 | Editor word wrap default | Device preference `editor_word_wrap`; off when absent |
 | Editor indentation fallback | Device preference `editor_indentation`; two spaces when absent or invalid |

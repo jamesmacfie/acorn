@@ -128,6 +128,7 @@ client: VisibleElementRect
 client: WorkflowNotice
 client: Workspace
 client: activateTaskSignals
+client: activeCollectionItem
 client: activeNodeId
 client: activeTaskId
 client: agentContextContributions

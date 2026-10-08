@@ -1,6 +1,7 @@
 import type { CommandSearchItem } from '@acorn/protocol/commands.ts'
 import {
   COMMAND_CLOSED,
+  activeCollectionItem,
   activeNodeId,
   activeTaskId,
   fuzzyScore,
@@ -13,6 +14,8 @@ import { editorApi } from './editorClient'
 import { activeFile, requestEditorReveal } from './editorState'
 import { pruneRecentToListing } from './editorNavigation'
 import { graphicalEditorAdmitted } from './editorAdmission'
+import { collapseEditorTreeDirectories, EDITOR_TREE_COLLECTION } from './editorTreeState'
+import { findInFolder } from './search/searchState'
 import { focusedPane } from '@acorn/plugin-api/client'
 
 // ⌘P, and the two commands that were already here.
@@ -74,6 +77,34 @@ const fileItem = (path: string): CommandSearchItem => {
 }
 
 export const editorCommands: readonly ContributedCommand[] = [
+  {
+    id: 'editor.tree.collapse', title: 'Collapse all folders', category: 'navigation', palette: true,
+    scope: 'task', requires: { plugin: 'editor' },
+    when: () => !!activeTaskId(),
+    run: (context) => { if (context.nodeId === activeNodeId() && context.taskId === activeTaskId() && context.taskId) collapseEditorTreeDirectories(context.taskId, context.nodeId) },
+  },
+  {
+    id: 'editor.tree.reveal-active', title: 'Reveal active file', category: 'navigation', palette: true,
+    scope: 'task', requires: { plugin: 'editor' },
+    when: () => { const taskId = activeTaskId(); return !!taskId && !!activeFile(taskId) },
+    run: (context) => {
+      if (context.nodeId !== activeNodeId() || context.taskId !== activeTaskId() || !context.taskId) return
+      const path = activeFile(context.taskId)
+      if (path) openPane(context.taskId, 'editor', { kind: 'editor:tree-reveal', path }, 'add')
+    },
+  },
+  {
+    id: 'editor.search.folder', title: 'Find in focused folder', category: 'navigation', palette: true,
+    scope: 'task', requires: { plugin: 'editor' },
+    when: () => { const taskId = activeTaskId(); return !!taskId && focusedPane(taskId) === 'editor' && !!activeCollectionItem(EDITOR_TREE_COLLECTION) },
+    run: async (context) => {
+      const path = activeCollectionItem(EDITOR_TREE_COLLECTION)
+      if (!path || !context.taskId || context.nodeId !== activeNodeId() || context.taskId !== activeTaskId()) return
+      const target = await editorApi().entry(context.taskId, path)
+      if (target.kind === 'folder' && context.nodeId === activeNodeId() && context.taskId === activeTaskId())
+        findInFolder(context.taskId, path, context.nodeId)
+    },
+  },
   {
     id: 'editor.files.open',
     kind: 'search',

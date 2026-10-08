@@ -1,9 +1,10 @@
 import { useQueryClient } from '@tanstack/solid-query'
 import { createEffect, createMemo, createSignal, on, onCleanup, Show } from 'solid-js'
 import { activeNodeId, queryOwner, debounce } from '@acorn/plugin-api/client'
-import { Alert, CopyButton, EmptyState, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
+import { Alert, Button, CopyButton, EmptyState, Input, Row, Rows, SectionHeader, Stack, TabPanel, Text, ToggleButton, Toolbar } from '@acorn/plugin-api/ui'
 import { requestEditorReveal } from '../editorState'
 import { findInFiles, type SearchHit } from './searchClient'
+import { taskSearchState, updateTaskSearchState } from './searchState'
 
 // Find-in-files panel: substring search by default, with case, whole-word, and regex toggles.
 // Double-clicking a hit opens the file in the editor beside it, centered on the match. For why this
@@ -15,67 +16,95 @@ import { findInFiles, type SearchHit } from './searchClient'
 // End, the page keys and type-ahead work in a list that had none of them, and `TabPanel` owns the
 // hidden-but-mounted half that the panel used to spell as an inline `display: none`.
 export default function SearchPanel(props: { taskId: string; active: boolean }) {
-  const [query, setQuery] = createSignal('')
-  const [debounced, setDebounced] = createSignal('')
-  const [caseSensitive, setCaseSensitive] = createSignal(false)
-  const [wholeWord, setWholeWord] = createSignal(false)
-  const [regex, setRegex] = createSignal(false)
+  const queryClient = useQueryClient()
+  const registeredNode = queryOwner(queryClient)
+  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
+  const state = () => taskSearchState(props.taskId, nodeId)
+  const change = (update: Parameters<typeof updateTaskSearchState>[1]) => updateTaskSearchState(props.taskId, update, nodeId)
+  const [debounced, setDebounced] = createSignal(state().query)
+  const [filterRevision, setFilterRevision] = createSignal(0)
+  const [debouncedFilterRevision, setDebouncedFilterRevision] = createSignal(0)
+  const [details, setDetails] = createSignal(false)
+  const filterError = createMemo(() => {
+    const { include = [], exclude = [] } = state().opts
+    if (include.length > 20 || exclude.length > 20) return 'Use at most 20 patterns in each filter.'
+    if (include.some((pattern) => pattern.startsWith('!'))) return 'Put negative patterns in Files to exclude.'
+    if ([...include, ...exclude].some((pattern) => pattern.length > 256)) return 'Each pattern must be at most 256 characters.'
+    if (new TextEncoder().encode([...include, ...exclude].join('')).length > 4096) return 'Search filters must total at most 4 KiB.'
+    return ''
+  })
 
   // Debounces keystrokes so ripgrep does not spawn per character; toggles apply immediately since
   // they are part of the resource source, not debounced.
   const pushDebounced = debounce((q: string) => setDebounced(q), 200)
   const onInput = (v: string) => {
-    setQuery(v)
+    change((old) => ({ ...old, query: v, results: undefined, error: '' }))
     pushDebounced(v)
   }
-
-  const queryClient = useQueryClient()
-  const registeredNode = queryOwner(queryClient)
-  const nodeId = registeredNode === undefined ? activeNodeId() : registeredNode
-  const [results, setResults] = createSignal<Awaited<ReturnType<typeof findInFiles>>>()
+  const setOption = (option: 'caseSensitive' | 'wholeWord' | 'regex', value: boolean) =>
+    change((old) => ({ ...old, opts: { ...old.opts, [option]: value }, results: undefined, error: '' }))
+  const pushFilters = debounce((revision: number) => setDebouncedFilterRevision(revision), 200)
+  const setPatterns = (option: 'include' | 'exclude', value: string) => {
+    // Invalidate the running request before changing options. Otherwise the reactive options
+    // briefly start an un-debounced search with the new pattern on every keystroke.
+    const revision = setFilterRevision((current) => current + 1)
+    change((old) => ({ ...old,
+      [option === 'include' ? 'includeText' : 'excludeText']: value,
+      opts: { ...old.opts, [option]: value.split(',').map((pattern) => pattern.trim()).filter(Boolean) },
+      results: undefined, error: '',
+    }))
+    pushFilters(revision)
+  }
+  createEffect(on(() => props.taskId, () => { pushDebounced.cancel(); setDebounced(state().query) }, { defer: true }))
   const [loading, setLoading] = createSignal(false)
-  const [error, setError] = createSignal('')
   let disposed = false
   let generation = 0
   let controller: AbortController | undefined
-  createEffect(() => {
+  const requestKey = createMemo(() => JSON.stringify([activeNodeId(), props.taskId, state().query, debounced(), state().opts,
+    filterRevision(), debouncedFilterRevision(), state().scopeChanged]))
+  createEffect(on(requestKey, () => {
     const taskId = props.taskId
-    const input = query()
+    const input = state().query
     const q = debounced().trim()
-    const opts = { caseSensitive: caseSensitive(), wholeWord: wholeWord(), regex: regex() }
+    const opts = state().opts
+    const scopeChanged = state().scopeChanged
     const revision = ++generation
     controller?.abort()
     controller = undefined
     setLoading(false)
-    setError('')
+    if (activeNodeId() !== nodeId) return
+    if (scopeChanged) return
+    if (filterError()) return
+    if (filterRevision() !== debouncedFilterRevision()) return
     if (!q || input.trim() !== q) {
-      if (!input.trim()) setResults(undefined)
       return
     }
     const owned = new AbortController()
     controller = owned
     setLoading(true)
     void findInFiles(taskId, q, opts, { nodeId, signal: owned.signal }).then((result) => {
-      if (!disposed && revision === generation) setResults(result)
+      if (!disposed && revision === generation) change((old) => ({ ...old, results: result, error: '' }))
     }).catch((cause: unknown) => {
       if (!disposed && revision === generation && !owned.signal.aborted)
-        setError(cause instanceof Error ? cause.message : 'Search failed.')
+        change((old) => ({ ...old, results: undefined, error: cause instanceof Error ? cause.message : 'Search failed.' }))
     }).finally(() => {
       if (!disposed && revision === generation) setLoading(false)
     })
-  })
+  }))
   onCleanup(() => {
     disposed = true
     generation++
     pushDebounced.cancel()
+    pushFilters.cancel()
     controller?.abort()
   })
 
-  const files = () => results()?.files ?? []
+  const files = () => state().results?.files ?? []
   const totalHits = createMemo(() => files().reduce((n, f) => n + f.hits.length, 0))
 
   // The retained pane intent rather than a callback prop. See docs/panes/contributions.md § Contributions.
   function openHit(path: string, hit: SearchHit) {
+    if (activeNodeId() !== nodeId || !state().results?.files.some((file) => file.path === path && file.hits.includes(hit))) return
     requestEditorReveal(props.taskId, path, hit.line, hit.col)
   }
 
@@ -89,8 +118,9 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
   }))
 
   const status = () => {
+    if (filterError()) return filterError()
+    if (state().error) return state().error
     if (!debounced().trim()) return "Type to search this task's files."
-    if (error()) return error()
     if (loading()) return 'Searching…'
     const hits = `${totalHits()} result${totalHits() === 1 ? '' : 's'}`
     const where = `${files().length} file${files().length === 1 ? '' : 's'}`
@@ -109,7 +139,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
           size="sm"
           label="Search in files"
           placeholder="Search in files…"
-          value={query()}
+          value={state().query}
           assist={false}
           onInput={(value) => onInput(value)}
         />
@@ -117,21 +147,35 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
       <Toolbar size="sm" ariaLabel="Search options">
         {/* Three independent booleans, so three ToggleButtons, not a radiogroup, which would make
             them mutually exclusive. The find bar's shape. */}
-        <ToggleButton variant="bare" size="sm" tip="Match case" pressed={caseSensitive()} onPressedChange={setCaseSensitive}>Aa</ToggleButton>
-        <ToggleButton variant="bare" size="sm" tip="Whole word" pressed={wholeWord()} onPressedChange={setWholeWord}>\b</ToggleButton>
-        <ToggleButton variant="bare" size="sm" tip="Use regular expression" pressed={regex()} onPressedChange={setRegex}>.*</ToggleButton>
+        <ToggleButton variant="bare" size="sm" tip="Match case" pressed={!!state().opts.caseSensitive} onPressedChange={(value) => setOption('caseSensitive', value)}>Aa</ToggleButton>
+        <ToggleButton variant="bare" size="sm" tip="Whole word" pressed={!!state().opts.wholeWord} onPressedChange={(value) => setOption('wholeWord', value)}>\b</ToggleButton>
+        <ToggleButton variant="bare" size="sm" tip="Use regular expression" pressed={!!state().opts.regex} onPressedChange={(value) => setOption('regex', value)}>.*</ToggleButton>
         <Show when={files().length}>
           <Toolbar.Spacer />
           <Text emphasis="muted">{status()}</Text>
         </Show>
       </Toolbar>
+      <Show when={state().opts.folder}>
+        <Toolbar size="sm" ariaLabel="Folder scope"><Text>{state().opts.folder}</Text>
+          <Button onPress={() => change((old) => ({ ...old, opts: { ...old.opts, folder: undefined }, scopeChanged: false, error: '', results: undefined }))}>Clear folder scope</Button>
+        </Toolbar>
+      </Show>
+      <Button expanded={details()} onPress={() => setDetails(!details())}>Search details</Button>
+      <Show when={details()}>
+        <Stack gap="none">
+          <Input label="Files to include" value={state().includeText} onInput={(value) => setPatterns('include', value)} />
+          <Input label="Files to exclude" value={state().excludeText} onInput={(value) => setPatterns('exclude', value)} />
+          <Text emphasis="muted">Comma-separated ripgrep globs. Excludes win. A literal comma in a pattern is unsupported. Hidden and ignored files are skipped.</Text>
+        </Stack>
+      </Show>
+      <Show when={filterError()}><Alert tone="danger">{filterError()}</Alert></Show>
 
       <Show when={files().length} fallback={<EmptyState busy={loading()} size="sm" align="start">{status()}</EmptyState>}>
         {/* One collection per file rather than one for the whole result set: a hit's key has to be
             stable across a refetch, and `path:line:col` is the only thing about a hit that is. */}
         <Stack gap="none">
           {/* The client never learns the node's cap, so this cannot say how many it kept. */}
-          <Show when={results()?.truncated}>
+          <Show when={state().results?.truncated}>
             <Alert variant="banner" tone="muted">Showing the first results. Narrow your search to see more.</Alert>
           </Show>
           {files().map((file) => (
@@ -148,7 +192,7 @@ export default function SearchPanel(props: { taskId: string; active: boolean }) 
               </SectionHeader>
               {/* Every returned hit; the node caps the total result set. */}
               <Rows
-                id={`editor.search:${file.path}`}
+                id={`editor.search:${nodeId}:${props.taskId}:${file.path}`}
                 ariaLabel={`Matches in ${file.path}`}
                 items={file.hits.map((hit) => ({ key: `${hit.line}:${hit.col}`, label: String(hit.line), hit }))}
                 onActivate={(key) => {

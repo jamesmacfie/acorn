@@ -30,6 +30,17 @@ directory entries for the file tree. Entries include `name`, `dir`, `kind`, `ide
 The added fields let a menu carry the entry it saw. Image and line-marker reads keep their separate
 contracts.
 
+`POST …/ignored` accepts `{ path, names }` for one requested directory. It returns
+`{ available: true, ignored: string[] }` or `{ available: false, ignored: [], reason }`. The Node
+caps the batch at 10,000 names and 256 KiB, confines the directory, and reads Git's NUL-delimited
+ignore output. A failed ignore read leaves the ordinary listing usable.
+
+`POST /v1/p/editor/tasks/:id/search` accepts a query and optional `opts` with `caseSensitive`,
+`wholeWord`, `regex`, `folder`, `include`, and `exclude`. Folder is task-root-relative and confined
+before ripgrep starts. The Node limits each filter to 20 patterns, each pattern to 256 characters,
+and both filters to 4 KiB. Results have task-root-relative paths, one-based UTF-16 columns, and a
+2,000-match cap. Invalid query or filters return 400; missing or escaped scope returns 404.
+
 ## Manage tree entries
 
 `GET …/entry?path=` returns `{ root, path, kind, identity }`. An empty path names the root for

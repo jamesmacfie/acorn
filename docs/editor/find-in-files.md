@@ -26,3 +26,16 @@ The panel captures its query client's Node, the task, the query, and the options
 or a toggle, or disposing the panel, aborts its request through the client transport. The Node owns
 ending the process, and escalates past SIGTERM when it has to. Hiding the panel keeps its query,
 results, and request.
+
+**Find in folder** on a tree folder opens this panel with that relative folder captured. **Clear
+folder scope** returns to the task root. **Search details** accepts comma-separated ripgrep globs in
+**Files to include** and **Files to exclude**. Whitespace around commas and empty entries are ignored.
+Excludes win. Negative globs belong in the exclude field; literal commas in patterns are unsupported.
+Each field accepts 20 patterns of at most 256 characters, with a combined 4 KiB limit. The Node
+rejects invalid filters, missing folders, and symlink scopes outside the task before searching.
+
+Filtered searches run one bounded ripgrep filename pass to select paths, then search text with
+ripgrep's ordinary ignore and hidden-file defaults. The filename pass uses ripgrep glob rules;
+there is no shell expansion or separate JavaScript matcher. Query, scope, filters, results, and
+reading place remain in the Node/task session when the sidebar is hidden or remounted. A rename or
+trash affecting the scope leaves a reset action instead of redirecting the search.

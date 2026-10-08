@@ -21,6 +21,12 @@ export const readEditorWordWrap = (prefs: Record<string, string> | undefined): b
 export const saveEditorWordWrap = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
   savePref(qc, PrefKeys.editorWordWrap, enabled ? '1' : '0')
 
+export const readEditorShowIgnored = (prefs: Record<string, string> | undefined): boolean =>
+  prefs?.[PrefKeys.editorShowIgnored] !== '0'
+
+export const saveEditorShowIgnored = (qc: QueryClient, enabled: boolean): Promise<boolean> =>
+  savePref(qc, PrefKeys.editorShowIgnored, enabled ? '1' : '0')
+
 export const readEditorIndentation = (prefs: Record<string, string> | undefined): Indentation => {
   const match = /^(spaces|tabs):(2|4|8)$/.exec(prefs?.[PrefKeys.editorIndentation] ?? '')
   return match ? { mode: match[1] as Indentation['mode'], width: Number(match[2]) as Indentation['width'] } : { mode: 'spaces', width: 2 }

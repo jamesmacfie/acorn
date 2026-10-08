@@ -151,7 +151,7 @@ export { refResolutionsOptions } from '@acorn/client-core/host/registries/panes'
 export type { PluginRefResolution } from '@acorn/protocol/refResolvers.ts'
 // Put a named collection's item in view, for a pane answering "show me this one" from somewhere else.
 // The host owns scroll, the same way it owns selection, so a pane never selects a row out of the DOM.
-export { revealCollectionItem } from '@acorn/client-core/kit/keys'
+export { activeCollectionItem, revealCollectionItem } from '@acorn/client-core/kit/keys'
 export { agentContextContributions } from '@acorn/client-core/host/registries/sources'
 // The tone of a tool call's status dot. Shared because two plugins draw that dot: agents owns the
 // `agents:tool-card` point and changes fills it.

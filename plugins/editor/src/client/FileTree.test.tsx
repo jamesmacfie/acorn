@@ -7,19 +7,23 @@ import type { createFileActionModel } from './fileActionModel'
 import { evictEditorTreeState, setEditorTreeDirectoryOpen } from './editorTreeState'
 import { projectFileStatus } from './fileStatusModel'
 import type { FileStatusProjection } from './fileStatusModel'
+import { prefsKey } from '@acorn/protocol/api.ts'
+import { saveEditorShowIgnored } from './editorPrefs'
 
 Element.prototype.scrollIntoView ??= () => {}
 
-const listing = vi.fn(async (_taskId: string, path: string): Promise<EditorEntry[]> => {
+const defaultListing = async (_taskId: string, path: string): Promise<EditorEntry[]> => {
   if (path === '') return [{ name: 'src', dir: true }]
   if (path === 'src') return [{ name: 'nested', dir: true }, { name: 'app.ts', dir: false }]
   if (path === 'src/nested') return [{ name: 'model.ts', dir: false }]
   return []
-})
+}
+const listing = vi.fn(defaultListing)
+const ignored = vi.fn(async (_task: string, _dir: string, _names: string[]) => ({ available: true as const, ignored: [] as string[] }))
 
 vi.mock('./editorClient', async (importOriginal) => ({
   ...(await importOriginal<typeof import('./editorClient')>()),
-  editorApi: () => ({ list: listing, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root', entryId: path || 'root' }),
+  editorApi: () => ({ list: listing, ignored, entry: async (_taskId: string, path: string) => ({ root: '/test', path, kind: 'folder', identity: path || 'root', entryId: path || 'root' }),
     trashAvailability: async () => ({ available: false, reason: 'Unsupported in this test.' }), renameAvailability: async () => ({ available: true }) }),
 }))
 
@@ -34,11 +38,13 @@ afterEach(() => {
   dispose?.()
   dispose = undefined
   host?.remove()
-  listing.mockClear()
+  listing.mockReset().mockImplementation(defaultListing)
+  ignored.mockReset().mockResolvedValue({ available: true, ignored: [] })
   vi.mocked(actions.arm).mockReset()
   vi.mocked(actions.create).mockReset()
   vi.mocked(actions.rename).mockReset()
   evictEditorTreeState(taskId)
+  localStorage.clear()
 })
 
 it('renames the focused tree target with F2 without opening its file', async () => {
@@ -135,19 +141,25 @@ it('keeps the captured root target and uses an explicit destination folder', asy
   await vi.waitFor(() => expect(actions.create).toHaveBeenCalledWith({ root: '/test', path: 'src', kind: 'folder', identity: 'src', entryId: 'src' }, 'new.txt', 'file'))
 })
 
-const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection }) => {
+const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () => { path: string; revision: number } | null; onRevealed?: (revision: number) => void; fileStatus?: FileStatusProjection; openPath?: () => string | null; hideIgnored?: boolean }) => {
   host = document.createElement('div')
   document.body.append(host)
+  const queryClient = new QueryClient()
+  if (options?.hideIgnored) {
+    queryClient.setQueryData(prefsKey, { editor_show_ignored: '0' })
+    void saveEditorShowIgnored(queryClient, false)
+  }
   dispose = render(() => (
-    <QueryClientProvider client={new QueryClient()}><FileTree
+    <QueryClientProvider client={queryClient}><FileTree
       taskId={options?.task?.() ?? taskId}
       fileStatus={() => options?.fileStatus ?? { files: new Map(), folders: new Map() }}
       statusStale={() => false}
       onStatusChanged={() => {}}
-      openPath={null}
+      openPath={options?.openPath?.() ?? null}
       reveal={options?.reveal?.() ?? null}
       onOpen={onOpen}
       onRevealed={options?.onRevealed ?? (() => {})}
+      onRevealActive={() => {}}
       actions={actions}
     /></QueryClientProvider>
   ), host)
@@ -155,6 +167,33 @@ const mount = (onOpen = vi.fn(), options?: { task?: () => string; reveal?: () =>
 }
 
 describe('the editor file tree', () => {
+  it('hides ignored rows, temporarily reveals an ignored active path, and clears it on file change', async () => {
+    listing.mockImplementation(async (_task, dir) => dir === ''
+      ? [{ name: 'build', dir: true }, { name: 'source.ts', dir: false }]
+      : [{ name: 'output.ts', dir: false }])
+    ignored.mockImplementation(async (_task, dir) => ({ available: true, ignored: dir ? ['output.ts'] : ['build'] }))
+    const [reveal, setReveal] = createSignal<{ path: string; revision: number } | null>(null)
+    const [openPath, setOpenPath] = createSignal<string | null>('build/output.ts')
+    mount(vi.fn(), { hideIgnored: true, reveal, openPath })
+    await vi.waitFor(() => expect(host.textContent).toContain('source.ts'))
+    expect([...host.querySelectorAll('button')].find((button) => button.textContent === 'Show ignored files')?.getAttribute('aria-pressed')).toBe('false')
+    expect(ignored).toHaveBeenCalled()
+    await vi.waitFor(() => expect(host.textContent).not.toContain('build'))
+    expect(host.textContent).not.toContain('output.ts')
+    setReveal({ path: 'build/output.ts', revision: 1 })
+    await vi.waitFor(() => expect(host.textContent).toContain('output.ts'))
+    setOpenPath('source.ts')
+    await vi.waitFor(() => expect(host.textContent).not.toContain('output.ts'))
+  })
+
+  it('keeps a listing usable when Git ignore metadata fails', async () => {
+    ignored.mockRejectedValue(new Error('Git unavailable'))
+    mount()
+    await vi.waitFor(() => expect(host.textContent).toContain('src'))
+    await vi.waitFor(() => expect(host.textContent).toContain('Ignore filtering unavailable'))
+    expect(host.textContent).toContain('Git unavailable')
+  })
+
   it('keeps a large listing virtual and shows a status badge without opening the file', async () => {
     listing.mockResolvedValueOnce(Array.from({ length: 10_000 }, (_, index) => ({ name: `${index}.txt`, dir: false })))
     const status = projectFileStatus({ kind: 'ready', changes: [{ path: '0.txt', status: 'untracked', staged: false }] })

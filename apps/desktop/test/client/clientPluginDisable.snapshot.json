@@ -22,7 +22,11 @@
       "context.open",
       "source.docker.open",
       "docker.find",
+      "editor.tree.collapse",
+      "editor.tree.reveal-active",
+      "editor.search.folder",
       "editor.files.open",
+      "editor.navigation.go-to-line",
       "editor.search.open",
       "source.github.open",
       "memory.search",
@@ -30,6 +34,7 @@
       "notes.create",
       "preview.open",
       "terminal.run",
+      "terminal.run.setup",
       "terminal.run.targets",
       "terminal.run.layouts",
       "terminal.run.sessions",
@@ -79,6 +84,7 @@
     ],
     "extensions": [
       "agents.storage",
+      "agents.loop-coverage",
       "changes.tool-card",
       "github.push-actions",
       "memory.tool-card"
@@ -99,6 +105,7 @@
     "railMarkers": [
       "core:task",
       "agents",
+      "changes",
       "docker",
       "workflows.task-groups"
     ],
@@ -148,6 +155,9 @@
       ],
       "extensions": [
         "changes.tool-card"
+      ],
+      "railMarkers": [
+        "changes"
       ],
       "persistedStateSlices": [
         "changes.view"
@@ -213,7 +223,11 @@
         "editor"
       ],
       "commands": [
+        "editor.tree.collapse",
+        "editor.tree.reveal-active",
+        "editor.search.folder",
         "editor.files.open",
+        "editor.navigation.go-to-line",
         "editor.search.open"
       ],
       "persistedStateSlices": [

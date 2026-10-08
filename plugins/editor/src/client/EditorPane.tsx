@@ -764,6 +764,13 @@ export default function EditorPane(props: { task: Task }) {
       setSide('search')
       return
     }
+    if (intent.kind === 'editor:tree-reveal') {
+      if (active() !== intent.path) return
+      setSidebarCollapsed(false)
+      setSide('files')
+      setTreeReveal({ path: intent.path, revision: ++treeRevealRevision })
+      return
+    }
     if (intent.kind !== 'editor:reveal') return
     if (replayPath === intent.path) replayPath = null
     else recordNavigation(intent.path, intent.line, intent.column)
@@ -1134,6 +1141,10 @@ export default function EditorPane(props: { task: Task }) {
                   reveal={treeReveal()}
                   onRevealed={(revision) => {
                     setTreeReveal((request) => request?.revision === revision ? null : request)
+                  }}
+                  onRevealActive={() => {
+                    const path = active()
+                    if (path) setTreeReveal({ path, revision: ++treeRevealRevision })
                   }}
                 />
               </TabPanel>
