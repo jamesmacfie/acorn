@@ -48,7 +48,7 @@ export type AgentActivityTool = {
   turnId: string | null
   kind: string | null
   title: string
-  status: 'pending' | 'running' | 'completed' | 'failed'
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted' | 'unknown'
   paths: string[]
   /** The subagent that ran the call, when the harness says. Its parent is that subagent, else the session. */
   subagentId: string | null

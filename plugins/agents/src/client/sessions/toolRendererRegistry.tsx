@@ -38,8 +38,7 @@ function useOpenToolClock(open: () => boolean): () => number {
   return now
 }
 
-// A call with no status reported yet is in flight; see AgentToolCall.status.
-const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 'running'
+const toolStatusLabel = (props: AgentToolRendererProps) => props.tool.status ?? 'unknown'
 
 // Claude's Skill call has a generic provider title, while its useful name is in the recorded input.
 // Read it at presentation time so older transcript rows get the same label without rewriting events.

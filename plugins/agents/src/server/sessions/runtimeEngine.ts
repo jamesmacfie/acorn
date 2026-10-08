@@ -484,10 +484,11 @@ export class ManagedAgentEngine {
     // active is one whose ending we will never hear. These sessions are not in `unsettledSessions`:
     // a backgrounded child leaves its parent `ready`, which is exactly why the row was stranded.
     for (const session of await this.store.sessionsWithActiveSubagents()) {
-      for (const id of quietedSubagents(session.subagents, Date.now())) {
+      for (const id of session.subagents.filter(isActiveSubagent).map((child) => child.id)) {
         await this.record(session.id, null, { type: 'subagent', subagent: { id, status: 'idle' } })
       }
     }
+    await this.settleCommands()
     await this.store.cancelWorkflowFollowUps()
     await this.attachments.collectGarbage()
     // A start's skill folder goes when its process stops. One left by a Node that died is removed here,
@@ -679,7 +680,7 @@ export class ManagedAgentEngine {
     const live = this.processes.current(sessionId)
     if (!live || live.closing || !this.processes.owns(generation)) return
     this.processes.heard(generation, !['session_state', 'session_metadata', 'diagnostic', 'error'].includes(event.type))
-    const turnId = live.activeTurnId
+    const turnId = event.acornTurnId === undefined ? live.activeTurnId : event.acornTurnId
     if (event.type === 'request' || event.type === 'permission_request' || event.type === 'input_request') {
       const session = await this.store.requireSession(sessionId)
       const turn = turnId ? await this.store.turn(turnId) : null
@@ -923,9 +924,17 @@ export class ManagedAgentEngine {
     event: AgentNormalizedEvent,
   ): Promise<AgentEventRecord> {
     const record = await this.store.recordEvent(sessionId, turnId, event)
-    this.emit({ channel: 'agent:event', event: record })
-    await this.emitProjection(sessionId, turnId, event)
     const session = await this.store.requireSession(sessionId)
+    let clientRecord = record
+    if (record.event.type === 'tool' && record.event.tool.kind === 'execute' && record.event.tool.status !== undefined) {
+      const { commandStatus } = await import('./commandLifecycle')
+      const turn = record.turnId ? await this.store.turn(record.turnId) : null
+      clientRecord = { ...record, event: { type: 'tool', tool: {
+        ...record.event.tool, status: commandStatus(record.event.tool, turn ?? undefined, session),
+      } } }
+    }
+    this.emit({ channel: 'agent:event', event: clientRecord })
+    await this.emitProjection(sessionId, record.turnId, event)
     // Only when the event changed what the row says. Most events in a streamed reply move nothing on
     // the row except its sequence and clock, and the row runs 26 KB on average and up to 58 KB, mostly
     // the harness's skills list. Sent after every event, rows were about 96% of the agent socket's
@@ -934,7 +943,28 @@ export class ManagedAgentEngine {
     if (event.type === 'session_metadata' || this.sentRows.get(sessionId) !== listedRow(session)) {
       this.emit({ channel: 'agent:session', session })
     }
+    if (event.type === 'turn_completed' || event.type === 'error'
+      || (event.type === 'session_state' && ['ready', 'stopped', 'failed', 'archived'].includes(event.state))
+      || (event.type === 'subagent' && ['idle', 'completed', 'failed'].includes(event.subagent.status ?? ''))) {
+      await this.settleCommands(sessionId)
+    }
     return record
+  }
+
+  /** Append lifecycle endings past client cursors. Read projection also covers untouched history. */
+  private async settleCommands(sessionId?: string): Promise<void> {
+    const { commandStatus } = await import('./commandLifecycle')
+    for (const record of await this.store.unfinishedCommands(sessionId)) {
+      if (record.event.type !== 'tool') continue
+      const session = await this.store.requireSession(record.sessionId)
+      const turn = record.turnId ? await this.store.turn(record.turnId) : null
+      const status = commandStatus(record.event.tool, turn ?? undefined, session)
+      if (status === record.event.tool.status) continue
+      await this.record(record.sessionId, record.turnId, { type: 'tool', tool: {
+        id: record.event.tool.id, title: '', kind: 'execute', status,
+        subagentId: record.event.tool.subagentId,
+      } })
+    }
   }
 
   // The row a projected event changed, sent with the event.

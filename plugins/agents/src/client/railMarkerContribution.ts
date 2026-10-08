@@ -50,7 +50,10 @@ const forTask = (taskId: string, predicate: (session: AgentSession) => boolean) 
 // spinner only for this task's workflow agents, so a spinner on the Agent button with none here says
 // the agent at work is not the workflow's.
 const WORKFLOWS_PANE_ID = 'workflows'
-const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && isActiveAgent(session)
+const hasAgentWork = (session: AgentSession) => isActiveAgent(session)
+  || (!['stopped', 'failed', 'archived'].includes(session.runtimeState)
+    && session.subagents.some((child) => child.status === 'pending' || child.status === 'running'))
+const isWorkingWorkflowAgent = (session: AgentSession) => session.kind === 'workflow' && hasAgentWork(session)
 
 export const agentRailMarkerContribution: RailMarkerContribution = {
   id: 'agents',
@@ -67,7 +70,7 @@ export const agentRailMarkerContribution: RailMarkerContribution = {
       // `idle` means the harness has gone quiet, which is the PTY tier's nearest thing to "not
       // working" (docs/terminal/activity.md § Activity and status).
       working: agentSessionsFor(taskId).filter((session) => !session.idle).length
-        + forTask(taskId, isActiveAgent),
+        + forTask(taskId, hasAgentWork),
       attention: forTask(taskId, needsAttention),
     })
   },

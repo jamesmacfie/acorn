@@ -232,6 +232,29 @@ describe('Codex collaboration modes', () => {
     await expect(handle.cancelSubagent!('child-1')).rejects.toThrow('Provider refused the interrupt')
   })
 
+  it('keeps a late command on its dispatched turn while another turn is active', async () => {
+    const { handle, driverEvents } = await start()
+    const first = { ...turn('default'), id: 'managed-first' }
+    await handle.sendTurn({ turn: first, input: first.input, attachments: {} })
+    wire.onNotification?.({ method: 'item/started', params: { threadId: 'thread-1', turnId: 'turn-provider-1',
+      item: { id: 'cmd', type: 'commandExecution', command: 'sleep 30' } } })
+    wire.onNotification?.({ method: 'turn/completed', params: { threadId: 'thread-1', turn: { id: 'turn-provider-1', status: 'completed' } } })
+    wire.onNotification?.({ method: 'thread/status/changed', params: { threadId: 'thread-1', status: { type: 'idle' } } })
+    const second = { ...turn('default'), id: 'managed-second' }
+    await handle.sendTurn({ turn: second, input: second.input, attachments: {} })
+    wire.onNotification?.({ method: 'item/completed', params: { threadId: 'thread-1', turnId: 'turn-provider-1',
+      item: { id: 'cmd', type: 'commandExecution', status: 'completed', aggregatedOutput: 'done' } } })
+    wire.onNotification?.({ method: 'item/commandExecution/outputDelta', params: { threadId: 'thread-1', turnId: 'turn-provider-1', itemId: 'cmd', delta: 'late' } })
+    const commands = driverEvents.filter((event) => event.type === 'tool')
+    expect(commands).toMatchObject([
+      { acornTurnId: 'managed-first', tool: { status: 'running' } },
+      { acornTurnId: 'managed-first', tool: { status: 'completed' } },
+      { acornTurnId: 'managed-first', tool: { output: 'late' } },
+    ])
+    expect(commands[2]?.type === 'tool' && commands[2].tool.status).toBeUndefined()
+    await handle.stop()
+  })
+
   it('supplies host attendance in the developer channel on creation and resume', async () => {
     for (const resumed of [false, true]) {
       const { handle } = await start(null, resumed, {}, [], undefined, undefined, 'Nobody is waiting to answer.');
