@@ -284,6 +284,22 @@ describe('dragging a task row', () => {
       .toEqual([undefined, undefined, '1'])
   })
 
+  it('orders a task whose parent is gone with the other roots', async () => {
+    const rows = mount([
+      task('orphan', 'Orphan', 'archived'),
+      task('root', 'Root'),
+    ])
+    vi.spyOn(rows[0]!, 'getBoundingClientRect').mockReturnValue({ top: 0, height: 52 } as DOMRect)
+    pointAt(rows[0]!)
+
+    dispatchMouse(rows[1]!, 'mousedown', 40)
+    dispatchMouse(rows[1]!, 'mousemove', 10)
+    expect(rows[0]!.dataset.dropPosition).toBe('before')
+
+    dispatchMouse(rows[1]!, 'mouseup', 10)
+    await vi.waitFor(() => expect(taskLabels()).toEqual(['Root', 'Orphan']))
+  })
+
   it('does not offer a drop that would separate a child from its parent', () => {
     const rows = mount([
       task('parent', 'Parent'),
