@@ -741,10 +741,12 @@ ui/editor: EmbeddedEditor
 ui/editor: applyViewState
 ui/editor: captureViewState
 ui/editor: documentCustody
+ui/editor: editorSearch
 ui/editor: editorTheme
 ui/editor: fileDocumentCustodies
 ui/editor: languageForPath
 ui/editor: mountEmbeddedEditor
+ui/editor: openReplacePanel
 ui/editor: recoverDocumentCustody
 ui/editor: refreshEditorTheme
 ui/editor: reserveDocumentDestinations

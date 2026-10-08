@@ -7,7 +7,9 @@ import { useNavigate, useParams } from '@solidjs/router'
 import type { PluginRailItem, PluginSourceDescriptor } from '@acorn/protocol/api.ts'
 import { activeNodeId } from '@acorn/client-core/infra/node/activeNode.ts'
 import { createFleetQuery } from '@acorn/client-core/infra/node'
-import { chromeDeps, chromeKey, filterSourceItems, readRailItems, scopedSourceItemsPath } from '@acorn/client-core/host/chrome'
+import {
+  chromeDeps, chromeKey, createSourceSearch, readRailItems, scopedSourceItemsPath, sourceSearchEmpty, sourceSearchNotice,
+} from '@acorn/client-core/host/chrome'
 import { runChromeAction } from '@acorn/client-core/host/chrome'
 import { decodeProjectSurfaceItem, projectSurfaceRegistry } from '@acorn/client-core/host/registries/panes'
 import { sourceRegistry } from '@acorn/client-core/host/registries/sources'
@@ -36,8 +38,9 @@ import { openPromotion } from '../chrome/promotionStore'
 // component.
 //
 // The desktop's dashboard panels beside the list are not here: they need a separate cell surface.
-// Row promotion uses the host task picker below. The title and identifier filter stays in the list,
-// because a hundred issues without a way to narrow them is a list nobody can page through.
+// Row promotion uses the host task picker below. The search field stays in the list, because a hundred
+// issues without a way to narrow them is a list nobody can page through. What it searches, and when it
+// asks the plugin, is shared with the desktop (client-core/host/chrome/sourceSearch.ts).
 
 /** One row's secondary text: the aligned fields where a source sends them, the pre-joined line where
  *  it sends that instead. The DOM reserves a track per field so the Nth lines up down the list; in
@@ -61,10 +64,8 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
   // The same fan-out the DOM panel runs, pinned to one node, with the project in the dependency rather
   // than read inside the fetch so it reaches the cache key too. Both hosts build the key with
   // `chromeKey`, so a list drawn here and the same list drawn there are one cache entry.
-  const scope = () => ({
-    revision: chromeDeps(props.pluginId),
-    projectId: props.descriptor.projectScoped ? params.projectId : undefined,
-  })
+  const projectId = () => props.descriptor.projectScoped ? params.projectId : undefined
+  const scope = () => ({ revision: chromeDeps(props.pluginId), projectId: projectId() })
   const [result] = createFleetQuery(
     ({ projectId }) => chromeKey(props.pluginId, props.descriptor.id, projectId),
     (node, { projectId }, signal) => readRailItems(
@@ -79,7 +80,15 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
 
   const row = () => result().rows[0]
   const all = createMemo<PluginRailItem[]>(() => row()?.data ?? [])
-  const items = createMemo(() => filterSourceItems(all(), query()))
+  const search = createSourceSearch({
+    pluginId: props.pluginId,
+    nodeId,
+    descriptor: () => props.descriptor,
+    projectId,
+    text: query,
+    loaded: all,
+  })
+  const items = search.items
   const unavailable = () => result().unavailable[0]
 
   const select = (id: string, activate = false): void => {
@@ -142,8 +151,11 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
           it filters is still there. */}
       <Show when={all().length}>
         <box flexShrink={0} ref={bindField}>
-          <Input kind="filter" placeholder="Filter" value={query()} onInput={setQuery} />
+          <Input kind="filter" placeholder="Search" value={query()} onInput={setQuery} />
         </box>
+      </Show>
+      <Show when={items().length ? sourceSearchNotice(search) : undefined}>
+        {(notice) => <Line role="muted">{notice()}</Line>}
       </Show>
       {/* A node that did not answer and had nothing cached is a banner, never a failed pane — the same
           call the DOM panel makes, because "nothing is assigned to you" is a claim the host cannot make
@@ -157,7 +169,11 @@ function SourceList(props: { pluginId: string; descriptor: PluginSourceDescripto
       >
         <Show
           when={items().length}
-          fallback={<EmptyState title={props.descriptor.label}>{props.descriptor.emptyState?.message ?? 'Nothing to show.'}</EmptyState>}
+          fallback={(
+            <EmptyState title={props.descriptor.label}>
+              {search.status() === 'idle' ? props.descriptor.emptyState?.message ?? 'Nothing to show.' : sourceSearchEmpty(search.status())}
+            </EmptyState>
+          )}
         >
           <Rows
             virtual

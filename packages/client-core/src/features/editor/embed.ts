@@ -3,6 +3,7 @@ import { EditorState, StateEffect } from '@codemirror/state'
 import { EditorView } from '@codemirror/view'
 import type { LanguageId } from '@acorn/protocol/languageIds.ts'
 import { languageFor } from './language'
+import { editorSearch } from './search'
 import { editorTheme, watchEditorTheme } from './theme'
 
 // A small editor inside somebody else's pane: a box of code that is not a document.
@@ -39,6 +40,7 @@ export function mountEmbeddedEditor(element: HTMLElement, options: {
       doc: options.doc,
       extensions: [
         basicSetup,
+        editorSearch(),
         editorTheme(),
         ...(options.readOnly ? [EditorState.readOnly.of(true), EditorView.editable.of(false)] : []),
         EditorView.updateListener.of((update) => {

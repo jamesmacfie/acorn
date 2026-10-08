@@ -67,6 +67,9 @@ export const workflowSteps = sqliteTable(
     inputsJson: text('inputs_json'), // the assembled bundle handed to the step
     resultJson: text('result_json'), // the captured HeadlessResult (sans events)
     structuredJson: text('structured_json'), // the schema-conforming output, the edge currency
+    // The completion condition's state for an agent step with a goal: progress while it runs, the
+    // final summary after. Host metadata, kept apart from the output so no binding can read it.
+    goalJson: text('goal_json'),
     sessionId: text('session_id'), // for --resume (open in terminal, 15 P2)
     agentSessionId: text('agent_session_id'), // → plugins/agents' session id (plain ID across databases)
     costUsd: real('cost_usd'),

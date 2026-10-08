@@ -286,6 +286,15 @@ describe('webview surfaces', () => {
     }))).toContain('route must be inside /v1/p/board/')
   })
 
+  it('confines a source search route to the plugin and requires an items list to search', () => {
+    const source = { id: 'cards', label: 'Cards', order: 1, items: '/v1/p/board/items' }
+    expect(manifest({ sources: [{ ...source, search: '/v1/p/board/search' }] }).success).toBe(true)
+    expect(messages(manifest({ sources: [{ ...source, search: '/v1/p/other/search' }] })))
+      .toContain('route must be inside /v1/p/board/')
+    expect(manifest({ sources: [{ id: 'cards', label: 'Cards', order: 1, tree: { list: 'l', detail: 'd' }, search: '/v1/p/board/search' }] }).success)
+      .toBe(false)
+  })
+
   it('validates hosts and requires a literal URL to stay inside them', () => {
     expect(webviewManifest({
       frames: [{ target: 'webview', id: 'docs', label: 'Docs', url: 'https://other.example.com', hosts: ['docs.example.com'] }],

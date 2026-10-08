@@ -46,6 +46,11 @@ export type PluginRailItem = {
   task?: PluginRailTask
 }
 export type PluginRailItems = { items: PluginRailItem[] }
+/** What a source's `search` route answers: the matching rows, and whether the provider holds more
+ *  matches than these. `incomplete` is how a bounded first page avoids reading as the whole answer. */
+export type PluginRailSearchResult = { items: PluginRailItem[]; incomplete?: boolean }
+/** The most rows the host draws from one search answer. More than this counts as incomplete. */
+export const MAX_RAIL_SEARCH_ITEMS = 100
 
 // A rail row's `id` survives a round trip the plugin doesn't control: the host hands it back verbatim
 // as the pane frame's `context.item`, and the frame recovers the row's full identity from that one

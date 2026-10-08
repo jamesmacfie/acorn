@@ -2,7 +2,7 @@
 
 The Linear plugin is a loaded plugin that reads Linear issues into a rail, a task pane, a project pane,
 and a reference panel. This page covers connections, teams and projects, the rail, the ticket view,
-and palette search. The plugin is in `plugins/linear/`.
+rail search, and palette search. The plugin is in `plugins/linear/`.
 
 ## Linear
 
@@ -57,9 +57,21 @@ issue from the list. A refresh keeps the issue and reports a failure above it. A
 titled state with the reason in words and **Try again**. The rail row is the state icon, title, and
 key. The detail shows the state's name beside a badge toned by Linear's state type.
 
+## Rail search
+
+The rail's `search` route, `/rail-search`, asks Linear for matches in the same mapped projects and
+teams the rail lists, so it finds an issue beyond the rail's first 250
+([searching a source](../plugins/descriptors.md#searching-a-source)). Each mapped connection returns
+one page of 50 (`RAIL_SEARCH_QUERY` in `plugins/linear/src/server/index.ts`). That query leaves out
+labels, which make a page of issues expensive, and reads `pageInfo`. A full page, or a connection
+that failed, marks the answer incomplete. Rows keep the `<connection>:<identifier>` ID and the
+promotion seed. Only a failure of every mapped connection is an error. The search covers active
+issues, like the rail.
+
 ## Palette search
 
-Find a Linear issue asks Linear instead of filtering a cache. Linear's `IssueFilter` takes the mapping
+Find a Linear issue asks Linear instead of filtering a cache, through the same search as the rail's
+**Search** field (`searchMappedIssues` in `plugins/linear/src/server/routes/linear.ts`). Linear's `IssueFilter` takes the mapping
 filter the rail already sends, `project: { id: { in: … } }`, so a title clause and an identifier
 clause ride along (`projectIssueSearchFilter` in `plugins/linear/src/server/index.ts`). There's no
 cached set to filter, because `/rail-items` calls `providerFetch` directly. Filtering the first

@@ -34,8 +34,10 @@ display without rewriting existing whitespace or line endings. **Indent selectio
 selection** are palette commands; Tab remains available for keyboard navigation.
 
 Focused graphical commands expose Find, Replace, Toggle comment, Duplicate line, Move line up and
-down, Select next occurrence, Undo, and Redo. Find and Replace open CodeMirror's installed search
-panel. Go to line uses the file-navigation search command and records the jump in Editor history.
+down, Select next occurrence, Undo, and Redo. Find opens the shared
+[find panel](../editor.md#find-in-a-file), and Replace opens it with the replace row showing and its
+field focused. Go to line uses the file-navigation search command and records the jump in Editor
+history.
 Commands check the admitted file when they run, so a palette opened before a tab switch cannot edit
 the former file. Read-only text allows Find and Select next occurrence; text edits and unavailable
 undo or redo actions leave the palette. Graphical commands do not load CodeMirror until a text

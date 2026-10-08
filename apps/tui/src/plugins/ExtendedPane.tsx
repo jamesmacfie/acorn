@@ -27,7 +27,7 @@ export function ExtendedPane(props: ExtendedPaneProps) {
       <Show when={props.footerPointId}>{(pointId) => <ExtensionRows point={pointId()} />}</Show>
       {/* `pane.aside` is a dashboard: a grid of panels sized in pixels, whose terminal projection is a
           design rather than a port and belongs with the dashboards programme
-          (docs/future/dashboards/README.md). Named, for the same reason a rectangle is. */}
+          (docs/dashboards.md). Named, for the same reason a rectangle is. */}
       <Show when={props.aside}>
         {(aside) => <Line role="muted">{`${aside().pointId} is a dashboard, so it is not drawn here.`}</Line>}
       </Show>

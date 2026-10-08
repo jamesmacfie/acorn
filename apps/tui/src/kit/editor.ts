@@ -37,6 +37,12 @@ export const shouldHighlightDocument = (_characters: number): boolean => false
  *  host reads (./roles.ts), and there is no second stylesheet to hand a colour list to. */
 export const editorTheme = (): Extension => []
 
+/** No find panel: this host's editor is the file's text, and the reader's own `$EDITOR` has its own
+ *  search. */
+export const editorSearch = (): Extension => []
+
+export const openReplacePanel = (_view: EditorView): boolean => false
+
 export const refreshEditorTheme = (_view: EditorView): void => {}
 
 /** A watcher that has nothing to watch. It still returns the stop function, because the caller stores

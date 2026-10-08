@@ -90,11 +90,20 @@ export const createWorkflowExecution = (
         runId: opts.workflowRunId,
         stepId: opts.workflowStepId,
         posture: opts.posture ?? 'gated',
+        goal: opts.goal,
+        admitAutomatic: opts.admitAutomatic,
+        onGoal: opts.onGoal,
         onEvent: opts.onEvent,
         signal: opts.signal,
       })
       if (managed) return managed
       if (opts.requireManagedSession) throw new Error('Agent sessions are unavailable. Enable the Agents plugin to run this loop.')
+      // A completion condition is checked inside a managed session, so a step with one never runs headless.
+      if (opts.goal !== undefined) {
+        throw new Error(ctx.capabilities.get(AGENTS_SESSION_EXECUTE)
+          ? `Step '${def.name}' has a completion condition, and harness '${opts.profileId}' has no managed session to check it in. Choose Claude, Codex, or another managed harness.`
+          : `Step '${def.name}' has a completion condition, and agent sessions are unavailable. Enable the Agents plugin to run it.`)
+      }
       // The headless fallback, which now means what it says: a profile with no managed driver, or
       // a node with agents disabled. It used to catch a blank harness as well.
       const task = await core.tasks.load(taskId)

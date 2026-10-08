@@ -1,6 +1,6 @@
 # Feature inventory
 
-Date: 2026-09-27. Status: review inventory, with verification still open.
+Date: October 8, 2026. Status: remaining journey checklist. Evidence labels retain the September 27 review; later feature evidence is linked where available.
 
 This inventory follows [the product feature list](../../features.md) and the terminal roster in
 `apps/tui/src/roster.ts`. "Live" means observed in the isolated PTY. "Test" means an automated
@@ -21,8 +21,8 @@ cover navigation, visible state, the principal action, failure, and recovery at 
 | Managed agents and Agent Center | Live list, tests | Tests drive opening a run, sending a turn, newline, approval, new run, and whole-word session actions. Verify real Claude and Codex sessions, queue, fork, compact, delegated child tasks, archive, search, usage, and failure or signed-out states. A stopped fixture session does not prove a running CLI. |
 | Agent attachments, artifacts, export, handoff | Code, focused file tests | The `files` seam now asks for an absolute local path, transfers bytes, reports errors, and confirms overwrite. Continue in terminal can open the native session view. Verify actual Agent Attach, Export, artifact download, and managed handoff against a disposable Node at both sizes. |
 | Raw terminals and run targets | Live shell PTY, focused tests | The task and palette now reach a session chooser and native PTY. A disposable shell accepted a command and resized at 80 by 24 and 120 by 40. Verify provider sessions, managed return, missing CLI, and run-target commands end to end. |
-| Editor and file search | Tests, code | The tree, search, and read-only file box render; `$EDITOR` uses a PTY. Verify opening, editing, saving, external editor failure, file palette, search result navigation, and return focus. Make the handoff command visible in the pane. |
-| Notes, memory, findings, context | Tests, code | Notes and context frames render, and memory is a rail source. Verify edits, inclusion toggles, proposals and review, findings history, context preview and budget, send to agent, and independent slow or failed sections. |
+| Editor and file search | Tests, local live evidence | File operations, navigation, Git marks, and scoped search are implemented. [Editor acceptance](../editor/README.md) links October 8 completion records and connected local checks. Verify unsupported-platform and real external-editor paths; preserve focus and document custody. |
+| Notes, memory, findings, context | Tests, code | Notes and context frames render, and memory is a rail source. Verify direct memory writes, Undo, import, inclusion toggles, findings history, context preview and budget, send to agent, and independent slow or failed sections. |
 | Workflows | Code, tests of graph kit | The source, editor, run pane, and graph list have terminal projections. Verify create, edit, publish, run, gate approval, retry, scheduling and progress. A terminal-only user needs a settings route for defaults and schedules. |
 | Docker | Live rendering, code | The fixture showed stopped containers and a filter, but the list mixed names and status at 120 columns. Verify project match, start, stop, logs, stats, exec PTY, and trust prompts. State the scope when Browse has no list. |
 | HTTP requests | Code and shared plugin tests | Loaded tree draws in cells. Verify install and trust, create, auth variables, send, response inspection, save, and delete against a local test server. Check terminal text editing and readable request/response headers. |

@@ -4,6 +4,7 @@ import { workflowDataProblems } from './dataSteps'
 import { gateFormDefinitionProblems } from '../workflowGateForm'
 import { declaredOutputSchema } from '../../shared/gateForm'
 import { DEFAULT_PROFILE_ID } from '@acorn/plugin-api/node'
+import { MAX_AGENT_GOAL_CHARS } from '@acorn/plugin-agents/contract/sessionExecute.ts'
 import { BUILTIN_AGENT_STEP_KINDS, readStepField } from '../../shared/stepFields'
 import type {
   StepField,
@@ -132,7 +133,28 @@ function invalidTemplateExpressions(prompt: string | undefined): string[] {
 /** Every string a definition may hold a reference in: the prompt, the child prompt, and one level of
  *  `with`. Anywhere else, a `${...}` is just text. */
 function templatedStrings(step: WorkflowStepDef): (string | undefined)[] {
-  return [step.prompt, ...Object.values(step.with ?? {}).filter((value): value is string => typeof value === 'string')]
+  return [step.prompt, typeof step.goal === 'string' ? step.goal : undefined,
+    ...Object.values(step.with ?? {}).filter((value): value is string => typeof value === 'string')]
+}
+
+/**
+ * A completion condition's shape and the harness it needs (docs/workflows/agent-steps.md § Completion
+ * conditions). The step runs as a managed session, and the check runs through the same harness's
+ * one-shot mode. The length is checked again after rendering, when bindings have been filled in.
+ */
+export function goalProblems(
+  label: string,
+  goal: unknown,
+  profileId: string,
+  catalog: Pick<WorkflowValidationCatalog, 'profiles' | 'managedProfiles' | 'structuredProfiles'>,
+): string[] {
+  if (goal === undefined) return []
+  if (typeof goal !== 'string' || !goal.trim()) return [`${label} goal must be text that says when the step is finished`]
+  if (goal.trim().length > MAX_AGENT_GOAL_CHARS) return [`${label} goal is longer than ${MAX_AGENT_GOAL_CHARS} characters`]
+  if (!catalog.profiles.has(profileId)) return []
+  if (!catalog.managedProfiles.has(profileId)) return [`${label} goal needs a managed harness, and '${profileId}' has no managed session driver`]
+  if (!catalog.structuredProfiles.has(profileId)) return [`${label} goal needs a harness with a one-shot mode to check it, and '${profileId}' has none`]
+  return []
 }
 
 const BUDGET_FIELDS: Array<keyof WorkflowBudget> = [
@@ -263,7 +285,11 @@ export function validateWorkflow(def: WorkflowDef, catalog: WorkflowValidationCa
       const profile = step.agent.profileId ?? DEFAULT_PROFILE_ID
       if (!catalog.profiles.has(profile)) errors.push(`${label} agent names unknown profile '${profile}'`)
       else if (!catalog.managedProfiles.has(profile)) errors.push(`${label} agent profile '${profile}' has no managed session driver`)
+      else errors.push(...goalProblems(`${label} agent`, step.agent.goal, profile, catalog))
     }
+    // Other kinds finish on rules of their own, so only the plain agent step takes a goal.
+    if (step.goal !== undefined && kind !== 'agent') errors.push(`${label} is a '${kind}' step, which cannot take goal`)
+    else errors.push(...goalProblems(label, step.goal, step.profileId ?? DEFAULT_PROFILE_ID, catalog))
     if ((catalog.agentStepKinds ?? BUILTIN_AGENT_STEP_KINDS).has(kind)) {
       const profileId = step.profileId ?? DEFAULT_PROFILE_ID
       if (!catalog.profiles.has(profileId)) errors.push(`${label} names unknown profile '${profileId}'`)

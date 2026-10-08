@@ -14,11 +14,22 @@ import { Input } from './Input'
 // Matching and highlighting stay entirely at the call site; the bar is chrome. What it also
 // standardises is the highlight class: `.ui-find-mark` (plus `[data-current]`) replaces three
 // separate vocabularies, and callers put it on their own <mark> elements.
+/** "3/17", "17 matches" when the selection is on none of them, "1000+" when counting stopped. */
+function findCountText(count: { current: number; total: number; more?: boolean }): string {
+  if (!count.total) return 'No matches'
+  const total = `${count.total}${count.more ? '+' : ''}`
+  if (count.current) return `${count.current}/${total}`
+  return `${total} ${count.total === 1 && !count.more ? 'match' : 'matches'}`
+}
+
 export function FindBar(props: {
   query: string
   onQuery: (query: string) => void
-  /** Renders "3/17". Omit while idle; a 0/0 reads as a failed search rather than an unused one. */
-  count?: { current: number; total: number }
+  /** Renders "3/17". Omit while idle; a 0/0 reads as a failed search rather than an unused one. A
+   *  `current` of 0 means the selection is not on a match, and `more` means counting stopped early. */
+  count?: { current: number; total: number; more?: boolean }
+  /** Why the query cannot run, such as an invalid regular expression. Shown in the count's place. */
+  error?: string
   onNext: () => void
   onPrev: () => void
   onClose?: () => void
@@ -38,7 +49,9 @@ export function FindBar(props: {
         <Input
           ref={props.ref}
           kind="filter"
-          size="sm"
+          label="Find"
+          invalid={!!props.error}
+          assist={false}
           placeholder={props.placeholder ?? 'Find…'}
           value={props.query}
           onInput={(value) => props.onQuery(value)}
@@ -54,13 +67,9 @@ export function FindBar(props: {
           }}
         />
       </div>
-      <Show when={props.count}>
-        {/* Polite, not assertive: the count changes on every keystroke. */}
-        {(count) => (
-          <span class="ui-findbar-count" aria-live="polite">
-            {count().total ? `${count().current}/${count().total}` : 'No matches'}
-          </span>
-        )}
+      {/* Polite, not assertive: the count changes on every keystroke. */}
+      <Show when={props.error ?? (props.count && findCountText(props.count))}>
+        {(text) => <span class="ui-findbar-count" data-error={props.error ? '' : undefined} aria-live="polite">{text()}</span>}
       </Show>
       <Show when={status()}><span class="ui-findbar-status muted">{status()}</span></Show>
       <Toolbar.Group>

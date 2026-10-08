@@ -39,7 +39,7 @@ import {
   type RollbarOccurrencesInput,
 } from './occurrenceResources'
 
-const ROLLBAR_PER_PAGE = 100
+export const ROLLBAR_PER_PAGE = 100
 export const ROLLBAR_ITEMS_RESOURCE = 'rollbar.items'
 
 type RollbarValidated = { project: RollbarProject; secret: string }

@@ -1,4 +1,5 @@
 import type { EditorView } from '@codemirror/view'
+import { openReplacePanel } from '@acorn/plugin-api/ui/editor'
 import type * as Engine from './editorEngine'
 
 export type EditorAction = 'find' | 'replace' | 'comment' | 'duplicate' | 'move-up' | 'move-down' | 'select-next' | 'undo' | 'redo' | 'indent' | 'outdent'
@@ -29,9 +30,7 @@ export function actionAvailable(engine: typeof Engine, view: EditorView, action:
 export function runEditorAction(engine: typeof Engine, view: EditorView, action: EditorAction): boolean {
   if (!actionAvailable(engine, view, action)) return false
   if (action === 'find' || action === 'replace') {
-    const opened = engine.openSearchPanel(view)
-    if (action === 'replace') view.dom.querySelector<HTMLInputElement>(`.cm-search input[name="${action}"]`)?.focus()
-    return opened
+    return action === 'replace' ? openReplacePanel(view) : engine.openSearchPanel(view)
   }
   const operation = {
     comment: engine.toggleComment,

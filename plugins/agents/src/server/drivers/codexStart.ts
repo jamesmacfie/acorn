@@ -410,6 +410,23 @@ export async function startCodexSession(
       if (!threadId || !currentTurnId) return
       await rpc.request('turn/interrupt', { threadId, turnId: currentTurnId }).catch(() => undefined)
     },
+    async cancelSubagent(subagentId) {
+      if (subagentId === threadId) throw new Error('Subagent not found.')
+      let turnId = childRouter.activeTurnId(subagentId)
+      // A resumed connection can miss the child's turn/started notification. Read the provider's
+      // turn rather than borrowing the parent's currentTurnId or restarting the child.
+      if (!turnId) {
+        const response = await rpc.request<Record<string, unknown>>('thread/read', {
+          threadId: subagentId, includeTurns: true,
+        })
+        const turns = asObject(response.thread)?.turns
+        if (!Array.isArray(turns)) throw new Error('Codex did not return the subagent turns.')
+        const active = turns.map(asObject).find((turn) => turn?.status === 'inProgress')
+        turnId = stringValue(active?.id)
+      }
+      if (turnId) await rpc.request('turn/interrupt', { threadId: subagentId, turnId })
+      else await options.onEvent({ type: 'subagent', subagent: { id: subagentId, status: 'idle' } })
+    },
     async resolveRequest(providerRequestId, resolution) {
       answer(providerRequestId, resolution)
     },

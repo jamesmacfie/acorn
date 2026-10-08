@@ -8,6 +8,7 @@ import {
   type LinearNode,
   PROJECT_ISSUES_QUERY,
   projectIssuesFilter,
+  RAIL_SEARCH_QUERY,
   projectIssueSearchFilter,
   issuesFilter,
   linearData,
@@ -50,9 +51,11 @@ import type {
   LinearUploadResponse,
 } from '../../shared/api'
 import type { PluginRefResolutionBody } from '@acorn/protocol/refResolvers.ts'
+import type { PluginRailSearchResult } from '@acorn/protocol/api.ts'
+import { MAX_COMMAND_SEARCH_QUERY } from '@acorn/protocol/commands.ts'
 import { linearRailItem } from '../../shared/rail'
 import { sortLinearIssues } from '../../shared/triage'
-import { linearSearchItems, type LinearSearchRow } from '../paletteSearch'
+import { linearSearchItems } from '../paletteSearch'
 
 // TTL policy: docs/caching.md § Provider mirrors. Linear's reads fan out across every connected
 // integration with per-item freshness, so they skip the serve-then-revalidate wrapper; this file owns
@@ -167,6 +170,70 @@ async function mappedScopes(
   return byConnection
 }
 
+type MappedSearch = {
+  found: { row: StoredConnection; node: LinearNode }[]
+  asked: number
+  failed: number
+  failure: { code: string; status: 401 | 502 } | null
+  // Some connection said it holds more matches than it sent.
+  more: boolean
+}
+
+/**
+ * The reader's text, searched within the routed project's mapped Linear scopes. The palette's search and
+ * the rail's Search field both ask through here, so both keep the same mapping: a connection with
+ * nothing mapped is never asked, and a team mapping includes issues in no Linear project.
+ *
+ * The narrowing goes to Linear rather than happening here, for the reason `projectIssueSearchFilter`
+ * gives: the mapping is already a filter that API supports, so the query can ride along with it and
+ * reach past the first page of active issues. One request per mapped connection, through the same
+ * scheduler and budget the rail uses.
+ */
+async function searchMappedIssues(
+  c: Context<AppEnv>,
+  projects: LinearProjectScope | undefined,
+  projectId: string | undefined,
+  query: string,
+): Promise<MappedSearch> {
+  const connections = await linearConnections(c)
+  const mapped = await mappedScopes(c, projectId, projects)
+  const text = query.trim().slice(0, MAX_COMMAND_SEARCH_QUERY)
+  const search: MappedSearch = { found: [], asked: 0, failed: 0, failure: null, more: false }
+  for (const { row, key } of connections) {
+    const scopeIds = mapped?.get(row.id) ?? []
+    if (!scopeIds.length) continue
+    search.asked++
+    try {
+      const res = await providerFetch(row, key, RAIL_SEARCH_QUERY, { filter: projectIssueSearchFilter(scopeIds, text) })
+      const err = linearError(res)
+      if (err) {
+        search.failed++
+        search.failure ??= { code: err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: err.status }
+        continue
+      }
+      const { issues } = await linearData<{ issues: { nodes: LinearNode[]; pageInfo?: { hasNextPage?: boolean } } }>(res)
+      for (const node of issues.nodes) search.found.push({ row, node })
+      if (issues.pageInfo?.hasNextPage) search.more = true
+    } catch {
+      search.failed++
+      search.failure ??= { code: 'provider_unavailable', status: 502 }
+    }
+  }
+  return search
+}
+
+// Only a total wash is an error. A workspace that answered, even with nothing, is a real answer to a
+// typed word, and erasing it would be worse than the failure it reports.
+const allFailed = (search: MappedSearch): boolean => search.asked > 0 && search.failed === search.asked
+
+/** Rail rows, naming each row's workspace only when rows came from more than one. Two workspaces can
+ *  both have an ENG-42, and with one connection the name would be a column repeating itself. */
+function railRows(found: { row: StoredConnection; node: LinearNode }[]) {
+  const issues = found.map(({ row, node }) => triageRow(row, node))
+  const names = new Map(found.map(({ row }) => [row.id, connectionName(row)]))
+  return sortLinearIssues(issues).map((issue) => linearRailItem(issue, names.size > 1 ? names.get(issue.integrationId) : undefined))
+}
+
 // /v1/p/linear: read Linear issues referenced from a PR, plus the rail source's rows. Per-user, cached
 // locally (never shared). A bare identifier is resolved across all connected Linear integrations;
 // project/browse routes take an explicit ?integration=<id> since the caller already knows it.
@@ -200,10 +267,9 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
     const connections = await linearConnections(c)
     if (!connections.length) return c.json({ items: [] } satisfies LinearRailItemsResponse)
     const mapped = await mappedScopes(c, c.req.query('project'), projects)
-    const issues: LinearProjectIssue[] = []
     // Named per connection that actually returned rows, not per connection that exists: a workspace
     // that is connected but mapped to nothing, or that failed, must not put a column on this list.
-    const names = new Map<string, string>()
+    const found: { row: StoredConnection; node: LinearNode }[] = []
     for (const { row, key } of connections) {
       const scopeIds = mapped?.get(row.id) ?? []
       // Nothing mapped for this connection, whether the workspace maps other connections or none at
@@ -212,65 +278,37 @@ export const createLinearRoutes = (projects?: LinearProjectScope, emit: (frame: 
       try {
         const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: projectIssuesFilter(scopeIds) })
         if (linearError(res)) continue
-        const { issues: found } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        if (found.nodes.length) names.set(row.id, connectionName(row))
-        issues.push(...found.nodes.map((node) => triageRow(row, node)))
+        const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
+        for (const node of issues.nodes) found.push({ row, node })
       } catch {
         // Partial success is honest: one workspace failing must not erase another's rows.
       }
     }
-    const named = names.size > 1
-    return c.json({
-      items: sortLinearIssues(issues).map((issue) => linearRailItem(issue, named ? names.get(issue.integrationId) : undefined)),
-    } satisfies LinearRailItemsResponse)
+    return c.json({ items: railRows(found) } satisfies LinearRailItemsResponse)
   })
-  // The `Find a Linear issue` command's rows (docs/plugins/commands.md § Command kinds).
+  // The rail's Search field (docs/integrations/linear.md § Rail search). The same scope as the rows
+  // above, narrowed by the reader's text on Linear's side, so it finds an issue past the list's first
+  // 250. `project` is the host's routed project and `q` the typed text; neither is anything the
+  // manifest or an earlier answer chose.
   //
-  // Same scope as the rail above and by the same code: the routed project names its workspace, the
-  // workspace's links name the Linear projects and teams, and a connection with nothing mapped is
-  // never asked.
-  // Both things this route is given are the host's — `projectId` is the project the palette session
-  // captured, `q` is the typed text — and neither the manifest nor a previous answer can write either.
+  // Each connection sends one bounded page. `incomplete` says when a page was full or a connection
+  // failed, because either way there may be matches this answer does not hold.
+  .get('/rail-search', async (c) => {
+    const search = await searchMappedIssues(c, projects, c.req.query('project'), c.req.query('q') ?? '')
+    if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
+    return c.json({ items: railRows(search.found), incomplete: search.more || search.failed > 0 } satisfies PluginRailSearchResult)
+  })
+  // The `Find a Linear issue` command's rows (docs/plugins/commands.md § Command kinds), through the
+  // same search as the rail's Search field. `projectId` is the project the palette session captured.
   //
-  // The narrowing goes to Linear rather than happening here, for the reason `projectIssueSearchFilter`
-  // gives: the mapping is already a filter that API supports, so the query can ride along with it and
-  // reach past the first page of active issues. It spends the same one request per mapped connection
-  // the rail does, through the same scheduler and the same budget.
-  //
-  // Unlike the rail, a total failure is reported. A rail that quietly empties is a list that looks
+  // Unlike the rail list, a total failure is reported. A rail that quietly empties is a list that looks
   // finished; a search that quietly empties is a reader retyping a word that was never the problem.
   .get('/palette/issues', async (c) => {
-    const connections = await linearConnections(c)
-    const mapped = await mappedScopes(c, c.req.query('projectId'), projects)
-    const filter = (scopeIds: string[]) => projectIssueSearchFilter(scopeIds, c.req.query('q') ?? '')
-    const rows: LinearSearchRow[] = []
-    let asked = 0
-    let failed = 0
-    let failure: { code: string; status: 401 | 502 } | null = null
-    for (const { row, key } of connections) {
-      const scopeIds = mapped?.get(row.id) ?? []
-      if (!scopeIds.length) continue
-      asked++
-      try {
-        const res = await providerFetch(row, key, PROJECT_ISSUES_QUERY, { filter: filter(scopeIds) })
-        const err = linearError(res)
-        if (err) {
-          failed++
-          failure ??= { code: err.status === 401 ? 'provider_needs_auth' : 'provider_unavailable', status: err.status }
-          continue
-        }
-        const { issues } = await linearData<{ issues: { nodes: LinearNode[] } }>(res)
-        for (const node of issues.nodes) rows.push({ issue: triageRow(row, node), connectionLabel: connectionName(row) })
-      } catch {
-        failed++
-        failure ??= { code: 'provider_unavailable', status: 502 }
-      }
-    }
-    // Only a total wash is an error, the same line rollbar's palette route draws: a workspace that
-    // answered — even with nothing, which is a real answer to a typed word — is a partial success, and
-    // erasing it would be worse than the failure it reports.
-    if (asked > 0 && failed === asked) return respondError(c, failure!.status, failure!.code)
-    return c.json({ items: linearSearchItems(rows) })
+    const search = await searchMappedIssues(c, projects, c.req.query('projectId'), c.req.query('q') ?? '')
+    if (allFailed(search)) return respondError(c, search.failure!.status, search.failure!.code)
+    return c.json({
+      items: linearSearchItems(search.found.map(({ row, node }) => ({ issue: triageRow(row, node), connectionLabel: connectionName(row) }))),
+    })
   })
   // Batch enrichment for referenced tickets: summaries, 10-minute TTL over core's external-item cache.
   // Stale identifiers are resolved across all connections; each result is cached under its connection.

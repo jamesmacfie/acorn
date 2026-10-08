@@ -7,7 +7,17 @@ to exist. Read it as a pressure test for the seams in
 [docs/extensibility.md](../extensibility.md) and the fat-core position in
 [docs/future/ecosystem/blockers.md](./ecosystem/blockers.md), not as a roadmap.
 
-## What already exists
+## Before assigning an integration
+
+Reviewed October 8, 2026. This is dated research, not a list of confirmed product gaps.
+GitHub Actions data sources and Sentry telemetry are implemented; neither proves every CI journey
+or a Sentry issue browser. Recheck the relevant source, tools, and owning docs before selecting a candidate.
+
+For a selected integration, write a separate handoff that names user journeys, provider authority,
+contribution contracts, failure behavior, and acceptance. Do not give the whole survey to a developer
+as an instruction to implement every entry.
+
+## Recorded starting point
 
 The plugins under `plugins/` cover code, tickets, errors, data, and requests: **github, linear,
 rollbar, database, http, docker, preview, terminal, editor, changes, notes, memory, context, agents,

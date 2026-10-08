@@ -13,21 +13,27 @@ import {
   type PluginFetchHandler,
   type PluginProviderResourceRequest,
   portableCarrier,
+  providerRequestScheduler,
   respondError,
   type RouteResult,
 } from '@acorn/plugin-api/node'
+import type { PluginRailSearchResult } from '@acorn/protocol/api.ts'
+import { MAX_COMMAND_SEARCH_QUERY } from '@acorn/protocol/commands.ts'
+import { itemsSearchPath, rollbarData, rollbarFetch, type RollbarApiItem } from '..'
 import {
   ROLLBAR_ITEMS_RESOURCE,
+  ROLLBAR_PER_PAGE,
+  rollbarProvider,
   type RollbarListResult,
   type RollbarResourceInput,
 } from '../provider'
+import { composeItemDetail, normalizeSummary } from '../normalize'
 import {
   ROLLBAR_OCCURRENCES_RESOURCE,
   ROLLBAR_OCCURRENCE_RESOURCE,
   type RollbarOccurrenceInput,
   type RollbarOccurrencesInput,
 } from '../occurrenceResources'
-import { composeItemDetail } from '../normalize'
 import { rollbarRailItem } from '../../shared/rail'
 import { rollbarSearchItems } from '../paletteSearch'
 
@@ -99,6 +105,34 @@ async function scopedConnections(c: Context<AppEnv>, projectId: string | undefin
   return (await rollbarConnections(c, PROVIDER)).filter((connection) => mapped.has(connection.id))
 }
 
+type SearchAnswer = { items: RollbarItemSummary[]; full: boolean } | { failed: true }
+
+/**
+ * Rollbar's own search over each mapped connection's active items, one page each. It reads past the
+ * three mirrored pages the rail lists, and it writes nothing: a search answer is not a list refresh,
+ * so it must not restamp the mirror's membership (../provider.ts).
+ *
+ * Rows go through the same normalizer as the mirror, so the same fields reach the client. `status` is
+ * checked here as well as sent, because the reader's text is Rollbar's search language and could name
+ * a status of its own.
+ */
+async function searchItems(c: Context<AppEnv>, connectionIds: Set<string>, query: string): Promise<SearchAnswer[]> {
+  return requestContext(c).providers.withConnections(PROVIDER, async (connection, token): Promise<SearchAnswer | undefined> => {
+    if (!connectionIds.has(connection.id)) return undefined
+    try {
+      const response = await providerRequestScheduler.run(PROVIDER, connection.id, rollbarProvider.budgets, () =>
+        rollbarFetch(token, itemsSearchPath(query)))
+      const raw = (await rollbarData<{ items?: RollbarApiItem[] }>(response)).items ?? []
+      return {
+        items: raw.map((item) => normalizeSummary(connection.id, connection.label, item)).filter((item) => item.status === 'active'),
+        full: raw.length >= ROLLBAR_PER_PAGE,
+      }
+    } catch {
+      return { failed: true }
+    }
+  })
+}
+
 export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<AppEnv>()
   .get('/items', async (c) => {
     const available = await rollbarConnections(c, PROVIDER)
@@ -121,6 +155,23 @@ export const createRollbarRoutes = (projects?: RollbarProjectScope) => new Hono<
       return respondError(c, 502, response.failures[0]!.code)
     }
     return c.json({ items: response.items.map(rollbarRailItem) })
+  })
+  // The rail's Search field (docs/integrations/rollbar.md § Rail search). The same connections as the
+  // rows above, asked through Rollbar's items search rather than the capped mirror. `incomplete` says
+  // when a connection's page was full or it failed, since either way matches may be missing.
+  .get('/rail-search', async (c) => {
+    const connections = await scopedConnections(c, c.req.query('project'), projects)
+    const query = (c.req.query('q') ?? '').trim().slice(0, MAX_COMMAND_SEARCH_QUERY)
+    if (!connections.length || !query) return c.json({ items: [] } satisfies PluginRailSearchResult)
+    const answers = await searchItems(c, new Set(connections.map((connection) => connection.id)), query)
+    const answered = answers.flatMap((answer) => 'failed' in answer ? [] : [answer])
+    if (!answered.length) return respondError(c, 502, 'provider_unavailable')
+    const items = answered.flatMap((answer) => answer.items)
+    items.sort((a, b) => (b.lastOccurrenceAt ?? 0) - (a.lastOccurrenceAt ?? 0))
+    return c.json({
+      items: items.map(rollbarRailItem),
+      incomplete: answered.length < connections.length || answered.some((answer) => answer.full),
+    } satisfies PluginRailSearchResult)
   })
   // The `Find a Rollbar item` command's rows (docs/plugins/commands.md § Command kinds).
   //

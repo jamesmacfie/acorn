@@ -15,6 +15,10 @@ const openPane = vi.fn()
 const registerCommands = vi.fn()
 const disposeCommands = vi.fn()
 const openManagedParent = vi.fn()
+const cancel = vi.fn(async () => ({ ok: true }))
+const cancelSubagent = vi.fn(async () => ({ ok: true }))
+
+vi.mock('./managedClient', () => ({ managedAgentApi: { cancel, cancelSubagent } }))
 
 vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
   ...(await importOriginal<Record<string, unknown>>()),
@@ -27,6 +31,7 @@ vi.mock('@acorn/plugin-api/client', async (importOriginal) => ({
 
 const { AgentDetailHeader } = await import('./AgentPane')
 const { registerSessionActionCommands } = await import('../commands')
+const { selectManagedSubagent, clearManagedSubagent } = await import('./managedSelection')
 
 const session = (over: Partial<AgentSession>): AgentSession => ({
   id: 'sess-1', taskId: 'task-1', providerId: 'claude', profileId: 'claude-code', kind: 'interactive',
@@ -47,7 +52,7 @@ const modelFor = (current: AgentSession, parent?: AgentSession): AgentPaneModel 
   choices: () => [],
   creating: () => false,
   refreshProviders: () => undefined,
-  action: () => undefined,
+  action: (operation: () => Promise<unknown>) => operation(),
 } as unknown as AgentPaneModel)
 
 let host: HTMLDivElement
@@ -74,9 +79,45 @@ const settle = () => new Promise((resolve) => setTimeout(resolve, 0))
 const chip = () => host.querySelector('.ui-chip')
 
 afterEach(() => {
+  clearManagedSubagent('sess-1')
   dispose?.()
   host?.remove()
   vi.clearAllMocks()
+})
+
+describe('stopping the selected agent', () => {
+  const stop = () => [...host.querySelectorAll('button')].find((button) => button.textContent === 'Stop')!
+
+  it('stops a running Codex child under a ready parent and restores parent controls on return', async () => {
+    mount(session({ driverKind: 'codex-app-server', providerId: 'codex', subagents: [
+      { id: 'child-1', title: 'desktop_boundaries', status: 'running', startedAt: 1, updatedAt: 1 },
+    ] }))
+    await settle()
+    expect(stop().disabled).toBe(true)
+    selectManagedSubagent('sess-1', 'child-1')
+    expect(stop().disabled).toBe(false)
+    expect(host.textContent).toContain('Working')
+    stop().click()
+    expect(cancelSubagent).toHaveBeenCalledWith('sess-1', 'child-1')
+    expect(cancel).not.toHaveBeenCalled()
+    clearManagedSubagent('sess-1')
+    expect(stop().disabled).toBe(true)
+  })
+
+  it.each([
+    ['codex-app-server', 'idle'], ['acp', 'running'],
+  ])('disables child Stop for %s / %s even when the parent is working', async (driverKind, status) => {
+    selectManagedSubagent('sess-1', 'child-1')
+    mount(session({ driverKind, runtimeState: 'working', subagents: [
+      { id: 'child-1', title: 'Child', status: status as 'idle' | 'running', startedAt: 1, updatedAt: 1 },
+    ] }))
+    await settle()
+    expect(stop().disabled).toBe(true)
+    clearManagedSubagent('sess-1')
+    expect(stop().disabled).toBe(false)
+    stop().click()
+    expect(cancel).toHaveBeenCalledWith('sess-1')
+  })
 })
 
 describe('the workflow chip', () => {

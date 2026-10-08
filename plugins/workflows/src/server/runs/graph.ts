@@ -31,14 +31,17 @@ export function unreachableSteps(
 export function retryRecord(step: WorkflowStepRow): Record<string, unknown> {
   if (!step.inputsJson) return {}
   try {
-    const { originalPrompt, retryPrompt, mapRoster } = JSON.parse(step.inputsJson) as {
+    const { originalPrompt, retryPrompt, mapRoster, goal } = JSON.parse(step.inputsJson) as {
       originalPrompt?: string
       retryPrompt?: string
       mapRoster?: unknown
+      goal?: string
     }
     return {
       ...(typeof originalPrompt === 'string' ? { originalPrompt } : {}),
       ...(typeof retryPrompt === 'string' ? { retryPrompt } : {}),
+      // The resolved completion condition, frozen on the first attempt so a retry keeps it.
+      ...(typeof goal === 'string' ? { goal } : {}),
       ...(mapRoster && typeof mapRoster === 'object' ? { mapRoster } : {}),
     }
   } catch {

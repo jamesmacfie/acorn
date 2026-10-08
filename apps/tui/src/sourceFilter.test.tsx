@@ -1,5 +1,6 @@
 /** @jsxImportSource @acorn/tui/jsx */
 import { createComponent } from 'solid-js'
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { describe, expect, it, vi } from 'vitest'
 import { bootFixture } from './harness'
 import { renderCells } from './kit/render'
@@ -14,7 +15,8 @@ import { regionFocus } from './keys/regions'
 // integration first and an assertion second, which is the call phase 3 already made about a Linear
 // case. So the panel is asked for directly, the way `plugins/plugins.test.tsx` asks for it, and it is
 // drawn inside a region so that the two walks the filter uses — Down into the rows and Escape out of
-// the panel — have a region to walk (../keys/regions.ts § moveStop).
+// the panel — have a region to walk (../keys/regions.ts § moveStop). The list's search reads a query
+// client, which the shell provides per node, so each render brings its own.
 
 const caretLine = (screen: Cells): string => screen.lines.find((line) => line.includes('›')) ?? ''
 
@@ -41,7 +43,7 @@ describe('a descriptor source list', () => {
     let screen = await renderCells(() => (
       <box flexDirection="column" flexGrow={1}
         ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}>
-        {createComponent(list, {})}
+        <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
       </box>
     ), { width: 44, height: 12 })
     try {
@@ -76,7 +78,7 @@ describe('a descriptor source list', () => {
         flexGrow={1}
         ref={regionFocus({ paneId: 'chrome', regionId: 'browse' }, 0)}
       >
-        {createComponent(list, {})}
+        <QueryClientProvider client={new QueryClient()}>{createComponent(list, {})}</QueryClientProvider>
       </box>
     ), { width: 44, height: 12 })
     try {

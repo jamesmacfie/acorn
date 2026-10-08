@@ -1,5 +1,7 @@
 export { runChromeAction } from './actions.ts'
 export { filterSourceItems } from './sourceFilter.ts'
+export { createSourceSearch, sourceSearchEmpty, sourceSearchNotice } from './sourceSearch.ts'
+export type { SourceSearch, SourceSearchStatus } from './sourceSearch.ts'
 export { chromeDeps, chromeKey, readRailItems, scopedSourceItemsPath } from './chromeData.ts'
 export { setExtendedPane } from './extendedPane.ts'
 export type { ExtendedPaneProps } from './extendedPane.ts'

@@ -430,8 +430,10 @@ export const agentsPlugin = (dataDir: string, deps: AgentsPluginDeps): NodePlugi
       // non-managed workflow steps.
       // Loaded on the first step, to stay inside the service boot budget (apps/node/scripts/check-service-budget.mjs).
       const executeRuntime = runtime
+      // The judge is the same one interactive goals use, so a step's completion check runs through its own harness.
+      const goalJudge = { models: ctx.core.models, currentUserId: () => ctx.core.identity.active() }
       ctx.capabilities.provide(AGENTS_SESSION_EXECUTE, async (request) =>
-        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry)(request))
+        (await import('../server/sessions/sessionExecute')).createSessionExecute(executeRuntime, followUpRegistry, goalJudge)(request))
       ctx.capabilities.provide(AGENTS_SESSION_CONTROL, createSessionControl(runtime))
       // reconcile() runs from the composition root, not here: it has to run after the listener binds,
       // and it interrupts every unsettled session. Same reason as workflows (contract/runtime.ts).

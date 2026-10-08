@@ -4,16 +4,24 @@
 // workflows couldn't import agents. It's agents' code: every line touches ManagedAgentRuntime, its
 // session store and its turn lifecycle.
 import { randomUUID } from 'node:crypto'
-import { HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
+import { describeError, HEADLESS_TIMEOUT_MS, type HeadlessResult, type StreamEvent } from '@acorn/plugin-api/node'
 import { MAX_AGENT_CONTEXT_BYTES } from '@acorn/protocol/agentContext.ts'
 import type { AgentInputPart, AgentSession, AgentSessionSnapshot, AgentTurn, AgentUsage } from '../../contract/wire.ts'
-import { managedProviderForProfile, type AgentSessionExecute, type AgentSessionExecuteRequest } from '../../contract/sessionExecute'
+import {
+  managedProviderForProfile,
+  MAX_AGENT_GOAL_CHARS,
+  type AgentSessionExecute,
+  type AgentSessionExecuteRequest,
+  type AgentSessionExecuteResult,
+} from '../../contract/sessionExecute'
 import type { ManagedAgentRuntime } from './runtime'
 import { assistantResult, parseStructuredResult, promptWithResultContract } from './resultContract'
 import { contextBlock } from '../drivers/contextBlock'
 import { ExecutionEvents } from './executionEvents'
 import type { TurnFollowUps } from './turnFollowUps'
 import { persistedAttendance, resolveAttendance, sessionAttendance } from './attendance'
+import { goalContinuationPrompt, goalJudgeUnavailable, MAX_GOAL_CONTINUATIONS, type GoalJudgePorts } from './sessionGoal'
+import { StepGoal, type GoalDecision } from './stepGoal'
 
 // The profile-to-driver map moved to ../../contract/sessionExecute.ts, so a caller can ask before it
 // calls whether a profile has a managed path at all. Re-exported here for the callers already on it.
@@ -39,11 +47,16 @@ const continuationPrompt = (schema: object | undefined): string => schema
   ? 'Your turn ended before the fenced `json` result block this step needs. If the work is finished, reply with that block. If it is not, carry on and end with the block. If something is blocking you, say what it is.'
   : 'Your turn ended without a final message. If the work is finished, reply with the result. If it is not, carry on. If something is blocking you, say what it is.'
 
+// Placed after the work request and before the result contract, so the model reads what to do, when it
+// is finished, and how to answer, in that order.
+const goalInstruction = (goal: string): string =>
+  `Completion condition: ${goal}\n\nAcorn checks this condition when your turn ends and asks you to continue while useful work remains. If something blocks you, say what it is.`
+
 // The step's prompt, then its context as parts of their own. The model reads the same tagged blocks
 // either way. Past the per-turn context cap the blocks go inline in the text instead, which only the
 // larger whole-input cap bounds, so a step with a big diff upstream still runs.
-function stepInput(request: AgentSessionExecuteRequest): AgentInputPart[] {
-  const text = promptWithResultContract(request.prompt, request.schema)
+function stepInput(request: AgentSessionExecuteRequest, goal: string | undefined): AgentInputPart[] {
+  const text = promptWithResultContract(goal ? [request.prompt, goalInstruction(goal)].join('\n\n') : request.prompt, request.schema)
   const context = request.context ?? []
   const bytes = context.reduce((total, item) => total + Buffer.byteLength(item.content, 'utf8'), 0)
   if (bytes > MAX_AGENT_CONTEXT_BYTES) return [{ type: 'text', text: [text, ...context.map(contextBlock)].join('\n\n') }]
@@ -194,16 +207,47 @@ async function applyRequestedConfig(runtime: ManagedAgentRuntime, sessionId: str
   await runtime.applyRequestedConfig(sessionId, wanted)
 }
 
+type JudgeUsage = { inputTokens?: number; outputTokens?: number }
+
+/** Adds what the completion checks reported to the turns' usage. Tokens only: a check reports no cost. */
+function withJudgeUsage(usage: HeadlessResult['capture']['usage'], judged: readonly JudgeUsage[]): HeadlessResult['capture']['usage'] {
+  if (!judged.length) return usage
+  return {
+    ...usage,
+    inputTokens: sum([usage?.inputTokens, ...judged.map((item) => item.inputTokens)]),
+    outputTokens: sum([usage?.outputTokens, ...judged.map((item) => item.outputTokens)]),
+  }
+}
+
+/** The step ends on `reason` with whatever its last turn produced. */
+const stopped = (result: HeadlessResult, reason: string): HeadlessResult =>
+  ({ ...result, status: 'error', exitCode: null, stderrTail: reason })
+
 /**
  * `followUps` is the operation registry, loaded on the first step. A step opens an operation on its
  * first turn: plugin notes about its turns join it, its reviewers get one window once its own turns
  * finish, and it publishes only after every joined turn has settled
  * (docs/managed-agents/unattended-follow-ups.md).
+ *
+ * `judge` runs completion checks for a step with a goal (docs/workflows/agent-steps.md § Completion
+ * conditions). A goal is checked once the step's turns settle, before the review window, and again
+ * whenever a repair or a joined note changes the step's turns.
  */
-export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: () => Promise<TurnFollowUps>): AgentSessionExecute {
+export function createSessionExecute(
+  runtime: ManagedAgentRuntime,
+  followUps?: () => Promise<TurnFollowUps>,
+  judge?: GoalJudgePorts,
+): AgentSessionExecute {
   return async (request) => {
     const providerId = managedProviderForProfile(request.profileId)
     if (!providerId) return null
+    // Checked before any work starts, so a goal never runs without its check.
+    const objective = request.goal?.trim()
+    if (request.goal !== undefined) {
+      if (!objective || objective.length > MAX_AGENT_GOAL_CHARS) throw new Error(`A completion condition must be 1 to ${MAX_AGENT_GOAL_CHARS} characters.`)
+      const unavailable = judge ? goalJudgeUnavailable(judge, request.profileId!) : 'This node has no completion checker.'
+      if (unavailable) throw new Error(unavailable)
+    }
     const session = await sessionFor(runtime, request, providerId)
     await applyRequestedConfig(runtime, session.id, request.configOptions)
     const registry = await followUps?.()
@@ -212,7 +256,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
     const unsubscribe = runtime.subscribe((frame) => forwarding.receive(frame))
     try {
       const first = await runtime.enqueueTurn(session.id, {
-        input: stepInput(request),
+        input: stepInput(request, objective),
         source: 'workflow',
         effectivePolicy: {
           // Codex reads the model and the effort off the policy at turn time; the Claude driver takes
@@ -236,15 +280,26 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
         turnIds.push(turnId)
         forwarding.acceptTurn(turnId)
       })
+      const goal = objective && judge
+        ? new StepGoal({ judge, store: runtime.store, onChange: request.onGoal }, objective, session.id, request.profileId!, first.id)
+        : null
       // The events the loop below waits past. It moves on whenever the step is still waiting on a turn,
       // because a wait for `turn_completed` after `beforeSeq` is already met by the first turn.
       let waitSeq = beforeSeq
-      let continuations = 0
+      let repairs = 0
       let reviewed = false
       // Set when the operation changed without a turn completing, so the loop looks again at once.
       let recheck = false
+      // The turn set the goal was found satisfied for, and the turn set the step was stopped on. A
+      // turn joining changes the set, so either decision goes stale and the loop decides again.
+      // Asserted rather than annotated: TypeScript would otherwise narrow them to null across the loop.
+      let satisfiedFor = null as string | null
+      let stop = null as { key: string; reason: string } | null
       const startedAt = Date.now()
       const timeoutMs = request.timeoutMs ?? HEADLESS_TIMEOUT_MS
+      const remainingMs = () => timeoutMs - (Date.now() - startedAt)
+      // Turns are only ever appended, so the count and the newest one name the set.
+      const turnSet = () => `${turnIds.length}:${turnIds.at(-1)}`
       // Closes the operation first, so no note joins after the sweep, then cancels newest first so a
       // cancelled running turn doesn't start the next queued one.
       const cancelAll = async () => {
@@ -267,6 +322,62 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
         usage: undefined,
         events: turnEvents(snapshot, turnIds),
       })
+      const finish = async (result: HeadlessResult): Promise<AgentSessionExecuteResult> => {
+        if (!goal) return result
+        const capture = { ...result.capture, usage: withJudgeUsage(result.capture.usage, goal.judgeUsage) }
+        return { ...result, capture, goal: await goal.finish(result) }
+      }
+      // The caller's say on each turn Acorn queues by itself, and on each check, with usage so far.
+      const admit = async (kind: 'turn' | 'check', snapshot: AgentSessionSnapshot): Promise<string | null> => {
+        if (!request.admitAutomatic) return null
+        const { costUsd, usage } = operationUsage(snapshot.session, snapshot.turns)
+        return request.admitAutomatic({ kind, usage: { costUsd, usage: withJudgeUsage(usage, goal?.judgeUsage ?? []) } })
+      }
+      const enqueueAutomatic = async (text: string, key: string): Promise<string> => {
+        forwarding.beginEnqueue()
+        const next = await runtime.enqueueTurn(session.id, {
+          input: [{ type: 'text', text }],
+          source: 'workflow',
+          effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
+          idempotencyKey: key,
+        }, { originTurnId: first.id })
+        turnIds.push(next.id)
+        forwarding.acceptTurn(next.id)
+        return next.id
+      }
+      // One completion check of the settled turns in `snapshot`. 'stale' means the step changed while
+      // it ran, or was cancelled, so the loop looks again rather than acting on it.
+      const checkGoal = async (goal: StepGoal, snapshot: AgentSessionSnapshot): Promise<'stale' | GoalDecision> => {
+        const checked = turnSet()
+        const owned = snapshot.events.filter((record) => record.turnId != null && turnIds.includes(record.turnId))
+        let verdict = await goal.saved(turnIds)
+        if (cancelled) return 'stale'
+        if (!verdict) {
+          const refused = await admit('check', snapshot)
+          if (cancelled) return 'stale'
+          if (refused) {
+            goal.set('stopped', refused)
+            return { kind: 'stop', status: 'stopped', reason: refused }
+          }
+          goal.set('checking')
+          try {
+            verdict = await goal.judge(owned, turnIds.at(-1)!, request.signal, remainingMs())
+          } catch (error) {
+            if (cancelled) return 'stale'
+            const reason = `Unable to check completion: ${describeError(error).message}`
+            goal.set('unavailable', reason)
+            return { kind: 'stop', status: 'unavailable', reason }
+          }
+          // A note admitted or a turn queued while the judge ran makes this verdict stale.
+          if (cancelled || turnSet() !== checked || operation?.admitting.size) return 'stale'
+          const after = await runtime.captureExecution(session.id, turnIds)
+          if (cancelled || turnSet() !== checked || after.turns.some((turn) => !SETTLED.includes(turn.status))) return 'stale'
+          await goal.save(turnIds, snapshot.session.lastEventSeq, verdict)
+          if (cancelled) return 'stale'
+        }
+        const last = snapshot.turns.at(-1)!
+        return goal.decide(verdict, { id: last.id, events: owned.filter((record) => record.turnId === last.id) })
+      }
       request.signal?.addEventListener('abort', abort, { once: true })
       try {
         for (;;) {
@@ -275,22 +386,24 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
             // Again, for a continuation enqueued while the first sweep ran.
             await cancelAll()
             const snapshot = await runtime.captureExecution(session.id, turnIds)
-            return (
-              resultFromSnapshot(snapshot, turnIds, request.schema)
-              ?? { status: 'cancelled', exitCode: null, capture: unfinished(snapshot), stderrTail: '', agentSessionId: session.id }
-            )
+            const settled = resultFromSnapshot(snapshot, turnIds, request.schema)
+            // A cancel that lands after the step's turns finished leaves an ordinary step's result
+            // standing. A step with a goal publishes no success once cancelled: its check never finished.
+            return finish(settled && !(goal && settled.status === 'ok')
+              ? settled
+              : { status: 'cancelled', exitCode: null, capture: settled?.capture ?? unfinished(snapshot), stderrTail: '', agentSessionId: session.id })
           }
           const elapsed = Date.now() - startedAt
           if (elapsed >= timeoutMs) {
             await cancelAll()
             const snapshot = await runtime.captureExecution(session.id, turnIds)
-            return {
+            return finish({
               status: 'timeout',
               exitCode: null,
               capture: unfinished(snapshot),
               stderrTail: `Managed workflow turn exceeded ${timeoutMs}ms.`,
               agentSessionId: session.id,
-            }
+            })
           }
           try {
             if (!recheck) await runtime.wait(session.id, waitSeq, 'turn_completed', Math.min(1_000, timeoutMs - elapsed), request.signal)
@@ -302,26 +415,54 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
           const snapshot = await runtime.captureExecution(session.id, turnIds)
           if (cancelled) continue
           waitSeq = snapshot.session.lastEventSeq
-          const result = resultFromSnapshot(snapshot, turnIds, request.schema)
-          if (!result) continue
-          if (result.status === 'malformed' && continuations < MAX_CONTINUATIONS) {
-            continuations += 1
-            forwarding.beginEnqueue()
-            const next = await runtime.enqueueTurn(session.id, {
-              input: [{ type: 'text', text: continuationPrompt(request.schema) }],
-              source: 'workflow',
-              effectivePolicy: { ...first.effectivePolicy, continuationOf: first.id },
-              idempotencyKey: `workflow-continue:${first.id}:${continuations}`,
-            }, { originTurnId: first.id })
-            turnIds.push(next.id)
-            forwarding.acceptTurn(next.id)
+          const settled = resultFromSnapshot(snapshot, turnIds, request.schema)
+          if (!settled) continue
+          const key = turnSet()
+          const answered = settled.status === 'ok' || settled.status === 'malformed'
+          // The goal first: a valid answer with work left continues, and repair only polishes a finished one.
+          if (goal && answered && stop?.key !== key && satisfiedFor !== key) {
+            const decision = await checkGoal(goal, snapshot)
+            if (decision === 'stale') {
+              recheck = !cancelled
+              continue
+            }
+            if (decision.kind === 'stop') stop = { key, reason: decision.reason }
+            else if (decision.kind === 'satisfied') satisfiedFor = key
+            else {
+              const refused = await admit('turn', snapshot)
+              if (cancelled) continue
+              if (refused) {
+                goal.set('stopped', refused)
+                stop = { key, reason: refused }
+              } else {
+                goal.queued(await enqueueAutomatic(
+                  promptWithResultContract(goalContinuationPrompt(goal.objective, goal.summary().verdict!.reason), request.schema),
+                  `workflow-goal:${first.id}:${goal.automatic + 1}`,
+                ), 'goal')
+                continue
+              }
+            }
+          }
+          const result = stop?.key === key ? stopped(settled, stop.reason) : settled
+          if (result.status === 'malformed' && repairs < MAX_CONTINUATIONS && (!goal || goal.automatic < MAX_GOAL_CONTINUATIONS)) {
+            const refused = await admit('turn', snapshot)
+            if (cancelled) continue
+            if (refused) {
+              goal?.set('stopped', refused)
+              stop = { key, reason: refused }
+              recheck = true
+              continue
+            }
+            repairs += 1
+            const turnId = await enqueueAutomatic(continuationPrompt(request.schema), `workflow-continue:${first.id}:${repairs}`)
+            goal?.queued(turnId, 'repair')
             continue
           }
           // One review window, once the step has a finished answer. A note it sends queues another turn,
           // which the loop waits for before it publishes anything.
           if (operation && !reviewed && (result.status === 'ok' || result.status === 'malformed')) {
             reviewed = true
-            await registry!.review(operation, snapshot.turns.at(-1)!.id, timeoutMs - (Date.now() - startedAt))
+            await registry!.review(operation, snapshot.turns.at(-1)!.id, remainingMs())
             recheck = true
             continue
           }
@@ -331,7 +472,7 @@ export function createSessionExecute(runtime: ManagedAgentRuntime, followUps?: (
             recheck = true
             continue
           }
-          return result
+          return finish(result)
         }
       } finally {
         request.signal?.removeEventListener('abort', abort)

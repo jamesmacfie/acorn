@@ -4,8 +4,8 @@
 // packages that can't import each other, and one would eventually gain an exception the other didn't.
 //
 // `https` and nothing else, narrower than the shell's own external-URL allowlist
-// (node-core/server/urlGuards.ts, which also permits `http` and `mailto` because a GitHub body or a Linear
-// ticket legitimately contains both). That list decides what a person's click may reach; this one
+// (apps/desktop/src-tauri/src/external_urls.rs), which also permits `http` and `mailto` for links in
+// GitHub bodies and Linear tickets. That list decides what a person's click may reach; this one
 // decides what plugin code may hand the machine unprompted. Anything else is a downgrade or a scheme
 // handler, meaning an arbitrary application launch. `app-plugin://`, the frame's own origin, is refused
 // by the same clause, so a frame can't ask the host to open another plugin's bundle.

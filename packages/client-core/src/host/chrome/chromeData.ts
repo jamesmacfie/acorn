@@ -1,9 +1,11 @@
 import { createSignal } from 'solid-js'
-import type {
-  PluginAttentionWireItem,
-  PluginNodeStatValue,
-  PluginRailItem,
-  PluginSlotBadge,
+import {
+  MAX_RAIL_SEARCH_ITEMS,
+  type PluginAttentionWireItem,
+  type PluginNodeStatValue,
+  type PluginRailItem,
+  type PluginRailSearchResult,
+  type PluginSlotBadge,
 } from '@acorn/protocol/api.ts'
 import { isAnnotationSeverity, MAX_RAW_ANNOTATION_ROWS, type PluginAnnotationKey, type PluginAnnotationMark, type PluginExtensionItem } from '@acorn/protocol/extensionPoints.ts'
 import {
@@ -239,6 +241,37 @@ export async function readRailItems(pluginId: string, path: string, nodeId: stri
     drop(pluginId, 'rail item', row)
     return []
   })
+}
+
+/** A source search's cache key. Its own prefix, so a search answer never stands in for the list and a
+ *  chrome refresh never touches a search. The node partition is the cache's, as with `chromeKey`. */
+export const chromeSearchKey = (pluginId: string, sourceId: string, projectId: string | undefined, query: string): readonly unknown[] =>
+  ['plugin-chrome-search', pluginId, sourceId, projectId ?? '', query]
+
+/**
+ * One source search, from the plugin's own `search` route (docs/plugins/descriptors.md § Searching a
+ * source). The host sends the reader's text and the routed project, the same `project` the items route
+ * gets, and nothing the plugin chose. Rows are sanitized one by one like the list's, and an answer
+ * longer than the host draws is cut and reported as incomplete rather than shown as the whole set.
+ */
+export async function readRailSearch(
+  pluginId: string,
+  path: string,
+  nodeId: string,
+  query: string,
+  projectId: string | undefined,
+  signal: AbortSignal,
+): Promise<Required<PluginRailSearchResult>> {
+  const scoped = withQuery(scopedSourceItemsPath(path, projectId), { q: query.slice(0, MAX_COMMAND_SEARCH_QUERY) })
+  const body = await read<{ items?: unknown; incomplete?: unknown }>(pluginId, scoped, nodeId, signal)
+  const rows = Array.isArray(body?.items) ? body.items : []
+  const items = rows.slice(0, MAX_RAIL_SEARCH_ITEMS).flatMap((row) => {
+    const item = sanitizeRailItem(pluginId, row)
+    if (item) return [item]
+    drop(pluginId, 'rail search item', row)
+    return []
+  })
+  return { items, incomplete: body?.incomplete === true || rows.length > MAX_RAIL_SEARCH_ITEMS }
 }
 
 // ── Command search and input (docs/plugins/commands.md § Command kinds) ──

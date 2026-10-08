@@ -1,4 +1,5 @@
 /** @jsxImportSource @acorn/tui/jsx */
+import { QueryClient, QueryClientProvider } from '@tanstack/solid-query'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -200,7 +201,8 @@ test('a descriptor source draws its list and its detail in cells', async () => {
   expect(panel.component).toBeUndefined()
 
   for (const region of [panel.regions!.list, panel.regions!.detail]) {
-    const screen = await renderCells(() => createComponent(region, {}))
+    // The list's search reads a query client, which the shell provides per node.
+    const screen = await renderCells(() => <QueryClientProvider client={new QueryClient()}>{createComponent(region, {})}</QueryClientProvider>)
     // A real wait: the list runs a fan-out query and the detail asks the surface registry, and both
     // answer off a tick rather than off a frame.
     await new Promise((done) => setTimeout(done, 150))

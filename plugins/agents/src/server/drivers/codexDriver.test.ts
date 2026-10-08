@@ -6,6 +6,8 @@ import { sessionStartupTelemetry } from '../sessions/startupTelemetry'
 import { makeTestNodeContext } from '@acorn/plugin-api/testkit'
 
 const wire = vi.hoisted(() => ({
+  threadReadResponse: {} as unknown,
+  interruptError: undefined as Error | undefined,
   modelsWait: undefined as Promise<void> | undefined,
   requests: [] as Array<{ method: string; params: Record<string, unknown> }>,
   responses: [] as Array<{ id: string | number; result: unknown }>,
@@ -74,6 +76,8 @@ vi.mock('./jsonRpcProcess', () => ({
         return wire.modeResponse
       }
       if (method === 'turn/start') return { turn: { id: 'turn-provider-1' } }
+      if (method === 'thread/read') return wire.threadReadResponse
+      if (method === 'turn/interrupt' && wire.interruptError) throw wire.interruptError
       return {}
     }
 
@@ -177,6 +181,8 @@ const requestIds = (events: AgentNormalizedEvent[]): string[] =>
 
 describe('Codex collaboration modes', () => {
   beforeEach(() => {
+    wire.threadReadResponse = {}
+    wire.interruptError = undefined
     wire.modelsWait = undefined
     wire.requests.length = 0
     wire.responses.length = 0
@@ -188,6 +194,42 @@ describe('Codex collaboration modes', () => {
     }
     wire.onRequest = undefined
     wire.onNotification = undefined
+  })
+
+  it('interrupts the selected child while its parent has no active turn', async () => {
+    const { handle, events } = await start()
+    wire.onNotification!({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn-1' } } })
+    await handle.cancelSubagent!('child-1')
+    expect(wire.requests.filter((request) => request.method === 'turn/interrupt')).toEqual([
+      { method: 'turn/interrupt', params: { threadId: 'child-1', turnId: 'child-turn-1' } },
+    ])
+    expect(handle.ready).toBe(true)
+    wire.onNotification!({ method: 'turn/completed', params: { threadId: 'child-1', turn: { id: 'child-turn-1', status: 'interrupted' } } })
+    expect(events.filter((event) => event.type === 'subagent').at(-1)).toMatchObject({ subagent: { id: 'child-1', status: 'idle' } })
+  })
+
+  it('reads a resumed child turn and leaves the parent turn available to cancel', async () => {
+    const { handle } = await start(null, true)
+    await handle.sendTurn({ turn: turn('default'), input: turn('default').input, attachments: {} })
+    wire.threadReadResponse = { thread: { turns: [
+      { id: 'old-turn', status: 'completed' }, { id: 'resumed-child-turn', status: 'inProgress' },
+    ] } }
+    await handle.cancelSubagent!('child-1')
+    await handle.cancel()
+    expect(wire.requests.filter((request) => request.method === 'turn/interrupt').map((request) => request.params)).toEqual([
+      { threadId: 'child-1', turnId: 'resumed-child-turn' },
+      { threadId: 'thread-1', turnId: 'turn-provider-1' },
+    ])
+  })
+
+  it('does not interrupt a settled child or hide a provider cancellation failure', async () => {
+    const { handle } = await start()
+    wire.threadReadResponse = { thread: { turns: [{ id: 'settled', status: 'completed' }] } }
+    await handle.cancelSubagent!('child-1')
+    expect(wire.requests.some((request) => request.method === 'turn/interrupt')).toBe(false)
+    wire.onNotification!({ method: 'turn/started', params: { threadId: 'child-1', turn: { id: 'child-turn-2' } } })
+    wire.interruptError = new Error('Provider refused the interrupt')
+    await expect(handle.cancelSubagent!('child-1')).rejects.toThrow('Provider refused the interrupt')
   })
 
   it('supplies host attendance in the developer channel on creation and resume', async () => {

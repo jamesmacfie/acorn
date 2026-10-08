@@ -5,7 +5,7 @@ import type { EditorView } from '@codemirror/view'
 import { languageIdForPath } from '@acorn/protocol/languageIds.ts'
 import { activeNodeId, queryOwner, activeTaskId, clientEvents, consumePaneIntent, createLogger, debounce, focusedPane, formatFileReference, onClosePaneWhen, type PaneIntent, paneModel, prefsOptions, registerCommands, sendReferenceToAgent, telemetryFor, toast, type Task, wsOnNodeEvent, wsOnPluginsChanged, wsOnReconnect } from '@acorn/plugin-api/client'
 import { Alert, Button, ConfirmButton, copyText, DocumentTabs, EmptyState, Icon, IconButton, Input, ListDetail, Menu, Only, paneCollapseKey, Rectangle, sidebarCollapse, TabPanel, Tabs, ToggleButton } from '@acorn/plugin-api/ui'
-import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
+import { documentCustody, recoverDocumentCustody, type DocumentCustody, applyViewState, captureViewState, editorSearch, editorTheme, languageForPath, refreshEditorTheme, shouldHighlightDocument, watchEditorTheme } from '@acorn/plugin-api/ui/editor'
 import { assertCanRebindEditorFile, createEditorDocumentPool, flushEditorDocument, rebindEditorFile, type EditorPool, type PooledFile } from './editorDocumentPool'
 import { captureFileDecision, createEditorRefreshQueue, fileDecisionIsCurrent, reconcileEditorDisk, type FileDecision } from './editorDocumentLifecycle'
 import { editorApi, editorRootKey, EDITOR_ROOT_STALE_MS } from './editorClient'
@@ -363,6 +363,7 @@ export default function EditorPane(props: { task: Task }) {
   // Grammar installation follows usable text and stays within the same document entry.
   const perFile = (path: string, language: Extension, indentation: Indentation): Extension[] => [
     engine!.basicSetup,
+    editorSearch(),
     editorTheme(),
     engine!.lineMarkerExtension(),
     language,
@@ -395,7 +396,7 @@ export default function EditorPane(props: { task: Task }) {
 
   // An empty read-only state until a file is opened: the view always has one, so "no file" is a
   // document with nothing in it rather than a special case in every handler below.
-  const emptyState = () => engine!.EditorState.create({ extensions: [engine!.basicSetup, editorTheme(), engine!.EditorState.readOnly.of(true)] })
+  const emptyState = () => engine!.EditorState.create({ extensions: [engine!.basicSetup, editorSearch(), editorTheme(), engine!.EditorState.readOnly.of(true)] })
 
   // The graphical editor is built and torn down with its rectangle, because terminal mode replaces
   // that rectangle rather than hiding it. Nothing is lost across the swap: the per-file states stay in

@@ -49,9 +49,10 @@ The composer has two cooperative extension points
 
 ## Session goal
 
-The row above an interactive session's composer shows its goal, status, last check reason, and
-continuation count. **Set goal** opens the completion-condition editor. **Clear** removes the goal;
-a paused goal offers **Resume**. The same controls appear in the desktop and terminal clients. The
+The **Goal** button below an interactive session's message field opens the completion-condition
+editor. When a goal is set, the row above the composer shows its goal, status, last check reason,
+and continuation count. **Edit** opens the editor, **Clear** removes the goal, and a paused goal offers
+**Resume**. The same controls appear in the desktop and terminal clients. The
 palette's **Set session goal** command opens the editor for the visible session. A goal is separate
 from the message draft and survives leaving the session.
 

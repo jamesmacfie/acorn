@@ -138,6 +138,7 @@ export function managedAgentsBridge(
     patchQueuedTurn: (sessionId, turnId, patch) =>
       guarded(() => runtime.patchQueuedTurn(sessionId, turnId, patch)),
     cancelTurn: (sessionId, turnId) => guarded(() => runtime.cancelTurn(sessionId, turnId)),
+    cancelSubagent: (sessionId, subagentId) => guarded(() => runtime.cancelSubagent(sessionId, subagentId)),
     resolveRequest: (sessionId, requestId, resolution, idempotencyKey) =>
       guarded(() => runtime.resolveRequest(sessionId, requestId, resolution, idempotencyKey)),
     patchSession: (sessionId, patch) => guarded(() => runtime.patchSession(sessionId, patch)),

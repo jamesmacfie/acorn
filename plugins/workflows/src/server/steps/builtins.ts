@@ -117,7 +117,8 @@ export function buildBuiltinWorkflowContributions(services: BuiltinServices): {
       await services.runHeadless(
         ctx.run.taskId,
         ctx.def,
-        { ...inputs, model: ctx.def.model, schema: ctx.def.schema, signal: ctx.signal, tools: ctx.tools },
+        { ...inputs, model: ctx.def.model, schema: ctx.def.schema, signal: ctx.signal, tools: ctx.tools,
+          ...(ctx.renderedGoal !== undefined ? { goal: ctx.renderedGoal } : {}) },
         ctx,
       ),
     )

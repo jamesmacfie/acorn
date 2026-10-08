@@ -16,6 +16,7 @@ const step = (structured: unknown): WorkflowStepRow => ({
   inputsJson: null,
   resultJson: null,
   structuredJson: JSON.stringify(structured),
+  goalJson: null,
   sessionId: null,
   agentSessionId: null,
   costUsd: null,

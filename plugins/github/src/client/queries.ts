@@ -30,6 +30,8 @@ import {
   pullRoute,
   pullsKey,
   pullsRoute,
+  pullSearchKey,
+  pullSearchRoute,
   repoLabelsKey,
   repoLabelsRoute,
   reposKey,
@@ -51,6 +53,7 @@ import {
   type PullDetail,
   type PullDiffResponse,
   type PullFilesResponse,
+  type PullSearchPage,
   type Repo,
   type RunJobs,
   type TaskPullRelationsResponse,
@@ -88,6 +91,19 @@ export const closedPullsInfiniteOptions = (owner: string, repo: string, enabled:
   queryFn: async ({ pageParam, signal }: PageQueryContext): Promise<ClosedPullsPage> =>
     readJson<ClosedPullsPage>(closedPullsRoute(owner, repo, pageParam), { signal }),
   getNextPageParam: (last: ClosedPullsPage) => last.nextPage ?? undefined,
+})
+
+// GitHub's search within the routed repository and tab. Kept in memory only: a restored search would
+// show an old answer as though GitHub had just given it.
+export const pullSearchOptions = (owner: string, repo: string, state: 'open' | 'closed', query: string, enabled: boolean) => ({
+  queryKey: pullSearchKey(owner, repo, state, query),
+  enabled,
+  staleTime: 30_000,
+  gcTime: 5 * 60_000,
+  retry: false,
+  meta: { persist: false },
+  queryFn: async ({ signal }: QueryContext): Promise<PullSearchPage> =>
+    readJson<PullSearchPage>(pullSearchRoute(owner, repo, state, query), { signal }),
 })
 
 export const pullDetailOptions = (owner: string, repo: string, number: string, enabled: boolean) => ({

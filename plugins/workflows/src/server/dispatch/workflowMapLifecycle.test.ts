@@ -214,6 +214,37 @@ describe('workflow map lifecycle', () => {
     expect(taskIds.size).toBe(0)
   })
 
+  it('gives each item its own completion condition and puts each outcome in the parent summary', async () => {
+    // A goal is checked through the harness's one-shot mode, which the default fixture profile lacks.
+    unregisterProfile()
+    unregisterProfile = agentProfileRegistry.register({
+      id: DEFAULT_PROFILE_ID, label: 'Claude Code', kind: 'agent', command: 'claude', managedProvider: 'claude',
+      backendPreference: 'tmux', transport: 'pty', aiArgv: () => null,
+    })
+    const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
+    const seen: { stepId: string; goal: string | undefined }[] = []
+    const { runner } = makeRunner(tickets, {
+      runStep: async (_taskId, def, opts) => {
+        if (def.name === 'source') return result({ tickets })
+        seen.push({ stepId: opts.workflowStepId!, goal: opts.goal })
+        const id = JSON.parse(opts.context!.find(part => part.label === 'Current item')!.content).id as string
+        return { ...result({ fixed: id }), goal: { objective: 'Its tests pass.', status: 'satisfied' as const,
+          continuations: id === 'two' ? 1 : 0, repairs: 0, verdict: null, automaticTurns: [] } }
+      },
+    })
+    const root = agentDefinition()
+    root.steps[1].agent!.goal = 'Its tests pass.'
+    const runId = await runner.start('parent-task', root, { resolvedGraph: await agentGraph(runner, root) })
+    await waitForRun(runner, runId, ['done'])
+    expect(seen.map(row => row.goal)).toEqual(['Its tests pass.', 'Its tests pass.'])
+    expect(new Set(seen.map(row => row.stepId)).size).toBe(2)
+    const loop = (await runner.steps(runId)).find(row => row.name === 'dispatch')!
+    expect(JSON.parse(loop.structuredJson!).children.map((child: { goal: unknown }) => child.goal)).toEqual([
+      { status: 'satisfied', continuations: 0, reason: null },
+      { status: 'satisfied', continuations: 1, reason: null },
+    ])
+  })
+
   it.each(['stop', 'cancel'] as const)('retains queued records when the agent loop must %s', async mode => {
     const tickets = [{ id: 'one', number: 'ABC-1' }, { id: 'two', number: 'ABC-2' }]
     let started = 0
