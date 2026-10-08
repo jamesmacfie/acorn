@@ -58,9 +58,10 @@ describe('the agents plugin catalogue', () => {
     mocks.readJson.mockResolvedValue([])
   })
 
-  it('is the rail source, mark-all-read and two task-scoped searches, all gated on the plugin', () => {
+  it('registers session goals, the rail source, mark-all-read, and two task-scoped searches', () => {
     expect(agentsCommands.map((command) => command.id))
-      .toEqual(['agents.sessions.new', 'source.agents.open', 'agents.sessions.mark-read', 'agents.sessions.find'])
+      .toEqual(['agents.goal.set', 'agents.sessions.new', 'source.agents.open', 'agents.sessions.mark-read', 'agents.sessions.find'])
+    expect(at('agents.goal.set')).toMatchObject({ scope: 'task', palette: true, requires: { plugin: 'agents' } })
     expect(start()).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'agents' } })
     expect(at('source.agents.open')).toMatchObject({ palette: true, scope: 'none', requires: { plugin: 'agents' } })
     expect(find()).toMatchObject({ kind: 'search', scope: 'task', palette: true, requires: { plugin: 'agents' } })

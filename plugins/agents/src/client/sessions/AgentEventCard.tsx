@@ -171,7 +171,7 @@ export default function AgentEventCard(props: {
               <Stack gap="row">
                 <Inline>
                   <Text emphasis="eyebrow">
-                    {message().subagentId ? 'Subagent' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
+                    {message().subagentId ? 'Subagent' : props.turn?.source === 'goal' ? 'Goal' : message().automatic ? 'Acorn' : senderLabel(props.turn)}
                   </Text>
                   <Text emphasis="eyebrow" tip={time().full} tipAt={props.item.createdAt}>{time().short}</Text>
                 </Inline>

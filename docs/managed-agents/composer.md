@@ -47,6 +47,14 @@ The composer has two cooperative extension points
 - `agents:composer-actions` is room in the action bar beside **Attach** and the two pickers, in
   `stack` mode with a ceiling of four.
 
+## Session goal
+
+The row above an interactive session's composer shows its goal, status, last check reason, and
+continuation count. **Set goal** opens the completion-condition editor. **Clear** removes the goal;
+a paused goal offers **Resume**. The same controls appear in the desktop and terminal clients. The
+palette's **Set session goal** command opens the editor for the visible session. A goal is separate
+from the message draft and survives leaving the session.
+
 ## Reference another session
 
 Open **Context**, choose **Agent sessions**, and select sessions from the same task. The picker

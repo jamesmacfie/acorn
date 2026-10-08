@@ -41,6 +41,27 @@ Only a turn moves a session into `working`. An event with no turn records into t
 marks the session unread without claiming work. **Stop** settles a session that reports work with no
 turn to cancel.
 
+## Session goals
+
+An interactive session can hold one goal of up to 2,000 characters. Set it from the conversation or
+the **Set session goal** palette command. If the session is idle, acorn queues the goal as its first
+turn. Goal turns use the normal queue and count against the same concurrency and usage limits.
+
+After a turn settles and its queue drains, acorn checks the goal against the event ledger. The check
+reads recent messages and shortened tool input and output, with a 12,000-character evidence limit.
+It uses a one-shot call on the session's harness. Claude Code uses its `haiku` alias; other harnesses
+use their configured default. A failed or invalid check blocks the goal and does not queue more work.
+
+Only a verdict that says useful work remains queues another **Goal** turn. A goal stops after eight
+continuations or two consecutive goal turns without a tool call or file change. **Stop** pauses an
+active goal. **Resume** queues a turn to carry on. A restart interrupts an active provider turn and
+pauses its goal; a completed turn whose check was interrupted is checked after startup. The session
+row stores the objective, counters, status, and last verdict, so every client sees the same state.
+
+The goal route is device-only: `PUT /v1/p/agents/sessions/:id/goal` accepts an objective or `null`
+to clear it, and `POST /v1/p/agents/sessions/:id/goal/resume` resumes a paused goal. Workflow,
+delegated, imported, terminal-controlled, and archived sessions cannot accept a goal.
+
 ## Plan usage limits
 
 A plan usage limit pauses the turn until the account resets. The runtime needs two facts: a provider

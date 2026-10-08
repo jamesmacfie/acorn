@@ -32,7 +32,24 @@ export type AgentSessionKind = 'interactive' | 'workflow' | 'delegated' | 'impor
 // settled result queued back on that owner (docs/managed-agents/delegation.md § Managed delegation).
 // `plugin` is a note a plugin queued through `agents:session-messenger`; its `effectivePolicy.sentBy`
 // names the plugin (docs/managed-agents/session-messages.md).
-export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin'
+export type AgentTurnSource = 'interactive' | 'workflow' | 'delegation' | 'delegation_report' | 'automation' | 'import' | 'plugin' | 'goal'
+export type AgentGoalStatus = 'active' | 'satisfied' | 'blocked' | 'paused' | 'exhausted' | 'cleared'
+export type AgentGoalBlocker = 'none' | 'missing_evidence' | 'needs_user_input' | 'run_failed' | 'external_wait' | 'goal_not_met_yet'
+export type AgentGoalVerdict = {
+  turnId: string
+  satisfied: boolean
+  blocker: AgentGoalBlocker
+  reason: string
+  evidence_summary: string
+  relied_on_assumption: boolean
+}
+export type AgentGoal = {
+  objective: string
+  status: AgentGoalStatus
+  continuations: number
+  noProgress: number
+  verdict: AgentGoalVerdict | null
+}
 export type AgentTurnStatus = 'queued' | 'dispatching' | 'active' | 'completed' | 'cancelled' | 'failed' | 'interrupted'
 export type AgentRequestKind = 'permission' | 'question' | 'elicitation' | 'workflow_gate'
 export type AgentRequestStatus = 'pending' | 'resolving' | 'resolved' | 'expired'
@@ -355,6 +372,7 @@ export type AgentSession = {
   statusAuthority: AgentStatusAuthority
   title: string
   model: string | null
+  goal?: AgentGoal | null
   config: Record<string, unknown>
   parentSessionId: string | null
   parentTurnId: string | null

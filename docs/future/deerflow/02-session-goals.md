@@ -1,6 +1,19 @@
 # Session goals
 
-Status: proposed, October 6, 2026. Not started. Part of the [DeerFlow review](./README.md).
+Completion note, October 8, 2026: Interactive, Acorn-controlled sessions now persist one goal,
+its status, counters, and last verdict. Device-only set, clear, and resume routes feed the normal
+turn queue. A bounded ledger-based check runs after the queue drains; cancellation pauses the goal,
+and recovery reuses saved verdicts and continuation keys. Desktop and TUI share the goal strip,
+composer control, and palette command. Claude uses the `haiku` alias for checks; other harnesses use
+their configured default because they expose no stable cheap alias. The service bundle ceiling rose
+by 4,000 bytes for the lazy goal coordinator. Workflow and delegated sessions remain outside this
+phase; later phases can read the additive goal fields without changing their own result rules.
+Focused goal and route tests, affected typechecks, targeted oxlint, migration and architecture checks,
+the final full suite (36 package tasks), and real desktop and TUI checks pass. The desktop check
+also verified the phase 1 same-task session reference picker, exclusion of the receiving session,
+and its draft chip and preview.
+
+Status: completed October 8, 2026. Part of the [DeerFlow review](./README.md).
 
 ## Problem and outcome
 

@@ -14,6 +14,7 @@
     "commands": [
       "task.terminal.new-claude",
       "task.terminal.new-codex",
+      "agents.goal.set",
       "agents.sessions.new",
       "source.agents.open",
       "agents.sessions.mark-read",
@@ -89,6 +90,7 @@
       "github-pull"
     ],
     "agentContexts": [
+      "agents.sessions",
       "acorn-task-context",
       "acorn-docker",
       "acorn-terminals"

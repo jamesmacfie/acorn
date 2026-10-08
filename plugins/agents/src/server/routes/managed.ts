@@ -28,6 +28,7 @@ import {
   patchAgentSessionSchema,
   patchQueuedTurnSchema,
   resolveAgentRequestSchema,
+  sessionGoalSchema,
   type CreateAgentSessionInput,
   type EnqueueAgentTurnInput,
   type ImportAgentTranscriptInput,
@@ -64,6 +65,8 @@ export type ManagedAgentsBridge = {
   listSessions(filter: SessionListFilter): Promise<AgentSessionList>
   snapshot(sessionId: string, afterSeq?: number, eventLimit?: number, foldTools?: boolean): Promise<AgentSessionSnapshot>
   referenceContext(sessionId: string): Promise<AgentContextSnapshot>
+  setGoal(sessionId: string, objective: string | null): Promise<AgentSession>
+  resumeGoal(sessionId: string): Promise<AgentSession>
   events(sessionId: string, afterSeq?: number, limit?: number, foldTools?: boolean): Promise<AgentEventPage>
   enqueueTurn(sessionId: string, input: EnqueueAgentTurnInput): Promise<AgentTurn>
   implementCodexPlan(sessionId: string, itemId: string): Promise<AgentTurn>
@@ -151,13 +154,13 @@ export const managedAgents = new Hono<AppEnv>()
   // Register before the ownership resolvers so denied callers cannot reach any runtime operation.
   // Agent execution uses the guarded delegation/workflow capabilities, never these HTTP controls.
   .on('GET', ['/providers', '/sessions/:sessionId/mcp', '/sessions/:sessionId/reference-context'], requireDevice)
-  .on('PUT', ['/sessions/:sessionId/mcp'], requireDevice)
+  .on('PUT', ['/sessions/:sessionId/mcp', '/sessions/:sessionId/goal'], requireDevice)
   .on('POST', [
     '/sessions', '/transcript-imports', '/sessions/:sessionId/turns',
     '/sessions/:sessionId/implement-plan', '/sessions/:sessionId/requests/:requestId/resolve',
     '/sessions/:sessionId/fork', '/sessions/:sessionId/compact',
     '/sessions/:sessionId/regenerate-title', '/sessions/:sessionId/handoff-terminal',
-    '/sessions/:sessionId/resume-managed', '/sessions/:sessionId/verify-imported-resume',
+    '/sessions/:sessionId/resume-managed', '/sessions/:sessionId/verify-imported-resume', '/sessions/:sessionId/goal/resume',
   ], requireDevice)
   .on('PATCH', ['/sessions/:sessionId', '/sessions/:sessionId/turns/:turnId'], requireDevice)
   .on('DELETE', ['/sessions/:sessionId'], requireDevice)
@@ -391,6 +394,13 @@ export const managedAgents = new Hono<AppEnv>()
   })
   .post('/sessions/:sessionId/regenerate-title', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.regenerateTitle(c.req.param('sessionId'))))
+  .put('/sessions/:sessionId/goal', async (c) => {
+    const parsed = sessionGoalSchema.safeParse(await c.req.json().catch(() => null))
+    if (!parsed.success) return respondError(c, 400, 'bad_request')
+    return viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.setGoal(c.req.param('sessionId'), parsed.data.objective))
+  })
+  .post('/sessions/:sessionId/goal/resume', (c) =>
+    viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.resumeGoal(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/handoff-terminal', (c) =>
     viaBridge(c, MANAGED_AGENTS, (bridge) => bridge.handoffToTerminal(c.req.param('sessionId'))))
   .post('/sessions/:sessionId/resume-managed', (c) =>

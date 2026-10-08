@@ -41,6 +41,7 @@ const METHODS = [
   'artifactContent', 'createSession', 'importTranscript', 'verifyImportedResume', 'listSessions',
   'snapshot', 'events', 'enqueueTurn', 'patchQueuedTurn', 'cancelTurn', 'resolveRequest',
   'referenceContext',
+  'setGoal', 'resumeGoal',
   'implementCodexPlan',
   'patchSession', 'fork', 'compact', 'regenerateTitle', 'deleteSession', 'handoffToTerminal', 'resumeManaged',
   'exportSession', 'wait', 'search', 'footprint', 'stopIdleNow', 'sessionMcp', 'setSessionMcp',
@@ -73,6 +74,8 @@ const executionControls = [
   ['POST', '/sessions/s1/verify-imported-resume', undefined, 'verifyImportedResume'],
   ['GET', '/sessions/s1/mcp', undefined, 'sessionMcp'],
   ['PUT', '/sessions/s1/mcp', { enabled: [] }, 'setSessionMcp'],
+  ['PUT', '/sessions/s1/goal', { objective: 'Finish the migration' }, 'setGoal'],
+  ['POST', '/sessions/s1/goal/resume', undefined, 'resumeGoal'],
 ] as const
 
 describe('managed execution requires device authority', () => {

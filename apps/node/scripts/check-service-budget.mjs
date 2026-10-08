@@ -50,7 +50,10 @@ const dist = resolve(dirFlag === -1 ? resolve(import.meta.dirname, '../dist') : 
 // load on first use. The additive tables and route callbacks add about 3 KB to registration.
 // 2026-10-08: TEMPORARY. 3,154,767 B with the uncommitted task archive work. The growth isn't traced
 // yet. Put the ceiling back to 3,153,000 once it is, or record the reason here.
-const limits = { ceiling: 3_156_000, floor: 1_000_000 }
+// 2026-10-08: session goals add durable row fields, two device routes, and the engine's settlement
+// and recovery calls. Verdict parsing and evaluation stay behind a dynamic import. The remaining
+// registration grows the static graph to 3,159,369 B, so the ceiling moves by 4 KB.
+const limits = { ceiling: 3_160_000, floor: 1_000_000 }
 
 const builtins = new Set(builtinModules)
 const isBuiltin = (specifier) => builtins.has(specifier) || builtins.has(specifier.replace(/^node:/, ''))

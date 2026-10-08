@@ -447,12 +447,21 @@ export class ManagedAgentRuntime {
     return this.titleGeneration.regenerate(sessionId)
   }
 
+  setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {
+    return this.engine.setGoal(sessionId, objective)
+  }
+
+  resumeGoal(sessionId: string): Promise<AgentSession> {
+    return this.engine.resumeGoal(sessionId)
+  }
+
   // A raised concurrency limit must wake the pump without waiting for another turn or completion.
   drainQueue(): void {
     void this.engine.pump()
   }
 
   async cancelTurn(sessionId: string, turnId?: string): Promise<void> {
+    await this.engine.pauseGoal(sessionId)
     const live = this.engine.currentSession(sessionId)
     const active = await this.store.activeTurn(sessionId)
     const target = turnId ?? active?.id

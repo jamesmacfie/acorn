@@ -44,6 +44,7 @@ import {
 } from './stateMachine'
 import { ProviderEventMaterializer } from './providerEventMaterializer'
 import { agentTurnInputText, buildForkContext } from './runtimeContext'
+import type { SessionGoalGeneration } from './sessionGoalGeneration'
 import {
   mayBeUsageLimit,
   USAGE_CONTINUATION_GRACE_MS,
@@ -218,6 +219,7 @@ export class ManagedAgentEngine {
   protected readonly turnSpans = new Map<string, SpanHandle>()
   protected readonly processes: ProviderSessionLifecycle
   protected readonly queue: QueueCoordinator
+  private goalServicePromise: Promise<SessionGoalGeneration> | null = null
   protected readonly subagentQuietMs: number
   // Each start's native skill folder, `<session id>/<generation>` (../drivers/skillFolder.ts).
   private readonly skillFolders: string
@@ -345,6 +347,39 @@ export class ManagedAgentEngine {
     this.armFootprintSample(options.footprintSampleMs ?? FOOTPRINT_SAMPLE_MS)
   }
 
+  private goals(): Promise<SessionGoalGeneration> {
+    return this.goalServicePromise ??= import('./sessionGoalGeneration').then(({ SessionGoalGeneration }) =>
+      new SessionGoalGeneration({
+        db: this.db,
+        store: this.store,
+        models: this.core.models,
+        currentUserId: this.currentUserId,
+        publish: (session) => this.emit({ channel: 'agent:session', session }),
+        enqueue: async (sessionId, prompt, key) => {
+          const outcome = await this.store.enqueueTurn(sessionId, {
+            source: 'goal', input: [{ type: 'text', text: prompt }], effectivePolicy: {}, idempotencyKey: key,
+          })
+          if (outcome.inserted) {
+            this.emit({ channel: 'agent:session', session: await this.store.requireSession(sessionId) })
+            this.emit({ channel: 'agent:turn', turn: outcome.turn })
+            void this.pump()
+          }
+        },
+      }))
+  }
+
+  async setGoal(sessionId: string, objective: string | null): Promise<AgentSession> {
+    return (await this.goals()).set(sessionId, objective)
+  }
+
+  async resumeGoal(sessionId: string): Promise<AgentSession> {
+    return (await this.goals()).resume(sessionId)
+  }
+
+  async pauseGoal(sessionId: string): Promise<void> {
+    await (await this.goals()).pause(sessionId)
+  }
+
   subscribe(listener: RuntimeListener): () => void {
     this.listeners.add(listener)
     return () => this.listeners.delete(listener)
@@ -464,6 +499,7 @@ export class ManagedAgentEngine {
     // unless a session that started since is using it.
     await (await import('../drivers/skillFolder')).sweepSkillFolders(this.skillFolders, (sessionId) => this.processes.has(sessionId))
     await this.webhooks.reconcile()
+    await (await this.goals()).recover()
     // Turns queued when the process last exited have nothing else to wake them: pump() runs on enqueue,
     // on a provider start, and when a turn settles, none of which happen on their own after a restart.
     // Not awaited, because draining spawns a provider child per session and boot waits on reconcile().
@@ -498,6 +534,7 @@ export class ManagedAgentEngine {
   private async stopEngine(): Promise<void> {
     this.stopped = true
     this.shutdown.abort(new Error('The managed agent runtime is shutting down.'))
+    if (this.goalServicePromise) await (await this.goalServicePromise).stop()
     this.processes.abortAndClearTimers()
     const queueDrain = this.queue.stop()
     // Stops at its next step. Awaited, because the database closes once stop() returns.
@@ -719,6 +756,7 @@ export class ManagedAgentEngine {
     // are deliberately not on this list, and a session with no children never holds a timer.
     if (event.type === 'subagent' || eventSubagentId(event)) this.processes.armQuiet(sessionId)
     if (settlesTurn) {
+      if (turnId) void this.goals().then((goals) => goals.check(sessionId, turnId))
       void this.pump()
     }
   }
@@ -774,7 +812,7 @@ export class ManagedAgentEngine {
       await this.record(session.id, turn.id, {
         type: 'user_message',
         text: agentTurnInputText({ ...turn, input }),
-        ...(turn.continuationInput ? { automatic: true } : {}),
+        ...(turn.continuationInput || turn.source === 'goal' ? { automatic: true } : {}),
       })
       const attachments = Object.fromEntries((await Promise.all(
         [...new Set(input.flatMap((part) =>

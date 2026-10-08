@@ -126,6 +126,8 @@ export function managedAgentsBridge(
       return { ...snapshot, events: foldTools ? foldToolEvents(events) : events }
     }),
     referenceContext: (sessionId) => guarded(async () => sessionReferenceContext(await runtime.store.exportSnapshot(sessionId))),
+    setGoal: (sessionId, objective) => guarded(() => runtime.setGoal(sessionId, objective)),
+    resumeGoal: (sessionId) => guarded(() => runtime.resumeGoal(sessionId)),
     events: (sessionId, afterSeq, limit, foldTools) => guarded(async () => {
       const page = await runtime.store.clientEventPage(sessionId, afterSeq, limit)
       const events = foldTools ? foldToolEvents(foldUsageEvents(page.events)) : page.events
